@@ -135,17 +135,20 @@ func TestCombineVariableSets(t *testing.T) {
 	ClearError()
 }
 
-func TestVectorFilterNilTableFailClosed(t *testing.T) {
-	// incomplete filter must not invent domain 100 / accept-all
-	f := &VectorFilter{table: nil, filterOut: map[int]bool{}}
-	if f.MaxProb() != 0 {
-		t.Fatal("nil table MaxProb must be 0, not invent 100")
+func TestVectorFilterNilTableMatchesCPP(t *testing.T) {
+	// VectorFilter.cpp:75–83 — ptable==nullptr → get_max_prob 100, lookup returns v
+	// kinds all set (Filter ctor) → valid in random mode
+	SetProcessOptions(Defaults())
+	f := NewVectorFilter(nil)
+	if f.MaxProb() != 100 {
+		t.Fatalf("nil ptable MaxProb: got %d want 100 (VectorFilter.cpp:75–77)", f.MaxProb())
 	}
-	if f.Lookup(5) != -1 {
-		t.Fatal("nil table Lookup must fail closed -1")
+	if f.Lookup(5) != 5 {
+		t.Fatalf("nil ptable Lookup: got %d want identity 5", f.Lookup(5))
 	}
-	if !f.Filter(0) {
-		t.Fatal("nil table Filter must reject all")
+	// empty FilterOut set → never rejects
+	if f.Filter(0) {
+		t.Fatal("empty FilterOut must not reject")
 	}
 }
 

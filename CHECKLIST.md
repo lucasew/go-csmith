@@ -30,25 +30,25 @@ Total items: 2070
 - [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.goGenerator
 - [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.initialize
 - [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.~AbsProgramGenerator
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.AbsRndNumGenerator
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.count
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.genrand
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_dec1
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_hex1
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_prefixed_name
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_sequence
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.kind
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.AbsRndNumGenerator
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.count
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.genrand
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_dec1
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_hex1
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_prefixed_name
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_sequence
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.kind
 - [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.make_rndnum_generator
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.operator=
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.RandomDigits
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.RandomHexDigits
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.rnd_flipcoin
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.rnd_upto
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.seedrand
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.trace_depth
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.~AbsRndNumGenerator
-- [ ] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDefaultRndNumGenerator
-- [ ] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDFSRndNumGenerator
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.operator=
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.RandomDigits
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.RandomHexDigits
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.rnd_flipcoin
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.rnd_upto
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.seedrand
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.trace_depth
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.~AbsRndNumGenerator
+- [x] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDefaultRndNumGenerator
+- [x] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDFSRndNumGenerator
 - [ ] ArrayVariable.cpp::ArrayVariable.add_index
 - [ ] ArrayVariable.cpp::ArrayVariable.ArrayVariable
 - [ ] ArrayVariable.cpp::ArrayVariable.build_init_recursive
@@ -125,7 +125,7 @@ Total items: 2070
 - [ ] Block.cpp::Block.set_depth_protect
 - [ ] Block.cpp::Block.visit_facts
 - [ ] Block.cpp::Block.~Block
-- [ ] Block.cpp::BlockProbability
+- [x] Block.cpp::BlockProbability
 - [ ] Block.cpp::find_block_by_id
 - [ ] Block.cpp::OutputStatementList
 - [ ] Bookkeeper.cpp::Bookkeeper.Bookkeeper
@@ -200,157 +200,157 @@ Total items: 2070
 - [ ] CGContext.cpp::CGContext.~CGContext
 - [ ] CGContext.cpp::RWDirective.find_must_use_arrays
 - [ ] CGContext.cpp::RWDirective.must_write_vars
-- [ ] CGOptions.cpp::CGOptions.accept_argc
+- [x] CGOptions.cpp::CGOptions.accept_argc
 - [ ] CGOptions.cpp::CGOptions.access_once
 - [ ] CGOptions.cpp::CGOptions.addr_taken_of_locals
-- [ ] CGOptions.cpp::CGOptions.allow_const_volatile
-- [ ] CGOptions.cpp::CGOptions.allow_int64
-- [ ] CGOptions.cpp::CGOptions.arg_structs
-- [ ] CGOptions.cpp::CGOptions.arg_unions
+- [x] CGOptions.cpp::CGOptions.allow_const_volatile
+- [x] CGOptions.cpp::CGOptions.allow_int64
+- [x] CGOptions.cpp::CGOptions.arg_structs
+- [x] CGOptions.cpp::CGOptions.arg_unions
 - [ ] CGOptions.cpp::CGOptions.array_oob_prob
-- [ ] CGOptions.cpp::CGOptions.arrays
-- [ ] CGOptions.cpp::CGOptions.avoid_signed_overflow
-- [ ] CGOptions.cpp::CGOptions.binary_constant
-- [ ] CGOptions.cpp::CGOptions.bitfields
-- [ ] CGOptions.cpp::CGOptions.blind_check_global
-- [ ] CGOptions.cpp::CGOptions.builtin_function_prob
-- [ ] CGOptions.cpp::CGOptions.builtins
-- [ ] CGOptions.cpp::CGOptions.ccomp
-- [ ] CGOptions.cpp::CGOptions.CGOptions
-- [ ] CGOptions.cpp::CGOptions.compact_output
-- [ ] CGOptions.cpp::CGOptions.compatible_check
-- [ ] CGOptions.cpp::CGOptions.compound_assignment
-- [ ] CGOptions.cpp::CGOptions.compute_hash
-- [ ] CGOptions.cpp::CGOptions.concise
-- [ ] CGOptions.cpp::CGOptions.conflict_msg
-- [ ] CGOptions.cpp::CGOptions.const_as_condition
-- [ ] CGOptions.cpp::CGOptions.const_pointers
-- [ ] CGOptions.cpp::CGOptions.const_struct_union_fields
-- [ ] CGOptions.cpp::CGOptions.consts
-- [ ] CGOptions.cpp::CGOptions.coverage_test
-- [ ] CGOptions.cpp::CGOptions.coverage_test_size
-- [ ] CGOptions.cpp::CGOptions.cpp11
-- [ ] CGOptions.cpp::CGOptions.crest
-- [ ] CGOptions.cpp::CGOptions.dangling_global_ptrs
-- [ ] CGOptions.cpp::CGOptions.dead_pointer_dereference_prob
+- [x] CGOptions.cpp::CGOptions.arrays
+- [x] CGOptions.cpp::CGOptions.avoid_signed_overflow
+- [x] CGOptions.cpp::CGOptions.binary_constant
+- [x] CGOptions.cpp::CGOptions.bitfields
+- [x] CGOptions.cpp::CGOptions.blind_check_global
+- [x] CGOptions.cpp::CGOptions.builtin_function_prob
+- [x] CGOptions.cpp::CGOptions.builtins
+- [x] CGOptions.cpp::CGOptions.ccomp
+- [x] CGOptions.cpp::CGOptions.CGOptions
+- [x] CGOptions.cpp::CGOptions.compact_output
+- [x] CGOptions.cpp::CGOptions.compatible_check
+- [x] CGOptions.cpp::CGOptions.compound_assignment
+- [x] CGOptions.cpp::CGOptions.compute_hash
+- [x] CGOptions.cpp::CGOptions.concise
+- [x] CGOptions.cpp::CGOptions.conflict_msg
+- [x] CGOptions.cpp::CGOptions.const_as_condition
+- [x] CGOptions.cpp::CGOptions.const_pointers
+- [x] CGOptions.cpp::CGOptions.const_struct_union_fields
+- [x] CGOptions.cpp::CGOptions.consts
+- [x] CGOptions.cpp::CGOptions.coverage_test
+- [x] CGOptions.cpp::CGOptions.coverage_test_size
+- [x] CGOptions.cpp::CGOptions.cpp11
+- [x] CGOptions.cpp::CGOptions.crest
+- [x] CGOptions.cpp::CGOptions.dangling_global_ptrs
+- [x] CGOptions.cpp::CGOptions.dead_pointer_dereference_prob
 - [ ] CGOptions.cpp::CGOptions.delta_input
 - [ ] CGOptions.cpp::CGOptions.delta_monitor
 - [ ] CGOptions.cpp::CGOptions.delta_output
-- [ ] CGOptions.cpp::CGOptions.depth_protect
+- [x] CGOptions.cpp::CGOptions.depth_protect
 - [ ] CGOptions.cpp::CGOptions.dfs_debug_sequence
 - [ ] CGOptions.cpp::CGOptions.dfs_exhaustive
 - [ ] CGOptions.cpp::CGOptions.disable_builtin_kinds
-- [ ] CGOptions.cpp::CGOptions.divs
+- [x] CGOptions.cpp::CGOptions.divs
 - [ ] CGOptions.cpp::CGOptions.dump_default_probabilities
 - [ ] CGOptions.cpp::CGOptions.dump_random_probabilities
 - [ ] CGOptions.cpp::CGOptions.enable_builtin_kinds
-- [ ] CGOptions.cpp::CGOptions.enable_float
+- [x] CGOptions.cpp::CGOptions.enable_float
 - [ ] CGOptions.cpp::CGOptions.enabled_builtin
 - [ ] CGOptions.cpp::CGOptions.enabled_builtin_kind
-- [ ] CGOptions.cpp::CGOptions.expand_struct
+- [x] CGOptions.cpp::CGOptions.expand_struct
 - [ ] CGOptions.cpp::CGOptions.f
-- [ ] CGOptions.cpp::CGOptions.fast_execution
-- [ ] CGOptions.cpp::CGOptions.fix_options_for_cpp
-- [ ] CGOptions.cpp::CGOptions.fixed_struct_fields
-- [ ] CGOptions.cpp::CGOptions.force_globals_static
-- [ ] CGOptions.cpp::CGOptions.force_non_uniform_array_init
+- [x] CGOptions.cpp::CGOptions.fast_execution
+- [x] CGOptions.cpp::CGOptions.fix_options_for_cpp
+- [x] CGOptions.cpp::CGOptions.fixed_struct_fields
+- [x] CGOptions.cpp::CGOptions.force_globals_static
+- [x] CGOptions.cpp::CGOptions.force_non_uniform_array_init
 - [ ] CGOptions.cpp::CGOptions.fresh_array_ctrl_var_names
-- [ ] CGOptions.cpp::CGOptions.func1_max_params
+- [x] CGOptions.cpp::CGOptions.func1_max_params
 - [ ] CGOptions.cpp::CGOptions.func_attr_flag
-- [ ] CGOptions.cpp::CGOptions.global_variables
+- [x] CGOptions.cpp::CGOptions.global_variables
 - [ ] CGOptions.cpp::CGOptions.go_delta
-- [ ] CGOptions.cpp::CGOptions.has_conflict
-- [ ] CGOptions.cpp::CGOptions.has_delta_conflict
-- [ ] CGOptions.cpp::CGOptions.has_extension_conflict
-- [ ] CGOptions.cpp::CGOptions.has_extension_support
-- [ ] CGOptions.cpp::CGOptions.has_random_based_conflict
-- [ ] CGOptions.cpp::CGOptions.hash_value_printf
-- [ ] CGOptions.cpp::CGOptions.identify_wrappers
-- [ ] CGOptions.cpp::CGOptions.inline_function
-- [ ] CGOptions.cpp::CGOptions.inline_function_prob
-- [ ] CGOptions.cpp::CGOptions.Int128
-- [ ] CGOptions.cpp::CGOptions.int8
-- [ ] CGOptions.cpp::CGOptions.int_size
-- [ ] CGOptions.cpp::CGOptions.interested_facts
-- [ ] CGOptions.cpp::CGOptions.is_random
-- [ ] CGOptions.cpp::CGOptions.jumps
-- [ ] CGOptions.cpp::CGOptions.klee
-- [ ] CGOptions.cpp::CGOptions.label_attr_flag
-- [ ] CGOptions.cpp::CGOptions.lang_cpp
-- [ ] CGOptions.cpp::CGOptions.longlong
-- [ ] CGOptions.cpp::CGOptions.mark_mutable_const
-- [ ] CGOptions.cpp::CGOptions.match_exact_qualifiers
-- [ ] CGOptions.cpp::CGOptions.math64
-- [ ] CGOptions.cpp::CGOptions.math_notmp
-- [ ] CGOptions.cpp::CGOptions.max_array_dimensions
-- [ ] CGOptions.cpp::CGOptions.max_array_length
-- [ ] CGOptions.cpp::CGOptions.max_array_length_per_dimension
-- [ ] CGOptions.cpp::CGOptions.max_array_num_in_loop
-- [ ] CGOptions.cpp::CGOptions.max_blk_depth
-- [ ] CGOptions.cpp::CGOptions.max_block_size
-- [ ] CGOptions.cpp::CGOptions.max_exhaustive_depth
-- [ ] CGOptions.cpp::CGOptions.max_expr_depth
-- [ ] CGOptions.cpp::CGOptions.max_funcs
-- [ ] CGOptions.cpp::CGOptions.max_indirect_level
-- [ ] CGOptions.cpp::CGOptions.max_nested_struct_level
-- [ ] CGOptions.cpp::CGOptions.max_params
-- [ ] CGOptions.cpp::CGOptions.max_split_files
-- [ ] CGOptions.cpp::CGOptions.max_struct_fields
-- [ ] CGOptions.cpp::CGOptions.max_union_fields
+- [x] CGOptions.cpp::CGOptions.has_conflict
+- [x] CGOptions.cpp::CGOptions.has_delta_conflict
+- [x] CGOptions.cpp::CGOptions.has_extension_conflict
+- [x] CGOptions.cpp::CGOptions.has_extension_support
+- [x] CGOptions.cpp::CGOptions.has_random_based_conflict
+- [x] CGOptions.cpp::CGOptions.hash_value_printf
+- [x] CGOptions.cpp::CGOptions.identify_wrappers
+- [x] CGOptions.cpp::CGOptions.inline_function
+- [x] CGOptions.cpp::CGOptions.inline_function_prob
+- [x] CGOptions.cpp::CGOptions.Int128
+- [x] CGOptions.cpp::CGOptions.int8
+- [x] CGOptions.cpp::CGOptions.int_size
+- [x] CGOptions.cpp::CGOptions.interested_facts
+- [x] CGOptions.cpp::CGOptions.is_random
+- [x] CGOptions.cpp::CGOptions.jumps
+- [x] CGOptions.cpp::CGOptions.klee
+- [x] CGOptions.cpp::CGOptions.label_attr_flag
+- [x] CGOptions.cpp::CGOptions.lang_cpp
+- [x] CGOptions.cpp::CGOptions.longlong
+- [x] CGOptions.cpp::CGOptions.mark_mutable_const
+- [x] CGOptions.cpp::CGOptions.match_exact_qualifiers
+- [x] CGOptions.cpp::CGOptions.math64
+- [x] CGOptions.cpp::CGOptions.math_notmp
+- [x] CGOptions.cpp::CGOptions.max_array_dimensions
+- [x] CGOptions.cpp::CGOptions.max_array_length
+- [x] CGOptions.cpp::CGOptions.max_array_length_per_dimension
+- [x] CGOptions.cpp::CGOptions.max_array_num_in_loop
+- [x] CGOptions.cpp::CGOptions.max_blk_depth
+- [x] CGOptions.cpp::CGOptions.max_block_size
+- [x] CGOptions.cpp::CGOptions.max_exhaustive_depth
+- [x] CGOptions.cpp::CGOptions.max_expr_depth
+- [x] CGOptions.cpp::CGOptions.max_funcs
+- [x] CGOptions.cpp::CGOptions.max_indirect_level
+- [x] CGOptions.cpp::CGOptions.max_nested_struct_level
+- [x] CGOptions.cpp::CGOptions.max_params
+- [x] CGOptions.cpp::CGOptions.max_split_files
+- [x] CGOptions.cpp::CGOptions.max_struct_fields
+- [x] CGOptions.cpp::CGOptions.max_union_fields
 - [ ] CGOptions.cpp::CGOptions.monitored_funcs
-- [ ] CGOptions.cpp::CGOptions.muls
+- [x] CGOptions.cpp::CGOptions.muls
 - [ ] CGOptions.cpp::CGOptions.no_delta_reduction
 - [ ] CGOptions.cpp::CGOptions.no_return_dead_ptr
-- [ ] CGOptions.cpp::CGOptions.nomain
-- [ ] CGOptions.cpp::CGOptions.null_pointer_dereference_prob
-- [ ] CGOptions.cpp::CGOptions.output_file
-- [ ] CGOptions.cpp::CGOptions.packed_struct
-- [ ] CGOptions.cpp::CGOptions.paranoid
+- [x] CGOptions.cpp::CGOptions.nomain
+- [x] CGOptions.cpp::CGOptions.null_pointer_dereference_prob
+- [x] CGOptions.cpp::CGOptions.output_file
+- [x] CGOptions.cpp::CGOptions.packed_struct
+- [x] CGOptions.cpp::CGOptions.paranoid
 - [ ] CGOptions.cpp::CGOptions.parse_string_options
 - [ ] CGOptions.cpp::CGOptions.partial_expand
-- [ ] CGOptions.cpp::CGOptions.pointer_size
-- [ ] CGOptions.cpp::CGOptions.pointers
-- [ ] CGOptions.cpp::CGOptions.post_decr_operator
-- [ ] CGOptions.cpp::CGOptions.post_incr_operator
-- [ ] CGOptions.cpp::CGOptions.pre_decr_operator
-- [ ] CGOptions.cpp::CGOptions.pre_incr_operator
-- [ ] CGOptions.cpp::CGOptions.prefix_name
+- [x] CGOptions.cpp::CGOptions.pointer_size
+- [x] CGOptions.cpp::CGOptions.pointers
+- [x] CGOptions.cpp::CGOptions.post_decr_operator
+- [x] CGOptions.cpp::CGOptions.post_incr_operator
+- [x] CGOptions.cpp::CGOptions.pre_decr_operator
+- [x] CGOptions.cpp::CGOptions.pre_incr_operator
+- [x] CGOptions.cpp::CGOptions.prefix_name
 - [ ] CGOptions.cpp::CGOptions.probability_configuration
-- [ ] CGOptions.cpp::CGOptions.quiet
-- [ ] CGOptions.cpp::CGOptions.random_based
+- [x] CGOptions.cpp::CGOptions.quiet
+- [x] CGOptions.cpp::CGOptions.random_based
 - [ ] CGOptions.cpp::CGOptions.random_random
-- [ ] CGOptions.cpp::CGOptions.resolve_exhaustive_options
-- [ ] CGOptions.cpp::CGOptions.return_structs
-- [ ] CGOptions.cpp::CGOptions.return_unions
-- [ ] CGOptions.cpp::CGOptions.safe_math_wrapper
-- [ ] CGOptions.cpp::CGOptions.sequence_name_prefix
+- [x] CGOptions.cpp::CGOptions.resolve_exhaustive_options
+- [x] CGOptions.cpp::CGOptions.return_structs
+- [x] CGOptions.cpp::CGOptions.return_unions
+- [x] CGOptions.cpp::CGOptions.safe_math_wrapper
+- [x] CGOptions.cpp::CGOptions.sequence_name_prefix
 - [ ] CGOptions.cpp::CGOptions.set_default_builtin_kinds
-- [ ] CGOptions.cpp::CGOptions.set_default_settings
+- [x] CGOptions.cpp::CGOptions.set_default_settings
 - [ ] CGOptions.cpp::CGOptions.set_platform_specific_options
 - [ ] CGOptions.cpp::CGOptions.set_vol_tests
-- [ ] CGOptions.cpp::CGOptions.signed_char_index
-- [ ] CGOptions.cpp::CGOptions.split_files_dir
-- [ ] CGOptions.cpp::CGOptions.step_hash_by_stmt
-- [ ] CGOptions.cpp::CGOptions.stop_by_stmt
-- [ ] CGOptions.cpp::CGOptions.strict_const_arrays
-- [ ] CGOptions.cpp::CGOptions.strict_float
+- [x] CGOptions.cpp::CGOptions.signed_char_index
+- [x] CGOptions.cpp::CGOptions.split_files_dir
+- [x] CGOptions.cpp::CGOptions.step_hash_by_stmt
+- [x] CGOptions.cpp::CGOptions.stop_by_stmt
+- [x] CGOptions.cpp::CGOptions.strict_const_arrays
+- [x] CGOptions.cpp::CGOptions.strict_float
 - [ ] CGOptions.cpp::CGOptions.strict_volatile_rule
 - [ ] CGOptions.cpp::CGOptions.struct_output
-- [ ] CGOptions.cpp::CGOptions.take_union_field_addr
-- [ ] CGOptions.cpp::CGOptions.type_attr_flag
-- [ ] CGOptions.cpp::CGOptions.UInt128
-- [ ] CGOptions.cpp::CGOptions.uint8
-- [ ] CGOptions.cpp::CGOptions.unary_plus_operator
-- [ ] CGOptions.cpp::CGOptions.use_comma_exprs
-- [ ] CGOptions.cpp::CGOptions.use_embedded_assigns
-- [ ] CGOptions.cpp::CGOptions.use_struct
-- [ ] CGOptions.cpp::CGOptions.use_union
-- [ ] CGOptions.cpp::CGOptions.var_attr_flag
-- [ ] CGOptions.cpp::CGOptions.vol_struct_union_fields
+- [x] CGOptions.cpp::CGOptions.take_union_field_addr
+- [x] CGOptions.cpp::CGOptions.type_attr_flag
+- [x] CGOptions.cpp::CGOptions.UInt128
+- [x] CGOptions.cpp::CGOptions.uint8
+- [x] CGOptions.cpp::CGOptions.unary_plus_operator
+- [x] CGOptions.cpp::CGOptions.use_comma_exprs
+- [x] CGOptions.cpp::CGOptions.use_embedded_assigns
+- [x] CGOptions.cpp::CGOptions.use_struct
+- [x] CGOptions.cpp::CGOptions.use_union
+- [x] CGOptions.cpp::CGOptions.var_attr_flag
+- [x] CGOptions.cpp::CGOptions.vol_struct_union_fields
 - [ ] CGOptions.cpp::CGOptions.vol_tests_mach
-- [ ] CGOptions.cpp::CGOptions.volatile_pointers
-- [ ] CGOptions.cpp::CGOptions.volatiles
-- [ ] CGOptions.cpp::CGOptions.wrap_volatiles
+- [x] CGOptions.cpp::CGOptions.volatile_pointers
+- [x] CGOptions.cpp::CGOptions.volatiles
+- [x] CGOptions.cpp::CGOptions.wrap_volatiles
 - [ ] CGOptions.cpp::CGOptions.x86_64
 - [ ] CompatibleChecker.cpp::CompatibleChecker.compatible_check
 - [ ] CompatibleChecker.cpp::CompatibleChecker.enable_compatible_check
@@ -464,28 +464,28 @@ Total items: 2070
 - [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.goGenerator
 - [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.initialize
 - [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.~DefaultProgramGenerator
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.add_number
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.DefaultRndNumGenerator
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.genrand
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.get_prefixed_name
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.get_sequence
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.kind
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.add_number
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.DefaultRndNumGenerator
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.genrand
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.get_prefixed_name
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.get_sequence
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.kind
 - [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.make_rndnum_generator
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.operator=
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.RandomDigits
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.RandomHexDigits
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.rnd_flipcoin
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.rnd_upto
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.set_rand_depth
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.trace_depth
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.~DefaultRndNumGenerator
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.operator=
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.RandomDigits
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.RandomHexDigits
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.rnd_flipcoin
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.rnd_upto
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.set_rand_depth
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.trace_depth
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.~DefaultRndNumGenerator
 - [ ] DefaultRndNumGenerator.cpp::std.find
 - [ ] DefaultRndNumGenerator.cpp::std.getenv
 - [ ] DefaultRndNumGenerator.cpp::std.next_permutation
 - [ ] DefaultRndNumGenerator.cpp::std.strcmp
 - [ ] DefaultRndNumGenerator.cpp::std.string
 - [ ] DefaultRndNumGenerator.cpp::std.to_string
-- [ ] DefaultRndNumGenerator.cpp::csmith_trace_rng_enabled
+- [x] DefaultRndNumGenerator.cpp::csmith_trace_rng_enabled
 - [ ] DepthSpec.cpp::DepthSpec.backtracking
 - [ ] DepthSpec.cpp::DepthSpec.depth_guard_by_depth
 - [ ] DepthSpec.cpp::DepthSpec.depth_guard_by_type
@@ -700,12 +700,12 @@ Total items: 2070
 - [ ] Enumerator.h::reset_changed
 - [ ] Enumerator.h::reset_pos
 - [ ] Enumerator.h::roll_back_current_pos
-- [ ] Error.cpp::Error.Error
-- [ ] Error.cpp::Error.get_error
-- [ ] Error.cpp::Error.operator=
-- [ ] Error.cpp::Error.set_error
-- [ ] Error.cpp::Error.~Error
-- [ ] Error.cpp::get_error
+- [x] Error.cpp::Error.Error
+- [x] Error.cpp::Error.get_error
+- [x] Error.cpp::Error.operator=
+- [x] Error.cpp::Error.set_error
+- [x] Error.cpp::Error.~Error
+- [x] Error.cpp::get_error
 - [ ] Expression.cpp::eBinaryOp
 - [ ] Expression.cpp::eBinaryOp.eAdd
 - [ ] Expression.cpp::eBinaryOp.eSub
@@ -986,16 +986,16 @@ Total items: 2070
 - [ ] FactUnion.cpp::FactUnion.set_top
 - [ ] FactUnion.cpp::FactUnion.set_var
 - [ ] FactUnion.cpp::FactUnion.~FactUnion
-- [ ] Filter.cpp::Filter.current_kind
-- [ ] Filter.cpp::Filter.disable
-- [ ] Filter.cpp::Filter.enable
-- [ ] Filter.cpp::Filter.filter
-- [ ] Filter.cpp::Filter.Filter
-- [ ] Filter.cpp::Filter.valid_filter
-- [ ] Filter.cpp::Filter.~Filter
-- [ ] Filter.cpp::FilterKind.fDefault
-- [ ] Filter.cpp::FilterKind.fDFS
-- [ ] Filter.cpp::FilterKind.MAX_FILTER_KIND_SIZE
+- [x] Filter.cpp::Filter.current_kind
+- [x] Filter.cpp::Filter.disable
+- [x] Filter.cpp::Filter.enable
+- [x] Filter.cpp::Filter.filter
+- [x] Filter.cpp::Filter.Filter
+- [x] Filter.cpp::Filter.valid_filter
+- [x] Filter.cpp::Filter.~Filter
+- [x] Filter.cpp::FilterKind.fDefault
+- [x] Filter.cpp::FilterKind.fDFS
+- [x] Filter.cpp::FilterKind.MAX_FILTER_KIND_SIZE
 - [ ] Finalization.cpp::Finalization.doFinalization
 - [ ] Finalization.cpp::Finalization.Finalization
 - [ ] Finalization.cpp::Finalization.~Finalization
@@ -1267,14 +1267,14 @@ Total items: 2070
 - [ ] Probabilities.cpp::Probabilities.dump_default_probabilities
 - [ ] Probabilities.cpp::Probabilities.get_binary_ops_prob_filter
 - [ ] Probabilities.cpp::Probabilities.get_pname
-- [ ] Probabilities.cpp::Probabilities.get_prob
+- [x] Probabilities.cpp::Probabilities.get_prob
 - [ ] Probabilities.cpp::Probabilities.get_prob_filter
 - [ ] Probabilities.cpp::Probabilities.get_random_single_prob
 - [ ] Probabilities.cpp::Probabilities.get_sname
-- [ ] Probabilities.cpp::Probabilities.GetInstance
-- [ ] Probabilities.cpp::Probabilities.initialize
+- [x] Probabilities.cpp::Probabilities.GetInstance
+- [x] Probabilities.cpp::Probabilities.initialize
 - [ ] Probabilities.cpp::Probabilities.initialize_group_probs
-- [ ] Probabilities.cpp::Probabilities.initialize_single_probs
+- [x] Probabilities.cpp::Probabilities.initialize_single_probs
 - [ ] Probabilities.cpp::Probabilities.parse_configuration
 - [ ] Probabilities.cpp::Probabilities.parse_group_probabilities
 - [ ] Probabilities.cpp::Probabilities.parse_line
@@ -1411,8 +1411,8 @@ Total items: 2070
 - [ ] Probabilities.cpp::SingleProbElem.dump_default
 - [ ] Probabilities.cpp::SingleProbElem.dump_val
 - [ ] Probabilities.cpp::SingleProbElem.get_all_values
-- [ ] Probabilities.cpp::SingleProbElem.get_prob
-- [ ] Probabilities.cpp::SingleProbElem.get_prob_direct
+- [x] Probabilities.cpp::SingleProbElem.get_prob
+- [x] Probabilities.cpp::SingleProbElem.get_prob_direct
 - [ ] Probabilities.cpp::SingleProbElem.is_equal
 - [ ] Probabilities.cpp::SingleProbElem.set_prob
 - [ ] Probabilities.cpp::SingleProbElem.set_prob_table
@@ -2067,14 +2067,14 @@ Total items: 2070
 - [ ] VariableSelector.cpp::RandomParamName
 - [ ] VariableSelector.cpp::VariableCreationProbability
 - [ ] VariableSelector.cpp::VariableSelectionProbability
-- [ ] VectorFilter.cpp::Mode.FilterOut
-- [ ] VectorFilter.cpp::Mode.Keep
-- [ ] VectorFilter.cpp::VectorFilter.add
-- [ ] VectorFilter.cpp::VectorFilter.filter
-- [ ] VectorFilter.cpp::VectorFilter.get_max_prob
-- [ ] VectorFilter.cpp::VectorFilter.lookup
-- [ ] VectorFilter.cpp::VectorFilter.Mode
-- [ ] VectorFilter.cpp::VectorFilter.Mode.FilterOut
-- [ ] VectorFilter.cpp::VectorFilter.Mode.Keep
-- [ ] VectorFilter.cpp::VectorFilter.VectorFilter
-- [ ] VectorFilter.cpp::VectorFilter.~VectorFilter
+- [x] VectorFilter.cpp::Mode.FilterOut
+- [x] VectorFilter.cpp::Mode.Keep
+- [x] VectorFilter.cpp::VectorFilter.add
+- [x] VectorFilter.cpp::VectorFilter.filter
+- [x] VectorFilter.cpp::VectorFilter.get_max_prob
+- [x] VectorFilter.cpp::VectorFilter.lookup
+- [x] VectorFilter.cpp::VectorFilter.Mode
+- [x] VectorFilter.cpp::VectorFilter.Mode.FilterOut
+- [x] VectorFilter.cpp::VectorFilter.Mode.Keep
+- [x] VectorFilter.cpp::VectorFilter.VectorFilter
+- [x] VectorFilter.cpp::VectorFilter.~VectorFilter

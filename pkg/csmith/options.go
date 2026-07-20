@@ -625,8 +625,11 @@ func (o Options) Validate() error {
 	if o.DeltaMonitor != "" && o.GoDelta != "" {
 		return fmt.Errorf("you cannot specify --delta-monitor and --go-delta monitor at the same time")
 	}
-	if o.MaxSplitFiles > 0 && o.SplitFilesDir == "" {
+	// CGOptions.cpp:525–532 — empty split_files_dir → "./output"; create only if max_split_files>0
+	if o.SplitFilesDir == "" {
 		o.SplitFilesDir = "./output"
+	}
+	if o.MaxSplitFiles > 0 {
 		if err := os.MkdirAll(o.SplitFilesDir, 0o755); err != nil {
 			return fmt.Errorf("cannot create dir for split files: %w", err)
 		}

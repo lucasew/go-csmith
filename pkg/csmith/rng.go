@@ -17,6 +17,27 @@ const (
 	lcgMask uint64 = (1 << 48) - 1
 )
 
+// AbsRndNumGenerator.cpp:50–52 — alphabet tables (get_hex1 / get_dec1).
+const (
+	// HexAlphabet is AbsRndNumGenerator::hex1 / get_hex1().
+	HexAlphabet = "0123456789ABCDEF"
+	// DecAlphabet is AbsRndNumGenerator::dec1 / get_dec1().
+	DecAlphabet = "0123456789"
+)
+
+// RngKind mirrors RNDNUM_GENERATOR (AbsRndNumGenerator.h).
+type RngKind int
+
+const (
+	// RngKindDefault is RNDNUM_GENERATOR::rDefaultRndNumGenerator.
+	RngKindDefault RngKind = 0
+	// RngKindDFS is RNDNUM_GENERATOR::rDFSRndNumGenerator.
+	RngKindDFS RngKind = 1
+)
+
+// RngKindCount is AbsRndNumGenerator::count() → MAX_RNDNUM_GENERATOR.
+const RngKindCount = int(RngKindDFS) + 1
+
 // Filter mirrors Filter::filter — true means reject this candidate.
 // DefaultRndNumGenerator.cpp rnd_upto / rnd_flipcoin.
 type Filter interface {
@@ -28,6 +49,9 @@ type Filter interface {
 type Rng struct {
 	state     uint64
 	randDepth uint64
+
+	// traceString mirrors DefaultRndNumGenerator::trace_string_ (where labels).
+	traceString string
 
 	trace   bool
 	traceTo io.Writer
@@ -186,11 +210,10 @@ func (r *Rng) RandomHexDigits(num int) string {
 	if num <= 0 {
 		return ""
 	}
-	const hex1 = "0123456789ABCDEF"
 	b := make([]byte, 0, num)
 	for i := 0; i < num; i++ {
 		x := r.Genrand() % 16
-		b = append(b, hex1[x])
+		b = append(b, HexAlphabet[x])
 		r.randDepth++
 	}
 	return string(b)
@@ -206,14 +229,56 @@ func (r *Rng) RandomDigits(num int) string {
 	if num <= 0 {
 		return ""
 	}
-	const dec1 = "0123456789"
 	b := make([]byte, 0, num)
 	for i := 0; i < num; i++ {
 		x := r.Genrand() % 10
-		b = append(b, dec1[x])
+		b = append(b, DecAlphabet[x])
 		r.randDepth++
 	}
 	return string(b)
+}
+
+// Kind is DefaultRndNumGenerator::kind → rDefaultRndNumGenerator.
+func (r *Rng) Kind() RngKind {
+	if r == nil {
+		SetError(ErrGeneric)
+		return RngKindDefault
+	}
+	return RngKindDefault
+}
+
+// GetPrefixedNameDefault is DefaultRndNumGenerator::get_prefixed_name — identity.
+// DefaultRndNumGenerator.cpp:105–107.
+func GetPrefixedNameDefault(name string) string { return name }
+
+// TraceDepth is DefaultRndNumGenerator::trace_depth (where-string accumulator).
+// Random-mode default does not append where labels unless callers use where;
+// Go Rng keeps an empty string unless extended.
+func (r *Rng) TraceDepth() string {
+	if r == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return r.traceString
+}
+
+// GetSequence is DefaultRndNumGenerator::get_sequence.
+// Sequence bookkeeping is a no-op in default mode (add_number empty); returns "".
+func (r *Rng) GetSequence() string {
+	if r == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return ""
+}
+
+// SetRandDepth is DefaultRndNumGenerator::set_rand_depth.
+func (r *Rng) SetRandDepth(depth uint64) {
+	if r == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	r.randDepth = depth
 }
 
 // filterFunc adapts a function to Filter.

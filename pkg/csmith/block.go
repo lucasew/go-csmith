@@ -371,20 +371,19 @@ func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 // Block.cpp:87–93 — VectorFilter Keep on {block_size-1} then
 // filter.disable(fDefault). In random mode valid_filter() is false so
 // filter() never rejects → uniform rnd_upto(block_size) in [0, block_size).
-// No soft invent always block_size-1 (that would force max statements).
 func BlockProbability(blockSize int, r *Rng) int {
 	if blockSize < 1 {
 		return 0
 	}
 	if r == nil {
-		// C++ always has RNG; sticky fail-closed → 0 (no invent fixed size draw)
+		// C++ always has RNG; sticky fail-closed → 0
 		SetError(ErrGeneric)
 		return 0
 	}
-	// Block.cpp:92 — rnd_upto(block.block_size(), &filter) with filter inert
-	v := int(r.RndUpto(uint32(blockSize)))
-	// ERROR_GUARD path: caller checks HasError after BlockProbability
-	return v
+	// Block.cpp:88–92 — Keep {block_size-1}, disable fDefault, rnd_upto
+	f := NewVectorFilterItems([]int{blockSize - 1}, FilterModeKeep)
+	f.Disable(FilterKindDefault)
+	return int(r.RndUptoFilter(uint32(blockSize), f))
 }
 
 // MakeRandomBlock mirrors Block::make_random.

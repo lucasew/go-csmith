@@ -184,3 +184,158 @@ func TestRngNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+// --- AbsRndNumGenerator / DefaultRndNumGenerator component contracts ---
+// CHECKLIST: AbsRndNumGenerator.cpp::*, DefaultRndNumGenerator.cpp::*
+
+func TestAbsRndNumAlphabetTables(t *testing.T) {
+	// AbsRndNumGenerator.cpp:50–52, get_hex1 / get_dec1
+	if HexAlphabet != "0123456789ABCDEF" {
+		t.Fatalf("get_hex1: got %q", HexAlphabet)
+	}
+	if DecAlphabet != "0123456789" {
+		t.Fatalf("get_dec1: got %q", DecAlphabet)
+	}
+}
+
+func TestAbsRndNumGeneratorCount(t *testing.T) {
+	// AbsRndNumGenerator::count → MAX_RNDNUM_GENERATOR = rDFS + 1
+	if RngKindCount != 2 {
+		t.Fatalf("count: got %d want 2", RngKindCount)
+	}
+	if RngKindDefault != 0 || RngKindDFS != 1 {
+		t.Fatalf("RNDNUM_GENERATOR enum order: default=%d dfs=%d", RngKindDefault, RngKindDFS)
+	}
+}
+
+func TestDefaultRndKind(t *testing.T) {
+	// DefaultRndNumGenerator::kind
+	r := NewRng(2)
+	if r.Kind() != RngKindDefault {
+		t.Fatalf("kind: got %d want Default", r.Kind())
+	}
+}
+
+func TestDefaultGetPrefixedNameIdentity(t *testing.T) {
+	// DefaultRndNumGenerator.cpp:105–107 — returns name unchanged
+	if got := GetPrefixedNameDefault("g_42"); got != "g_42" {
+		t.Fatalf("get_prefixed_name: got %q", got)
+	}
+	// random.cpp get_prefixed_name with prefix_name off
+	if got := GetPrefixedName("g_42", false); got != "g_42" {
+		t.Fatalf("prefix off: got %q", got)
+	}
+	// prefix on + default RNG still identity
+	if got := GetPrefixedName("g_42", true); got != "g_42" {
+		t.Fatalf("prefix on default: got %q", got)
+	}
+}
+
+func TestDefaultTraceDepthAndSequenceEmpty(t *testing.T) {
+	// DefaultRndNumGenerator::trace_depth starts empty; get_sequence empty when Sequence add_number is no-op
+	r := NewRng(2)
+	if r.TraceDepth() != "" {
+		t.Fatalf("trace_depth initial: %q", r.TraceDepth())
+	}
+	if r.GetSequence() != "" {
+		t.Fatalf("get_sequence default: %q", r.GetSequence())
+	}
+}
+
+func TestSetRandDepth(t *testing.T) {
+	// DefaultRndNumGenerator::set_rand_depth
+	r := NewRng(2)
+	r.SetRandDepth(42)
+	if r.RandDepth() != 42 {
+		t.Fatalf("set_rand_depth: got %d want 42", r.RandDepth())
+	}
+	_ = r.RndUpto(3)
+	if r.RandDepth() != 43 {
+		t.Fatalf("after rnd_upto from 42: got %d want 43", r.RandDepth())
+	}
+}
+
+func TestRandomHexDigitsMulti(t *testing.T) {
+	// DefaultRndNumGenerator::RandomHexDigits — per-digit genrand%16, depth++ each
+	// seed2: raw0=1959434203%16=11→B, raw1=341627945%16=9→9
+	r := NewRng(2)
+	got := r.RandomHexDigits(2)
+	if got != "B9" {
+		t.Fatalf("RandomHexDigits(2) seed2: got %q want B9", got)
+	}
+	if r.RandDepth() != 2 {
+		t.Fatalf("rand_depth after 2 hex: got %d want 2", r.RandDepth())
+	}
+	// zero / negative → empty, no draw
+	r2 := NewRng(2)
+	if r2.RandomHexDigits(0) != "" || r2.RandomHexDigits(-1) != "" {
+		t.Fatal("RandomHexDigits(<=0) must be empty")
+	}
+	if r2.RandDepth() != 0 {
+		t.Fatal("RandomHexDigits(<=0) must not burn depth")
+	}
+}
+
+func TestRandomDigitsMulti(t *testing.T) {
+	// seed2: 1959434203%10=3, 341627945%10=5 → "35"
+	r := NewRng(2)
+	got := r.RandomDigits(2)
+	if got != "35" {
+		t.Fatalf("RandomDigits(2) seed2: got %q want 35", got)
+	}
+	if r.RandDepth() != 2 {
+		t.Fatalf("rand_depth after 2 digits: got %d want 2", r.RandDepth())
+	}
+}
+
+func TestRndFlipcoinFilterForceFalse(t *testing.T) {
+	// DefaultRndNumGenerator::rnd_flipcoin: filter(1) → return false without genrand
+	r := NewRng(2)
+	if r.RndFlipcoinFilter(50, RejectEQ(1)) {
+		t.Fatal("filter reject 1: want false without draw")
+	}
+	r2 := NewRng(2)
+	want := r2.Genrand()
+	if got := r.Genrand(); got != want {
+		t.Fatalf("after force-false flipcoin, Genrand desynced: got %d want %d", got, want)
+	}
+}
+
+func TestRndFlipcoinP0And100(t *testing.T) {
+	// p=0 → always false; p=100 → always true (genrand still burned)
+	r := NewRng(2)
+	if r.RndFlipcoin(0) {
+		t.Fatal("RndFlipcoin(0) want false")
+	}
+	r = NewRng(2)
+	if !r.RndFlipcoin(100) {
+		t.Fatal("RndFlipcoin(100) want true")
+	}
+	// clamp p>100 to 100 (C++ asserts p<=100; non-assert builds use clamp safety)
+	r = NewRng(2)
+	if !r.RndFlipcoin(150) {
+		t.Fatal("RndFlipcoin(150) clamped to 100 want true")
+	}
+}
+
+func TestSeedrandIndependence(t *testing.T) {
+	// AbsRndNumGenerator::seedrand — each NewRng(seed) reseeds independently (srand48)
+	a := NewRng(7)
+	b := NewRng(7)
+	for i := 0; i < 5; i++ {
+		if a.Genrand() != b.Genrand() {
+			t.Fatalf("same seed diverged at i=%d", i)
+		}
+	}
+	c := NewRng(8)
+	a = NewRng(7)
+	if a.Genrand() == c.Genrand() {
+		// extremely unlikely equal; if equal still ok for this weak check — compare sequences
+	}
+	// stronger: full first value differs for seed 7 vs 8
+	a = NewRng(7)
+	c = NewRng(8)
+	if a.Genrand() == c.Genrand() {
+		t.Fatal("seed 7 and 8 should not share first genrand")
+	}
+}

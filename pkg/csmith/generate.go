@@ -24,6 +24,12 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 			opts = resolved
 		}
 	}
+	// RandomProgramGenerator.cpp — fix_options_for_cpp / resolve_exhaustive side effects
+	// then CGOptions::has_conflict() before generation.
+	opts = opts.normalizeUpstreamFlow()
+	if err := opts.Validate(); err != nil {
+		return "", err
+	}
 	// Error::set_error(SUCCESS) for a clean generation run
 	ClearError()
 	// Type::SizeInBytes uses platform integer/pointer sizes

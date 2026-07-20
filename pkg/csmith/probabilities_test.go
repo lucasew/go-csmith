@@ -3,23 +3,39 @@ package csmith
 import "testing"
 
 func TestSingleProbsDefaults(t *testing.T) {
-	// Probabilities::initialize_single_probs with default CGOptions flags.
+	// Probabilities.cpp:478–585 initialize_single_probs — full default map vs C++.
 	p := NewProbabilities(Defaults())
 	want := map[ProbName]int{
-		PMoreStructUnionProb:    50,
-		PBitFieldsCreationProb:  50,
-		PRegularVolatileProb:    50, // volatiles on
-		PRegularConstProb:       10, // consts on
-		PSelectDerefPointerProb: 80, // pointers on
-		PNewArrayVariableProb:   20, // arrays on
-		PFloatAsLTypeProb:       0,  // float off
-		PInlineFunctionProb:     50,
-		PBuiltinFunctionProb:    50,
-		PPointerAsLTypeProb:     50,
-		PFieldVolatileProb:      30,
-		PFieldConstProb:         20,
-		PStdUnaryFuncProb:       5,
-		PBinaryConstProb:        3,
+		PMoreStructUnionProb:            50,
+		PBitFieldsCreationProb:          50,
+		PBitFieldInNormalStructProb:     10,
+		PScalarFieldInFullBitFieldsProb: 10,
+		PExhaustiveBitFieldsProb:        10,
+		PBitFieldsSignedProb:            50,
+		PSafeOpsSignedProb:              50,
+		PFuncAttrProb:                   30,
+		PTypeAttrProb:                   50,
+		PLabelAttrProb:                  30,
+		PVarAttrProb:                    30,
+		PBinaryConstProb:                3,
+		PRegularVolatileProb:            50, // volatiles on
+		PRegularConstProb:               10, // consts on
+		PStricterConstProb:              50,
+		PLooserConstProb:                50,
+		PFieldVolatileProb:              30, // vol + vol_struct_union + globals
+		PFieldConstProb:                 20, // consts + const_struct_union_fields
+		PStdUnaryFuncProb:               5,
+		PShiftByNonConstantProb:         50,
+		PStructAsLTypeProb:              30,
+		PUnionAsLTypeProb:               25,
+		PFloatAsLTypeProb:               0, // float off
+		PNewArrayVariableProb:           20,
+		PPointerAsLTypeProb:             50,
+		PSelectDerefPointerProb:         80,
+		PAccessOnceVariableProb:         20,
+		PInlineFunctionProb:             50, // CGOptions::inline_function_prob
+		PBuiltinFunctionProb:            50, // CGOptions::builtin_function_prob
+		PArrayOOBProb:                   0,
 	}
 	for name, w := range want {
 		if got := p.Single(name); got != w {
