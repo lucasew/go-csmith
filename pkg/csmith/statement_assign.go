@@ -194,7 +194,7 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:131–140 — running effect + separate RHS/LHS accum
 	runningEff := cg.EffectContext()
 	rhsAccum := EmptyEffect()
-	rhsCG := *cg
+	rhsCG := cg.CloneSubcontext()
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = EmptyEffect()
@@ -342,7 +342,7 @@ func MakeRandomAssignQfer(
 
 	// LHS context after RHS (StatementAssign.cpp:185–199)
 	lhsAccum := EmptyEffect()
-	lhsCG := *cg
+	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = runningEff
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = rhsCG.EffectStm
@@ -1002,7 +1002,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			paramAccum := EmptyEffect()
-			paramCG := *cg
+			paramCG := cg.CloneSubcontext()
 			paramCG.effectContext = running
 			paramCG.EffectAccum = &paramAccum
 			if !VisitFactsExpression(arg, &paramCG, opts) {
@@ -1160,7 +1160,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	rhsAccum := EmptyEffect()
-	rhsCG := *cg
+	rhsCG := cg.CloneSubcontext()
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = cg.EffectStm
@@ -1210,7 +1210,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 
 	// StatementAssign.cpp:379–384 — LHS context
 	lhsAccum := EmptyEffect()
-	lhsCG := *cg
+	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = runningEff
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = rhsCG.EffectStm

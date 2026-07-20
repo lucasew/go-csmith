@@ -550,9 +550,10 @@ func (f *Function) generateBodyCore(
 	f.BuildState = BuildBuilding
 
 	// Function.cpp:633–634 / 675–676 — CGContext(this, prev.effect_context, &effect_accum)
-	// Constructor: current_func=this, blk_depth(0), expr_depth(0), flags(0) [or flags=0 later].
-	// Do not invent inherit caller's BlkDepth (seed-2 e502: filter max-depth-5 while
-	// upstream still accepted For at lower depth after nested func body gen).
+	// Constructor: current_func=this, blk_depth(0), expr_depth(0), flags(0),
+	// iv_bounds() empty — not a copy of caller's loop IVs.
+	// Inheriting BlkDepth hit max-depth filters early (seed-2 e502).
+	// Inheriting IVBounds inflated ItemizeArray ok_ivs (seed-2 e716 n=4 vs n=2).
 	bodyEff := EmptyEffect()
 	if prev.EffectAccum != nil {
 		// known-params path: caller already points EffectAccum at callee accum
@@ -565,6 +566,7 @@ func (f *Function) generateBodyCore(
 	cg.Flags = 0
 	cg.BlkDepth = 0
 	cg.ExprDepth = 0
+	cg.IVBounds = nil
 	// Function.cpp:635 / 677 — extend_call_chain
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual

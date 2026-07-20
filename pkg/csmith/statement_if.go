@@ -135,7 +135,9 @@ func MakeRandomIf(
 	}
 
 	thenEff := pre
-	thenCG := *cg
+	// CGContext copy for then-arm: independent iv_bounds (C++ same ref, but
+	// Go must not share map with else/parent — CloneSubcontext).
+	thenCG := cg.CloneSubcontext()
 	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
 	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
@@ -169,7 +171,7 @@ func MakeRandomIf(
 	}
 
 	elseEff := pre
-	elseCG := *cg
+	elseCG := cg.CloneSubcontext()
 	elseCG.EffectAccum = &elseEff
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
 	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false

@@ -493,7 +493,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// visit body
 	savedGlobal := fm.GlobalFacts
 	fm.GlobalFacts = *facts
-	bodyCG := *cg
+	bodyCG := cg.CloneSubcontext()
 	bodyCG.CurrentFunc = f
 	bodyCG.FM = fm
 	ok := VisitFactsBlock(f.Body, &bodyCG, opts)

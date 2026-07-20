@@ -78,6 +78,38 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	ClearError()
 }
 
+func TestGenerateBodyClearsIVBounds(t *testing.T) {
+	// Function.cpp:633 — new CGContext has empty iv_bounds, not caller's loops
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	vs := NewVariableSelector(opts)
+	iv := CreateVariableScalars("g_iv", GetIntType(), false, false)
+	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
+	_ = caller.ensurePairedFactMgr()
+	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(caller.PairedFactMgr())
+	prev.AddIVBound(iv, 0) // leftover loop IV as if caller nested
+	if len(prev.IVBounds) != 1 {
+		t.Fatal(prev.IVBounds)
+	}
+	callee := &Function{Name: "func_2", ReturnType: GetIntType()}
+	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	_ = callee.ensurePairedFactMgr()
+	callee.GenerateBody(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	// caller map still has IV; callee generation must not keep sharing that map
+	if _, ok := prev.IVBounds[iv]; !ok {
+		t.Fatal("caller IVBounds must remain")
+	}
+	if callee.BuildState != BuildBuilt {
+		t.Fatal(callee.BuildState)
+	}
+	// After body gen, prev still has its IV (not cleared by callee)
+	if len(prev.IVBounds) != 1 {
+		t.Fatalf("caller IVBounds mutated: %v", prev.IVBounds)
+	}
+	ClearError()
+}
+
 func TestGenerateBodyBuiltinDummy(t *testing.T) {
 	opts := Defaults()
 	f := &Function{

@@ -267,7 +267,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementIf.cpp:170–173 — true branch from post-cond facts
 	thenAccum := preAccum
-	thenCG := *cg
+	thenCG := cg.CloneSubcontext()
 	thenCG.EffectAccum = &thenAccum
 	if !VisitFactsBlock(st.Then, &thenCG, opts) {
 		return false
@@ -296,7 +296,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 
 	// StatementIf.cpp:174–177 — false branch
 	elseAccum := preAccum
-	elseCG := *cg
+	elseCG := cg.CloneSubcontext()
 	elseCG.EffectAccum = &elseAccum
 	if !VisitFactsBlock(st.Else, &elseCG, opts) {
 		return false
@@ -512,7 +512,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	cg.AddIVBound(iv, 0)
 	defer cg.RemoveIVBound(iv)
 	// StatementFor.cpp:445–449 — body under IN_LOOP (body uses shared accum)
-	bodyCG := *cg
+	bodyCG := cg.CloneSubcontext()
 	bodyCG.Flags |= FlagInLoop
 	if !VisitFactsBlock(st.Then, &bodyCG, opts) {
 		return false
@@ -719,7 +719,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	if HasError() {
 		return false
 	}
-	bodyCG := *cg
+	bodyCG := cg.CloneSubcontext()
 	bodyCG.Flags |= FlagInLoop
 	// add all IVs as bounds for body analysis
 	for _, iv := range ivs {

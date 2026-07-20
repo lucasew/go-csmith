@@ -545,7 +545,7 @@ func BuildUserInvocation(
 		qfer := &q
 		// FunctionInvocationUser.cpp:252–254 — param_cg(cg, running_eff_context, &param_eff_accum)
 		paramAccum := EmptyEffect()
-		paramCG := *cg
+		paramCG := cg.CloneSubcontext()
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
@@ -617,7 +617,7 @@ func BuildUserInvocation(
 			fi.Failed = true
 			return fi
 		}
-		newCG := *cg
+		newCG := cg.CloneSubcontext()
 		newCG.effectContext = effectContext
 		newCG.EffectAccum = &effectAccum
 		// keep caller FM for global_facts input; RevisitUserInvocation swaps CurrentFunc
@@ -754,7 +754,8 @@ func BuildInvocationAndFunction(
 		q := p.Qfer
 		qfer := &q
 		paramAccum := EmptyEffect()
-		paramCG := *cg
+		// CGContext.cpp:74–82 — param context deep-copies iv_bounds
+		paramCG := cg.CloneSubcontext()
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
@@ -836,7 +837,7 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
 	effectAccum := EmptyEffect()
-	bodyCG := *cg
+	bodyCG := cg.CloneSubcontext()
 	bodyCG.CurrentFunc = callee
 	bodyCG.FM = calFM
 	bodyCG.Flags = 0
@@ -1070,7 +1071,7 @@ func MakeRandomBinaryInvocation(
 
 	// FunctionInvocation.cpp:208–216 — LHS under dedicated accum + ambient effect_context
 	lhsAccum := EmptyEffect()
-	lhsCG := *cg
+	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = cg.EffectContext()
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()
@@ -1146,7 +1147,7 @@ func MakeRandomBinaryInvocation(
 			// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
 			// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 			rhsAccum := EmptyEffect()
-			rhsCG := *cg
+			rhsCG := cg.CloneSubcontext()
 			rhsCtx := cg.EffectContext().AddEffectOpts(lhsAccum, true)
 			if !EffectComplete(rhsCtx) {
 				SetError(ErrGeneric)
@@ -1299,7 +1300,7 @@ func MakeRandomBinaryPtrComparison(
 	}
 	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func=true
 	lhsAccum := EmptyEffect()
-	lhsCG := *cg
+	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = cg.EffectContext()
 	lhsCG.Flags |= FlagNoDanglingPtr
 	lhsCG.EffectAccum = &lhsAccum
@@ -1335,7 +1336,7 @@ func MakeRandomBinaryPtrComparison(
 		cg.Flags = oldFlags
 	} else {
 		rhsAccum := EmptyEffect()
-		rhsCG := *cg
+		rhsCG := cg.CloneSubcontext()
 		// FunctionInvocation.cpp:338–342 — effect_context + lhs_eff_accum
 		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 		rhsCtx := cg.EffectContext().AddEffect(lhsAccum)

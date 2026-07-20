@@ -307,8 +307,26 @@ func (c CGContext) InLoop() bool { return c.Flags&FlagInLoop != 0 }
 func (c CGContext) NoDanglingPtr() bool { return c.Flags&FlagNoDanglingPtr != 0 }
 
 // WithFlags returns a copy with additional flags OR'd in.
+// IVBounds is deep-copied (see CloneSubcontext) so loop-body contexts do not
+// share the caller's map pointer.
 func (c CGContext) WithFlags(f uint) CGContext {
+	c = c.CloneSubcontext()
 	c.Flags |= f
+	return c
+}
+
+// CloneSubcontext returns a value copy whose iv_bounds map is independent.
+// C++ CGContext copy constructors deep-copy std::map iv_bounds (CGContext.cpp:74–100).
+// A shallow Go struct copy would share the map: AddIVBound/RemoveIVBound on a child
+// context then leaks/strips IVs on the parent (ItemizeArray ok_ivs n inflated).
+func (c CGContext) CloneSubcontext() CGContext {
+	if c.IVBounds != nil {
+		m := make(map[*Variable]int, len(c.IVBounds))
+		for k, v := range c.IVBounds {
+			m[k] = v
+		}
+		c.IVBounds = m
+	}
 	return c
 }
 

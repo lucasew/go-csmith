@@ -190,7 +190,7 @@ func MakeRandomArrayLoop(
 		MustWriteVars: allMustWrites,
 	}
 	// CGContext(loop, &rwd, nullptr, 0) — no outer IV
-	loopCG := *cg
+	loopCG := cg.CloneSubcontext()
 	loopCG.RW = rwd
 	loopCG.MustUseArrays = avs
 	// StatementFor.cpp:344–346 — make_random → StatementFor* (not StatementArrayOp)

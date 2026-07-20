@@ -335,7 +335,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			}
 			boundOf[iv] = bound
 		}
-		v := ChooseOKVar(r, ok)
+			v := ChooseOKVar(r, ok)
 		if v == nil {
 			return nil
 		}
