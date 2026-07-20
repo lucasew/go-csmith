@@ -2,11 +2,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import (
-	"fmt"
-	"os"
-	"strings"
-)
+import "strings"
 
 // stmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
 // StatementGoto.cpp:55, 224–229.
@@ -664,15 +660,6 @@ func MakeRandomGoto(
 					SetError(ErrGeneric)
 				}
 				return makeGotoFailed()
-			}
-			if os.Getenv("CSMITH_DUMP_EV") == "1" {
-				has := false
-				for _, f := range stmInMerged {
-					if f != nil && f.Var != nil && f.Var.Name == "l_432" {
-						has = true
-					}
-				}
-				fmt.Fprintf(os.Stderr, "GOTO makeup after has432=%v n=%d\n", has, len(stmInMerged))
 			}
 			fm.SetGlobalFacts(CloneFactSlice(stmInMerged), "auto_statement_goto_664")
 			if !VisitFactsStmt(dest, cg, opts) {
