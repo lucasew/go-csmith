@@ -95,7 +95,12 @@ func (l *Lhs) IsVolatile() bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	return l.Var.IsVolatileAfterDeref(n)
+	vol := l.Var.IsVolatileAfterDeref(n)
+	// residual ERROR sticky — no invent non-vol soft-skip past IsVolatileAfterDeref residual
+	if HasError() {
+		return true
+	}
+	return vol
 }
 
 // GetQualifiers mirrors Lhs::get_qualifiers.
@@ -547,28 +552,79 @@ func MakeRandomLhs(
 		}
 		// Lhs.cpp:110–113 — no_signed_overflow rejects signed base / bitfield for ++/--
 		if valid && typ.IsSimple() && noSignedOverflow {
+			// residual ERROR sticky — no invent soft-continue past IsSimple residual
+			if HasError() {
+				restore()
+				return nil
+			}
 			base := v.Type
 			if base != nil {
 				base = base.BaseType()
 			}
-			if (base != nil && base.IsSigned()) || v.IsBitfield {
+			// residual ERROR sticky — no invent soft-continue past BaseType residual
+			if HasError() {
+				restore()
+				return nil
+			}
+			if base != nil {
+				if base.IsSigned() {
+					// residual ERROR sticky — no invent soft-continue past IsSigned residual true
+					if HasError() {
+						restore()
+						return nil
+					}
+					valid = false
+				} else if HasError() {
+					// residual ERROR sticky — no invent soft-continue past IsSigned residual false
+					restore()
+					return nil
+				}
+			}
+			if valid && v.IsBitfield {
 				valid = false
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+			restore()
+			return nil
 		}
 		// Lhs.cpp:114–116 — ccomp forbids bitfield assigned as long long
 		if valid && opts.CComp && v.IsBitfield && typ.IsSimple() {
+			// residual ERROR sticky — no invent soft-continue past IsSimple residual
+			if HasError() {
+				restore()
+				return nil
+			}
 			switch typ.Simple() {
 			case ELongLong, EULongLong:
 				valid = false
 			}
+		} else if HasError() {
+			restore()
+			return nil
 		}
 		// Lhs.cpp:117–121 — float filters
 		if valid && typ != nil && v.Type != nil {
 			if !typ.IsFloat() && v.Type.IsFloat() {
+				// residual ERROR sticky — no invent soft-continue past IsFloat residual
+				if HasError() {
+					restore()
+					return nil
+				}
 				valid = false
+			} else if HasError() {
+				restore()
+				return nil
 			}
-			if opts.StrictFloat && typ.IsFloat() && !v.Type.IsFloat() {
+			if valid && opts.StrictFloat && typ.IsFloat() && !v.Type.IsFloat() {
+				if HasError() {
+					restore()
+					return nil
+				}
 				valid = false
+			} else if HasError() {
+				restore()
+				return nil
 			}
 		}
 		if !valid {
@@ -654,9 +710,27 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		}
 		// IsConst / IsVolatile residual only on nil (v already gated); complete path never stickies
 		if v.IsConst() {
+			// residual ERROR sticky — no invent soft-skip const past IsConst residual true
+			if HasError() {
+				incomplete = true
+			}
+			return
+		}
+		// residual ERROR sticky — no invent soft-continue past IsConst residual false
+		if HasError() {
+			incomplete = true
 			return
 		}
 		if compound && v.IsVolatile() {
+			// residual ERROR sticky — no invent soft-skip vol past IsVolatile residual true
+			if HasError() {
+				incomplete = true
+			}
+			return
+		}
+		// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
+		if HasError() {
+			incomplete = true
 			return
 		}
 		// expand fields for aggregates

@@ -682,3 +682,44 @@ func TestChooseFuncContextMatchResidualTruePathSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
+	// IsSigned residual soft invent was invent eInt/eUInt past Type-nil signed check after GetType ok.
+	// Force via args whose GetType returns complete type then IsSigned residual — Type nil after get.
+	// Path: GetType residual already sticky when Type-nil Con; for IsSigned residual use non-simple type shell?
+	// IsSigned on Type-nil SetError sticky true.
+	ClearError()
+	// Use pointer types (non-simple): IsSigned residual path returns false without error when complete.
+	// Residual invent: ambient residual after GetType complete before IsSigned.
+	// Direct: (*Type)(nil).IsSigned sticky — exercise getTypeBinary via args with valid GetType then...
+	// Fair residual: invoke GetType after planting residual via incomplete simple shell?
+	// lt non-nil complete int — IsSigned complete. Test IsSigned residual itself through getTypeBinary:
+	// Use Type with IsSimple residual? IsSimple never residual on non-nil Type.
+	// Test assignLhsIsVolatile residual and for IsSigned nil Type via statement path.
+	// For getTypeBinary: after GetType returns type, call IsSigned — residual only on nil Type.
+	// So if GetType returns non-nil, IsSigned residual only ambient.
+	// Stick with: Type-nil GetType residual already covered; add IsSigned on nil Type hygiene:
+	if !((*Type)(nil)).IsSigned() {
+		// IsSigned residual returns true (restrictive)
+		t.Fatal("nil Type IsSigned must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Type IsSigned must SetError sticky")
+	}
+	ClearError()
+	// getTypeBinary with complete signed ints must not sticky
+	fi := &Invocation{
+		IsStd: true, Binary: "+",
+		Args: []*Expression{
+			{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+			{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()},
+		},
+	}
+	if fi.GetType() != GetSimpleType(EInt) {
+		t.Fatal("complete signed binary GetType must eInt")
+	}
+	if HasError() {
+		t.Fatal("complete signed binary GetType must not sticky")
+	}
+	ClearError()
+}

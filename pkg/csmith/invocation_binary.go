@@ -153,7 +153,12 @@ func (fi *Invocation) getTypeBinary() *Type {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if lt.IsSigned() && rt.IsSigned() {
+		ls, rs := lt.IsSigned(), rt.IsSigned()
+		// residual ERROR sticky — no invent eInt/eUInt past IsSigned residual hole
+		if HasError() {
+			return nil
+		}
+		if ls && rs {
 			return GetSimpleType(EInt)
 		}
 		return GetSimpleType(EUInt)
@@ -174,7 +179,12 @@ func (fi *Invocation) getTypeBinary() *Type {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if lt.IsSigned() {
+		ls := lt.IsSigned()
+		// residual ERROR sticky — no invent eInt/eUInt past IsSigned residual hole
+		if HasError() {
+			return nil
+		}
+		if ls {
 			return GetSimpleType(EInt)
 		}
 		return GetSimpleType(EUInt)

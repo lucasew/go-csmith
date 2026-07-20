@@ -222,3 +222,33 @@ func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAssignLhsIsVolatileResidualSticky(t *testing.T) {
+	// IsVolatile residual soft invent was invent non-vol soft-skip ccomp path past Lhs hole.
+	ClearError()
+	// nil Lhs + nil LhsVar complete false
+	if assignLhsIsVolatile(&Stmt{Kind: StmtAssign, StmID: 1}) {
+		t.Fatal("no lhs must soft false not sticky")
+	}
+	if HasError() {
+		t.Fatal("no lhs must not sticky")
+	}
+	ClearError()
+	// incomplete Lhs (nil Var) residual sticky true
+	st := &Stmt{Kind: StmtAssign, StmID: 1, Lhs: &Lhs{}}
+	if !assignLhsIsVolatile(st) {
+		t.Fatal("nil Lhs.Var residual must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs.Var residual must SetError sticky")
+	}
+	ClearError()
+	// nil Stmt residual
+	if !assignLhsIsVolatile(nil) {
+		t.Fatal("nil Stmt must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt assignLhsIsVolatile must SetError sticky")
+	}
+	ClearError()
+}

@@ -786,9 +786,22 @@ func assignLhsIsVolatile(st *Stmt) bool {
 		return true
 	}
 	if st.Lhs != nil {
-		return st.Lhs.IsVolatile()
+		vol := st.Lhs.IsVolatile()
+		// residual ERROR sticky — no invent non-vol soft-skip past Lhs IsVolatile residual
+		if HasError() {
+			return true
+		}
+		return vol
 	}
-	return st.LhsVar != nil && st.LhsVar.IsVolatile()
+	if st.LhsVar == nil {
+		return false
+	}
+	vol := st.LhsVar.IsVolatile()
+	// residual ERROR sticky — no invent non-vol soft-skip past LhsVar IsVolatile residual
+	if HasError() {
+		return true
+	}
+	return vol
 }
 
 // expressionQualifiers mirrors Expression::get_qualifiers for qfer seed.

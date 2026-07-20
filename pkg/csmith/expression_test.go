@@ -1402,3 +1402,23 @@ func TestExpressionGetTypeInvokeResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestExpressionToStringIndentedOutputResidualSticky(t *testing.T) {
+	// Output residual soft invent was invent soft-empty ToString/Indented past incomplete Con.
+	ClearError()
+	e := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil
+	if e.ToString() != "" {
+		t.Fatal("Type-nil constant ToString must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil constant ToString must SetError sticky")
+	}
+	ClearError()
+	if e.IndentedOutput(1) != "" {
+		t.Fatal("Type-nil constant IndentedOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil constant IndentedOutput must SetError sticky")
+	}
+	ClearError()
+}

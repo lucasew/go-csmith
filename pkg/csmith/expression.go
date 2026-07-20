@@ -781,7 +781,12 @@ func (e *Expression) UseVar(v *Variable) bool {
 // Expression.cpp:120–124.
 // Expression always live; sticky empty via Output (no invent soft-skip past hole).
 func (e *Expression) ToString() string {
-	return e.Output()
+	out := e.Output()
+	// residual ERROR sticky — no invent soft-empty string past Output residual
+	if HasError() {
+		return ""
+	}
+	return out
 }
 
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).
@@ -1502,7 +1507,12 @@ func (e *Expression) Output() string {
 // IndentedOutput mirrors Expression::indented_output.
 // Expression.cpp:133–136 — output_tab(indent) + Output.
 func (e *Expression) IndentedOutput(indent int) string {
-	return OutputTab(indent) + e.Output()
+	out := e.Output()
+	// residual ERROR sticky — no invent soft-indent emit past Output residual
+	if HasError() {
+		return ""
+	}
+	return OutputTab(indent) + out
 }
 
 func (e *Expression) outputBody() string {

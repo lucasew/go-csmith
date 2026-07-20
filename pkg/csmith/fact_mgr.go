@@ -1437,8 +1437,19 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		return
 	}
 	// FactMgr.cpp:77–79 — only meta_facts that were registered
-	wantPT := metaFactPointToEnabled && v.IsPointer()
+	isPtr := v.IsPointer()
+	// residual ERROR sticky — no invent soft-skip makeup past IsPointer residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
+	wantPT := metaFactPointToEnabled && isPtr
 	wantUn := metaFactUnionEnabled && v.Type != nil && v.Type.IsUnion()
+	// residual ERROR sticky — no invent soft-skip makeup past IsUnion residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
 	if !wantPT && !wantUn {
 		return
 	}
@@ -2004,7 +2015,19 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	// recurse into aggregate fields (pointer members) like AddNewVarFact
-	if !v.IsPointer() && !v.Type.IsUnion() {
+	isPtr := v.IsPointer()
+	// residual ERROR sticky — no invent soft-skip field walk past IsPointer residual
+	if HasError() {
+		*facts = IncompleteFactSlice()
+		return
+	}
+	isUn := v.Type.IsUnion()
+	// residual ERROR sticky — no invent soft-skip field walk past IsUnion residual
+	if HasError() {
+		*facts = IncompleteFactSlice()
+		return
+	}
+	if !isPtr && !isUn {
 		for _, f := range v.FieldVars {
 			if f == nil {
 				*facts = IncompleteFactSlice()
@@ -2023,12 +2046,8 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		}
 		return
 	}
-	if !v.IsPointer() {
-		// residual ERROR sticky — no invent soft-skip makeup past IsPointer residual false
-		if HasError() {
-			*facts = IncompleteFactSlice()
-			return
-		}
+	if !isPtr {
+		// residual ERROR sticky — no invent soft-skip makeup past non-pointer non-union
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue makeup past IsPointer residual true

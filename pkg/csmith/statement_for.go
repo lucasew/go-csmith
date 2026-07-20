@@ -308,6 +308,10 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		return nil
 	}
 	signed := iv.Type.IsSigned()
+	// residual ERROR sticky — no invent for bounds past IsSigned residual hole
+	if HasError() {
+		return nil
+	}
 	var initN, limitN, incrN int
 	var testOp BinaryOp
 	var incrOp AssignOp
