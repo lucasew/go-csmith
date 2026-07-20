@@ -504,14 +504,23 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
 	cg.ClearEffectStm()
-	// Statement.cpp:612 — curr_blk = parent (stack top is current block in Go)
-	// C++ stm_visit_facts: visit_facts(inputs) mutates inputs only — does not assign
-	// fm->global_facts = inputs. Mid-gen ExpressionAssign updates live on global_facts
-	// (OPP reads global_facts). Go visit uses FM.GlobalFacts as the working set, so we
-	// must load *facts into GlobalFacts for the walk — but must not drop may-null that
-	// is already on GlobalFacts and missing from map_facts_in / fixed-point *facts
-	// (seed-2 e10107: StmVisitFacts SetGlobalFacts wiped l_233 may-null).
+	// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; does not assign
+	// fm->global_facts = inputs. Go VisitFacts* uses GlobalFacts as the working set.
+	// Load *facts as work; merge live may-null into work for visit (seed-2 e10107).
+	// Always restore pre-visit live GlobalFacts after harvest (C++ never assigns
+	// global_facts from inputs in stm_visit_facts).
+	var liveSaved []*FactPointTo
+	haveLive := false
 	if cg.FM != nil {
+		if FactsComplete(cg.FM.GlobalFacts) {
+			liveSaved = CloneFactSlice(cg.FM.GlobalFacts)
+			if liveSaved == nil {
+				liveSaved = []*FactPointTo{}
+			}
+			if FactsComplete(liveSaved) {
+				haveLive = true
+			}
+		}
 		cl := CloneFactSlice(*facts)
 		if HasError() || !FactsComplete(cl) {
 			if !HasError() {
@@ -519,12 +528,18 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 			return false
 		}
-		cl = mergeMayNullFromLive(cg.FM.GlobalFacts, cl)
-		if HasError() || !FactsComplete(cl) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		// merge live may-null into work (Go GlobalFacts stands in for inputs; mid-gen
+		// ExpressionAssign nulls must stay visible during visit — seed-2 e10107).
+		// During find_fixed_point this still reinjects into maps (e12688); full fair
+		// fix needs VisitFacts(inputs) separate from global_facts.
+		if haveLive {
+			cl = mergeMayNullFromLive(liveSaved, cl)
+			if HasError() || !FactsComplete(cl) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
 			}
-			return false
 		}
 		cg.FM.SetGlobalFacts(cl, "StmVisitFacts_work")
 	}
@@ -534,11 +549,9 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		FailedStm = st
 	}
 	if cg.FM != nil {
-		// Statement.cpp:621–624 — remove_rv; accum; visited always set
-		// incomplete GlobalFacts after visit: sticky wipe + false (no invent clean slice)
+		// Statement.cpp:621–624 — remove_rv on inputs; accum; visited always set
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			*facts = IncompleteFactSlice()
-			cg.FM.GlobalFacts = IncompleteFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
@@ -546,24 +559,40 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		} else {
 			*facts = CloneFactSlice(cg.FM.GlobalFacts)
 			if HasError() || !FactsComplete(*facts) {
-				*facts = IncompleteFactSlice()
-				cg.FM.GlobalFacts = IncompleteFactSlice()
-				if !HasError() {
-					SetError(ErrGeneric)
+				// residual visit HasError with complete empty work: still harvest
+				if !FactsComplete(*facts) {
+					*facts = IncompleteFactSlice()
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					ok = false
 				}
-				ok = false
-			} else {
-				cg.FM.RemoveRVFacts(facts)
-				// RemoveRVFacts mutates *facts; keep GlobalFacts as the same post-RV set
-				// C++ stm_visit_facts only remove_rv_facts(inputs) — no separate global_facts
-				cg.FM.SetGlobalFacts(*facts, "auto_shortcut_analysis_550")
 			}
+			if FactsComplete(*facts) {
+				cg.FM.RemoveRVFacts(facts)
+				if !FactsComplete(*facts) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					ok = false
+				}
+			}
+		}
+		// C++ never assigns global_facts from inputs — restore mid-gen live
+		if haveLive {
+			cg.FM.SetGlobalFacts(liveSaved, "StmVisitFacts_restore_live")
+		} else if !FactsComplete(*facts) {
+			cg.FM.GlobalFacts = IncompleteFactSlice()
+		} else {
+			cg.FM.SetGlobalFacts(*facts, "StmVisitFacts_work_as_live")
 		}
 		// Statement::stm_id always live; StmID 0 fails closed sticky (C++ always
 		// records map_accum_effect / map_visited — no invent soft-skip maps)
 		if st.StmID <= 0 {
 			*facts = IncompleteFactSlice()
-			cg.FM.GlobalFacts = IncompleteFactSlice()
+			if !haveLive {
+				cg.FM.GlobalFacts = IncompleteFactSlice()
+			}
 			SetError(ErrGeneric)
 			return false
 		}

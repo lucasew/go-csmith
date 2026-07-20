@@ -1360,9 +1360,11 @@ func TestFromTailToHeadNilResidualSticky(t *testing.T) {
 
 func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	// Block.cpp:558–562 — set_fact_out from re-analysis outputs only.
-	// mergeMayNullFromLive(GlobalFacts) invent re-injected mid-gen may-null after
-	// statements that produced null were stripped (seed-2 g_87 null after
-	// (*g_140)=(void*)0 removed → ExpressionVariable rejects g_140).
+	// mergeMayNullFromLive during StmVisitFacts invent re-injected mid-gen may-null
+	// after stmts that produced null were stripped (seed-2 g_87 / e12688).
+	// Block.cpp:513–568 — find_fixed_point does not assign global_facts; mid-gen
+	// live may stay polluted until post_creation installs map_facts_out (729).
+	// FactMgr.InFixedPoint skips merge so map_facts_out stays clean.
 	ClearError()
 	SetProcessOptions(Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1393,8 +1395,46 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	if got.IsNull() {
 		t.Fatalf("stripped may-null must not reinject into out: %v", got.PointTo)
 	}
-	// GlobalFacts after fixed-point should match clean out
-	if FindRelatedPointTo(fm.GlobalFacts, p) != nil && FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
-		t.Fatal("GlobalFacts must not keep reinjected may-null")
+	// map_facts_out is the installed analysis env — must stay clean
+	mout := fm.GetMapFactsOut(100)
+	if g := FindRelatedPointTo(mout, p); g != nil && g.IsNull() {
+		t.Fatal("map_facts_out must not reinject stripped may-null")
 	}
+	// global_facts unchanged by find_fixed_point (C++); may still hold mid-gen
+	if g := FindRelatedPointTo(fm.GlobalFacts, p); g == nil || !g.IsNull() {
+		t.Fatal("find_fixed_point must not assign global_facts from out")
+	}
+}
+
+
+func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
+	// Statement.cpp:609–626 — does not assign global_facts = inputs.
+	// After visit, mid-gen may-null on GlobalFacts must remain (seed-2 e10107).
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	inputs := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	live := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	if live == nil {
+		t.Fatal("live fact")
+	}
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{live}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := CloneFactSlice(inputs)
+	if !StmVisitFacts(st, &facts, &cg, Defaults()) {
+		t.Fatalf("simple assign visit must ok hasErr=%v", HasError())
+	}
+	gotLive := FindRelatedPointTo(fm.GlobalFacts, p)
+	if gotLive == nil || !gotLive.IsNull() {
+		t.Fatalf("live GlobalFacts must restore mid-gen may-null: %+v", gotLive)
+	}
+	ClearError()
 }

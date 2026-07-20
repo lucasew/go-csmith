@@ -584,9 +584,8 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			sc := ShortcutAnalysisBlock(b, &work, cg)
 			switch sc {
 			case ShortcutOK:
-				if fm != nil {
-					fm.SetGlobalFacts(work, "auto_edges_analysis_584")
-				}
+				// Block.cpp:538–541 — shortcut returns true; does not assign global_facts.
+				// (map_facts_out already holds the reused env; caller may install.)
 				return work, -1, true
 			case ShortcutConflict:
 				return currentInputs, 0, false
@@ -659,13 +658,16 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// from statements later stripped by post_creation_analysis fixed-point
 		// (seed-2: (*g_140)=(void*)0 stripped but null kept → ExpressionVariable
 		// rejects g_140; UP accepts). C++ installs cleaned outputs only.
+		// Block.cpp:513–568 — find_fixed_point never assigns fm->global_facts;
+		// post_creation_analysis installs map_facts_out after success (Block.cpp:729).
+		// Invent SetGlobalFacts(outCopy) here wiped mid-gen may-null during FP
+		// (seed-2 e10107) unless StmVisitFacts unfairly remerged live into maps.
 		fm.SetMapFactsOut(b.StmID, outCopy)
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)
 		}
 		fm.MapVisited[b.StmID] = true
 		b.SetAccumulatedEffect(fm)
-		fm.SetGlobalFacts(outCopy, "fixed_point_out")
 		facts = outCopy
 		visitOnce = false
 		// next loop: merge edges + shortcut when inputs stable
