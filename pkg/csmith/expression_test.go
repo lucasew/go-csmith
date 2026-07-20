@@ -109,6 +109,19 @@ func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
 		t.Fatal("nil Var rhs CompatibleWithExpr must SetError sticky")
 	}
 	ClearError()
+	// Compatible residual soft invent was soft-continue invent compatible true.
+	// Fair: sticky false. CompatibleWithVar residual via nil Var path already sticky.
+	// CompatibleCheckExprs residual soft invent was soft-continue no-reject invent false.
+	// Fair: sticky reject true.
+	opts := Defaults()
+	opts.CompatibleCheck = true
+	if !CompatibleCheckExprs(opts, hole, live) {
+		t.Fatal("Compatible residual CompatibleCheckExprs must fail closed reject true")
+	}
+	if !HasError() {
+		t.Fatal("Compatible residual CompatibleCheckExprs must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
@@ -1240,6 +1253,16 @@ func TestIs0Or1NotEqualsLessThanIncompleteSticky(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("Funcall without Invoke Is0Or1 must SetError sticky")
+	}
+	ClearError()
+	// nested Is0Or1 residual soft invent was soft-continue invent 0or1 true.
+	// Fair: sticky false. assign peel incomplete residual.
+	holeAssign := &Expression{Term: TermAssignment, Assign: &Stmt{AssignOp: AssignSimple, Expr: nil}}
+	if holeAssign.Is0Or1() {
+		t.Fatal("nested Is0Or1 residual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nested Is0Or1 residual must SetError sticky")
 	}
 	ClearError()
 	if (&Expression{Term: TermConstant}).NotEquals(0) {

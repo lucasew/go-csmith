@@ -75,21 +75,36 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Var.Compatible(v, expandStruct)
+		ok := e.Var.Compatible(v, expandStruct)
+		// residual ERROR sticky — no invent compatible true past Compatible residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermFunction:
 		// ExpressionFuncall.cpp:206–207 — invoke always live
 		if e.Invoke == nil {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Invoke.CompatibleVar(v, expandStruct)
+		ok := e.Invoke.CompatibleVar(v, expandStruct)
+		// residual ERROR sticky — no invent compatible true past CompatibleVar residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermLhs:
 		// Lhs shell always has live Variable*
 		if e.Var == nil {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Var.Compatible(v, expandStruct)
+		ok := e.Var.Compatible(v, expandStruct)
+		// residual ERROR sticky — no invent compatible true past Compatible residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermConstant:
 		// Constant.cpp:488–493 — assert(v); expand_struct → true; else false
 		// incomplete Constant shell sticky (no invent expand_struct success past hole)
@@ -125,10 +140,20 @@ func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bo
 	// Variable / Lhs → other.compatible(this.var)
 	// ExpressionVariable.cpp:289 — assert(v) on Variable* overload via CompatibleWithVar
 	if e.Term == TermVariable || e.Term == TermLhs {
-		return other.CompatibleWithVar(e.Var, expandStruct)
+		ok := other.CompatibleWithVar(e.Var, expandStruct)
+		// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	if other.Term == TermVariable || other.Term == TermLhs {
-		return e.CompatibleWithVar(other.Var, expandStruct)
+		ok := e.CompatibleWithVar(other.Var, expandStruct)
+		// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	// Funcall::compatible(Expression*) is false (ExpressionFuncall.cpp:210–212)
 	return false
@@ -501,14 +526,24 @@ func (e *Expression) Is0Or1() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Invoke.Is0Or1()
+		ok := e.Invoke.Is0Or1()
+		// residual ERROR sticky — no invent 0or1 true past nested Is0Or1 residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermCommaExpr:
 		// comma value is RHS; sticky incomplete without RHS
 		if e.CommaRHS == nil {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.CommaRHS.Is0Or1()
+		ok := e.CommaRHS.Is0Or1()
+		// residual ERROR sticky — no invent 0or1 true past RHS Is0Or1 residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermAssignment:
 		// ExpressionAssign.cpp:103–104
 		if e.Assign == nil {
@@ -523,7 +558,12 @@ func (e *Expression) Is0Or1() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Assign.Expr.Is0Or1()
+		ok := e.Assign.Expr.Is0Or1()
+		// residual ERROR sticky — no invent 0or1 true past assign RHS residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	// Expression.h default false (incl. Constant — no override)
 	return false

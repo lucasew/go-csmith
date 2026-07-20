@@ -1425,8 +1425,13 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 		if c.EffectContext().IsWrittenPartially(v) {
+			// residual ERROR sticky — no invent conflict true past IsWrittenPartially residual hole
+			if HasError() {
+				return true
+			}
 			return true
 		}
+		// residual ERROR sticky — no invent soft-continue conflict scan past IsWrittenPartially residual false
 		if HasError() {
 			return true
 		}
@@ -1437,6 +1442,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 			}
 			return true
 		}
+		// residual ERROR sticky — no invent soft-continue conflict scan past IsVolatile residual false
 		if HasError() {
 			return true
 		}
@@ -1453,16 +1459,19 @@ func (c CGContext) InConflict(eff Effect) bool {
 			}
 			return true
 		}
+		// residual ERROR sticky — no invent soft-continue conflict scan past IsNonWritable residual false
 		if HasError() {
 			return true
 		}
 		ctx := c.EffectContext()
 		if ctx.IsWrittenPartially(v) || ctx.IsReadPartially(v) {
+			// residual ERROR sticky — no invent conflict true past partial residual hole
 			if HasError() {
 				return true
 			}
 			return true
 		}
+		// residual ERROR sticky — no invent soft-continue conflict scan past partial residual false
 		if HasError() {
 			return true
 		}

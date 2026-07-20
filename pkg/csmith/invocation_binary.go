@@ -214,7 +214,12 @@ func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return fi.Args[0].CompatibleWithVar(v, expandStruct)
+	ok := fi.Args[0].CompatibleWithVar(v, expandStruct)
+	// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // Is0Or1 mirrors FunctionInvocationBinary::is_0_or_1 and Unary eNot.

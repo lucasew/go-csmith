@@ -942,6 +942,14 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	if cg.InConflict(eff) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual true
+		if HasError() {
+			return ShortcutConflict
+		}
+		return ShortcutConflict
+	}
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual false
+	if HasError() {
 		return ShortcutConflict
 	}
 	// Statement.cpp:559 — inputs = map_facts_out[this]; out must be present and complete

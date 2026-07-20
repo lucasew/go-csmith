@@ -851,6 +851,14 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			cg.FM.GlobalFacts = facts
 			// fold feffect from accum during revisit
 			if cg.InConflict(fi.User.FEffect) {
+				// residual ERROR sticky — no invent soft-continue visit past InConflict residual true
+				if HasError() {
+					return false
+				}
+				return false
+			}
+			// residual ERROR sticky — no invent soft-continue visit past InConflict residual false
+			if HasError() {
 				return false
 			}
 			// FunctionInvocation.cpp:543 — assert(cg_context.curr_blk) sticky
@@ -870,6 +878,14 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			}
 			// static effect path (no fact/pointer change)
 			if cg.InConflict(fi.User.FEffect) {
+				// residual ERROR sticky — no invent soft-continue visit past InConflict residual true
+				if HasError() {
+					return false
+				}
+				return false
+			}
+			// residual ERROR sticky — no invent soft-continue visit past InConflict residual false
+			if HasError() {
 				return false
 			}
 			// same curr_blk for visible effect sticky when missing

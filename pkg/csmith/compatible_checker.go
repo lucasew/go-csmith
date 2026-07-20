@@ -33,5 +33,27 @@ func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	return a.CompatibleWithExpr(b, opts.ExpandStruct) || b.CompatibleWithExpr(a, opts.ExpandStruct)
+	if a.CompatibleWithExpr(b, opts.ExpandStruct) {
+		// residual ERROR sticky — no invent reject-true past CompatibleWithExpr residual hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue reverse check past residual false
+	if HasError() {
+		return true
+	}
+	if b.CompatibleWithExpr(a, opts.ExpandStruct) {
+		// residual ERROR sticky — no invent reject-true past reverse CompatibleWithExpr residual
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue no-reject past reverse residual false
+	if HasError() {
+		return true
+	}
+	return false
 }
