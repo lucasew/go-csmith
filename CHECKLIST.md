@@ -706,130 +706,130 @@ Total items: 2070
 - [x] Error.cpp::Error.set_error
 - [x] Error.cpp::Error.~Error
 - [x] Error.cpp::get_error
-- [ ] Expression.cpp::eBinaryOp
-- [ ] Expression.cpp::eBinaryOp.eAdd
-- [ ] Expression.cpp::eBinaryOp.eSub
-- [ ] Expression.cpp::eTermType
-- [ ] Expression.cpp::eTermType.eAssignment
-- [ ] Expression.cpp::eTermType.eCommaExpr
-- [ ] Expression.cpp::eTermType.eConstant
-- [ ] Expression.cpp::eTermType.eFunction
-- [ ] Expression.cpp::eTermType.eLhs
-- [ ] Expression.cpp::eTermType.eVariable
-- [ ] Expression.cpp::Expression.check_and_set_cast
-- [ ] Expression.cpp::Expression.clone
-- [ ] Expression.cpp::Expression.compatible
-- [ ] Expression.cpp::Expression.equals
-- [ ] Expression.cpp::Expression.Expression
-- [ ] Expression.cpp::Expression.func_count
-- [ ] Expression.cpp::Expression.get_called_funcs
-- [ ] Expression.cpp::Expression.get_complexity
-- [ ] Expression.cpp::Expression.get_dereferenced_ptrs
-- [ ] Expression.cpp::Expression.get_eval_to_subexps
-- [ ] Expression.cpp::Expression.get_invoke
-- [ ] Expression.cpp::Expression.get_qualifiers
-- [ ] Expression.cpp::Expression.get_referenced_ptrs
-- [ ] Expression.cpp::Expression.get_type
-- [ ] Expression.cpp::Expression.has_uncertain_call_recursive
-- [ ] Expression.cpp::Expression.indented_output
-- [ ] Expression.cpp::Expression.InitExprProbabilityTable
-- [ ] Expression.cpp::Expression.InitParamProbabilityTable
-- [ ] Expression.cpp::Expression.InitProbabilityTables
-- [ ] Expression.cpp::Expression.is_0_or_1
-- [ ] Expression.cpp::Expression.less_than
-- [ ] Expression.cpp::Expression.make_random
-- [ ] Expression.cpp::Expression.make_random_param
-- [ ] Expression.cpp::Expression.not_equals
-- [ ] Expression.cpp::Expression.Output
-- [ ] Expression.cpp::Expression.output_cast
-- [ ] Expression.cpp::Expression.OutputBinaryOp
-- [ ] Expression.cpp::Expression.record_dereference_level
-- [ ] Expression.cpp::Expression.to_string
-- [ ] Expression.cpp::Expression.use_var
-- [ ] Expression.cpp::Expression.visit_facts
-- [ ] Expression.cpp::Expression.~Expression
-- [ ] Expression.cpp::ExpressionTypeProbability
-- [ ] ExpressionAssign.cpp::ExpressionAssign.clone
-- [ ] ExpressionAssign.cpp::ExpressionAssign.equals
-- [ ] ExpressionAssign.cpp::ExpressionAssign.ExpressionAssign
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_called_funcs
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_complexity
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_dereferenced_ptrs
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_eval_to_subexps
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_expr
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_lhs
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_qualifiers
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_referenced_ptrs
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_stm_assign
-- [ ] ExpressionAssign.cpp::ExpressionAssign.get_type
-- [ ] ExpressionAssign.cpp::ExpressionAssign.has_uncertain_call_recursive
-- [ ] ExpressionAssign.cpp::ExpressionAssign.indented_output
-- [ ] ExpressionAssign.cpp::ExpressionAssign.is_0_or_1
-- [ ] ExpressionAssign.cpp::ExpressionAssign.make_random
-- [ ] ExpressionAssign.cpp::ExpressionAssign.Output
-- [ ] ExpressionAssign.cpp::ExpressionAssign.use_var
-- [ ] ExpressionAssign.cpp::ExpressionAssign.visit_facts
-- [ ] ExpressionAssign.cpp::ExpressionAssign.~ExpressionAssign
-- [ ] ExpressionComma.cpp::ExpressionComma.clone
-- [ ] ExpressionComma.cpp::ExpressionComma.equals
-- [ ] ExpressionComma.cpp::ExpressionComma.ExpressionComma
-- [ ] ExpressionComma.cpp::ExpressionComma.get_called_funcs
-- [ ] ExpressionComma.cpp::ExpressionComma.get_complexity
-- [ ] ExpressionComma.cpp::ExpressionComma.get_dereferenced_ptrs
-- [ ] ExpressionComma.cpp::ExpressionComma.get_eval_to_subexps
-- [ ] ExpressionComma.cpp::ExpressionComma.get_lhs
-- [ ] ExpressionComma.cpp::ExpressionComma.get_qualifiers
-- [ ] ExpressionComma.cpp::ExpressionComma.get_referenced_ptrs
-- [ ] ExpressionComma.cpp::ExpressionComma.get_rhs
-- [ ] ExpressionComma.cpp::ExpressionComma.get_type
-- [ ] ExpressionComma.cpp::ExpressionComma.has_uncertain_call_recursive
-- [ ] ExpressionComma.cpp::ExpressionComma.indented_output
-- [ ] ExpressionComma.cpp::ExpressionComma.is_0_or_1
-- [ ] ExpressionComma.cpp::ExpressionComma.make_random
-- [ ] ExpressionComma.cpp::ExpressionComma.Output
-- [ ] ExpressionComma.cpp::ExpressionComma.use_var
-- [ ] ExpressionComma.cpp::ExpressionComma.visit_facts
-- [ ] ExpressionComma.cpp::ExpressionComma.~ExpressionComma
-- [ ] ExpressionComma.cpp::cast_if_needed
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.clone
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.compatible
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.equals
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.ExpressionFuncall
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_called_funcs
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_complexity
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_dereferenced_ptrs
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_invoke
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_qualifiers
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_referenced_ptrs
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.get_type
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.has_uncertain_call_recursive
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.indented_output
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.is_0_or_1
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.make_random
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.operator=
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.Output
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.push_back
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.use_var
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.visit_facts
-- [ ] ExpressionFuncall.cpp::ExpressionFuncall.~ExpressionFuncall
-- [ ] ExpressionFuncall.cpp::ExpressionFunctionProbability
-- [ ] ExpressionVariable.cpp::ExpressionVariable.clone
-- [ ] ExpressionVariable.cpp::ExpressionVariable.compatible
-- [ ] ExpressionVariable.cpp::ExpressionVariable.ExpressionVariable
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_complexity
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_dereferenced_ptrs
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_indirect_level
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_qualifiers
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_referenced_ptrs
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_type
-- [ ] ExpressionVariable.cpp::ExpressionVariable.get_var
-- [ ] ExpressionVariable.cpp::ExpressionVariable.make_random
-- [ ] ExpressionVariable.cpp::ExpressionVariable.operator=
-- [ ] ExpressionVariable.cpp::ExpressionVariable.Output
-- [ ] ExpressionVariable.cpp::ExpressionVariable.push_back
-- [ ] ExpressionVariable.cpp::ExpressionVariable.use_var
-- [ ] ExpressionVariable.cpp::ExpressionVariable.visit_facts
-- [ ] ExpressionVariable.cpp::ExpressionVariable.~ExpressionVariable
+- [x] Expression.cpp::eBinaryOp
+- [x] Expression.cpp::eBinaryOp.eAdd
+- [x] Expression.cpp::eBinaryOp.eSub
+- [x] Expression.cpp::eTermType
+- [x] Expression.cpp::eTermType.eAssignment
+- [x] Expression.cpp::eTermType.eCommaExpr
+- [x] Expression.cpp::eTermType.eConstant
+- [x] Expression.cpp::eTermType.eFunction
+- [x] Expression.cpp::eTermType.eLhs
+- [x] Expression.cpp::eTermType.eVariable
+- [x] Expression.cpp::Expression.check_and_set_cast
+- [x] Expression.cpp::Expression.clone
+- [x] Expression.cpp::Expression.compatible
+- [x] Expression.cpp::Expression.equals
+- [x] Expression.cpp::Expression.Expression
+- [x] Expression.cpp::Expression.func_count
+- [x] Expression.cpp::Expression.get_called_funcs
+- [x] Expression.cpp::Expression.get_complexity
+- [x] Expression.cpp::Expression.get_dereferenced_ptrs
+- [x] Expression.cpp::Expression.get_eval_to_subexps
+- [x] Expression.cpp::Expression.get_invoke
+- [x] Expression.cpp::Expression.get_qualifiers
+- [x] Expression.cpp::Expression.get_referenced_ptrs
+- [x] Expression.cpp::Expression.get_type
+- [x] Expression.cpp::Expression.has_uncertain_call_recursive
+- [x] Expression.cpp::Expression.indented_output
+- [x] Expression.cpp::Expression.InitExprProbabilityTable
+- [x] Expression.cpp::Expression.InitParamProbabilityTable
+- [x] Expression.cpp::Expression.InitProbabilityTables
+- [x] Expression.cpp::Expression.is_0_or_1
+- [x] Expression.cpp::Expression.less_than
+- [x] Expression.cpp::Expression.make_random
+- [x] Expression.cpp::Expression.make_random_param
+- [x] Expression.cpp::Expression.not_equals
+- [x] Expression.cpp::Expression.Output
+- [x] Expression.cpp::Expression.output_cast
+- [x] Expression.cpp::Expression.OutputBinaryOp
+- [x] Expression.cpp::Expression.record_dereference_level
+- [x] Expression.cpp::Expression.to_string
+- [x] Expression.cpp::Expression.use_var
+- [x] Expression.cpp::Expression.visit_facts
+- [x] Expression.cpp::Expression.~Expression
+- [x] Expression.cpp::ExpressionTypeProbability
+- [x] ExpressionAssign.cpp::ExpressionAssign.clone
+- [x] ExpressionAssign.cpp::ExpressionAssign.equals
+- [x] ExpressionAssign.cpp::ExpressionAssign.ExpressionAssign
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_called_funcs
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_complexity
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_dereferenced_ptrs
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_eval_to_subexps
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_expr
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_lhs
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_qualifiers
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_referenced_ptrs
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_stm_assign
+- [x] ExpressionAssign.cpp::ExpressionAssign.get_type
+- [x] ExpressionAssign.cpp::ExpressionAssign.has_uncertain_call_recursive
+- [x] ExpressionAssign.cpp::ExpressionAssign.indented_output
+- [x] ExpressionAssign.cpp::ExpressionAssign.is_0_or_1
+- [x] ExpressionAssign.cpp::ExpressionAssign.make_random
+- [x] ExpressionAssign.cpp::ExpressionAssign.Output
+- [x] ExpressionAssign.cpp::ExpressionAssign.use_var
+- [x] ExpressionAssign.cpp::ExpressionAssign.visit_facts
+- [x] ExpressionAssign.cpp::ExpressionAssign.~ExpressionAssign
+- [x] ExpressionComma.cpp::ExpressionComma.clone
+- [x] ExpressionComma.cpp::ExpressionComma.equals
+- [x] ExpressionComma.cpp::ExpressionComma.ExpressionComma
+- [x] ExpressionComma.cpp::ExpressionComma.get_called_funcs
+- [x] ExpressionComma.cpp::ExpressionComma.get_complexity
+- [x] ExpressionComma.cpp::ExpressionComma.get_dereferenced_ptrs
+- [x] ExpressionComma.cpp::ExpressionComma.get_eval_to_subexps
+- [x] ExpressionComma.cpp::ExpressionComma.get_lhs
+- [x] ExpressionComma.cpp::ExpressionComma.get_qualifiers
+- [x] ExpressionComma.cpp::ExpressionComma.get_referenced_ptrs
+- [x] ExpressionComma.cpp::ExpressionComma.get_rhs
+- [x] ExpressionComma.cpp::ExpressionComma.get_type
+- [x] ExpressionComma.cpp::ExpressionComma.has_uncertain_call_recursive
+- [x] ExpressionComma.cpp::ExpressionComma.indented_output
+- [x] ExpressionComma.cpp::ExpressionComma.is_0_or_1
+- [x] ExpressionComma.cpp::ExpressionComma.make_random
+- [x] ExpressionComma.cpp::ExpressionComma.Output
+- [x] ExpressionComma.cpp::ExpressionComma.use_var
+- [x] ExpressionComma.cpp::ExpressionComma.visit_facts
+- [x] ExpressionComma.cpp::ExpressionComma.~ExpressionComma
+- [x] ExpressionComma.cpp::cast_if_needed
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.clone
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.compatible
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.equals
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.ExpressionFuncall
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_called_funcs
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_complexity
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_dereferenced_ptrs
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_invoke
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_qualifiers
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_referenced_ptrs
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.get_type
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.has_uncertain_call_recursive
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.indented_output
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.is_0_or_1
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.make_random
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.operator=
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.Output
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.push_back
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.use_var
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.visit_facts
+- [x] ExpressionFuncall.cpp::ExpressionFuncall.~ExpressionFuncall
+- [x] ExpressionFuncall.cpp::ExpressionFunctionProbability
+- [x] ExpressionVariable.cpp::ExpressionVariable.clone
+- [x] ExpressionVariable.cpp::ExpressionVariable.compatible
+- [x] ExpressionVariable.cpp::ExpressionVariable.ExpressionVariable
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_complexity
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_dereferenced_ptrs
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_indirect_level
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_qualifiers
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_referenced_ptrs
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_type
+- [x] ExpressionVariable.cpp::ExpressionVariable.get_var
+- [x] ExpressionVariable.cpp::ExpressionVariable.make_random
+- [x] ExpressionVariable.cpp::ExpressionVariable.operator=
+- [x] ExpressionVariable.cpp::ExpressionVariable.Output
+- [x] ExpressionVariable.cpp::ExpressionVariable.push_back
+- [x] ExpressionVariable.cpp::ExpressionVariable.use_var
+- [x] ExpressionVariable.cpp::ExpressionVariable.visit_facts
+- [x] ExpressionVariable.cpp::ExpressionVariable.~ExpressionVariable
 - [x] ExtensionMgr.cpp::ExtensionMgr.CreateExtension
 - [x] ExtensionMgr.cpp::ExtensionMgr.DestroyExtension
 - [x] ExtensionMgr.cpp::ExtensionMgr.GenerateFirstParameterList
@@ -1180,27 +1180,27 @@ Total items: 2070
 - [ ] KleeExtension.cpp::KleeExtension.OutputInit
 - [ ] KleeExtension.cpp::KleeExtension.OutputTail
 - [ ] KleeExtension.cpp::KleeExtension.~KleeExtension
-- [ ] Lhs.cpp::Lhs.clone
-- [ ] Lhs.cpp::Lhs.compatible
-- [ ] Lhs.cpp::Lhs.get_complexity
-- [ ] Lhs.cpp::Lhs.get_dereferenced_ptrs
-- [ ] Lhs.cpp::Lhs.get_indirect_level
-- [ ] Lhs.cpp::Lhs.get_lvars
-- [ ] Lhs.cpp::Lhs.get_qualifiers
-- [ ] Lhs.cpp::Lhs.get_referenced_ptrs
-- [ ] Lhs.cpp::Lhs.get_type
-- [ ] Lhs.cpp::Lhs.get_var
-- [ ] Lhs.cpp::Lhs.is_volatile
-- [ ] Lhs.cpp::Lhs.Lhs
-- [ ] Lhs.cpp::Lhs.make_random
-- [ ] Lhs.cpp::Lhs.operator=
-- [ ] Lhs.cpp::Lhs.Output
-- [ ] Lhs.cpp::Lhs.ptr_modified_in_rhs
-- [ ] Lhs.cpp::Lhs.push_back
-- [ ] Lhs.cpp::Lhs.visit_facts
-- [ ] Lhs.cpp::Lhs.visit_indices
-- [ ] Lhs.cpp::Lhs.~Lhs
-- [ ] Lhs.cpp::have_overlapping_fields
+- [x] Lhs.cpp::Lhs.clone
+- [x] Lhs.cpp::Lhs.compatible
+- [x] Lhs.cpp::Lhs.get_complexity
+- [x] Lhs.cpp::Lhs.get_dereferenced_ptrs
+- [x] Lhs.cpp::Lhs.get_indirect_level
+- [x] Lhs.cpp::Lhs.get_lvars
+- [x] Lhs.cpp::Lhs.get_qualifiers
+- [x] Lhs.cpp::Lhs.get_referenced_ptrs
+- [x] Lhs.cpp::Lhs.get_type
+- [x] Lhs.cpp::Lhs.get_var
+- [x] Lhs.cpp::Lhs.is_volatile
+- [x] Lhs.cpp::Lhs.Lhs
+- [x] Lhs.cpp::Lhs.make_random
+- [x] Lhs.cpp::Lhs.operator=
+- [x] Lhs.cpp::Lhs.Output
+- [x] Lhs.cpp::Lhs.ptr_modified_in_rhs
+- [x] Lhs.cpp::Lhs.push_back
+- [x] Lhs.cpp::Lhs.visit_facts
+- [x] Lhs.cpp::Lhs.visit_indices
+- [x] Lhs.cpp::Lhs.~Lhs
+- [x] Lhs.cpp::have_overlapping_fields
 - [x] LinearSequence.cpp::LinearSequence.add_number
 - [x] LinearSequence.cpp::LinearSequence.clear
 - [x] LinearSequence.cpp::LinearSequence.get_number
@@ -1565,207 +1565,207 @@ Total items: 2070
 - [ ] SequenceLineParser.h::ss
 - [ ] SequenceLineParser.h::str2int
 - [ ] SequenceLineParser.h::substr
-- [ ] Statement.cpp::eStatementType
-- [ ] Statement.cpp::eStatementType.eArrayOp
-- [ ] Statement.cpp::eStatementType.eAssign
-- [ ] Statement.cpp::eStatementType.eBlock
-- [ ] Statement.cpp::eStatementType.eBreak
-- [ ] Statement.cpp::eStatementType.eContinue
-- [ ] Statement.cpp::eStatementType.eFor
-- [ ] Statement.cpp::eStatementType.eGoto
-- [ ] Statement.cpp::eStatementType.eIfElse
-- [ ] Statement.cpp::eStatementType.eInvoke
-- [ ] Statement.cpp::eStatementType.eReturn
-- [ ] Statement.cpp::Statement.add_back_return_facts
-- [ ] Statement.cpp::Statement.analyze_with_edges_in
-- [ ] Statement.cpp::Statement.contains_stmt
-- [ ] Statement.cpp::Statement.contains_unfixed_goto
-- [ ] Statement.cpp::Statement.dominate
-- [ ] Statement.cpp::Statement.find_contained_labels
-- [ ] Statement.cpp::Statement.find_container_stm
-- [ ] Statement.cpp::Statement.find_edges_in
-- [ ] Statement.cpp::Statement.find_jump_label
-- [ ] Statement.cpp::Statement.find_jump_sources
-- [ ] Statement.cpp::Statement.find_typed_stmts
-- [ ] Statement.cpp::Statement.get_blk_depth
-- [ ] Statement.cpp::Statement.get_blocks
-- [ ] Statement.cpp::Statement.get_called_funcs
-- [ ] Statement.cpp::Statement.get_current_sid
-- [ ] Statement.cpp::Statement.get_dereferenced_ptrs
-- [ ] Statement.cpp::Statement.get_direct_invocation
-- [ ] Statement.cpp::Statement.get_exprs
-- [ ] Statement.cpp::Statement.get_referenced_ptrs
-- [ ] Statement.cpp::Statement.get_type
-- [ ] Statement.cpp::Statement.has_edge_in
-- [ ] Statement.cpp::Statement.has_uncertain_call_recursive
-- [ ] Statement.cpp::Statement.in_block
-- [ ] Statement.cpp::Statement.InitProbabilityTable
-- [ ] Statement.cpp::Statement.is_1st_stm
-- [ ] Statement.cpp::Statement.is_compound
-- [ ] Statement.cpp::Statement.is_ctrl_stmt
-- [ ] Statement.cpp::Statement.is_jump_target_from_other_blocks
-- [ ] Statement.cpp::Statement.is_ptr_used
-- [ ] Statement.cpp::Statement.make_random
-- [ ] Statement.cpp::Statement.must_jump
-- [ ] Statement.cpp::Statement.must_return
-- [ ] Statement.cpp::Statement.number_to_type
-- [ ] Statement.cpp::Statement.operator=
-- [ ] Statement.cpp::Statement.Output
-- [ ] Statement.cpp::Statement.output_hash
-- [ ] Statement.cpp::Statement.output_with_assert
-- [ ] Statement.cpp::Statement.post_creation_analysis
-- [ ] Statement.cpp::Statement.post_output
-- [ ] Statement.cpp::Statement.pre_output
-- [ ] Statement.cpp::Statement.read_union_field
-- [ ] Statement.cpp::Statement.set_accumulated_effect_after_block
-- [ ] Statement.cpp::Statement.shortcut_analysis
-- [ ] Statement.cpp::Statement.Statement
-- [ ] Statement.cpp::Statement.stm_visit_facts
-- [ ] Statement.cpp::Statement.str
-- [ ] Statement.cpp::Statement.to_string
-- [ ] Statement.cpp::Statement.validate_and_update_facts
-- [ ] Statement.cpp::Statement.visit_facts
-- [ ] Statement.cpp::Statement.~Statement
-- [ ] Statement.cpp::StatementFilter.filter
-- [ ] Statement.cpp::StatementFilter.StatementFilter
-- [ ] Statement.cpp::StatementFilter.~StatementFilter
-- [ ] Statement.cpp::find_stm_in_set
-- [ ] Statement.cpp::InitializeLabelAttributes
-- [ ] Statement.cpp::StatementProbability
-- [ ] StatementArrayOp.cpp::StatementArrayOp.make_random
-- [ ] StatementArrayOp.cpp::StatementArrayOp.make_random_array_init
-- [ ] StatementArrayOp.cpp::StatementArrayOp.make_random_iter_ctrl
-- [ ] StatementArrayOp.cpp::StatementArrayOp.Output
-- [ ] StatementArrayOp.cpp::StatementArrayOp.output_header
-- [ ] StatementArrayOp.cpp::StatementArrayOp.push_back
-- [ ] StatementArrayOp.cpp::StatementArrayOp.StatementArrayOp
-- [ ] StatementArrayOp.cpp::StatementArrayOp.visit_facts
-- [ ] StatementArrayOp.cpp::StatementArrayOp.~StatementArrayOp
-- [ ] StatementAssign.cpp::eAssignOps
-- [ ] StatementAssign.cpp::eAssignOps.eAddAssign
-- [ ] StatementAssign.cpp::eAssignOps.eBitAndAssign
-- [ ] StatementAssign.cpp::eAssignOps.eBitOrAssign
-- [ ] StatementAssign.cpp::eAssignOps.eBitXorAssign
-- [ ] StatementAssign.cpp::eAssignOps.eDivAssign
-- [ ] StatementAssign.cpp::eAssignOps.eLShiftAssign
-- [ ] StatementAssign.cpp::eAssignOps.eMulAssign
-- [ ] StatementAssign.cpp::eAssignOps.ePostDecr
-- [ ] StatementAssign.cpp::eAssignOps.ePostIncr
-- [ ] StatementAssign.cpp::eAssignOps.ePreDecr
-- [ ] StatementAssign.cpp::eAssignOps.ePreIncr
-- [ ] StatementAssign.cpp::eAssignOps.eRemAssign
-- [ ] StatementAssign.cpp::eAssignOps.eRShiftAssign
-- [ ] StatementAssign.cpp::eAssignOps.eSimpleAssign
-- [ ] StatementAssign.cpp::eAssignOps.eSubAssign
-- [ ] StatementAssign.cpp::StatementAssign.AssignOpsProbability
-- [ ] StatementAssign.cpp::StatementAssign.AssignOpWorksForFloat
-- [ ] StatementAssign.cpp::StatementAssign.compound_to_binary_ops
-- [ ] StatementAssign.cpp::StatementAssign.get_blocks
-- [ ] StatementAssign.cpp::StatementAssign.get_dereferenced_ptrs
-- [ ] StatementAssign.cpp::StatementAssign.get_expr
-- [ ] StatementAssign.cpp::StatementAssign.get_lhs
-- [ ] StatementAssign.cpp::StatementAssign.get_rhs
-- [ ] StatementAssign.cpp::StatementAssign.has_uncertain_call_recursive
-- [ ] StatementAssign.cpp::StatementAssign.InitProbabilityTable
-- [ ] StatementAssign.cpp::StatementAssign.is_simple_assign
-- [ ] StatementAssign.cpp::StatementAssign.make_possible_compound_assign
-- [ ] StatementAssign.cpp::StatementAssign.make_random
-- [ ] StatementAssign.cpp::StatementAssign.need_no_rhs
-- [ ] StatementAssign.cpp::StatementAssign.number_to_op
-- [ ] StatementAssign.cpp::StatementAssign.operator=
-- [ ] StatementAssign.cpp::StatementAssign.Output
-- [ ] StatementAssign.cpp::StatementAssign.output_op
-- [ ] StatementAssign.cpp::StatementAssign.OutputAsExpr
-- [ ] StatementAssign.cpp::StatementAssign.OutputSimple
-- [ ] StatementAssign.cpp::StatementAssign.push_back
-- [ ] StatementAssign.cpp::StatementAssign.safe_assign
-- [ ] StatementAssign.cpp::StatementAssign.StatementAssign
-- [ ] StatementAssign.cpp::StatementAssign.visit_facts
-- [ ] StatementAssign.cpp::StatementAssign.~StatementAssign
-- [ ] StatementBreak.cpp::StatementBreak.get_blocks
-- [ ] StatementBreak.cpp::StatementBreak.make_random
-- [ ] StatementBreak.cpp::StatementBreak.must_jump
-- [ ] StatementBreak.cpp::StatementBreak.Output
-- [ ] StatementBreak.cpp::StatementBreak.push_back
-- [ ] StatementBreak.cpp::StatementBreak.StatementBreak
-- [ ] StatementBreak.cpp::StatementBreak.visit_facts
-- [ ] StatementBreak.cpp::StatementBreak.~StatementBreak
-- [ ] StatementContinue.cpp::StatementContinue.get_blocks
-- [ ] StatementContinue.cpp::StatementContinue.make_random
-- [ ] StatementContinue.cpp::StatementContinue.must_jump
-- [ ] StatementContinue.cpp::StatementContinue.Output
-- [ ] StatementContinue.cpp::StatementContinue.push_back
-- [ ] StatementContinue.cpp::StatementContinue.StatementContinue
-- [ ] StatementContinue.cpp::StatementContinue.visit_facts
-- [ ] StatementContinue.cpp::StatementContinue.~StatementContinue
-- [ ] StatementExpr.cpp::StatementExpr.get_blocks
-- [ ] StatementExpr.cpp::StatementExpr.get_call
-- [ ] StatementExpr.cpp::StatementExpr.get_dereferenced_ptrs
-- [ ] StatementExpr.cpp::StatementExpr.get_invoke
-- [ ] StatementExpr.cpp::StatementExpr.has_uncertain_call_recursive
-- [ ] StatementExpr.cpp::StatementExpr.make_random
-- [ ] StatementExpr.cpp::StatementExpr.operator=
-- [ ] StatementExpr.cpp::StatementExpr.Output
-- [ ] StatementExpr.cpp::StatementExpr.push_back
-- [ ] StatementExpr.cpp::StatementExpr.StatementExpr
-- [ ] StatementExpr.cpp::StatementExpr.visit_facts
-- [ ] StatementExpr.cpp::StatementExpr.~StatementExpr
-- [ ] StatementFor.cpp::StatementFor.get_body
-- [ ] StatementFor.cpp::StatementFor.get_incr
-- [ ] StatementFor.cpp::StatementFor.get_init
-- [ ] StatementFor.cpp::StatementFor.get_test
-- [ ] StatementFor.cpp::StatementFor.make_iteration
-- [ ] StatementFor.cpp::StatementFor.make_random
-- [ ] StatementFor.cpp::StatementFor.make_random_array_loop
-- [ ] StatementFor.cpp::StatementFor.operator=
-- [ ] StatementFor.cpp::StatementFor.Output
-- [ ] StatementFor.cpp::StatementFor.output_header
-- [ ] StatementFor.cpp::StatementFor.post_loop_analysis
-- [ ] StatementFor.cpp::StatementFor.push_back
-- [ ] StatementFor.cpp::StatementFor.StatementFor
-- [ ] StatementFor.cpp::StatementFor.visit_facts
-- [ ] StatementFor.cpp::StatementFor.~StatementFor
-- [ ] StatementFor.cpp::make_random_array_control
-- [ ] StatementFor.cpp::make_random_loop_control
+- [x] Statement.cpp::eStatementType
+- [x] Statement.cpp::eStatementType.eArrayOp
+- [x] Statement.cpp::eStatementType.eAssign
+- [x] Statement.cpp::eStatementType.eBlock
+- [x] Statement.cpp::eStatementType.eBreak
+- [x] Statement.cpp::eStatementType.eContinue
+- [x] Statement.cpp::eStatementType.eFor
+- [x] Statement.cpp::eStatementType.eGoto
+- [x] Statement.cpp::eStatementType.eIfElse
+- [x] Statement.cpp::eStatementType.eInvoke
+- [x] Statement.cpp::eStatementType.eReturn
+- [x] Statement.cpp::Statement.add_back_return_facts
+- [x] Statement.cpp::Statement.analyze_with_edges_in
+- [x] Statement.cpp::Statement.contains_stmt
+- [x] Statement.cpp::Statement.contains_unfixed_goto
+- [x] Statement.cpp::Statement.dominate
+- [x] Statement.cpp::Statement.find_contained_labels
+- [x] Statement.cpp::Statement.find_container_stm
+- [x] Statement.cpp::Statement.find_edges_in
+- [x] Statement.cpp::Statement.find_jump_label
+- [x] Statement.cpp::Statement.find_jump_sources
+- [x] Statement.cpp::Statement.find_typed_stmts
+- [x] Statement.cpp::Statement.get_blk_depth
+- [x] Statement.cpp::Statement.get_blocks
+- [x] Statement.cpp::Statement.get_called_funcs
+- [x] Statement.cpp::Statement.get_current_sid
+- [x] Statement.cpp::Statement.get_dereferenced_ptrs
+- [x] Statement.cpp::Statement.get_direct_invocation
+- [x] Statement.cpp::Statement.get_exprs
+- [x] Statement.cpp::Statement.get_referenced_ptrs
+- [x] Statement.cpp::Statement.get_type
+- [x] Statement.cpp::Statement.has_edge_in
+- [x] Statement.cpp::Statement.has_uncertain_call_recursive
+- [x] Statement.cpp::Statement.in_block
+- [x] Statement.cpp::Statement.InitProbabilityTable
+- [x] Statement.cpp::Statement.is_1st_stm
+- [x] Statement.cpp::Statement.is_compound
+- [x] Statement.cpp::Statement.is_ctrl_stmt
+- [x] Statement.cpp::Statement.is_jump_target_from_other_blocks
+- [x] Statement.cpp::Statement.is_ptr_used
+- [x] Statement.cpp::Statement.make_random
+- [x] Statement.cpp::Statement.must_jump
+- [x] Statement.cpp::Statement.must_return
+- [x] Statement.cpp::Statement.number_to_type
+- [x] Statement.cpp::Statement.operator=
+- [x] Statement.cpp::Statement.Output
+- [x] Statement.cpp::Statement.output_hash
+- [x] Statement.cpp::Statement.output_with_assert
+- [x] Statement.cpp::Statement.post_creation_analysis
+- [x] Statement.cpp::Statement.post_output
+- [x] Statement.cpp::Statement.pre_output
+- [x] Statement.cpp::Statement.read_union_field
+- [x] Statement.cpp::Statement.set_accumulated_effect_after_block
+- [x] Statement.cpp::Statement.shortcut_analysis
+- [x] Statement.cpp::Statement.Statement
+- [x] Statement.cpp::Statement.stm_visit_facts
+- [x] Statement.cpp::Statement.str
+- [x] Statement.cpp::Statement.to_string
+- [x] Statement.cpp::Statement.validate_and_update_facts
+- [x] Statement.cpp::Statement.visit_facts
+- [x] Statement.cpp::Statement.~Statement
+- [x] Statement.cpp::StatementFilter.filter
+- [x] Statement.cpp::StatementFilter.StatementFilter
+- [x] Statement.cpp::StatementFilter.~StatementFilter
+- [x] Statement.cpp::find_stm_in_set
+- [x] Statement.cpp::InitializeLabelAttributes
+- [x] Statement.cpp::StatementProbability
+- [x] StatementArrayOp.cpp::StatementArrayOp.make_random
+- [x] StatementArrayOp.cpp::StatementArrayOp.make_random_array_init
+- [x] StatementArrayOp.cpp::StatementArrayOp.make_random_iter_ctrl
+- [x] StatementArrayOp.cpp::StatementArrayOp.Output
+- [x] StatementArrayOp.cpp::StatementArrayOp.output_header
+- [x] StatementArrayOp.cpp::StatementArrayOp.push_back
+- [x] StatementArrayOp.cpp::StatementArrayOp.StatementArrayOp
+- [x] StatementArrayOp.cpp::StatementArrayOp.visit_facts
+- [x] StatementArrayOp.cpp::StatementArrayOp.~StatementArrayOp
+- [x] StatementAssign.cpp::eAssignOps
+- [x] StatementAssign.cpp::eAssignOps.eAddAssign
+- [x] StatementAssign.cpp::eAssignOps.eBitAndAssign
+- [x] StatementAssign.cpp::eAssignOps.eBitOrAssign
+- [x] StatementAssign.cpp::eAssignOps.eBitXorAssign
+- [x] StatementAssign.cpp::eAssignOps.eDivAssign
+- [x] StatementAssign.cpp::eAssignOps.eLShiftAssign
+- [x] StatementAssign.cpp::eAssignOps.eMulAssign
+- [x] StatementAssign.cpp::eAssignOps.ePostDecr
+- [x] StatementAssign.cpp::eAssignOps.ePostIncr
+- [x] StatementAssign.cpp::eAssignOps.ePreDecr
+- [x] StatementAssign.cpp::eAssignOps.ePreIncr
+- [x] StatementAssign.cpp::eAssignOps.eRemAssign
+- [x] StatementAssign.cpp::eAssignOps.eRShiftAssign
+- [x] StatementAssign.cpp::eAssignOps.eSimpleAssign
+- [x] StatementAssign.cpp::eAssignOps.eSubAssign
+- [x] StatementAssign.cpp::StatementAssign.AssignOpsProbability
+- [x] StatementAssign.cpp::StatementAssign.AssignOpWorksForFloat
+- [x] StatementAssign.cpp::StatementAssign.compound_to_binary_ops
+- [x] StatementAssign.cpp::StatementAssign.get_blocks
+- [x] StatementAssign.cpp::StatementAssign.get_dereferenced_ptrs
+- [x] StatementAssign.cpp::StatementAssign.get_expr
+- [x] StatementAssign.cpp::StatementAssign.get_lhs
+- [x] StatementAssign.cpp::StatementAssign.get_rhs
+- [x] StatementAssign.cpp::StatementAssign.has_uncertain_call_recursive
+- [x] StatementAssign.cpp::StatementAssign.InitProbabilityTable
+- [x] StatementAssign.cpp::StatementAssign.is_simple_assign
+- [x] StatementAssign.cpp::StatementAssign.make_possible_compound_assign
+- [x] StatementAssign.cpp::StatementAssign.make_random
+- [x] StatementAssign.cpp::StatementAssign.need_no_rhs
+- [x] StatementAssign.cpp::StatementAssign.number_to_op
+- [x] StatementAssign.cpp::StatementAssign.operator=
+- [x] StatementAssign.cpp::StatementAssign.Output
+- [x] StatementAssign.cpp::StatementAssign.output_op
+- [x] StatementAssign.cpp::StatementAssign.OutputAsExpr
+- [x] StatementAssign.cpp::StatementAssign.OutputSimple
+- [x] StatementAssign.cpp::StatementAssign.push_back
+- [x] StatementAssign.cpp::StatementAssign.safe_assign
+- [x] StatementAssign.cpp::StatementAssign.StatementAssign
+- [x] StatementAssign.cpp::StatementAssign.visit_facts
+- [x] StatementAssign.cpp::StatementAssign.~StatementAssign
+- [x] StatementBreak.cpp::StatementBreak.get_blocks
+- [x] StatementBreak.cpp::StatementBreak.make_random
+- [x] StatementBreak.cpp::StatementBreak.must_jump
+- [x] StatementBreak.cpp::StatementBreak.Output
+- [x] StatementBreak.cpp::StatementBreak.push_back
+- [x] StatementBreak.cpp::StatementBreak.StatementBreak
+- [x] StatementBreak.cpp::StatementBreak.visit_facts
+- [x] StatementBreak.cpp::StatementBreak.~StatementBreak
+- [x] StatementContinue.cpp::StatementContinue.get_blocks
+- [x] StatementContinue.cpp::StatementContinue.make_random
+- [x] StatementContinue.cpp::StatementContinue.must_jump
+- [x] StatementContinue.cpp::StatementContinue.Output
+- [x] StatementContinue.cpp::StatementContinue.push_back
+- [x] StatementContinue.cpp::StatementContinue.StatementContinue
+- [x] StatementContinue.cpp::StatementContinue.visit_facts
+- [x] StatementContinue.cpp::StatementContinue.~StatementContinue
+- [x] StatementExpr.cpp::StatementExpr.get_blocks
+- [x] StatementExpr.cpp::StatementExpr.get_call
+- [x] StatementExpr.cpp::StatementExpr.get_dereferenced_ptrs
+- [x] StatementExpr.cpp::StatementExpr.get_invoke
+- [x] StatementExpr.cpp::StatementExpr.has_uncertain_call_recursive
+- [x] StatementExpr.cpp::StatementExpr.make_random
+- [x] StatementExpr.cpp::StatementExpr.operator=
+- [x] StatementExpr.cpp::StatementExpr.Output
+- [x] StatementExpr.cpp::StatementExpr.push_back
+- [x] StatementExpr.cpp::StatementExpr.StatementExpr
+- [x] StatementExpr.cpp::StatementExpr.visit_facts
+- [x] StatementExpr.cpp::StatementExpr.~StatementExpr
+- [x] StatementFor.cpp::StatementFor.get_body
+- [x] StatementFor.cpp::StatementFor.get_incr
+- [x] StatementFor.cpp::StatementFor.get_init
+- [x] StatementFor.cpp::StatementFor.get_test
+- [x] StatementFor.cpp::StatementFor.make_iteration
+- [x] StatementFor.cpp::StatementFor.make_random
+- [x] StatementFor.cpp::StatementFor.make_random_array_loop
+- [x] StatementFor.cpp::StatementFor.operator=
+- [x] StatementFor.cpp::StatementFor.Output
+- [x] StatementFor.cpp::StatementFor.output_header
+- [x] StatementFor.cpp::StatementFor.post_loop_analysis
+- [x] StatementFor.cpp::StatementFor.push_back
+- [x] StatementFor.cpp::StatementFor.StatementFor
+- [x] StatementFor.cpp::StatementFor.visit_facts
+- [x] StatementFor.cpp::StatementFor.~StatementFor
+- [x] StatementFor.cpp::make_random_array_control
+- [x] StatementFor.cpp::make_random_loop_control
 - [x] StatementGoto.cpp::StatementGoto.doFinalization
-- [ ] StatementGoto.cpp::StatementGoto.find_good_jump_block
-- [ ] StatementGoto.cpp::StatementGoto.get_blocks
-- [ ] StatementGoto.cpp::StatementGoto.has_init_skipped_vars
-- [ ] StatementGoto.cpp::StatementGoto.make_random
-- [ ] StatementGoto.cpp::StatementGoto.must_jump
-- [ ] StatementGoto.cpp::StatementGoto.Output
-- [ ] StatementGoto.cpp::StatementGoto.output_skipped_var_inits
-- [ ] StatementGoto.cpp::StatementGoto.push_back
-- [ ] StatementGoto.cpp::StatementGoto.StatementGoto
-- [ ] StatementGoto.cpp::StatementGoto.visit_facts
-- [ ] StatementGoto.cpp::StatementGoto.~StatementGoto
-- [ ] StatementIf.cpp::StatementIf.combine_branch_facts
-- [ ] StatementIf.cpp::StatementIf.get_false_branch
-- [ ] StatementIf.cpp::StatementIf.get_test
-- [ ] StatementIf.cpp::StatementIf.get_true_branch
-- [ ] StatementIf.cpp::StatementIf.make_random
-- [ ] StatementIf.cpp::StatementIf.must_jump
-- [ ] StatementIf.cpp::StatementIf.must_return
-- [ ] StatementIf.cpp::StatementIf.operator=
-- [ ] StatementIf.cpp::StatementIf.Output
-- [ ] StatementIf.cpp::StatementIf.output_branches
-- [ ] StatementIf.cpp::StatementIf.output_condition
-- [ ] StatementIf.cpp::StatementIf.push_back
-- [ ] StatementIf.cpp::StatementIf.StatementIf
-- [ ] StatementIf.cpp::StatementIf.visit_facts
-- [ ] StatementIf.cpp::StatementIf.~StatementIf
-- [ ] StatementReturn.cpp::StatementReturn.get_blocks
-- [ ] StatementReturn.cpp::StatementReturn.get_dereferenced_ptrs
-- [ ] StatementReturn.cpp::StatementReturn.get_var
-- [ ] StatementReturn.cpp::StatementReturn.make_random
-- [ ] StatementReturn.cpp::StatementReturn.must_jump
-- [ ] StatementReturn.cpp::StatementReturn.must_return
-- [ ] StatementReturn.cpp::StatementReturn.operator=
-- [ ] StatementReturn.cpp::StatementReturn.Output
-- [ ] StatementReturn.cpp::StatementReturn.push_back
-- [ ] StatementReturn.cpp::StatementReturn.StatementReturn
-- [ ] StatementReturn.cpp::StatementReturn.visit_facts
-- [ ] StatementReturn.cpp::StatementReturn.~StatementReturn
+- [x] StatementGoto.cpp::StatementGoto.find_good_jump_block
+- [x] StatementGoto.cpp::StatementGoto.get_blocks
+- [x] StatementGoto.cpp::StatementGoto.has_init_skipped_vars
+- [x] StatementGoto.cpp::StatementGoto.make_random
+- [x] StatementGoto.cpp::StatementGoto.must_jump
+- [x] StatementGoto.cpp::StatementGoto.Output
+- [x] StatementGoto.cpp::StatementGoto.output_skipped_var_inits
+- [x] StatementGoto.cpp::StatementGoto.push_back
+- [x] StatementGoto.cpp::StatementGoto.StatementGoto
+- [x] StatementGoto.cpp::StatementGoto.visit_facts
+- [x] StatementGoto.cpp::StatementGoto.~StatementGoto
+- [x] StatementIf.cpp::StatementIf.combine_branch_facts
+- [x] StatementIf.cpp::StatementIf.get_false_branch
+- [x] StatementIf.cpp::StatementIf.get_test
+- [x] StatementIf.cpp::StatementIf.get_true_branch
+- [x] StatementIf.cpp::StatementIf.make_random
+- [x] StatementIf.cpp::StatementIf.must_jump
+- [x] StatementIf.cpp::StatementIf.must_return
+- [x] StatementIf.cpp::StatementIf.operator=
+- [x] StatementIf.cpp::StatementIf.Output
+- [x] StatementIf.cpp::StatementIf.output_branches
+- [x] StatementIf.cpp::StatementIf.output_condition
+- [x] StatementIf.cpp::StatementIf.push_back
+- [x] StatementIf.cpp::StatementIf.StatementIf
+- [x] StatementIf.cpp::StatementIf.visit_facts
+- [x] StatementIf.cpp::StatementIf.~StatementIf
+- [x] StatementReturn.cpp::StatementReturn.get_blocks
+- [x] StatementReturn.cpp::StatementReturn.get_dereferenced_ptrs
+- [x] StatementReturn.cpp::StatementReturn.get_var
+- [x] StatementReturn.cpp::StatementReturn.make_random
+- [x] StatementReturn.cpp::StatementReturn.must_jump
+- [x] StatementReturn.cpp::StatementReturn.must_return
+- [x] StatementReturn.cpp::StatementReturn.operator=
+- [x] StatementReturn.cpp::StatementReturn.Output
+- [x] StatementReturn.cpp::StatementReturn.push_back
+- [x] StatementReturn.cpp::StatementReturn.StatementReturn
+- [x] StatementReturn.cpp::StatementReturn.visit_facts
+- [x] StatementReturn.cpp::StatementReturn.~StatementReturn
 - [x] StringUtils.cpp::StringUtils.breakup_assigns
 - [x] StringUtils.cpp::StringUtils.chop
 - [x] StringUtils.cpp::StringUtils.empty_line

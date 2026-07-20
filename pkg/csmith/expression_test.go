@@ -1497,3 +1497,28 @@ func TestMakeRandomExpressionVoidIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestExpressionCloneGetInvokeComplexity(t *testing.T) {
+	ClearError()
+	c := MakeInt(3)
+	e := &Expression{Term: TermConstant, Con: c}
+	cl := e.Clone()
+	if cl == nil || cl.Con == c || cl.Con.Value != "3" {
+		t.Fatal(cl)
+	}
+	if e.GetComplexity() != 0 {
+		t.Fatal(e.GetComplexity())
+	}
+	if e.GetInvoke() != nil {
+		t.Fatal("non-func")
+	}
+	// compound sticky
+	if e2 := (&Expression{Term: TermCommaExpr}).Clone(); e2 != nil || !HasError() {
+		t.Fatal("comma clone sticky")
+	}
+	ClearError()
+	tabs := InitProbabilityTables(Defaults())
+	if tabs == nil || ProcessExprTables() != tabs {
+		t.Fatal("init tables")
+	}
+}

@@ -114,3 +114,28 @@ func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) Stateme
 func IsCompound(t StatementType) bool {
 	return t == StmtBlock || t == StmtFor || t == StmtIfElse || t == StmtArrayOp
 }
+
+// InitProbabilityTable mirrors Statement::InitProbabilityTable.
+// Statement.cpp:133–139 — builds/installs process statement threshold table.
+// Prefer session Probabilities::StatementThresholdTable when live.
+func InitProbabilityTable(opts Options) *ThresholdTable {
+	t := NewStatementThresholdTable(opts)
+	SetProcessStmtTab(t)
+	return t
+}
+
+// GetType mirrors Statement::get_type — returns the eStatementType kind.
+// Incomplete Stmt sticky MaxStatementType.
+func (st *Stmt) GetType() StatementType {
+	if st == nil {
+		SetError(ErrGeneric)
+		return MaxStatementType
+	}
+	return st.Kind
+}
+
+// GetCurrentSID mirrors Statement::get_current_sid process counter.
+// Statement uses nextStmID package counter (nextStmID).
+func GetCurrentSID() int {
+	return nextStmID
+}

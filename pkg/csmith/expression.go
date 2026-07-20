@@ -159,6 +159,58 @@ func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bo
 	return false
 }
 
+// GetComplexity mirrors Expression::get_complexity via ExpressionComplexity.
+// Incomplete IR sticky -1 (no invent leaf 0 past holes).
+func (e *Expression) GetComplexity() int {
+	return ExpressionComplexity(e)
+}
+
+// GetInvoke mirrors Expression::get_invoke — non-nil only for TermFunction.
+func (e *Expression) GetInvoke() *Invocation {
+	if e == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if e.Term != TermFunction {
+		return nil
+	}
+	if e.Invoke == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return e.Invoke
+}
+
+// Clone mirrors Expression::clone for Constant / Variable / Lhs leaves.
+// Compound terms fail closed sticky nil (no invent shallow shell without deep copy).
+func (e *Expression) Clone() *Expression {
+	if e == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	switch e.Term {
+	case TermConstant:
+		if e.Con == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		c := e.Con.Clone()
+		if c == nil {
+			return nil
+		}
+		return &Expression{Term: TermConstant, Con: c, CastType: e.CastType}
+	case TermVariable, TermLhs:
+		if e.Var == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		return &Expression{Term: e.Term, Var: e.Var, ExprType: e.ExprType, CastType: e.CastType}
+	default:
+		SetError(ErrGeneric)
+		return nil
+	}
+}
+
 // CheckAndSetCast mirrors Expression::check_and_set_cast.
 // Expression.cpp:222–226 — lang_cpp or needs_cast; we apply when desired type needs cast.
 // CheckAndSetCast mirrors Expression::check_and_set_cast without lang_cpp gate
@@ -836,6 +888,25 @@ func NewExprTables(opts Options) *ExprTables {
 		t.Param.AddEntry(int(TermCommaExpr), 10)
 	}
 	return t
+}
+
+// InitProbabilityTables mirrors Expression::InitProbabilityTables static setup.
+// Expression.cpp:93–96 — installs process session expr/param tables from opts.
+func InitProbabilityTables(opts Options) *ExprTables {
+	t := NewExprTables(opts)
+	SetProcessExprTables(t)
+	return t
+}
+
+// InitExprProbabilityTable rebuilds only the expr DistributionTable half.
+// Expression.cpp InitExprProbabilityTable path via NewExprTables.
+func InitExprProbabilityTable(opts Options) DistributionTable {
+	return NewExprTables(opts).Expr
+}
+
+// InitParamProbabilityTable rebuilds only the param DistributionTable half.
+func InitParamProbabilityTable(opts Options) DistributionTable {
+	return NewExprTables(opts).Param
 }
 
 // ExpressionTypeProbability mirrors ExpressionTypeProbability.

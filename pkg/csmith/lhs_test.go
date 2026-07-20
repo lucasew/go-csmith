@@ -708,3 +708,27 @@ func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsCloneDereferencedComplexity(t *testing.T) {
+	ClearError()
+	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	lhs := &Lhs{Var: v, Type: GetIntType()} // deref once: pointer → int
+	cl := lhs.Clone()
+	if cl == nil || cl.Var != v || cl == lhs {
+		t.Fatal(cl)
+	}
+	if lhs.GetComplexity() != 0 {
+		t.Fatal(lhs.GetComplexity())
+	}
+	ptrs := lhs.GetDereferencedPtrs()
+	if len(ptrs) != 1 || ptrs[0].Var != v {
+		t.Fatal(ptrs)
+	}
+	// bare non-deref
+	sc := CreateVariableScalars("g_1", GetIntType(), true, false)
+	bare := &Lhs{Var: sc, Type: GetIntType()}
+	if len(bare.GetDereferencedPtrs()) != 0 {
+		t.Fatal("no deref")
+	}
+	ClearError()
+}

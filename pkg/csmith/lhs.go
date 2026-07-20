@@ -7,11 +7,65 @@ import "strings"
 // Lhs mirrors Lhs : Expression — variable + desired type for * / bare / VOL_LVAL.
 // Lhs.cpp:149–165.
 type Lhs struct {
-	Var              *Variable
+	Var *Variable
 	// Type is the desired LHS type (may differ from Var.Type by indirection).
 	Type *Type
 	// CompoundAssign mirrors for_compound_assign.
 	CompoundAssign bool
+}
+
+// Clone mirrors Lhs::clone.
+// Lhs.cpp:174 — new Lhs(*this).
+// Incomplete Lhs sticky nil (no invent empty Lhs shell).
+func (l *Lhs) Clone() *Lhs {
+	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	cp := *l
+	return &cp
+}
+
+// GetComplexity mirrors Expression::get_complexity for Lhs — ExpressionVariable leaf.
+// ExpressionVariable is complexity 0 (Bookkeeper ExpressionComplexity TermVariable).
+func (l *Lhs) GetComplexity() int {
+	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
+		return -1
+	}
+	return 0
+}
+
+// GetDereferencedPtrs mirrors Lhs::get_dereferenced_ptrs.
+// Lhs.cpp:225–232 — self ExpressionVariable when indirect_level > 0.
+// Incomplete Lhs sticky IncompleteExpressions.
+func (l *Lhs) GetDereferencedPtrs() []*Expression {
+	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
+		return IncompleteExpressions()
+	}
+	n, ok := l.IndirectLevelComplete()
+	if !ok {
+		return IncompleteExpressions()
+	}
+	if n <= 0 {
+		return []*Expression{}
+	}
+	ty := l.Type
+	if ty == nil {
+		ty = l.Var.Type
+	}
+	return []*Expression{{Term: TermVariable, Var: l.Var, ExprType: ty}}
+}
+
+// PtrModifiedInRhs mirrors Lhs::ptr_modified_in_rhs via CGContext.
+// Lhs.cpp:233–257.
+func (l *Lhs) PtrModifiedInRhs(cg *CGContext, facts []*FactPointTo) bool {
+	if l == nil || cg == nil {
+		SetError(ErrGeneric)
+		return true // fail closed as modified
+	}
+	return cg.PtrModifiedInRhs(l, facts)
 }
 
 // IndirectLevel mirrors Lhs::get_indirect_level.
