@@ -622,3 +622,49 @@ func TestRhsToLhsTransferUnionGetCollectiveResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRhsToLhsTransferGetCollectiveResidualSticky(t *testing.T) {
+	// GetCollective residual soft invent was invent soft-merge pointees past array shell.
+	ClearError()
+	// IsArray without AsArray GetCollective residual
+	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	rhs := &Expression{Term: TermVariable, Var: shell, ExprType: PointerTo(GetIntType())}
+	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	if FactsComplete(out) && out != nil && len(out) > 0 {
+		// may incomplete empty
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray GetCollective residual RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestAbstractFactForAssignGetCollectiveResidualSticky(t *testing.T) {
+	// GetCollective residual soft invent was invent soft-abstract past array shell LHS.
+	ClearError()
+	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
+	out := AbstractFactForAssign(nil, shell, 0, rhs)
+	if FactsComplete(out) && out != nil && len(out) > 0 {
+		// may incomplete
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray GetCollective residual AbstractFactForAssign must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestAbstractFactUnionForAssignGetCollectiveResidualSticky(t *testing.T) {
+	// GetCollective residual soft invent was invent soft-abstract union past array shell.
+	ClearError()
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	out, _ := AbstractFactUnionForAssign(nil, nil, shell, 0, nil)
+	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
+		// may incomplete
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray GetCollective residual AbstractFactUnionForAssign must SetError sticky")
+	}
+	ClearError()
+}

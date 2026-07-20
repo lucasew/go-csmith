@@ -199,6 +199,10 @@ func MakeRandomAssignQfer(
 		}
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
+			// residual ERROR sticky — no invent soft-continue compound past AddEffect residual
+			if HasError() {
+				return Stmt{}
+			}
 			if !EffectComplete(runningEff) {
 				SetError(ErrGeneric)
 				return Stmt{}
@@ -209,12 +213,23 @@ func MakeRandomAssignQfer(
 		}
 		// StatementAssign.cpp:163 — always fold RHS into running under strict_volatile
 		runningEff = runningEff.AddEffect(rhsAccum)
+		// residual ERROR sticky — no invent soft-continue strict-vol past AddEffect residual
+		if HasError() {
+			return Stmt{}
+		}
 		if !EffectComplete(runningEff) {
 			SetError(ErrGeneric)
 			return Stmt{}
 		}
 		if !callerQf && qfer.IsVolatile() {
+			// residual ERROR sticky — no invent soft-clear vol past IsVolatile residual
+			if HasError() {
+				return Stmt{}
+			}
 			qfer.SetVolatile(false, 0)
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
+			return Stmt{}
 		}
 	} else {
 		// StatementAssign.cpp:168–181
@@ -232,6 +247,10 @@ func MakeRandomAssignQfer(
 		}
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
+			// residual ERROR sticky — no invent soft-continue compound past AddEffect residual
+			if HasError() {
+				return Stmt{}
+			}
 			if !EffectComplete(runningEff) {
 				SetError(ErrGeneric)
 				return Stmt{}
@@ -904,10 +923,12 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			}
 			// Incomplete param accum sticky (no invent visit more args under incomplete)
 			running = running.AddEffect(paramAccum)
+			// residual ERROR sticky — no invent soft-continue later args past AddEffect residual
+			if HasError() {
+				return false
+			}
 			if !EffectComplete(running) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return false
 			}
 			// merge_param_context; include_lhs for std ops only
@@ -1051,10 +1072,12 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	// Incomplete folds sticky (no invent LHS visit under incomplete running)
 	if st.AssignOp != AssignSimple {
 		runningEff = runningEff.AddEffect(rhsAccum)
+		// residual ERROR sticky — no invent soft-continue LHS visit past AddEffect residual
+		if HasError() {
+			return false
+		}
 		if !EffectComplete(runningEff) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return false
 		}
 	}

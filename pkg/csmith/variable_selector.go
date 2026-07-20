@@ -1062,6 +1062,10 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
 	// Incomplete GetCollective fails closed sticky (no invent not-eligible past hole)
 	coll := v.GetCollective()
+	// residual ERROR sticky — no invent soft not-eligible past GetCollective residual
+	if HasError() {
+		return false
+	}
 	if coll == nil {
 		SetError(ErrGeneric)
 		return false

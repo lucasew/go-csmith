@@ -553,6 +553,10 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			}
 			// GetCollective always live for address-of; nil is broken IR sticky
 			coll := rhs.Var.GetCollective()
+			// residual ERROR sticky — no invent soft-address past GetCollective residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			if coll == nil {
 				SetError(ErrGeneric)
 				return IncompleteFactSlice()
@@ -562,7 +566,16 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
 			// incomplete collective / pointees — non-sticky abstract hole marker
-			vars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, facts)
+			coll := rhs.Var.GetCollective()
+			// residual ERROR sticky — no invent soft-merge aggregate past GetCollective residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
+			vars := MergePointeesOfPointer(coll, indirect, facts)
+			// residual ERROR sticky — no invent soft-merge past MergePointees residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			if !VariablesComplete(vars) {
 				return IncompleteFactSlice()
 			}
@@ -599,7 +612,16 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		}
 		// FactPointTo.cpp:225–228 — merge_pointees(collective, indirect+1)
 		// empty set is valid (no soft invent GarbagePtr); incomplete set non-sticky
-		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
+		coll := rhs.Var.GetCollective()
+		// residual ERROR sticky — no invent soft-merge pointees past GetCollective residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
+		set := MergePointeesOfPointer(coll, indirect+1, facts)
+		// residual ERROR sticky — no invent soft-merge past MergePointees residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if !VariablesComplete(set) {
 			return IncompleteFactSlice()
 		}
@@ -712,7 +734,16 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	}
 	// find all pointed variables on LHS (merge_pointees of collective)
 	// incomplete pointees — non-sticky abstract hole (fact-map soft re-pick)
-	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, factsIn)
+	coll := lhs.GetCollective()
+	// residual ERROR sticky — no invent soft-abstract past GetCollective residual
+	if HasError() {
+		return IncompleteFactSlice()
+	}
+	lvars := MergePointeesOfPointer(coll, lhsIndir, factsIn)
+	// residual ERROR sticky — no invent soft-abstract past MergePointees residual
+	if HasError() {
+		return IncompleteFactSlice()
+	}
 	if !VariablesComplete(lvars) {
 		return IncompleteFactSlice()
 	}
@@ -784,10 +815,19 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
-		if v.IsPointer() && lhsIndir > 0 {
+		isPtr := v.IsPointer()
+		// residual ERROR sticky — no invent soft-skip *p path past IsPointer residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
+		if isPtr && lhsIndir > 0 {
 			// assigning *p = rhs: also update pointer pointees
 			// incomplete more — non-sticky abstract (fact-map soft re-pick)
 			more := MergePointeesOfPointer(v, 1, factsIn)
+			// residual ERROR sticky — no invent soft-abstract past MergePointees residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			if !VariablesComplete(more) {
 				return IncompleteFactSlice()
 			}

@@ -2235,6 +2235,10 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 	}
 	// base name always live sticky; no invent printf with bare "[0]" access
 	base := v.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty dump past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if base == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -2560,6 +2564,10 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	}
 	// array name always live sticky; no invent transparent_crc([i], …) / for ( = 0; …)
 	access := v.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty hash past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if access == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -2572,6 +2580,10 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 			return ""
 		}
 		names[i] = ctrl[i].GetActualName(false)
+		// residual ERROR sticky — no invent soft-continue later indices past GetActualName residual
+		if HasError() {
+			return ""
+		}
 		if names[i] == "" {
 			// ctrl get_actual_name always live sticky; no invent empty index id
 			SetError(ErrGeneric)

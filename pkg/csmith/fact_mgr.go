@@ -1667,12 +1667,20 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 		return IncompleteVariables()
 	}
 	coll := lhs.GetCollective()
+	// residual ERROR sticky — no invent soft-lvars past GetCollective residual
+	if HasError() {
+		return IncompleteVariables()
+	}
 	if coll == nil {
 		// incomplete field path collective sticky (hard IR hole)
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	lvars := MergePointeesOfPointer(coll, lhsIndir, facts)
+	// residual ERROR sticky — no invent soft-lvars past MergePointees residual
+	if HasError() {
+		return IncompleteVariables()
+	}
 	if !VariablesComplete(lvars) {
 		// missing exist_fact / incomplete merge non-sticky (soft re-pick)
 		return IncompleteVariables()

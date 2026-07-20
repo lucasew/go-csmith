@@ -638,7 +638,16 @@ func AbstractFactUnionForAssign(
 	if !UnionFactsComplete(unionFacts) || !FactsComplete(ptFacts) {
 		return IncompleteUnionFactSlice(), 0
 	}
-	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, ptFacts)
+	coll := lhs.GetCollective()
+	// residual ERROR sticky — no invent soft-abstract union past GetCollective residual
+	if HasError() {
+		return IncompleteUnionFactSlice(), 0
+	}
+	lvars := MergePointeesOfPointer(coll, lhsIndir, ptFacts)
+	// residual ERROR sticky — no invent soft-abstract union past MergePointees residual
+	if HasError() {
+		return IncompleteUnionFactSlice(), 0
+	}
 	// incomplete merge at indir>0 — non-sticky; indir 0 yields [lhs]
 	if !VariablesComplete(lvars) {
 		return IncompleteUnionFactSlice(), 0

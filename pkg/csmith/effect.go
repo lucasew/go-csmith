@@ -749,11 +749,19 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 		return true
 	}
 	youColl := v.GetCollective()
+	// residual ERROR sticky — no invent soft no-sibling past GetCollective residual
+	if HasError() {
+		return true
+	}
 	if youColl == nil {
 		SetError(ErrGeneric)
 		return true
 	}
 	you := youColl.GetContainerUnion()
+	// residual ERROR sticky — no invent soft no-sibling past GetContainerUnion residual
+	if HasError() {
+		return true
+	}
 	if you == nil {
 		// Type-nil ancestry (not residual global HasError): restrictive true
 		// (no invent no-sibling / conflict-free past incomplete container shell)
@@ -775,6 +783,10 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 			continue
 		}
 		rColl := r.GetCollective()
+		// residual ERROR sticky — no invent soft-continue later reads past GetCollective residual
+		if HasError() {
+			return true
+		}
 		if rColl == nil {
 			SetError(ErrGeneric)
 			return true
@@ -807,11 +819,19 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 		return true
 	}
 	youColl := v.GetCollective()
+	// residual ERROR sticky — no invent soft no-sibling past GetCollective residual
+	if HasError() {
+		return true
+	}
 	if youColl == nil {
 		SetError(ErrGeneric)
 		return true
 	}
 	you := youColl.GetContainerUnion()
+	// residual ERROR sticky — no invent soft no-sibling past GetContainerUnion residual
+	if HasError() {
+		return true
+	}
 	if you == nil {
 		// Type-nil ancestry (not residual global HasError): restrictive true
 		// (no invent no-sibling / conflict-free past incomplete container shell)
@@ -833,6 +853,10 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 			continue
 		}
 		wColl := w.GetCollective()
+		// residual ERROR sticky — no invent soft-continue later writes past GetCollective residual
+		if HasError() {
+			return true
+		}
 		if wColl == nil {
 			SetError(ErrGeneric)
 			return true
