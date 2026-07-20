@@ -130,8 +130,9 @@ func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 		// residual ERROR sticky — no invent soft-continue decl past IsGlobal residual false
 		return ""
 	}
+	// Variable.cpp:675–676 — output_qualified_type then name with no invent space.
+	// Spacing (trailing after base / "volatile ") is owned by OutputQualifiedType.
 	b.WriteString(ty)
-	b.WriteString(" ")
 	b.WriteString(name)
 	return b.String()
 }
@@ -203,7 +204,8 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	b.WriteString(" = ")
 	b.WriteString(initOut)
 	b.WriteString(";")
-	// Variable.cpp:658–661 — volatile global comment on same line path uses comment helper
+	// Variable.cpp:662–667 — is_volatile → output_comment_line("VOLATILE GLOBAL "+name)
+	// OutputMgr.cpp:314–319 — immediately "/* " + comment + " */" (no invent space before /*)
 	if v.IsGlobal() && v.IsVolatile() {
 		// residual ERROR sticky — no invent soft-skip comment past IsGlobal/IsVolatile residual
 		if HasError() {
@@ -215,7 +217,7 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 			return ""
 		}
 		if nm != "" {
-			b.WriteString(" /* VOLATILE GLOBAL ")
+			b.WriteString("/* VOLATILE GLOBAL ")
 			b.WriteString(nm)
 			b.WriteString(" */")
 		}

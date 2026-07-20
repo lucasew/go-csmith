@@ -575,7 +575,8 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("/* --- GLOBAL VARIABLES --- */\n\n")
+	// VariableSelector.cpp:1552 — output_comment_line then globals; no invent blank line.
+	b.WriteString("/* --- GLOBAL VARIABLES --- */\n")
 	b.WriteString(body.String())
 	b.WriteString("\n")
 	return b.String()

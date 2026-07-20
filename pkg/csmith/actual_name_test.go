@@ -154,7 +154,8 @@ func TestOutputGlobalsVolatileComment(t *testing.T) {
 	}
 }
 
-func TestOutputGlobalsVolatileArrayComment(t *testing.T) {
+func TestOutputGlobalsVolatileArrayNoComment(t *testing.T) {
+	// ArrayVariable.cpp:506–507 — array OutputDef emits ";\n" only; no VOLATILE GLOBAL invent.
 	opts := Defaults()
 	g := NewProgramGenerator(opts)
 	av := &ArrayVariable{
@@ -169,7 +170,10 @@ func TestOutputGlobalsVolatileArrayComment(t *testing.T) {
 	g.VS.GlobalList = []*Variable{&av.Variable}
 	g.VS.Arrays = []*ArrayVariable{av}
 	out := g.OutputGlobals()
-	if !strings.Contains(out, "VOLATILE GLOBAL g_a") {
+	if strings.Contains(out, "VOLATILE GLOBAL") {
+		t.Fatal("array must not invent VOLATILE GLOBAL comment:", out)
+	}
+	if !strings.Contains(out, "volatile int") || !strings.Contains(out, "g_a[2]") {
 		t.Fatal(out)
 	}
 }

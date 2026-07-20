@@ -250,6 +250,8 @@ func (av *ArrayVariable) IsGlobal() bool {
 }
 
 // CDeclType returns C type with dimensions, e.g. int x[2][3].
+// ArrayVariable.cpp:512–521 OutputDecl — output_qualified_type + name + [sizes].
+// Do not invent bare Type.CName + storage IsVolatile (misplaces pointer vol).
 func (av *ArrayVariable) CDeclType() string {
 	// ArrayVariable / Variable decl always has live type; sticky (no invent "int")
 	if av == nil {
@@ -260,39 +262,29 @@ func (av *ArrayVariable) CDeclType() string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	cn := av.Type.CName()
-	// residual ERROR sticky — no invent soft-empty decl past CName residual
+	// ArrayVariable.cpp:517 — output_qualified_type(out)
+	ty := av.Qfer.OutputQualifiedType(av.Type)
+	// residual ERROR sticky — no invent soft-empty decl past OutputQualifiedType residual
 	if HasError() {
 		return ""
 	}
-	if cn == "" || av.Name == "" {
+	if ty == "" {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// ArrayVariable.cpp:518 — get_actual_name(); no invent space (type already spaced)
+	name := av.GetActualName(false)
+	// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
+	if HasError() {
+		return ""
+	}
+	if name == "" {
 		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
-	if av.IsConst() {
-		// residual ERROR sticky — no invent soft-const decl past IsConst residual hole
-		if HasError() {
-			return ""
-		}
-		b.WriteString("const ")
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-continue decl past IsConst residual false
-		return ""
-	}
-	if av.IsVolatile() {
-		// residual ERROR sticky — no invent soft-vol decl past IsVolatile residual hole
-		if HasError() {
-			return ""
-		}
-		b.WriteString("volatile ")
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-continue decl past IsVolatile residual false
-		return ""
-	}
-	b.WriteString(cn)
-	b.WriteString(" ")
-	b.WriteString(av.Name)
+	b.WriteString(ty)
+	b.WriteString(name)
 	for _, s := range av.Sizes {
 		b.WriteString(fmt.Sprintf("[%d]", s))
 	}
@@ -959,27 +951,8 @@ func (av *ArrayVariable) OutputDef() string {
 	b.WriteString(" = ")
 	b.WriteString(init)
 	b.WriteString(";")
-	// Variable.cpp:658–661 — ArrayVariable inherits OutputDef comment path for volatile globals
-	if av.IsGlobal() && av.IsVolatile() {
-		// residual ERROR sticky — no invent soft-skip comment past IsGlobal/IsVolatile residual
-		if HasError() {
-			return ""
-		}
-		// name always live (CDeclType already requires Name); comment uses actual_name
-		nm := av.GetActualName(false)
-		// residual ERROR sticky — no invent complete def past GetActualName residual hole
-		if HasError() {
-			return ""
-		}
-		if nm != "" {
-			b.WriteString(" /* VOLATILE GLOBAL ")
-			b.WriteString(nm)
-			b.WriteString(" */")
-		}
-	} else if HasError() {
-		// residual ERROR sticky — no invent complete def past IsGlobal residual false path
-		return ""
-	}
+	// ArrayVariable.cpp:506–507 — "= init;" then outputln only.
+	// Do not invent Variable::OutputDef VOLATILE GLOBAL comment (arrays omit it).
 	return b.String()
 }
 

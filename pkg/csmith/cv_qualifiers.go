@@ -928,7 +928,9 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 			SetError(ErrGeneric)
 			return ""
 		}
+		// CVQualifiers.cpp:557–559 — base Output then trailing space before name/site
 		b.WriteString(cn)
+		b.WriteString(" ")
 		return b.String()
 	}
 	base := t.BaseType()
@@ -939,7 +941,8 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	if base == nil {
 		base = t
 	}
-	// For simple types with one qualifier level: "const volatile int"
+	// For simple types with one qualifier level: "const volatile int "
+	// CVQualifiers.cpp:534–561 — single-level loop: quals then base + " "
 	if t.IsSimple() || t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-qual emit past IsSimple/IsAggregate residual true
 		if HasError() {
@@ -970,13 +973,15 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 			return ""
 		}
 		b.WriteString(cn)
+		b.WriteString(" ")
 		return b.String()
 	}
 	// residual ERROR sticky — no invent soft-pointer qual emit past IsSimple/IsAggregate residual false
 	if HasError() {
 		return ""
 	}
-	// pointer: const volatile base * const * ...
+	// pointer: const volatile base * const * ... (CVQualifiers.cpp:534–561)
+	// Do not TrimSpace — trailing space after base/"volatile " is significant for name concat.
 	var b strings.Builder
 	for i := 0; i < len(q.IsConsts); i++ {
 		if i > 0 {
@@ -1017,7 +1022,7 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 			b.WriteString(" ")
 		}
 	}
-	return strings.TrimSpace(b.String())
+	return b.String()
 }
 
 // isVolatileOKOnOneLevel mirrors is_volatile_ok_on_one_level (CVQualifiers.cpp).

@@ -580,8 +580,9 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 			}
 			return nil
 		}
+		// Constant.cpp:266–268 / 273–275 — value += "," (no invent ", " spaces)
 		if !first {
-			b.WriteString(", ")
+			b.WriteString(",")
 		}
 		first = false
 		b.WriteString(val)

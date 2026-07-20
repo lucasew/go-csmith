@@ -125,9 +125,9 @@ func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {
 	}
 	c := MakeStructConstant(NewRng(4), opts, probs, st)
 	// should have two values, not three (pad skipped)
-	// "{a, b}"
+	// Constant.cpp:266–275 — "{a,b}" with bare "," separators
 	inner := strings.TrimPrefix(strings.TrimSuffix(c.Value, "}"), "{")
-	parts := strings.Split(inner, ", ")
+	parts := strings.Split(inner, ",")
 	if len(parts) != 2 {
 		t.Fatalf("want 2 fields, got %q parts=%v", c.Value, parts)
 	}

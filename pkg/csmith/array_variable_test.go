@@ -1147,3 +1147,54 @@ func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
+	// ArrayVariable.cpp:512–521 + CVQualifiers.cpp:534–561 —
+	// storage-volatile pointer array: "int32_t * volatile g_38[1]" not "volatile int32_t* g_38[1]"
+	ClearError()
+	SetProcessOptions(Defaults())
+	pt := PointerTo(GetIntType())
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_38",
+			Type: pt,
+			IsArray: true,
+			ArraySizes: []int{1},
+			Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, true}),
+			Init: &Constant{Type: pt, Value: "0"},
+		},
+		Sizes: []int{1},
+		InitValues: []string{"&g_37"},
+	}
+	av.AsArray = av
+	d := av.CDeclType()
+	if HasError() {
+		t.Fatal("sticky error on CDeclType")
+	}
+	want := "int32_t * volatile g_38[1]"
+	if d != want {
+		t.Fatalf("got %q want %q", d, want)
+	}
+	def := av.OutputDef()
+	if strings.Contains(def, "VOLATILE GLOBAL") {
+		t.Fatal("array OutputDef must not invent VOLATILE GLOBAL:", def)
+	}
+	if !strings.Contains(def, want+" = ") {
+		t.Fatal(def)
+	}
+}
+
+func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
+	// Variable.cpp:662–664 + OutputMgr.cpp:318 — ";/* VOLATILE GLOBAL name */"
+	ClearError()
+	SetProcessOptions(Defaults())
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v.Init = MakeInt(0)
+	s := v.OutputDefOpts(true, false)
+	if !strings.Contains(s, ";/* VOLATILE GLOBAL g_v */") {
+		t.Fatal(s)
+	}
+	if strings.Contains(s, "; /*") {
+		t.Fatal("invent space before comment:", s)
+	}
+}
