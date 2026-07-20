@@ -119,7 +119,12 @@ func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
 // ProbabilityFilter for pSimpleTypesProb (equal group): filter(v) when weight==0.
 func (p *Probabilities) SimpleTypesFilter() Filter {
 	return filterFunc(func(v uint32) bool {
-		return p.SimpleTypeWeight(int(v)) == 0
+		w := p.SimpleTypeWeight(int(v))
+		// residual ERROR sticky — no invent filter false (keep) past SimpleTypeWeight residual
+		if HasError() {
+			return true
+		}
+		return w == 0
 	})
 }
 
@@ -141,7 +146,12 @@ func (p *Probabilities) BinaryOpWeight(opIdx int) int {
 // Probabilities.cpp set_default_binary_ops_prob + set_prob_filter.
 func (p *Probabilities) BinaryOpsFilter() Filter {
 	return filterFunc(func(v uint32) bool {
-		return p.BinaryOpWeight(int(v)) == 0
+		w := p.BinaryOpWeight(int(v))
+		// residual ERROR sticky — no invent filter false (keep) past BinaryOpWeight residual
+		if HasError() {
+			return true
+		}
+		return w == 0
 	})
 }
 
@@ -163,7 +173,12 @@ func (p *Probabilities) UnaryOpWeight(opIdx int) int {
 // Probabilities.cpp set_default_unary_ops_prob + set_prob_filter.
 func (p *Probabilities) UnaryOpsFilter() Filter {
 	return filterFunc(func(v uint32) bool {
-		return p.UnaryOpWeight(int(v)) == 0
+		w := p.UnaryOpWeight(int(v))
+		// residual ERROR sticky — no invent filter false (keep) past UnaryOpWeight residual
+		if HasError() {
+			return true
+		}
+		return w == 0
 	})
 }
 
@@ -340,6 +355,11 @@ func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
 // Probabilities.cpp set_default_safe_ops_size_prob + set_prob_filter.
 func (p *Probabilities) SafeOpsSizeFilter() Filter {
 	return filterFunc(func(v uint32) bool {
-		return p.SafeOpsSizeWeight(int(v)) == 0
+		w := p.SafeOpsSizeWeight(int(v))
+		// residual ERROR sticky — no invent filter false (keep) past SafeOpsSizeWeight residual
+		if HasError() {
+			return true
+		}
+		return w == 0
 	})
 }

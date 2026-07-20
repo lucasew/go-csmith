@@ -65,7 +65,21 @@ func MakeRandomExprStmt(
 		if cg.FM != nil {
 			cg.FM.RestoreFacts(factsCopy)
 		}
+		// residual ERROR sticky — no invent soft re-pick past Failed residual (restore may residual)
+		if HasError() {
+			return Stmt{}
+		}
 		// Statement::make_random retries on null
+		return Stmt{}
+	}
+	// residual ERROR sticky — no invent invoke stmt past MakeRandomInvocation residual success path
+	if HasError() {
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = preEffect
+		}
+		if cg.FM != nil {
+			cg.FM.RestoreFacts(factsCopy)
+		}
 		return Stmt{}
 	}
 	// Statement base ctor always assigns stm_id (Statement.cpp:364–367)

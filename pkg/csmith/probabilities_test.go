@@ -154,3 +154,16 @@ func TestProbabilitiesNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSimpleTypesFilterNilProbsResidualSticky(t *testing.T) {
+	// SimpleTypeWeight residual soft invent was invent keep candidate past nil probs.
+	ClearError()
+	f := (*Probabilities)(nil).SimpleTypesFilter()
+	if !f.Filter(0) {
+		t.Fatal("nil probs filter must reject (filter true) fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil probs SimpleTypesFilter must SetError sticky")
+	}
+	ClearError()
+}

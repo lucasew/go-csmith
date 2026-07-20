@@ -43,6 +43,7 @@ func MakeRandomContinue(
 	cg.EffectStm = EmptyEffect()
 	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	// residual ERROR sticky — no invent soft-return continue past condition make residual
 	if expr == nil || HasError() {
 		return Stmt{}
 	}
@@ -50,6 +51,10 @@ func MakeRandomContinue(
 	// FactMgr::create_cfg_edge(sc, b, false, true) — StatementContinue.cpp:83
 	if cg.FM != nil {
 		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)
+		// residual ERROR sticky — no invent soft-return continue past CreateCFGEdge residual
+		if HasError() {
+			return Stmt{}
+		}
 	}
 	return st
 }

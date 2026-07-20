@@ -194,3 +194,34 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 		t.Fatal("ProcessStmtTab must share generator table")
 	}
 }
+
+func TestMakeRandomExprStmtNilCGSticky(t *testing.T) {
+	ClearError()
+	if MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil).Kind != 0 {
+		t.Fatal("nil cg MakeRandomExprStmt must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil cg MakeRandomExprStmt must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestHasUncertainCallRecursiveExprNilSticky(t *testing.T) {
+	ClearError()
+	if !HasUncertainCallRecursiveExpr(nil) {
+		t.Fatal("nil HasUncertainCallRecursiveExpr must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil HasUncertainCallRecursiveExpr must SetError sticky")
+	}
+	ClearError()
+	// complete constant no uncertain
+	e := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	if HasUncertainCallRecursiveExpr(e) {
+		t.Fatal("constant must not invent uncertain call")
+	}
+	if HasError() {
+		t.Fatal("complete HasUncertainCallRecursiveExpr must not sticky")
+	}
+	ClearError()
+}

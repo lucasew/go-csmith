@@ -411,3 +411,15 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 		}
 	}
 }
+
+func TestMakeRandomBreakNilCGSticky(t *testing.T) {
+	// nil CG residual soft invent was invent Kind-only break shell.
+	ClearError()
+	if MakeRandomBreak(NewRng(1), Defaults(), nil, nil, nil).Kind != 0 {
+		t.Fatal("nil cg MakeRandomBreak must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil cg MakeRandomBreak must SetError sticky")
+	}
+	ClearError()
+}

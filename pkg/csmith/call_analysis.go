@@ -287,7 +287,12 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.Invoke.HasUncertainCallRecursive()
+		ok := e.Invoke.HasUncertainCallRecursive()
+		// residual ERROR sticky — no invent certain soft-skip past Invoke recurse residual
+		if HasError() {
+			return true
+		}
+		return ok
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			SetError(ErrGeneric)
@@ -345,7 +350,12 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return HasUncertainCallRecursiveExpr(st.Expr)
+		ok := HasUncertainCallRecursiveExpr(st.Expr)
+		// residual ERROR sticky — no invent certain soft-skip past expr recurse residual
+		if HasError() {
+			return true
+		}
+		return ok
 	case StmtFor, StmtArrayOp:
 		// StatementFor::get_exprs → test (not st.Expr)
 		if st.Loop == nil || st.Loop.TestExpr == nil {
@@ -364,7 +374,12 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 			return true
 		}
 		// get_blocks body only — sticky no invent soft-skip nil body as "no uncertain call"
-		for _, b := range GetBlocksStmt(st) {
+		blks := GetBlocksStmt(st)
+		// residual ERROR sticky — no invent certain soft-skip past GetBlocksStmt residual
+		if HasError() {
+			return true
+		}
+		for _, b := range blks {
 			if b == nil {
 				SetError(ErrGeneric)
 				return true
