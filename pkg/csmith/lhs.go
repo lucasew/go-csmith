@@ -522,10 +522,13 @@ func MakeRandomLhs(
 		cg.EffectStm = stmSave
 	}
 
-	// Lhs.cpp:63, 70–140 — do { DEPTH_GUARD; select; filters; visit } while (!lhs)
-	// C++ loops until success or ERROR_GUARD; cap high to avoid soft invent nil early
+	// Lhs.cpp:70–140 — do { DEPTH_GUARD; select; filters; visit } while (true).
+	// C++ is unbounded; Go uses a high soft ceiling so unit tests that only offer
+	// impossible candidates (e.g. signed-only + no_signed_overflow) still return nil.
+	// 256 was too low: seed-2 e4412 exhausted at try 255 while UP continued and
+	// accepted a Lhs on the next SelectDeref F80 path.
 	var dummy []*Variable
-	for tries := 0; tries < 256; tries++ {
+	for tries := 0; tries < 10000; tries++ {
 		// Lhs.cpp:71 — DEPTH_GUARD_BY_TYPE_RETURN(dtLhs, nullptr) inside the do-loop
 		if DepthGuardByType(opts, DtLhs) == BadDepth {
 			return nil
