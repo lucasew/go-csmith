@@ -39,6 +39,41 @@ func TestIfMustReturnBothBranches(t *testing.T) {
 	ClearError()
 }
 
+// TestForArrayOpMustReturnBaseFalse — Statement.h:187 default false; StatementFor /
+// StatementArrayOp do not override. A for/array-op whose body returns must NOT
+// stop Block::make_random (seed-2 e13830 parent stack depth).
+func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
+	ClearError()
+	body := &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
+	for _, kind := range []StatementType{StmtFor, StmtArrayOp} {
+		st := Stmt{Kind: kind, Then: body}
+		if st.MustReturn() {
+			t.Fatalf("%v MustReturn must be false (Statement.h default), body return ignored", kind)
+		}
+		if st.MustJump() {
+			t.Fatalf("%v MustJump must be false (Statement.h default)", kind)
+		}
+		if HasError() {
+			t.Fatalf("%v must not sticky-error on complete body", kind)
+		}
+	}
+	// Parent block continues after for even when for-body last is return.
+	parent := &Block{Stmts: []Stmt{
+		{Kind: StmtFor, Then: body},
+		{Kind: StmtAssign},
+	}}
+	if parent.MustReturn() {
+		t.Fatal("parent ending in assign must not must_return via for body")
+	}
+	// After only the for (as if Block stopped early on invent for.MustReturn):
+	// Block with last=for must not must_return either.
+	onlyFor := &Block{Stmts: []Stmt{{Kind: StmtFor, Then: body}}}
+	if onlyFor.MustReturn() {
+		t.Fatal("block last=for must not must_return (for base false)")
+	}
+	ClearError()
+}
+
 func TestBlockMustReturnLast(t *testing.T) {
 	ClearError()
 	b := &Block{Stmts: []Stmt{{Kind: StmtAssign}, {Kind: StmtReturn}}}

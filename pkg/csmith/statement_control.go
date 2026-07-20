@@ -3,9 +3,14 @@
 package csmith
 
 // MustReturn mirrors Statement::must_return (default false; Return true; If both branches).
-// Statement.h:187; StatementReturn.h:60; StatementIf.cpp:200–201; Block.cpp:313–316.
-// Incomplete get_blocks (nil if-arm / for body) sticky false — C++ always has
-// live Block refs; no invent "must_return" by soft-skipping a missing arm.
+// Statement.h:187 — virtual default false (StatementFor / StatementArrayOp do NOT override).
+// StatementReturn.h:60; StatementIf.cpp:200–201; Block.cpp:313–316.
+// Incomplete get_blocks (nil if-arm) sticky false — C++ always has live Block refs;
+// no invent "must_return" by soft-skipping a missing arm.
+//
+// For/ArrayOp: body may contain return, but Statement::must_return stays false, so
+// Block::make_random continues siblings after a for/array-op (seed-2 e13830: Go used
+// to stop the parent block when the for body returned → stack n=4 vs upstream n=5).
 func (st Stmt) MustReturn() bool {
 	switch st.Kind {
 	case StmtReturn:
@@ -35,21 +40,8 @@ func (st Stmt) MustReturn() bool {
 			return false
 		}
 		return ok
-	case StmtFor, StmtArrayOp:
-		// for only if body always returns (StatementFor.cpp visit path)
-		blks := GetBlocksStmt(&st)
-		if len(blks) == 0 || blks[0] == nil {
-			// StatementFor always has body; incomplete sticky not-must-return
-			SetError(ErrGeneric)
-			return false
-		}
-		ok := blks[0].MustReturn()
-		// residual ERROR sticky — no invent must-return true past body residual hole
-		if HasError() {
-			return false
-		}
-		return ok
 	default:
+		// Statement.h:187 — includes StmtFor / StmtArrayOp (no override in C++)
 		return false
 	}
 }
@@ -108,20 +100,8 @@ func (st Stmt) MustJump() bool {
 			return false
 		}
 		return ok
-	case StmtFor, StmtArrayOp:
-		blks := GetBlocksStmt(&st)
-		if len(blks) == 0 || blks[0] == nil {
-			// StatementFor always has body; incomplete sticky not-must-jump
-			SetError(ErrGeneric)
-			return false
-		}
-		ok := blks[0].MustJump()
-		// residual ERROR sticky — no invent must-jump true past body residual hole
-		if HasError() {
-			return false
-		}
-		return ok
 	default:
+		// Statement.h:189 — includes StmtFor / StmtArrayOp (no override in C++)
 		return false
 	}
 }
