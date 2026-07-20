@@ -28,6 +28,11 @@ type Effect struct {
 	written map[*Variable]bool
 	// read tracks variables read (Effect::read_vars subset).
 	read map[*Variable]bool
+	// readOrder / writeOrder preserve Effect::read_vars/write_vars insertion order
+	// (C++ vector). Maps alone are unordered; ChooseOKVar index depends on order
+	// after expand_struct_union_vars (seed-2 e18618 ok_vars n).
+	readOrder  []*Variable
+	writeOrder []*Variable
 	// lhsWrite tracks LHS write vars (Effect::lhs_write_vars).
 	// Effect.h:104 — used after assign visit to extend running context.
 	lhsWrite map[*Variable]bool
@@ -72,11 +77,17 @@ func (e Effect) Clone() Effect {
 			out.read[k] = v
 		}
 	}
+	if len(e.readOrder) > 0 {
+		out.readOrder = append([]*Variable(nil), e.readOrder...)
+	}
 	if len(e.written) > 0 {
 		out.written = make(map[*Variable]bool, len(e.written))
 		for k, v := range e.written {
 			out.written[k] = v
 		}
+	}
+	if len(e.writeOrder) > 0 {
+		out.writeOrder = append([]*Variable(nil), e.writeOrder...)
 	}
 	if len(e.lhsWrite) > 0 {
 		out.lhsWrite = make(map[*Variable]bool, len(e.lhsWrite))
@@ -253,6 +264,8 @@ func (e Effect) AddEffect(other Effect) Effect {
 }
 
 // AddEffectOpts mirrors Effect::add_effect(e, include_lhs_effects).
+// Effect.cpp:167–180 — push each of other's reads/writes only if !is_read /
+// !is_written on the destination (struct-parent coverage applies).
 // Variable* always live as map keys; incomplete either side fails closed sticky
 // IncompleteEffect (no invent leave-base empty-complete merge / soft re-pick past hole).
 func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
@@ -261,35 +274,50 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 		return IncompleteEffect()
 	}
 	out := e
-	if other.read != nil {
-		if out.read == nil {
-			out.read = make(map[*Variable]bool)
-		}
-		nr := make(map[*Variable]bool, len(out.read)+len(other.read))
-		for k, v := range out.read {
-			nr[k] = v
-		}
-		for k, v := range other.read {
-			if v {
-				nr[k] = true
-			}
-		}
-		out.read = nr
+	// Effect.cpp:167–172 — for each other read: if (!is_read) push
+	reads := other.ReadVars()
+	if !VariablesComplete(reads) {
+		SetError(ErrGeneric)
+		return IncompleteEffect()
 	}
-	if other.written != nil {
-		if out.written == nil {
-			out.written = make(map[*Variable]bool)
+	for _, v := range reads {
+		// Effect.cpp:169–171 — if (!is_read) push only; purity via pure &= e.pure below
+		already := out.IsRead(v)
+		if HasError() {
+			return IncompleteEffect()
 		}
-		nw := make(map[*Variable]bool, len(out.written)+len(other.written))
-		for k, v := range out.written {
-			nw[k] = v
+		if already {
+			continue
 		}
-		for k, v := range other.written {
-			if v {
-				nw[k] = true
-			}
+		nr := make(map[*Variable]bool, len(out.read)+1)
+		for k, val := range out.read {
+			nr[k] = val
 		}
+		nr[v] = true
+		out.read = nr
+		out.readOrder = append(append([]*Variable(nil), out.readOrder...), v)
+	}
+	// Effect.cpp:174–179 — for each other write: if (!is_written) push
+	writes := other.WrittenVars()
+	if !VariablesComplete(writes) {
+		SetError(ErrGeneric)
+		return IncompleteEffect()
+	}
+	for _, v := range writes {
+		already := out.IsWritten(v)
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if already {
+			continue
+		}
+		nw := make(map[*Variable]bool, len(out.written)+1)
+		for k, val := range out.written {
+			nw[k] = val
+		}
+		nw[v] = true
 		out.written = nw
+		out.writeOrder = append(append([]*Variable(nil), out.writeOrder...), v)
 	}
 	if includeLHS && other.lhsWrite != nil {
 		if out.lhsWrite == nil {
@@ -389,8 +417,8 @@ func (e Effect) LhsWriteVars() []*Variable {
 }
 
 // WriteVar mirrors Effect::write_var.
-// Effect.cpp:137–146 — record write; SE-free &= !volatile && !access_once;
-// pure left unchanged (upstream "pure = pure").
+// Effect.cpp:137–146 — push only if !is_written(v); SE-free &= !volatile &&
+// !access_once; pure left unchanged (upstream "pure = pure").
 // Incomplete base / nil Variable sticky IncompleteEffect (no invent grow write map
 // / soft-skip identity past holes).
 func (e Effect) WriteVar(v *Variable) Effect {
@@ -403,17 +431,23 @@ func (e Effect) WriteVar(v *Variable) Effect {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	if e.written == nil {
-		e.written = make(map[*Variable]bool)
+	// Effect.cpp:138–140 — only push if !is_written(v) (parent write covers fields)
+	already := e.IsWritten(v)
+	// residual ERROR sticky — no invent grow write map past IsWritten hole
+	if HasError() {
+		return IncompleteEffect()
 	}
-	// copy-on-write for value semantics
-	nw := make(map[*Variable]bool, len(e.written)+1)
-	for k, val := range e.written {
-		nw[k] = val
+	if !already {
+		// copy-on-write for value semantics
+		nw := make(map[*Variable]bool, len(e.written)+1)
+		for k, val := range e.written {
+			nw[k] = val
+		}
+		nw[v] = true
+		e.written = nw
+		e.writeOrder = append(append([]*Variable(nil), e.writeOrder...), v)
 	}
-	nw[v] = true
-	e.written = nw
-	// Effect.cpp:144–145 — SE-free means volatile/access_once free
+	// Effect.cpp:144–145 — SE-free means volatile/access_once free (always apply)
 	if v.IsVolatile() || v.IsAccessOnce {
 		// residual ERROR sticky — no invent complete write map past IsVolatile residual
 		if HasError() {
@@ -428,8 +462,10 @@ func (e Effect) WriteVar(v *Variable) Effect {
 }
 
 // ReadVar mirrors Effect::read_var.
-// Effect.cpp:116–122 — record read; pure &= const&&!vol&&!access_once;
-// SE-free &= !vol&&!access_once.
+// Effect.cpp:116–122 — push only if !is_read(v); pure &= const&&!vol&&!access_once;
+// SE-free &= !vol&&!access_once. is_read covers struct parent → field, so a field
+// is not re-pushed after its parent struct was already recorded (expand_struct would
+// otherwise duplicate field entries in choose_visible_read_var pools).
 // Incomplete base / nil Variable sticky IncompleteEffect (no invent grow read map
 // / soft-skip identity past holes).
 func (e Effect) ReadVar(v *Variable) Effect {
@@ -442,13 +478,23 @@ func (e Effect) ReadVar(v *Variable) Effect {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	nr := make(map[*Variable]bool, len(e.read)+1)
-	for k, val := range e.read {
-		nr[k] = val
+	// Effect.cpp:117–119 — only push if !is_read(v)
+	already := e.IsRead(v)
+	// residual ERROR sticky — no invent grow read map past IsRead hole
+	if HasError() {
+		return IncompleteEffect()
 	}
-	nr[v] = true
-	e.read = nr
-	// Effect.cpp:120–121
+	if !already {
+		nr := make(map[*Variable]bool, len(e.read)+1)
+		for k, val := range e.read {
+			nr[k] = val
+		}
+		nr[v] = true
+		e.read = nr
+		// C++ vector push_back — preserve insertion order for get_read_vars
+		e.readOrder = append(append([]*Variable(nil), e.readOrder...), v)
+	}
+	// Effect.cpp:120–121 — purity always updated even when already is_read
 	isConst := v.IsConst()
 	// residual ERROR sticky — no invent complete read map past IsConst residual
 	if HasError() {
@@ -505,7 +551,7 @@ func (e Effect) IsWritten(v *Variable) bool {
 	return false
 }
 
-// ReadVars mirrors Effect::get_read_vars — list of read variables (stable order by name).
+// ReadVars mirrors Effect::get_read_vars — insertion order (C++ vector).
 // Incomplete effect / nil map keys fail closed sticky IncompleteVariables
 // (no invent skip hole as absent read / soft re-pick empty-complete read set).
 func (e Effect) ReadVars() []*Variable {
@@ -513,25 +559,21 @@ func (e Effect) ReadVars() []*Variable {
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
-	if len(e.read) == 0 {
+	if len(e.readOrder) == 0 {
 		return nil
 	}
-	out := make([]*Variable, 0, len(e.read))
-	for v, ok := range e.read {
-		if !ok {
-			continue
-		}
+	out := make([]*Variable, 0, len(e.readOrder))
+	for _, v := range e.readOrder {
 		if v == nil {
 			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		out = append(out, v)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 
-// WrittenVars mirrors Effect::get_write_vars subset.
+// WrittenVars mirrors Effect::get_write_vars — insertion order (C++ vector).
 // Incomplete effect / nil map keys fail closed sticky IncompleteVariables
 // (no invent skip hole as absent write / soft re-pick empty-complete write set).
 func (e Effect) WrittenVars() []*Variable {
@@ -539,21 +581,17 @@ func (e Effect) WrittenVars() []*Variable {
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
-	if len(e.written) == 0 {
+	if len(e.writeOrder) == 0 {
 		return nil
 	}
-	out := make([]*Variable, 0, len(e.written))
-	for v, ok := range e.written {
-		if !ok {
-			continue
-		}
+	out := make([]*Variable, 0, len(e.writeOrder))
+	for _, v := range e.writeOrder {
 		if v == nil {
 			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		out = append(out, v)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 
@@ -1238,6 +1276,13 @@ func (e *Effect) Consolidate() {
 				return
 			}
 			delete(e.read, v)
+			// keep readOrder in sync with map
+			for i, x := range e.readOrder {
+				if x == v {
+					e.readOrder = append(e.readOrder[:i], e.readOrder[i+1:]...)
+					break
+				}
+			}
 		} else if HasError() {
 			// residual ERROR sticky — no invent leave-base complete past IsRead hole
 			*e = IncompleteEffect()
@@ -1275,6 +1320,12 @@ func (e *Effect) Consolidate() {
 				return
 			}
 			delete(e.written, v)
+			for i, x := range e.writeOrder {
+				if x == v {
+					e.writeOrder = append(e.writeOrder[:i], e.writeOrder[i+1:]...)
+					break
+				}
+			}
 		} else if HasError() {
 			// residual ERROR sticky — no invent leave-base complete past IsWritten hole
 			*e = IncompleteEffect()
@@ -1391,6 +1442,9 @@ func (e Effect) CommentOutput() string {
 // Incomplete either arm fails closed sticky IncompleteEffect (no invent pure/empty-complete
 // merge past incomplete map_stm_effect / accum holes — VisitFacts / generation would
 // treat merged as success and poison parent accum as complete / soft re-pick).
+//
+// Uses is_read/is_written gates and preserves a-then-b insertion order (fair with
+// C++ vector merges that skip already-covered vars).
 func MergeEffects(a, b Effect) Effect {
 	if !EffectComplete(a) || !EffectComplete(b) {
 		SetError(ErrGeneric)
@@ -1400,47 +1454,82 @@ func MergeEffects(a, b Effect) Effect {
 		pure:           a.pure && b.pure,
 		sideEffectFree: a.sideEffectFree && b.sideEffectFree,
 	}
-	if len(a.written)+len(b.written) > 0 {
-		out.written = make(map[*Variable]bool, len(a.written)+len(b.written))
-		for k, v := range a.written {
-			if k == nil {
-				SetError(ErrGeneric)
+	// a first, then b — push if not already is_read/is_written on out
+	for _, v := range a.ReadVars() {
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.IsRead(v) {
+			if HasError() {
 				return IncompleteEffect()
 			}
-			if v {
-				out.written[k] = true
-			}
+			continue
 		}
-		for k, v := range b.written {
-			if k == nil {
-				SetError(ErrGeneric)
-				return IncompleteEffect()
-			}
-			if v {
-				out.written[k] = true
-			}
+		if HasError() {
+			return IncompleteEffect()
 		}
+		if out.read == nil {
+			out.read = make(map[*Variable]bool)
+		}
+		out.read[v] = true
+		out.readOrder = append(out.readOrder, v)
 	}
-	if len(a.read)+len(b.read) > 0 {
-		out.read = make(map[*Variable]bool, len(a.read)+len(b.read))
-		for k, v := range a.read {
-			if k == nil {
-				SetError(ErrGeneric)
+	for _, v := range b.ReadVars() {
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.IsRead(v) {
+			if HasError() {
 				return IncompleteEffect()
 			}
-			if v {
-				out.read[k] = true
-			}
+			continue
 		}
-		for k, v := range b.read {
-			if k == nil {
-				SetError(ErrGeneric)
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.read == nil {
+			out.read = make(map[*Variable]bool)
+		}
+		out.read[v] = true
+		out.readOrder = append(out.readOrder, v)
+	}
+	for _, v := range a.WrittenVars() {
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.IsWritten(v) {
+			if HasError() {
 				return IncompleteEffect()
 			}
-			if v {
-				out.read[k] = true
-			}
+			continue
 		}
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.written == nil {
+			out.written = make(map[*Variable]bool)
+		}
+		out.written[v] = true
+		out.writeOrder = append(out.writeOrder, v)
+	}
+	for _, v := range b.WrittenVars() {
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.IsWritten(v) {
+			if HasError() {
+				return IncompleteEffect()
+			}
+			continue
+		}
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if out.written == nil {
+			out.written = make(map[*Variable]bool)
+		}
+		out.written[v] = true
+		out.writeOrder = append(out.writeOrder, v)
 	}
 	if len(out.written) > 0 {
 		out.pure = false

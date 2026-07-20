@@ -120,14 +120,29 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	ClearError()
 }
 
-func TestEffectReadVarsSorted(t *testing.T) {
+func TestEffectReadVarsInsertionOrder(t *testing.T) {
+	// Effect.cpp:get_read_vars — C++ vector insertion order, not name-sorted.
+	// choose_visible_read_var ok_vars index depends on this order.
 	ClearError()
 	a := CreateVariableScalars("g_z", GetIntType(), false, false)
 	b := CreateVariableScalars("g_a", GetIntType(), false, false)
 	e := EmptyEffect().ReadVar(a).ReadVar(b)
 	rs := e.ReadVars()
-	if len(rs) != 2 || rs[0].Name != "g_a" {
-		t.Fatalf("%v", rs)
+	if len(rs) != 2 || rs[0] != a || rs[1] != b {
+		t.Fatalf("want insertion order [g_z,g_a], got %v", rs)
+	}
+	// struct parent covers field — field not re-pushed (Effect.cpp:117–119 + is_read)
+	parent := CreateVariableScalars("g_s", GetIntType(), true, false)
+	// mark as struct for IsRead field inheritance
+	parent.Type = &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	e2 := EmptyEffect().ReadVar(parent).ReadVar(field)
+	rs2 := e2.ReadVars()
+	if len(rs2) != 1 || rs2[0] != parent {
+		t.Fatalf("field after parent must not re-push; got %v", rs2)
+	}
+	if !e2.IsRead(field) {
+		t.Fatal("IsRead(field) true via parent")
 	}
 }
 

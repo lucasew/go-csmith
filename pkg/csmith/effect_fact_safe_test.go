@@ -100,6 +100,91 @@ func TestEffectConsolidate(t *testing.T) {
 	}
 }
 
+// TestReadVarNoRepushWhenStructParentRead mirrors Effect.cpp:116–122 + is_read
+// (276–287): after a struct parent is in read_vars, reading a field must not
+// re-push the field (is_read true via parent). Otherwise expand_struct_union_vars
+// in choose_visible_read_var duplicates field entries and inflates ok-list size.
+func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
+	ClearError()
+	st := &Type{isStruct: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := &Variable{Name: "g_s", Type: st}
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) < 2 {
+		t.Fatal("need struct fields")
+	}
+	f0, f1 := parent.FieldVars[0], parent.FieldVars[1]
+
+	// Effect.cpp:117 — if (!is_read(v)) push; parent then field → field skipped
+	e := EmptyEffect().ReadVar(parent).ReadVar(f0).ReadVar(f1)
+	if HasError() {
+		t.Fatal("complete ReadVar must not sticky")
+	}
+	reads := e.ReadVars()
+	if len(reads) != 1 || reads[0] != parent {
+		t.Fatalf("only parent in read set after field reads: %v", namesOf(reads))
+	}
+	if !e.IsRead(f0) || !e.IsRead(f1) {
+		t.Fatal("fields must still IsRead via parent struct walk")
+	}
+
+	// field-first then parent: both present (is_read parent is exact only)
+	e2 := EmptyEffect().ReadVar(f0).ReadVar(parent)
+	if HasError() {
+		t.Fatal("field-then-parent ReadVar must not sticky")
+	}
+	r2 := e2.ReadVars()
+	if len(r2) != 2 {
+		t.Fatalf("field then parent should keep both: %v", namesOf(r2))
+	}
+	// expand of that set: parent expands to fields → f0 appears twice
+	exp := ExpandStructUnionVars(append([]*Variable(nil), r2...), GetIntType())
+	if !VariablesComplete(exp) {
+		t.Fatal("expand must complete")
+	}
+	// parent-only set expands without dups
+	expParent := ExpandStructUnionVars([]*Variable{parent}, GetIntType())
+	if len(exp) <= len(expParent) {
+		// field-first path can have dups; parent-only path is the fair post-ReadVar set
+		t.Fatalf("sanity: field+parent expand len=%d parent-only=%d", len(exp), len(expParent))
+	}
+
+	// AddEffect also skips is_read covered fields (Effect.cpp:169–172)
+	base := EmptyEffect().ReadVar(parent)
+	other := EmptyEffect().ReadVar(f0)
+	merged := base.AddEffect(other)
+	if HasError() {
+		t.Fatal("AddEffect must not sticky")
+	}
+	if len(merged.ReadVars()) != 1 || merged.ReadVars()[0] != parent {
+		t.Fatalf("AddEffect must not re-push field covered by parent: %v", namesOf(merged.ReadVars()))
+	}
+
+	// WriteVar: is_written walks any parent (Effect.cpp:137–140 + 333–345)
+	ew := EmptyEffect().WriteVar(parent).WriteVar(f0)
+	if HasError() {
+		t.Fatal("WriteVar must not sticky")
+	}
+	if len(ew.WrittenVars()) != 1 || ew.WrittenVars()[0] != parent {
+		t.Fatalf("only parent in write set after field write: %v", namesOf(ew.WrittenVars()))
+	}
+	ClearError()
+}
+
+func namesOf(vars []*Variable) []string {
+	out := make([]string, 0, len(vars))
+	for _, v := range vars {
+		if v == nil {
+			out = append(out, "<nil>")
+			continue
+		}
+		out = append(out, v.Name)
+	}
+	return out
+}
+
 func TestEffectIsReadTypeNilParentSticky(t *testing.T) {
 	// Type-nil parent sticky read true (restrictive — no invent not-read soft-skip)
 	ClearError()
