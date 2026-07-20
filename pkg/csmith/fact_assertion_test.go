@@ -440,3 +440,25 @@ func TestPostOutputOutputAssertionsResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputAssertionIsTopResidualSticky(t *testing.T) {
+	// IsTop residual soft invent was invent soft-empty assert past nil Fact.
+	ClearError()
+	if (*FactPointTo)(nil).OutputAssertion(nil, "  ") != "" {
+		t.Fatal("nil Fact OutputAssertion must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact OutputAssertion must SetError sticky")
+	}
+	ClearError()
+	// complete TOP empty assert
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	top := &FactPointTo{Var: p, PointTo: []*Variable{}}
+	if top.OutputAssertion(nil, "  ") != "" {
+		t.Fatal("TOP OutputAssertion must soft empty")
+	}
+	if HasError() {
+		t.Fatal("complete TOP OutputAssertion must not sticky")
+	}
+	ClearError()
+}

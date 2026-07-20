@@ -762,6 +762,11 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		}
 		// expand fields for aggregates
 		exp := v.CollectExpandable()
+		// residual ERROR sticky — no invent soft-expand past CollectExpandable residual
+		if HasError() {
+			incomplete = true
+			return
+		}
 		if !VariablesComplete(exp) {
 			incomplete = true
 			return

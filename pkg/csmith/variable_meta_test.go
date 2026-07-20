@@ -324,3 +324,19 @@ func TestGetCollectiveIsArrayFieldResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetFieldIDIncompleteParentResidualSticky(t *testing.T) {
+	// GetFieldID residual soft invent was invent field index past incomplete parent FieldVars.
+	ClearError()
+	parent := CreateVariableScalars("g_s", GetIntType(), false, false)
+	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	// incomplete parent FieldVars (hole)
+	parent.FieldVars = []*Variable{nil, field}
+	if field.GetFieldID() != -1 {
+		t.Fatal("incomplete parent FieldVars GetFieldID must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("incomplete parent FieldVars GetFieldID must SetError sticky")
+	}
+	ClearError()
+}

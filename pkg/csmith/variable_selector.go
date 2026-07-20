@@ -1005,7 +1005,12 @@ func (vs *VariableSelector) MakeInitValue(
 		}
 		noVolatile := false
 		if vs.Opts.StrictVolatileRule {
-			noVolatile = !cg.EffectContext().IsSideEffectFree()
+			seFree := cg.EffectContext().IsSideEffectFree()
+			// residual ERROR sticky — no invent soft-no-vol past IsSideEffectFree residual
+			if HasError() {
+				return nil
+			}
+			noVolatile = !seFree
 		}
 		qferDeref := qfer.RandomLooseQualifiers(noVolatile, access, cg, vs.Opts, vs.Probs, r)
 		qferDeref.RemoveQualifiers(1)
@@ -1159,7 +1164,12 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 
 	// volatile + non-SE-free context → reject
-	if isVol && !eff.IsSideEffectFree() {
+	seFree := eff.IsSideEffectFree()
+	// residual ERROR sticky — no invent soft-eligible past IsSideEffectFree residual
+	if HasError() {
+		return false
+	}
+	if isVol && !seFree {
 		return false
 	}
 	// cannot read/write a var being written in context

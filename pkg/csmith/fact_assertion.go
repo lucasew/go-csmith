@@ -224,7 +224,12 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 		return ""
 	}
 	// TOP fact: no assert condition (complete empty success)
-	if f.IsTop() {
+	isTop := f.IsTop()
+	// residual ERROR sticky — no invent soft-empty assert past IsTop residual
+	if HasError() {
+		return ""
+	}
+	if isTop {
 		return ""
 	}
 	cond := f.OutputCondition()

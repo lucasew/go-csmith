@@ -56,3 +56,23 @@ func TestWriteVarSetResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsSideEffectFreeIncompleteResidualSticky(t *testing.T) {
+	// IsSideEffectFree residual soft invent was invent SE-free soft-skip past IncompleteEffect.
+	ClearError()
+	if IncompleteEffect().IsSideEffectFree() {
+		t.Fatal("IncompleteEffect IsSideEffectFree must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect IsSideEffectFree must SetError sticky")
+	}
+	ClearError()
+	// complete pure is SE-free
+	if !EmptyEffect().IsSideEffectFree() {
+		t.Fatal("EmptyEffect must be SE-free")
+	}
+	if HasError() {
+		t.Fatal("complete EmptyEffect IsSideEffectFree must not sticky")
+	}
+	ClearError()
+}

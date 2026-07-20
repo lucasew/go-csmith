@@ -582,6 +582,10 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			var ret []*FactPointTo
 			for _, vv := range vars {
 				ptrs := vv.FindPointerFields()
+				// residual ERROR sticky — no invent soft-merge past FindPointerFields residual
+				if HasError() {
+					return IncompleteFactSlice()
+				}
 				// incomplete FieldVars — hard IR sticky (no invent skip field hole)
 				if !VariablesComplete(ptrs) {
 					SetError(ErrGeneric)
@@ -657,6 +661,10 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				return IncompleteFactSlice()
 			}
 			ptrs := fn.RV.FindPointerFields()
+			// residual ERROR sticky — no invent soft-transfer past FindPointerFields residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			if !VariablesComplete(ptrs) {
 				// FieldVars hole sticky
 				SetError(ErrGeneric)
@@ -848,6 +856,10 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		}
 		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
 		ptrs := u.FindPointerFields()
+		// residual ERROR sticky — no invent soft-transfer past FindPointerFields residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if !VariablesComplete(ptrs) {
 			// FieldVars hole sticky
 			SetError(ErrGeneric)
@@ -1405,6 +1417,10 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 		}
 		localSet[l] = true
 		exp := l.CollectExpandable()
+		// residual ERROR sticky — no invent soft-mark past CollectExpandable residual
+		if HasError() {
+			return nil
+		}
 		if !VariablesComplete(exp) {
 			SetError(ErrGeneric)
 			return nil

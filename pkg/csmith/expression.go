@@ -385,7 +385,12 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
-		return e.Var.Qfer.IndirectQualifiers(n)
+		q := e.Var.Qfer.IndirectQualifiers(n)
+		// residual ERROR sticky — no invent soft-quals past IndirectQualifiers residual
+		if HasError() {
+			return CVQualifiers{}
+		}
+		return q
 	case TermAssignment:
 		if e.Assign == nil {
 			SetError(ErrGeneric)
@@ -1147,6 +1152,10 @@ func MakeRandomExpression(
 			return nil
 		}
 		seFree := cg.EffectContext().IsSideEffectFree()
+		// residual ERROR sticky — no invent soft-choose type past IsSideEffectFree residual
+		if HasError() {
+			return nil
+		}
 		for tries := 0; tries < 256; tries++ {
 			if seFree {
 				typ = env.ChooseRandomNonvoid(r, opts, probs)

@@ -767,7 +767,12 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	if access == AccessWrite {
 		q.SetConst(false, 0)
 	}
-	if !cg.EffectContext().IsSideEffectFree() {
+	seFree := cg.EffectContext().IsSideEffectFree()
+	// residual ERROR sticky — no invent soft-restrict past IsSideEffectFree residual
+	if HasError() {
+		return
+	}
+	if !seFree {
 		q.SetVolatile(false, 0)
 	}
 }
@@ -1091,7 +1096,17 @@ func RandomQualifiersForType(
 	}
 
 	// CVQualifiers.cpp:332–343 — variable itself.
-	volatileOK := effectCtx.IsSideEffectFree() && isVolatileOKOnOneLevel(opts, t)
+	seFree := effectCtx.IsSideEffectFree()
+	// residual ERROR sticky — no invent soft-qual past IsSideEffectFree residual
+	if HasError() {
+		return CVQualifiers{}
+	}
+	volOK1 := isVolatileOKOnOneLevel(opts, t)
+	// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
+	if HasError() {
+		return CVQualifiers{}
+	}
+	volatileOK := seFree && volOK1
 	constOK := access != AccessWrite
 	isVolatile := false
 	if volatileOK {

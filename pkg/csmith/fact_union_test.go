@@ -480,3 +480,15 @@ func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestImplyIsBottomResidualSticky(t *testing.T) {
+	// IsBottom residual soft invent was invent soft-imply past nil FactUnion.
+	ClearError()
+	if (*FactUnion)(nil).Imply(MakeFactUnionTop(CreateVariableScalars("g_u", GetIntType(), false, false))) {
+		t.Fatal("nil Imply must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Imply must SetError sticky")
+	}
+	ClearError()
+}

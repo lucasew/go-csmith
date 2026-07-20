@@ -1746,6 +1746,10 @@ func (v *Variable) GetCollective() *Variable {
 		var path []int
 		for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
 			fid := cur.GetFieldID()
+			// residual ERROR sticky — no invent soft-collective past GetFieldID residual
+			if HasError() {
+				return nil
+			}
 			// incomplete FieldVars → GetFieldID -1 — sticky (no invent self)
 			if fid < 0 {
 				SetError(ErrGeneric)
@@ -1989,7 +1993,12 @@ func (v *Variable) IsInsideUnionField() bool {
 		return false
 	}
 	for p := v; p != nil; p = p.FieldVarOf {
-		if p.IsUnionField() {
+		uf := p.IsUnionField()
+		// residual ERROR sticky — no invent soft not-inside past IsUnionField residual
+		if HasError() {
+			return true
+		}
+		if uf {
 			return true
 		}
 		// IsUnionField stickies Type-nil parent as false; incomplete ancestry

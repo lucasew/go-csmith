@@ -185,9 +185,25 @@ func (f *FactUnion) Imply(other *FactUnion) bool {
 		return false
 	}
 	if f.IsBottom() {
+		// residual ERROR sticky — no invent soft-imply past IsBottom residual true
+		if HasError() {
+			return false
+		}
 		return true
 	}
+	// residual ERROR sticky — no invent soft-continue past IsBottom residual false
+	if HasError() {
+		return false
+	}
 	if other.IsBottom() {
+		// residual ERROR sticky — no invent soft-imply past other IsBottom residual true
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue past other IsBottom residual false
+	if HasError() {
 		return false
 	}
 	return f.LastWrittenFID == other.LastWrittenFID
@@ -241,7 +257,17 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 		SetError(ErrGeneric)
 		return nil
 	}
-	if f.IsTop() || f.IsBottom() {
+	isTop := f.IsTop()
+	// residual ERROR sticky — no invent soft-nil type past IsTop residual
+	if HasError() {
+		return nil
+	}
+	isBot := f.IsBottom()
+	// residual ERROR sticky — no invent soft-nil type past IsBottom residual
+	if HasError() {
+		return nil
+	}
+	if isTop || isBot {
 		return nil
 	}
 	// FactUnion.cpp:65 — assert(var->type && eUnion) sticky; fail closed nil if not union
@@ -510,16 +536,28 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	for i, old := range facts {
 		if old.Var == nf.Var {
 			cp := old.Clone()
+			// residual ERROR sticky — no invent soft-merge past Clone residual
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
 			if cp == nil {
 				SetError(ErrGeneric)
 				return IncompleteUnionFactSlice()
 			}
 			cp.Join(nf)
+			// residual ERROR sticky — no invent soft-merge past Join residual
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
 			facts[i] = cp
 			return facts
 		}
 	}
 	cl := nf.Clone()
+	// residual ERROR sticky — no invent soft-append past Clone residual
+	if HasError() {
+		return IncompleteUnionFactSlice()
+	}
 	if cl == nil {
 		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
@@ -731,14 +769,19 @@ func AbstractFactUnionForAssign(
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 			// FactUnion.cpp:141–143
-			fu = MakeFactUnion(v.FieldVarOf, v.GetFieldID())
+			fid := v.GetFieldID()
+			// residual ERROR sticky — no invent soft-union fact past GetFieldID residual
+			if HasError() {
+				return IncompleteUnionFactSlice(), lvarCnt
+			}
+			fu = MakeFactUnion(v.FieldVarOf, fid)
+			// residual ERROR sticky — no invent soft-continue past MakeFactUnion residual
+			if HasError() {
+				return IncompleteUnionFactSlice(), lvarCnt
+			}
 			// FieldVarOf non-union → MakeFactUnion nil is broken IR sticky
 			if fu == nil && v.FieldVarOf != nil {
 				SetError(ErrGeneric)
-				return IncompleteUnionFactSlice(), lvarCnt
-			}
-			// residual ERROR sticky — no invent soft-continue past GetFieldID/MakeFactUnion hole
-			if HasError() {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 		} else if HasError() {
@@ -763,16 +806,20 @@ func AbstractFactUnionForAssign(
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
 				cu := v.GetContainerUnion()
+				// residual ERROR sticky — no invent soft-skip container past GetContainerUnion residual
+				if HasError() {
+					return IncompleteUnionFactSlice(), lvarCnt
+				}
 				if cu != nil {
 					fu = MakeFactUnion(cu, FactUnionBottom)
+					// residual ERROR sticky — no invent soft-continue past MakeFactUnion residual
+					if HasError() {
+						return IncompleteUnionFactSlice(), lvarCnt
+					}
 					if fu == nil {
 						SetError(ErrGeneric)
 						return IncompleteUnionFactSlice(), lvarCnt
 					}
-				}
-				// residual ERROR sticky — no invent soft-skip container past GetContainerUnion hole
-				if HasError() {
-					return IncompleteUnionFactSlice(), lvarCnt
 				}
 			} else if HasError() {
 				// residual ERROR sticky — no invent soft-skip no-padding past IsPacked residual false
