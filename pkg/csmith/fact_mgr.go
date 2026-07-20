@@ -727,6 +727,8 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	// global_facts = old_facts. Snapshot is a Fact* vector (shallow); do not deep-clone
 	// FactPointTo objects (CloneFactSlice would freeze pre-merge lattice and diverge
 	// from C++ when Fact objects are still shared with the live env).
+	// FactMgr.cpp:489–492 only — makeup then assign. No invent re-join of live
+	// may-null into the restored snapshot (SPEC: no invent may-null reinject).
 	work := append([]*FactPointTo(nil), oldFacts...)
 	if !MakeupNewVarFacts(&work, fm.GlobalFacts) {
 		// incomplete GlobalFacts or mid-makeup hole — fail closed sticky
@@ -736,50 +738,7 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 		}
 		return
 	}
-	// Re-join may-null from live GlobalFacts into the restored snapshot for subjects
-	// already present (seed-2 first_div 10107). ExpressionFuncall takes a shallow
-	// Fact* snapshot; mid-gen merge_fact replaces slots with new FactPointTo may-null
-	// objects the snapshot does not reference. Failed-invoke restore would drop that
-	// lattice; C++ often re-derives it via visit_facts, but soft re-pick paths may not.
-	if FactsComplete(fm.GlobalFacts) && FactsComplete(work) {
-		for _, f := range fm.GlobalFacts {
-			if f == nil || f.Var == nil || !f.IsNull() {
-				continue
-			}
-			var subj *Variable
-			if rel := FindRelatedPointTo(work, f.Var); rel != nil {
-				subj = rel.Var
-			} else {
-				for _, w := range work {
-					if w != nil && w.Var != nil && w.Var.Name == f.Var.Name {
-						subj = w.Var
-						break
-					}
-				}
-			}
-			if subj == nil {
-				continue
-			}
-			bridge := MakeFactPointToSet(subj, f.PointTo)
-			if bridge == nil {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				fm.GlobalFacts = IncompleteFactSlice()
-				return
-			}
-			merged := MergeFactInto(work, bridge)
-			if !FactsComplete(merged) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				fm.GlobalFacts = IncompleteFactSlice()
-				return
-			}
-			work = merged
-		}
-	}
-	fm.SetGlobalFacts(work, "auto_fact_mgr_782")
+	fm.SetGlobalFacts(work, "auto_fact_mgr_restore")
 }
 
 // SetupInOutMaps mirrors FactMgr::setup_in_out_maps.
