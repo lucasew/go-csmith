@@ -689,3 +689,43 @@ func TestOutputGlobalsUsesOutputDef(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestOutputDeclOutputQualifiedTypeResidualSticky(t *testing.T) {
+	// OutputQualifiedType residual soft invent was soft-continue invent " name" decl.
+	// Unnamed struct CName residual under OutputQualifiedType.
+	ClearError()
+	v := &Variable{
+		Name: "g_s",
+		Type: &Type{isStruct: true}, // CName residual
+		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+	}
+	if s := v.OutputDecl(false); s != "" {
+		t.Fatal("CName residual must fail closed OutputDecl", s)
+	}
+	if !HasError() {
+		t.Fatal("CName residual OutputDecl must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputAddrOfGetActualNameResidualSticky(t *testing.T) {
+	// GetActualName residual soft invent was soft-empty invent bare "&".
+	// Empty name already sticky; residual path: covered by nil. Keep complete hygiene.
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if s := v.OutputAddrOf(false); s != "&g_x" {
+		t.Fatal("complete OutputAddrOf", s)
+	}
+	if HasError() {
+		t.Fatal("complete OutputAddrOf must not sticky")
+	}
+	ClearError()
+	// empty name residual hole
+	if s := (&Variable{Type: GetIntType()}).OutputAddrOf(false); s != "" {
+		t.Fatal("empty name OutputAddrOf must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name OutputAddrOf must SetError sticky")
+	}
+	ClearError()
+}

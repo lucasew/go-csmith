@@ -553,3 +553,59 @@ func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsOutputAccessResidualSticky(t *testing.T) {
+	// OutputAccess residual soft invent was soft-empty invent bare/partial LHS.
+	ClearError()
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:      []int{2},
+		Collective: parent,
+		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Value: "0"}}}, // Type-nil residual
+	}
+	item.AsArray = item
+	lhs := &Lhs{Var: &item.Variable, Type: GetIntType()}
+	if s := lhs.Output(false); s != "" {
+		t.Fatal("OutputAccess residual must fail closed Lhs.Output", s)
+	}
+	if !HasError() {
+		t.Fatal("OutputAccess residual Lhs.Output must SetError sticky")
+	}
+	ClearError()
+	// OutputLhsC residual same hole
+	if s := item.OutputLhsC(); s != "" {
+		t.Fatal("OutputAccess residual must fail closed OutputLhsC", s)
+	}
+	if !HasError() {
+		t.Fatal("OutputAccess residual OutputLhsC must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestLhsOutputCNameResidualSticky(t *testing.T) {
+	// CName residual soft invent was soft-wrap invent VOL_LVAL(name, invented type).
+	ClearError()
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	lhs := &Lhs{Var: v, Type: &Type{isStruct: true}} // unnamed struct → CName residual
+	if s := lhs.Output(true); s != "" {
+		t.Fatal("CName residual must fail closed Lhs.Output VOL_LVAL wrap", s)
+	}
+	if !HasError() {
+		t.Fatal("CName residual Lhs.Output must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputLhsCAccessResidualSticky(t *testing.T) {
+	// covered by TestLhsOutputAccessResidualSticky OutputLhsC arm; keep Complete path hygiene.
+	ClearError()
+	v := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	if s := v.OutputLhsC(); s != "g_ok" {
+		t.Fatal("complete OutputLhsC", s)
+	}
+	if HasError() {
+		t.Fatal("complete OutputLhsC must not sticky")
+	}
+	ClearError()
+}

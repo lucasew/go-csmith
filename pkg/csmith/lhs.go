@@ -278,22 +278,39 @@ func (l *Lhs) Output(wrapVolatiles bool) string {
 	}
 	// ExpressionVariable::Output for (var, type)
 	ev := outputExpressionVariable(l.Var, l.Type)
-	// IsVolatile residual only on nil (Var already gated); complete path never stickies
+	// residual ERROR sticky — no invent soft-empty LHS past outputExpressionVariable residual
+	if HasError() {
+		return ""
+	}
 	if wrapVolatiles && l.Var.IsVolatile() {
+		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
+		if HasError() {
+			return ""
+		}
 		// Lhs.cpp:211–216 — type->Output always live; sticky no invent "int"
 		t := l.GetType()
+		// residual ERROR sticky — no invent soft-wrap past GetType residual hole
+		if HasError() {
+			return ""
+		}
 		if t == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
 		ty := t.CName()
+		// residual ERROR sticky — no invent soft-wrap past CName residual hole
+		if HasError() {
+			return ""
+		}
 		if ty == "" || ev == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "VOL_LVAL(" + ev + ", " + ty + ")"
+	}
+	// residual ERROR sticky — no invent bare LHS past IsVolatile residual false path
+	if HasError() {
+		return ""
 	}
 	return ev
 }
@@ -311,14 +328,26 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		if wt == nil {
 			wt = v.Type
 		}
-		ind = v.Type.IndirectLevel() - wt.IndirectLevel()
+		vi := v.Type.IndirectLevel()
+		// residual ERROR sticky — no invent soft-level past IndirectLevel residual hole
+		if HasError() {
+			return ""
+		}
+		wi := wt.IndirectLevel()
+		// residual ERROR sticky — no invent soft-level past want IndirectLevel residual
+		if HasError() {
+			return ""
+		}
+		ind = vi - wi
 	}
 	base := v.OutputC()
+	// residual ERROR sticky — no invent soft-empty base past OutputC residual hole
+	if HasError() {
+		return ""
+	}
 	// ExpressionVariable always has live var Output; sticky no invent "(***)" / "&" without base
 	if base == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	if ind > 0 {
@@ -333,6 +362,10 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		}
 		// sticky no invent bare "&" when get_actual_name empty
 		nm := v.GetActualName(false)
+		// residual ERROR sticky — no invent soft-empty & past GetActualName residual
+		if HasError() {
+			return ""
+		}
 		if nm == "" {
 			SetError(ErrGeneric)
 			return ""

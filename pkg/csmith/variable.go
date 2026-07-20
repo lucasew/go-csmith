@@ -94,11 +94,19 @@ func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 	}
 	// Variable.cpp:670–676 — output_qualified_type always live type; sticky no invent " name"
 	ty := v.Qfer.OutputQualifiedType(v.Type)
+	// residual ERROR sticky — no invent soft-continue decl past OutputQualifiedType residual
+	if HasError() {
+		return ""
+	}
 	if ty == "" {
 		SetError(ErrGeneric)
 		return ""
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	// name always live; sticky no invent "int " without identifier
 	if name == "" {
 		SetError(ErrGeneric)
@@ -106,7 +114,14 @@ func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 	}
 	var b strings.Builder
 	if forceStatic && v.IsGlobal() {
+		// residual ERROR sticky — no invent soft-static past IsGlobal residual hole
+		if HasError() {
+			return ""
+		}
 		b.WriteString("static ")
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue decl past IsGlobal residual false
+		return ""
 	}
 	b.WriteString(ty)
 	b.WriteString(" ")
@@ -303,26 +318,47 @@ func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 		return ""
 	}
 	if v.AsArray != nil && v.AsArray.Collective != nil {
-		return v.AsArray.OutputAccess()
+		out := v.AsArray.OutputAccess()
+		// residual ERROR sticky — no invent soft-empty access past OutputAccess residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-empty name past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	// sticky no invent VOL_LVAL(, T) / empty LHS identifier
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
 	}
 	if v.UseVolRVal && v.IsVolatile() {
+		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
+		if HasError() {
+			return ""
+		}
 		// Lhs/Variable type->Output always live; sticky no invent "int"
 		if v.Type == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
 		ty := v.Type.CName()
+		// residual ERROR sticky — no invent soft-wrap past CName residual hole
+		if HasError() {
+			return ""
+		}
 		if ty == "" {
 			SetError(ErrGeneric)
 			return ""
 		}
 		return "VOL_LVAL(" + name + ", " + ty + ")"
+	}
+	// residual ERROR sticky — no invent bare LHS past IsVolatile residual false path
+	if HasError() {
+		return ""
 	}
 	return name
 }
@@ -336,6 +372,10 @@ func (v *Variable) OutputAddrOf(prefixName bool) string {
 		return ""
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-empty & past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		// sticky no invent bare "&"
 		SetError(ErrGeneric)

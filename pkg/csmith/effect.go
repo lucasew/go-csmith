@@ -899,8 +899,16 @@ func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile 
 	level := derefLevel
 	for level > 0 {
 		if v.IsVolatileAfterDeref(level) {
+			// residual ERROR sticky — no invent complete SE-free tweak past residual hole
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out.sideEffectFree = false
 			return out
+		}
+		// residual ERROR sticky — no invent soft-continue peel past residual false path
+		if HasError() {
+			return IncompleteEffect()
 		}
 		level--
 	}

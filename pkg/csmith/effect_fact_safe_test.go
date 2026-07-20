@@ -541,3 +541,31 @@ func TestReadWriteVarNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAccessDerefVolatileResidualSticky(t *testing.T) {
+	// IsVolatileAfterDeref residual soft invent was soft-continue peel invent complete SE-free.
+	// Qfer depth > deref so OOB non-sticky true is skipped; Type-nil peels sticky.
+	ClearError()
+	hole := &Variable{
+		Name: "g_p", Type: nil,
+		Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false}),
+	}
+	out := EmptyEffect().AccessDerefVolatile(hole, 1, true)
+	if EffectComplete(out) {
+		t.Fatal("IsVolatileAfterDeref residual must fail closed IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("IsVolatileAfterDeref residual AccessDerefVolatile must SetError sticky")
+	}
+	ClearError()
+	// complete non-vol peel must stay SE-free complete
+	ok := CreateVariableScalars("g_i", GetIntType(), false, false)
+	e := EmptyEffect().AccessDerefVolatile(ok, 0, true)
+	if !EffectComplete(e) {
+		t.Fatal("complete AccessDerefVolatile level0 must stay complete")
+	}
+	if HasError() {
+		t.Fatal("complete AccessDerefVolatile must not sticky")
+	}
+	ClearError()
+}
