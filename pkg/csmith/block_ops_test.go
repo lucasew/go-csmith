@@ -1409,16 +1409,15 @@ func TestFromTailToHeadNilResidualSticky(t *testing.T) {
 
 func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	// Block.cpp:558–562 — set_fact_out from re-analysis outputs only.
-	// mergeMayNullFromLive during StmVisitFacts invent re-injected mid-gen may-null
-	// after stmts that produced null were stripped (seed-2 g_87 / e12688).
+	// StmVisitFacts must not invent mergeMayNullFromLive into analysis inputs.
 	// Block.cpp:513–568 — find_fixed_point does not assign global_facts; mid-gen
 	// live may stay polluted until post_creation installs map_facts_out (729).
 	// map_facts_out from re-analysis outputs only (no invent reinject after strip).
 	ClearError()
 	SetProcessOptions(Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), true, false)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	// clean entry: g_p → g_t only
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	// live GlobalFacts polluted as if mid-gen assign set may-null then stmt stripped
@@ -1538,3 +1537,120 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 	}
 	ClearError()
 }
+
+
+// TestStmVisitFactsDoesNotMergeLiveMayNullIntoInputs — Statement.cpp:609–626.
+// stm_visit_facts mutates inputs only; never merges global_facts may-null into inputs.
+// Invent per-stmt mergeMayNull reinjected mid-gen null during FP (seed-2 e12688).
+// TestStmVisitFactsRestoresLiveAndMayMergeNull — Statement.cpp:609–626 restores
+// global_facts after visit. Residual: join live may-null into work (e10107) until
+// self-back+sequential alone preserve lattice (e12688 over-strip residual).
+func TestStmVisitFactsRestoresLiveAndMayMergeNull(t *testing.T) {
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	inputs := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	live := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	if live == nil {
+		t.Fatal("live")
+	}
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{live}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := CloneFactSlice(inputs)
+	if !StmVisitFacts(st, &facts, &cg, Defaults()) {
+		t.Fatalf("visit must ok err=%v", HasError())
+	}
+	// live GlobalFacts restored
+	if g := FindRelatedPointTo(fm.GlobalFacts, p); g == nil || !g.IsNull() {
+		t.Fatal("live GlobalFacts must restore after visit")
+	}
+	ClearError()
+}
+
+
+func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	// mid-gen: may-null
+	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	if mid == nil {
+		t.Fatal("mid")
+	}
+	entry := []*FactPointTo{MakeFactPointTo(p, tgt)} // pre-block entry non-null only
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = []*FactPointTo{mid}
+	b := &Block{StmID: 50, Func: f, Looping: true, LocalVars: nil}
+	// pre-FP set_fact_out from mid-gen global (Block.cpp:693)
+	fm.SetMapFactsOut(50, []*FactPointTo{mid})
+	fm.SetMapFactsIn(50, entry)
+	fm.MapVisited = map[int]bool{50: true} // post_creation marks visited before FP
+	// self-back like Block.cpp:701
+	fm.CreateCFGEdge(50, b, false, true)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// entry to FP is map_facts_in (facts_copy)
+	out, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
+	if !ok {
+		t.Fatalf("FP must succeed sticky=%v", HasError())
+	}
+	got := FindRelatedPointTo(out, p)
+	if got == nil || !got.IsNull() {
+		t.Fatalf("self-back must bring mid-gen may-null into out: %+v", got)
+	}
+	ClearError()
+}
+
+
+// TestFindFixedPointRecreatesMayNullFromAssign — after reset_stm_fact_maps clears
+// mid-gen map_facts_out, re-visit of p=0 must recreate null lattice (C++ inputs path).
+// Statement.cpp:609–626 + FactMgr::update_fact_for_assign(sa, inputs).
+func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
+	// FactPointTo.cpp:411–419 — is_valid_ptr rejects may-null when null_prob=0.
+	// Self-back / entry with may-null makes *p=… visit fail (C++ same); strip path.
+	// No invent mergeMayNull needed for that fail — inputs already carry null.
+	ClearError()
+	SetProcessOptions(Defaults())
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
+	ptr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// may-null entry (as after self-back merge of mid-gen)
+	entry := []*FactPointTo{MakeFactPointToSet(ptr, []*Variable{pointee, NullPtr})}
+	// *g_p = 0
+	asg := Stmt{
+		Kind: StmtAssign, StmID: 2,
+		LhsVar: ptr, Lhs: &Lhs{Var: ptr, Type: GetIntType()}, // deref store
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}
+	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = CloneFactSlice(entry)
+	fm.SetMapFactsIn(1, entry)
+	fm.MapVisited = map[int]bool{1: true}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	_, idx, ok := FindFixedPointBlock(body, entry, &cg, opts, true)
+	if ok {
+		t.Fatal("FP must fail analyze of *p write under may-null (null_prob=0)")
+	}
+	if idx != 0 {
+		t.Fatalf("failIdx want 0 got %d", idx)
+	}
+	ClearError()
+}
+

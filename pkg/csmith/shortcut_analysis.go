@@ -505,10 +505,13 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	// Statement.cpp:611 — get_effect_stm().clear()
 	cg.ClearEffectStm()
 	// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; does not assign
-	// fm->global_facts = inputs. Go VisitFacts* uses GlobalFacts as the working set.
-	// Load *facts as work; merge live may-null into work for visit (seed-2 e10107).
-	// Always restore pre-visit live GlobalFacts after harvest (C++ never assigns
-	// global_facts from inputs in stm_visit_facts).
+	// fm->global_facts = inputs. Go VisitFacts* use GlobalFacts as the working set:
+	// load *facts then join live may-null (seed-2 e10107). C++ keeps mid-gen on
+	// inputs via self-back of map_facts_out (Block.cpp:693+531–536) once per FP
+	// iteration; pure inputs-only without that lattice matching still drops may-null
+	// (e10107). Per-stmt live merge is residual invent vs sequential refine and can
+	// over-strip (e12688). Prefer pure inputs once self-back+sequential match C++.
+	// Always restore pre-visit live GlobalFacts after harvest.
 	var liveSaved []*FactPointTo
 	haveLive := false
 	if cg.FM != nil {
@@ -528,14 +531,6 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 			return false
 		}
-		// merge live may-null into work (seed-2 e10107 mid-gen).
-		// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; never merges
-		// global_facts into inputs. Go VisitFacts* use GlobalFacts as work: load *facts,
-		// then join live may-null so mid-gen ExpressionAssign null is not dropped
-		// when map_facts_in / FP inputs lag GlobalFacts.
-		// CAUTION: during find_fixed_point this can reinject mid-gen null that C++
-		// inputs lack (seed-2 e12688 over-strip residual) — keep until FP inputs
-		// carry mid-gen lattice without invent merge.
 		if haveLive {
 			cl = mergeMayNullFromLive(liveSaved, cl)
 			if HasError() || !FactsComplete(cl) {
