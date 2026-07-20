@@ -330,7 +330,15 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementIf.cpp:185–196 — must_return pruning
 	if cg.FM != nil {
 		trueMust := st.Then.MustReturn()
+		// residual ERROR sticky — no invent soft-continue merge path past Then MustReturn residual
+		if HasError() {
+			return false
+		}
 		falseMust := st.Else.MustReturn()
+		// residual ERROR sticky — no invent soft-continue merge path past Else MustReturn residual
+		if HasError() {
+			return false
+		}
 		switch {
 		case trueMust && falseMust:
 			// pre-condition env (inputs_copy), not post-condition
@@ -456,9 +464,17 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if st.Then.MustReturn() {
+			// residual ERROR sticky — no invent soft-continue pre-loop path past MustReturn residual true
+			if HasError() {
+				return false
+			}
 			// control reaches end of for with pre-loop (post-init) env
 			cg.FM.GlobalFacts = CloneFactSlice(factsCopy)
 		} else {
+			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
+			if HasError() {
+				return false
+			}
 			// map_facts_in[&body] — fixed-point entry, not merge(pre,post)
 			// C++ map[] always assigns (missing → empty); no invent keep prior
 			in := cg.FM.GetMapFactsIn(st.Then.StmID)
@@ -647,8 +663,16 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if inner.Then.MustReturn() {
+			// residual ERROR sticky — no invent soft-continue pre-loop path past MustReturn residual true
+			if HasError() {
+				return false
+			}
 			cg.FM.GlobalFacts = preFacts
 		} else {
+			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
+			if HasError() {
+				return false
+			}
 			// map_facts_in[&body] — C++ map[] always; missing → empty
 			in := cg.FM.GetMapFactsIn(inner.Then.StmID)
 			if !FactsComplete(in) {

@@ -1130,6 +1130,10 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	if !c.ReadIndices(v, facts) {
 		return false
 	}
+	// residual ERROR sticky — no invent soft-continue pointees past ReadIndices residual
+	if HasError() {
+		return false
+	}
 	// incomplete collective sticky via GetCollective
 	coll := v.GetCollective()
 	if coll == nil {
@@ -1153,6 +1157,13 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 			// MergePointees incomplete stays non-sticky for fact-map soft re-pick
 			return false
 		}
+		// residual ERROR sticky — no invent soft-continue pointees past MergePointees residual
+		if HasError() {
+			if accumCopy != nil && c.EffectAccum != nil {
+				*c.EffectAccum = *accumCopy
+			}
+			return false
+		}
 		if len(tmp) == 0 ||
 			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
 			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
@@ -1167,6 +1178,13 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 				continue
 			}
 			if !c.CheckReadVar(pointee, facts) {
+				if accumCopy != nil && c.EffectAccum != nil {
+					*c.EffectAccum = *accumCopy
+				}
+				return false
+			}
+			// residual ERROR sticky — no invent soft-continue later pointees past CheckReadVar residual
+			if HasError() {
 				if accumCopy != nil && c.EffectAccum != nil {
 					*c.EffectAccum = *accumCopy
 				}
@@ -1248,6 +1266,13 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 				succ = c.CheckReadVar(pointee, facts)
 			}
 			if !succ {
+				if accumCopy != nil && c.EffectAccum != nil {
+					*c.EffectAccum = *accumCopy
+				}
+				return false
+			}
+			// residual ERROR sticky — no invent soft-continue later pointees past Check residual
+			if HasError() {
 				if accumCopy != nil && c.EffectAccum != nil {
 					*c.EffectAccum = *accumCopy
 				}

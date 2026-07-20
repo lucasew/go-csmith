@@ -15,6 +15,7 @@ func TestStmtReturnMustReturn(t *testing.T) {
 }
 
 func TestIfMustReturnBothBranches(t *testing.T) {
+	ClearError()
 	st := Stmt{
 		Kind: StmtIfElse,
 		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}},
@@ -32,9 +33,14 @@ func TestIfMustReturnBothBranches(t *testing.T) {
 	if st.MustReturn() {
 		t.Fatal("nil Else must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil Else MustReturn must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBlockMustReturnLast(t *testing.T) {
+	ClearError()
 	b := &Block{Stmts: []Stmt{{Kind: StmtAssign}, {Kind: StmtReturn}}}
 	if !b.MustReturn() {
 		t.Fatal("last return")

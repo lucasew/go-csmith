@@ -38,11 +38,28 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 			continue
 		}
 		jumpF := FindRelatedPointTo(jumpFacts, f.Var)
+		// residual ERROR sticky — no invent soft-continue garbage path past FindRelated residual
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
 		if jumpF == nil {
 			// jump over initializer → garbage
 			jumpF = MakeFactPointTo(f.Var, GarbagePtr)
+			if jumpF == nil || HasError() {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				*facts = IncompleteFactSlice()
+				return false, false
+			}
 		}
 		before := FindRelatedPointTo(*facts, f.Var)
+		// residual ERROR sticky — no invent soft-continue merge past FindRelated residual
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
 		merged := MergeFactInto(*facts, jumpF)
 		if !FactsComplete(merged) {
 			// mid-join incomplete — clear partial sticky, no invent keep half-merged map
@@ -52,7 +69,22 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		}
 		*facts = merged
 		after := FindRelatedPointTo(*facts, f.Var)
-		if before == nil || after == nil || !before.Equal(after) {
+		// residual ERROR sticky — no invent soft-continue equal check past FindRelated residual
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
+		if before == nil || after == nil {
+			changed = true
+			continue
+		}
+		eq := before.Equal(after)
+		// residual ERROR sticky — no invent soft-continue no-change past Equal residual hole
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
+		if !eq {
 			changed = true
 		}
 	}

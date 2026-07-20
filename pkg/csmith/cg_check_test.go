@@ -241,6 +241,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 }
 
 func TestReadPointedNullRejected(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.NullPointerDerefProb = 0
 	opts.DeadPointerDerefProb = 0
@@ -253,6 +254,26 @@ func TestReadPointedNullRejected(t *testing.T) {
 	if cg.ReadPointed(p, 1, fm.GlobalFacts, opts) {
 		t.Fatal("null pointee")
 	}
+	if HasError() {
+		t.Fatal("complete null reject ReadPointed must not sticky")
+	}
+	ClearError()
+	// CheckReadVar residual soft invent was soft-continue later pointees invent success.
+	// Fair: sticky false. pointee with incomplete EffectStm stickies CheckReadVar residual.
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	fm2 := NewFactMgr(nil)
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
+	cg2 := EmptyCGContext().WithFactMgr(fm2)
+	cg2.EffectStm = IncompleteEffect()
+	eff2 := EmptyEffect()
+	cg2.EffectAccum = &eff2
+	if cg2.ReadPointed(p, 1, fm2.GlobalFacts, opts) {
+		t.Fatal("CheckReadVar residual ReadPointed must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("CheckReadVar residual ReadPointed must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAccessDerefVolatile(t *testing.T) {

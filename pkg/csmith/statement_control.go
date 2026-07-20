@@ -18,7 +18,23 @@ func (st Stmt) MustReturn() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return blks[0].MustReturn() && blks[1].MustReturn()
+		if !blks[0].MustReturn() {
+			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
+			if HasError() {
+				return false
+			}
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue false-arm past Then residual true
+		if HasError() {
+			return false
+		}
+		ok := blks[1].MustReturn()
+		// residual ERROR sticky — no invent must-return true past Else residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case StmtFor, StmtArrayOp:
 		// for only if body always returns (StatementFor.cpp visit path)
 		blks := GetBlocksStmt(&st)
@@ -27,7 +43,12 @@ func (st Stmt) MustReturn() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return blks[0].MustReturn()
+		ok := blks[0].MustReturn()
+		// residual ERROR sticky — no invent must-return true past body residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	default:
 		return false
 	}
@@ -39,7 +60,15 @@ func (st Stmt) MustReturn() bool {
 // Incomplete get_blocks sticky false (no invent not-must-jump soft re-pick past holes).
 func (st Stmt) MustJump() bool {
 	if st.MustReturn() {
+		// residual ERROR sticky — no invent must-jump true past MustReturn residual hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue jump kinds past MustReturn residual false
+	if HasError() {
+		return false
 	}
 	switch st.Kind {
 	case StmtBreak, StmtContinue, StmtGoto:
@@ -49,7 +78,12 @@ func (st Stmt) MustJump() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return st.Expr.NotEquals(0)
+		ok := st.Expr.NotEquals(0)
+		// residual ERROR sticky — no invent must-jump true past NotEquals residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case StmtIfElse:
 		blks := GetBlocksStmt(&st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
@@ -57,7 +91,23 @@ func (st Stmt) MustJump() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return blks[0].MustJump() && blks[1].MustJump()
+		if !blks[0].MustJump() {
+			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
+			if HasError() {
+				return false
+			}
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue false-arm past Then residual true
+		if HasError() {
+			return false
+		}
+		ok := blks[1].MustJump()
+		// residual ERROR sticky — no invent must-jump true past Else residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case StmtFor, StmtArrayOp:
 		blks := GetBlocksStmt(&st)
 		if len(blks) == 0 || blks[0] == nil {
@@ -65,7 +115,12 @@ func (st Stmt) MustJump() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return blks[0].MustJump()
+		ok := blks[0].MustJump()
+		// residual ERROR sticky — no invent must-jump true past body residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	default:
 		return false
 	}
@@ -99,10 +154,23 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	}
 	last := b.GetLastStm()
 	if last == nil || !last.MustReturn() {
+		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue escape check past MustReturn residual true
+	if HasError() {
 		return false
 	}
 	// Block.cpp:318–326 — back edges into block (continue) can skip end return
-	return !b.hasEscapeBackEdge(fm)
+	esc := b.hasEscapeBackEdge(fm)
+	// residual ERROR sticky — no invent must-return true past escape CFG residual hole
+	if HasError() {
+		return false
+	}
+	return !esc
 }
 
 // MustJump mirrors Block::must_jump.
@@ -120,7 +188,15 @@ func (b *Block) MustJump() bool {
 		return false
 	}
 	last := b.GetLastStm()
-	return last != nil && last.MustJump()
+	if last == nil {
+		return false
+	}
+	ok := last.MustJump()
+	// residual ERROR sticky — no invent must-jump true past last MustJump residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // hasEscapeBackEdge reports a back_link edge into b whose src is not the block itself.

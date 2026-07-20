@@ -377,6 +377,28 @@ func TestMustReturnIncompleteSticky(t *testing.T) {
 		t.Fatal("nil Then MustReturn must SetError sticky")
 	}
 	ClearError()
+	// nested MustReturn residual soft invent was soft-continue false-arm invent must-return true.
+	// Fair: sticky false. Then arm incomplete if (nil Else) residual.
+	thenHole := &Block{Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}}}
+	elseOK := &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
+	st2 := Stmt{Kind: StmtIfElse, Then: thenHole, Else: elseOK}
+	if st2.MustReturn() {
+		t.Fatal("nested MustReturn residual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nested MustReturn residual must SetError sticky")
+	}
+	ClearError()
+	// MustJump residual via nested MustReturn residual same invent soft-continue.
+	// Fair: sticky false.
+	st3 := Stmt{Kind: StmtIfElse, Then: thenHole, Else: elseOK}
+	if st3.MustJump() {
+		t.Fatal("nested MustJump residual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nested MustJump residual must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestNeedReturnStmtIncompleteSticky(t *testing.T) {
