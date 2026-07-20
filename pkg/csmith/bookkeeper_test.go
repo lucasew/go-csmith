@@ -437,3 +437,31 @@ func TestRecordTypeWithBitfieldsIsAggregateResidualSticky(t *testing.T) {
 	ClearError()
 	BookkeeperDoFinalization()
 }
+
+func TestRecordPointerComparisonsIsPointerLikeResidualSticky(t *testing.T) {
+	// IsPointerLike residual soft invent was invent soft-skip then later cmp counts.
+	// Type-nil GetType residual already sticky; complete non-pointer soft-skip hygiene.
+	ClearError()
+	BookkeeperDoFinalization()
+	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	before := cmpPtrToNull + cmpPtrToPtr + cmpPtrToAddr
+	RecordPointerComparisons(a, b)
+	// non-pointer soft skip no count
+	if cmpPtrToNull+cmpPtrToPtr+cmpPtrToAddr != before {
+		t.Fatal("non-pointer must not invent cmp counts")
+	}
+	if HasError() {
+		t.Fatal("complete non-pointer RecordPointerComparisons must not sticky")
+	}
+	ClearError()
+	// Type-nil GetType residual
+	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
+	ok := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)}
+	RecordPointerComparisons(hole, ok)
+	if !HasError() {
+		t.Fatal("GetType residual RecordPointerComparisons must SetError sticky")
+	}
+	ClearError()
+	BookkeeperDoFinalization()
+}

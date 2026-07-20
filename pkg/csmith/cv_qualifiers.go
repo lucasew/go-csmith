@@ -169,9 +169,19 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 		return true
 	}
 	if !q.AcceptStricter {
-		return q.StricterThan(other)
+		ok := q.StricterThan(other)
+		// residual ERROR sticky — no invent match true past StricterThan residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
-	return other.StricterThan(q)
+	ok := other.StricterThan(q)
+	// residual ERROR sticky — no invent match true past other StricterThan residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // AddQualifiers mirrors CVQualifiers::add_qualifiers — push one level.
@@ -267,6 +277,10 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 		return true
 	}
 	level := t.IndirectLevel()
+	// residual ERROR sticky — no invent sanity true past IndirectLevel residual hole
+	if HasError() {
+		return false
+	}
 	// CVQualifiers.cpp:529 assert(level >= 0) sticky
 	if level < 0 {
 		SetError(ErrGeneric)

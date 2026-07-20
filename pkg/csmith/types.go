@@ -386,7 +386,15 @@ func (t *Type) IsFullBitfieldsStruct() bool {
 		return true
 	}
 	if !t.IsStruct() || len(t.Fields) == 0 {
+		// residual ERROR sticky — no invent not-full soft-skip past IsStruct residual
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue full check past IsStruct residual true
+	if HasError() {
+		return true
 	}
 	for _, f := range t.Fields {
 		if f.BitWidth < 0 {

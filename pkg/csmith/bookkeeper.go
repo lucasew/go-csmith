@@ -294,7 +294,20 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 	}
 	// Bookkeeper.cpp:364–365 — assert both pointer; fail closed non-sticky skip
 	// (non-pointer cmp is soft non-event, not sticky factory poison)
-	if lt == nil || rt == nil || !lt.IsPointerLike() || !rt.IsPointerLike() {
+	if lt == nil || rt == nil {
+		return
+	}
+	lPtr := lt.IsPointerLike()
+	// residual ERROR sticky — no invent soft-skip cmp stats past IsPointerLike residual
+	if HasError() {
+		return
+	}
+	rPtr := rt.IsPointerLike()
+	// residual ERROR sticky — no invent soft-skip cmp stats past RHS IsPointerLike residual
+	if HasError() {
+		return
+	}
+	if !lPtr || !rPtr {
 		return
 	}
 	// var vs constant → null compare

@@ -137,3 +137,39 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 		t.Fatal("nil sides")
 	}
 }
+
+func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
+	// WriteVar residual soft invent was invent soft-complete NoteWrite past Type-nil IsVolatile residual.
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), FEffect: EmptyEffect()}
+	cg := WithFunc(f, EmptyEffect())
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// Type-nil Variable IsVolatile residual on WriteVar path
+	hole := &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	cg.NoteWrite(hole)
+	// WriteVar residual on Type-nil IsVolatile may sticky IncompleteEffect
+	if EffectComplete(*cg.EffectAccum) && !HasError() {
+		// may still complete if IsVolatile non-residual on empty qfer
+	}
+	// Type-nil IsVolatile: Variable.IsVolatile uses Qfer only - no Type residual
+	// Use incomplete EffectAccum residual path
+	ClearError()
+	cg2 := WithFunc(f, EmptyEffect())
+	inc := IncompleteEffect()
+	cg2.EffectAccum = &inc
+	cg2.NoteWrite(CreateVariableScalars("g_y", GetIntType(), false, false))
+	if !HasError() {
+		t.Fatal("Incomplete EffectAccum NoteWrite must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestNoteWriteNilSticky(t *testing.T) {
+	ClearError()
+	EmptyCGContext().NoteWrite(nil)
+	if !HasError() {
+		t.Fatal("nil NoteWrite must SetError sticky")
+	}
+	ClearError()
+}

@@ -1277,7 +1277,12 @@ func (v *Variable) IsVisible(blk *Block) bool {
 	if HasError() {
 		return false
 	}
-	return v.IsVisibleLocal(blk)
+	ok := v.IsVisibleLocal(blk)
+	// residual ERROR sticky — no invent not-visible soft-skip past IsVisibleLocal residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsVisibleLocal mirrors Variable::is_visible_local / ArrayVariable override.
@@ -1292,9 +1297,18 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 		return false
 	}
 	if blk == nil {
-		return v.IsGlobal()
+		ok := v.IsGlobal()
+		// residual ERROR sticky — no invent not-visible soft-skip past IsGlobal residual
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	if v.IsFieldVar() {
+		// residual ERROR sticky — no invent soft-continue field path past IsFieldVar residual
+		if HasError() {
+			return false
+		}
 		// FieldVarOf always live for field vars; nil sticky fail closed
 		if v.FieldVarOf == nil {
 			SetError(ErrGeneric)
@@ -1306,6 +1320,10 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 			return false
 		}
 		return ok
+	}
+	// residual ERROR sticky — no invent soft-continue non-field past IsFieldVar residual false
+	if HasError() {
+		return false
 	}
 	// ArrayVariable.cpp:419–429 — parent block chain for array (collective or itemized)
 	if v.AsArray != nil && v.AsArray.Block != nil {

@@ -498,3 +498,24 @@ func TestIsConstAfterDeref(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSanityCheckIndirectLevelResidualSticky(t *testing.T) {
+	// IndirectLevel residual soft invent was invent sanity true past Type-nil.
+	ClearError()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if q.SanityCheck(nil) {
+		t.Fatal("nil Type SanityCheck must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Type SanityCheck must SetError sticky")
+	}
+	ClearError()
+	// complete scalar depth 1
+	if !q.SanityCheck(GetIntType()) {
+		t.Fatal("complete SanityCheck")
+	}
+	if HasError() {
+		t.Fatal("complete SanityCheck must not sticky")
+	}
+	ClearError()
+}

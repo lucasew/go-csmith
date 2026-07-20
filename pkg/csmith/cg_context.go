@@ -88,19 +88,35 @@ func (c CGContext) NoteWrite(v *Variable) {
 			return
 		}
 		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+		// residual ERROR sticky — no invent soft-continue FEffect past WriteVar residual
+		if HasError() {
+			return
+		}
 		if !EffectComplete(*c.EffectAccum) {
 			SetError(ErrGeneric)
+			return
 		}
 	}
 	if c.CurrentFunc != nil && v.IsGlobal() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
+		if HasError() {
+			return
+		}
 		if !EffectComplete(c.CurrentFunc.FEffect) {
 			SetError(ErrGeneric)
 			return
 		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
+		// residual ERROR sticky — no invent soft-complete write past FEffect WriteVar residual
+		if HasError() {
+			return
+		}
 		if !EffectComplete(c.CurrentFunc.FEffect) {
 			SetError(ErrGeneric)
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
+		return
 	}
 }
 
@@ -118,19 +134,35 @@ func (c CGContext) NoteRead(v *Variable) {
 			return
 		}
 		*c.EffectAccum = c.EffectAccum.ReadVar(v)
+		// residual ERROR sticky — no invent soft-continue FEffect past ReadVar residual
+		if HasError() {
+			return
+		}
 		if !EffectComplete(*c.EffectAccum) {
 			SetError(ErrGeneric)
+			return
 		}
 	}
 	if c.CurrentFunc != nil && v.IsGlobal() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
+		if HasError() {
+			return
+		}
 		if !EffectComplete(c.CurrentFunc.FEffect) {
 			SetError(ErrGeneric)
 			return
 		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
+		// residual ERROR sticky — no invent soft-complete read past FEffect ReadVar residual
+		if HasError() {
+			return
+		}
 		if !EffectComplete(c.CurrentFunc.FEffect) {
 			SetError(ErrGeneric)
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
+		return
 	}
 }
 
