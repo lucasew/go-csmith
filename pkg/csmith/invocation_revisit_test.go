@@ -403,3 +403,15 @@ func TestRenewFactNilFactsSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestNeedsRevisitNilResidualSticky(t *testing.T) {
+	// NeedsRevisit residual soft invent was invent not-revisit soft-skip past nil Function.
+	ClearError()
+	if (*Function)(nil).NeedsRevisit() {
+		t.Fatal("nil NeedsRevisit must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil NeedsRevisit must SetError sticky")
+	}
+	ClearError()
+}

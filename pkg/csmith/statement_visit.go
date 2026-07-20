@@ -191,6 +191,10 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			return false
 		}
 		inputs = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-fixed-point past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 	}
 	_, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
 	return ok
@@ -213,6 +217,10 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-if visit past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 	}
 	// StatementIf.cpp:165–168 — evaluate condition first; nil test sticky
 	if st.Expr == nil {
@@ -224,6 +232,10 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementIf.cpp:169 — effect_stm after condition
 	condEff := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
+	if HasError() {
+		return false
+	}
 	// post-condition env shared as entry to both arms
 	var postCond []*FactPointTo
 	if cg.FM != nil {
@@ -234,10 +246,18 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		postCond = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-if arms past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 	}
 	preAccum := EmptyEffect()
 	if cg.EffectAccum != nil {
 		preAccum = cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-if arms past EffectAccum Clone residual
+		if HasError() {
+			return false
+		}
 	}
 
 	// StatementIf.cpp:170–177 — both arms always live Blocks sticky
@@ -262,8 +282,16 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-then facts past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 		// StatementIf.cpp:174 — false starts from same post-cond inputs (not after true)
 		cg.FM.GlobalFacts = CloneFactSlice(postCond)
+		// residual ERROR sticky — no invent soft-else start past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 	}
 
 	// StatementIf.cpp:174–177 — false branch
@@ -440,8 +468,16 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-for visit past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 	}
 	eff := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-for visit past EffectStm Clone residual
+	if HasError() {
+		return false
+	}
 
 	iv := st.Loop.IV
 	// StatementFor.cpp:440 — assert(iv->type->eType == eSimple) sticky
@@ -670,7 +706,15 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	preFacts := CloneFactSlice(ptFacts)
+	// residual ERROR sticky — no invent soft-arrayop visit past CloneFactSlice residual
+	if HasError() {
+		return false
+	}
 	preStm := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-arrayop visit past EffectStm Clone residual
+	if HasError() {
+		return false
+	}
 	bodyCG := *cg
 	bodyCG.Flags |= FlagInLoop
 	// add all IVs as bounds for body analysis

@@ -1311,8 +1311,16 @@ func makeExpressionVariableFlags(
 	var preAccum, preStm Effect
 	if cg.EffectAccum != nil {
 		preAccum = cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-expr past EffectAccum Clone residual
+		if HasError() {
+			return nil
+		}
 	}
 	preStm = cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-expr past EffectStm Clone residual
+	if HasError() {
+		return nil
+	}
 	// ExpressionVariable.cpp:71–132 — do { select; filters; visit_facts } while (!ev)
 	// dummy is invalid_vars passed into select (ExpressionVariable.cpp:78, 131)
 	// C++ loops until success or ERROR_GUARD; cap high to avoid soft invent nil early
@@ -1770,14 +1778,26 @@ func makeExpressionFuncall(
 	var preAccum Effect
 	if cg.EffectAccum != nil {
 		preAccum = cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-funcall past EffectAccum Clone residual
+		if HasError() {
+			return nil
+		}
 	}
 	preStm := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-funcall past EffectStm Clone residual
+	if HasError() {
+		return nil
+	}
 	// incomplete GlobalFacts fail closed sticky (no invent cleaned snapshot for failed call restore)
 	if !FactsComplete(cg.FM.GlobalFacts) {
 		SetError(ErrGeneric)
 		return nil
 	}
 	factsCopy := CloneFactSlice(cg.FM.GlobalFacts)
+	// residual ERROR sticky — no invent soft-funcall past CloneFactSlice residual
+	if HasError() {
+		return nil
+	}
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	// ExpressionFuncall.cpp:82 — ERROR_GUARD(nullptr) before fi->failed
 	if HasError() {

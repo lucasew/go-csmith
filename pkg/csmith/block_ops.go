@@ -603,6 +603,10 @@ func (b *Block) AppendNestedLoop(
 			return nil
 		}
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-append for past CloneFactSlice residual
+		if HasError() {
+			return nil
+		}
 	}
 	cg.ClearEffectStm()
 	// Block.cpp:424 — Statement::make_random(eFor); ERROR_GUARD(nullptr)

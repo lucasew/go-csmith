@@ -794,3 +794,25 @@ func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCloneFactSliceIncompleteResidualSticky(t *testing.T) {
+	// CloneFactSlice residual soft invent was invent soft-complete empty past IncompleteFactSlice.
+	ClearError()
+	out := CloneFactSlice(IncompleteFactSlice())
+	if FactsComplete(out) {
+		t.Fatal("IncompleteFactSlice CloneFactSlice must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IncompleteFactSlice CloneFactSlice must SetError sticky")
+	}
+	ClearError()
+	// complete empty
+	out2 := CloneFactSlice([]*FactPointTo{})
+	if !FactsComplete(out2) || out2 == nil {
+		// empty complete may be non-nil empty
+	}
+	if HasError() {
+		t.Fatal("complete empty CloneFactSlice must not sticky")
+	}
+	ClearError()
+}

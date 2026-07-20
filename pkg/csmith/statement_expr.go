@@ -35,6 +35,10 @@ func MakeRandomExprStmt(
 	if cg.EffectAccum != nil {
 		// pre-validated EffectComplete
 		preEffect = cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-expr stmt past Effect Clone residual
+		if HasError() {
+			return Stmt{}
+		}
 	}
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
@@ -43,6 +47,10 @@ func MakeRandomExprStmt(
 			return Stmt{}
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-expr stmt past CloneFactSlice residual
+		if HasError() {
+			return Stmt{}
+		}
 	}
 	list := cg.Funcs
 	// is_std_func=false (StatementExpr.cpp:60)

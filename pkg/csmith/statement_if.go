@@ -45,12 +45,20 @@ func MakeRandomIf(
 			return nil
 		}
 		func1PreFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-if past CloneFactSlice residual
+		if HasError() {
+			return nil
+		}
 		if cg.EffectAccum != nil {
 			if !EffectComplete(*cg.EffectAccum) {
 				SetError(ErrGeneric)
 				return nil
 			}
 			func1PreEffect = cg.EffectAccum.Clone()
+			// residual ERROR sticky — no invent soft-if past Effect Clone residual
+			if HasError() {
+				return nil
+			}
 		}
 	}
 	// StatementIf.cpp:69 — clear per-statement effect before condition
@@ -84,8 +92,16 @@ func MakeRandomIf(
 		}
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = func1PreEffect.Clone()
+			// residual ERROR sticky — no invent soft-restore past Effect Clone residual
+			if HasError() {
+				return nil
+			}
 		}
 		cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
+		// residual ERROR sticky — no invent soft-restore past CloneFactSlice residual
+		if HasError() {
+			return nil
+		}
 		if !VisitFactsExpression(test, cg, opts) {
 			// StatementIf.cpp:84–88 — assert(ok) sticky; no invent soft re-pick past visit fail
 			if cg.EffectAccum != nil {
@@ -113,6 +129,10 @@ func MakeRandomIf(
 	}
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
 	condEff := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
+	if HasError() {
+		return nil
+	}
 
 	thenEff := pre
 	thenCG := *cg

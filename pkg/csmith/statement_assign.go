@@ -1005,13 +1005,22 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	}
 	if isFuncCall {
 		// FunctionInvocation.cpp:530–551 — revisit user callee when DFA needed
-		if fi.User.NeedsRevisit() && fi.User.Body != nil && cg.FM != nil {
+		needRev := fi.User.NeedsRevisit()
+		// residual ERROR sticky — no invent soft-skip revisit past NeedsRevisit residual
+		if HasError() {
+			return false
+		}
+		if needRev && fi.User.Body != nil && cg.FM != nil {
 			// incomplete GlobalFacts sticky (no invent cleaned revisit)
 			if !FactsComplete(cg.FM.GlobalFacts) {
 				SetError(ErrGeneric)
 				return false
 			}
 			facts := CloneFactSlice(cg.FM.GlobalFacts)
+			// residual ERROR sticky — no invent soft-revisit past CloneFactSlice residual
+			if HasError() {
+				return false
+			}
 			if !RevisitUserInvocation(fi, &facts, cg, opts) {
 				return false
 			}

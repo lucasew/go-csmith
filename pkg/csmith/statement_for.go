@@ -532,11 +532,19 @@ func MakeRandomFor(
 		return nil
 	}
 	preEffect := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-for past EffectStm Clone residual
+	if HasError() {
+		return nil
+	}
 	if !EffectComplete(preEffect) {
 		SetError(ErrGeneric)
 		return nil
 	}
 	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
+	// residual ERROR sticky — no invent soft-for past CloneFactSlice residual
+	if HasError() {
+		return nil
+	}
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
 	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
 	bodyCG := cg.WithFlags(FlagInLoop)

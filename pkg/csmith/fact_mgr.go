@@ -1468,11 +1468,27 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if !wantPT && !wantUn {
 		return
 	}
-	if wantPT && FindRelatedPointTo(fm.GlobalFacts, v) != nil {
-		return
+	if wantPT {
+		rel := FindRelatedPointTo(fm.GlobalFacts, v)
+		// residual ERROR sticky — no invent soft-skip makeup past FindRelated residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
+		if rel != nil {
+			return
+		}
 	}
-	if wantUn && FindRelatedUnion(fm.UnionFacts, v) != nil {
-		return
+	if wantUn {
+		relU := FindRelatedUnion(fm.UnionFacts, v)
+		// residual ERROR sticky — no invent soft-skip makeup past FindRelatedUnion residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
+		if relU != nil {
+			return
+		}
 	}
 	pt, un := AbstractFactForVarInit(v)
 	if wantPT {

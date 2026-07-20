@@ -376,8 +376,18 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				return
 			}
 			outputs := CloneFactSlice(preFacts)
+			// residual ERROR sticky — no invent soft-validate past CloneFactSlice residual
+			if HasError() {
+				fm.GlobalFacts = IncompleteFactSlice()
+				return
+			}
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
+				// residual ERROR sticky — no invent soft-validate past Effect Clone residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
 			}
 			// Statement.cpp:868–871 — assert(validate); no soft invent skip special path
 			if !ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock()) {
@@ -515,6 +525,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				}
 				// MergeFacts clears on mid-join failure — fail closed fixed-point
 				_ = MergeFacts(&currentInputs, out)
+				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
+				if HasError() {
+					return currentInputs, -1, false
+				}
 				if !FactsComplete(currentInputs) {
 					SetError(ErrGeneric)
 					return currentInputs, -1, false
@@ -533,6 +547,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					return currentInputs, -1, false
 				}
 				_ = MergeFacts(&currentInputs, out)
+				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
+				if HasError() {
+					return currentInputs, -1, false
+				}
 				if !FactsComplete(currentInputs) {
 					SetError(ErrGeneric)
 					return currentInputs, -1, false

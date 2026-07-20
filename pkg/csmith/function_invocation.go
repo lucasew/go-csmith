@@ -596,7 +596,13 @@ func BuildUserInvocation(
 	fi.Failed = false
 	first := GetFirstFunction(list)
 	// skip revisit for first function (func_1) — no params, single call, DFA hack
-	if callee != first && callee.NeedsRevisit() {
+	needRev := callee != first && callee.NeedsRevisit()
+	// residual ERROR sticky — no invent soft-skip revisit past NeedsRevisit residual
+	if HasError() {
+		fi.Failed = true
+		return fi
+	}
+	if needRev {
 		// FunctionInvocationUser.cpp:277–291 — revisit with accum_eff_context
 		// Incomplete AccumEffContext fails closed sticky (no invent revisit under incomplete ambient)
 		effectAccum := EmptyEffect()
@@ -624,6 +630,11 @@ func BuildUserInvocation(
 				return fi
 			}
 			facts = CloneFactSlice(cg.FM.GlobalFacts)
+			// residual ERROR sticky — no invent soft-revisit past CloneFactSlice residual
+			if HasError() {
+				fi.Failed = true
+				return fi
+			}
 		}
 		ok := RevisitUserInvocation(fi, &facts, &newCG, opts)
 		fi.Failed = !ok
@@ -1163,6 +1174,10 @@ func MakeRandomBinaryInvocation(
 			return nil
 		}
 		_ = MergeFacts(&cg.FM.GlobalFacts, factsCopy)
+		// residual ERROR sticky — no invent soft-binary past MergeFacts residual
+		if HasError() {
+			return nil
+		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			SetError(ErrGeneric)
 			return nil

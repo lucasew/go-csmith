@@ -476,6 +476,11 @@ func MakeRandomBlock(
 			return nil
 		}
 		preEffect = cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-block past Effect Clone residual
+		if HasError() {
+			abortBlockMake(f, b)
+			return nil
+		}
 	}
 	if !EffectComplete(preEffect) {
 		abortBlockMake(f, b)
@@ -637,6 +642,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		return
 	} else {
 		postFacts = CloneFactSlice(fm.GlobalFacts)
+		// residual ERROR sticky — no invent soft-post past CloneFactSlice residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
+		}
 		if len(b.LocalVars) > 0 {
 			fm.UpdateFactsForOOSVars(b.LocalVars)
 		}
@@ -668,9 +680,23 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				return
 			} else {
 				factsCopy := CloneFactSlice(in0)
+				// residual ERROR sticky — no invent soft-fixed-point past CloneFactSlice residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					return
+				}
 				// reset accum to pre-block effect
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preEffect.Clone()
+					// residual ERROR sticky — no invent soft-reset past Effect Clone residual
+					if HasError() {
+						fm.GlobalFacts = IncompleteFactSlice()
+						postFacts = IncompleteFactSlice()
+						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+						return
+					}
 				}
 				for {
 					out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
@@ -702,6 +728,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					}
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preEffect.Clone()
+						// residual ERROR sticky — no invent soft-reset past Effect Clone residual
+						if HasError() {
+							fm.GlobalFacts = IncompleteFactSlice()
+							postFacts = IncompleteFactSlice()
+							fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+							return
+						}
 					}
 					if len(b.Stmts) == 0 {
 						break
@@ -718,6 +751,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					return
 				} else {
 					fm.GlobalFacts = CloneFactSlice(out)
+					// residual ERROR sticky — no invent soft-out past CloneFactSlice residual
+					if HasError() {
+						fm.GlobalFacts = IncompleteFactSlice()
+						postFacts = IncompleteFactSlice()
+						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+						return
+					}
 					postFacts = fm.GlobalFacts
 				}
 			}
