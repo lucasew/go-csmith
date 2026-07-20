@@ -184,7 +184,12 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if m := v.MatchVarName(name); m != nil {
+		m := v.MatchVarName(name)
+		// residual ERROR sticky — no invent soft-continue later vars past MatchVarName residual
+		if HasError() {
+			return nil
+		}
+		if m != nil {
 			return m
 		}
 	}
@@ -195,7 +200,12 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if m := av.Variable.MatchVarName(name); m != nil {
+		m := av.Variable.MatchVarName(name)
+		// residual ERROR sticky — no invent soft-continue later arrays past MatchVarName residual
+		if HasError() {
+			return nil
+		}
+		if m != nil {
 			return m
 		}
 	}
@@ -1415,7 +1425,10 @@ func (vs *VariableSelector) SelectMustUseVar(
 	blk := cg.CurrentBlock()
 	// incomplete Param/LocalVars must not invent IsVisible false and skip must-use vars
 	if blk != nil && !blk.StackScanComplete() {
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-must-use past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	// incomplete must-use list fails closed sticky (no invent partial scan)

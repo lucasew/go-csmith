@@ -38,7 +38,10 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 	}
 	if !f.StackScanComplete(stParent) {
 		// incomplete Param/LocalVars sticky fail closed not-on-stack
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft not-on-stack past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	for _, p := range f.Param {
@@ -132,7 +135,10 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	}
 	if !f.StackScanComplete(stParent) {
 		// incomplete stack sticky OOS (no invent not-OOS when scan short-circuits)
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-OOS past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	if f.IsVarVisible(v, stParent) {

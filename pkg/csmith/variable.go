@@ -1232,7 +1232,12 @@ func (v *Variable) MatchVarName(vname string) *Variable {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if m := f.MatchVarName(vname); m != nil {
+		m := f.MatchVarName(vname)
+		// residual ERROR sticky — no invent soft-continue field match past MatchVarName residual
+		if HasError() {
+			return nil
+		}
+		if m != nil {
 			return m
 		}
 	}
@@ -1636,7 +1641,12 @@ func (v *Variable) IsVirtual() bool {
 		return false
 	}
 	if v.FieldVarOf != nil {
-		return v.FieldVarOf.IsVirtual()
+		ok := v.FieldVarOf.IsVirtual()
+		// residual ERROR sticky — no invent soft not-virtual past parent IsVirtual residual
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	if v.AsArray != nil {
 		// ArrayVariable::collective == 0 → parent / non-itemized
@@ -1691,7 +1701,12 @@ func (v *Variable) GetCollective() *Variable {
 		return nil
 	}
 	// special handling for array fields (Variable.cpp:583–612)
-	if v.IsArrayField() {
+	isAF := v.IsArrayField()
+	// residual ERROR sticky — no invent soft-collective past IsArrayField residual
+	if HasError() {
+		return nil
+	}
+	if isAF {
 		// find top-level array ancestor
 		parent := v.FieldVarOf
 		for parent != nil && !parent.IsArray && parent.AsArray == nil {
@@ -2261,11 +2276,12 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		return ""
 	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
-	if v.IsVirtual() {
-		// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual hole
-		if HasError() {
-			return ""
-		}
+	virt := v.IsVirtual()
+	// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual
+	if HasError() {
+		return ""
+	}
+	if virt {
 		// field of virtual array is broken IR sticky for this path
 		if v.IsFieldVar() {
 			// residual ERROR sticky — no invent soft-continue dump past IsFieldVar residual

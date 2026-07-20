@@ -285,7 +285,10 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 	}
 	if !b.StackScanComplete() {
 		// incomplete Param/LocalVars sticky fail closed not-on-stack
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft not-on-stack past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	f := b.Func

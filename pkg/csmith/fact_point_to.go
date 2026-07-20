@@ -1468,7 +1468,10 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	}
 	// incomplete stack lists fail closed sticky (no invent leave stack pointees live)
 	if !fn.StackScanComplete(stParent) {
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-mark dead past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	set := append([]*Variable(nil), f.PointTo...)
@@ -1531,7 +1534,10 @@ func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	}
 	if fn != nil && !fn.StackScanComplete(stParent) {
 		*facts = IncompleteFactSlice()
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-mark past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	for i, f := range *facts {
@@ -1774,7 +1780,10 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	}
 	// incomplete LocalVars/Param sticky (membership short-circuit invents not-local)
 	if b != nil && !b.StackScanComplete() {
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft not-local past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	if indirection == -1 {

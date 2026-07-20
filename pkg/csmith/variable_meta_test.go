@@ -284,3 +284,43 @@ func TestIsPackedAggregateFieldVarNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsVirtualParentResidualSticky(t *testing.T) {
+	// IsVirtual residual soft invent was invent soft not-virtual past IsArray without AsArray parent.
+	ClearError()
+	// IsArray without AsArray on self sticky
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if shell.IsVirtual() {
+		t.Fatal("IsArray without AsArray IsVirtual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray IsVirtual must SetError sticky")
+	}
+	ClearError()
+	// field of IsArray without AsArray parent residual recursive
+	parent := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	field := &Variable{Name: "g_a.f0", Type: GetIntType(), FieldVarOf: parent}
+	if field.IsVirtual() {
+		t.Fatal("field of IsArray without AsArray parent must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("field of IsArray without AsArray parent IsVirtual must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestGetCollectiveIsArrayFieldResidualSticky(t *testing.T) {
+	// IsArrayField residual soft invent was invent soft-collective past FieldVarOf shell.
+	ClearError()
+	// IsArray without AsArray as FieldVarOf parent IsArrayField residual restrictive true
+	parent := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	field := &Variable{Name: "g_a.f0", Type: GetIntType(), FieldVarOf: parent}
+	// IsArrayField on field with parent IsArray without AsArray stickies residual true
+	if field.GetCollective() != nil {
+		// may incomplete nil
+	}
+	if !HasError() {
+		t.Fatal("IsArrayField residual GetCollective must SetError sticky")
+	}
+	ClearError()
+}

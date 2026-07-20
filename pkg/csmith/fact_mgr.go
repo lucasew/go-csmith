@@ -423,7 +423,10 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		}
 		if !f.StackScanComplete(stParent) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
-			SetError(ErrGeneric)
+			// residual ERROR sticky — no invent soft-skip AddFactOut past StackScan residual
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 		if !f.IsVarVisible(fact.Var, stParent) {
@@ -1100,7 +1103,10 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 		return IncompleteFactSlice()
 	}
 	if f != nil && stParent != nil && !f.StackScanComplete(stParent) {
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-clean facts past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return IncompleteFactSlice()
 	}
 	out := make([]*FactPointTo, 0, len(facts))
