@@ -181,7 +181,8 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	av.AsArray = av
-	vs.Arrays = []*ArrayVariable{av}
+	// visible via GlobalList (C++ find_all_visible_vars); not Arrays invent list
+	vs.GlobalList = []*Variable{&av.Variable}
 	cg := EmptyCGContext()
 	if vs.SelectArray(NewRng(1), cg) != nil {
 		t.Fatal("Type-nil SelectArray must fail closed")

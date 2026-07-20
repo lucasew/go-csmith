@@ -3012,16 +3012,9 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return nil
 		}
 	}
-	// ArrayVariable* on Arrays list; nil hole fails closed sticky
-	for _, av := range vs.Arrays {
-		if av == nil {
-			SetError(ErrGeneric)
-			return nil
-		}
-		if !add(av) {
-			return nil
-		}
-	}
+	// VariableSelector.cpp:1386–1426 — only find_all_visible_vars; do not invent
+	// candidates from vs.Arrays when the collective is not on GlobalList/local_vars
+	// (seed-2 e198: UP create_random_array F25 while Go reused a non-visible Arrays entry).
 	// Type-nil / filter sticky from add — no invent CreateRandomArray / pick soft-success
 	if HasError() {
 		return nil

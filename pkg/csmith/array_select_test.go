@@ -52,10 +52,13 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	a := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
-	b := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_2", GetIntType(), MakeInt(1), q)
-	vs.Arrays = []*ArrayVariable{a, b}
-	// sole when filter... both ok
+	// VariableSelector.cpp:1386 — find_all_visible_vars only (GlobalList / local_vars)
+	a := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
+	b := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_2", GetIntType(), MakeInt(1), q)
+	if a == nil || b == nil {
+		t.Fatal("create")
+	}
+	// CreateArrayVariable(blk=nil) registers GlobalList when vs non-nil
 	got := vs.SelectArray(NewRng(3), EmptyCGContext())
 	if got != a && got != b {
 		t.Fatal(got)
@@ -189,15 +192,6 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 		t.Fatal("visible list hole must SetError sticky")
 	}
 	ClearError()
-	vs.GlobalList = nil
-	vs.Arrays = []*ArrayVariable{nil}
-	if vs.SelectArray(NewRng(2), EmptyCGContext()) != nil {
-		t.Fatal("Arrays list hole must fail closed SelectArray")
-	}
-	if !HasError() {
-		t.Fatal("Arrays list hole must SetError sticky")
-	}
-	ClearError()
 	// IsArray without AsArray is incomplete IR — fail closed sticky
 	broken := &Variable{Name: "g_broken", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	vs.GlobalList = []*Variable{broken}
@@ -227,6 +221,34 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("incomplete GlobalFacts must SetError sticky SelectArray")
+	}
+	ClearError()
+}
+
+func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
+	// VariableSelector.cpp:1386–1426 — only find_all_visible_vars; vs.Arrays is not a
+	// second inventory. Array only on Arrays (not GlobalList/local) → create_random_array.
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	// Create without vs/blk registration (orphan array)
+	orphan := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntType(), MakeInt(0), q)
+	if orphan == nil {
+		t.Fatal("orphan create")
+	}
+	vs.Arrays = []*ArrayVariable{orphan}
+	// GlobalList empty → must not pick orphan; create_random_array draws flipcoin(25)
+	r := NewRng(7)
+	d0 := r.RandDepth()
+	got := vs.SelectArray(r, EmptyCGContext())
+	if got == orphan {
+		t.Fatal("must not invent select from vs.Arrays without visibility")
+	}
+	// create path: at least F25 when globals enabled
+	if r.RandDepth() <= d0 {
+		t.Fatal("empty visible must draw create_random_array RNG")
 	}
 	ClearError()
 }
