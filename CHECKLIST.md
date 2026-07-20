@@ -248,7 +248,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.enabled_builtin
 - [x] CGOptions.cpp::CGOptions.enabled_builtin_kind
 - [x] CGOptions.cpp::CGOptions.expand_struct
-- [ ] CGOptions.cpp::CGOptions.f
+- [x] CGOptions.cpp::CGOptions.f
 - [x] CGOptions.cpp::CGOptions.fast_execution
 - [x] CGOptions.cpp::CGOptions.fix_options_for_cpp
 - [x] CGOptions.cpp::CGOptions.fixed_struct_fields
@@ -327,7 +327,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.set_default_builtin_kinds
 - [x] CGOptions.cpp::CGOptions.set_default_settings
 - [x] CGOptions.cpp::CGOptions.set_platform_specific_options
-- [ ] CGOptions.cpp::CGOptions.set_vol_tests
+- [x] CGOptions.cpp::CGOptions.set_vol_tests
 - [x] CGOptions.cpp::CGOptions.signed_char_index
 - [x] CGOptions.cpp::CGOptions.split_files_dir
 - [x] CGOptions.cpp::CGOptions.step_hash_by_stmt
@@ -440,20 +440,20 @@ Total items: 2070
 - [x] CVQualifiers.cpp::CVQualifiers.stricter_than
 - [x] CVQualifiers.cpp::CVQualifiers.~CVQualifiers
 - [x] CVQualifiers.cpp::is_volatile_ok_on_one_level
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.create_output_dir
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.create_output_dir
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.CreateInstance
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.DefaultOutputMgr
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.get_main_out
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.init
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.is_split
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.open_one_output_file
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.is_split
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.open_one_output_file
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.Output
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.output_comment_line
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.output_tab
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputAllHeaders
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputGlobals
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputHeader
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.outputln
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.output_comment_line
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.output_tab
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputAllHeaders
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputGlobals
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputHeader
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.outputln
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputDefs
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputFuncDefs
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputVarDefs
@@ -582,10 +582,10 @@ Total items: 2070
 - [ ] DFSOutputMgr.cpp::DFSOutputMgr.DFSOutputMgr
 - [ ] DFSOutputMgr.cpp::DFSOutputMgr.get_main_out
 - [ ] DFSOutputMgr.cpp::DFSOutputMgr.Output
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.output_comment_line
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.output_tab
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.output_comment_line
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.output_tab
 - [ ] DFSOutputMgr.cpp::DFSOutputMgr.OutputHeader
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.outputln
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.outputln
 - [ ] DFSOutputMgr.cpp::DFSOutputMgr.OutputStructUnions
 - [ ] DFSOutputMgr.cpp::DFSOutputMgr.~DFSOutputMgr
 - [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.DFSProgramGenerator
@@ -1201,36 +1201,36 @@ Total items: 2070
 - [ ] Lhs.cpp::Lhs.visit_indices
 - [ ] Lhs.cpp::Lhs.~Lhs
 - [ ] Lhs.cpp::have_overlapping_fields
-- [ ] LinearSequence.cpp::LinearSequence.add_number
-- [ ] LinearSequence.cpp::LinearSequence.clear
-- [ ] LinearSequence.cpp::LinearSequence.get_number
-- [ ] LinearSequence.cpp::LinearSequence.get_number_by_pos
-- [ ] LinearSequence.cpp::LinearSequence.get_sep_char
-- [ ] LinearSequence.cpp::LinearSequence.get_sequence
-- [ ] LinearSequence.cpp::LinearSequence.init_sequence
-- [ ] LinearSequence.cpp::LinearSequence.LinearSequence
-- [ ] LinearSequence.cpp::LinearSequence.sequence_length
-- [ ] LinearSequence.cpp::LinearSequence.~LinearSequence
+- [x] LinearSequence.cpp::LinearSequence.add_number
+- [x] LinearSequence.cpp::LinearSequence.clear
+- [x] LinearSequence.cpp::LinearSequence.get_number
+- [x] LinearSequence.cpp::LinearSequence.get_number_by_pos
+- [x] LinearSequence.cpp::LinearSequence.get_sep_char
+- [x] LinearSequence.cpp::LinearSequence.get_sequence
+- [x] LinearSequence.cpp::LinearSequence.init_sequence
+- [x] LinearSequence.cpp::LinearSequence.LinearSequence
+- [x] LinearSequence.cpp::LinearSequence.sequence_length
+- [x] LinearSequence.cpp::LinearSequence.~LinearSequence
 - [ ] OutputMgr.cpp::OutputMgr.get_main_out
 - [x] OutputMgr.cpp::OutputMgr.is_monitored_func
 - [ ] OutputMgr.cpp::OutputMgr.Output
-- [ ] OutputMgr.cpp::OutputMgr.output_comment_line
-- [ ] OutputMgr.cpp::OutputMgr.output_tab
-- [ ] OutputMgr.cpp::OutputMgr.output_tab_
-- [ ] OutputMgr.cpp::OutputMgr.OutputHashFuncDecl
-- [ ] OutputMgr.cpp::OutputMgr.OutputHashFuncDef
-- [ ] OutputMgr.cpp::OutputMgr.OutputHashFuncInvocation
-- [ ] OutputMgr.cpp::OutputMgr.OutputHeader
-- [ ] OutputMgr.cpp::OutputMgr.outputln
-- [ ] OutputMgr.cpp::OutputMgr.OutputMain
+- [x] OutputMgr.cpp::OutputMgr.output_comment_line
+- [x] OutputMgr.cpp::OutputMgr.output_tab
+- [x] OutputMgr.cpp::OutputMgr.output_tab_
+- [x] OutputMgr.cpp::OutputMgr.OutputHashFuncDecl
+- [x] OutputMgr.cpp::OutputMgr.OutputHashFuncDef
+- [x] OutputMgr.cpp::OutputMgr.OutputHashFuncInvocation
+- [x] OutputMgr.cpp::OutputMgr.OutputHeader
+- [x] OutputMgr.cpp::OutputMgr.outputln
+- [x] OutputMgr.cpp::OutputMgr.OutputMain
 - [ ] OutputMgr.cpp::OutputMgr.OutputMgr
-- [ ] OutputMgr.cpp::OutputMgr.OutputPtrResets
-- [ ] OutputMgr.cpp::OutputMgr.OutputStepHashFuncDecl
-- [ ] OutputMgr.cpp::OutputMgr.OutputStepHashFuncDef
-- [ ] OutputMgr.cpp::OutputMgr.OutputStepHashFuncInvocation
+- [x] OutputMgr.cpp::OutputMgr.OutputPtrResets
+- [x] OutputMgr.cpp::OutputMgr.OutputStepHashFuncDecl
+- [x] OutputMgr.cpp::OutputMgr.OutputStepHashFuncDef
+- [x] OutputMgr.cpp::OutputMgr.OutputStepHashFuncInvocation
 - [ ] OutputMgr.cpp::OutputMgr.OutputStructUnions
-- [ ] OutputMgr.cpp::OutputMgr.OutputTail
-- [ ] OutputMgr.cpp::OutputMgr.really_outputln
+- [x] OutputMgr.cpp::OutputMgr.OutputTail
+- [x] OutputMgr.cpp::OutputMgr.really_outputln
 - [x] OutputMgr.cpp::OutputMgr.set_curr_func
 - [ ] OutputMgr.cpp::OutputMgr.~OutputMgr
 - [ ] PartialExpander.cpp::PartialExpander.copy_expands
@@ -1553,12 +1553,12 @@ Total items: 2070
 - [ ] Sequence.cpp::Sequence.Sequence
 - [ ] Sequence.cpp::Sequence.sequence_length
 - [ ] Sequence.cpp::Sequence.~Sequence
-- [ ] SequenceFactory.cpp::SequenceFactory.current_sep_char
-- [ ] SequenceFactory.cpp::SequenceFactory.destroy_sequences
-- [ ] SequenceFactory.cpp::SequenceFactory.make_sequence
-- [ ] SequenceLineParser.h::SequenceLineParser.parse_sequence
+- [x] SequenceFactory.cpp::SequenceFactory.current_sep_char
+- [x] SequenceFactory.cpp::SequenceFactory.destroy_sequences
+- [x] SequenceFactory.cpp::SequenceFactory.make_sequence
+- [x] SequenceLineParser.h::SequenceLineParser.parse_sequence
 - [ ] SequenceLineParser.h::SequenceLineParser.SequenceLineParser
-- [ ] SequenceLineParser.h::SequenceLineParser.str2int
+- [x] SequenceLineParser.h::SequenceLineParser.str2int
 - [ ] SequenceLineParser.h::SequenceLineParser.~SequenceLineParser
 - [ ] SequenceLineParser.h::find_first_of
 - [ ] SequenceLineParser.h::parse_sequence

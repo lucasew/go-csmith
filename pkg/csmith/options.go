@@ -491,6 +491,23 @@ func (o Options) FuncAttrFlag() bool { return o.FunctionAttributes }
 // CGOptions.cpp:589–591.
 func (o Options) VolTestsMachValue() string { return o.VolTestsMach }
 
+// SetVolTests mirrors CGOptions::set_vol_tests.
+// Declared CGOptions.h:289; no .cpp body on pin 0cdc710 (header-only / dead link).
+// Last known body (csmith-2.1.0 CGOptions.cpp): accept "x86"|"x86_64", store mach, return true.
+// enable_vol_tests flag was removed from the pin; only vol_tests_mach_ remains (Variable dump).
+// Incomplete/unknown mach fails closed false (no invent silent store of invalid host string).
+func (o *Options) SetVolTests(s string) bool {
+	if o == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if s == "x86" || s == "x86_64" {
+		o.VolTestsMach = s
+		return true
+	}
+	return false
+}
+
 // ApplyMonitoredFuncs installs Options.MonitorFuncs into OutputMgr process list.
 // Call from generation setup (CGOptions::monitored_funcs).
 func (o Options) ApplyMonitoredFuncs() {

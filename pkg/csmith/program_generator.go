@@ -270,8 +270,8 @@ func (g *ProgramGenerator) OutputHeader() string {
 	// (no invent forward decls without live defs)
 	if g.hashHelpersEnabled() {
 		// OutputMgr::OutputHashFuncDecl / OutputStepHashFuncDecl
-		b.WriteString("void csmith_compute_hash(void);\n")
-		b.WriteString("void step_hash(int stmt_id);\n\n")
+		b.WriteString(OutputHashFuncDecl())
+		b.WriteString(OutputStepHashFuncDecl())
 	}
 	return b.String()
 }
