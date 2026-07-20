@@ -393,6 +393,10 @@ func (v *Variable) OutputForComment(prefixName bool) string {
 		return ""
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-empty comment past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -416,15 +420,22 @@ func (v *Variable) OutputUpperBound(prefixName bool) string {
 		return ""
 	}
 	if v.AsArray != nil && len(v.AsArray.Sizes) > 0 {
-		return v.AsArray.OutputUpperBoundArray()
+		out := v.AsArray.OutputUpperBoundArray()
+		// residual ERROR sticky — no invent soft-empty upper past OutputUpperBoundArray residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	if v.FieldVarOf != nil {
 		// Variable.cpp:724–727 — assert(dot != npos); sticky no invent base-only without ".fN"
 		base := v.FieldVarOf.OutputUpperBound(prefixName)
+		// residual ERROR sticky — no invent soft-continue field path past parent residual
+		if HasError() {
+			return ""
+		}
 		if base == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		dot := strings.LastIndex(v.Name, ".")
@@ -435,6 +446,10 @@ func (v *Variable) OutputUpperBound(prefixName bool) string {
 		return base + v.Name[dot:]
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-empty upper past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -459,15 +474,22 @@ func (v *Variable) OutputLowerBound(prefixName bool) string {
 		return ""
 	}
 	if v.AsArray != nil {
-		return v.AsArray.OutputLowerBound()
+		out := v.AsArray.OutputLowerBound()
+		// residual ERROR sticky — no invent soft-empty lower past Array OutputLowerBound residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	if v.FieldVarOf != nil {
 		// Variable.cpp:737–740 — assert(dot != npos); sticky no invent base-only without ".fN"
 		base := v.FieldVarOf.OutputLowerBound(prefixName)
+		// residual ERROR sticky — no invent soft-continue field path past parent residual
+		if HasError() {
+			return ""
+		}
 		if base == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		dot := strings.LastIndex(v.Name, ".")
@@ -478,6 +500,10 @@ func (v *Variable) OutputLowerBound(prefixName bool) string {
 		return base + v.Name[dot:]
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-empty lower past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -551,6 +577,10 @@ func CtrlVarNames(ctrl []*Variable) []string {
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
 		name := v.GetActualName(false)
+		// residual ERROR sticky — no invent soft-continue later names past GetActualName residual
+		if HasError() {
+			return IncompleteLabelsSlice()
+		}
 		if name == "" {
 			// empty actual name is broken IR — fail closed sticky incomplete names
 			SetError(ErrGeneric)
@@ -582,7 +612,12 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	}
 	for i := 0; i < dimen; i++ {
 		// Variable.cpp:806 — get_actual_name always live; sticky no invent "int i, ;"
-		if ctrl[i].GetActualName(false) == "" {
+		nm := ctrl[i].GetActualName(false)
+		// residual ERROR sticky — no invent soft-continue later ctrl past GetActualName residual
+		if HasError() {
+			return ""
+		}
+		if nm == "" {
 			SetError(ErrGeneric)
 			return ""
 		}
@@ -593,7 +628,12 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(ctrl[i].GetActualName(false))
+		nm := ctrl[i].GetActualName(false)
+		// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
+		if HasError() {
+			return ""
+		}
+		b.WriteString(nm)
 	}
 	b.WriteString(";\n")
 	return b.String()

@@ -817,3 +817,54 @@ func TestOutputArrayInitForcedResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputQualifiedTypeCNameResidualSticky(t *testing.T) {
+	// CName residual soft invent was invent "const " / partial qualified type past hole.
+	ClearError()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if s := q.OutputQualifiedType(&Type{isStruct: true}); s != "" {
+		t.Fatal("CName residual must fail closed OutputQualifiedType", s)
+	}
+	if !HasError() {
+		t.Fatal("CName residual OutputQualifiedType must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputUpperBoundResidualSticky(t *testing.T) {
+	// OutputUpperBoundArray residual soft invent was invent bare field path past hole.
+	ClearError()
+	// IsArray without AsArray residual
+	v := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if s := v.OutputUpperBound(false); s != "" {
+		t.Fatal("IsArray without AsArray must fail closed OutputUpperBound", s)
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputUpperBound must SetError sticky")
+	}
+	ClearError()
+	// empty name residual
+	if s := (&Variable{Type: GetIntType()}).OutputUpperBound(false); s != "" {
+		t.Fatal("empty name OutputUpperBound must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name OutputUpperBound must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCtrlVarNamesGetActualNameResidualSticky(t *testing.T) {
+	// GetActualName residual soft invent was soft-continue invent partial name list.
+	ClearError()
+	ctrl := []*Variable{
+		{Name: "i", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // residual
+	}
+	if LabelsComplete(CtrlVarNames(ctrl)) {
+		t.Fatal("empty name residual must fail closed IncompleteLabelsSlice")
+	}
+	if !HasError() {
+		t.Fatal("empty name residual CtrlVarNames must SetError sticky")
+	}
+	ClearError()
+}

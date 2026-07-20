@@ -397,3 +397,25 @@ func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRecordVarCreatedStructDepthResidualSticky(t *testing.T) {
+	// StructDepth residual soft invent was invent soft-count depth/union past hole.
+	ClearError()
+	BookkeeperDoFinalization()
+	// Aggregate with nil field Type → StructDepth residual incompleteStructDepth + ERROR
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	v := &Variable{Name: "g_s", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	before := useNewVarCnt
+	RecordVarCreated(v)
+	if !HasError() {
+		t.Fatal("StructDepth residual RecordVarCreated must SetError sticky")
+	}
+	// useNewVarCnt may increment before residual stop — fair fail-closed means no further invent
+	if useNewVarCnt < before {
+		t.Fatal("counter regression")
+	}
+	ClearError()
+	BookkeeperDoFinalization()
+}

@@ -387,10 +387,24 @@ func RecordTypeWithBitfields(t *Type) {
 		}
 		// Bookkeeper.cpp:491–495 — qfers_[i] const/volatile
 		if f.Qfer.IsConst() {
+			// residual ERROR sticky — no invent soft-count past IsConst residual hole
+			if HasError() {
+				return
+			}
 			constBitfieldsInTotal++
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue stats past IsConst residual false
+			return
 		}
 		if f.Qfer.IsVolatile() {
+			// residual ERROR sticky — no invent soft-count past IsVolatile residual hole
+			if HasError() {
+				return
+			}
 			volatileBitfieldsInTotal++
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue stats past IsVolatile residual false
+			return
 		}
 	}
 }
@@ -406,9 +420,25 @@ func RecordVarCreated(v *Variable) {
 	}
 	useNewVarCnt++
 	RecordVarsWithBitfields(v.Type)
-	IncrCounter(&structDepthCnts, v.Type.StructDepth())
+	// residual ERROR sticky — no invent soft-continue create stats past bitfields residual
+	if HasError() {
+		return
+	}
+	d := v.Type.StructDepth()
+	// residual ERROR sticky — no invent soft-count depth past StructDepth residual
+	if HasError() {
+		return
+	}
+	IncrCounter(&structDepthCnts, d)
 	if v.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-count union past IsUnion residual hole
+		if HasError() {
+			return
+		}
 		unionVarCnt++
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+		return
 	}
 }
 

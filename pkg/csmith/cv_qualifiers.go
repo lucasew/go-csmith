@@ -739,30 +739,50 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		var b strings.Builder
 		// CVQualifiers.cpp:541–544 — assert(0) sticky if const bit without Consts option
 		if q.IsConst() {
+			// residual ERROR sticky — no invent soft-const past IsConst residual hole
+			if HasError() {
+				return ""
+			}
 			if !emitConst() {
 				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString("const ")
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsConst residual false
+			return ""
 		}
 		if q.IsVolatile() {
+			// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
+			if HasError() {
+				return ""
+			}
 			if !emitVol() {
 				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString("volatile ")
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
+			return ""
 		}
 		cn := t.CName()
+		// residual ERROR sticky — no invent soft-empty type past CName residual
+		if HasError() {
+			return ""
+		}
 		if cn == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(cn)
 		return b.String()
 	}
 	base := t.BaseType()
+	// residual ERROR sticky — no invent soft-continue bare base past BaseType residual
+	if HasError() {
+		return ""
+	}
 	if base == nil {
 		base = t
 	}
@@ -784,10 +804,12 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 			b.WriteString("volatile ")
 		}
 		cn := t.CName()
+		// residual ERROR sticky — no invent soft-empty type past CName residual
+		if HasError() {
+			return ""
+		}
 		if cn == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(cn)
@@ -822,10 +844,12 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		}
 		if i == 0 {
 			cn := base.CName()
+			// residual ERROR sticky — no invent soft-empty pointer base past CName residual
+			if HasError() {
+				return ""
+			}
 			if cn == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString(cn)
