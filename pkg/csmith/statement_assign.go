@@ -153,8 +153,12 @@ func MakeRandomAssignQfer(
 	}
 	if typ == nil {
 		// Type::SelectLType(!SE-free, op)
-		noVol := !cg.EffectContext().IsSideEffectFree()
-		typ = SelectLType(r, opts, probs, cg.Types, noVol, op)
+		seFree := cg.EffectContext().IsSideEffectFree()
+		// residual ERROR sticky — no invent soft-no-vol SelectLType past IsSideEffectFree residual
+		if HasError() {
+			return Stmt{}
+		}
+		typ = SelectLType(r, opts, probs, cg.Types, !seFree, op)
 		// ERROR_GUARD after SelectLType RNG paths
 		if HasError() || typ == nil {
 			return Stmt{}
@@ -162,9 +166,16 @@ func MakeRandomAssignQfer(
 		op = AssignOpsProbability(r, opts, assignTab, typ)
 	}
 	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()) sticky
-	if typ != nil && typ.IsConstStructUnion() {
-		SetError(ErrGeneric)
-		return Stmt{}
+	if typ != nil {
+		isCSU := typ.IsConstStructUnion()
+		// residual ERROR sticky — no invent soft-continue assign past IsConstStructUnion residual
+		if HasError() {
+			return Stmt{}
+		}
+		if isCSU {
+			SetError(ErrGeneric)
+			return Stmt{}
+		}
 	}
 	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work
 	if typ != nil {
@@ -209,9 +220,16 @@ func MakeRandomAssignQfer(
 		}
 	} else if opts.StrictVolatileRule {
 		// StatementAssign.cpp:145–167
-		if typ != nil && typ.IsVolatileStructUnion() {
-			// StatementAssign.cpp:145–146 — return nullptr (no set_error)
-			return Stmt{}
+		if typ != nil {
+			isVSU := typ.IsVolatileStructUnion()
+			// residual ERROR sticky — no invent soft-continue RHS past IsVolatileStructUnion residual
+			if HasError() {
+				return Stmt{}
+			}
+			if isVSU {
+				// StatementAssign.cpp:145–146 — return nullptr (no set_error)
+				return Stmt{}
+			}
 		}
 		// StatementAssign.cpp:148 — Expression::make_random; ERROR_GUARD (no const soft-fallback)
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
@@ -303,12 +321,21 @@ func MakeRandomAssignQfer(
 	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge
 	// when LhsWriteVars used bare nil on incomplete rhs_accum).
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
-		runningEff = runningEff.WriteVarSet(lw)
-		// Incomplete fold fails closed sticky (no invent LHS under incomplete running)
-		if !EffectComplete(runningEff) {
-			SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-skip WriteVarSet past LhsWriteVars residual
+		if HasError() {
 			return Stmt{}
 		}
+		runningEff = runningEff.WriteVarSet(lw)
+		// residual ERROR sticky — no invent soft-continue LHS past WriteVarSet residual
+		if HasError() || !EffectComplete(runningEff) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return Stmt{}
+		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-empty LhsWriteVars past residual hole
+		return Stmt{}
 	}
 
 	// LHS context after RHS (StatementAssign.cpp:185–199)
@@ -1170,13 +1197,21 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementAssign.cpp:377 — write_var_set(rhs_accum.get_lhs_write_vars())
 	// IncompleteVariables → WriteVarSet IncompleteEffect sticky
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
+		// residual ERROR sticky — no invent soft-skip WriteVarSet past LhsWriteVars residual
+		if HasError() {
+			return false
+		}
 		runningEff = runningEff.WriteVarSet(lw)
-		if !EffectComplete(runningEff) {
+		// residual ERROR sticky — no invent soft-continue LHS past WriteVarSet residual
+		if HasError() || !EffectComplete(runningEff) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return false
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-empty LhsWriteVars past residual hole
+		return false
 	}
 
 	// StatementAssign.cpp:379–384 — LHS context

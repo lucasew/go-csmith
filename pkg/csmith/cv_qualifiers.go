@@ -482,8 +482,15 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	if HasError() {
 		return NewCVQualifiers(nil, vols)
 	}
-	if !noVolatile && !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
-		vols[len(vols)-1] = false
+	if !noVolatile {
+		seFree := cg.EffectContext().IsSideEffectFree()
+		// residual ERROR sticky — no invent soft-clear/keep vol past IsSideEffectFree residual
+		if HasError() {
+			return CVQualifiers{}
+		}
+		if !seFree && len(vols) > 0 {
+			vols[len(vols)-1] = false
+		}
 	}
 	MakeScalarVolatiles(opts, vols)
 	// CVQualifiers.cpp:215 — ERROR_GUARD

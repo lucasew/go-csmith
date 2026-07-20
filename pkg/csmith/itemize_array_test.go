@@ -232,6 +232,16 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 		t.Fatal("IsNonWritable residual SelectArray must SetError sticky")
 	}
 	ClearError()
+	// IsSideEffectFree residual soft invent was soft-continue keep/filter invent pick.
+	// Fair: sticky fail closed whole SelectArray (EffectComplete gate + sefree residual).
+	cg2 := WithEffectContext(IncompleteEffect())
+	if vs.SelectArray(NewRng(3), cg2) != nil {
+		t.Fatal("IsSideEffectFree residual must fail closed SelectArray")
+	}
+	if !HasError() {
+		t.Fatal("IsSideEffectFree residual SelectArray must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {

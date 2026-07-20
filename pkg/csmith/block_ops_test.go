@@ -1221,6 +1221,35 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 		t.Fatal("const struct assign must SetError sticky")
 	}
 	ClearError()
+	// IsConstStructUnion residual soft invent was soft-continue assign past Type-nil field.
+	// Fair: sticky fail closed empty Stmt.
+	hole := &Type{isStruct: true, StructName: "H", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if !hole.IsConstStructUnion() || !HasError() {
+		t.Fatal("fixture Type-nil field must residual IsConstStructUnion sticky true")
+	}
+	ClearError()
+	got2 := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, hole)
+	if stmtOK(got2) {
+		t.Fatal("IsConstStructUnion residual must fail closed assign")
+	}
+	if !HasError() {
+		t.Fatal("IsConstStructUnion residual assign must SetError sticky")
+	}
+	ClearError()
+	// IsVolatileStructUnion residual under StrictVolatileRule soft invent was soft-continue RHS.
+	optsSV := Defaults()
+	optsSV.StrictVolatileRule = true
+	SetProcessAssignOpsTable(NewAssignOpsTable(optsSV))
+	got3 := MakeRandomAssign(NewRng(1), optsSV, NewProbabilities(optsSV), NewVariableSelector(optsSV), NewExprTables(optsSV), &cg, hole)
+	if stmtOK(got3) {
+		t.Fatal("IsVolatileStructUnion residual must fail closed assign")
+	}
+	if !HasError() {
+		t.Fatal("IsVolatileStructUnion residual assign must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeDummyBlockCGFactIn(t *testing.T) {

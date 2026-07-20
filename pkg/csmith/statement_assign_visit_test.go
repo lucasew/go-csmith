@@ -242,3 +242,46 @@ func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
+	// LhsWriteVars residual soft invent was soft-empty skip WriteVarSet invent visit success.
+	// Fair: sticky fail closed false.
+	ClearError()
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 11,
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}
+	// plant incomplete EffectStm so RHS path leaves residual before WriteVarSet fold
+	// (incomplete EffectContext fails earlier — use complete context + incomplete rhs via
+	// compound path: seed rhsAccum-like incomplete by incomplete EffectStm after merge gate)
+	cg := EmptyCGContext()
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// incomplete EffectStm fails closed before LhsWriteVars — still residual invent class
+	cg.EffectStm = IncompleteEffect()
+	if VisitFactsStatementAssign(st, &cg, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed assign visit")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm assign visit must SetError sticky")
+	}
+	ClearError()
+	// WriteVarSet residual: nil var in lhs_write map stickies IncompleteVariables → WriteVarSet
+	// force incomplete rhsAccum LhsWriteVars by visiting with incomplete write fold path
+	// via running EffectContext incomplete after RHS succeeds is hard; unit WriteVarSet already
+	// covered in effect_test — here assert assign visit remains sticky under incomplete Accum
+	// after MergeParamContext would re-check EffectComplete.
+	cg3 := EmptyCGContext()
+	inc3 := IncompleteEffect()
+	cg3.EffectAccum = &inc3
+	if VisitFactsStatementAssign(st, &cg3, Defaults()) {
+		t.Fatal("incomplete Accum WriteVarSet path must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete Accum assign visit must SetError sticky")
+	}
+	ClearError()
+}

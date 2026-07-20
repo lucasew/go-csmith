@@ -872,7 +872,12 @@ func (av *ArrayVariable) OutputDef() string {
 	}
 	b.WriteString(decl)
 	// multi-dim or multi-value: recursive full initializer when total size small
-	if av.TotalSize() <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
+	tot := av.TotalSize()
+	// residual ERROR sticky — no invent soft-brace/full init past TotalSize residual
+	if HasError() {
+		return ""
+	}
+	if tot <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
 		seed := uint32(0xABCDEF)
 		init := av.buildInitRecursive(0, vals, &seed)
 		if init == "" {
@@ -883,7 +888,7 @@ func (av *ArrayVariable) OutputDef() string {
 		b.WriteString(init)
 	} else {
 		b.WriteString(" = {")
-		maxEmit := av.TotalSize()
+		maxEmit := tot
 		if maxEmit > 8 {
 			maxEmit = 8
 		}

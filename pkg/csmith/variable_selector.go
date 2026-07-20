@@ -2923,7 +2923,12 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			}
 			return true
 		}
-		if !cg.EffectContext().IsSideEffectFree() && av.IsVolatile() {
+		seFree := cg.EffectContext().IsSideEffectFree()
+		// residual ERROR sticky — no invent soft-continue keep past IsSideEffectFree residual
+		if HasError() {
+			return false
+		}
+		if !seFree && av.IsVolatile() {
 			// residual ERROR sticky — no invent soft-skip past IsVolatile hole
 			if HasError() {
 				return false
@@ -3401,14 +3406,21 @@ func (vs *VariableSelector) SelectWithInvalid(
 	}
 	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
 	// non-sticky null soft re-pick (sticky poisons generation when vol slips through filter)
-	if v != nil && !cg.EffectContext().IsSideEffectFree() {
-		vol := v.IsVolatile()
-		// residual ERROR sticky — no invent soft-null past IsVolatile residual
+	if v != nil {
+		seFree := cg.EffectContext().IsSideEffectFree()
+		// residual ERROR sticky — no invent soft-skip vol assert past IsSideEffectFree residual
 		if HasError() {
 			return nil
 		}
-		if vol {
-			return nil
+		if !seFree {
+			vol := v.IsVolatile()
+			// residual ERROR sticky — no invent soft-null past IsVolatile residual
+			if HasError() {
+				return nil
+			}
+			if vol {
+				return nil
+			}
 		}
 	}
 	// VariableSelector.cpp:1229–1239 — record statistics

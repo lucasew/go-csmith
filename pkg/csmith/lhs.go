@@ -973,8 +973,12 @@ func selectDerefPointerInv(
 		pq = RandomQualifiersDefaultProbs(ptrType, access, cg, true, opts, probs, r)
 	} else {
 		// random_add_qualifiers(!SE-free)
-		noVol := !cg.EffectContext().IsSideEffectFree()
-		pq = qfer.RandomAddQualifiers(r, opts, probs, noVol)
+		seFree := cg.EffectContext().IsSideEffectFree()
+		// residual ERROR sticky — no invent soft-no-vol RandomAdd past IsSideEffectFree residual
+		if HasError() {
+			return nil
+		}
+		pq = qfer.RandomAddQualifiers(r, opts, probs, !seFree)
 	}
 	// VariableSelector.cpp:1281 ERROR_GUARD after random_add/random_qualifiers
 	if HasError() {

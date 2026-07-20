@@ -178,6 +178,33 @@ func TestRandomQualifiersFromNoVolatile(t *testing.T) {
 	}
 }
 
+func TestRandomQualifiersFromIsSideEffectFreeResidualSticky(t *testing.T) {
+	// IsSideEffectFree residual soft invent was soft-clear/keep vol invent looser qfer.
+	// Fair: sticky fail closed empty CVQualifiers (EffectComplete gate + sefree residual).
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	base := NewCVQualifiers([]bool{false}, []bool{true})
+	base.AcceptStricter = false
+	cg := WithEffectContext(IncompleteEffect())
+	out := base.RandomQualifiersFrom(false, AccessRead, cg, opts, probs, NewRng(2))
+	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
+		t.Fatalf("IsSideEffectFree residual RandomQualifiersFrom must fail closed empty, got %+v", out)
+	}
+	if !HasError() {
+		t.Fatal("IsSideEffectFree residual RandomQualifiersFrom must SetError sticky")
+	}
+	ClearError()
+	out2 := base.RandomLooseQualifiers(false, AccessRead, cg, opts, probs, NewRng(2))
+	if len(out2.IsConsts) != 0 || len(out2.IsVolatiles) != 0 {
+		t.Fatalf("IsSideEffectFree residual RandomLooseQualifiers must fail closed empty, got %+v", out2)
+	}
+	if !HasError() {
+		t.Fatal("IsSideEffectFree residual RandomLooseQualifiers must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRandomLooseQualifiers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
