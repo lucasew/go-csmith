@@ -939,7 +939,10 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 
 // VisitFactsInvocation mirrors FunctionInvocation::visit_facts.
 // FunctionInvocation.cpp:502–555 — ordered params (unordered path available but
-// upstream sets unordered=false); then user revisit when NeedsRevisit.
+// upstream sets unordered=false); then ALWAYS revisit user callees.
+// NeedsRevisit / static feffect is build_invocation only
+// (FunctionInvocationUser.cpp:272–297). Gating visit_facts on NeedsRevisit
+// invents soft skip of body re-analysis (seed-2 e10107 lattice path).
 // Binary &&/|| use FunctionInvocationBinary::visit_facts short-circuit merge.
 func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	// C++ always has live FunctionInvocation*; nil sticky.
@@ -1024,89 +1027,61 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 		}
 	}
 	if isFuncCall {
-		// FunctionInvocation.cpp:530–551 — revisit user callee when DFA needed
-		needRev := fi.User.NeedsRevisit()
-		// residual ERROR sticky — no invent soft-skip revisit past NeedsRevisit residual
+		// FunctionInvocation.cpp:530–551 — visit_facts ALWAYS revisits user callees.
+		// NeedsRevisit / static feffect is build_invocation only
+		// (FunctionInvocationUser.cpp:272–297). Do not invent soft-skip of body
+		// re-analysis during fixed-point (seed-2 e10107 may-null path).
+		// Body nil: soft analysis fail (no sticky) — C++ always has a Block* body;
+		// incomplete IR here is an analysis miss, not a hard generation ERROR.
+		if fi.User.Body == nil {
+			return false
+		}
+		if cg.FM == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return false
+		}
+		// FunctionInvocation.cpp:539–540 — revisit(inputs, new_context)
+		if !RevisitUserInvocation(fi, &cg.FM.GlobalFacts, cg, opts) {
+			return false
+		}
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		// FunctionInvocation.cpp:542–550 — assert(curr_blk); add_visible_effect(accum);
+		// feffect.add_external_effect(accum). Revisit already AddEffect(body map_stm_effect).
+		blk := cg.CurrentBlock()
+		if blk == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		vis := fi.User.FEffect
+		if fm := fi.User.PairedFactMgr(); fm != nil && fi.User.Body.StmID > 0 {
+			if be := fm.GetMapStmEffect(fi.User.Body.StmID); EffectComplete(be) {
+				vis = be
+			}
+		}
+		cg.AddVisibleEffectAt(vis, blk)
 		if HasError() {
 			return false
 		}
-		if needRev && fi.User.Body != nil && cg.FM != nil {
-			// incomplete GlobalFacts sticky (no invent cleaned revisit)
-			if !FactsComplete(cg.FM.GlobalFacts) {
-				SetError(ErrGeneric)
-				return false
-			}
-			// FunctionInvocation.cpp:530–551 — revisit(caller global_facts) by reference
-			// (same as build_invocation: mutate caller lattice in place via handover+renew).
-			if !RevisitUserInvocation(fi, &cg.FM.GlobalFacts, cg, opts) {
-				return false
-			}
-			// incomplete post-revisit sticky
-			if !FactsComplete(cg.FM.GlobalFacts) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				return false
-			}
-			// fold feffect from accum during revisit
-			if cg.InConflict(fi.User.FEffect) {
-				// residual ERROR sticky — no invent soft-continue visit past InConflict residual true
-				if HasError() {
-					return false
-				}
-				return false
-			}
-			// residual ERROR sticky — no invent soft-continue visit past InConflict residual false
-			if HasError() {
-				return false
-			}
-			// FunctionInvocation.cpp:543 — assert(cg_context.curr_blk) sticky
-			blk := cg.CurrentBlock()
-			if blk == nil {
-				SetError(ErrGeneric)
-				return false
-			}
-			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
-			if HasError() {
-				return false
-			}
-		} else if fi.User.IsEffectKnown() {
-			// residual ERROR sticky — no invent static-effect path past IsEffectKnown hole
-			if HasError() {
-				return false
-			}
-			// static effect path (no fact/pointer change)
-			if cg.InConflict(fi.User.FEffect) {
-				// residual ERROR sticky — no invent soft-continue visit past InConflict residual true
-				if HasError() {
-					return false
-				}
-				return false
-			}
-			// residual ERROR sticky — no invent soft-continue visit past InConflict residual false
-			if HasError() {
-				return false
-			}
-			// same curr_blk for visible effect sticky when missing
-			blk := cg.CurrentBlock()
-			if blk == nil {
-				SetError(ErrGeneric)
-				return false
-			}
-			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
-			if HasError() {
-				return false
-			}
-			// also add_external_effect of feffect
-			cg.AddExternalEffect(fi.User.FEffect)
-			if HasError() {
-				return false
-			}
-		} else if HasError() {
-			// residual ERROR sticky — no invent soft-skip effect fold past IsEffectKnown residual false
+		if !EffectComplete(fi.User.FEffect) || !EffectComplete(vis) {
+			SetError(ErrGeneric)
 			return false
 		}
-		// propagate fact_changed to caller (FunctionInvocation.cpp:96)
+		fi.User.FEffect = fi.User.FEffect.AddExternalEffectWithCallers(vis, cg.CallChain)
+		if !EffectComplete(fi.User.FEffect) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
 		if cg.CurrentFunc != nil && fi.User.FactChanged {
 			cg.CurrentFunc.FactChanged = true
 		}

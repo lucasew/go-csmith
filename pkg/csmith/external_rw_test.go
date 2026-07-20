@@ -177,16 +177,60 @@ func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
+	// FunctionInvocation.cpp:530–551 — always revisit user callees in visit_facts.
+	ClearError()
+	SetProcessOptions(Defaults())
+	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	callee.Body = &Block{StmID: 50, Func: callee, Stmts: nil}
+	fm := callee.ensurePairedFactMgr()
+	// NeedsRevisit false (no FactChanged / ptrs) — visit_facts still revisits
+	if callee.NeedsRevisit() {
+		t.Fatal("fixture must not NeedsRevisit; testing always-revisit gate")
+	}
+	fi := &Invocation{User: callee}
+	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	blk := &Block{StmID: 1, Func: caller}
+	caller.Stack = []*Block{blk}
+	// caller FM for GlobalFacts work set; revisit uses callee.PairedFactMgr
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(caller))
+	cg.CurrentFunc = caller
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsInvocation(fi, &cg, Defaults()) {
+		t.Fatalf("always-revisit empty body must ok err=%v", HasError())
+	}
+	// body maps recorded by find_fixed_point
+	if !FactsComplete(fm.GetMapFactsIn(50)) && !FactsComplete(fm.GetMapFactsOut(50)) {
+		// empty complete is ok; incomplete would be wrong
+		t.Fatal("revisit must install complete body fact maps")
+	}
+	ClearError()
+}
+
 func TestVisitFactsInvocationConflict(t *testing.T) {
+	// Legacy name kept: ambient write conflict on static path removed with always-revisit.
+	// Soft analysis fail remains non-sticky (RevisitUserInvocation ClearError on body fail).
+	ClearError()
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
-	callee.FEffect = EmptyEffect().WriteVar(g)
+	// body with *p write under may-null would fail; use incomplete as soft fail
+	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{{Kind: StmtAssign, StmID: 0}}} // StmID 0 sticky fail
+	_ = callee.ensurePairedFactMgr()
 	fi := &Invocation{User: callee}
-	// context already wrote g
-	cg := WithEffectContext(EmptyEffect().WriteVar(g))
+	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	blk := &Block{StmID: 1, Func: caller}
+	caller.Stack = []*Block{blk}
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(caller))
+	cg.CurrentFunc = caller
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	_ = g
 	if VisitFactsInvocation(fi, &cg, Defaults()) {
-		t.Fatal("should conflict")
+		t.Fatal("revisit of broken body must fail analysis")
 	}
+	// soft fail clears sticky ERROR
+	ClearError()
 }
 
 func TestFactMgrMapStmEffect(t *testing.T) {
