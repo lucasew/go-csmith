@@ -650,13 +650,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return outCopy, -1, false
 			}
 		}
-		// Keep mid-gen may-null that fixed-point *outputs* may lag (same class as
-		// StmVisitFacts mergeMayNullFromLive; C++ leaves global_facts as live env).
-		outCopy = mergeMayNullFromLive(fm.GlobalFacts, outCopy)
-		if !FactsComplete(outCopy) {
-			SetError(ErrGeneric)
-			return outCopy, -1, false
-		}
+		// Block.cpp:558–562 — set_fact_out(this, outputs) after OOS locals only.
+		// Do not mergeMayNullFromLive(GlobalFacts): that re-injects mid-gen may-null
+		// from statements later stripped by post_creation_analysis fixed-point
+		// (seed-2: (*g_140)=(void*)0 stripped but null kept → ExpressionVariable
+		// rejects g_140; UP accepts). C++ installs cleaned outputs only.
 		fm.SetMapFactsOut(b.StmID, outCopy)
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)

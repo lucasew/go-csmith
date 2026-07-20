@@ -1003,7 +1003,9 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 				SetError(ErrGeneric)
 				return ""
 			}
-			if i > 0 && !q.IsConsts[i] {
+			// CVQualifiers.cpp:548–552 — if (i > 0) out << " " before volatile
+			// (even when const already wrote trailing space → "const  volatile ")
+			if i > 0 {
 				b.WriteString(" ")
 			}
 			b.WriteString("volatile ")

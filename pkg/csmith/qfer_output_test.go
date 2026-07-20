@@ -911,3 +911,24 @@ func TestOutputGlobalVariablesListResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputQualifiedTypeConstVolatilePointerDoubleSpace(t *testing.T) {
+	// CVQualifiers.cpp:540–552 — level i>0 with both const and volatile:
+	// "const " then (i>0) " " then "volatile " → "const  volatile "
+	// (seed-2 g_459: UP "const  volatile" vs invent skip space when const already present)
+	ClearError()
+	SetProcessOptions(Defaults())
+	pt := PointerTo(PointerTo(GetIntType())) // int32_t **
+	// depth 3: [obj, *, *] — outer pointer level both const+vol
+	q := NewCVQualifiers(
+		[]bool{false, false, true},
+		[]bool{false, false, true},
+	)
+	s := q.OutputQualifiedType(pt)
+	if !strings.Contains(s, "const  volatile") {
+		t.Fatalf("want double space const  volatile, got %q", s)
+	}
+	if strings.Contains(s, "const volatile") && !strings.Contains(s, "const  volatile") {
+		t.Fatalf("single space is wrong: %q", s)
+	}
+}

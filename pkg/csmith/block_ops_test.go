@@ -1357,3 +1357,44 @@ func TestFromTailToHeadNilResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
+	// Block.cpp:558–562 — set_fact_out from re-analysis outputs only.
+	// mergeMayNullFromLive(GlobalFacts) invent re-injected mid-gen may-null after
+	// statements that produced null were stripped (seed-2 g_87 null after
+	// (*g_140)=(void*)0 removed → ExpressionVariable rejects g_140).
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), true, false)
+	// clean entry: g_p → g_t only
+	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	// live GlobalFacts polluted as if mid-gen assign set may-null then stmt stripped
+	polluted := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	if polluted == nil {
+		t.Fatal("make fact")
+	}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = []*FactPointTo{polluted}
+	b := &Block{StmID: 100, Func: f, Looping: false, LocalVars: nil}
+	fm.SetMapFactsIn(100, entry)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	out, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), true)
+	if !ok {
+		t.Fatal("empty-body fixed-point must succeed")
+	}
+	got := FindRelatedPointTo(out, p)
+	if got == nil {
+		t.Fatal("missing fact for g_p")
+	}
+	if got.IsNull() {
+		t.Fatalf("stripped may-null must not reinject into out: %v", got.PointTo)
+	}
+	// GlobalFacts after fixed-point should match clean out
+	if FindRelatedPointTo(fm.GlobalFacts, p) != nil && FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
+		t.Fatal("GlobalFacts must not keep reinjected may-null")
+	}
+}
