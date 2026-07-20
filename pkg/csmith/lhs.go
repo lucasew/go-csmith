@@ -275,7 +275,12 @@ func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return l.Var.Compatible(v, expandStruct)
+	ok := l.Var.Compatible(v, expandStruct)
+	// residual ERROR sticky — no invent soft-compat past Compatible residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // CompatibleExpr mirrors Lhs::compatible(Expression*).

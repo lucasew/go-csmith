@@ -117,3 +117,17 @@ func TestGenerateHashUsesFieldCrc(t *testing.T) {
 		t.Log("struct field hash not seen in sample — optional")
 	}
 }
+
+func TestHashOutputIsAggregateResidualSticky(t *testing.T) {
+	// IsAggregate residual soft invent was invent soft-continue scalar hash past incomplete.
+	// Type-nil already sticky at hashOutput entry.
+	ClearError()
+	v := &Variable{Name: "g_x", Type: nil}
+	if v.hashOutput(nil, nil) != "" {
+		t.Fatal("Type-nil hashOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil hashOutput must SetError sticky")
+	}
+	ClearError()
+}

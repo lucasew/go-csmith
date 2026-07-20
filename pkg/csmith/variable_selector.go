@@ -1772,7 +1772,12 @@ func typesMatchExact(a, b *Type) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	return a.Match(b, MatchExact)
+	ok := a.Match(b, MatchExact)
+	// residual ERROR sticky — no invent soft-match past Match residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // applyInitExpr stores make_init_value result on Variable (Constant and/or full expr).
@@ -1902,7 +1907,12 @@ func varCollective(v *Variable) *Variable {
 	if v.AsArray != nil && v.AsArray.Collective != nil {
 		return &v.AsArray.Collective.Variable
 	}
-	return v.GetCollective()
+	coll := v.GetCollective()
+	// residual ERROR sticky — no invent soft-collective past GetCollective residual
+	if HasError() {
+		return nil
+	}
+	return coll
 }
 
 // GenerateNewNonArrayGlobal mirrors VariableSelector::GenerateNewNonArrayGlobal.
@@ -2005,7 +2015,12 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
 	// VariableSelector.cpp:600–602 — no access_once on NonArray path
-	if !varQfer.IsVolatile() {
+	volQ := varQfer.IsVolatile()
+	// residual ERROR sticky — no invent soft-register past qfer IsVolatile residual
+	if HasError() {
+		return nil
+	}
+	if !volQ {
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
 	}
 	vs.VarCreated = true

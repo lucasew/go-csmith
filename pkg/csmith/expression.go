@@ -870,7 +870,17 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 		if typ.IsUnion() && !opts.ReturnUnions {
 			f.Add(int(TermFunction))
 		}
-		if typ.IsConstStructUnion() || typ.IsVolatileStructUnion() {
+		isCSU := typ.IsConstStructUnion()
+		// residual ERROR sticky — no invent soft-filter term past IsConstStructUnion residual
+		if HasError() {
+			return MaxTermTypes
+		}
+		isVSU := typ.IsVolatileStructUnion()
+		// residual ERROR sticky — no invent soft-filter term past IsVolatileStructUnion residual
+		if HasError() {
+			return MaxTermTypes
+		}
+		if isCSU || isVSU {
 			f.Add(int(TermAssignment))
 		}
 	}
@@ -904,7 +914,12 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 		if typ.IsUnion() && !opts.ReturnUnions {
 			f.Add(int(TermFunction))
 		}
-		if typ.IsConstStructUnion() {
+		isCSU := typ.IsConstStructUnion()
+		// residual ERROR sticky — no invent soft-filter param term past IsConstStructUnion residual
+		if HasError() {
+			return MaxTermTypes
+		}
+		if isCSU {
 			f.Add(int(TermAssignment))
 		}
 	}

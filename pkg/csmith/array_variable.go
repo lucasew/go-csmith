@@ -227,11 +227,17 @@ func (av *ArrayVariable) TotalSize() int {
 // IsGlobal for arrays: name prefix g_ (same as Variable).
 // ArrayVariable always live; sticky incomplete no invent not-global soft-skip.
 func (av *ArrayVariable) IsGlobal() bool {
+	// residual sticky via Variable.IsGlobal
 	if av == nil {
 		SetError(ErrGeneric)
 		return false
 	}
-	return av.Variable.IsGlobal()
+	ok := av.Variable.IsGlobal()
+	// residual ERROR sticky — no invent soft-global past Variable.IsGlobal residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // CDeclType returns C type with dimensions, e.g. int x[2][3].

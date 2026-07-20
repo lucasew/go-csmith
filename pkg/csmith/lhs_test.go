@@ -672,3 +672,16 @@ func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCompatibleVarResidualSticky(t *testing.T) {
+	// Compatible residual soft invent was invent soft-compat past nil other.
+	ClearError()
+	lhs := &Lhs{Var: CreateVariableScalars("g_a", GetIntType(), false, false)}
+	if lhs.CompatibleVar(nil, false) {
+		t.Fatal("nil other CompatibleVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil other CompatibleVar must SetError sticky")
+	}
+	ClearError()
+}

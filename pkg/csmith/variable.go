@@ -1178,13 +1178,28 @@ func (v *Variable) MatchVarName(vname string) *Variable {
 		return nil
 	}
 	// array / array field: compare Output text
-	if v.IsArray || v.IsArrayField() {
-		if v.OutputC() == vname {
+	isAF := v.IsArrayField()
+	// residual ERROR sticky — no invent soft-match name past IsArrayField residual
+	if HasError() {
+		return nil
+	}
+	if v.IsArray || isAF {
+		out := v.OutputC()
+		// residual ERROR sticky — no invent soft-match name past OutputC residual
+		if HasError() {
+			return nil
+		}
+		if out == vname {
 			return v
 		}
 		// itemized with indices
 		if v.AsArray != nil && len(v.AsArray.Indices) > 0 {
-			if v.AsArray.OutputAccess() == vname {
+			acc := v.AsArray.OutputAccess()
+			// residual ERROR sticky — no invent soft-match name past OutputAccess residual
+			if HasError() {
+				return nil
+			}
+			if acc == vname {
 				return v
 			}
 		}
@@ -1816,7 +1831,15 @@ func (v *Variable) GetContainerUnion() *Variable {
 			return nil
 		}
 		if p.Type.IsUnion() {
+			// residual ERROR sticky — no invent soft-container past IsUnion residual true
+			if HasError() {
+				return nil
+			}
 			return p
+		}
+		// residual ERROR sticky — no invent soft-continue walk past IsUnion residual false
+		if HasError() {
+			return nil
 		}
 	}
 	return nil
@@ -1879,7 +1902,12 @@ func (v *Variable) IsUnionField() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.FieldVarOf.Type.IsUnion()
+	ok := v.FieldVarOf.Type.IsUnion()
+	// residual ERROR sticky — no invent soft not-union-field past IsUnion residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsInsideUnionField mirrors Variable::is_inside_union_field.
@@ -2489,6 +2517,10 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		return hashArrayVariable(v, ctrl, unionFacts)
 	}
 	if v.Type.IsAggregate() {
+		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
+		if HasError() {
+			return ""
+		}
 		// incomplete FieldVars fails closed sticky whole hash (no invent soft-skip hole)
 		if !v.FieldVarsComplete() {
 			SetError(ErrGeneric)
@@ -2498,6 +2530,10 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		for i, f := range v.FieldVars {
 			// Variable.cpp:893–898 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
+				// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
+				if HasError() {
+					return ""
+				}
 				if !IsFieldReadable(v, i, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial hash past hole
 					if HasError() {
@@ -2509,6 +2545,9 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 				if HasError() {
 					return ""
 				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+				return ""
 			}
 			part := f.hashOutput(ctrl, unionFacts)
 			// residual ERROR sticky — no invent partial field hash past hard IR hole
@@ -2519,7 +2558,15 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		}
 		return b.String()
 	}
+	// residual ERROR sticky — no invent soft-continue scalar hash past IsAggregate residual false
+	if HasError() {
+		return ""
+	}
 	if v.Type.IsSimple() {
+		// residual ERROR sticky — no invent soft-hash past IsSimple residual
+		if HasError() {
+			return ""
+		}
 		// Variable.cpp:900–920 — name always live sticky; no invent empty transparent_crc
 		name := v.GetActualName(false)
 		// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
@@ -2672,17 +2719,37 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 					return ""
 				}
 			}
-			if f.Type.IsSimple() && !f.Type.IsFloat() {
+			simple := f.Type.IsSimple()
+			// residual ERROR sticky — no invent soft-continue field hash past IsSimple residual
+			if HasError() {
+				return ""
+			}
+			if simple {
+				isF := f.Type.IsFloat()
+				// residual ERROR sticky — no invent soft-continue field hash past IsFloat residual
+				if HasError() {
+					return ""
+				}
 				fn := ".f" + itoa(j)
-				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
-			} else if f.Type.IsSimple() && f.Type.IsFloat() {
-				fn := ".f" + itoa(j)
-				b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
+				if isF {
+					b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
+				} else {
+					b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
+				}
 			}
 			j++
 		}
 	} else if v.Type != nil && v.Type.IsSimple() {
-		if v.Type.IsFloat() {
+		// residual ERROR sticky — no invent soft-hash past IsSimple residual
+		if HasError() {
+			return ""
+		}
+		isF := v.Type.IsFloat()
+		// residual ERROR sticky — no invent soft-hash past IsFloat residual
+		if HasError() {
+			return ""
+		}
+		if isF {
 			b.WriteString(indent + "transparent_crc_bytes (&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
 		} else {
 			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")

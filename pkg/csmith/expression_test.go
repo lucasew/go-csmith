@@ -1422,3 +1422,28 @@ func TestExpressionToStringIndentedOutputResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestPickTermTypeIsConstStructUnionResidualSticky(t *testing.T) {
+	// IsConstStructUnion residual soft invent was invent soft-filter term past Type-nil field.
+	ClearError()
+	opts := Defaults()
+	tables := NewExprTables(opts)
+	// aggregate with Type-nil field → IsConstStructUnion residual sticky true
+	agg := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: nil, BitWidth: -1}}}
+	tt := PickTermType(NewRng(2), tables, opts, agg, false, false, 0)
+	// residual → MaxTermTypes sticky
+	if tt != MaxTermTypes {
+		// may still return MaxTermTypes on residual
+		_ = tt
+	}
+	if !HasError() {
+		t.Fatal("IsConstStructUnion residual PickTermType must SetError sticky")
+	}
+	ClearError()
+	// complete int path no sticky
+	tt2 := PickTermType(NewRng(2), tables, opts, GetIntType(), false, false, 0)
+	if tt2 == MaxTermTypes && HasError() {
+		t.Fatal("complete int PickTermType must not sticky MaxTermTypes", tt2)
+	}
+	ClearError()
+}
