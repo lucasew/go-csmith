@@ -357,6 +357,14 @@ func RecordTypeWithBitfields(t *Type) {
 		return
 	}
 	if !t.IsAggregate() {
+		// residual ERROR sticky — no invent soft-skip count past IsAggregate residual false
+		if HasError() {
+			return
+		}
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue count past IsAggregate residual true
+	if HasError() {
 		return
 	}
 	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
@@ -916,7 +924,16 @@ func outputPointerStatistics(b *strings.Builder) {
 					break
 				}
 				if pt.IsSimple() {
+					// residual ERROR sticky — no invent soft-count past IsSimple residual hole
+					if HasError() {
+						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+						break
+					}
 					ptScalar++
+				} else if HasError() {
+					// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+					break
 				} else if pt.IsStruct() {
 					// residual ERROR sticky — no invent soft-count past IsStruct residual hole
 					if HasError() {

@@ -1714,7 +1714,16 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	lvarCnt := len(lvars)
 	// when AbstractFactForAssign used direct pointer path, lvarCnt matches transfer targets
 	if lvarCnt == 0 && lhs != nil && lhsIndir == 0 && lhs.IsPointer() {
+		// residual ERROR sticky — no invent soft-lvarCnt past IsPointer residual hole
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
 		lvarCnt = 1
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue merge past IsPointer residual false
+		*facts = IncompleteFactSlice()
+		return false, false
 	}
 	if lvarCnt == 1 && newFacts[0] != nil && newFacts[0].Var != nil && !newFacts[0].Var.IsArray {
 		// definitive assignment — renew (strong replace)

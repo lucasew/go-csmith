@@ -42,6 +42,10 @@ func MakeExpressionAssign(
 	// ExpressionAssign.cpp:52–55 — WRITE qfer when nil (random_qualifiers WRITE, no_volatile)
 	if qfer == nil {
 		q := RandomQualifiersDefaultProbs(typ, AccessWrite, *cg, true, opts, probs, r)
+		// residual ERROR sticky — no invent soft-continue assign past RandomQualifiers residual
+		if HasError() {
+			return nil
+		}
 		qfer = &q
 	}
 	// ExpressionAssign.cpp:56 / 61 — StatementAssign::make_random(cg, type, qfer)
@@ -57,8 +61,17 @@ func MakeExpressionAssign(
 		indir := 0
 		if st.Lhs != nil {
 			indir = st.Lhs.IndirectLevel()
+			// residual ERROR sticky — no invent soft-continue UpdateFact past IndirectLevel residual
+			if HasError() {
+				return nil
+			}
 		}
-		_ = cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.GetAssignRhs())
+		rhs := st.GetAssignRhs()
+		// residual ERROR sticky — no invent soft-continue UpdateFact past GetAssignRhs residual
+		if HasError() {
+			return nil
+		}
+		_ = cg.FM.UpdateFactForAssign(st.LhsVar, indir, rhs)
 		// residual ERROR sticky — no invent ExpressionAssign shell past UpdateFact residual
 		// incomplete assign must not invent ExpressionAssign shell with wiped facts
 		if HasError() || !FactsComplete(cg.FM.GlobalFacts) {

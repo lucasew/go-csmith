@@ -718,3 +718,16 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestApplyFactForAssignIsPointerResidualSticky(t *testing.T) {
+	// IsPointer residual soft invent was invent lvarCnt=1 renew past Type-nil LHS.
+	ClearError()
+	hole := &Variable{Name: "g_p", Type: nil}
+	if hole.IsPointer() {
+		t.Fatal("Type-nil IsPointer must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsPointer must SetError sticky")
+	}
+	ClearError()
+}

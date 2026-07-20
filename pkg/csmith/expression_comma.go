@@ -77,7 +77,15 @@ func castIfNeeded(exp *Expression) {
 	if HasError() {
 		return
 	}
-	if ty != nil && ty.IsPointerLike() && exp.EqualsInt(0) {
+	if ty == nil {
+		return
+	}
+	isPtr := ty.IsPointerLike()
+	// residual ERROR sticky — no invent soft-continue cast past IsPointerLike residual
+	if HasError() {
+		return
+	}
+	if isPtr && exp.EqualsInt(0) {
 		// residual ERROR sticky — no invent cast-true past EqualsInt residual hole
 		if HasError() {
 			return

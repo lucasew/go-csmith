@@ -419,3 +419,21 @@ func TestRecordVarCreatedStructDepthResidualSticky(t *testing.T) {
 	ClearError()
 	BookkeeperDoFinalization()
 }
+
+func TestRecordTypeWithBitfieldsIsAggregateResidualSticky(t *testing.T) {
+	// IsAggregate residual soft invent was invent soft-count bitfields past non-aggregate.
+	ClearError()
+	BookkeeperDoFinalization()
+	// non-aggregate complete no-op
+	RecordTypeWithBitfields(GetIntType())
+	if HasError() {
+		t.Fatal("complete non-aggregate RecordTypeWithBitfields must not sticky")
+	}
+	// nil sticky
+	RecordTypeWithBitfields(nil)
+	if !HasError() {
+		t.Fatal("nil RecordTypeWithBitfields must SetError sticky")
+	}
+	ClearError()
+	BookkeeperDoFinalization()
+}

@@ -116,3 +116,38 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
+	// IndirectLevel residual soft invent was invent ExpressionAssign shell past Type-nil Lhs.
+	// Force path: complete assign then Type-nil Lhs on re-apply UpdateFact is hard.
+	// Hygiene: Type-nil ambient incomplete Effect fails closed before assign.
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{}
+	tables := NewExprTables(opts)
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	cg := WithFunc(f, EmptyEffect())
+	cg.FM = NewFactMgr(f)
+	// incomplete EffectStm sticky before MakeExpressionAssign
+	cg.EffectStm = IncompleteEffect()
+	if MakeExpressionAssign(NewRng(1), opts, probs, vs, tables, &cg, GetIntType(), nil) != nil {
+		t.Fatal("incomplete EffectStm must fail closed MakeExpressionAssign")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm MakeExpressionAssign must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestMakeExpressionAssignNilCGSticky(t *testing.T) {
+	ClearError()
+	if MakeExpressionAssign(NewRng(1), Defaults(), nil, nil, nil, nil, GetIntType(), nil) != nil {
+		t.Fatal("nil cg must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil cg MakeExpressionAssign must SetError sticky")
+	}
+	ClearError()
+}
