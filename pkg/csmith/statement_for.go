@@ -628,7 +628,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		SetError(ErrGeneric)
 		return
 	}
-	fm.GlobalFacts = CloneFactSlice(in)
+	fm.SetGlobalFacts(CloneFactSlice(in), "auto_statement_for_631")
 	// residual ERROR sticky — no invent soft-must-return path past CloneFactSlice residual
 	if HasError() {
 		fm.GlobalFacts = IncompleteFactSlice()

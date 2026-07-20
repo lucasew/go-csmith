@@ -661,7 +661,7 @@ func MakeRandomGoto(
 				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
-			fm.GlobalFacts = CloneFactSlice(stmInMerged)
+			fm.SetGlobalFacts(CloneFactSlice(stmInMerged), "auto_statement_goto_664")
 			if !VisitFactsStmt(dest, cg, opts) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
@@ -739,7 +739,7 @@ func MakeRandomGoto(
 			fm.GlobalFacts = IncompleteFactSlice()
 			SetError(ErrGeneric)
 		} else {
-			fm.GlobalFacts = CloneFactSlice(out)
+			fm.SetGlobalFacts(CloneFactSlice(out), "auto_statement_goto_742")
 		}
 		if IsCtrlStmt(dest) || dest.Kind == StmtReturn {
 			// ctrl/return: use map_facts_in[stm] (altered outs for OOS)
@@ -748,7 +748,7 @@ func MakeRandomGoto(
 				fm.GlobalFacts = IncompleteFactSlice()
 				SetError(ErrGeneric)
 			} else {
-				fm.GlobalFacts = CloneFactSlice(in)
+				fm.SetGlobalFacts(CloneFactSlice(in), "auto_statement_goto_751")
 			}
 		}
 	}

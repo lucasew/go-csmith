@@ -928,10 +928,10 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							if len(b.LocalVars) > 0 {
 								tmp := outCopy
 								saved := fm.GlobalFacts
-								fm.GlobalFacts = tmp
+								fm.SetGlobalFacts(tmp, "auto_block_931")
 								fm.UpdateFactsForOOSVars(b.LocalVars)
 								outCopy = fm.GlobalFacts
-								fm.GlobalFacts = saved
+								fm.SetGlobalFacts(saved, "auto_block_934")
 								if !FactsComplete(outCopy) {
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()
@@ -956,7 +956,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					SetError(ErrGeneric)
 					return
 				} else {
-					fm.GlobalFacts = CloneFactSlice(out)
+					fm.SetGlobalFacts(CloneFactSlice(out), "auto_block_959")
 					// residual ERROR sticky — no invent soft-out past CloneFactSlice residual
 					if HasError() {
 						fm.GlobalFacts = IncompleteFactSlice()
@@ -999,7 +999,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				SetError(ErrGeneric)
 				return
 			}
-			fm.GlobalFacts = postFacts
+			fm.SetGlobalFacts(postFacts, "auto_block_1002")
 			if b.AppendReturnStmt(r, opts, vs, cg) == nil {
 				// append_return_stmt ERROR_GUARD / assert(visited) leave sticky error
 				return

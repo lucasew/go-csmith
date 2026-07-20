@@ -2,6 +2,13 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+)
+
 // eFactCategory (Fact.h) — bit flags for FactMgr::meta_facts registration.
 const (
 	// FactCategoryPointTo is ePointTo.
@@ -79,6 +86,51 @@ func NewFactMgr(f *Function) *FactMgr {
 		MapAccumEffect:   make(map[int]Effect),
 		MapVisited:       make(map[int]bool),
 	}
+}
+
+// factHasL233MayNull reports whether facts contain may-null for variable l_233.
+func factHasL233MayNull(facts []*FactPointTo) bool {
+	for _, f := range facts {
+		if f != nil && f.Var != nil && f.Var.Name == "l_233" && f.IsNull() {
+			return true
+		}
+	}
+	return false
+}
+
+// SetGlobalFacts assigns fm.GlobalFacts. With CSMITH_DEBUG_FACTS=1, logs when
+// l_233 may-null is dropped by a full slice replacement (seed-2 first_div 10107).
+func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if os.Getenv("CSMITH_DEBUG_FACTS") != "" && factHasL233MayNull(fm.GlobalFacts) && !factHasL233MayNull(facts) {
+		depth := uint64(0)
+		if r := ProcessRng(); r != nil {
+			depth = r.RandDepth()
+		}
+		fn := "?"
+		if fm.Func != nil {
+			fn = fm.Func.Name
+		}
+		_, file, line, _ := runtime.Caller(1)
+		fmt.Fprintf(os.Stderr, "WIPE tag=%s func=%s d=%d from=%s:%d\n",
+			tag, fn, depth, filepath.Base(file), line)
+		var pcs [8]uintptr
+		n := runtime.Callers(2, pcs[:])
+		frames := runtime.CallersFrames(pcs[:n])
+		fmt.Fprintf(os.Stderr, "  stack:")
+		for {
+			fr, more := frames.Next()
+			fmt.Fprintf(os.Stderr, " %s:%d", filepath.Base(fr.File), fr.Line)
+			if !more {
+				break
+			}
+		}
+		fmt.Fprintln(os.Stderr)
+	}
+	fm.GlobalFacts = facts
 }
 
 // SetMapFactsIn records pre-statement facts (FactMgr::map_facts_in[s] = facts).
@@ -727,7 +779,7 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 			work = merged
 		}
 	}
-	fm.GlobalFacts = work
+	fm.SetGlobalFacts(work, "auto_fact_mgr_782")
 }
 
 // SetupInOutMaps mirrors FactMgr::setup_in_out_maps.
@@ -1559,7 +1611,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				SetError(ErrGeneric)
 				return
 			}
-			fm.GlobalFacts = merged
+			fm.SetGlobalFacts(merged, "auto_fact_mgr_1614")
 		}
 	}
 	if wantUn {
@@ -2382,7 +2434,7 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 	// reuse slice-level fail-closed filter (nil holes → GlobalFacts nil)
 	facts := fm.GlobalFacts
 	UpdateFactsForOOSVars(vars, &facts)
-	fm.GlobalFacts = facts
+	fm.SetGlobalFacts(facts, "auto_fact_mgr_2437")
 }
 
 // AddParamFacts mirrors FactMgr::add_param_facts.

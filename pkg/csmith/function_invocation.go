@@ -829,7 +829,7 @@ func BuildInvocationAndFunction(
 		fi.Failed = true
 		return fi
 	}
-	calFM.GlobalFacts = facts
+	calFM.SetGlobalFacts(facts, "auto_function_invocation_832")
 
 	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
 	effectAccum := EmptyEffect()

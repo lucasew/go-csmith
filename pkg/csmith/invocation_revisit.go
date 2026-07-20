@@ -346,7 +346,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 			}
 			// visit under working facts
 			if cg.FM != nil {
-				cg.FM.GlobalFacts = cur
+				cg.FM.SetGlobalFacts(cur, "auto_invocation_revisit_349")
 			}
 			if !VisitFactsExpression(arg, cg, opts) {
 				return false
@@ -389,7 +389,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 	}
 	*facts = merged
 	if cg.FM != nil {
-		cg.FM.GlobalFacts = merged
+		cg.FM.SetGlobalFacts(merged, "auto_invocation_revisit_392")
 	}
 	return true
 }
@@ -503,7 +503,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// visit body — install work into callee FM only for the duration of VisitFactsBlock
 	// (C++ visit_facts mutates the inputs vector; Go visit uses FM.GlobalFacts).
 	savedGlobal := fm.GlobalFacts
-	fm.GlobalFacts = work
+	fm.SetGlobalFacts(work, "auto_invocation_revisit_506")
 	bodyCG := cg.CloneSubcontext()
 	bodyCG.CurrentFunc = f
 	bodyCG.FM = fm
@@ -513,14 +513,14 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		// returns false without leaving permanent Error for caller generation). Sticky
 		// ERROR from incomplete IR during nested visit would poison subsequent soft paths.
 		restore()
-		fm.GlobalFacts = savedGlobal
+		fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_516")
 		ClearError()
 		return false
 	}
 	// incomplete body GlobalFacts sticky
 	if !FactsComplete(fm.GlobalFacts) {
 		restore()
-		fm.GlobalFacts = savedGlobal
+		fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_523")
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -528,7 +528,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	}
 	work = CloneFactSlice(fm.GlobalFacts)
 	// Restore callee GlobalFacts immediately — do not leave caller lattice installed.
-	fm.GlobalFacts = savedGlobal
+	fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_531")
 	// body Block::stm_id always live; StmID 0 sticky
 	if f.Body.StmID <= 0 {
 		restore()

@@ -212,7 +212,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = cl
+			cg.FM.SetGlobalFacts(cl, "auto_statement_visit_215")
 		} else if FactsComplete(out) {
 			cl := CloneFactSlice(out)
 			if HasError() || !FactsComplete(cl) {
@@ -221,7 +221,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = cl
+			cg.FM.SetGlobalFacts(cl, "auto_statement_visit_224")
 		}
 	}
 	return true
@@ -314,7 +314,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		// StatementIf.cpp:174 — false starts from same post-cond inputs (not after true)
-		cg.FM.GlobalFacts = CloneFactSlice(postCond)
+		cg.FM.SetGlobalFacts(CloneFactSlice(postCond), "auto_statement_visit_317")
 		// residual ERROR sticky — no invent soft-else start past CloneFactSlice residual
 		if HasError() {
 			return false
@@ -416,7 +416,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = CloneFactSlice(inputsCopy)
+			cg.FM.SetGlobalFacts(CloneFactSlice(inputsCopy), "auto_statement_visit_419")
 		case trueMust:
 			if !FactsComplete(elseFacts) {
 				if !HasError() {
@@ -424,7 +424,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = elseFacts
+			cg.FM.SetGlobalFacts(elseFacts, "auto_statement_visit_427")
 		case falseMust:
 			if !FactsComplete(thenFacts) {
 				if !HasError() {
@@ -432,7 +432,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = thenFacts
+			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_435")
 		default:
 			if !FactsComplete(thenFacts) || !FactsComplete(elseFacts) {
 				if !HasError() {
@@ -440,7 +440,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = thenFacts
+			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_443")
 			// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit sticky
 			_ = MergeFacts(&cg.FM.GlobalFacts, elseFacts)
 			if !FactsComplete(cg.FM.GlobalFacts) {
@@ -556,7 +556,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 				return false
 			}
 			// control reaches end of for with pre-loop (post-init) env
-			cg.FM.GlobalFacts = CloneFactSlice(factsCopy)
+			cg.FM.SetGlobalFacts(CloneFactSlice(factsCopy), "auto_statement_visit_559")
 		} else {
 			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
 			if HasError() {
@@ -571,7 +571,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = CloneFactSlice(in)
+			cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_visit_574")
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
@@ -767,7 +767,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			if HasError() {
 				return false
 			}
-			cg.FM.GlobalFacts = preFacts
+			cg.FM.SetGlobalFacts(preFacts, "auto_statement_visit_770")
 		} else {
 			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
 			if HasError() {
@@ -781,7 +781,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = CloneFactSlice(in)
+			cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_visit_784")
 		}
 		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
 		// nil FindEdgesIn sticky incomplete CFG

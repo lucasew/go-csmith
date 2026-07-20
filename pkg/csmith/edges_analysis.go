@@ -405,7 +405,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
-			fm.GlobalFacts = outputs
+			fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
 			specialHandled = true
 		}
 	}
@@ -581,7 +581,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			switch sc {
 			case ShortcutOK:
 				if fm != nil {
-					fm.GlobalFacts = work
+					fm.SetGlobalFacts(work, "auto_edges_analysis_584")
 				}
 				return work, -1, true
 			case ShortcutConflict:
@@ -640,15 +640,22 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			tmp := outCopy
 			// UpdateFactsForOOSVars mutates GlobalFacts; apply via temp
 			saved := fm.GlobalFacts
-			fm.GlobalFacts = tmp
+			fm.SetGlobalFacts(tmp, "fixed_point_oos_tmp")
 			fm.UpdateFactsForOOSVars(b.LocalVars)
 			outCopy = fm.GlobalFacts
-			fm.GlobalFacts = saved
+			fm.SetGlobalFacts(saved, "fixed_point_oos_restore")
 			// OOS may nil on incomplete; fail closed
 			if !FactsComplete(outCopy) {
 				SetError(ErrGeneric)
 				return outCopy, -1, false
 			}
+		}
+		// Keep mid-gen may-null that fixed-point *outputs* may lag (same class as
+		// StmVisitFacts mergeMayNullFromLive; C++ leaves global_facts as live env).
+		outCopy = mergeMayNullFromLive(fm.GlobalFacts, outCopy)
+		if !FactsComplete(outCopy) {
+			SetError(ErrGeneric)
+			return outCopy, -1, false
 		}
 		fm.SetMapFactsOut(b.StmID, outCopy)
 		if fm.MapVisited == nil {
@@ -656,7 +663,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		}
 		fm.MapVisited[b.StmID] = true
 		b.SetAccumulatedEffect(fm)
-		fm.GlobalFacts = outCopy
+		fm.SetGlobalFacts(outCopy, "fixed_point_out")
 		facts = outCopy
 		visitOnce = false
 		// next loop: merge edges + shortcut when inputs stable

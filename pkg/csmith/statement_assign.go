@@ -975,7 +975,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM != nil {
-			cg.FM.GlobalFacts = facts
+			cg.FM.SetGlobalFacts(facts, "auto_statement_assign_978")
 		}
 	} else {
 		running := cg.EffectContext()

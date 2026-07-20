@@ -505,10 +505,12 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	// Statement.cpp:611 — get_effect_stm().clear()
 	cg.ClearEffectStm()
 	// Statement.cpp:612 — curr_blk = parent (stack top is current block in Go)
-	// C++ visit_facts mutates inputs in place; Go uses FM.GlobalFacts as the visit
-	// working set. Must clone: applyPointToAssignFacts reassigns GlobalFacts on
-	// merge/append, which would leave *facts pointing at the pre-merge slice and
-	// drop lattice updates (seed-2 e10107 may-null wipe during for fixed-point).
+	// C++ stm_visit_facts: visit_facts(inputs) mutates inputs only — does not assign
+	// fm->global_facts = inputs. Mid-gen ExpressionAssign updates live on global_facts
+	// (OPP reads global_facts). Go visit uses FM.GlobalFacts as the working set, so we
+	// must load *facts into GlobalFacts for the walk — but must not drop may-null that
+	// is already on GlobalFacts and missing from map_facts_in / fixed-point *facts
+	// (seed-2 e10107: StmVisitFacts SetGlobalFacts wiped l_233 may-null).
 	if cg.FM != nil {
 		cl := CloneFactSlice(*facts)
 		if HasError() || !FactsComplete(cl) {
@@ -517,7 +519,14 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 			return false
 		}
-		cg.FM.GlobalFacts = cl
+		cl = mergeMayNullFromLive(cg.FM.GlobalFacts, cl)
+		if HasError() || !FactsComplete(cl) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		cg.FM.SetGlobalFacts(cl, "StmVisitFacts_work")
 	}
 	ok := VisitFactsStmt(st, cg, opts)
 	// Statement.cpp:615–617 — failed_stm = this when !ok && !is_compound
@@ -547,7 +556,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 				cg.FM.RemoveRVFacts(facts)
 				// RemoveRVFacts mutates *facts; keep GlobalFacts as the same post-RV set
 				// C++ stm_visit_facts only remove_rv_facts(inputs) — no separate global_facts
-				cg.FM.GlobalFacts = *facts
+				cg.FM.SetGlobalFacts(*facts, "auto_shortcut_analysis_550")
 			}
 		}
 		// Statement::stm_id always live; StmID 0 fails closed sticky (C++ always
@@ -577,6 +586,44 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	return ok
 }
 
+// mergeMayNullFromLive joins may-null lattice from live into work for subjects
+// already present in work. Used when loading fixed-point / map_facts_in into
+// GlobalFacts so mid-gen ExpressionAssign may-null is not dropped.
+func mergeMayNullFromLive(live, work []*FactPointTo) []*FactPointTo {
+	if !FactsComplete(live) || !FactsComplete(work) {
+		return work
+	}
+	for _, f := range live {
+		if f == nil || f.Var == nil || !f.IsNull() {
+			continue
+		}
+		var subj *Variable
+		if rel := FindRelatedPointTo(work, f.Var); rel != nil {
+			subj = rel.Var
+		} else {
+			for _, w := range work {
+				if w != nil && w.Var != nil && w.Var.Name == f.Var.Name {
+					subj = w.Var
+					break
+				}
+			}
+		}
+		if subj == nil {
+			continue
+		}
+		bridge := MakeFactPointToSet(subj, f.PointTo)
+		if bridge == nil {
+			return IncompleteFactSlice()
+		}
+		merged := MergeFactInto(work, bridge)
+		if !FactsComplete(merged) {
+			return IncompleteFactSlice()
+		}
+		work = merged
+	}
+	return work
+}
+
 // ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts.
 // Statement.cpp:569–606 — shortcut; else stm_visit_facts then set_fact_in/out.
 // Incomplete working facts fail closed (false) — no invent pre-visit copy past holes.
@@ -591,23 +638,18 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 		SetError(ErrGeneric)
 		return false
 	}
-	// sync FM global facts with working set (clone — no alias with *facts)
-	if cg.FM != nil {
-		// Statement::stm_id always live; StmID 0 sticky (no invent
-		// validate success without set_fact_in/out)
-		if st.StmID <= 0 {
-			SetError(ErrGeneric)
-			return false
-		}
-		cl := CloneFactSlice(*facts)
-		if HasError() || !FactsComplete(cl) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return false
-		}
-		cg.FM.GlobalFacts = cl
+	// Statement::stm_id always live; StmID 0 sticky (no invent
+	// validate success without set_fact_in/out)
+	if cg.FM != nil && st.StmID <= 0 {
+		SetError(ErrGeneric)
+		return false
 	}
+	// Statement.cpp:574–606 — validate_and_update_facts does NOT assign
+	// fm->global_facts = inputs before shortcut/visit. Mid-gen ExpressionAssign
+	// updates live on global_facts; map_facts_in / fixed-point *facts can lag.
+	// Installing CloneFactSlice(*facts) here wiped l_233 may-null (seed-2 e10107:
+	// WIPE at ValidateAndUpdateFacts before shortcut reuse returned without
+	// re-visit). C++ opportunistic_validate reads global_facts, not map_facts_in.
 	sc := ShortcutAnalysis(st, facts, cg, opts)
 	switch sc {
 	case ShortcutOK:

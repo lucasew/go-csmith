@@ -593,21 +593,21 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	}
 	switch {
 	case trueMust && falseMust:
-		fm.GlobalFacts = CloneFactSlice(preFacts)
+		fm.SetGlobalFacts(CloneFactSlice(preFacts), "auto_call_analysis_596")
 		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 	case trueMust:
-		fm.GlobalFacts = CloneFactSlice(elseOut)
+		fm.SetGlobalFacts(CloneFactSlice(elseOut), "auto_call_analysis_603")
 		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 	case falseMust:
-		fm.GlobalFacts = CloneFactSlice(thenOut)
+		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_610")
 		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -629,7 +629,7 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 			return
 		}
 	default:
-		fm.GlobalFacts = CloneFactSlice(thenOut)
+		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_632")
 		// incomplete clone must not invent empty-complete GlobalFacts (bare nil)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()

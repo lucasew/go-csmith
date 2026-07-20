@@ -97,7 +97,7 @@ func MakeRandomIf(
 				return nil
 			}
 		}
-		cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
+		cg.FM.SetGlobalFacts(CloneFactSlice(func1PreFacts), "auto_statement_if_100")
 		// residual ERROR sticky — no invent soft-restore past CloneFactSlice residual
 		if HasError() {
 			return nil
@@ -167,7 +167,7 @@ func MakeRandomIf(
 			SetError(ErrGeneric)
 			return nil
 		}
-		cg.FM.GlobalFacts = CloneFactSlice(in)
+		cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_if_170")
 	}
 
 	elseEff := pre

@@ -457,7 +457,7 @@ func MakeFirst(
 			SetError(ErrGeneric)
 			return nil
 		}
-		fm.GlobalFacts = CloneFactSlice(out)
+		fm.SetGlobalFacts(CloneFactSlice(out), "auto_function_460")
 		if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) || !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			SetError(ErrGeneric)
@@ -663,7 +663,7 @@ func (f *Function) generateBodyCore(
 						f.IsBuilt = false
 						return
 					}
-					cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, nf)
+					cg.FM.SetGlobalFacts(append(cg.FM.GlobalFacts, nf), "auto_function_666")
 					// residual ERROR sticky — no invent soft-continue later params past append residual
 					if HasError() {
 						f.BuildState = BuildUnbuilt
@@ -812,7 +812,7 @@ func (f *Function) generateBodyCore(
 			abortUnbuilt()
 			return
 		}
-		cg.FM.GlobalFacts = CloneFactSlice(out)
+		cg.FM.SetGlobalFacts(CloneFactSlice(out), "auto_function_815")
 		if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) || !FactsComplete(cg.FM.GlobalFacts) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
 			abortUnbuilt()
