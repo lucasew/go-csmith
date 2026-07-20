@@ -512,11 +512,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	currentInputs := CloneFactSlice(inputs)
 	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
 	var lastPreOOS []*FactPointTo
-	// push block onto generation stack for nested is_var_on_stack during re-visit.
-	// C++ find_fixed_point does not push (Block.cpp:513–568); make_random already
-	// has the block on stack during post_creation. VisitFactsBlock (no make) needs
-	// the block on stack for Go paths that consult func.Stack. Push only when not
-	// already top to avoid double-entry during post_creation (seed-2 e13830).
+	// Generation-time stack: make_random already has `b` on func.Stack during
+	// post_creation. Always-push here double-entered `b` (seed-2 e13830).
+	// VisitFactsBlock (off stack) still needs CurrentBlock() for some visit paths.
+	// C++ find_fixed_point does not push (Block.cpp:513–568); push only when not top.
 	pushed := false
 	if cg.CurrentFunc != nil {
 		n := len(cg.CurrentFunc.Stack)

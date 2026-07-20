@@ -375,7 +375,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 
 // TestFindFixedPointBlockNoDoublePushStack — when block is already stack top
 // (make_random post_creation), find_fixed_point must not push again.
-// VisitFactsBlock still pushes when the block is not on stack.
+// VisitFactsBlock still needs a push when the block is not on stack.
 func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -403,6 +403,15 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 	}
 	if len(f.Stack) != 2 || f.Stack[0] != outer || f.Stack[1] != body {
 		t.Fatalf("stack identity must be unchanged")
+	}
+	// Off-stack visit: temporary push then pop.
+	f.Stack = []*Block{outer}
+	_, _, ok = FindFixedPointBlock(body, []*FactPointTo{}, &cg, Defaults(), true)
+	if !ok {
+		t.Fatalf("fp off-stack failed sticky=%v", HasError())
+	}
+	if len(f.Stack) != 1 || f.Stack[0] != outer {
+		t.Fatalf("off-stack FP must restore stack to outer only: %#v", f.Stack)
 	}
 	ClearError()
 }

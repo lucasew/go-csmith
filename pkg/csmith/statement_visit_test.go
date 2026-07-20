@@ -72,11 +72,16 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	st.StmID = 1
 	cg := EmptyCGContext().WithFactMgr(fm)
 	// return path needs CurrentFunc.RV for fact update; visit still runs expr visit
-	cg.CurrentFunc = &Function{Name: "f", ReturnType: GetIntType(), RV: rv}
+	// Generation-time stack top is the enclosing make_random block (not if arms);
+	// find_fixed_point does not push arms (Block.cpp:513–568).
+	f := &Function{Name: "f", ReturnType: GetIntType(), RV: rv}
+	encl := &Block{StmID: 9, Func: f}
+	f.Stack = []*Block{encl}
+	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(&st, &cg, Defaults()) {
-		t.Fatal("visit if")
+		t.Fatalf("visit if sticky=%v", HasError())
 	}
 	// incomplete arm StmID must fail closed
 	st.Else.StmID = 0
