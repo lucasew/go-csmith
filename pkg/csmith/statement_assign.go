@@ -484,19 +484,12 @@ func MakeRandomAssignQfer(
 			}
 		}
 	}
-	// FactMgr::update_fact_for_assign(sa) — get_rhs() (canonized ExpressionFuncall)
-	// Write effects come from Lhs::visit_facts (CheckWriteVar / write_pointed) +
-	// merge_param_context — do NOT NoteWrite(LhsVar): that marks the pointer itself
-	// on *p=… and poisons is_written_partially / ptr-bias choose_var (seed2 e9238).
-	if cg.FM != nil && st.LhsVar != nil {
-		// false may be no lattice change or incomplete abstract; only poison is incomplete FM
-		_ = cg.FM.UpdateFactForAssign(st.LhsVar, lhsIndir, st.GetAssignRhs())
-		// incomplete GlobalFacts fail closed sticky (no invent assign with wiped facts)
-		if !FactsComplete(cg.FM.GlobalFacts) {
-			SetError(ErrGeneric)
-			return Stmt{}
-		}
-	}
+	// StatementAssign.cpp:make_random — does NOT update_fact_for_assign here.
+	// Fact updates: ExpressionAssign.cpp after make_random (nested assigns), and
+	// Statement::post_creation_analysis for eAssign (top-level). Early update
+	// here double-applied lattice merges and diverged may-null (seed-2 e10107).
+	// Write effects still come from Lhs visit + merge_param_context only —
+	// do NOT NoteWrite(LhsVar) (seed2 e9238).
 	return st
 }
 

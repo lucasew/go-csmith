@@ -56,7 +56,8 @@ func MakeExpressionAssign(
 		return nil
 	}
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
-	// uses get_rhs(); MakeRandomAssignQfer already updates; re-apply matches C++ double call
+	// StatementAssign::make_random does not update; this is the sole mid-gen update for
+	// nested assigns (top-level StatementAssign updates in post_creation_analysis).
 	if st.LhsVar != nil {
 		indir := 0
 		if st.Lhs != nil {

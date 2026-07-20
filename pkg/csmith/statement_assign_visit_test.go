@@ -325,3 +325,48 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 		t.Fatalf("expected write of pointee %s, writes=%v", pointee.Name, eff.WrittenVars())
 	}
 }
+
+func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
+	// StatementAssign.cpp:make_random — no update_fact_for_assign; only ExpressionAssign
+	// and post_creation_analysis update (seed-2 e10107 double-merge path).
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	r := NewRng(42)
+	SetProcessRng(r)
+	vs := NewVariableSelector(opts)
+	g := CreateVariableScalars("g_x", GetIntType(), false, false)
+	vs.GlobalList = append(vs.GlobalList, g)
+	vs.AllVars = append(vs.AllVars, g)
+	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
+	p.Init = &Constant{Type: p.Type, Value: "0"}
+	vs.GlobalList = append(vs.GlobalList, p)
+	vs.AllVars = append(vs.AllVars, p)
+	fm := NewFactMgr(&Function{Name: "f"})
+	fm.AddNewVarFact(p)
+	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
+		t.Fatal("want null init for p")
+	}
+	// force pointer assign facts path: assign p = &g_x would change null→g_x if update ran
+	before := CloneFactSlice(fm.GlobalFacts)
+	cg := EmptyCGContext()
+	cg.FM = fm
+	cg.CurrentFunc = fm.Func
+	st := MakeRandomAssign(r, opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil)
+	if HasError() {
+		ClearError()
+		// may fail to generate; that is ok — key is no fact mutation on success
+	}
+	if stmtOK(st) {
+		// If make updated facts, pointer lattice would often change; require identical related p fact.
+		got := FindRelatedPointTo(fm.GlobalFacts, p)
+		want := FindRelatedPointTo(before, p)
+		if got == nil || want == nil {
+			t.Fatalf("facts missing after make got=%v want=%v", got, want)
+		}
+		if !got.Equal(want) {
+			t.Fatalf("MakeRandomAssign must not update GlobalFacts; before=%v after=%v", want.PointTo, got.PointTo)
+		}
+	}
+}

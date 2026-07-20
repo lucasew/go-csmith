@@ -1115,6 +1115,10 @@ func makeRandomStmt(
 			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make
+		// C++: FactVec pre_facts = fm->global_facts; shallow copy of Fact* vector.
+		// Nested ExpressionAssign merges replace pointers in global_facts only;
+		// pre_facts keeps the pre-make Fact* set for set_fact_in. Deep CloneFactSlice
+		// isolated pointees incorrectly vs that sharing model (seed-2 e10107 may-null).
 		// incomplete GlobalFacts/accum fail closed sticky (no invent cleaned pre-stmt snapshot
 		// or soft re-pick past holes)
 		var preFacts []*FactPointTo
@@ -1123,11 +1127,7 @@ func makeRandomStmt(
 				SetError(ErrGeneric)
 				return Stmt{}
 			}
-			preFacts = CloneFactSlice(cg.FM.GlobalFacts)
-			// residual ERROR sticky — no invent soft-stmt past CloneFactSlice residual
-			if HasError() {
-				return Stmt{}
-			}
+			preFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
 		}
 		preEffect := EmptyEffect()
 		if cg.EffectAccum != nil {
