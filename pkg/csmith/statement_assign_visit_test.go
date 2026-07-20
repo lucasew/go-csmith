@@ -141,6 +141,21 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 	if !VisitFactsExpression(&Expression{Term: TermConstant, Con: MakeInt(0)}, &cg, Defaults()) {
 		t.Fatal("live constant must visit")
 	}
+	ClearError()
+	// comma LHS residual soft invent was soft-continue RHS invent visit success.
+	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}
+	comma := &Expression{
+		Term:     TermCommaExpr,
+		CommaLHS: hole,
+		CommaRHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+	}
+	if VisitFactsExpression(comma, &cg, Defaults()) {
+		t.Fatal("LHS visit residual must fail closed comma visit")
+	}
+	if !HasError() {
+		t.Fatal("LHS visit residual comma must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {

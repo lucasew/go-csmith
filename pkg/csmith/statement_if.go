@@ -90,6 +90,13 @@ func MakeRandomIf(
 			}
 			return nil
 		}
+		// residual ERROR sticky — no invent if arms past condition visit residual true path
+		if HasError() {
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = func1PreEffect.Clone()
+			}
+			return nil
+		}
 		// StatementIf.cpp:89 — global_facts = pre_facts (already in FM via visit)
 	}
 	// Snapshot pre-branch effect; each arm runs from the same pre-state (StatementIf.cpp:96–99).

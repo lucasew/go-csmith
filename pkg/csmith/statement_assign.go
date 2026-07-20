@@ -776,7 +776,16 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 		if !VisitFactsExpression(e.CommaLHS, cg, opts) {
 			return false
 		}
-		return VisitFactsExpression(e.CommaRHS, cg, opts)
+		// residual ERROR sticky — no invent soft-continue RHS past LHS visit residual
+		if HasError() {
+			return false
+		}
+		ok := VisitFactsExpression(e.CommaRHS, cg, opts)
+		// residual ERROR sticky — no invent visit success past RHS visit residual
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermAssignment:
 		if e.Assign == nil {
 			SetError(ErrGeneric)
@@ -850,6 +859,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if !VisitFactsExpression(arg, &paramCG, opts) {
 				return false
 			}
+			// residual ERROR sticky — no invent soft-continue later args past visit residual
+			if HasError() {
+				return false
+			}
 			// Incomplete param accum sticky (no invent visit more args under incomplete)
 			running = running.AddEffect(paramAccum)
 			if !EffectComplete(running) {
@@ -860,6 +873,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			}
 			// merge_param_context; include_lhs for std ops only
 			cg.MergeParamContext(paramCG, !isFuncCall)
+			// residual ERROR sticky — no invent soft-continue later args past MergeParam residual
+			if HasError() {
+				return false
+			}
 			if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
 				if !HasError() {
 					SetError(ErrGeneric)

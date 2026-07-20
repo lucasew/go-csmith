@@ -408,6 +408,10 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if !VisitFactsExpression(fi.Args[0], cg, opts) {
 		return false
 	}
+	// residual ERROR sticky — no invent soft-continue right/merge past left visit residual
+	if HasError() {
+		return false
+	}
 	// snapshot after left — incomplete GlobalFacts sticky
 	var afterLeft []*FactPointTo
 	if cg.FM != nil {
@@ -423,6 +427,10 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if !VisitFactsExpression(fi.Args[1], cg, opts) {
 		return false
 	}
+	// residual ERROR sticky — no invent soft-continue merge past right visit residual
+	if HasError() {
+		return false
+	}
 	// merge post-right with post-left
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeft) {
@@ -433,6 +441,10 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		}
 		// MergeFacts sticky on incomplete mid-join
 		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeft)
+		// residual ERROR sticky — no invent visit success past MergeFacts residual hole
+		if HasError() {
+			return false
+		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)

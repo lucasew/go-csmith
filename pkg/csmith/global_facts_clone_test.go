@@ -112,6 +112,35 @@ func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 	}
 }
 
+func TestVisitFactsBinaryOrderedVisitResidualSticky(t *testing.T) {
+	// Visit residual soft invent was soft-continue right/merge invent visit success.
+	ClearError()
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// incomplete Constant shell residuals VisitFactsExpression
+	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}} // empty Value
+	good := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	fi := &Invocation{Args: []*Expression{hole, good}, Binary: "&&"}
+	if VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
+		t.Fatal("visit residual must fail closed ordered binary, not invent success")
+	}
+	if !HasError() {
+		t.Fatal("visit residual VisitFactsBinaryOrdered must SetError sticky")
+	}
+	ClearError()
+	// residual on right after left succeeds
+	fi2 := &Invocation{Args: []*Expression{good, hole}, Binary: "||"}
+	if VisitFactsBinaryOrdered(fi2, &cg, Defaults()) {
+		t.Fatal("right visit residual must fail closed ordered binary")
+	}
+	if !HasError() {
+		t.Fatal("right visit residual must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	// func_1 pre_facts snapshot must fail closed on incomplete GlobalFacts
 	ClearError()

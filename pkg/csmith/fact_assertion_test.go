@@ -136,6 +136,18 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	if fl.IsAssertable(blk) {
 		t.Fatal("incomplete stack must not invent assertable")
 	}
+	if !HasError() {
+		t.Fatal("HasInvisible residual IsAssertable must SetError sticky")
+	}
+	ClearError()
+	// Soft invent was IsAssertable residual then invent assert/commented assert line.
+	// Fair: sticky empty OutputAssertion.
+	if s := fl.OutputAssertion(blk, "  "); s != "" {
+		t.Fatal("HasInvisible residual must fail closed empty OutputAssertion, not invent line", s)
+	}
+	if !HasError() {
+		t.Fatal("HasInvisible residual OutputAssertion must SetError sticky")
+	}
 	ClearError()
 	if s := hole.OutputAssertion(nil, "  "); s != "" && !strings.Contains(s, "//") {
 		// OutputCondition fails closed empty on hole → empty assertion

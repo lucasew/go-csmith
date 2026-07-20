@@ -154,6 +154,29 @@ func TestVisitFactsInvocationParams(t *testing.T) {
 	}
 }
 
+func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
+	// Visit residual soft invent was soft-continue later args invent visit success.
+	ClearError()
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}
+	fi := &Invocation{
+		Args: []*Expression{
+			{Term: TermVariable, Var: a, ExprType: GetIntType()},
+			hole,
+		},
+	}
+	eff := EmptyEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &eff
+	if VisitFactsInvocation(fi, &cg, Defaults()) {
+		t.Fatal("arg visit residual must fail closed VisitFactsInvocation")
+	}
+	if !HasError() {
+		t.Fatal("arg visit residual must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestVisitFactsInvocationConflict(t *testing.T) {
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}

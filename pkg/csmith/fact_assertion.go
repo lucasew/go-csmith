@@ -94,7 +94,12 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	if IsVariableInSet(f.PointTo, GarbagePtr) || IsVariableInSet(f.PointTo, TBDPtr) {
 		return false
 	}
-	return !f.HasInvisible(stParent)
+	inv := f.HasInvisible(stParent)
+	// residual ERROR sticky — no invent assertable true past HasInvisible residual hole
+	if HasError() {
+		return false
+	}
+	return !inv
 }
 
 // OutputCondition mirrors FactPointTo::Output — C expression for the fact.
@@ -216,7 +221,14 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 	}
 	prefix := ""
 	if !f.IsAssertable(stParent) {
+		// residual ERROR sticky — no invent assert line past IsAssertable residual hole
+		if HasError() {
+			return ""
+		}
 		prefix = "//"
+	} else if HasError() {
+		// residual ERROR sticky — no invent live assert past IsAssertable residual true
+		return ""
 	}
 	return indent + prefix + "assert (" + cond + ");\n"
 }
