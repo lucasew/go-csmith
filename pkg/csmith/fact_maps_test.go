@@ -791,3 +791,83 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 		t.Fatalf("array assign must merge keep may-null, pts=%v", names)
 	}
 }
+
+// TestFixedPointBlockReintroducesMayNull: loop body fixed-point must re-apply
+// assigns that introduce null so map_facts_in (after back-edge merge) and
+// post_loop restore can keep may-null (seed-2 l_233 / first_div 10107).
+func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessRng(NewRng(1))
+
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	base := CreateVariableScalars("l_233", elem, false, false)
+	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
+	av.IsArray = true
+	av.AsArray = av
+	av.Name = "l_233"
+	av.Type = elem
+	// Entry: only g_127 (as if map_facts_in taken before body assign)
+	entry := []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{g})}
+	// Body statement: l_233 = null (Constant 0 pointer)
+	nullRHS := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 2, LhsVar: &av.Variable,
+		Lhs: &Lhs{Var: &av.Variable, Type: elem},
+		Expr: nullRHS, AssignOp: AssignSimple,
+	}
+	body := &Block{
+		Func: f, StmID: 1, Looping: true, Parent: nil,
+		Stmts: []Stmt{*st},
+	}
+	f.Blocks = []*Block{body}
+	f.Stack = []*Block{body}
+	// Entry facts in map (body start)
+	fm.SetMapFactsIn(body.StmID, entry)
+	// Self back-edge (loop)
+	fm.CreateCFGEdge(body.StmID, body, false, true)
+
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	opts2 := Defaults()
+
+	out, failIdx, ok := FindFixedPointBlock(body, CloneFactSlice(entry), &cg, opts2, true)
+	if !ok {
+		t.Fatalf("fixed-point failed idx=%d err=%v", failIdx, HasError())
+	}
+	// After fixed-point, map_facts_in should have absorbed may-null from out via
+	// back-edge merge on iteration 2+ (or out itself has may-null).
+	inAfter := fm.GetMapFactsIn(body.StmID)
+	fpIn := FindRelatedPointTo(inAfter, &av.Variable)
+	fpOut := FindRelatedPointTo(out, &av.Variable)
+	if fpOut == nil || !fpOut.IsNull() {
+		t.Fatalf("map_facts_out/return must be may-null after null assign; out=%v", fpOut)
+	}
+	// post_loop uses map_facts_in — must eventually include null after ≥2 iters
+	if fpIn == nil || !fpIn.IsNull() {
+		// document actual state for diagnosis
+		inPts, outPts := []string{}, []string{}
+		if fpIn != nil {
+			for _, p := range fpIn.PointTo {
+				if p != nil {
+					inPts = append(inPts, p.Name)
+				}
+			}
+		}
+		if fpOut != nil {
+			for _, p := range fpOut.PointTo {
+				if p != nil {
+					outPts = append(outPts, p.Name)
+				}
+			}
+		}
+		t.Fatalf("map_facts_in must gain may-null after back-edge merge; in=%v out=%v", inPts, outPts)
+	}
+}
