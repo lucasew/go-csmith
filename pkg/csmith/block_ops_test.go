@@ -1454,7 +1454,6 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	}
 }
 
-
 func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	// Statement.cpp:609–626 — does not assign global_facts = inputs.
 	// After visit, mid-gen may-null on GlobalFacts must remain (seed-2 e10107).
@@ -1538,7 +1537,6 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 	ClearError()
 }
 
-
 // TestStmVisitFactsDoesNotMergeLiveMayNullIntoInputs — Statement.cpp:609–626.
 // stm_visit_facts mutates inputs only; never merges global_facts may-null into inputs.
 // Invent per-stmt mergeMayNull reinjected mid-gen null during FP (seed-2 e12688).
@@ -1578,7 +1576,6 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	ClearError()
 }
 
-
 // TestFindFixedPointRecreatesMayNullFromAssign — after reset_stm_fact_maps clears
 // mid-gen map_facts_out, re-visit of p=0 must recreate null lattice (C++ inputs path).
 // Statement.cpp:609–626 + FactMgr::update_fact_for_assign(sa, inputs).
@@ -1598,7 +1595,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar: ptr, Lhs: &Lhs{Var: ptr, Type: GetIntType()}, // deref store
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
@@ -1620,7 +1617,6 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	ClearError()
 }
 
-
 // TestFindFixedPointKeepsUnrelatedMayNull — self-back merges mid-gen may-null;
 // a non-touching assign must not drop it (Statement.cpp inputs flow).
 // No invent mergeMayNullFromLive — pure sequential + self-back.
@@ -1639,7 +1635,7 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
@@ -1765,6 +1761,81 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	// visited set
 	if fm.MapVisited == nil || !fm.MapVisited[body.StmID] {
 		t.Fatal("must mark visited after post_creation")
+	}
+	ClearError()
+}
+
+// TestPostCreationMapVisitedMergesSelfBackMayNull — Block.cpp:687 map_visited[this]=true
+// before find_fixed_point so the first FP iteration merges self-back map_facts_out
+// (post-OOS body lattice with may-null) into map_facts_in (Block.cpp:525–536).
+// StatementFor.cpp:355 post_loop then restores map_facts_in — without early visited,
+// visit_once=false pure-shortcuts on entry and post_loop wipes live may-null
+// (seed-2 first_div 10107: auto_statement_for_631 WIPE).
+func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessRng(NewRng(1))
+
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	base := CreateVariableScalars("l_233", elem, false, false)
+	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
+	av.IsArray = true
+	av.AsArray = av
+	av.Name = "l_233"
+	av.Type = elem
+
+	// Pure entry (pre-body) in map_facts_in; live GlobalFacts already has may-null
+	// as after mid-gen *p=null assign before post_creation.
+	entry := []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{g})}
+	mayNull := []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{g, NullPtr})}
+	nullRHS := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
+	st := Stmt{
+		Kind: StmtAssign, StmID: 2, LhsVar: &av.Variable,
+		Lhs:  &Lhs{Var: &av.Variable, Type: elem},
+		Expr: nullRHS, AssignOp: AssignSimple,
+	}
+	body := &Block{
+		Func: f, StmID: 90, Looping: true, Parent: nil,
+		Stmts: []Stmt{st},
+	}
+	f.Blocks = []*Block{body}
+	f.Stack = []*Block{body}
+	fm.SetMapFactsIn(body.StmID, entry)
+	// Mid-gen lattice after null assign (pre-post_creation).
+	fm.GlobalFacts = CloneFactSlice(mayNull)
+	// Stmt effect complete so set_accumulated_effect succeeds.
+	fm.SetMapStmEffect(st.StmID, EmptyEffect())
+
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	pre := EmptyEffect()
+	cg.EffectAccum = &pre
+	body.PostCreationAnalysis(&cg, opts, pre, NewRng(1), nil)
+	if HasError() {
+		t.Fatalf("PostCreationAnalysis sticky err=%v", HasError())
+	}
+	inAfter := fm.GetMapFactsIn(body.StmID)
+	fpIn := FindRelatedPointTo(inAfter, &av.Variable)
+	if fpIn == nil || !fpIn.IsNull() {
+		pts := []string{}
+		if fpIn != nil {
+			for _, p := range fpIn.PointTo {
+				if p != nil {
+					pts = append(pts, p.Name)
+				}
+			}
+		}
+		t.Fatalf("map_facts_in after post_creation must include may-null via self-back merge, pts=%v visited=%v",
+			pts, fm.MapVisited[body.StmID])
+	}
+	// post_loop contract: map_facts_in keeps may-null for StatementFor.cpp:355 restore
+	if !factHasL233MayNull(inAfter) {
+		t.Fatal("factHasL233MayNull map_facts_in")
 	}
 	ClearError()
 }

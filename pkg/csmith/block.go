@@ -737,12 +737,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
-	// Do not set map_visited[this]=true here (Block.cpp:687). That forces the first
-	// find_fixed_point iteration to merge continue/break map_facts_out into entry
-	// (Block.cpp:526–536), injecting garbage pointees before re-analysis
-	// (seed-2: l_260→garbage → assign 108 fail → for 124 strip → e10107).
-	// find_fixed_point sets visited after a successful pass (Block.cpp:561).
-	// Set visited at end of successful post_creation below.
+	// Block.cpp:687 — map_visited[this]=true before find_fixed_point so the first
+	// iteration merges back-edge map_facts_out (incl. self-back post-OOS with body
+	// effects such as may-null) into current_inputs (Block.cpp:525–536). Skipping
+	// this left map_visited false + visit_once false → pure shortcut on entry and
+	// map_facts_in never absorbed may-null; post_loop then wiped live lattice
+	// (seed-2 first_div 10107: auto_statement_for_631 WIPE).
+	fm.MapVisited[b.StmID] = true
 	b.SetAccumulatedEffect(fm)
 	// incomplete block map_stm_effect fails closed (no invent continue post-analysis)
 	if !EffectComplete(fm.GetMapStmEffect(b.StmID)) {
@@ -1043,7 +1044,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			}
 		}
 	}
-	// Mark visited after successful post_creation (Block.cpp:687 / 561).
+	// Block.cpp:687 already set map_visited; find_fixed_point also sets (561). Reaffirm.
 	fm.MapVisited[b.StmID] = true
 	// Block.cpp:734–741 — append return for top-level body when still missing
 	// incomplete postFacts must not invent return gen via FactsComplete(nil) empty
