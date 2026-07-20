@@ -651,3 +651,100 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+
+func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
+	// FactMgr.cpp:378 — array LHS merges.
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessRng(NewRng(1))
+
+	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	base := CreateVariableScalars("l_233", elem, false, false)
+	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
+	av.IsArray = true
+	av.AsArray = av
+	av.Name = "l_233"
+	av.Type = elem
+
+	fm := NewFactMgr(&Function{Name: "f"})
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(&av.Variable, NullPtr)}
+	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
+	_ = fm.UpdateFactForAssign(&av.Variable, 0, rhs)
+	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
+	if fp == nil || !fp.IsNull() {
+		t.Fatalf("merge keep null; fp=%v", fp)
+	}
+}
+
+func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
+	// Fact.cpp:97–109 — primary init + more_init_values merge.
+	// Primary &g plus Constant 0 alt must leave may-null.
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessRng(NewRng(2))
+
+	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	base := CreateVariableScalars("l_233", elem, false, false)
+	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
+	av.IsArray = true
+	av.AsArray = av
+	av.Name = "l_233"
+	av.Type = elem
+	// primary = address-of g
+	av.InitExpr = &Expression{Term: TermVariable, Var: g, ExprType: elem}
+	// alt = null constant
+	av.InitExprs = []*Expression{{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}}
+
+	pt, _ := AbstractFactForVarInit(&av.Variable)
+	if !FactsComplete(pt) || len(pt) != 1 {
+		t.Fatalf("abstract incomplete n=%d err=%v", len(pt), HasError())
+	}
+	if !pt[0].IsNull() {
+		names := []string{}
+		for _, p := range pt[0].PointTo {
+			if p != nil {
+				names = append(names, p.Name)
+			}
+		}
+		t.Fatalf("want may-null after merge alts, PointTo=%v", names)
+	}
+}
+
+func TestEqualsIntZeroPointer(t *testing.T) {
+	e := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: PointerTo(GetIntType())}
+	if !e.EqualsInt(0) {
+		t.Fatalf("EqualsInt(0) false for MakeInt(0) pointer expr; Con=%v", e.Con)
+	}
+}
+
+func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
+	ClearError()
+	elem := PointerTo(GetIntType())
+	base := CreateVariableScalars("p", elem, false, false)
+	av := &ArrayVariable{Variable: *base, Sizes: []int{2}}
+	av.IsArray = true
+	av.AsArray = av
+	av.Name = "p"
+	av.Type = elem
+	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
+	pt := AbstractFactForAssign(nil, &av.Variable, 0, rhs)
+	if !FactsComplete(pt) || len(pt) != 1 {
+		t.Fatalf("n=%d complete=%v err=%v", len(pt), FactsComplete(pt), HasError())
+	}
+	if !pt[0].IsNull() {
+		names := []string{}
+		for _, x := range pt[0].PointTo {
+			if x != nil {
+				names = append(names, x.Name)
+			}
+		}
+		t.Fatalf("const0 must be null, pts=%v", names)
+	}
+}
