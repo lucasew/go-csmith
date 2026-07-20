@@ -414,3 +414,29 @@ func TestOutputAssertionsIsGlobalIsReadResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestPostOutputOutputAssertionsResidualSticky(t *testing.T) {
+	// OutputAssertions residual soft invent was invent soft-empty post past incomplete final maps.
+	// postCondition path uses FindUpdatedFinalFacts (not GlobalFacts).
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// incomplete final out map for st → FindUpdatedFinalFacts residual sticky
+	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: IncompleteFactSlice()}
+	st := &Stmt{Kind: StmtAssign, StmID: 1}
+	if PostOutput(st, nil, fm, true, false, "    ") != "" {
+		t.Fatal("incomplete final facts PostOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("incomplete final facts PostOutput must SetError sticky")
+	}
+	ClearError()
+	// options off soft empty (must not re-enter OutputAssertions)
+	if PostOutput(st, nil, fm, false, false, "    ") != "" {
+		t.Fatal("paranoid off must soft empty")
+	}
+	if HasError() {
+		t.Fatal("paranoid off must not sticky")
+	}
+	ClearError()
+}

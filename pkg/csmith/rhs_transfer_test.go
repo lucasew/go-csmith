@@ -603,3 +603,22 @@ func TestRhsToLhsTransferIsPointerResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRhsToLhsTransferUnionGetCollectiveResidualSticky(t *testing.T) {
+	// GetCollective residual soft invent was invent soft-merge union transfer past array shell.
+	ClearError()
+	// IsArray without AsArray GetCollective residual
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	lvars := []*Variable{CreateVariableScalars("g_u", GetIntType(), false, false)}
+	// force union transfer path via RhsToLhsTransferUnion with TermVariable shell
+	rhs := &Expression{Term: TermVariable, Var: shell, ExprType: GetIntType()}
+	out := RhsToLhsTransferUnion(nil, nil, lvars, rhs)
+	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
+		// may incomplete
+	}
+	if !HasError() {
+		// GetCollective on IsArray without AsArray SetError
+		t.Fatal("IsArray without AsArray GetCollective residual must SetError sticky")
+	}
+	ClearError()
+}

@@ -110,7 +110,13 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 			break
 		}
 	}
-	for _, b := range GetBlocksStmt(st) {
+	blks := GetBlocksStmt(st)
+	// residual ERROR sticky — no invent soft-walk past GetBlocksStmt residual
+	if HasError() {
+		*stms = IncompleteStmtsSlice()
+		return -1
+	}
+	for _, b := range blks {
 		// Block* always live from get_blocks; nil hole fails closed sticky
 		if b == nil {
 			*stms = IncompleteStmtsSlice()
@@ -119,13 +125,23 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 		}
 		for i := range b.Stmts {
 			if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+				// residual ERROR sticky — no invent soft-continue walk past child residual
+				if HasError() {
+					if StmtsComplete(*stms) {
+						*stms = IncompleteStmtsSlice()
+					}
+					return -1
+				}
 				// child already set IncompleteStmtsSlice sticky when it failed closed
 				if StmtsComplete(*stms) {
 					*stms = IncompleteStmtsSlice()
-					if !HasError() {
-						SetError(ErrGeneric)
-					}
+					SetError(ErrGeneric)
 				}
+				return -1
+			}
+			// residual ERROR sticky — no invent soft-continue later stmts past child residual true
+			if HasError() {
+				*stms = IncompleteStmtsSlice()
 				return -1
 			}
 		}

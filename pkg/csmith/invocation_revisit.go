@@ -531,6 +531,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	cg.AddEffect(bodyEff, false)
+	// residual ERROR sticky — no invent soft-continue ret-facts past AddEffect residual
+	if HasError() {
+		restore()
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
 		restore()
 		fm.GlobalFacts = savedGlobal

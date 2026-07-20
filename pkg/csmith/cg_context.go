@@ -512,6 +512,10 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddEffectOpts(e, includeLHS)
+		// residual ERROR sticky — no invent soft-continue stm past accum AddEffect residual
+		if HasError() {
+			return
+		}
 		if !EffectComplete(*c.EffectAccum) {
 			SetError(ErrGeneric)
 			return
@@ -519,6 +523,10 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 	}
 	// CGContext.cpp:386 — effect_stm.add_effect(e) always default include_lhs=false
 	c.EffectStm = c.EffectStm.AddEffectOpts(e, false)
+	// residual ERROR sticky — no invent soft-complete merge past stm AddEffect residual
+	if HasError() {
+		return
+	}
 	if !EffectComplete(c.EffectStm) {
 		SetError(ErrGeneric)
 	}

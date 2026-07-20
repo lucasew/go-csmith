@@ -435,5 +435,10 @@ func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, 
 	if st.Kind == StmtBlock {
 		return ""
 	}
-	return fm.OutputAssertions(st, stParent, indent, true)
+	out := fm.OutputAssertions(st, stParent, indent, true)
+	// residual ERROR sticky — no invent soft-empty post past OutputAssertions residual
+	if HasError() {
+		return ""
+	}
+	return out
 }

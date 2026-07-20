@@ -311,20 +311,28 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		acc := condEff.AddEffect(thenE)
+		// residual ERROR sticky — no invent soft-continue else merge past then AddEffect residual
+		if HasError() {
+			return false
+		}
 		if !EffectComplete(acc) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return false
 		}
 		acc = acc.AddEffect(elseE)
+		// residual ERROR sticky — no invent soft-continue set-map past else AddEffect residual
+		if HasError() {
+			return false
+		}
 		if !EffectComplete(acc) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, acc)
+		// residual ERROR sticky — no invent soft-continue visit past SetMapStmEffect residual
+		if HasError() {
+			return false
+		}
 	}
 
 	// StatementIf.cpp:185–196 — must_return pruning

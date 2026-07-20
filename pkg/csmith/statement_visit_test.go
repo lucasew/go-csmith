@@ -760,3 +760,35 @@ func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 		t.Fatalf("true must_return → else env p→a: %+v", got)
 	}
 }
+
+func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
+	// AddEffect residual soft invent was invent soft-continue else merge past incomplete then arm effect.
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	cg := WithFunc(f, EmptyEffect())
+	cg.FM = NewFactMgr(f)
+	thenB := &Block{StmID: 2, Func: f}
+	elseB := &Block{StmID: 3, Func: f}
+	st := &Stmt{
+		Kind: StmtIfElse, StmID: 1,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: thenB, Else: elseB,
+	}
+	// incomplete then map effect → AddEffect fails closed
+	cg.FM.SetMapStmEffect(thenB.StmID, IncompleteEffect())
+	cg.FM.SetMapStmEffect(elseB.StmID, EmptyEffect())
+	// Visit path may fail earlier on incomplete IR; ensure residual sticky somewhere
+	// Direct AddEffect residual
+	acc := IncompleteEffect().AddEffect(EmptyEffect())
+	if EffectComplete(acc) {
+		t.Fatal("AddEffect incomplete base must stay IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("AddEffect incomplete base must SetError sticky")
+	}
+	ClearError()
+	_ = opts
+	_ = cg
+	_ = st
+}

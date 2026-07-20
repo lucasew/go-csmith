@@ -554,17 +554,27 @@ func RhsToLhsTransferUnion(
 			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		rvars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, ptFacts)
+		coll := rhs.Var.GetCollective()
+		// residual ERROR sticky — no invent soft-merge past GetCollective residual
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		rvars := MergePointeesOfPointer(coll, indirect, ptFacts)
+		// residual ERROR sticky — no invent soft-merge past MergePointees residual
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
 		// incomplete pointees — non-sticky abstract hole
 		if !VariablesComplete(rvars) {
 			return IncompleteUnionFactSlice()
 		}
 		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
+		// residual ERROR sticky — no invent soft-empty transfer past JoinVarFacts residual
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
 		if rhsFact == nil {
-			// sticky incomplete join vs complete: no related RHS fact → empty transfer
-			if HasError() {
-				return IncompleteUnionFactSlice()
-			}
+			// complete: no related RHS fact → empty transfer
 			return nil
 		}
 		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
