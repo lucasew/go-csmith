@@ -838,11 +838,15 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					}
 				}
 				for {
-					_, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
+					fpOut, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
 					if ok {
-						// Block.cpp:706–728 — post_facts is NOT reassigned to analysis
-						// outs; it stays the pre-OOS snapshot (Block.cpp:690). Only
-						// global_facts = map_facts_out after the loop (729).
+						// Block.cpp:706–728 + find_fixed_point Block.cpp:558 —
+						// full visit assigns post_facts = pre-OOS outputs; pure
+						// shortcut leaves post_facts (line-690 snapshot) unchanged.
+						// FindFixedPointBlock returns nil on pure shortcut.
+						if fpOut != nil {
+							postFacts = fpOut
+						}
 						break
 					}
 					// remove from fail index through end (Block.cpp:709–714)
@@ -892,8 +896,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					// from inputs. Breaking here left MapFactsIn/Out deleted → complete-empty
 					// postLoop/global_facts (seed-2 e2308: EV rejects ** with nfacts=0).
 					if len(b.Stmts) == 0 {
-						_, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
-						if !okEmpty {
+						fpEmpty, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
+						if okEmpty {
+							if fpEmpty != nil {
+								postFacts = fpEmpty
+							}
+						} else {
 							// install empty-body maps from entry facts (C++ find_fixed_point)
 							if !FactsComplete(factsCopy) {
 								fm.GlobalFacts = IncompleteFactSlice()
@@ -903,7 +911,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 								return
 							}
 							fm.SetMapFactsIn(b.StmID, factsCopy)
-							outCopy := CloneFactSlice(factsCopy)
+							// pre-OOS outputs = entry + local facts (Block.cpp:558)
+							preOOS := CloneFactSlice(factsCopy)
 							for _, v := range b.LocalVars {
 								if v == nil {
 									fm.GlobalFacts = IncompleteFactSlice()
@@ -912,8 +921,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									SetError(ErrGeneric)
 									return
 								}
-								AddNewVarFactTo(v, &outCopy)
-								if !FactsComplete(outCopy) {
+								AddNewVarFactTo(v, &preOOS)
+								if !FactsComplete(preOOS) {
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()
 									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -921,6 +930,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									return
 								}
 							}
+							postFacts = preOOS
+							outCopy := CloneFactSlice(preOOS)
 							if len(b.LocalVars) > 0 {
 								tmp := outCopy
 								saved := fm.GlobalFacts
@@ -938,11 +949,11 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							}
 							fm.SetMapFactsOut(b.StmID, outCopy)
 						}
-						// post_facts stays pre-OOS snapshot (Block.cpp:690)
 						break
 					}
 				}
-				// Block.cpp:729 — global_facts = map_facts_out[this] only; post_facts unchanged
+				// Block.cpp:729 — global_facts = map_facts_out[this]
+				// post_facts already set by find_fixed_point (pre-OOS) or line-690
 				// incomplete out fails closed (hole marker — no invent keep prior / empty)
 				out := fm.GetMapFactsOut(b.StmID)
 				if !FactsComplete(out) {
@@ -960,7 +971,6 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 						return
 					}
-					// do not invent postFacts = global_facts — C++ post_facts stays line-690 snapshot
 				}
 			}
 		} else if b.Looping {

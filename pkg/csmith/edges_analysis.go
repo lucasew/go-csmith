@@ -488,6 +488,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 // FindFixedPointBlock mirrors Block::find_fixed_point.
 // Block.cpp:513–568 — merge back edges, shortcut, locals, analyze stmts, loop.
 // failIndex is the statement index that failed analyze_with_edges_in, or -1.
+//
+// On success, facts is C++ post_facts after the call:
+//   - After at least one full sequential visit: pre-OOS outputs (Block.cpp:558).
+//   - Pure shortcut (no full visit this call): nil — C++ leaves the caller's
+//     post_facts unchanged (Block.cpp:538–541 return true without assignment).
+// map_facts_out is always post-OOS (Block.cpp:560–561).
 func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Options, visitOnce bool) (facts []*FactPointTo, failIndex int, ok bool) {
 	// Block.cpp:513+ — always live this + cg_context; sticky no soft invent success on nil
 	if b == nil || cg == nil {
@@ -501,6 +507,8 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	}
 	fm := cg.FM
 	currentInputs := CloneFactSlice(inputs)
+	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
+	var lastPreOOS []*FactPointTo
 	// push block
 	if cg.CurrentFunc != nil {
 		cg.CurrentFunc.Stack = append(cg.CurrentFunc.Stack, b)
@@ -565,9 +573,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			sc := ShortcutAnalysisBlock(b, &work, cg)
 			switch sc {
 			case ShortcutOK:
-				// Block.cpp:538–541 — shortcut returns true; does not assign global_facts.
-				// (map_facts_out already holds the reused env; caller may install.)
-				return work, -1, true
+				// Block.cpp:538–541 — shortcut returns true without assigning post_facts.
+				// If a full visit already set lastPreOOS, that is the C++ post_facts value.
+				// Pure shortcut (no full visit): nil so caller keeps its pre-call post_facts.
+				if lastPreOOS != nil {
+					return lastPreOOS, -1, true
+				}
+				return nil, -1, true
 			case ShortcutConflict:
 				return currentInputs, 0, false
 			}
@@ -613,12 +625,20 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			return outputs, -1, false
 		}
 		fm.SetMapFactsIn(b.StmID, currentInputs)
-		// OOS locals for fact_out (Block.cpp:560–561)
+		// Block.cpp:558 — post_facts = outputs (pre-OOS)
 		// incomplete outputs after analyze fail closed (no invent cleaned out)
 		if !FactsComplete(outputs) {
 			SetError(ErrGeneric)
 			return outputs, -1, false
 		}
+		lastPreOOS = CloneFactSlice(outputs)
+		if HasError() || !FactsComplete(lastPreOOS) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return outputs, -1, false
+		}
+		// Block.cpp:560–561 — OOS locals then set_fact_out (post-OOS)
 		outCopy := CloneFactSlice(outputs)
 		if len(b.LocalVars) > 0 {
 			tmp := outCopy
@@ -634,22 +654,16 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return outCopy, -1, false
 			}
 		}
-		// Block.cpp:558–562 — set_fact_out(this, outputs) after OOS locals only.
-		// Do not mergeMayNullFromLive(GlobalFacts): that re-injects mid-gen may-null
-		// from statements later stripped by post_creation_analysis fixed-point
-		// (seed-2: (*g_140)=(void*)0 stripped but null kept → ExpressionVariable
-		// rejects g_140; UP accepts). C++ installs cleaned outputs only.
-		// Block.cpp:513–568 — find_fixed_point never assigns fm->global_facts;
-		// post_creation_analysis installs map_facts_out after success (Block.cpp:729).
-		// Invent SetGlobalFacts(outCopy) here wiped mid-gen may-null during FP
-		// (seed-2 e10107) unless StmVisitFacts unfairly remerged live into maps.
+		// Block.cpp:561 — set_fact_out(this, outputs) after OOS only.
+		// Do not mergeMayNullFromLive / SetGlobalFacts here (Block.cpp:513–568
+		// never assigns global_facts; post_creation installs map_facts_out at 729).
 		fm.SetMapFactsOut(b.StmID, outCopy)
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)
 		}
 		fm.MapVisited[b.StmID] = true
 		b.SetAccumulatedEffect(fm)
-		facts = outCopy
+		facts = lastPreOOS
 		visitOnce = false
 		// next loop: merge edges + shortcut when inputs stable
 	}

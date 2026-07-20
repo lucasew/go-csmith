@@ -1664,45 +1664,54 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	ClearError()
 }
 
-// TestPostCreationFPKeepsPreOOSPostFacts — Block.cpp:690 vs 729.
-// post_facts is the pre-OOS snapshot; after FP only global_facts = map_facts_out.
-// Top-level return path (734–735) restores post_facts, not analysis outs.
-func TestPostCreationFPKeepsPreOOSPostFacts(t *testing.T) {
-	// Covered indirectly: empty-loop FP with self-back leaves map out from analysis
-	// while StmVisitFacts pure-inputs is exercised by KeepsUnrelatedMayNull.
-	// Explicit contract: after successful FindFixedPointBlock, caller must not
-	// treat analysis out as Block.cpp:690 post_facts.
+// TestFindFixedPointReturnsPreOOSPostFacts — Block.cpp:558 vs 560–561.
+// find_fixed_point assigns post_facts = outputs (pre-OOS); map_facts_out is
+// post-OOS. Pure shortcut returns nil so the caller keeps its line-690 snapshot.
+// Top-level return path (734–735) restores post_facts, not map_facts_out.
+func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	ClearError()
 	SetProcessOptions(Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	preOOS := []*FactPointTo{MakeFactPointToSet(p, []*Variable{tgt, NullPtr})}
+	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
-	body := &Block{StmID: 1, Func: f, Looping: true, Parent: nil, Stmts: nil}
+	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	if mid == nil {
+		t.Fatal("mid")
+	}
+	body := &Block{StmID: 1, Func: f, Looping: true, Parent: nil, Stmts: nil, LocalVars: []*Variable{loc}}
 	fm := NewFactMgr(f)
-	fm.GlobalFacts = CloneFactSlice(preOOS)
+	fm.GlobalFacts = []*FactPointTo{mid}
 	fm.SetMapFactsIn(1, entry)
-	fm.SetMapFactsOut(1, CloneFactSlice(preOOS))
+	// pre-FP map out after OOS of locals — p may-null, no l_1
+	fm.SetMapFactsOut(1, []*FactPointTo{mid})
 	fm.MapVisited = map[int]bool{1: true}
 	fm.CreateCFGEdge(1, body, false, true)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	// snapshot like Block.cpp:690
-	postFacts := CloneFactSlice(preOOS)
-	out, _, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
-	if !ok {
-		t.Fatal("empty FP")
+	// visitOnce true → full sequential visit (no pure shortcut)
+	post, _, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
+	if !ok || post == nil {
+		t.Fatalf("full visit must return pre-OOS post_facts ok=%v post=%v", ok, post)
 	}
-	// analysis out has may-null from self-back; postFacts snapshot is independent
-	if g := FindRelatedPointTo(out, p); g == nil || !g.IsNull() {
-		t.Fatalf("analysis out should have may-null: %+v", g)
+	// pre-OOS outputs include local facts
+	if FindRelatedPointTo(post, loc) == nil {
+		t.Fatal("post_facts (pre-OOS) must include local var fact")
 	}
-	// postFacts must remain the pre-OOS snapshot object content (not replaced by out)
-	if len(postFacts) != len(preOOS) {
-		t.Fatal("postFacts snapshot must be untouched by FindFixedPointBlock")
+	// self-back may-null on p preserved in pre-OOS
+	if g := FindRelatedPointTo(post, p); g == nil || !g.IsNull() {
+		t.Fatalf("post_facts must keep self-back may-null: %+v", g)
+	}
+	// map_facts_out is post-OOS — local removed
+	mout := fm.GetMapFactsOut(1)
+	if FindRelatedPointTo(mout, loc) != nil {
+		t.Fatal("map_facts_out must OOS local var")
+	}
+	if g := FindRelatedPointTo(mout, p); g == nil || !g.IsNull() {
+		t.Fatalf("map_facts_out must keep non-local may-null: %+v", g)
 	}
 	ClearError()
 }

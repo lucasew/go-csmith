@@ -507,11 +507,11 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	cg.ClearEffectStm()
 	// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; does not assign
 	// fm->global_facts = inputs. Go VisitFacts* use GlobalFacts as the working set:
-	// load *facts then join live may-null. C++ mid-gen enters via self-back of
-	// map_facts_out once (Block.cpp:693+531–536). Pure inputs-only still loses
-	// may-null on seed-2 (e10107) despite unit self-back tests; per-stmt live join
-	// is residual invent that can over-strip (e12688). Always restore pre-visit
-	// live GlobalFacts after harvest.
+	// load *facts only (no invent mergeMayNullFromLive). C++ mid-gen may-null enters
+	// FP via self-back merge of map_facts_out (Block.cpp:693+531–536) once per
+	// iteration — not per-stmt live rejoin (that over-stripped seed-2 e12688:
+	// Function.Blocks n=11 vs UP n=14). Always restore pre-visit live GlobalFacts
+	// after harvest so mid-gen lattice survives validation (e10107).
 	var liveSaved []*FactPointTo
 	haveLive := false
 	if cg.FM != nil {
@@ -530,15 +530,6 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 				SetError(ErrGeneric)
 			}
 			return false
-		}
-		if haveLive {
-			cl = mergeMayNullFromLive(liveSaved, cl)
-			if HasError() || !FactsComplete(cl) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				return false
-			}
 		}
 		cg.FM.SetGlobalFacts(cl, "StmVisitFacts_work")
 	}
@@ -614,43 +605,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	return ok
 }
 
-// mergeMayNullFromLive joins may-null lattice from live into work for subjects
-// already present in work. Used when loading fixed-point / map_facts_in into
-// GlobalFacts so mid-gen ExpressionAssign may-null is not dropped.
-func mergeMayNullFromLive(live, work []*FactPointTo) []*FactPointTo {
-	if !FactsComplete(live) || !FactsComplete(work) {
-		return work
-	}
-	for _, f := range live {
-		if f == nil || f.Var == nil || !f.IsNull() {
-			continue
-		}
-		var subj *Variable
-		if rel := FindRelatedPointTo(work, f.Var); rel != nil {
-			subj = rel.Var
-		} else {
-			for _, w := range work {
-				if w != nil && w.Var != nil && w.Var.Name == f.Var.Name {
-					subj = w.Var
-					break
-				}
-			}
-		}
-		if subj == nil {
-			continue
-		}
-		bridge := MakeFactPointToSet(subj, f.PointTo)
-		if bridge == nil {
-			return IncompleteFactSlice()
-		}
-		merged := MergeFactInto(work, bridge)
-		if !FactsComplete(merged) {
-			return IncompleteFactSlice()
-		}
-		work = merged
-	}
-	return work
-}
+
 
 // ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts.
 // Statement.cpp:569–606 — shortcut; else stm_visit_facts then set_fact_in/out.
