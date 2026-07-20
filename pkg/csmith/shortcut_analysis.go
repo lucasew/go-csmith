@@ -222,7 +222,12 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 		}
 		return true
 	}
-	return containsUnfixedGotoIDs(ids, fm)
+	ok := containsUnfixedGotoIDs(ids, fm)
+	// residual ERROR sticky — no invent fixed/unfixed soft-skip past CFG residual hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // ContainsUnfixedGotoBlock mirrors contains_unfixed_goto when root is a Block.
@@ -250,7 +255,12 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 			return true
 		}
 	}
-	return containsUnfixedGotoIDs(ids, fm)
+	ok := containsUnfixedGotoIDs(ids, fm)
+	// residual ERROR sticky — no invent fixed/unfixed soft-skip past CFG residual hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // containsUnfixedGotoIDs is the CFG scan for Statement.cpp:769–804.
@@ -396,10 +406,26 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 		return ShortcutNone
 	}
 	if !SameFacts(*facts, in) || IsCtrlStmt(st) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
+		if HasError() {
+			return ShortcutNone
+		}
+		return ShortcutNone
+	}
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual true path
+	if HasError() {
 		return ShortcutNone
 	}
 	// contains_unfixed_goto — conservative none if any unvisited goto in tree
 	if ContainsUnfixedGoto(st, fm) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual true
+		if HasError() {
+			return ShortcutNone
+		}
+		return ShortcutNone
+	}
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual false
+	if HasError() {
 		return ShortcutNone
 	}
 	// Incomplete map_stm_effect / accum fails closed before AddEffect

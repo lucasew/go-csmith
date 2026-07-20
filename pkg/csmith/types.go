@@ -581,13 +581,36 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 		return t == other
 	case MatchConvert:
 		// Type::is_convertable reads CGOptions::strict_float / lang_cpp
-		return t.IsConvertableOpts(other, ProcessOptions())
+		ok := t.IsConvertableOpts(other, ProcessOptions())
+		// residual ERROR sticky — no invent match true past IsConvertableOpts residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case MatchDereference:
-		return t.IsDereferencedFrom(other)
+		ok := t.IsDereferencedFrom(other)
+		// residual ERROR sticky — no invent match true past IsDereferencedFrom residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case MatchDerefExact:
-		return other == t || t.IsDereferencedFrom(other)
+		if other == t {
+			return true
+		}
+		ok := t.IsDereferencedFrom(other)
+		// residual ERROR sticky — no invent match true past IsDereferencedFrom residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case MatchFlexible:
-		return t.IsDerivable(other)
+		ok := t.IsDerivable(other)
+		// residual ERROR sticky — no invent match true past IsDerivable residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	default:
 		return false
 	}
@@ -703,7 +726,29 @@ func (t *Type) IsDerivable(other *Type) bool {
 	if t == other {
 		return true
 	}
-	return t.IsConvertable(other) || t.IsDereferencedFrom(other) || t.ptrTo == other
+	if t.IsConvertable(other) {
+		// residual ERROR sticky — no invent derivable true past IsConvertable residual hole
+		if HasError() {
+			return false
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue derivable past IsConvertable residual false
+	if HasError() {
+		return false
+	}
+	if t.IsDereferencedFrom(other) {
+		// residual ERROR sticky — no invent derivable true past IsDereferencedFrom residual hole
+		if HasError() {
+			return false
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue derivable past IsDereferencedFrom residual false
+	if HasError() {
+		return false
+	}
+	return t.ptrTo == other
 }
 
 // IsEquivalent mirrors Type::is_equivalent — same size and signedness for simples.

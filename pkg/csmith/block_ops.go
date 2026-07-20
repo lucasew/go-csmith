@@ -922,10 +922,26 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	if !SameFacts(*facts, in) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
+		if HasError() {
+			return ShortcutNone
+		}
+		return ShortcutNone
+	}
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual true path
+	if HasError() {
 		return ShortcutNone
 	}
 	// Statement.cpp:552 — !contains_unfixed_goto()
 	if ContainsUnfixedGotoBlock(b, fm) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual true
+		if HasError() {
+			return ShortcutNone
+		}
+		return ShortcutNone
+	}
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual false
+	if HasError() {
 		return ShortcutNone
 	}
 	// block is not is_ctrl_stmt

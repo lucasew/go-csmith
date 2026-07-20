@@ -486,6 +486,17 @@ func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 		t.Fatal("FindStmt residual ContainsUnfixedGoto must SetError sticky")
 	}
 	ClearError()
+	// residual after containsUnfixedGotoIDs residual soft invent was invent fixed false.
+	// Fair: sticky unfixed true. incomplete CFG residual.
+	fm2 := NewFactMgr(f)
+	fm2.CFGEdges = []*CFGEdge{nil}
+	if !ContainsUnfixedGoto(root, fm2) {
+		t.Fatal("CFG residual ContainsUnfixedGoto must fail closed unfixed")
+	}
+	if !HasError() {
+		t.Fatal("CFG residual ContainsUnfixedGoto must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestContainsUnfixedGotoImply(t *testing.T) {

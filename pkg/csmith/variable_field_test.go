@@ -190,6 +190,20 @@ func TestCollectExpandable(t *testing.T) {
 		t.Fatal("Type-nil CollectExpandable must SetError sticky")
 	}
 	ClearError()
+	// nested CollectExpandable residual soft invent was soft-continue invent complete expand pool.
+	// Fair: sticky IncompleteVariables.
+	nestHole := &Variable{Name: "nest", Type: &Type{isStruct: true}, FieldVars: []*Variable{nil}}
+	outer := &Variable{
+		Name: "outer", Type: &Type{isStruct: true},
+		FieldVars: []*Variable{nestHole, CreateVariableScalars("g_ok", GetIntType(), false, false)},
+	}
+	if VariablesComplete(outer.CollectExpandable()) {
+		t.Fatal("nested residual CollectExpandable must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nested residual CollectExpandable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFieldVolatileOrFromParent(t *testing.T) {

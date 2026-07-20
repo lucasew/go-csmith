@@ -2196,6 +2196,10 @@ func (v *Variable) CollectExpandable() []*Variable {
 			}
 			return IncompleteVariables()
 		}
+		// residual ERROR sticky — no invent soft-continue expand past nested residual hole
+		if HasError() {
+			return IncompleteVariables()
+		}
 		out = append(out, nested...)
 	}
 	return out

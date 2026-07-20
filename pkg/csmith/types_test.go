@@ -24,6 +24,7 @@ func TestPointerToCached(t *testing.T) {
 }
 
 func TestMatchConvertSimple(t *testing.T) {
+	ClearError()
 	// non-void integers interconvert
 	if !GetSimpleType(EInt).Match(GetSimpleType(EShort), MatchConvert) {
 		t.Fatal("int convert short")
@@ -36,9 +37,23 @@ func TestMatchConvertSimple(t *testing.T) {
 	if GetSimpleType(EInt).Match(GetSimpleType(EFloat), MatchConvert) {
 		t.Fatal("int not convertable from float")
 	}
+	if HasError() {
+		t.Fatal("complete MatchConvert must not sticky")
+	}
+	ClearError()
+	// IsConvertableOpts residual soft invent was soft-continue invent match true.
+	// Fair: sticky false.
+	if GetSimpleType(EInt).Match(nil, MatchConvert) {
+		t.Fatal("nil other MatchConvert must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil other MatchConvert must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMatchDereference(t *testing.T) {
+	ClearError()
 	pint := PointerTo(GetSimpleType(EInt))
 	if !GetSimpleType(EInt).Match(pint, MatchDereference) {
 		t.Fatal("int is_dereferenced_from int*")
@@ -49,6 +64,28 @@ func TestMatchDereference(t *testing.T) {
 	if GetSimpleType(EShort).Match(pint, MatchDereference) {
 		t.Fatal("short not from int*")
 	}
+	if HasError() {
+		t.Fatal("complete MatchDereference must not sticky")
+	}
+	ClearError()
+	// IsDereferencedFrom residual soft invent was soft-continue invent match true.
+	// Fair: sticky false.
+	if GetSimpleType(EInt).Match(nil, MatchDereference) {
+		t.Fatal("nil other MatchDereference must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil other MatchDereference must SetError sticky")
+	}
+	ClearError()
+	// IsDerivable residual soft invent was soft-continue invent flexible match true.
+	// Fair: sticky false.
+	if GetSimpleType(EInt).Match(nil, MatchFlexible) {
+		t.Fatal("nil other MatchFlexible must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil other MatchFlexible must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsSigned(t *testing.T) {
