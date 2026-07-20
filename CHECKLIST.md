@@ -74,7 +74,7 @@ Total items: 2070
 - [x] ArrayVariable.cpp::ArrayVariable.is_global
 - [x] ArrayVariable.cpp::ArrayVariable.is_variant
 - [x] ArrayVariable.cpp::ArrayVariable.is_visible_local
-- [ ] ArrayVariable.cpp::ArrayVariable.itemize
+- [x] ArrayVariable.cpp::ArrayVariable.itemize
 - [x] ArrayVariable.cpp::ArrayVariable.make_print_index_str
 - [x] ArrayVariable.cpp::ArrayVariable.no_loop_initializer
 - [x] ArrayVariable.cpp::ArrayVariable.Output
@@ -834,7 +834,7 @@ Total items: 2070
 - [x] ExpressionVariable.cpp::ExpressionVariable.get_var
 - [x] ExpressionVariable.cpp::ExpressionVariable.make_random
 - [x] ExpressionVariable.cpp::ExpressionVariable.operator=
-- [ ] ExpressionVariable.cpp::ExpressionVariable.Output
+- [x] ExpressionVariable.cpp::ExpressionVariable.Output
 - [x] ExpressionVariable.cpp::ExpressionVariable.push_back
 - [x] ExpressionVariable.cpp::ExpressionVariable.use_var
 - [x] ExpressionVariable.cpp::ExpressionVariable.visit_facts

@@ -444,23 +444,18 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		return "(" + strings.Repeat("*", ind) + base + ")"
 	}
 	if ind < 0 {
-		// ExpressionVariable.cpp:210–212 — assert(indirect_level == -1)
-		// multi-level & is broken IR sticky; no soft invent single &
+		// ExpressionVariable.cpp:210–216 — assert(indirect_level == -1); out << "&"; var.Output(out)
+		// var.Output is ArrayVariable::Output for itemized members (name[index]…), not bare get_actual_name.
 		if ind != -1 {
 			SetError(ErrGeneric)
 			return ""
 		}
-		// sticky no invent bare "&" when get_actual_name empty
-		nm := v.GetActualName(false)
-		// residual ERROR sticky — no invent soft-empty & past GetActualName residual
-		if HasError() {
-			return ""
-		}
-		if nm == "" {
+		// base already from v.OutputC() above (includes itemized indices)
+		if base == "" {
 			SetError(ErrGeneric)
 			return ""
 		}
-		return "&" + nm
+		return "&" + base
 	}
 	return base
 }

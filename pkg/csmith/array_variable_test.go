@@ -1121,3 +1121,29 @@ func TestCDeclTypeCNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
+	// ExpressionVariable.cpp:210–216 — & + ArrayVariable::Output → &g_83[1]
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_83", Type: GetSimpleType(EULong), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_83", Type: GetSimpleType(EULong), IsArray: true, ArraySizes: []int{4}},
+		Sizes:      []int{4},
+		Collective: parent,
+		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: "1"}, ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	// want type is pointer to element so indirect_level = 0 - 1 = -1 for &
+	want := PointerTo(GetSimpleType(EULong))
+	got := outputExpressionVariable(&item.Variable, want)
+	if got != "&g_83[1]" {
+		t.Fatalf("got %q want &g_83[1]", got)
+	}
+	ClearError()
+}
