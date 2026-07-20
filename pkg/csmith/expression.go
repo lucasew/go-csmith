@@ -1454,6 +1454,7 @@ func makeExpressionVariableFlags(
 			return nil
 		}
 		// ExpressionVariable.cpp:93–94 — no float var for non-float want
+		// C++ continue without dummy.push_back (only validate/visit fail push dummy)
 		if !typ.IsFloat() && v.Type.IsFloat() {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
 			if HasError() {
@@ -1463,7 +1464,6 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			dummy = append(dummy, v)
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue non-float filter past IsFloat residual false path
@@ -1476,6 +1476,7 @@ func makeExpressionVariableFlags(
 		}
 		// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
 		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
+		// continue without dummy (ExpressionVariable.cpp:97–100)
 		if asParam {
 			isArg := v.IsArgument()
 			// residual ERROR sticky — no invent soft-continue past IsArgument residual
@@ -1495,7 +1496,6 @@ func makeExpressionVariableFlags(
 					cg.EffectStm = preStm
 					return nil
 				}
-				dummy = append(dummy, v)
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom residual false
@@ -1508,6 +1508,7 @@ func makeExpressionVariableFlags(
 			}
 		}
 		// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
+		// continue without dummy
 		if !vs.Opts.AddrTakenOfLocals {
 			isArg := v.IsArgument()
 			// residual ERROR sticky — no invent soft-continue past IsArgument residual
@@ -1536,7 +1537,6 @@ func makeExpressionVariableFlags(
 					cg.EffectStm = preStm
 					return nil
 				}
-				dummy = append(dummy, v)
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom residual false
@@ -1549,6 +1549,7 @@ func makeExpressionVariableFlags(
 			}
 		}
 		// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
+		// continue without dummy
 		if asReturn && vs.Opts.NoReturnDeadPointer {
 			if v.Type == nil || typ == nil {
 				SetError(ErrGeneric)
@@ -1599,7 +1600,6 @@ func makeExpressionVariableFlags(
 					cg.EffectStm = preStm
 					return nil
 				}
-				dummy = append(dummy, v)
 				continue
 			}
 		}

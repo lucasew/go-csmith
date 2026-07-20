@@ -324,7 +324,20 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 	if v.Type.IndirectLevel() <= typ.IndirectLevel() {
 		return 1
 	}
-	fp := FindRelatedPointTo(facts, v)
+	// residual ERROR sticky — no invent soft-validate past IndirectLevel residual
+	if HasError() {
+		return 0
+	}
+	// FactPointTo.cpp:448–450 — FactPointTo tmp(var->get_collective()); find_related_fact
+	coll := varCollective(v)
+	if coll == nil {
+		// residual ERROR sticky — no invent soft-miss fact past get_collective hole
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return 0
+	}
+	fp := FindRelatedPointTo(facts, coll)
 	// residual ERROR sticky — no invent soft-continue validate past FindRelated hole
 	if HasError() {
 		return 0

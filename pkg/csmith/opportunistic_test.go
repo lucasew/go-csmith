@@ -95,6 +95,41 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	ClearError()
 }
 
+func TestOpportunisticValidateUsesCollective(t *testing.T) {
+	// FactPointTo.cpp:448–450 — FactPointTo tmp(var->get_collective()); find_related_fact
+	// Fact is stored on the collective; itemized member must resolve via get_collective.
+	ClearError()
+	elem := GetIntType()
+	pt := PointerTo(elem)
+	// collective array-of-pointer shell (fact subject)
+	coll := &ArrayVariable{
+		Variable: Variable{Name: "g_arr", Type: pt, IsArray: true, ArraySizes: []int{3}},
+		Sizes:    []int{3},
+	}
+	coll.AsArray = coll
+	tgt := CreateVariableScalars("g_t", elem, false, false)
+	facts := []*FactPointTo{MakeFactPointTo(&coll.Variable, tgt)}
+	// itemized member of that collective
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_arr", Type: pt, IsArray: true, ArraySizes: []int{3}},
+		Sizes:      []int{3},
+		Collective: coll,
+	}
+	item.AsArray = item
+	if OpportunisticValidate(NewRng(1), &item.Variable, elem, facts, 0, 0) != 1 {
+		t.Fatal("itemized must find fact via get_collective()")
+	}
+	if HasError() {
+		t.Fatal("complete collective path must not sticky")
+	}
+	// fact keyed only on item (not collective) must miss when looking up via collective
+	factsItemOnly := []*FactPointTo{MakeFactPointTo(&item.Variable, tgt)}
+	if OpportunisticValidate(NewRng(1), &item.Variable, elem, factsItemOnly, 0, 0) != 0 {
+		t.Fatal("fact on item alone must miss when lookup uses collective identity")
+	}
+	ClearError()
+}
+
 func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 	ClearError()
 	opts := Defaults()
