@@ -1267,36 +1267,19 @@ func IsSeenName(seen []string, name string) bool {
 	return false
 }
 
-// IsConst mirrors Variable::is_const → qfer is_const_after_deref(0).
-// Incomplete Variable sticky false (no invent non-const soft-skip past hole).
+// IsConst mirrors Variable::is_const → is_const_after_deref(0).
+// Variable.cpp:517 — qfer const OR type is_const_struct_union (not qfer-only).
 func (v *Variable) IsConst() bool {
-	// Variable always live; sticky incomplete no invent non-const soft-skip
-	if v == nil {
-		SetError(ErrGeneric)
-		return false
-	}
-	ok := v.Qfer.IsConst()
-	// residual ERROR sticky — no invent soft non-const past Qfer IsConst residual
-	if HasError() {
-		return false
-	}
-	return ok
+	return v.IsConstAfterDeref(0)
 }
 
-// IsVolatile mirrors Variable::is_volatile.
-// Incomplete Variable sticky false (no invent non-vol soft-skip past hole).
+// IsVolatile mirrors Variable::is_volatile → is_volatile_after_deref(0).
+// Variable.cpp:519 — qfer volatile OR type is_volatile_struct_union (not qfer-only).
+// Missing struct/union field path left aggregates like S0 (volatile bitfields)
+// as non-vol: ReadVar/WriteVar kept side_effect_free; Expression chose Nonvoid
+// instead of NonvoidNonvolatile (seed2 first_div@9674 accepted volatile struct).
 func (v *Variable) IsVolatile() bool {
-	// Variable always live; sticky incomplete no invent non-vol soft-skip
-	if v == nil {
-		SetError(ErrGeneric)
-		return false
-	}
-	ok := v.Qfer.IsVolatile()
-	// residual ERROR sticky — no invent soft non-vol past Qfer IsVolatile residual
-	if HasError() {
-		return false
-	}
-	return ok
+	return v.IsVolatileAfterDeref(0)
 }
 
 // IsFieldVar mirrors Variable::is_field_var.

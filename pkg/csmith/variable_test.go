@@ -519,3 +519,46 @@ func TestCreateVariableWithInitVoidIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+
+func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
+	// Variable.cpp:519 — is_volatile() → is_volatile_after_deref(0) which ORs
+	// type->is_volatile_struct_union(). Qfer-only IsVolatile missed S0-style
+	// aggregates (volatile bitfields, non-vol storage) and left side_effect_free.
+	ClearError()
+	volQ := NewCVQualifiers([]bool{false}, []bool{true}) // non-const, volatile field
+	st := &Type{
+		isStruct:   true,
+		StructName: "S0",
+		Fields: []StructField{
+			{Name: "f0", Type: GetSimpleType(EUInt), Qfer: volQ, BitWidth: 15},
+		},
+	}
+	if !st.IsVolatileStructUnion() {
+		t.Fatal("struct with volatile field must IsVolatileStructUnion")
+	}
+	// Storage qfer non-vol
+	v := CreateVariableScalars("g_44", st, true, false)
+	if v == nil {
+		t.Fatal("create")
+	}
+	// Force type (CreateVariableScalars may wrap)
+	v.Type = st
+	v.Qfer = NewCVQualifiers([]bool{false}, []bool{false})
+	if !v.IsVolatile() {
+		t.Fatal("IsVolatile must true for volatile-field struct (qfer non-vol)")
+	}
+	if v.IsVolatile() != v.IsVolatileAfterDeref(0) {
+		t.Fatal("IsVolatile must equal IsVolatileAfterDeref(0)")
+	}
+	// plain int remains non-vol
+	iv := CreateVariableScalars("g_i", GetIntType(), true, false)
+	if iv.IsVolatile() {
+		t.Fatal("plain int non-vol")
+	}
+	// ReadVar of vol struct must clear SE-free
+	e := EmptyEffect().ReadVar(v)
+	if e.IsSideEffectFree() {
+		t.Fatal("ReadVar volatile struct must clear side_effect_free")
+	}
+}

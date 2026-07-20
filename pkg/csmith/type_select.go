@@ -512,28 +512,26 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		if HasError() {
 			return true
 		}
-		// arg_structs / arg_unions gates (used for local array element types)
-		if t.IsStruct() && !opts.ArgStructs {
-			// residual ERROR sticky — no invent soft-reject/keep past IsStruct residual
+		// arg_structs / arg_unions: NonVoidNonVolatileTypeFilter only (Type.cpp:171–177)
+		if noVolatileAgg {
+			if t.IsStruct() && !opts.ArgStructs {
+				if HasError() {
+					return true
+				}
+				return true
+			}
 			if HasError() {
 				return true
 			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue filter past IsStruct residual false
-		if HasError() {
-			return true
-		}
-		if t.IsUnion() && !opts.ArgUnions {
-			// residual ERROR sticky — no invent soft-reject/keep past IsUnion residual
+			if t.IsUnion() && !opts.ArgUnions {
+				if HasError() {
+					return true
+				}
+				return true
+			}
 			if HasError() {
 				return true
 			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue filter past IsUnion residual false
-		if HasError() {
-			return true
 		}
 		return false
 	})
