@@ -27,8 +27,22 @@ func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant
 	}
 	// Constant.cpp:312 — assert(st != eVoid) before simple emit sticky
 	// (no invent soft re-pick past void as empty success / "/* void */")
-	if typ.IsSimple() && typ.Simple() == EVoid {
-		SetError(ErrGeneric)
+	if typ.IsSimple() {
+		// residual ERROR sticky — no invent soft-continue void check past IsSimple residual
+		if HasError() {
+			return nil
+		}
+		st := typ.Simple()
+		// residual ERROR sticky — no invent soft-continue void check past Simple residual
+		if HasError() {
+			return nil
+		}
+		if st == EVoid {
+			SetError(ErrGeneric)
+			return nil
+		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue const past IsSimple residual false
 		return nil
 	}
 	v := generateRandomConstant(typ, opts, probs, r)

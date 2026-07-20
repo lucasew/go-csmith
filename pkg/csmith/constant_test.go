@@ -324,3 +324,24 @@ func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent Constant void shell past eVoid.
+	ClearError()
+	vt := GetSimpleType(EVoid)
+	if MakeRandom(vt, Defaults(), nil, NewRng(1)) != nil {
+		t.Fatal("void MakeRandom must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("void MakeRandom must SetError sticky")
+	}
+	ClearError()
+	// nil Type sticky
+	if MakeRandom(nil, Defaults(), nil, NewRng(1)) != nil {
+		t.Fatal("nil Type MakeRandom must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil Type MakeRandom must SetError sticky")
+	}
+	ClearError()
+}

@@ -114,3 +114,20 @@ func TestChooseFuncSkipsBuilding(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestGenerateBodyIncompleteAmbientResidualSticky(t *testing.T) {
+	// incomplete ambient residual soft invent was invent Built shell past hole.
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildUnbuilt}
+	prev := EmptyCGContext()
+	prev.EffectStm = IncompleteEffect()
+	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	if f.BuildState != BuildUnbuilt {
+		t.Fatal("incomplete ambient must leave Unbuilt", f.BuildState)
+	}
+	if !HasError() {
+		t.Fatal("incomplete ambient GenerateBody must SetError sticky")
+	}
+	ClearError()
+}

@@ -562,12 +562,24 @@ func (f *Function) generateBodyCore(
 	cg.Flags = 0
 	// Function.cpp:635 / 677 — extend_call_chain
 	cg.ExtendCallChain(prev)
+	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual
+	if HasError() {
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+		return
+	}
 	if prev.Funcs != nil {
 		cg.Funcs = prev.Funcs
 	}
 	// Function.cpp:635 / 674 — get_fact_mgr_for_func(this); no invent NewFactMgr here
 	if cg.FM == nil {
 		cg.FM = f.PairedFactMgr()
+		// residual ERROR sticky — no invent soft-continue body past PairedFactMgr residual
+		if HasError() {
+			f.BuildState = BuildUnbuilt
+			f.IsBuilt = false
+			return
+		}
 	}
 	if cg.FM == nil {
 		// get_fact_mgr_for_func returned null — sticky fail closed (no soft invent FM)
@@ -580,7 +592,18 @@ func (f *Function) generateBodyCore(
 	// Function.cpp:680–685 — inherit external no-reads/writes (known-params only)
 	if knownParams {
 		if rwd := prev.BuildCalleeRWDirective(cg.FM.GlobalFacts); rwd != nil {
+			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual
+			if HasError() {
+				f.BuildState = BuildUnbuilt
+				f.IsBuilt = false
+				return
+			}
 			cg.RW = rwd
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual nil
+			f.BuildState = BuildUnbuilt
+			f.IsBuilt = false
+			return
 		}
 	}
 
@@ -634,6 +657,12 @@ func (f *Function) generateBodyCore(
 						return
 					}
 					cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, nf)
+					// residual ERROR sticky — no invent soft-continue later params past append residual
+					if HasError() {
+						f.BuildState = BuildUnbuilt
+						f.IsBuilt = false
+						return
+					}
 				} else if HasError() {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
@@ -652,8 +681,20 @@ func (f *Function) generateBodyCore(
 	// make_dummy_block needs CGContext (fact_in + post_creation); no soft empty shell
 	if f.IsBuiltin {
 		f.Body = MakeDummyBlockCG(&cg, opts)
+		// residual ERROR sticky — no invent soft-Built past MakeDummyBlock residual
+		if HasError() {
+			f.BuildState = BuildUnbuilt
+			f.IsBuilt = false
+			return
+		}
 	} else {
 		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
+		// residual ERROR sticky — no invent soft-Built past MakeRandomBlock residual
+		if HasError() {
+			f.BuildState = BuildUnbuilt
+			f.IsBuilt = false
+			return
+		}
 	}
 	// Function.cpp:647 / 689 — ERROR_RETURN(); body->set_depth_protect
 	// sticky error aborts; null body without error would crash C++ on body->
