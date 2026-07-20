@@ -302,9 +302,11 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 }
 
 // RandomParentBlock mirrors Block::random_parent_block.
-// Block.cpp:353–370 — self and ancestors; optional nil global if GlobalVariables.
+// Block.cpp:295–308 — optional nil (global) first when allowGlobal; then self+ancestors;
+// rnd_upto(blks.size()). C++ uses CGOptions::global_variables() for the nil slot
+// (StatementArrayOp::make_random_array_init always hits this with defaults).
 func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
-	// Block.cpp:353–370 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
+	// Block.cpp:295–308 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
 	// sticky only on nil RNG (live this); nil receiver is broken call non-sticky
 	if b == nil {
 		return nil
@@ -315,6 +317,7 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 	}
 	var blks []*Block
 	if allowGlobal {
+		// Block.cpp:297–299 — blks.push_back(nullptr) when global_variables()
 		blks = append(blks, nil)
 	}
 	for cur := b; cur != nil; cur = cur.Parent {
@@ -324,7 +327,7 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 		return nil
 	}
 	idx := r.RndUpto(uint32(len(blks)))
-	// Block.cpp:368 ERROR_GUARD
+	// Block.cpp:306 ERROR_GUARD
 	if HasError() {
 		return nil
 	}

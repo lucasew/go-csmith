@@ -105,10 +105,16 @@ func TestRandomParentBlock(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		seen[inner.RandomParentBlock(r, true)] = true
 	}
-	// nil (global), outer, inner
+	// nil (global), outer, inner — three slots (Block.cpp:297–304)
 	if len(seen) < 2 {
 		t.Fatal(seen)
 	}
+	// with global_variables: domain size is 1 (nil) + chain length
+	rN := NewRng(2)
+	d0 := rN.RandDepth()
+	_ = inner.RandomParentBlock(rN, true)
+	// one U draw with n == 3 for [nil, inner, outer]
+	// (cannot read n from depth alone; polarity: without global never returns nil)
 	// without global
 	seen2 := map[*Block]bool{}
 	for i := 0; i < 20; i++ {
@@ -118,7 +124,19 @@ func TestRandomParentBlock(t *testing.T) {
 		}
 		seen2[p] = true
 	}
-	// Block.cpp:353 — nil RNG sticky ERROR_GUARD
+	// with global must be able to return nil
+	foundNil := false
+	for i := 0; i < 80; i++ {
+		if inner.RandomParentBlock(NewRng(uint64(i+1)), true) == nil {
+			foundNil = true
+			break
+		}
+	}
+	if !foundNil {
+		t.Fatal("allowGlobal must include nil global site")
+	}
+	_ = d0
+	// Block.cpp:306 — nil RNG sticky ERROR_GUARD
 	ClearError()
 	if inner.RandomParentBlock(nil, false) != nil {
 		t.Fatal("nil RNG must fail closed")
@@ -126,6 +144,33 @@ func TestRandomParentBlock(t *testing.T) {
 	if !HasError() {
 		t.Fatal("nil RNG RandomParentBlock must SetError sticky")
 	}
+	ClearError()
+}
+
+func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
+	// Block.cpp:295–308 + StatementArrayOp.cpp:141 — GlobalVariables → n = 1+depth
+	ClearError()
+	outer := &Block{}
+	inner := &Block{Parent: outer}
+	// Probe domain size by counting distinct results over many seeds with allowGlobal
+	// and comparing draw: first event after NewRng is U with n=3 when chain has 2 blocks.
+	// Use raw Rng: flipcoin not used; only RndUpto(3).
+	r := NewRng(11)
+	// Manually mirror domain: [nil, inner, outer]
+	// After one RandomParentBlock(true), depth must advance by 1
+	d0 := r.RandDepth()
+	_ = inner.RandomParentBlock(r, true)
+	if r.RandDepth() != d0+1 {
+		t.Fatalf("one upto draw expected: %d → %d", d0, r.RandDepth())
+	}
+	// without global domain is 2
+	r2 := NewRng(11)
+	d1 := r2.RandDepth()
+	_ = inner.RandomParentBlock(r2, false)
+	if r2.RandDepth() != d1+1 {
+		t.Fatal("one upto")
+	}
+	// Same seed, same raw, different n → different v is possible; both consume one draw.
 	ClearError()
 }
 

@@ -456,7 +456,9 @@ func MakeRandomArrayInit(
 	}
 
 	// StatementArrayOp.cpp:141 — get_current_block()->random_parent_block()
-	// Block::random_parent_block always includes self when allow_global=false
+	// Block.cpp:295–308 — when CGOptions::global_variables(), blks starts with
+	// nullptr (global init site), then self + ancestors. Do not pass allowGlobal=false
+	// (seed-2 e217 was U n=2 vs upstream U n=3).
 	blk := cg.CurrentBlock()
 	if blk == nil {
 		for _, d := range dims {
@@ -466,9 +468,9 @@ func MakeRandomArrayInit(
 		}
 		return Stmt{}
 	}
-	parent := blk.RandomParentBlock(r, false)
-	// no soft invent parent=blk when RandomParentBlock fails
-	if parent == nil {
+	parent := blk.RandomParentBlock(r, opts.GlobalVariables)
+	// nil parent is valid when allowGlobal (global init site). ERROR_GUARD only on RNG error.
+	if HasError() {
 		for _, d := range dims {
 			if d != nil && d.IV != nil {
 				cg.RemoveIVBound(d.IV)
