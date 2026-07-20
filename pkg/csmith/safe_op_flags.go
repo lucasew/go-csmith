@@ -33,10 +33,37 @@ func ReturnFloatTypeBinary(opts Options, rv, op1, op2 *Type, bop BinaryOp) bool 
 		return false
 	}
 	if rv != nil && rv.IsFloat() {
+		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
+		if HasError() {
+			return false
+		}
 		return true
 	}
-	if (op1 != nil && op1.IsFloat()) || (op2 != nil && op2.IsFloat()) {
+	// residual ERROR sticky — no invent soft-continue past rv IsFloat residual false
+	if HasError() {
+		return false
+	}
+	if op1 != nil && op1.IsFloat() {
+		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue past op1 IsFloat residual false
+	if HasError() {
+		return false
+	}
+	if op2 != nil && op2.IsFloat() {
+		// residual ERROR sticky — no invent float-true past op2 IsFloat residual hole
+		if HasError() {
+			return false
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue past op2 IsFloat residual false
+	if HasError() {
+		return false
 	}
 	if !BinaryOpWorksForFloat(bop) {
 		return false
@@ -51,10 +78,26 @@ func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
 		return false
 	}
 	if rv != nil && rv.IsFloat() {
+		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
+		if HasError() {
+			return false
+		}
 		return true
 	}
+	// residual ERROR sticky — no invent soft-continue past rv IsFloat residual false
+	if HasError() {
+		return false
+	}
 	if op1 != nil && op1.IsFloat() {
+		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue past op1 IsFloat residual false
+	if HasError() {
+		return false
 	}
 	if !UnaryOpWorksForFloat(uop) {
 		return false

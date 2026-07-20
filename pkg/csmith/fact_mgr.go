@@ -1875,6 +1875,11 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 	if dest == nil && destStmID <= 0 {
 		return
 	}
+	// residual ERROR sticky — no invent soft-append edge past incomplete edge list residual
+	if fm.CFGEdges != nil && !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
+		return
+	}
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{
 		SrcID:     srcID,
 		DestBlock: dest,

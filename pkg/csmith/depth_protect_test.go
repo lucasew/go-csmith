@@ -130,3 +130,22 @@ func TestDepthGuardUnknownTypeFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestKnownDepthTypeUnknownResidualSticky(t *testing.T) {
+	// MinimalDepth residual soft invent was invent known-true for unknown dType.
+	ClearError()
+	if knownDepthType("dtTotallyUnknown") {
+		t.Fatal("unknown dType must fail closed not-known")
+	}
+	if !HasError() {
+		t.Fatal("unknown dType knownDepthType must SetError sticky")
+	}
+	ClearError()
+	if !knownDepthType(DtConstant) {
+		t.Fatal("DtConstant must be known")
+	}
+	if HasError() {
+		t.Fatal("complete knownDepthType must not sticky")
+	}
+	ClearError()
+}

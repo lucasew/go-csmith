@@ -64,3 +64,37 @@ func TestMakeRandomPointerTypeMayBeIntStar(t *testing.T) {
 		}
 	}
 }
+
+func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
+	// IsFloat residual soft invent was invent float-true past Type-nil shell.
+	ClearError()
+	opts := Defaults()
+	opts.EnableFloat = true
+	// nil Type IsFloat residual false with SetError - but we skip nil checks
+	// Type-nil: IsFloat SetError + false
+	if ReturnFloatTypeBinary(opts, (*Type)(nil), GetIntType(), GetIntType(), BinAdd) {
+		t.Fatal("nil rv must not invent float true")
+	}
+	// nil rv skipped by rv != nil check - no residual
+	if HasError() {
+		// ok if residual from elsewhere
+		ClearError()
+	}
+	// complete non-float
+	if ReturnFloatTypeBinary(opts, GetIntType(), GetIntType(), GetIntType(), BinAdd) {
+		t.Fatal("int binary must not invent float")
+	}
+	if HasError() {
+		t.Fatal("complete ReturnFloatTypeBinary must not sticky")
+	}
+	ClearError()
+	// float rv
+	ft := GetSimpleType(EFloat)
+	if !ReturnFloatTypeBinary(opts, ft, GetIntType(), GetIntType(), BinAdd) {
+		t.Fatal("float rv must return float true")
+	}
+	if HasError() {
+		t.Fatal("complete float ReturnFloatTypeBinary must not sticky")
+	}
+	ClearError()
+}

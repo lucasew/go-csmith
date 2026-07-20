@@ -143,7 +143,13 @@ func MinimalDepth(dType string, flag int) int {
 
 // knownDepthType reports whether dType is a handled DepthSpec case.
 func knownDepthType(dType string) bool {
-	return MinimalDepth(dType, 0) >= 0
+	d := MinimalDepth(dType, 0)
+	// residual ERROR sticky — no invent known-true past MinimalDepth residual hole
+	// (unknown dType SetError + -1; residual must not invent known via soft >=0)
+	if HasError() {
+		return false
+	}
+	return d >= 0
 }
 
 // DepthGuardByDepth mirrors DepthSpec::depth_guard_by_depth.

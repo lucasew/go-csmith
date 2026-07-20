@@ -173,3 +173,50 @@ func TestNoteWriteNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestReadVarGetCollectiveResidualSticky(t *testing.T) {
+	// GetCollective residual soft invent was invent soft-complete read past Type-nil array field shell.
+	ClearError()
+	cg := EmptyCGContext()
+	// IsArray without AsArray GetCollective residual
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	cg.ReadVar(shell)
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ReadVar must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestWriteVarIsNonWritableResidualSticky(t *testing.T) {
+	// IsNonWritable residual soft invent was invent soft-complete write past incomplete NoWriteVars.
+	ClearError()
+	cg := EmptyCGContext()
+	cg.RW = &RWDirective{NoWriteVars: []*Variable{nil}}
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	cg.WriteVar(v)
+	if !HasError() {
+		t.Fatal("nil NoWriteVars hole WriteVar must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestFindVariableScopeIsGlobalResidualSticky(t *testing.T) {
+	// IsGlobal residual soft invent was invent global-scope past nil Variable already sticky.
+	ClearError()
+	if EmptyCGContext().FindVariableScope(nil) != ScopeInactive {
+		t.Fatal("nil FindVariableScope must fail closed ScopeInactive")
+	}
+	if !HasError() {
+		t.Fatal("nil FindVariableScope must SetError sticky")
+	}
+	ClearError()
+	// complete global
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if EmptyCGContext().FindVariableScope(v) != ScopeGlobalVar {
+		t.Fatal("global FindVariableScope")
+	}
+	if HasError() {
+		t.Fatal("complete FindVariableScope must not sticky")
+	}
+	ClearError()
+}

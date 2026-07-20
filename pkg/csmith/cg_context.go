@@ -222,9 +222,16 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		SetError(ErrGeneric)
 		return ScopeInactive
 	}
-	// IsGlobal residual only on nil (already gated); complete path never stickies
 	if v.IsGlobal() {
+		// residual ERROR sticky — no invent global-scope past IsGlobal residual hole
+		if HasError() {
+			return ScopeInactive
+		}
 		return ScopeGlobalVar
+	}
+	// residual ERROR sticky — no invent soft-continue scope past IsGlobal residual false
+	if HasError() {
+		return ScopeInactive
 	}
 	// non-global scope needs live curr_func (CGContext.cpp always has it for locals/params);
 	// sticky ScopeInactive (no invent "not found" soft re-pick past missing frame shell)
@@ -825,23 +832,54 @@ func (c *CGContext) ReadVar(v *Variable) {
 		return
 	}
 	v = v.GetCollective()
+	// residual ERROR sticky — no invent soft-continue read past GetCollective residual
+	if HasError() {
+		return
+	}
 	if v == nil {
 		// incomplete field/array collective path — fail closed sticky error
 		SetError(ErrGeneric)
 		return
 	}
 	if c.IsNonReadable(v) {
+		// residual ERROR sticky — no invent soft-skip read past IsNonReadable residual
+		if HasError() {
+			return
+		}
 		// CGContext.cpp:178 — assert(!"attempted read from a nonreadable variable")
 		// no soft invent silent skip: set sticky error for ERROR_GUARD callers
 		SetError(ErrGeneric)
 		return
 	}
+	// residual ERROR sticky — no invent soft-continue read past IsNonReadable residual false
+	if HasError() {
+		return
+	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.ReadVar(v)
+		// residual ERROR sticky — no invent soft-continue stm read past accum ReadVar residual
+		if HasError() {
+			return
+		}
 	}
 	c.EffectStm = c.EffectStm.ReadVar(v)
+	// residual ERROR sticky — no invent soft-continue FEffect past stm ReadVar residual
+	if HasError() {
+		return
+	}
 	if c.CurrentFunc != nil && v.IsGlobal() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
+		if HasError() {
+			return
+		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
+		// residual ERROR sticky — no invent soft-complete read past FEffect ReadVar residual
+		if HasError() {
+			return
+		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
+		return
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
 		SetError(ErrGeneric)
@@ -864,22 +902,53 @@ func (c *CGContext) WriteVar(v *Variable) {
 		return
 	}
 	v = v.GetCollective()
+	// residual ERROR sticky — no invent soft-continue write past GetCollective residual
+	if HasError() {
+		return
+	}
 	if v == nil {
 		SetError(ErrGeneric)
 		return
 	}
 	if c.IsNonWritable(v) {
+		// residual ERROR sticky — no invent soft-skip write past IsNonWritable residual
+		if HasError() {
+			return
+		}
 		// CGContext.cpp:310 — assert(!"attempted write to a nonwritable variable")
 		// no soft invent silent skip
 		SetError(ErrGeneric)
 		return
 	}
+	// residual ERROR sticky — no invent soft-continue write past IsNonWritable residual false
+	if HasError() {
+		return
+	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+		// residual ERROR sticky — no invent soft-continue stm write past accum WriteVar residual
+		if HasError() {
+			return
+		}
 	}
 	c.EffectStm = c.EffectStm.WriteVar(v)
+	// residual ERROR sticky — no invent soft-continue FEffect past stm WriteVar residual
+	if HasError() {
+		return
+	}
 	if c.CurrentFunc != nil && v.IsGlobal() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
+		if HasError() {
+			return
+		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
+		// residual ERROR sticky — no invent soft-complete write past FEffect WriteVar residual
+		if HasError() {
+			return
+		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
+		return
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
 		SetError(ErrGeneric)
