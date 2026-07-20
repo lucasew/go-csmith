@@ -1100,10 +1100,12 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	}
 	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell
 	hdr := f.OutputHeader(forceStatic)
+	// residual ERROR sticky — no invent soft-continue body past OutputHeader residual
+	if HasError() {
+		return ""
+	}
 	if hdr == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	s := ""
@@ -1112,10 +1114,18 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	// Function.cpp:568–570 — feffect.Output when !concise
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()
+		// residual ERROR sticky — no invent soft-continue past CommentOutput residual
+		if HasError() {
+			return ""
+		}
 	}
 	s += hdr
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
+		// residual ERROR sticky — no invent soft-continue body past attr residual
+		if HasError() {
+			return ""
+		}
 	}
 	s += "\n"
 	// Function.cpp:575–598 — depth_protect + body + else ret_c always live together
@@ -1126,10 +1136,12 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 	bodyOut := f.Body.Output(0)
+	// residual ERROR sticky — no invent soft-continue past Body.Output residual
+	if HasError() {
+		return ""
+	}
 	if bodyOut == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	if f.DepthProtect && f.RetConst != nil {

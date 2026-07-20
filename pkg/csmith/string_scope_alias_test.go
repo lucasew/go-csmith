@@ -121,9 +121,18 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	if UpdatePtrAliases([]*FactPointTo{MakeFactPointTo(broken, p)}, &ptrs, &aliases) {
 		t.Fatal("Type-nil subject must fail closed UpdatePtrAliases")
 	}
+	if !HasError() {
+		t.Fatal("Type-nil subject UpdatePtrAliases must SetError sticky")
+	}
+	ClearError()
 	if UpdatePtrAliases([]*FactPointTo{nil}, &ptrs, &aliases) {
 		t.Fatal("nil fact hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil fact hole UpdatePtrAliases must SetError sticky")
+	}
+	// residual hygiene — Aggregate / OutputStatistics are complete-path emit
+	ClearError()
 	// Aggregate from FactMgr
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = facts[:1]

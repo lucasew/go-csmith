@@ -228,6 +228,26 @@ func TestOutputTailStatistics(t *testing.T) {
 	}
 }
 
+func TestOutputStatisticsStatResidualSticky(t *testing.T) {
+	// Stat residual soft invent was soft-continue later stats invent partial OutputStatistics.
+	ClearError()
+	// incomplete Funcs → StatExprDepths stickies ERROR
+	if s := OutputStatistics([]*Function{nil}, Defaults()); s != "" {
+		t.Fatal("Stat residual must fail closed OutputStatistics, not invent partial", s)
+	}
+	if !HasError() {
+		t.Fatal("Stat residual OutputStatistics must SetError sticky")
+	}
+	ClearError()
+	if s := OutputTail([]*Function{nil}, Defaults()); s != "" {
+		t.Fatal("Stat residual must fail closed OutputTail, not invent stats shell", s)
+	}
+	if !HasError() {
+		t.Fatal("Stat residual OutputTail must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRecordPointerComparisons(t *testing.T) {
 	BookkeeperDoFinalization()
 	pt := PointerTo(GetIntType())

@@ -1068,10 +1068,12 @@ func (b *Block) Output(indent int) string {
 			}
 			// incomplete array def sticky — fail closed whole block
 			def := av.OutputDef()
+			// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
+			if HasError() {
+				return ""
+			}
 			if def == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			sb.WriteString(inner)
@@ -1094,10 +1096,12 @@ func (b *Block) Output(indent int) string {
 		}
 		// Variable::Output for locals (no force static)
 		def := lv.OutputDef(false)
+		// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
+		if HasError() {
+			return ""
+		}
 		if def == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		sb.WriteString(inner)
@@ -1122,11 +1126,13 @@ func (b *Block) Output(indent int) string {
 		ctrl := CtrlVarNames(ctrlVars)
 		for _, av := range loopInits {
 			initOut := av.OutputInit(inner, ctrl)
+			// residual ERROR sticky — no invent soft-continue later inits past OutputInit residual
+			if HasError() {
+				return ""
+			}
 			if initOut == "" {
 				// incomplete array init IR sticky — fail closed whole block
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			sb.WriteString(initOut)
@@ -1165,10 +1171,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			exprOut := st.Expr.Output()
+			// residual ERROR sticky — no invent soft-continue stmt past Output residual
+			if HasError() {
+				return ""
+			}
 			if exprOut == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			// DEPTH-- before return when depth_protect
@@ -1185,11 +1193,17 @@ func (b *Block) Output(indent int) string {
 				st.Expr.Term == TermConstant && st.LhsVar != nil &&
 				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 				ty := st.LhsVar.Type.CName()
+				// residual ERROR sticky — no invent soft-continue past CName residual
+				if HasError() {
+					return ""
+				}
 				rhs := st.Expr.Output()
+				// residual ERROR sticky — no invent soft-continue past Output residual
+				if HasError() {
+					return ""
+				}
 				if ty == "" || rhs == "" {
-					if !HasError() {
-						SetError(ErrGeneric)
-					}
+					SetError(ErrGeneric)
 					return ""
 				}
 				content.WriteString(ty + " tmp = " + rhs + ";\n")
@@ -1200,23 +1214,27 @@ func (b *Block) Output(indent int) string {
 			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
 			// no soft invent Defaults() / force IdentifyWrappers=false
 			asExpr := OutputAssignAsExprOpts(&st, wrap, ProcessOptions())
+			// residual ERROR sticky — no invent soft-continue stmt past OutputAssign residual
+			if HasError() {
+				return ""
+			}
 			if asExpr != "" {
 				content.WriteString(asExpr + ";\n")
 			} else if st.ArrayAccess != "" && st.Expr != nil {
 				// array_init simple: a[i] = expr
 				rhs := st.Expr.Output()
+				// residual ERROR sticky — no invent soft-continue stmt past Output residual
+				if HasError() {
+					return ""
+				}
 				if rhs == "" {
-					if !HasError() {
-						SetError(ErrGeneric)
-					}
+					SetError(ErrGeneric)
 					return ""
 				}
 				content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
 			} else {
 				// incomplete assign IR sticky — fail whole block (no invent soft-skip)
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 		case StmtBreak:
@@ -1226,10 +1244,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			test := st.Expr.Output()
+			// residual ERROR sticky — no invent soft-continue stmt past Output residual
+			if HasError() {
+				return ""
+			}
 			if test == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1243,10 +1263,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			test := st.Expr.Output()
+			// residual ERROR sticky — no invent soft-continue stmt past Output residual
+			if HasError() {
+				return ""
+			}
 			if test == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1261,11 +1283,17 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			hdr := forHeaderOutput(st.Loop)
+			// residual ERROR sticky — no invent soft-continue body past header residual
+			if HasError() {
+				return ""
+			}
 			bodyOut := st.Then.Output(indent + 1)
+			// residual ERROR sticky — no invent soft-continue stmt past body residual
+			if HasError() {
+				return ""
+			}
 			if hdr == "" || bodyOut == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
@@ -1278,12 +1306,22 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			test := st.Expr.Output()
+			// residual ERROR sticky — no invent soft-continue arms past test residual
+			if HasError() {
+				return ""
+			}
 			thenOut := st.Then.Output(indent + 1)
+			// residual ERROR sticky — no invent soft-continue else past Then residual
+			if HasError() {
+				return ""
+			}
 			elseOut := st.Else.Output(indent + 1)
+			// residual ERROR sticky — no invent soft-continue stmt past Else residual
+			if HasError() {
+				return ""
+			}
 			if test == "" || thenOut == "" || elseOut == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1299,10 +1337,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			test := st.Expr.Output()
+			// residual ERROR sticky — no invent soft-continue stmt past Output residual
+			if HasError() {
+				return ""
+			}
 			if test == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1318,11 +1358,17 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
+			// residual ERROR sticky — no invent soft-continue body past header residual
+			if HasError() {
+				return ""
+			}
 			bodyOut := st.Then.Output(indent + 1)
+			// residual ERROR sticky — no invent soft-continue stmt past body residual
+			if HasError() {
+				return ""
+			}
 			if hdr == "" || bodyOut == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
@@ -1335,10 +1381,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			out := st.Expr.Output()
+			// residual ERROR sticky — no invent soft-continue stmt past Output residual
+			if HasError() {
+				return ""
+			}
 			if out == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString(out + ";\n")
@@ -1349,10 +1397,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			bodyOut := st.Then.Output(indent + 1)
+			// residual ERROR sticky — no invent soft-continue stmt past nested residual
+			if HasError() {
+				return ""
+			}
 			if bodyOut == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString(bodyOut)

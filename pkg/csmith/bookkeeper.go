@@ -708,18 +708,43 @@ func StatBlkDepths(funcs []*Function) int {
 func OutputStatistics(funcs []*Function, opts Options) string {
 	var b strings.Builder
 	outputStructUnionStatistics(&b, opts)
+	// residual ERROR sticky — no invent soft-continue later stats past residual hole
+	if HasError() {
+		return ""
+	}
 	b.WriteString("\n")
 	outputExprStatistics(&b, funcs)
+	// residual ERROR sticky — no invent soft-continue later stats past StatExpr residual
+	if HasError() {
+		return ""
+	}
 	b.WriteString("\n")
 	outputPointerStatistics(&b)
+	// residual ERROR sticky — no invent soft-continue later stats past pointer residual
+	if HasError() {
+		return ""
+	}
 	b.WriteString("\n")
 	outputVolatileAccessStatistics(&b)
+	if HasError() {
+		return ""
+	}
 	b.WriteString("\n")
 	outputJumpStatistics(&b)
+	if HasError() {
+		return ""
+	}
 	b.WriteString("\n")
 	outputStmtsStatistics(&b, funcs)
+	// residual ERROR sticky — no invent soft-continue later stats past StatBlk residual
+	if HasError() {
+		return ""
+	}
 	b.WriteString("\n")
 	outputVarFreshness(&b)
+	if HasError() {
+		return ""
+	}
 	if relyOnIntSize {
 		b.WriteString("FYI: the random generator makes assumptions about the integer size. See platform.info for more details.\n")
 	}
@@ -914,7 +939,12 @@ func OutputTail(funcs []*Function, opts Options) string {
 	}
 	var b strings.Builder
 	b.WriteString("\n/************************ statistics *************************\n")
-	b.WriteString(OutputStatistics(funcs, opts))
+	stats := OutputStatistics(funcs, opts)
+	// residual ERROR sticky — no invent soft-continue stats shell past residual hole
+	if HasError() {
+		return ""
+	}
+	b.WriteString(stats)
 	b.WriteString("********************* end of statistics **********************/\n")
 	return b.String()
 }
