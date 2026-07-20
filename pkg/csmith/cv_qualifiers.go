@@ -851,6 +851,10 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	}
 	// For simple types with one qualifier level: "const volatile int"
 	if t.IsSimple() || t.IsAggregate() {
+		// residual ERROR sticky — no invent soft-qual emit past IsSimple/IsAggregate residual true
+		if HasError() {
+			return ""
+		}
 		var b strings.Builder
 		if len(q.IsConsts) > 0 && q.IsConsts[0] {
 			if !emitConst() {
@@ -877,6 +881,10 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		}
 		b.WriteString(cn)
 		return b.String()
+	}
+	// residual ERROR sticky — no invent soft-pointer qual emit past IsSimple/IsAggregate residual false
+	if HasError() {
+		return ""
 	}
 	// pointer: const volatile base * const * ...
 	var b strings.Builder
@@ -935,13 +943,29 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 		return false
 	}
 	if !t.IsStruct() && !t.IsUnion() {
+		// residual ERROR sticky — no invent soft volatile-OK past IsStruct/IsUnion residual
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue past IsStruct/IsUnion residual true
+	if HasError() {
+		return false
 	}
 	if !t.HasAssignOps {
 		return false
 	}
 	if t.IsStruct() {
+		// residual ERROR sticky — no invent soft volatile-OK past IsStruct residual
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue union walk past IsStruct residual false
+	if HasError() {
+		return false
 	}
 	// Union: nested struct field blocks volatile; nested unions recurse.
 	// Type* always live on Fields; nil hole sticky not volatile-OK
@@ -952,9 +976,32 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 			return false
 		}
 		if f.Type.IsStruct() {
+			// residual ERROR sticky — no invent soft not-OK past nested IsStruct residual true
+			if HasError() {
+				return false
+			}
 			return false
 		}
-		if f.Type.IsUnion() && !isVolatileOKOnOneLevel(opts, f.Type) {
+		// residual ERROR sticky — no invent soft-continue past nested IsStruct residual false
+		if HasError() {
+			return false
+		}
+		if f.Type.IsUnion() {
+			// residual ERROR sticky — no invent soft-continue past nested IsUnion residual
+			if HasError() {
+				return false
+			}
+			if !isVolatileOKOnOneLevel(opts, f.Type) {
+				// residual ERROR sticky — no invent soft not-OK past recurse residual
+				if HasError() {
+					return false
+				}
+				return false
+			}
+			if HasError() {
+				return false
+			}
+		} else if HasError() {
 			return false
 		}
 	}

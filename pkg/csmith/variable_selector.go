@@ -1578,11 +1578,23 @@ func ChooseVarFull(
 	}
 	cands := vars
 	// VariableSelector.cpp:405–410 — expand when type simple/aggregate
-	if !noExpandStructUnion && (want.IsSimple() || want.IsAggregate()) {
-		cands = ExpandStructUnionVars(vars, want)
-		if !VariablesComplete(cands) {
-			SetError(ErrGeneric)
+	if !noExpandStructUnion {
+		simple := want.IsSimple()
+		// residual ERROR sticky — no invent soft-expand past IsSimple residual
+		if HasError() {
 			return nil
+		}
+		agg := want.IsAggregate()
+		// residual ERROR sticky — no invent soft-expand past IsAggregate residual
+		if HasError() {
+			return nil
+		}
+		if simple || agg {
+			cands = ExpandStructUnionVars(vars, want)
+			if !VariablesComplete(cands) {
+				SetError(ErrGeneric)
+				return nil
+			}
 		}
 	}
 	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
@@ -1692,8 +1704,17 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 	if want != nil && len(ok) > 1 {
 		var ptrs []*Variable
 		wantInd := want.IndirectLevel()
+		// residual ERROR sticky — no invent soft-bias past want IndirectLevel residual
+		if HasError() {
+			return nil
+		}
 		for _, vv := range ok {
-			if wantInd < vv.Type.IndirectLevel() {
+			lv := vv.Type.IndirectLevel()
+			// residual ERROR sticky — no invent soft-bias past candidate IndirectLevel residual
+			if HasError() {
+				return nil
+			}
+			if wantInd < lv {
 				ptrs = append(ptrs, vv)
 			}
 		}
@@ -1705,8 +1726,17 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 	if want != nil && want.IsPointerLike() && len(ok) > 1 {
 		var addressable []*Variable
 		wantInd := want.IndirectLevel()
+		// residual ERROR sticky — no invent soft-bias past want IndirectLevel residual
+		if HasError() {
+			return nil
+		}
 		for _, vv := range ok {
-			if wantInd > vv.Type.IndirectLevel() {
+			lv := vv.Type.IndirectLevel()
+			// residual ERROR sticky — no invent soft-bias past candidate IndirectLevel residual
+			if HasError() {
+				return nil
+			}
+			if wantInd > lv {
 				// VariableSelector.cpp:490–494
 				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionField() {
 					// Type-nil ancestry stickies residual ERROR — no invent soft-continue bias
@@ -1765,6 +1795,10 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 		}
 		// don't break up a struct if it matches the given type
 		if v.Type.IsAggregate() && v.Type != want {
+			// residual ERROR sticky — no invent soft-expand past IsAggregate residual true
+			if HasError() {
+				return IncompleteVariables()
+			}
 			// FieldVars always live; incomplete fails closed sticky
 			if !v.FieldVarsComplete() {
 				SetError(ErrGeneric)
@@ -1775,6 +1809,9 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 			out = append(out[:i], out[i+1:]...)
 			out = append(out, fields...)
 			i--
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue expand past IsAggregate residual false
+			return IncompleteVariables()
 		}
 	}
 	return out
@@ -1788,7 +1825,18 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 	}
 	// expand aggregates when want is simple or aggregate (choose_var:403–406)
 	cands := vars
-	if want.IsSimple() || want.IsAggregate() {
+	simple := want.IsSimple()
+	// residual ERROR sticky — no invent soft-expand past IsSimple residual
+	if HasError() {
+		SetError(ErrGeneric)
+		return nil
+	}
+	agg := want.IsAggregate()
+	// residual ERROR sticky — no invent soft-expand past IsAggregate residual
+	if HasError() {
+		return nil
+	}
+	if simple || agg {
 		cands = ExpandStructUnionVars(vars, want)
 	}
 	// incomplete expand / candidate list — fail closed sticky
@@ -2331,7 +2379,15 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		return nil
 	}
 	// VariableSelector.cpp:611 assert(type)
+	if typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	level := typ.IndirectLevel()
+	// residual ERROR sticky — no invent soft-create struct past IndirectLevel residual
+	if HasError() {
+		return nil
+	}
 	var inv []*Variable
 	if len(invalidVars) > 0 {
 		inv = invalidVars[0]
@@ -2405,7 +2461,15 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		return nil
 	}
 	// VariableSelector.cpp:641 assert(type)
+	if typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	level := typ.IndirectLevel()
+	// residual ERROR sticky — no invent soft-create local struct past IndirectLevel residual
+	if HasError() {
+		return nil
+	}
 	var inv []*Variable
 	if len(invalidVars) > 0 {
 		inv = invalidVars[0]

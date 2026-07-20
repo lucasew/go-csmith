@@ -1628,7 +1628,12 @@ func (v *Variable) IsAggregate() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Type.IsAggregate()
+	ok := v.Type.IsAggregate()
+	// residual ERROR sticky — no invent soft not-aggregate past IsAggregate residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // MakeDummyStaticVariable mirrors VariableSelector::make_dummy_static_variable.
@@ -2141,7 +2146,13 @@ func (v *Variable) CreateFieldVars() {
 			return
 		}
 		var init *Constant
-		if !top.Type.IsUnion() {
+		isUn := top.Type.IsUnion()
+		// residual ERROR sticky — no invent soft-init path past IsUnion residual
+		if HasError() {
+			fail()
+			return
+		}
+		if !isUn {
 			// Variable.cpp:395 — Constant::make_random via process CGOptions +
 			// Probabilities + DefaultRndNumGenerator; no invent NewProbabilities /
 			// separate NewRng stream
@@ -2342,6 +2353,10 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 			name += "[" + itoa(i) + "]"
 		}
 		if v.Type.IsSimple() {
+			// residual ERROR sticky — no invent soft-dump past IsSimple residual true
+			if HasError() {
+				return ""
+			}
 			dir := v.Type.PrintfDirective()
 			if dir == "" {
 				if !HasError() {
@@ -2352,7 +2367,15 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 			b.WriteString(OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n")
 			continue
 		}
+		// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+		if HasError() {
+			return ""
+		}
 		if v.Type.IsAggregate() && len(v.FieldVars) > 0 {
+			// residual ERROR sticky — no invent soft-dump past IsAggregate residual true
+			if HasError() {
+				return ""
+			}
 			// dump fields with indexed prefix path via synthetic names
 			// Variable* always live in FieldVars; nil hole sticky whole dump
 			for fi, f := range v.FieldVars {
@@ -2367,12 +2390,20 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 					}
 					continue
 				}
-				// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
+				// residual ERROR sticky — no invent soft-continue past IsFieldReadable/IsUnion residual
 				if HasError() {
 					return ""
 				}
 				if !f.Type.IsSimple() {
+					// residual ERROR sticky — no invent soft-skip field past IsSimple residual
+					if HasError() {
+						return ""
+					}
 					continue
+				}
+				// residual ERROR sticky — no invent soft-continue field dump past IsSimple residual true
+				if HasError() {
+					return ""
 				}
 				// field name is typically g_a.f0 — replace base with indexed access
 				fname := f.Name
@@ -2619,9 +2650,21 @@ func hashArrayHasPayload(v *Variable) bool {
 		return false
 	}
 	if v.Type.IsSimple() {
+		// residual ERROR sticky — no invent soft-payload past IsSimple residual true
+		if HasError() {
+			return false
+		}
 		return true
 	}
+	// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+	if HasError() {
+		return false
+	}
 	if v.Type.IsAggregate() {
+		// residual ERROR sticky — no invent soft-payload past IsAggregate residual true
+		if HasError() {
+			return false
+		}
 		j := 0
 		for _, f := range v.Type.Fields {
 			if f.Type == nil {
@@ -2633,10 +2676,21 @@ func hashArrayHasPayload(v *Variable) bool {
 				continue
 			}
 			if f.Type.IsSimple() {
+				// residual ERROR sticky — no invent soft-payload past field IsSimple residual true
+				if HasError() {
+					return false
+				}
 				return true
+			}
+			// residual ERROR sticky — no invent soft-continue past field IsSimple residual false
+			if HasError() {
+				return false
 			}
 			j++
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft no-payload past IsAggregate residual false
+		return false
 	}
 	return false
 }

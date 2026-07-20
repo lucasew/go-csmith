@@ -1103,8 +1103,27 @@ func (t *Type) SignedOverflowPossible(intSize int) bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	if !t.IsSimple() || !t.IsSigned() {
+	if !t.IsSimple() {
+		// residual ERROR sticky — no invent overflow-free soft-skip past IsSimple residual
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue past IsSimple residual true
+	if HasError() {
+		return true
+	}
+	if !t.IsSigned() {
+		// residual ERROR sticky — no invent overflow-free soft-skip past IsSigned residual
+		if HasError() {
+			return true
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue past IsSigned residual true
+	if HasError() {
+		return true
 	}
 	// CGOptions::int_size always positive; no invent platform size when arg is 0
 	if intSize < 1 {
@@ -1316,6 +1335,14 @@ func HasAggregateField(fields []StructField) bool {
 			return true
 		}
 		if f.Type.IsAggregate() {
+			// residual ERROR sticky — no invent soft has-aggregate past IsAggregate residual true
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue past IsAggregate residual false
+		if HasError() {
 			return true
 		}
 	}
@@ -1332,10 +1359,30 @@ func HasLongLongField(fields []StructField) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		if f.Type.IsSimple() && (f.Type.simple == ELongLong || f.Type.simple == EULongLong) {
+		if f.Type.IsSimple() {
+			// residual ERROR sticky — no invent soft has-longlong past IsSimple residual
+			if HasError() {
+				return true
+			}
+			if f.Type.simple == ELongLong || f.Type.simple == EULongLong {
+				return true
+			}
+		} else if HasError() {
 			return true
 		}
-		if f.Type.IsAggregate() && HasLongLongField(f.Type.Fields) {
+		if f.Type.IsAggregate() {
+			// residual ERROR sticky — no invent soft has-longlong past IsAggregate residual
+			if HasError() {
+				return true
+			}
+			if HasLongLongField(f.Type.Fields) {
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue past recursive residual
+			if HasError() {
+				return true
+			}
+		} else if HasError() {
 			return true
 		}
 	}

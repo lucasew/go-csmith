@@ -196,3 +196,17 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	}
 	t.Log("array op rare in sample")
 }
+
+func TestExpandStructUnionVarsIsAggregateResidualSticky(t *testing.T) {
+	// IsAggregate residual soft invent was invent soft-continue expand past incomplete pool.
+	ClearError()
+	// incomplete vars pool sticky
+	out := ExpandStructUnionVars([]*Variable{nil}, GetIntType())
+	if VariablesComplete(out) {
+		t.Fatal("nil hole ExpandStructUnionVars must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil hole ExpandStructUnionVars must SetError sticky")
+	}
+	ClearError()
+}

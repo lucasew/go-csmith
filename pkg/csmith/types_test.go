@@ -239,3 +239,43 @@ func TestIsEquivalentIsSimpleResidualHygiene(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSignedOverflowPossibleIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent overflow-free soft-skip past Type-nil.
+	ClearError()
+	if !((*Type)(nil)).SignedOverflowPossible(4) {
+		t.Fatal("nil Type SignedOverflowPossible must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Type SignedOverflowPossible must SetError sticky")
+	}
+	ClearError()
+	// complete unsigned int — no signed overflow
+	if GetSimpleType(EUInt).SignedOverflowPossible(4) {
+		t.Fatal("uint SignedOverflowPossible must false")
+	}
+	if HasError() {
+		t.Fatal("complete uint SignedOverflowPossible must not sticky")
+	}
+	ClearError()
+	// complete signed int with size >= intSize
+	if !GetIntType().SignedOverflowPossible(4) {
+		t.Fatal("int SignedOverflowPossible(4) must true")
+	}
+	if HasError() {
+		t.Fatal("complete int SignedOverflowPossible must not sticky")
+	}
+	ClearError()
+}
+
+func TestHasAggregateFieldIsAggregateResidualSticky(t *testing.T) {
+	// Type-nil field residual soft invent was invent no-aggregate soft-skip.
+	ClearError()
+	if !HasAggregateField([]StructField{{Name: "f0", Type: nil, BitWidth: -1}}) {
+		t.Fatal("Type-nil field HasAggregateField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil field HasAggregateField must SetError sticky")
+	}
+	ClearError()
+}
