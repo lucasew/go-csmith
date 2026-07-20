@@ -1,6 +1,9 @@
 package csmith
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestGensymSequence(t *testing.T) {
 	// util.cpp gensym: ++count appended to basename
@@ -78,4 +81,31 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 		t.Fatal("empty basename Gensym must SetError sticky")
 	}
 	ClearError()
+}
+
+func TestLogAnalysisFailAndEnclosers(t *testing.T) {
+	ClearAnalysisErrLog()
+	if LogAnalysisFail("x.y") {
+		t.Fatal("always false")
+	}
+	if !strings.Contains(AnalysisErrLog(), "Analysis failed at x.y") {
+		t.Fatal(AnalysisErrLog())
+	}
+	out, ind := OutputOpenEncloser("{", 0)
+	if out != "{\n" || ind != 1 {
+		t.Fatal(out, ind)
+	}
+	close, ind2 := OutputCloseEncloser("}", ind, false)
+	if !strings.Contains(close, "}") || ind2 != 0 {
+		t.Fatal(close, ind2)
+	}
+	if !strings.Contains(OutputPrintStr("hi %d", "x", 1), `printf("hi %d", x);`) {
+		t.Fatal(OutputPrintStr("hi %d", "x", 1))
+	}
+	// PermuteInts
+	p := PermuteInts([]int{1, 2})
+	if len(p) != 2 {
+		t.Fatal(p)
+	}
+	ClearAnalysisErrLog()
 }

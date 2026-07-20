@@ -49,6 +49,8 @@ func DoFinalization() {
 	// RandomNumber::doFinalization — Finalization.cpp:53
 	// Cleared here; ProgramGenerator re-CreateInstance / SetProcessRng after.
 	RandomNumberDoFinalization()
+	// util.cpp errlog
+	ClearAnalysisErrLog()
 	// Error state
 	ClearError()
 }

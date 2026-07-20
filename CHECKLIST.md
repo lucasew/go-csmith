@@ -158,48 +158,48 @@ Total items: 2070
 - [x] Bookkeeper.cpp::formatted_output
 - [x] Bookkeeper.cpp::formatted_outputf
 - [x] Bookkeeper.cpp::incr_counter
-- [ ] CFGEdge.cpp::CFGEdge.CFGEdge
-- [ ] CFGEdge.cpp::CFGEdge.~CFGEdge
-- [ ] CGContext.cpp::CGContext.accept_type
-- [ ] CGContext.cpp::CGContext.add_effect
-- [ ] CGContext.cpp::CGContext.add_external_effect
-- [ ] CGContext.cpp::CGContext.add_visible_effect
-- [ ] CGContext.cpp::CGContext.allow_const
-- [ ] CGContext.cpp::CGContext.allow_volatile
-- [ ] CGContext.cpp::CGContext.CGContext
-- [ ] CGContext.cpp::CGContext.check_deref_volatile
-- [ ] CGContext.cpp::CGContext.check_read_var
-- [ ] CGContext.cpp::CGContext.check_write_var
-- [ ] CGContext.cpp::CGContext.empty_context
-- [ ] CGContext.cpp::CGContext.empty_variable_set
-- [ ] CGContext.cpp::CGContext.extend_call_chain
-- [ ] CGContext.cpp::CGContext.find_reachable_frame_vars
-- [ ] CGContext.cpp::CGContext.find_variable_scope
-- [ ] CGContext.cpp::CGContext.get_accum_effect
-- [ ] CGContext.cpp::CGContext.get_current_block
-- [ ] CGContext.cpp::CGContext.get_current_func
-- [ ] CGContext.cpp::CGContext.get_effect_accum
-- [ ] CGContext.cpp::CGContext.get_effect_context
-- [ ] CGContext.cpp::CGContext.get_effect_stm
-- [ ] CGContext.cpp::CGContext.get_empty_context
-- [ ] CGContext.cpp::CGContext.get_external_no_reads_writes
-- [ ] CGContext.cpp::CGContext.in_conflict
-- [ ] CGContext.cpp::CGContext.is_frame_var
-- [ ] CGContext.cpp::CGContext.is_nonreadable
-- [ ] CGContext.cpp::CGContext.is_nonwritable
-- [ ] CGContext.cpp::CGContext.merge_param_context
-- [ ] CGContext.cpp::CGContext.output_call_chain
-- [ ] CGContext.cpp::CGContext.read_indices
-- [ ] CGContext.cpp::CGContext.read_pointed
-- [ ] CGContext.cpp::CGContext.read_var
-- [ ] CGContext.cpp::CGContext.reset_effect_accum
-- [ ] CGContext.cpp::CGContext.reset_effect_stm
-- [ ] CGContext.cpp::CGContext.sanity_check
-- [ ] CGContext.cpp::CGContext.write_pointed
-- [ ] CGContext.cpp::CGContext.write_var
-- [ ] CGContext.cpp::CGContext.~CGContext
-- [ ] CGContext.cpp::RWDirective.find_must_use_arrays
-- [ ] CGContext.cpp::RWDirective.must_write_vars
+- [x] CFGEdge.cpp::CFGEdge.CFGEdge
+- [x] CFGEdge.cpp::CFGEdge.~CFGEdge
+- [x] CGContext.cpp::CGContext.accept_type
+- [x] CGContext.cpp::CGContext.add_effect
+- [x] CGContext.cpp::CGContext.add_external_effect
+- [x] CGContext.cpp::CGContext.add_visible_effect
+- [x] CGContext.cpp::CGContext.allow_const
+- [x] CGContext.cpp::CGContext.allow_volatile
+- [x] CGContext.cpp::CGContext.CGContext
+- [x] CGContext.cpp::CGContext.check_deref_volatile
+- [x] CGContext.cpp::CGContext.check_read_var
+- [x] CGContext.cpp::CGContext.check_write_var
+- [x] CGContext.cpp::CGContext.empty_context
+- [x] CGContext.cpp::CGContext.empty_variable_set
+- [x] CGContext.cpp::CGContext.extend_call_chain
+- [x] CGContext.cpp::CGContext.find_reachable_frame_vars
+- [x] CGContext.cpp::CGContext.find_variable_scope
+- [x] CGContext.cpp::CGContext.get_accum_effect
+- [x] CGContext.cpp::CGContext.get_current_block
+- [x] CGContext.cpp::CGContext.get_current_func
+- [x] CGContext.cpp::CGContext.get_effect_accum
+- [x] CGContext.cpp::CGContext.get_effect_context
+- [x] CGContext.cpp::CGContext.get_effect_stm
+- [x] CGContext.cpp::CGContext.get_empty_context
+- [x] CGContext.cpp::CGContext.get_external_no_reads_writes
+- [x] CGContext.cpp::CGContext.in_conflict
+- [x] CGContext.cpp::CGContext.is_frame_var
+- [x] CGContext.cpp::CGContext.is_nonreadable
+- [x] CGContext.cpp::CGContext.is_nonwritable
+- [x] CGContext.cpp::CGContext.merge_param_context
+- [x] CGContext.cpp::CGContext.output_call_chain
+- [x] CGContext.cpp::CGContext.read_indices
+- [x] CGContext.cpp::CGContext.read_pointed
+- [x] CGContext.cpp::CGContext.read_var
+- [x] CGContext.cpp::CGContext.reset_effect_accum
+- [x] CGContext.cpp::CGContext.reset_effect_stm
+- [x] CGContext.cpp::CGContext.sanity_check
+- [x] CGContext.cpp::CGContext.write_pointed
+- [x] CGContext.cpp::CGContext.write_var
+- [x] CGContext.cpp::CGContext.~CGContext
+- [x] CGContext.cpp::RWDirective.find_must_use_arrays
+- [x] CGContext.cpp::RWDirective.must_write_vars
 - [x] CGOptions.cpp::CGOptions.accept_argc
 - [x] CGOptions.cpp::CGOptions.access_once
 - [x] CGOptions.cpp::CGOptions.addr_taken_of_locals
@@ -479,17 +479,17 @@ Total items: 2070
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.set_rand_depth
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.trace_depth
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.~DefaultRndNumGenerator
-- [ ] DefaultRndNumGenerator.cpp::std.find
-- [ ] DefaultRndNumGenerator.cpp::std.getenv
-- [ ] DefaultRndNumGenerator.cpp::std.next_permutation
-- [ ] DefaultRndNumGenerator.cpp::std.strcmp
-- [ ] DefaultRndNumGenerator.cpp::std.string
-- [ ] DefaultRndNumGenerator.cpp::std.to_string
+- [x] DefaultRndNumGenerator.cpp::std.find
+- [x] DefaultRndNumGenerator.cpp::std.getenv
+- [x] DefaultRndNumGenerator.cpp::std.next_permutation
+- [x] DefaultRndNumGenerator.cpp::std.strcmp
+- [x] DefaultRndNumGenerator.cpp::std.string
+- [x] DefaultRndNumGenerator.cpp::std.to_string
 - [x] DefaultRndNumGenerator.cpp::csmith_trace_rng_enabled
 - [x] DepthSpec.cpp::DepthSpec.backtracking
 - [x] DepthSpec.cpp::DepthSpec.depth_guard_by_depth
 - [x] DepthSpec.cpp::DepthSpec.depth_guard_by_type
-- [ ] DepthSpec.cpp::DepthSpec.depth_print
+- [x] DepthSpec.cpp::DepthSpec.depth_print
 - [x] DepthSpec.cpp::DepthSpec.dtBlock_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtExpression_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtExpressionFuncall_minimal_depth
@@ -497,17 +497,17 @@ Total items: 2070
 - [x] DepthSpec.cpp::DepthSpec.dtExpressionVariable_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFirstFunction_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFunction_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunction_minimal_depth_
+- [x] DepthSpec.cpp::DepthSpec.dtFunction_minimal_depth_
 - [x] DepthSpec.cpp::DepthSpec.dtFunctionGenerateBody_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationBinary_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandom_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomBinary_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomBinaryPointer_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomRegularBinary_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomBinaryPointer_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomRegularBinary_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomUnary_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationStdFunc_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationStdFunc_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationUnary_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionUserBuildInvocation_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionUserBuildInvocation_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtGenerateNewGlobal_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtGenerateNewParentLocal_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtGenerateNewVariable_minimal_depth
@@ -519,21 +519,21 @@ Total items: 2070
 - [x] DepthSpec.cpp::DepthSpec.dtReturnType_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtSafeOpFlags_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtSelectDerefPointer_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSelectExistingVariable_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSelectExistingVariable_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtSelectGlobal_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtSelectLValue_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtSelectParentLocal_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtSelectVariable_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtStatement_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtStatement_minimal_depth_
+- [x] DepthSpec.cpp::DepthSpec.dtStatement_minimal_depth_
 - [x] DepthSpec.cpp::DepthSpec.dtStatementAssign_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtStatementExpr_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtStatementFor_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtStatementIf_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtStatementReturn_minimal_depth
 - [x] DepthSpec.cpp::DepthSpec.dtTypeChooseSimple_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.~DepthSpec
-- [ ] DepthSpec.cpp::dType
+- [x] DepthSpec.cpp::DepthSpec.~DepthSpec
+- [x] DepthSpec.cpp::dType
 - [x] DepthSpec.cpp::dType.dtBlock
 - [x] DepthSpec.cpp::dType.dtExpression
 - [x] DepthSpec.cpp::dType.dtExpressionFuncall
@@ -545,12 +545,12 @@ Total items: 2070
 - [x] DepthSpec.cpp::dType.dtFunctionInvocationBinary
 - [x] DepthSpec.cpp::dType.dtFunctionInvocationRandom
 - [x] DepthSpec.cpp::dType.dtFunctionInvocationRandomBinary
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandomBinaryPointer
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandomRegularBinary
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationRandomBinaryPointer
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationRandomRegularBinary
 - [x] DepthSpec.cpp::dType.dtFunctionInvocationRandomUnary
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationStdFunc
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationStdFunc
 - [x] DepthSpec.cpp::dType.dtFunctionInvocationUnary
-- [ ] DepthSpec.cpp::dType.dtFunctionUserBuildInvocation
+- [x] DepthSpec.cpp::dType.dtFunctionUserBuildInvocation
 - [x] DepthSpec.cpp::dType.dtGenerateNewGlobal
 - [x] DepthSpec.cpp::dType.dtGenerateNewParentLocal
 - [x] DepthSpec.cpp::dType.dtGenerateNewVariable
@@ -562,7 +562,7 @@ Total items: 2070
 - [x] DepthSpec.cpp::dType.dtReturnType
 - [x] DepthSpec.cpp::dType.dtSafeOpFlags
 - [x] DepthSpec.cpp::dType.dtSelectDerefPointer
-- [ ] DepthSpec.cpp::dType.dtSelectExistingVariable
+- [x] DepthSpec.cpp::dType.dtSelectExistingVariable
 - [x] DepthSpec.cpp::dType.dtSelectGlobal
 - [x] DepthSpec.cpp::dType.dtSelectLValue
 - [x] DepthSpec.cpp::dType.dtSelectParentLocal
@@ -574,10 +574,10 @@ Total items: 2070
 - [x] DepthSpec.cpp::dType.dtStatementIf
 - [x] DepthSpec.cpp::dType.dtStatementReturn
 - [x] DepthSpec.cpp::dType.dtTypeChooseSimple
-- [ ] DepthSpec.cpp::depth_guard_by_depth
-- [ ] DepthSpec.cpp::depth_guard_by_type
-- [ ] DepthSpec.cpp::dtGenerateNewGlobal_minimal_depth_
-- [ ] DepthSpec.cpp::dtGenerateNewParentLocal_minimal_depth_
+- [x] DepthSpec.cpp::depth_guard_by_depth
+- [x] DepthSpec.cpp::depth_guard_by_type
+- [x] DepthSpec.cpp::dtGenerateNewGlobal_minimal_depth_
+- [x] DepthSpec.cpp::dtGenerateNewParentLocal_minimal_depth_
 - [x] DFSOutputMgr.cpp::DFSOutputMgr.CreateInstance
 - [x] DFSOutputMgr.cpp::DFSOutputMgr.DFSOutputMgr
 - [x] DFSOutputMgr.cpp::DFSOutputMgr.get_main_out
@@ -663,43 +663,43 @@ Total items: 2070
 - [x] Effect.cpp::Effect.write_var_set
 - [x] Effect.cpp::Effect.~Effect
 - [x] Effect.cpp::non_empty_intersection
-- [ ] Enumerator.h::Enumerator.add_bool_elem
-- [ ] Enumerator.h::Enumerator.add_bool_elem_of_bool
-- [ ] Enumerator.h::Enumerator.add_elem
-- [ ] Enumerator.h::Enumerator.begin
-- [ ] Enumerator.h::Enumerator.end
-- [ ] Enumerator.h::Enumerator.Enumerator
-- [ ] Enumerator.h::Enumerator.EnumObject
-- [ ] Enumerator.h::Enumerator.EnumObject.assert
-- [ ] Enumerator.h::Enumerator.EnumObject.bool_value
-- [ ] Enumerator.h::Enumerator.EnumObject.clear_value
-- [ ] Enumerator.h::Enumerator.EnumObject.get_current_value
-- [ ] Enumerator.h::Enumerator.EnumObject.good_value
-- [ ] Enumerator.h::Enumerator.EnumObject.is_bool
-- [ ] Enumerator.h::Enumerator.EnumObject.is_changed
-- [ ] Enumerator.h::Enumerator.EnumObject.next
-- [ ] Enumerator.h::Enumerator.EnumObject.reset_changed
-- [ ] Enumerator.h::Enumerator.EnumObject.~EnumObject
-- [ ] Enumerator.h::Enumerator.get_elem
-- [ ] Enumerator.h::Enumerator.is_changed
-- [ ] Enumerator.h::Enumerator.next
-- [ ] Enumerator.h::Enumerator.reset_after_backward_pos
-- [ ] Enumerator.h::Enumerator.reset_all_changed
-- [ ] Enumerator.h::Enumerator.reset_pos
-- [ ] Enumerator.h::Enumerator.roll_back_current_pos
-- [ ] Enumerator.h::Enumerator.~Enumerator
-- [ ] Enumerator.h::add_bool_elem
-- [ ] Enumerator.h::bool_value
-- [ ] Enumerator.h::clear_value
-- [ ] Enumerator.h::get_current_value
-- [ ] Enumerator.h::good_value
-- [ ] Enumerator.h::is_changed
-- [ ] Enumerator.h::next
-- [ ] Enumerator.h::reset_after_backward_pos
-- [ ] Enumerator.h::reset_all_changed
-- [ ] Enumerator.h::reset_changed
-- [ ] Enumerator.h::reset_pos
-- [ ] Enumerator.h::roll_back_current_pos
+- [x] Enumerator.h::Enumerator.add_bool_elem
+- [x] Enumerator.h::Enumerator.add_bool_elem_of_bool
+- [x] Enumerator.h::Enumerator.add_elem
+- [x] Enumerator.h::Enumerator.begin
+- [x] Enumerator.h::Enumerator.end
+- [x] Enumerator.h::Enumerator.Enumerator
+- [x] Enumerator.h::Enumerator.EnumObject
+- [x] Enumerator.h::Enumerator.EnumObject.assert
+- [x] Enumerator.h::Enumerator.EnumObject.bool_value
+- [x] Enumerator.h::Enumerator.EnumObject.clear_value
+- [x] Enumerator.h::Enumerator.EnumObject.get_current_value
+- [x] Enumerator.h::Enumerator.EnumObject.good_value
+- [x] Enumerator.h::Enumerator.EnumObject.is_bool
+- [x] Enumerator.h::Enumerator.EnumObject.is_changed
+- [x] Enumerator.h::Enumerator.EnumObject.next
+- [x] Enumerator.h::Enumerator.EnumObject.reset_changed
+- [x] Enumerator.h::Enumerator.EnumObject.~EnumObject
+- [x] Enumerator.h::Enumerator.get_elem
+- [x] Enumerator.h::Enumerator.is_changed
+- [x] Enumerator.h::Enumerator.next
+- [x] Enumerator.h::Enumerator.reset_after_backward_pos
+- [x] Enumerator.h::Enumerator.reset_all_changed
+- [x] Enumerator.h::Enumerator.reset_pos
+- [x] Enumerator.h::Enumerator.roll_back_current_pos
+- [x] Enumerator.h::Enumerator.~Enumerator
+- [x] Enumerator.h::add_bool_elem
+- [x] Enumerator.h::bool_value
+- [x] Enumerator.h::clear_value
+- [x] Enumerator.h::get_current_value
+- [x] Enumerator.h::good_value
+- [x] Enumerator.h::is_changed
+- [x] Enumerator.h::next
+- [x] Enumerator.h::reset_after_backward_pos
+- [x] Enumerator.h::reset_all_changed
+- [x] Enumerator.h::reset_changed
+- [x] Enumerator.h::reset_pos
+- [x] Enumerator.h::roll_back_current_pos
 - [x] Error.cpp::Error.Error
 - [x] Error.cpp::Error.get_error
 - [x] Error.cpp::Error.operator=
@@ -913,8 +913,8 @@ Total items: 2070
 - [x] FactMgr.cpp::FactMgr.update_fact_for_return
 - [x] FactMgr.cpp::FactMgr.update_facts_for_dest
 - [x] FactMgr.cpp::FactMgr.update_facts_for_oos_vars
-- [ ] FactMgr.cpp::FactMgr.validate_assign
-- [ ] FactMgr.cpp::FactMgr.validate_fact
+- [x] FactMgr.cpp::FactMgr.validate_assign
+- [x] FactMgr.cpp::FactMgr.validate_fact
 - [x] FactMgr.cpp::FactMgr.~FactMgr
 - [x] FactPointTo.cpp::FactPointTo.abstract_fact_for_assign
 - [x] FactPointTo.cpp::FactPointTo.aggregate_all_pointto_sets
@@ -999,178 +999,178 @@ Total items: 2070
 - [x] Finalization.cpp::Finalization.doFinalization
 - [x] Finalization.cpp::Finalization.Finalization
 - [x] Finalization.cpp::Finalization.~Finalization
-- [ ] Function.cpp::BuildState.Building
-- [ ] Function.cpp::BuildState.Built
-- [ ] Function.cpp::BuildState.Unbuilt
-- [ ] Function.cpp::Function.BuildState
-- [ ] Function.cpp::Function.BuildState.Building
-- [ ] Function.cpp::Function.BuildState.Built
-- [ ] Function.cpp::Function.BuildState.Unbuilt
-- [ ] Function.cpp::Function.choose_func
-- [ ] Function.cpp::Function.compute_summary
-- [ ] Function.cpp::Function.doFinalization
-- [ ] Function.cpp::Function.empty
-- [ ] Function.cpp::Function.Function
-- [ ] Function.cpp::Function.generate_body_with_known_params
-- [ ] Function.cpp::Function.GenerateAttributes
-- [ ] Function.cpp::Function.GenerateBody
-- [ ] Function.cpp::Function.GenerateFunctions
-- [ ] Function.cpp::Function.get_feffect
-- [ ] Function.cpp::Function.get_one_function
-- [ ] Function.cpp::Function.get_referenced_ptrs
-- [ ] Function.cpp::Function.initialize_builtin_functions
-- [ ] Function.cpp::Function.InitializeAttributes
-- [ ] Function.cpp::Function.is_built
-- [ ] Function.cpp::Function.is_effect_known
-- [ ] Function.cpp::Function.is_var_on_stack
-- [ ] Function.cpp::Function.is_var_oos
-- [ ] Function.cpp::Function.is_var_visible
-- [ ] Function.cpp::Function.make_builtin_function
-- [ ] Function.cpp::Function.make_first
-- [ ] Function.cpp::Function.make_random
-- [ ] Function.cpp::Function.make_random_signature
-- [ ] Function.cpp::Function.make_return_const
-- [ ] Function.cpp::Function.need_return_stmt
-- [ ] Function.cpp::Function.Output
-- [ ] Function.cpp::Function.OutputFormalParamList
-- [ ] Function.cpp::Function.OutputForwardDecl
-- [ ] Function.cpp::Function.OutputForwardDeclAlias
-- [ ] Function.cpp::Function.OutputHeader
-- [ ] Function.cpp::Function.OutputHeaderAlias
-- [ ] Function.cpp::Function.reach_max_functions_cnt
-- [ ] Function.cpp::Function.remove_irrelevant_facts
-- [ ] Function.cpp::Function.~Function
-- [ ] Function.cpp::find_blk_for_var
-- [ ] Function.cpp::find_function_by_name
-- [ ] Function.cpp::find_function_in_set
-- [ ] Function.cpp::FuncListSize
-- [ ] Function.cpp::GenerateFunctions
-- [ ] Function.cpp::GenerateParameterList
-- [ ] Function.cpp::GenerateParameterListFromString
-- [ ] Function.cpp::get_all_functions
-- [ ] Function.cpp::get_fact_mgr
-- [ ] Function.cpp::get_fact_mgr_for_func
-- [ ] Function.cpp::GetFirstFunction
-- [ ] Function.cpp::OutputFormalParam
-- [ ] Function.cpp::OutputForwardDeclarations
-- [ ] Function.cpp::OutputFunctions
-- [ ] Function.cpp::ParamListProbability
-- [ ] Function.cpp::RandomFunctionName
-- [ ] FunctionInvocation.cpp::eBinaryOps
-- [ ] FunctionInvocation.cpp::eBinaryOps.eAdd
-- [ ] FunctionInvocation.cpp::eBinaryOps.eAnd
-- [ ] FunctionInvocation.cpp::eBinaryOps.eBitAnd
-- [ ] FunctionInvocation.cpp::eBinaryOps.eBitOr
-- [ ] FunctionInvocation.cpp::eBinaryOps.eBitXor
-- [ ] FunctionInvocation.cpp::eBinaryOps.eCmpEq
-- [ ] FunctionInvocation.cpp::eBinaryOps.eCmpGe
-- [ ] FunctionInvocation.cpp::eBinaryOps.eCmpGt
-- [ ] FunctionInvocation.cpp::eBinaryOps.eCmpLe
-- [ ] FunctionInvocation.cpp::eBinaryOps.eCmpLt
-- [ ] FunctionInvocation.cpp::eBinaryOps.eCmpNe
-- [ ] FunctionInvocation.cpp::eBinaryOps.eDiv
-- [ ] FunctionInvocation.cpp::eBinaryOps.eLShift
-- [ ] FunctionInvocation.cpp::eBinaryOps.eMod
-- [ ] FunctionInvocation.cpp::eBinaryOps.eMul
-- [ ] FunctionInvocation.cpp::eBinaryOps.eOr
-- [ ] FunctionInvocation.cpp::eBinaryOps.eRShift
-- [ ] FunctionInvocation.cpp::eBinaryOps.eSub
-- [ ] FunctionInvocation.cpp::eInvocationType
-- [ ] FunctionInvocation.cpp::eInvocationType.eBinaryPrim
-- [ ] FunctionInvocation.cpp::eInvocationType.eFuncCall
-- [ ] FunctionInvocation.cpp::eInvocationType.eUnaryPrim
-- [ ] FunctionInvocation.cpp::eUnaryOps
-- [ ] FunctionInvocation.cpp::eUnaryOps.eBitNot
-- [ ] FunctionInvocation.cpp::eUnaryOps.eMinus
-- [ ] FunctionInvocation.cpp::eUnaryOps.eNot
-- [ ] FunctionInvocation.cpp::eUnaryOps.ePlus
-- [ ] FunctionInvocation.cpp::eUnaryOps.ePostDec
-- [ ] FunctionInvocation.cpp::eUnaryOps.ePostInc
-- [ ] FunctionInvocation.cpp::eUnaryOps.ePreDec
-- [ ] FunctionInvocation.cpp::FunctionInvocation.add_operand
-- [ ] FunctionInvocation.cpp::FunctionInvocation.BinaryOpWorksForFloat
-- [ ] FunctionInvocation.cpp::FunctionInvocation.clone
-- [ ] FunctionInvocation.cpp::FunctionInvocation.compatible
-- [ ] FunctionInvocation.cpp::FunctionInvocation.equals
-- [ ] FunctionInvocation.cpp::FunctionInvocation.FunctionInvocation
-- [ ] FunctionInvocation.cpp::FunctionInvocation.get_called_funcs
-- [ ] FunctionInvocation.cpp::FunctionInvocation.get_qualifiers
-- [ ] FunctionInvocation.cpp::FunctionInvocation.get_type
-- [ ] FunctionInvocation.cpp::FunctionInvocation.has_simple_params
-- [ ] FunctionInvocation.cpp::FunctionInvocation.has_uncertain_call
-- [ ] FunctionInvocation.cpp::FunctionInvocation.has_uncertain_call_recursive
-- [ ] FunctionInvocation.cpp::FunctionInvocation.indented_output
-- [ ] FunctionInvocation.cpp::FunctionInvocation.is_0_or_1
-- [ ] FunctionInvocation.cpp::FunctionInvocation.IsOrderedStandardFunc
-- [ ] FunctionInvocation.cpp::FunctionInvocation.make_binary
-- [ ] FunctionInvocation.cpp::FunctionInvocation.make_random
-- [ ] FunctionInvocation.cpp::FunctionInvocation.make_random_binary
-- [ ] FunctionInvocation.cpp::FunctionInvocation.make_random_binary_ptr_comparison
-- [ ] FunctionInvocation.cpp::FunctionInvocation.make_random_unary
-- [ ] FunctionInvocation.cpp::FunctionInvocation.make_unary
-- [ ] FunctionInvocation.cpp::FunctionInvocation.operator=
-- [ ] FunctionInvocation.cpp::FunctionInvocation.Output
-- [ ] FunctionInvocation.cpp::FunctionInvocation.permute_param_oders
-- [ ] FunctionInvocation.cpp::FunctionInvocation.safe_invocation
-- [ ] FunctionInvocation.cpp::FunctionInvocation.UnaryOpWorksForFloat
-- [ ] FunctionInvocation.cpp::FunctionInvocation.visit_facts
-- [ ] FunctionInvocation.cpp::FunctionInvocation.visit_unordered_params
-- [ ] FunctionInvocation.cpp::FunctionInvocation.~FunctionInvocation
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.clone
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.compatible
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.CreateFunctionInvocationBinary
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.equals
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.FunctionInvocationBinary
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_binop_string
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_operation
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_tmp_var1
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_tmp_var2
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_type
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.indented_output
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.is_0_or_1
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.is_return_type_float
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.operator=
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.Output
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.safe_invocation
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.safe_ops
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.set_operation
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.visit_facts
-- [ ] FunctionInvocationBinary.cpp::FunctionInvocationBinary.~FunctionInvocationBinary
-- [ ] FunctionInvocationBinary.cpp::OutputStandardFuncName
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.clone
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.compatible
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.CreateFunctionInvocationUnary
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.equals
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.FunctionInvocationUnary
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.get_type
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.indented_output
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.is_0_or_1
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.operator=
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.Output
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.safe_invocation
-- [ ] FunctionInvocationUnary.cpp::FunctionInvocationUnary.~FunctionInvocationUnary
-- [ ] FunctionInvocationUnary.cpp::OutputStandardFuncName
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.build_invocation
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.build_invocation_and_function
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.clone
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.compatible
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.doFinalization
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.FunctionInvocationUser
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.get_func
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.get_type
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.indented_output
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.operator=
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.Output
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.revisit
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.safe_invocation
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.save_return_fact
-- [ ] FunctionInvocationUser.cpp::FunctionInvocationUser.~FunctionInvocationUser
-- [ ] FunctionInvocationUser.cpp::add_return_fact_for_invocation
-- [ ] FunctionInvocationUser.cpp::calls_to_funcs
-- [ ] FunctionInvocationUser.cpp::calls_to_funcs_recursive
-- [ ] FunctionInvocationUser.cpp::get_return_fact_for_invocation
-- [ ] FunctionInvocationUser.cpp::OutputActualParamExpression
-- [ ] FunctionInvocationUser.cpp::OutputExpressionVector
+- [x] Function.cpp::BuildState.Building
+- [x] Function.cpp::BuildState.Built
+- [x] Function.cpp::BuildState.Unbuilt
+- [x] Function.cpp::Function.BuildState
+- [x] Function.cpp::Function.BuildState.Building
+- [x] Function.cpp::Function.BuildState.Built
+- [x] Function.cpp::Function.BuildState.Unbuilt
+- [x] Function.cpp::Function.choose_func
+- [x] Function.cpp::Function.compute_summary
+- [x] Function.cpp::Function.doFinalization
+- [x] Function.cpp::Function.empty
+- [x] Function.cpp::Function.Function
+- [x] Function.cpp::Function.generate_body_with_known_params
+- [x] Function.cpp::Function.GenerateAttributes
+- [x] Function.cpp::Function.GenerateBody
+- [x] Function.cpp::Function.GenerateFunctions
+- [x] Function.cpp::Function.get_feffect
+- [x] Function.cpp::Function.get_one_function
+- [x] Function.cpp::Function.get_referenced_ptrs
+- [x] Function.cpp::Function.initialize_builtin_functions
+- [x] Function.cpp::Function.InitializeAttributes
+- [x] Function.cpp::Function.is_built
+- [x] Function.cpp::Function.is_effect_known
+- [x] Function.cpp::Function.is_var_on_stack
+- [x] Function.cpp::Function.is_var_oos
+- [x] Function.cpp::Function.is_var_visible
+- [x] Function.cpp::Function.make_builtin_function
+- [x] Function.cpp::Function.make_first
+- [x] Function.cpp::Function.make_random
+- [x] Function.cpp::Function.make_random_signature
+- [x] Function.cpp::Function.make_return_const
+- [x] Function.cpp::Function.need_return_stmt
+- [x] Function.cpp::Function.Output
+- [x] Function.cpp::Function.OutputFormalParamList
+- [x] Function.cpp::Function.OutputForwardDecl
+- [x] Function.cpp::Function.OutputForwardDeclAlias
+- [x] Function.cpp::Function.OutputHeader
+- [x] Function.cpp::Function.OutputHeaderAlias
+- [x] Function.cpp::Function.reach_max_functions_cnt
+- [x] Function.cpp::Function.remove_irrelevant_facts
+- [x] Function.cpp::Function.~Function
+- [x] Function.cpp::find_blk_for_var
+- [x] Function.cpp::find_function_by_name
+- [x] Function.cpp::find_function_in_set
+- [x] Function.cpp::FuncListSize
+- [x] Function.cpp::GenerateFunctions
+- [x] Function.cpp::GenerateParameterList
+- [x] Function.cpp::GenerateParameterListFromString
+- [x] Function.cpp::get_all_functions
+- [x] Function.cpp::get_fact_mgr
+- [x] Function.cpp::get_fact_mgr_for_func
+- [x] Function.cpp::GetFirstFunction
+- [x] Function.cpp::OutputFormalParam
+- [x] Function.cpp::OutputForwardDeclarations
+- [x] Function.cpp::OutputFunctions
+- [x] Function.cpp::ParamListProbability
+- [x] Function.cpp::RandomFunctionName
+- [x] FunctionInvocation.cpp::eBinaryOps
+- [x] FunctionInvocation.cpp::eBinaryOps.eAdd
+- [x] FunctionInvocation.cpp::eBinaryOps.eAnd
+- [x] FunctionInvocation.cpp::eBinaryOps.eBitAnd
+- [x] FunctionInvocation.cpp::eBinaryOps.eBitOr
+- [x] FunctionInvocation.cpp::eBinaryOps.eBitXor
+- [x] FunctionInvocation.cpp::eBinaryOps.eCmpEq
+- [x] FunctionInvocation.cpp::eBinaryOps.eCmpGe
+- [x] FunctionInvocation.cpp::eBinaryOps.eCmpGt
+- [x] FunctionInvocation.cpp::eBinaryOps.eCmpLe
+- [x] FunctionInvocation.cpp::eBinaryOps.eCmpLt
+- [x] FunctionInvocation.cpp::eBinaryOps.eCmpNe
+- [x] FunctionInvocation.cpp::eBinaryOps.eDiv
+- [x] FunctionInvocation.cpp::eBinaryOps.eLShift
+- [x] FunctionInvocation.cpp::eBinaryOps.eMod
+- [x] FunctionInvocation.cpp::eBinaryOps.eMul
+- [x] FunctionInvocation.cpp::eBinaryOps.eOr
+- [x] FunctionInvocation.cpp::eBinaryOps.eRShift
+- [x] FunctionInvocation.cpp::eBinaryOps.eSub
+- [x] FunctionInvocation.cpp::eInvocationType
+- [x] FunctionInvocation.cpp::eInvocationType.eBinaryPrim
+- [x] FunctionInvocation.cpp::eInvocationType.eFuncCall
+- [x] FunctionInvocation.cpp::eInvocationType.eUnaryPrim
+- [x] FunctionInvocation.cpp::eUnaryOps
+- [x] FunctionInvocation.cpp::eUnaryOps.eBitNot
+- [x] FunctionInvocation.cpp::eUnaryOps.eMinus
+- [x] FunctionInvocation.cpp::eUnaryOps.eNot
+- [x] FunctionInvocation.cpp::eUnaryOps.ePlus
+- [x] FunctionInvocation.cpp::eUnaryOps.ePostDec
+- [x] FunctionInvocation.cpp::eUnaryOps.ePostInc
+- [x] FunctionInvocation.cpp::eUnaryOps.ePreDec
+- [x] FunctionInvocation.cpp::FunctionInvocation.add_operand
+- [x] FunctionInvocation.cpp::FunctionInvocation.BinaryOpWorksForFloat
+- [x] FunctionInvocation.cpp::FunctionInvocation.clone
+- [x] FunctionInvocation.cpp::FunctionInvocation.compatible
+- [x] FunctionInvocation.cpp::FunctionInvocation.equals
+- [x] FunctionInvocation.cpp::FunctionInvocation.FunctionInvocation
+- [x] FunctionInvocation.cpp::FunctionInvocation.get_called_funcs
+- [x] FunctionInvocation.cpp::FunctionInvocation.get_qualifiers
+- [x] FunctionInvocation.cpp::FunctionInvocation.get_type
+- [x] FunctionInvocation.cpp::FunctionInvocation.has_simple_params
+- [x] FunctionInvocation.cpp::FunctionInvocation.has_uncertain_call
+- [x] FunctionInvocation.cpp::FunctionInvocation.has_uncertain_call_recursive
+- [x] FunctionInvocation.cpp::FunctionInvocation.indented_output
+- [x] FunctionInvocation.cpp::FunctionInvocation.is_0_or_1
+- [x] FunctionInvocation.cpp::FunctionInvocation.IsOrderedStandardFunc
+- [x] FunctionInvocation.cpp::FunctionInvocation.make_binary
+- [x] FunctionInvocation.cpp::FunctionInvocation.make_random
+- [x] FunctionInvocation.cpp::FunctionInvocation.make_random_binary
+- [x] FunctionInvocation.cpp::FunctionInvocation.make_random_binary_ptr_comparison
+- [x] FunctionInvocation.cpp::FunctionInvocation.make_random_unary
+- [x] FunctionInvocation.cpp::FunctionInvocation.make_unary
+- [x] FunctionInvocation.cpp::FunctionInvocation.operator=
+- [x] FunctionInvocation.cpp::FunctionInvocation.Output
+- [x] FunctionInvocation.cpp::FunctionInvocation.permute_param_oders
+- [x] FunctionInvocation.cpp::FunctionInvocation.safe_invocation
+- [x] FunctionInvocation.cpp::FunctionInvocation.UnaryOpWorksForFloat
+- [x] FunctionInvocation.cpp::FunctionInvocation.visit_facts
+- [x] FunctionInvocation.cpp::FunctionInvocation.visit_unordered_params
+- [x] FunctionInvocation.cpp::FunctionInvocation.~FunctionInvocation
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.clone
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.compatible
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.CreateFunctionInvocationBinary
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.equals
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.FunctionInvocationBinary
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_binop_string
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_operation
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_tmp_var1
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_tmp_var2
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.get_type
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.indented_output
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.is_0_or_1
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.is_return_type_float
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.operator=
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.Output
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.safe_invocation
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.safe_ops
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.set_operation
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.visit_facts
+- [x] FunctionInvocationBinary.cpp::FunctionInvocationBinary.~FunctionInvocationBinary
+- [x] FunctionInvocationBinary.cpp::OutputStandardFuncName
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.clone
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.compatible
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.CreateFunctionInvocationUnary
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.equals
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.FunctionInvocationUnary
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.get_type
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.indented_output
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.is_0_or_1
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.operator=
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.Output
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.safe_invocation
+- [x] FunctionInvocationUnary.cpp::FunctionInvocationUnary.~FunctionInvocationUnary
+- [x] FunctionInvocationUnary.cpp::OutputStandardFuncName
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.build_invocation
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.build_invocation_and_function
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.clone
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.compatible
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.doFinalization
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.FunctionInvocationUser
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.get_func
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.get_type
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.indented_output
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.operator=
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.Output
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.revisit
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.safe_invocation
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.save_return_fact
+- [x] FunctionInvocationUser.cpp::FunctionInvocationUser.~FunctionInvocationUser
+- [x] FunctionInvocationUser.cpp::add_return_fact_for_invocation
+- [x] FunctionInvocationUser.cpp::calls_to_funcs
+- [x] FunctionInvocationUser.cpp::calls_to_funcs_recursive
+- [x] FunctionInvocationUser.cpp::get_return_fact_for_invocation
+- [x] FunctionInvocationUser.cpp::OutputActualParamExpression
+- [x] FunctionInvocationUser.cpp::OutputExpressionVector
 - [ ] KleeExtension.cpp::KleeExtension.GenerateValues
 - [ ] KleeExtension.cpp::KleeExtension.get_values
 - [ ] KleeExtension.cpp::KleeExtension.KleeExtension
@@ -1250,234 +1250,234 @@ Total items: 2070
 - [x] platform.cpp::read_time
 - [ ] Probabilities.cpp::GroupProbElem.dump_default
 - [ ] Probabilities.cpp::GroupProbElem.dump_val
-- [ ] Probabilities.cpp::GroupProbElem.elem_exist
-- [ ] Probabilities.cpp::GroupProbElem.get_all_values
-- [ ] Probabilities.cpp::GroupProbElem.get_prob
-- [ ] Probabilities.cpp::GroupProbElem.get_random_single_prob
-- [ ] Probabilities.cpp::GroupProbElem.GroupProbElem
-- [ ] Probabilities.cpp::GroupProbElem.initialize
-- [ ] Probabilities.cpp::GroupProbElem.is_equal
-- [ ] Probabilities.cpp::GroupProbElem.set_prob
-- [ ] Probabilities.cpp::GroupProbElem.set_prob_table
-- [ ] Probabilities.cpp::GroupProbElem.~GroupProbElem
+- [x] Probabilities.cpp::GroupProbElem.elem_exist
+- [x] Probabilities.cpp::GroupProbElem.get_all_values
+- [x] Probabilities.cpp::GroupProbElem.get_prob
+- [x] Probabilities.cpp::GroupProbElem.get_random_single_prob
+- [x] Probabilities.cpp::GroupProbElem.GroupProbElem
+- [x] Probabilities.cpp::GroupProbElem.initialize
+- [x] Probabilities.cpp::GroupProbElem.is_equal
+- [x] Probabilities.cpp::GroupProbElem.set_prob
+- [x] Probabilities.cpp::GroupProbElem.set_prob_table
+- [x] Probabilities.cpp::GroupProbElem.~GroupProbElem
 - [x] Probabilities.cpp::Probabilities.check_extra_filter
 - [x] Probabilities.cpp::Probabilities.clear_filter
 - [ ] Probabilities.cpp::Probabilities.DestroyInstance
 - [ ] Probabilities.cpp::Probabilities.dump_actual_probabilities
 - [ ] Probabilities.cpp::Probabilities.dump_default_probabilities
 - [x] Probabilities.cpp::Probabilities.get_binary_ops_prob_filter
-- [ ] Probabilities.cpp::Probabilities.get_pname
+- [x] Probabilities.cpp::Probabilities.get_pname
 - [x] Probabilities.cpp::Probabilities.get_prob
 - [x] Probabilities.cpp::Probabilities.get_prob_filter
-- [ ] Probabilities.cpp::Probabilities.get_random_single_prob
-- [ ] Probabilities.cpp::Probabilities.get_sname
+- [x] Probabilities.cpp::Probabilities.get_random_single_prob
+- [x] Probabilities.cpp::Probabilities.get_sname
 - [x] Probabilities.cpp::Probabilities.GetInstance
 - [x] Probabilities.cpp::Probabilities.initialize
-- [ ] Probabilities.cpp::Probabilities.initialize_group_probs
+- [x] Probabilities.cpp::Probabilities.initialize_group_probs
 - [x] Probabilities.cpp::Probabilities.initialize_single_probs
 - [ ] Probabilities.cpp::Probabilities.parse_configuration
 - [ ] Probabilities.cpp::Probabilities.parse_group_probabilities
 - [ ] Probabilities.cpp::Probabilities.parse_line
 - [ ] Probabilities.cpp::Probabilities.parse_single_elem
 - [ ] Probabilities.cpp::Probabilities.parse_single_probability
-- [ ] Probabilities.cpp::Probabilities.pname_to_type
-- [ ] Probabilities.cpp::Probabilities.Probabilities
+- [x] Probabilities.cpp::Probabilities.pname_to_type
+- [x] Probabilities.cpp::Probabilities.Probabilities
 - [x] Probabilities.cpp::Probabilities.register_extra_filter
 - [x] Probabilities.cpp::Probabilities.set_default_binary_ops_prob
 - [x] Probabilities.cpp::Probabilities.set_default_safe_ops_size_prob
 - [x] Probabilities.cpp::Probabilities.set_default_simple_types_prob
 - [x] Probabilities.cpp::Probabilities.set_default_statement_prob
 - [x] Probabilities.cpp::Probabilities.set_default_unary_ops_prob
-- [ ] Probabilities.cpp::Probabilities.set_group_prob
+- [x] Probabilities.cpp::Probabilities.set_group_prob
 - [x] Probabilities.cpp::Probabilities.set_prob_filter
-- [ ] Probabilities.cpp::Probabilities.set_prob_table
-- [ ] Probabilities.cpp::Probabilities.set_single_name
-- [ ] Probabilities.cpp::Probabilities.set_single_name_maps
-- [ ] Probabilities.cpp::Probabilities.setup_group_probabilities
+- [x] Probabilities.cpp::Probabilities.set_prob_table
+- [x] Probabilities.cpp::Probabilities.set_single_name
+- [x] Probabilities.cpp::Probabilities.set_single_name_maps
+- [x] Probabilities.cpp::Probabilities.setup_group_probabilities
 - [x] Probabilities.cpp::Probabilities.unregister_extra_filter
-- [ ] Probabilities.cpp::Probabilities.~Probabilities
+- [x] Probabilities.cpp::Probabilities.~Probabilities
 - [x] Probabilities.cpp::ProbabilityFilter.filter
 - [x] Probabilities.cpp::ProbabilityFilter.ProbabilityFilter
 - [x] Probabilities.cpp::ProbabilityFilter.~ProbabilityFilter
 - [ ] Probabilities.cpp::ProbElem.dump_default
 - [ ] Probabilities.cpp::ProbElem.dump_val
-- [ ] Probabilities.cpp::ProbElem.get_prob
-- [ ] Probabilities.cpp::ProbElem.is_equal
-- [ ] Probabilities.cpp::ProbElem.ProbElem
-- [ ] Probabilities.cpp::ProbElem.set_prob
-- [ ] Probabilities.cpp::ProbElem.set_prob_table
-- [ ] Probabilities.cpp::ProbElem.~ProbElem
+- [x] Probabilities.cpp::ProbElem.get_prob
+- [x] Probabilities.cpp::ProbElem.is_equal
+- [x] Probabilities.cpp::ProbElem.ProbElem
+- [x] Probabilities.cpp::ProbElem.set_prob
+- [x] Probabilities.cpp::ProbElem.set_prob_table
+- [x] Probabilities.cpp::ProbElem.~ProbElem
 - [x] Probabilities.cpp::ProbName.pAccessOnceVariableProb
-- [ ] Probabilities.cpp::ProbName.pAddAssignProb
-- [ ] Probabilities.cpp::ProbName.pAddProb
-- [ ] Probabilities.cpp::ProbName.pAndProb
+- [x] Probabilities.cpp::ProbName.pAddAssignProb
+- [x] Probabilities.cpp::ProbName.pAddProb
+- [x] Probabilities.cpp::ProbName.pAndProb
 - [x] Probabilities.cpp::ProbName.pArrayOOBProb
-- [ ] Probabilities.cpp::ProbName.pArrayOpProb
+- [x] Probabilities.cpp::ProbName.pArrayOpProb
 - [x] Probabilities.cpp::ProbName.pAssignOpsProb
-- [ ] Probabilities.cpp::ProbName.pAssignProb
+- [x] Probabilities.cpp::ProbName.pAssignProb
 - [x] Probabilities.cpp::ProbName.pBinaryConstProb
 - [x] Probabilities.cpp::ProbName.pBinaryOpsProb
-- [ ] Probabilities.cpp::ProbName.pBitAndAssignProb
-- [ ] Probabilities.cpp::ProbName.pBitAndProb
+- [x] Probabilities.cpp::ProbName.pBitAndAssignProb
+- [x] Probabilities.cpp::ProbName.pBitAndProb
 - [x] Probabilities.cpp::ProbName.pBitFieldInNormalStructProb
 - [x] Probabilities.cpp::ProbName.pBitFieldsCreationProb
 - [x] Probabilities.cpp::ProbName.pBitFieldsSignedProb
-- [ ] Probabilities.cpp::ProbName.pBitNotProb
-- [ ] Probabilities.cpp::ProbName.pBitOrAssignProb
-- [ ] Probabilities.cpp::ProbName.pBitOrProb
-- [ ] Probabilities.cpp::ProbName.pBitXorAssignProb
-- [ ] Probabilities.cpp::ProbName.pBitXorProb
-- [ ] Probabilities.cpp::ProbName.pBlockProb
-- [ ] Probabilities.cpp::ProbName.pBreakProb
+- [x] Probabilities.cpp::ProbName.pBitNotProb
+- [x] Probabilities.cpp::ProbName.pBitOrAssignProb
+- [x] Probabilities.cpp::ProbName.pBitOrProb
+- [x] Probabilities.cpp::ProbName.pBitXorAssignProb
+- [x] Probabilities.cpp::ProbName.pBitXorProb
+- [x] Probabilities.cpp::ProbName.pBlockProb
+- [x] Probabilities.cpp::ProbName.pBreakProb
 - [x] Probabilities.cpp::ProbName.pBuiltinFunctionProb
-- [ ] Probabilities.cpp::ProbName.pCharProb
-- [ ] Probabilities.cpp::ProbName.pCmpEqProb
-- [ ] Probabilities.cpp::ProbName.pCmpGeProb
-- [ ] Probabilities.cpp::ProbName.pCmpGtProb
-- [ ] Probabilities.cpp::ProbName.pCmpLeProb
-- [ ] Probabilities.cpp::ProbName.pCmpLtProb
-- [ ] Probabilities.cpp::ProbName.pCmpNeProb
-- [ ] Probabilities.cpp::ProbName.pContinueProb
-- [ ] Probabilities.cpp::ProbName.pDivAssignProb
-- [ ] Probabilities.cpp::ProbName.pDivProb
+- [x] Probabilities.cpp::ProbName.pCharProb
+- [x] Probabilities.cpp::ProbName.pCmpEqProb
+- [x] Probabilities.cpp::ProbName.pCmpGeProb
+- [x] Probabilities.cpp::ProbName.pCmpGtProb
+- [x] Probabilities.cpp::ProbName.pCmpLeProb
+- [x] Probabilities.cpp::ProbName.pCmpLtProb
+- [x] Probabilities.cpp::ProbName.pCmpNeProb
+- [x] Probabilities.cpp::ProbName.pContinueProb
+- [x] Probabilities.cpp::ProbName.pDivAssignProb
+- [x] Probabilities.cpp::ProbName.pDivProb
 - [x] Probabilities.cpp::ProbName.pExhaustiveBitFieldsProb
 - [x] Probabilities.cpp::ProbName.pFieldConstProb
 - [x] Probabilities.cpp::ProbName.pFieldVolatileProb
 - [x] Probabilities.cpp::ProbName.pFloatAsLTypeProb
-- [ ] Probabilities.cpp::ProbName.pFloatProb
-- [ ] Probabilities.cpp::ProbName.pForProb
+- [x] Probabilities.cpp::ProbName.pFloatProb
+- [x] Probabilities.cpp::ProbName.pForProb
 - [x] Probabilities.cpp::ProbName.pFuncAttrProb
-- [ ] Probabilities.cpp::ProbName.pGotoProb
-- [ ] Probabilities.cpp::ProbName.pIfElseProb
+- [x] Probabilities.cpp::ProbName.pGotoProb
+- [x] Probabilities.cpp::ProbName.pIfElseProb
 - [x] Probabilities.cpp::ProbName.pInlineFunctionProb
-- [ ] Probabilities.cpp::ProbName.pInt128Prob
-- [ ] Probabilities.cpp::ProbName.pInt16Prob
-- [ ] Probabilities.cpp::ProbName.pInt32Prob
-- [ ] Probabilities.cpp::ProbName.pInt64Prob
-- [ ] Probabilities.cpp::ProbName.pInt8Prob
-- [ ] Probabilities.cpp::ProbName.pIntProb
-- [ ] Probabilities.cpp::ProbName.pInvokeProb
+- [x] Probabilities.cpp::ProbName.pInt128Prob
+- [x] Probabilities.cpp::ProbName.pInt16Prob
+- [x] Probabilities.cpp::ProbName.pInt32Prob
+- [x] Probabilities.cpp::ProbName.pInt64Prob
+- [x] Probabilities.cpp::ProbName.pInt8Prob
+- [x] Probabilities.cpp::ProbName.pIntProb
+- [x] Probabilities.cpp::ProbName.pInvokeProb
 - [x] Probabilities.cpp::ProbName.pLabelAttrProb
-- [ ] Probabilities.cpp::ProbName.pLongLongProb
-- [ ] Probabilities.cpp::ProbName.pLongProb
+- [x] Probabilities.cpp::ProbName.pLongLongProb
+- [x] Probabilities.cpp::ProbName.pLongProb
 - [x] Probabilities.cpp::ProbName.pLooserConstProb
-- [ ] Probabilities.cpp::ProbName.pLShiftAssignProb
-- [ ] Probabilities.cpp::ProbName.pLShiftProb
-- [ ] Probabilities.cpp::ProbName.pMinusProb
-- [ ] Probabilities.cpp::ProbName.pModProb
+- [x] Probabilities.cpp::ProbName.pLShiftAssignProb
+- [x] Probabilities.cpp::ProbName.pLShiftProb
+- [x] Probabilities.cpp::ProbName.pMinusProb
+- [x] Probabilities.cpp::ProbName.pModProb
 - [x] Probabilities.cpp::ProbName.pMoreStructUnionProb
-- [ ] Probabilities.cpp::ProbName.pMulAssignProb
-- [ ] Probabilities.cpp::ProbName.pMulProb
+- [x] Probabilities.cpp::ProbName.pMulAssignProb
+- [x] Probabilities.cpp::ProbName.pMulProb
 - [x] Probabilities.cpp::ProbName.pNewArrayVariableProb
-- [ ] Probabilities.cpp::ProbName.pNotProb
-- [ ] Probabilities.cpp::ProbName.pOrProb
-- [ ] Probabilities.cpp::ProbName.pPlusProb
+- [x] Probabilities.cpp::ProbName.pNotProb
+- [x] Probabilities.cpp::ProbName.pOrProb
+- [x] Probabilities.cpp::ProbName.pPlusProb
 - [x] Probabilities.cpp::ProbName.pPointerAsLTypeProb
-- [ ] Probabilities.cpp::ProbName.pPostDecrProb
-- [ ] Probabilities.cpp::ProbName.pPostIncrProb
-- [ ] Probabilities.cpp::ProbName.pPreDecrProb
-- [ ] Probabilities.cpp::ProbName.pPreIncrProb
+- [x] Probabilities.cpp::ProbName.pPostDecrProb
+- [x] Probabilities.cpp::ProbName.pPostIncrProb
+- [x] Probabilities.cpp::ProbName.pPreDecrProb
+- [x] Probabilities.cpp::ProbName.pPreIncrProb
 - [x] Probabilities.cpp::ProbName.pRegularConstProb
 - [x] Probabilities.cpp::ProbName.pRegularVolatileProb
-- [ ] Probabilities.cpp::ProbName.pRemAssignProb
-- [ ] Probabilities.cpp::ProbName.pReturnProb
-- [ ] Probabilities.cpp::ProbName.pRShiftAssignProb
-- [ ] Probabilities.cpp::ProbName.pRShiftProb
+- [x] Probabilities.cpp::ProbName.pRemAssignProb
+- [x] Probabilities.cpp::ProbName.pReturnProb
+- [x] Probabilities.cpp::ProbName.pRShiftAssignProb
+- [x] Probabilities.cpp::ProbName.pRShiftProb
 - [x] Probabilities.cpp::ProbName.pSafeOpsSignedProb
 - [x] Probabilities.cpp::ProbName.pSafeOpsSizeProb
 - [x] Probabilities.cpp::ProbName.pScalarFieldInFullBitFieldsProb
 - [x] Probabilities.cpp::ProbName.pSelectDerefPointerProb
 - [x] Probabilities.cpp::ProbName.pShiftByNonConstantProb
-- [ ] Probabilities.cpp::ProbName.pShortProb
-- [ ] Probabilities.cpp::ProbName.pSimpleAssignProb
+- [x] Probabilities.cpp::ProbName.pShortProb
+- [x] Probabilities.cpp::ProbName.pSimpleAssignProb
 - [x] Probabilities.cpp::ProbName.pSimpleTypesProb
 - [x] Probabilities.cpp::ProbName.pStatementProb
 - [x] Probabilities.cpp::ProbName.pStdUnaryFuncProb
 - [x] Probabilities.cpp::ProbName.pStricterConstProb
 - [x] Probabilities.cpp::ProbName.pStructAsLTypeProb
-- [ ] Probabilities.cpp::ProbName.pSubAssignProb
-- [ ] Probabilities.cpp::ProbName.pSubProb
+- [x] Probabilities.cpp::ProbName.pSubAssignProb
+- [x] Probabilities.cpp::ProbName.pSubProb
 - [x] Probabilities.cpp::ProbName.pTypeAttrProb
-- [ ] Probabilities.cpp::ProbName.pUCharProb
-- [ ] Probabilities.cpp::ProbName.pUInt128Prob
-- [ ] Probabilities.cpp::ProbName.pUIntProb
-- [ ] Probabilities.cpp::ProbName.pULongLongProb
-- [ ] Probabilities.cpp::ProbName.pULongProb
+- [x] Probabilities.cpp::ProbName.pUCharProb
+- [x] Probabilities.cpp::ProbName.pUInt128Prob
+- [x] Probabilities.cpp::ProbName.pUIntProb
+- [x] Probabilities.cpp::ProbName.pULongLongProb
+- [x] Probabilities.cpp::ProbName.pULongProb
 - [x] Probabilities.cpp::ProbName.pUnaryOpsProb
 - [x] Probabilities.cpp::ProbName.pUnionAsLTypeProb
-- [ ] Probabilities.cpp::ProbName.pUShortProb
+- [x] Probabilities.cpp::ProbName.pUShortProb
 - [x] Probabilities.cpp::ProbName.pVarAttrProb
-- [ ] Probabilities.cpp::ProbName.pVoidProb
+- [x] Probabilities.cpp::ProbName.pVoidProb
 - [ ] Probabilities.cpp::SingleProbElem.dump_default
 - [ ] Probabilities.cpp::SingleProbElem.dump_val
-- [ ] Probabilities.cpp::SingleProbElem.get_all_values
+- [x] Probabilities.cpp::SingleProbElem.get_all_values
 - [x] Probabilities.cpp::SingleProbElem.get_prob
 - [x] Probabilities.cpp::SingleProbElem.get_prob_direct
-- [ ] Probabilities.cpp::SingleProbElem.is_equal
-- [ ] Probabilities.cpp::SingleProbElem.set_prob
-- [ ] Probabilities.cpp::SingleProbElem.set_prob_table
-- [ ] Probabilities.cpp::SingleProbElem.SingleProbElem
-- [ ] Probabilities.cpp::SingleProbElem.~SingleProbElem
-- [ ] Probabilities.cpp::AccessOnceVariableProb
-- [ ] Probabilities.cpp::BINARY_OPS_PROB_FILTER
-- [ ] Probabilities.cpp::BinaryConstProb
-- [ ] Probabilities.cpp::BitFieldInNormalStructProb
-- [ ] Probabilities.cpp::BitFieldsCreationProb
-- [ ] Probabilities.cpp::BitFieldsSignedProb
-- [ ] Probabilities.cpp::BuiltinFunctionProb
-- [ ] Probabilities.cpp::ExhaustiveBitFieldsProb
-- [ ] Probabilities.cpp::FieldConstProb
-- [ ] Probabilities.cpp::FieldVolatileProb
-- [ ] Probabilities.cpp::FloatAsLTypeProb
-- [ ] Probabilities.cpp::FuncAttrProb
-- [ ] Probabilities.cpp::get_prob
-- [ ] Probabilities.cpp::get_prob_filter
-- [ ] Probabilities.cpp::InlineFunctionProb
-- [ ] Probabilities.cpp::Int128Prob
-- [ ] Probabilities.cpp::LabelAttrProb
-- [ ] Probabilities.cpp::LooserConstProb
-- [ ] Probabilities.cpp::MoreStructUnionTypeProb
-- [ ] Probabilities.cpp::NewArrayVariableProb
-- [ ] Probabilities.cpp::PointerAsLTypeProb
-- [ ] Probabilities.cpp::RegularConstProb
-- [ ] Probabilities.cpp::RegularVolatileProb
-- [ ] Probabilities.cpp::SAFE_OPS_SIZE_PROB_FILTER
-- [ ] Probabilities.cpp::SafeOpsSignedProb
-- [ ] Probabilities.cpp::ScalarFieldInFullBitFieldsProb
-- [ ] Probabilities.cpp::SelectDerefPointerProb
-- [ ] Probabilities.cpp::ShiftByNonConstantProb
-- [ ] Probabilities.cpp::SIMPLE_TYPES_PROB_FILTER
-- [ ] Probabilities.cpp::single_elem_less
-- [ ] Probabilities.cpp::StdUnaryFuncProb
-- [ ] Probabilities.cpp::StricterConstProb
-- [ ] Probabilities.cpp::StructAsLTypeProb
-- [ ] Probabilities.cpp::TypeAttrProb
-- [ ] Probabilities.cpp::UInt128Prob
-- [ ] Probabilities.cpp::UNARY_OPS_PROB_FILTER
-- [ ] Probabilities.cpp::UnionAsLTypeProb
-- [ ] Probabilities.cpp::VarAttrProb
+- [x] Probabilities.cpp::SingleProbElem.is_equal
+- [x] Probabilities.cpp::SingleProbElem.set_prob
+- [x] Probabilities.cpp::SingleProbElem.set_prob_table
+- [x] Probabilities.cpp::SingleProbElem.SingleProbElem
+- [x] Probabilities.cpp::SingleProbElem.~SingleProbElem
+- [x] Probabilities.cpp::AccessOnceVariableProb
+- [x] Probabilities.cpp::BINARY_OPS_PROB_FILTER
+- [x] Probabilities.cpp::BinaryConstProb
+- [x] Probabilities.cpp::BitFieldInNormalStructProb
+- [x] Probabilities.cpp::BitFieldsCreationProb
+- [x] Probabilities.cpp::BitFieldsSignedProb
+- [x] Probabilities.cpp::BuiltinFunctionProb
+- [x] Probabilities.cpp::ExhaustiveBitFieldsProb
+- [x] Probabilities.cpp::FieldConstProb
+- [x] Probabilities.cpp::FieldVolatileProb
+- [x] Probabilities.cpp::FloatAsLTypeProb
+- [x] Probabilities.cpp::FuncAttrProb
+- [x] Probabilities.cpp::get_prob
+- [x] Probabilities.cpp::get_prob_filter
+- [x] Probabilities.cpp::InlineFunctionProb
+- [x] Probabilities.cpp::Int128Prob
+- [x] Probabilities.cpp::LabelAttrProb
+- [x] Probabilities.cpp::LooserConstProb
+- [x] Probabilities.cpp::MoreStructUnionTypeProb
+- [x] Probabilities.cpp::NewArrayVariableProb
+- [x] Probabilities.cpp::PointerAsLTypeProb
+- [x] Probabilities.cpp::RegularConstProb
+- [x] Probabilities.cpp::RegularVolatileProb
+- [x] Probabilities.cpp::SAFE_OPS_SIZE_PROB_FILTER
+- [x] Probabilities.cpp::SafeOpsSignedProb
+- [x] Probabilities.cpp::ScalarFieldInFullBitFieldsProb
+- [x] Probabilities.cpp::SelectDerefPointerProb
+- [x] Probabilities.cpp::ShiftByNonConstantProb
+- [x] Probabilities.cpp::SIMPLE_TYPES_PROB_FILTER
+- [x] Probabilities.cpp::single_elem_less
+- [x] Probabilities.cpp::StdUnaryFuncProb
+- [x] Probabilities.cpp::StricterConstProb
+- [x] Probabilities.cpp::StructAsLTypeProb
+- [x] Probabilities.cpp::TypeAttrProb
+- [x] Probabilities.cpp::UInt128Prob
+- [x] Probabilities.cpp::UNARY_OPS_PROB_FILTER
+- [x] Probabilities.cpp::UnionAsLTypeProb
+- [x] Probabilities.cpp::VarAttrProb
 - [x] ProbabilityTable.h::DistributionTable.add_entry
 - [x] ProbabilityTable.h::DistributionTable.DistributionTable
 - [x] ProbabilityTable.h::DistributionTable.get_max
 - [x] ProbabilityTable.h::DistributionTable.key_to_prob
 - [x] ProbabilityTable.h::DistributionTable.rnd_num_to_key
 - [x] ProbabilityTable.h::DistributionTable.~DistributionTable
-- [ ] ProbabilityTable.h::ProbabilityTable.add_elem
-- [ ] ProbabilityTable.h::ProbabilityTable.get_value
-- [ ] ProbabilityTable.h::ProbabilityTable.initialize
-- [ ] ProbabilityTable.h::ProbabilityTable.ProbabilityTable
-- [ ] ProbabilityTable.h::ProbabilityTable.sorted_insert
-- [ ] ProbabilityTable.h::ProbabilityTable.~ProbabilityTable
-- [ ] ProbabilityTable.h::TableEntry.get_key
-- [ ] ProbabilityTable.h::TableEntry.get_value
-- [ ] ProbabilityTable.h::TableEntry.TableEntry
-- [ ] ProbabilityTable.h::Entry
-- [ ] ProbabilityTable.h::get_key
-- [ ] ProbabilityTable.h::get_value
-- [ ] ProbabilityTable.h::GetInstance
-- [ ] ProbabilityTable.h::insert
-- [ ] ProbabilityTable.h::set_prob_table
-- [ ] ProbabilityTable.h::sorted_insert
+- [x] ProbabilityTable.h::ProbabilityTable.add_elem
+- [x] ProbabilityTable.h::ProbabilityTable.get_value
+- [x] ProbabilityTable.h::ProbabilityTable.initialize
+- [x] ProbabilityTable.h::ProbabilityTable.ProbabilityTable
+- [x] ProbabilityTable.h::ProbabilityTable.sorted_insert
+- [x] ProbabilityTable.h::ProbabilityTable.~ProbabilityTable
+- [x] ProbabilityTable.h::TableEntry.get_key
+- [x] ProbabilityTable.h::TableEntry.get_value
+- [x] ProbabilityTable.h::TableEntry.TableEntry
+- [x] ProbabilityTable.h::Entry
+- [x] ProbabilityTable.h::get_key
+- [x] ProbabilityTable.h::get_value
+- [x] ProbabilityTable.h::GetInstance
+- [x] ProbabilityTable.h::insert
+- [x] ProbabilityTable.h::set_prob_table
+- [x] ProbabilityTable.h::sorted_insert
 - [x] random.cpp::get_prefixed_name
 - [x] random.cpp::get_sequence
 - [x] random.cpp::pure_rnd_flipcoin
@@ -1495,8 +1495,8 @@ Total items: 2070
 - [x] RandomNumber.cpp::RandomNumber.get_sequence
 - [x] RandomNumber.cpp::RandomNumber.GetInstance
 - [x] RandomNumber.cpp::RandomNumber.GetRndNumGenerator
-- [ ] RandomNumber.cpp::RandomNumber.make_all_rndnum_generators
-- [ ] RandomNumber.cpp::RandomNumber.operator=
+- [x] RandomNumber.cpp::RandomNumber.make_all_rndnum_generators
+- [x] RandomNumber.cpp::RandomNumber.operator=
 - [x] RandomNumber.cpp::RandomNumber.RandomDigits
 - [x] RandomNumber.cpp::RandomNumber.RandomHexDigits
 - [x] RandomNumber.cpp::RandomNumber.RandomNumber
@@ -1542,29 +1542,29 @@ Total items: 2070
 - [x] SafeOpFlags.cpp::SafeOpSize.sInt32
 - [x] SafeOpFlags.cpp::SafeOpSize.sInt64
 - [x] SafeOpFlags.cpp::SafeOpSize.sInt8
-- [ ] Sequence.cpp::Sequence.add_number
-- [ ] Sequence.cpp::Sequence.clear
-- [ ] Sequence.cpp::Sequence.get_number
-- [ ] Sequence.cpp::Sequence.get_number_by_pos
-- [ ] Sequence.cpp::Sequence.get_sep_char
-- [ ] Sequence.cpp::Sequence.get_sequence
-- [ ] Sequence.cpp::Sequence.init_sequence
-- [ ] Sequence.cpp::Sequence.make_sequence
-- [ ] Sequence.cpp::Sequence.Sequence
-- [ ] Sequence.cpp::Sequence.sequence_length
-- [ ] Sequence.cpp::Sequence.~Sequence
+- [x] Sequence.cpp::Sequence.add_number
+- [x] Sequence.cpp::Sequence.clear
+- [x] Sequence.cpp::Sequence.get_number
+- [x] Sequence.cpp::Sequence.get_number_by_pos
+- [x] Sequence.cpp::Sequence.get_sep_char
+- [x] Sequence.cpp::Sequence.get_sequence
+- [x] Sequence.cpp::Sequence.init_sequence
+- [x] Sequence.cpp::Sequence.make_sequence
+- [x] Sequence.cpp::Sequence.Sequence
+- [x] Sequence.cpp::Sequence.sequence_length
+- [x] Sequence.cpp::Sequence.~Sequence
 - [x] SequenceFactory.cpp::SequenceFactory.current_sep_char
 - [x] SequenceFactory.cpp::SequenceFactory.destroy_sequences
 - [x] SequenceFactory.cpp::SequenceFactory.make_sequence
 - [x] SequenceLineParser.h::SequenceLineParser.parse_sequence
-- [ ] SequenceLineParser.h::SequenceLineParser.SequenceLineParser
+- [x] SequenceLineParser.h::SequenceLineParser.SequenceLineParser
 - [x] SequenceLineParser.h::SequenceLineParser.str2int
-- [ ] SequenceLineParser.h::SequenceLineParser.~SequenceLineParser
-- [ ] SequenceLineParser.h::find_first_of
-- [ ] SequenceLineParser.h::parse_sequence
-- [ ] SequenceLineParser.h::ss
-- [ ] SequenceLineParser.h::str2int
-- [ ] SequenceLineParser.h::substr
+- [x] SequenceLineParser.h::SequenceLineParser.~SequenceLineParser
+- [x] SequenceLineParser.h::find_first_of
+- [x] SequenceLineParser.h::parse_sequence
+- [x] SequenceLineParser.h::ss
+- [x] SequenceLineParser.h::str2int
+- [x] SequenceLineParser.h::substr
 - [x] Statement.cpp::eStatementType
 - [x] Statement.cpp::eStatementType.eArrayOp
 - [x] Statement.cpp::eStatementType.eAssign
@@ -1784,289 +1784,289 @@ Total items: 2070
 - [x] StringUtils.cpp::StringUtils.str2longlong
 - [x] StringUtils.cpp::StringUtils.StringUtils
 - [x] StringUtils.cpp::StringUtils.~StringUtils
-- [ ] Type.cpp::ChooseRandomTypeFilter.ChooseRandomTypeFilter
-- [ ] Type.cpp::ChooseRandomTypeFilter.filter
-- [ ] Type.cpp::ChooseRandomTypeFilter.get_type
-- [ ] Type.cpp::ChooseRandomTypeFilter.~ChooseRandomTypeFilter
-- [ ] Type.cpp::eMatchType
-- [ ] Type.cpp::eMatchType.eConvert
-- [ ] Type.cpp::eMatchType.eDereference
-- [ ] Type.cpp::eMatchType.eDerefExact
-- [ ] Type.cpp::eMatchType.eExact
-- [ ] Type.cpp::eMatchType.eFlexible
-- [ ] Type.cpp::eSimpleType
-- [ ] Type.cpp::eSimpleType.eChar
-- [ ] Type.cpp::eSimpleType.eFloat
-- [ ] Type.cpp::eSimpleType.eInt
-- [ ] Type.cpp::eSimpleType.eInt128
-- [ ] Type.cpp::eSimpleType.eLong
-- [ ] Type.cpp::eSimpleType.eLongLong
-- [ ] Type.cpp::eSimpleType.eShort
-- [ ] Type.cpp::eSimpleType.eUChar
-- [ ] Type.cpp::eSimpleType.eUInt
-- [ ] Type.cpp::eSimpleType.eUInt128
-- [ ] Type.cpp::eSimpleType.eULong
-- [ ] Type.cpp::eSimpleType.eULongLong
-- [ ] Type.cpp::eSimpleType.eUShort
-- [ ] Type.cpp::eSimpleType.eVoid
-- [ ] Type.cpp::eTypeDesc
-- [ ] Type.cpp::eTypeDesc.ePointer
-- [ ] Type.cpp::eTypeDesc.eSimple
-- [ ] Type.cpp::eTypeDesc.eStruct
-- [ ] Type.cpp::eTypeDesc.eUnion
-- [ ] Type.cpp::NonVoidNonVolatileTypeFilter.filter
-- [ ] Type.cpp::NonVoidNonVolatileTypeFilter.get_type
-- [ ] Type.cpp::NonVoidNonVolatileTypeFilter.NonVoidNonVolatileTypeFilter
-- [ ] Type.cpp::NonVoidNonVolatileTypeFilter.~NonVoidNonVolatileTypeFilter
-- [ ] Type.cpp::NonVoidTypeFilter.filter
-- [ ] Type.cpp::NonVoidTypeFilter.get_type
-- [ ] Type.cpp::NonVoidTypeFilter.NonVoidTypeFilter
-- [ ] Type.cpp::NonVoidTypeFilter.~NonVoidTypeFilter
-- [ ] Type.cpp::Type.choose_random
-- [ ] Type.cpp::Type.choose_random_nonvoid
-- [ ] Type.cpp::Type.choose_random_nonvoid_nonvolatile
-- [ ] Type.cpp::Type.choose_random_nonvoid_simple
-- [ ] Type.cpp::Type.choose_random_pointer_type
-- [ ] Type.cpp::Type.choose_random_simple
-- [ ] Type.cpp::Type.choose_random_struct_from_type
-- [ ] Type.cpp::Type.choose_random_struct_union_type
-- [ ] Type.cpp::Type.contain_pointer_field
-- [ ] Type.cpp::Type.copy_all_fields_types
-- [ ] Type.cpp::Type.delete_useless_structs
+- [x] Type.cpp::ChooseRandomTypeFilter.ChooseRandomTypeFilter
+- [x] Type.cpp::ChooseRandomTypeFilter.filter
+- [x] Type.cpp::ChooseRandomTypeFilter.get_type
+- [x] Type.cpp::ChooseRandomTypeFilter.~ChooseRandomTypeFilter
+- [x] Type.cpp::eMatchType
+- [x] Type.cpp::eMatchType.eConvert
+- [x] Type.cpp::eMatchType.eDereference
+- [x] Type.cpp::eMatchType.eDerefExact
+- [x] Type.cpp::eMatchType.eExact
+- [x] Type.cpp::eMatchType.eFlexible
+- [x] Type.cpp::eSimpleType
+- [x] Type.cpp::eSimpleType.eChar
+- [x] Type.cpp::eSimpleType.eFloat
+- [x] Type.cpp::eSimpleType.eInt
+- [x] Type.cpp::eSimpleType.eInt128
+- [x] Type.cpp::eSimpleType.eLong
+- [x] Type.cpp::eSimpleType.eLongLong
+- [x] Type.cpp::eSimpleType.eShort
+- [x] Type.cpp::eSimpleType.eUChar
+- [x] Type.cpp::eSimpleType.eUInt
+- [x] Type.cpp::eSimpleType.eUInt128
+- [x] Type.cpp::eSimpleType.eULong
+- [x] Type.cpp::eSimpleType.eULongLong
+- [x] Type.cpp::eSimpleType.eUShort
+- [x] Type.cpp::eSimpleType.eVoid
+- [x] Type.cpp::eTypeDesc
+- [x] Type.cpp::eTypeDesc.ePointer
+- [x] Type.cpp::eTypeDesc.eSimple
+- [x] Type.cpp::eTypeDesc.eStruct
+- [x] Type.cpp::eTypeDesc.eUnion
+- [x] Type.cpp::NonVoidNonVolatileTypeFilter.filter
+- [x] Type.cpp::NonVoidNonVolatileTypeFilter.get_type
+- [x] Type.cpp::NonVoidNonVolatileTypeFilter.NonVoidNonVolatileTypeFilter
+- [x] Type.cpp::NonVoidNonVolatileTypeFilter.~NonVoidNonVolatileTypeFilter
+- [x] Type.cpp::NonVoidTypeFilter.filter
+- [x] Type.cpp::NonVoidTypeFilter.get_type
+- [x] Type.cpp::NonVoidTypeFilter.NonVoidTypeFilter
+- [x] Type.cpp::NonVoidTypeFilter.~NonVoidTypeFilter
+- [x] Type.cpp::Type.choose_random
+- [x] Type.cpp::Type.choose_random_nonvoid
+- [x] Type.cpp::Type.choose_random_nonvoid_nonvolatile
+- [x] Type.cpp::Type.choose_random_nonvoid_simple
+- [x] Type.cpp::Type.choose_random_pointer_type
+- [x] Type.cpp::Type.choose_random_simple
+- [x] Type.cpp::Type.choose_random_struct_from_type
+- [x] Type.cpp::Type.choose_random_struct_union_type
+- [x] Type.cpp::Type.contain_pointer_field
+- [x] Type.cpp::Type.copy_all_fields_types
+- [x] Type.cpp::Type.delete_useless_structs
 - [x] Type.cpp::Type.doFinalization
-- [ ] Type.cpp::Type.find_pointer_type
-- [ ] Type.cpp::Type.find_type
-- [ ] Type.cpp::Type.GenerateAllTypes
-- [ ] Type.cpp::Type.GenerateSimpleTypes
-- [ ] Type.cpp::Type.get_all_ok_struct_union_types
-- [ ] Type.cpp::Type.get_base_type
-- [ ] Type.cpp::Type.get_bitfield_length
-- [ ] Type.cpp::Type.get_indirect_level
-- [ ] Type.cpp::Type.get_int_subfield_names
-- [ ] Type.cpp::Type.get_simple_type
-- [ ] Type.cpp::Type.get_struct_depth
-- [ ] Type.cpp::Type.get_type_from_string
-- [ ] Type.cpp::Type.get_type_sizeof_string
-- [ ] Type.cpp::Type.has_aggregate_field
-- [ ] Type.cpp::Type.has_assign_ops
-- [ ] Type.cpp::Type.has_bitfields
-- [ ] Type.cpp::Type.has_implicit_nontrivial_assign_ops
-- [ ] Type.cpp::Type.has_int_field
-- [ ] Type.cpp::Type.has_longlong_field
-- [ ] Type.cpp::Type.has_padding
-- [ ] Type.cpp::Type.has_pointer_type
-- [ ] Type.cpp::Type.if_struct_will_have_assign_ops
-- [ ] Type.cpp::Type.if_union_will_have_assign_ops
-- [ ] Type.cpp::Type.init_fields_enumerator
-- [ ] Type.cpp::Type.init_is_bitfield_enumerator
-- [ ] Type.cpp::Type.is_aggregate
-- [ ] Type.cpp::Type.is_bitfield
-- [ ] Type.cpp::Type.is_const_struct_union
-- [ ] Type.cpp::Type.is_convertable
-- [ ] Type.cpp::Type.is_dereferenced_from
-- [ ] Type.cpp::Type.is_derivable
-- [ ] Type.cpp::Type.is_equivalent
-- [ ] Type.cpp::Type.is_float
-- [ ] Type.cpp::Type.is_full_bitfields_struct
-- [ ] Type.cpp::Type.is_int
-- [ ] Type.cpp::Type.is_long_long
-- [ ] Type.cpp::Type.is_pointer_to_char
-- [ ] Type.cpp::Type.is_promotable
-- [ ] Type.cpp::Type.is_signed
-- [ ] Type.cpp::Type.is_signed_char
-- [ ] Type.cpp::Type.is_unamed_padding
-- [ ] Type.cpp::Type.is_volatile_struct_union
-- [ ] Type.cpp::Type.make_all_struct_types
-- [ ] Type.cpp::Type.make_all_struct_types_
-- [ ] Type.cpp::Type.make_all_struct_types_with_bitfields
-- [ ] Type.cpp::Type.make_all_struct_union_types
-- [ ] Type.cpp::Type.make_full_bitfields_struct_fields
-- [ ] Type.cpp::Type.make_normal_struct_fields
-- [ ] Type.cpp::Type.make_one_bitfield
-- [ ] Type.cpp::Type.make_one_bitfield_by_enum
-- [ ] Type.cpp::Type.make_one_normal_field_by_enum
-- [ ] Type.cpp::Type.make_one_struct_field
-- [ ] Type.cpp::Type.make_one_union_field
-- [ ] Type.cpp::Type.make_random_pointer_type
-- [ ] Type.cpp::Type.make_random_struct_type
-- [ ] Type.cpp::Type.make_random_union_type
-- [ ] Type.cpp::Type.match
-- [ ] Type.cpp::Type.needs_cast
-- [ ] Type.cpp::Type.operator=
-- [ ] Type.cpp::Type.Output
-- [ ] Type.cpp::Type.printf_directive
-- [ ] Type.cpp::Type.random_type_from_type
-- [ ] Type.cpp::Type.reset_accum_types
-- [ ] Type.cpp::Type.SelectLType
-- [ ] Type.cpp::Type.signed_overflow_possible
-- [ ] Type.cpp::Type.SizeInBytes
-- [ ] Type.cpp::Type.to_unsigned
-- [ ] Type.cpp::Type.Type
-- [ ] Type.cpp::Type.~Type
-- [ ] Type.cpp::checkImplicitNontrivialAssignOps
-- [ ] Type.cpp::GenerateAllTypes
-- [ ] Type.cpp::get_int_type
-- [ ] Type.cpp::InitializeTypeAttributes
-- [ ] Type.cpp::MoreTypesProbability
-- [ ] Type.cpp::OutputStructAssignOp
-- [ ] Type.cpp::OutputStructAssignOps
-- [ ] Type.cpp::OutputStructUnion
-- [ ] Type.cpp::OutputStructUnionDeclarations
-- [ ] Type.cpp::OutputUnionAssignOps
-- [ ] Type.cpp::to_index
-- [ ] util.cpp::expand_within_ranges
-- [ ] util.cpp::gensym
-- [ ] util.cpp::log_analysis_fail
-- [ ] util.cpp::output_close_encloser
-- [ ] util.cpp::output_comment_line
-- [ ] util.cpp::output_open_encloser
-- [ ] util.cpp::output_print_str
-- [ ] util.cpp::output_tab
-- [ ] util.cpp::outputln
-- [ ] util.cpp::permute
-- [ ] util.cpp::really_outputln
-- [ ] util.cpp::reset_gensym
-- [ ] Variable.cpp::Variable.compatible
-- [ ] Variable.cpp::Variable.create_field_vars
-- [ ] Variable.cpp::Variable.CreateVariable
+- [x] Type.cpp::Type.find_pointer_type
+- [x] Type.cpp::Type.find_type
+- [x] Type.cpp::Type.GenerateAllTypes
+- [x] Type.cpp::Type.GenerateSimpleTypes
+- [x] Type.cpp::Type.get_all_ok_struct_union_types
+- [x] Type.cpp::Type.get_base_type
+- [x] Type.cpp::Type.get_bitfield_length
+- [x] Type.cpp::Type.get_indirect_level
+- [x] Type.cpp::Type.get_int_subfield_names
+- [x] Type.cpp::Type.get_simple_type
+- [x] Type.cpp::Type.get_struct_depth
+- [x] Type.cpp::Type.get_type_from_string
+- [x] Type.cpp::Type.get_type_sizeof_string
+- [x] Type.cpp::Type.has_aggregate_field
+- [x] Type.cpp::Type.has_assign_ops
+- [x] Type.cpp::Type.has_bitfields
+- [x] Type.cpp::Type.has_implicit_nontrivial_assign_ops
+- [x] Type.cpp::Type.has_int_field
+- [x] Type.cpp::Type.has_longlong_field
+- [x] Type.cpp::Type.has_padding
+- [x] Type.cpp::Type.has_pointer_type
+- [x] Type.cpp::Type.if_struct_will_have_assign_ops
+- [x] Type.cpp::Type.if_union_will_have_assign_ops
+- [x] Type.cpp::Type.init_fields_enumerator
+- [x] Type.cpp::Type.init_is_bitfield_enumerator
+- [x] Type.cpp::Type.is_aggregate
+- [x] Type.cpp::Type.is_bitfield
+- [x] Type.cpp::Type.is_const_struct_union
+- [x] Type.cpp::Type.is_convertable
+- [x] Type.cpp::Type.is_dereferenced_from
+- [x] Type.cpp::Type.is_derivable
+- [x] Type.cpp::Type.is_equivalent
+- [x] Type.cpp::Type.is_float
+- [x] Type.cpp::Type.is_full_bitfields_struct
+- [x] Type.cpp::Type.is_int
+- [x] Type.cpp::Type.is_long_long
+- [x] Type.cpp::Type.is_pointer_to_char
+- [x] Type.cpp::Type.is_promotable
+- [x] Type.cpp::Type.is_signed
+- [x] Type.cpp::Type.is_signed_char
+- [x] Type.cpp::Type.is_unamed_padding
+- [x] Type.cpp::Type.is_volatile_struct_union
+- [x] Type.cpp::Type.make_all_struct_types
+- [x] Type.cpp::Type.make_all_struct_types_
+- [x] Type.cpp::Type.make_all_struct_types_with_bitfields
+- [x] Type.cpp::Type.make_all_struct_union_types
+- [x] Type.cpp::Type.make_full_bitfields_struct_fields
+- [x] Type.cpp::Type.make_normal_struct_fields
+- [x] Type.cpp::Type.make_one_bitfield
+- [x] Type.cpp::Type.make_one_bitfield_by_enum
+- [x] Type.cpp::Type.make_one_normal_field_by_enum
+- [x] Type.cpp::Type.make_one_struct_field
+- [x] Type.cpp::Type.make_one_union_field
+- [x] Type.cpp::Type.make_random_pointer_type
+- [x] Type.cpp::Type.make_random_struct_type
+- [x] Type.cpp::Type.make_random_union_type
+- [x] Type.cpp::Type.match
+- [x] Type.cpp::Type.needs_cast
+- [x] Type.cpp::Type.operator=
+- [x] Type.cpp::Type.Output
+- [x] Type.cpp::Type.printf_directive
+- [x] Type.cpp::Type.random_type_from_type
+- [x] Type.cpp::Type.reset_accum_types
+- [x] Type.cpp::Type.SelectLType
+- [x] Type.cpp::Type.signed_overflow_possible
+- [x] Type.cpp::Type.SizeInBytes
+- [x] Type.cpp::Type.to_unsigned
+- [x] Type.cpp::Type.Type
+- [x] Type.cpp::Type.~Type
+- [x] Type.cpp::checkImplicitNontrivialAssignOps
+- [x] Type.cpp::GenerateAllTypes
+- [x] Type.cpp::get_int_type
+- [x] Type.cpp::InitializeTypeAttributes
+- [x] Type.cpp::MoreTypesProbability
+- [x] Type.cpp::OutputStructAssignOp
+- [x] Type.cpp::OutputStructAssignOps
+- [x] Type.cpp::OutputStructUnion
+- [x] Type.cpp::OutputStructUnionDeclarations
+- [x] Type.cpp::OutputUnionAssignOps
+- [x] Type.cpp::to_index
+- [x] util.cpp::expand_within_ranges
+- [x] util.cpp::gensym
+- [x] util.cpp::log_analysis_fail
+- [x] util.cpp::output_close_encloser
+- [x] util.cpp::output_comment_line
+- [x] util.cpp::output_open_encloser
+- [x] util.cpp::output_print_str
+- [x] util.cpp::output_tab
+- [x] util.cpp::outputln
+- [x] util.cpp::permute
+- [x] util.cpp::really_outputln
+- [x] util.cpp::reset_gensym
+- [x] Variable.cpp::Variable.compatible
+- [x] Variable.cpp::Variable.create_field_vars
+- [x] Variable.cpp::Variable.CreateVariable
 - [x] Variable.cpp::Variable.doFinalization
-- [ ] Variable.cpp::Variable.find
-- [ ] Variable.cpp::Variable.find_pointer_fields
-- [ ] Variable.cpp::Variable.get_actual_name
-- [ ] Variable.cpp::Variable.get_array
-- [ ] Variable.cpp::Variable.get_collective
-- [ ] Variable.cpp::Variable.get_container_union
-- [ ] Variable.cpp::Variable.get_dimension
-- [ ] Variable.cpp::Variable.get_field_id
-- [ ] Variable.cpp::Variable.get_index_vars
-- [ ] Variable.cpp::Variable.get_last_ctrl_vars
-- [ ] Variable.cpp::Variable.get_named_var
-- [ ] Variable.cpp::Variable.get_new_ctrl_vars
-- [ ] Variable.cpp::Variable.get_seq_num
-- [ ] Variable.cpp::Variable.get_top_container
-- [ ] Variable.cpp::Variable.GetMaxArrayDimension
-- [ ] Variable.cpp::Variable.has_field_var
-- [ ] Variable.cpp::Variable.hash
-- [ ] Variable.cpp::Variable.is_access_once
-- [ ] Variable.cpp::Variable.is_aggregate
-- [ ] Variable.cpp::Variable.is_argument
-- [ ] Variable.cpp::Variable.is_array_field
-- [ ] Variable.cpp::Variable.is_const
-- [ ] Variable.cpp::Variable.is_const_after_deref
-- [ ] Variable.cpp::Variable.is_field_var
-- [ ] Variable.cpp::Variable.is_global
-- [ ] Variable.cpp::Variable.is_inside_union_field
-- [ ] Variable.cpp::Variable.is_local
-- [ ] Variable.cpp::Variable.is_packed_after_bitfield
-- [ ] Variable.cpp::Variable.is_packed_aggregate_field_var
-- [ ] Variable.cpp::Variable.is_partial_volatile_after_deref
-- [ ] Variable.cpp::Variable.is_pointer
-- [ ] Variable.cpp::Variable.is_seen_name
-- [ ] Variable.cpp::Variable.is_tmp_var
-- [ ] Variable.cpp::Variable.is_union_field
-- [ ] Variable.cpp::Variable.is_valid_volatile
-- [ ] Variable.cpp::Variable.is_virtual
-- [ ] Variable.cpp::Variable.is_visible_local
-- [ ] Variable.cpp::Variable.is_volatile
-- [ ] Variable.cpp::Variable.is_volatile_after_deref
-- [ ] Variable.cpp::Variable.loose_match
-- [ ] Variable.cpp::Variable.mark_address_taken
-- [ ] Variable.cpp::Variable.match
-- [ ] Variable.cpp::Variable.match_var_name
-- [ ] Variable.cpp::Variable.new_ctrl_vars
-- [ ] Variable.cpp::Variable.Output
-- [ ] Variable.cpp::Variable.output_addressable_name
-- [ ] Variable.cpp::Variable.output_qualified_type
-- [ ] Variable.cpp::Variable.output_runtime_value
-- [ ] Variable.cpp::Variable.output_value_dump
-- [ ] Variable.cpp::Variable.output_volatile_address
-- [ ] Variable.cpp::Variable.output_volatile_fprintf
-- [ ] Variable.cpp::Variable.OutputAddrOf
-- [ ] Variable.cpp::Variable.OutputDecl
-- [ ] Variable.cpp::Variable.OutputDef
-- [ ] Variable.cpp::Variable.OutputForComment
-- [ ] Variable.cpp::Variable.OutputLowerBound
-- [ ] Variable.cpp::Variable.OutputUpperBound
-- [ ] Variable.cpp::Variable.to_string
-- [ ] Variable.cpp::Variable.Variable
-- [ ] Variable.cpp::Variable.~Variable
-- [ ] Variable.cpp::add_variable_to_set
-- [ ] Variable.cpp::add_variables_to_set
-- [ ] Variable.cpp::combine_variable_sets
-- [ ] Variable.cpp::equal_variable_sets
-- [ ] Variable.cpp::find_field_variable_in_set
-- [ ] Variable.cpp::find_variable_in_set
-- [ ] Variable.cpp::HashVariable
-- [ ] Variable.cpp::InitializeVariableAttributes
-- [ ] Variable.cpp::is_variable_in_set
-- [ ] Variable.cpp::MapVariableList
-- [ ] Variable.cpp::OutputArrayCtrlVars
-- [ ] Variable.cpp::OutputArrayInitializers
-- [ ] Variable.cpp::OutputVariableDeclList
-- [ ] Variable.cpp::OutputVariableList
-- [ ] Variable.cpp::OutputVolatileAddress
-- [ ] Variable.cpp::remove_field_vars
-- [ ] Variable.cpp::sub_variable_sets
-- [ ] VariableSelector.cpp::eVariableScope
-- [ ] VariableSelector.cpp::eVariableScope.eGlobal
-- [ ] VariableSelector.cpp::eVariableScope.eNewValue
-- [ ] VariableSelector.cpp::eVariableScope.eParentLocal
-- [ ] VariableSelector.cpp::eVariableScope.eParentParam
-- [ ] VariableSelector.cpp::eVariableScope.MAX_VAR_SCOPE
-- [ ] VariableSelector.cpp::VariableSelectFilter.filter
-- [ ] VariableSelector.cpp::VariableSelectFilter.VariableSelectFilter
-- [ ] VariableSelector.cpp::VariableSelectFilter.~VariableSelectFilter
-- [ ] VariableSelector.cpp::VariableSelector.choose_ok_var
-- [ ] VariableSelector.cpp::VariableSelector.choose_var
-- [ ] VariableSelector.cpp::VariableSelector.choose_visible_read_var
-- [ ] VariableSelector.cpp::VariableSelector.create_and_initialize
-- [ ] VariableSelector.cpp::VariableSelector.create_array_and_itemize
-- [ ] VariableSelector.cpp::VariableSelector.create_mutated_array_var
-- [ ] VariableSelector.cpp::VariableSelector.create_random_array
+- [x] Variable.cpp::Variable.find
+- [x] Variable.cpp::Variable.find_pointer_fields
+- [x] Variable.cpp::Variable.get_actual_name
+- [x] Variable.cpp::Variable.get_array
+- [x] Variable.cpp::Variable.get_collective
+- [x] Variable.cpp::Variable.get_container_union
+- [x] Variable.cpp::Variable.get_dimension
+- [x] Variable.cpp::Variable.get_field_id
+- [x] Variable.cpp::Variable.get_index_vars
+- [x] Variable.cpp::Variable.get_last_ctrl_vars
+- [x] Variable.cpp::Variable.get_named_var
+- [x] Variable.cpp::Variable.get_new_ctrl_vars
+- [x] Variable.cpp::Variable.get_seq_num
+- [x] Variable.cpp::Variable.get_top_container
+- [x] Variable.cpp::Variable.GetMaxArrayDimension
+- [x] Variable.cpp::Variable.has_field_var
+- [x] Variable.cpp::Variable.hash
+- [x] Variable.cpp::Variable.is_access_once
+- [x] Variable.cpp::Variable.is_aggregate
+- [x] Variable.cpp::Variable.is_argument
+- [x] Variable.cpp::Variable.is_array_field
+- [x] Variable.cpp::Variable.is_const
+- [x] Variable.cpp::Variable.is_const_after_deref
+- [x] Variable.cpp::Variable.is_field_var
+- [x] Variable.cpp::Variable.is_global
+- [x] Variable.cpp::Variable.is_inside_union_field
+- [x] Variable.cpp::Variable.is_local
+- [x] Variable.cpp::Variable.is_packed_after_bitfield
+- [x] Variable.cpp::Variable.is_packed_aggregate_field_var
+- [x] Variable.cpp::Variable.is_partial_volatile_after_deref
+- [x] Variable.cpp::Variable.is_pointer
+- [x] Variable.cpp::Variable.is_seen_name
+- [x] Variable.cpp::Variable.is_tmp_var
+- [x] Variable.cpp::Variable.is_union_field
+- [x] Variable.cpp::Variable.is_valid_volatile
+- [x] Variable.cpp::Variable.is_virtual
+- [x] Variable.cpp::Variable.is_visible_local
+- [x] Variable.cpp::Variable.is_volatile
+- [x] Variable.cpp::Variable.is_volatile_after_deref
+- [x] Variable.cpp::Variable.loose_match
+- [x] Variable.cpp::Variable.mark_address_taken
+- [x] Variable.cpp::Variable.match
+- [x] Variable.cpp::Variable.match_var_name
+- [x] Variable.cpp::Variable.new_ctrl_vars
+- [x] Variable.cpp::Variable.Output
+- [x] Variable.cpp::Variable.output_addressable_name
+- [x] Variable.cpp::Variable.output_qualified_type
+- [x] Variable.cpp::Variable.output_runtime_value
+- [x] Variable.cpp::Variable.output_value_dump
+- [x] Variable.cpp::Variable.output_volatile_address
+- [x] Variable.cpp::Variable.output_volatile_fprintf
+- [x] Variable.cpp::Variable.OutputAddrOf
+- [x] Variable.cpp::Variable.OutputDecl
+- [x] Variable.cpp::Variable.OutputDef
+- [x] Variable.cpp::Variable.OutputForComment
+- [x] Variable.cpp::Variable.OutputLowerBound
+- [x] Variable.cpp::Variable.OutputUpperBound
+- [x] Variable.cpp::Variable.to_string
+- [x] Variable.cpp::Variable.Variable
+- [x] Variable.cpp::Variable.~Variable
+- [x] Variable.cpp::add_variable_to_set
+- [x] Variable.cpp::add_variables_to_set
+- [x] Variable.cpp::combine_variable_sets
+- [x] Variable.cpp::equal_variable_sets
+- [x] Variable.cpp::find_field_variable_in_set
+- [x] Variable.cpp::find_variable_in_set
+- [x] Variable.cpp::HashVariable
+- [x] Variable.cpp::InitializeVariableAttributes
+- [x] Variable.cpp::is_variable_in_set
+- [x] Variable.cpp::MapVariableList
+- [x] Variable.cpp::OutputArrayCtrlVars
+- [x] Variable.cpp::OutputArrayInitializers
+- [x] Variable.cpp::OutputVariableDeclList
+- [x] Variable.cpp::OutputVariableList
+- [x] Variable.cpp::OutputVolatileAddress
+- [x] Variable.cpp::remove_field_vars
+- [x] Variable.cpp::sub_variable_sets
+- [x] VariableSelector.cpp::eVariableScope
+- [x] VariableSelector.cpp::eVariableScope.eGlobal
+- [x] VariableSelector.cpp::eVariableScope.eNewValue
+- [x] VariableSelector.cpp::eVariableScope.eParentLocal
+- [x] VariableSelector.cpp::eVariableScope.eParentParam
+- [x] VariableSelector.cpp::eVariableScope.MAX_VAR_SCOPE
+- [x] VariableSelector.cpp::VariableSelectFilter.filter
+- [x] VariableSelector.cpp::VariableSelectFilter.VariableSelectFilter
+- [x] VariableSelector.cpp::VariableSelectFilter.~VariableSelectFilter
+- [x] VariableSelector.cpp::VariableSelector.choose_ok_var
+- [x] VariableSelector.cpp::VariableSelector.choose_var
+- [x] VariableSelector.cpp::VariableSelector.choose_visible_read_var
+- [x] VariableSelector.cpp::VariableSelector.create_and_initialize
+- [x] VariableSelector.cpp::VariableSelector.create_array_and_itemize
+- [x] VariableSelector.cpp::VariableSelector.create_mutated_array_var
+- [x] VariableSelector.cpp::VariableSelector.create_random_array
 - [x] VariableSelector.cpp::VariableSelector.doFinalization
-- [ ] VariableSelector.cpp::VariableSelector.eager_create_global_struct
-- [ ] VariableSelector.cpp::VariableSelector.eager_create_local_struct
-- [ ] VariableSelector.cpp::VariableSelector.expand_block_for_goto
-- [ ] VariableSelector.cpp::VariableSelector.expand_struct_union_vars
-- [ ] VariableSelector.cpp::VariableSelector.find_all_non_array_visible_vars
-- [ ] VariableSelector.cpp::VariableSelector.find_all_non_bitfield_visible_vars
-- [ ] VariableSelector.cpp::VariableSelector.find_all_visible_vars
-- [ ] VariableSelector.cpp::VariableSelector.find_var_by_name
-- [ ] VariableSelector.cpp::VariableSelector.GenerateNewGlobal
-- [ ] VariableSelector.cpp::VariableSelector.GenerateNewNonArrayGlobal
-- [ ] VariableSelector.cpp::VariableSelector.GenerateNewParentLocal
-- [ ] VariableSelector.cpp::VariableSelector.GenerateNewVariable
-- [ ] VariableSelector.cpp::VariableSelector.GenerateParameterVariable
-- [ ] VariableSelector.cpp::VariableSelector.get_all_array_vars
-- [ ] VariableSelector.cpp::VariableSelector.get_all_local_vars
-- [ ] VariableSelector.cpp::VariableSelector.GetGlobalVariables
-- [ ] VariableSelector.cpp::VariableSelector.has_dereferenceable_var
-- [ ] VariableSelector.cpp::VariableSelector.has_eligible_volatile_var
-- [ ] VariableSelector.cpp::VariableSelector.InitScopeTable
-- [ ] VariableSelector.cpp::VariableSelector.is_eligible_var
-- [ ] VariableSelector.cpp::VariableSelector.itemize_array
-- [ ] VariableSelector.cpp::VariableSelector.lower_block_for_vars
-- [ ] VariableSelector.cpp::VariableSelector.make_dummy_static_variable
-- [ ] VariableSelector.cpp::VariableSelector.make_init_value
-- [ ] VariableSelector.cpp::VariableSelector.new_variable
-- [ ] VariableSelector.cpp::VariableSelector.select
-- [ ] VariableSelector.cpp::VariableSelector.select_array
-- [ ] VariableSelector.cpp::VariableSelector.select_deref_pointer
-- [ ] VariableSelector.cpp::VariableSelector.select_must_use_var
-- [ ] VariableSelector.cpp::VariableSelector.SelectGlobal
-- [ ] VariableSelector.cpp::VariableSelector.SelectLoopCtrlVar
-- [ ] VariableSelector.cpp::VariableSelector.SelectParentLocal
-- [ ] VariableSelector.cpp::VariableSelector.SelectParentParam
-- [ ] VariableSelector.cpp::VariableSelector.VariableSelector
-- [ ] VariableSelector.cpp::VariableSelector.~VariableSelector
-- [ ] VariableSelector.cpp::HashGlobalVariables
-- [ ] VariableSelector.cpp::OutputGlobalVariables
-- [ ] VariableSelector.cpp::OutputGlobalVariablesDecls
-- [ ] VariableSelector.cpp::RandomGlobalName
-- [ ] VariableSelector.cpp::RandomLocalName
-- [ ] VariableSelector.cpp::RandomParamName
-- [ ] VariableSelector.cpp::VariableCreationProbability
-- [ ] VariableSelector.cpp::VariableSelectionProbability
+- [x] VariableSelector.cpp::VariableSelector.eager_create_global_struct
+- [x] VariableSelector.cpp::VariableSelector.eager_create_local_struct
+- [x] VariableSelector.cpp::VariableSelector.expand_block_for_goto
+- [x] VariableSelector.cpp::VariableSelector.expand_struct_union_vars
+- [x] VariableSelector.cpp::VariableSelector.find_all_non_array_visible_vars
+- [x] VariableSelector.cpp::VariableSelector.find_all_non_bitfield_visible_vars
+- [x] VariableSelector.cpp::VariableSelector.find_all_visible_vars
+- [x] VariableSelector.cpp::VariableSelector.find_var_by_name
+- [x] VariableSelector.cpp::VariableSelector.GenerateNewGlobal
+- [x] VariableSelector.cpp::VariableSelector.GenerateNewNonArrayGlobal
+- [x] VariableSelector.cpp::VariableSelector.GenerateNewParentLocal
+- [x] VariableSelector.cpp::VariableSelector.GenerateNewVariable
+- [x] VariableSelector.cpp::VariableSelector.GenerateParameterVariable
+- [x] VariableSelector.cpp::VariableSelector.get_all_array_vars
+- [x] VariableSelector.cpp::VariableSelector.get_all_local_vars
+- [x] VariableSelector.cpp::VariableSelector.GetGlobalVariables
+- [x] VariableSelector.cpp::VariableSelector.has_dereferenceable_var
+- [x] VariableSelector.cpp::VariableSelector.has_eligible_volatile_var
+- [x] VariableSelector.cpp::VariableSelector.InitScopeTable
+- [x] VariableSelector.cpp::VariableSelector.is_eligible_var
+- [x] VariableSelector.cpp::VariableSelector.itemize_array
+- [x] VariableSelector.cpp::VariableSelector.lower_block_for_vars
+- [x] VariableSelector.cpp::VariableSelector.make_dummy_static_variable
+- [x] VariableSelector.cpp::VariableSelector.make_init_value
+- [x] VariableSelector.cpp::VariableSelector.new_variable
+- [x] VariableSelector.cpp::VariableSelector.select
+- [x] VariableSelector.cpp::VariableSelector.select_array
+- [x] VariableSelector.cpp::VariableSelector.select_deref_pointer
+- [x] VariableSelector.cpp::VariableSelector.select_must_use_var
+- [x] VariableSelector.cpp::VariableSelector.SelectGlobal
+- [x] VariableSelector.cpp::VariableSelector.SelectLoopCtrlVar
+- [x] VariableSelector.cpp::VariableSelector.SelectParentLocal
+- [x] VariableSelector.cpp::VariableSelector.SelectParentParam
+- [x] VariableSelector.cpp::VariableSelector.VariableSelector
+- [x] VariableSelector.cpp::VariableSelector.~VariableSelector
+- [x] VariableSelector.cpp::HashGlobalVariables
+- [x] VariableSelector.cpp::OutputGlobalVariables
+- [x] VariableSelector.cpp::OutputGlobalVariablesDecls
+- [x] VariableSelector.cpp::RandomGlobalName
+- [x] VariableSelector.cpp::RandomLocalName
+- [x] VariableSelector.cpp::RandomParamName
+- [x] VariableSelector.cpp::VariableCreationProbability
+- [x] VariableSelector.cpp::VariableSelectionProbability
 - [x] VectorFilter.cpp::Mode.FilterOut
 - [x] VectorFilter.cpp::Mode.Keep
 - [x] VectorFilter.cpp::VectorFilter.add
