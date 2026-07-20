@@ -1303,7 +1303,15 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		rhs = &Expression{Term: TermConstant, Con: v.Init, ExprType: v.Type}
 	}
 	if v.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-continue union abstract past IsUnion residual
+		if HasError() {
+			return IncompleteFactSlice(), IncompleteUnionFactSlice()
+		}
 		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, rhs)
+		// residual ERROR sticky — no invent soft-empty init past AbstractFactUnion residual
+		if HasError() {
+			return IncompleteFactSlice(), IncompleteUnionFactSlice()
+		}
 		// incomplete union abstract is hole marker (not bare nil invent empty)
 		// non-sticky for soft re-pick factories (AddParamFacts); AddNewVarFact sticks after
 		if !UnionFactsComplete(un) {
@@ -1311,9 +1319,17 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		}
 		return nil, un
 	}
+	// residual ERROR sticky — no invent soft-continue pointer path past IsUnion residual false
+	if HasError() {
+		return IncompleteFactSlice(), IncompleteUnionFactSlice()
+	}
 	// pointer (Fact.cpp:94–95)
 	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
 	pt = AbstractFactForAssign(nil, v, 0, rhs)
+	// residual ERROR sticky — no invent soft-empty init past AbstractFact residual
+	if HasError() {
+		return IncompleteFactSlice(), IncompleteUnionFactSlice()
+	}
 	// incomplete / multi / zero — hole marker (no invent empty init for AddNewVarFact)
 	// non-sticky IncompleteFactSlice for soft re-pick factories
 	if !FactsComplete(pt) || len(pt) != 1 {

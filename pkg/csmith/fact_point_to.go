@@ -380,9 +380,21 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	}
 	// FactPointTo.cpp:164–167 — assert all possible LHS are pointers
 	for _, v := range lvars {
-		if v == nil || !v.IsPointer() {
+		if v == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
+		if !v.IsPointer() {
+			// residual ERROR sticky — no invent soft-skip transfer past IsPointer residual hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			// hard IR sticky — no invent empty transfer / soft re-pick past assert
 			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
+		// residual ERROR sticky — no invent soft-continue later LHS past IsPointer residual true
+		if HasError() {
 			return IncompleteFactSlice()
 		}
 	}
@@ -398,31 +410,80 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// structured transfer below (after rt fetch for pointer-like checks in Constant/Variable)
 	default:
 		rt0 := rhs.GetType()
+		// residual ERROR sticky — no invent soft-continue transfer past GetType residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		// incomplete type sticky Incomplete (no invent GarbagePtr complete success)
 		if rt0 == nil {
 			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// non-pointer, non-union RHS (FactPointTo.cpp:172–178)
-		if !rt0.IsPointerLike() && !rt0.IsUnion() {
+		isPtrLike := rt0.IsPointerLike()
+		// residual ERROR sticky — no invent soft-continue past IsPointerLike residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
+		isUn := rt0.IsUnion()
+		// residual ERROR sticky — no invent soft-continue past IsUnion residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
+		if !isPtrLike && !isUn {
 			// equals(0) and size >= 8 → null else garbage
-			if rhs.EqualsInt(0) && rt0.SizeInBytes() >= 8 {
+			eq0 := rhs.EqualsInt(0)
+			// residual ERROR sticky — no invent null/garbage past EqualsInt residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
+			sz := rt0.SizeInBytes()
+			// residual ERROR sticky — no invent null/garbage past SizeInBytes residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
+			if eq0 && sz >= 8 {
 				return MakeFactsPointTo(lvars, NullPtr)
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
 	}
 	rt := rhs.GetType()
+	// residual ERROR sticky — no invent soft-continue transfer past GetType residual
+	if HasError() {
+		return IncompleteFactSlice()
+	}
 	switch rhs.Term {
 	case TermConstant:
+		if rt == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
 		if rt.IsPointerLike() {
-			if rhs.EqualsInt(0) {
+			// residual ERROR sticky — no invent soft-continue past IsPointerLike residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
+			eq0 := rhs.EqualsInt(0)
+			// residual ERROR sticky — no invent null/garbage past EqualsInt residual
+			if HasError() {
+				return IncompleteFactSlice()
+			}
+			if eq0 {
 				return MakeFactsPointTo(lvars, NullPtr)
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
+		// residual ERROR sticky — no invent soft-continue past IsPointerLike residual false
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		// FactPointTo.cpp:186–193 — union constant field0 "0" → null on field0 pointers
 		if rt.IsUnion() {
+			// residual ERROR sticky — no invent soft-continue past IsUnion residual hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			lv0 := lvars[0]
 			if lv0 != nil && lv0.FieldVarOf != nil {
 				// parent Type* always live; Type-nil sticky (no invent GarbagePtr
@@ -433,16 +494,40 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 						return IncompleteFactSlice()
 					}
 				} else if lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
+					// residual ERROR sticky — no invent soft-continue past IsUnion/GetFieldID residual
+					if HasError() {
+						return IncompleteFactSlice()
+					}
 					// Constant::get_field(0) == "0"
 					if rhs.Con != nil && rhs.Con.GetField(0) == "0" {
+						// residual ERROR sticky — no invent null past GetField residual
+						if HasError() {
+							return IncompleteFactSlice()
+						}
 						return MakeFactsPointTo(lvars, NullPtr)
 					}
-					if rhs.EqualsInt(0) {
+					// residual ERROR sticky — no invent soft-continue past GetField residual false
+					if HasError() {
+						return IncompleteFactSlice()
+					}
+					eq0 := rhs.EqualsInt(0)
+					// residual ERROR sticky — no invent null past EqualsInt residual
+					if HasError() {
+						return IncompleteFactSlice()
+					}
+					if eq0 {
 						return MakeFactsPointTo(lvars, NullPtr)
 					}
+				} else if HasError() {
+					// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+					return IncompleteFactSlice()
 				}
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
+		}
+		// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+		if HasError() {
+			return IncompleteFactSlice()
 		}
 		// FactPointTo.cpp:195–196 — assert(0); hard IR sticky (no soft invent garbage)
 		SetError(ErrGeneric)

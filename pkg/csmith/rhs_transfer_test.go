@@ -574,3 +574,32 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRhsToLhsTransferGetTypeResidualSticky(t *testing.T) {
+	// GetType residual soft invent was invent GarbagePtr complete success past Type-nil RHS.
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// Type-nil constant shell → GetType residual
+	rhs := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+		t.Fatal("GetType residual must fail closed IncompleteFactSlice")
+	}
+	if !HasError() {
+		t.Fatal("GetType residual RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestRhsToLhsTransferIsPointerResidualSticky(t *testing.T) {
+	// IsPointer residual soft invent was invent transfer past non-pointer LHS soft-skip.
+	ClearError()
+	// Type-nil non-special IsPointer residual ERROR+false
+	hole := &Variable{Name: "g_x", Type: nil}
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{hole}, nil)) {
+		t.Fatal("IsPointer residual must fail closed IncompleteFactSlice")
+	}
+	if !HasError() {
+		t.Fatal("IsPointer residual RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
+}

@@ -115,6 +115,10 @@ func ChooseVisibleReadVar(
 			}
 			continue
 		}
+		// residual ERROR sticky — no invent soft-continue keep past IsVirtual/IsVolatile residual false
+		if HasError() {
+			return nil
+		}
 		if !typ.Match(v.Type, MatchConvert) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if HasError() {
@@ -2626,6 +2630,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			}
 			return true
 		}
+		// residual ERROR sticky — no invent soft-continue keep past IsVolatile residual false
+		if HasError() {
+			return false
+		}
 		if av.IsConst() {
 			// residual ERROR sticky — no invent soft-skip past IsConst hole
 			if HasError() {
@@ -2633,12 +2641,20 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			}
 			return true
 		}
+		// residual ERROR sticky — no invent soft-continue keep past IsConst residual false
+		if HasError() {
+			return false
+		}
 		if cg.IsNonWritable(&av.Variable) {
 			// residual ERROR sticky — no invent soft-skip past IsNonWritable hole then pick another
 			if HasError() {
 				return false
 			}
 			return true
+		}
+		// residual ERROR sticky — no invent soft-continue keep past IsNonWritable residual false
+		if HasError() {
+			return false
 		}
 		// VariableSelector.cpp:1405 — av->type->is_const_struct_union() always live Type*
 		// Type-nil sticky fail whole select (no invent soft-skip past hole then pick another)
@@ -2663,6 +2679,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 				return false
 			}
 			return true
+		}
+		// residual ERROR sticky — no invent soft-continue keep past strict IsVolatile residual false
+		if HasError() {
+			return false
 		}
 		seen[av] = true
 		arrayVars = append(arrayVars, av)
