@@ -196,7 +196,16 @@ func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
 			return false
 		}
 	}
+	// CVQualifiers.cpp:116–119 — storage volatile (index 0) must match when depth > 1
+	// (pointer qfer vs address-of target after indirect_qualifiers(-1))
+	if depth > 1 && q.IsVolatiles[0] != other.IsVolatiles[0] {
+		return false
+	}
 	for i := 0; i < depth; i++ {
+		// CVQualifiers.cpp:122–125 — multi-level ** must match volatile exactly
+		if depth-i > 2 && q.IsVolatiles[i] != other.IsVolatiles[i] {
+			return false
+		}
 		if other.IsVolatiles[i] && !q.IsVolatiles[i] {
 			return false
 		}

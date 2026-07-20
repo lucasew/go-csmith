@@ -596,3 +596,66 @@ func TestCVQualifiersGettersAndOutput(t *testing.T) {
 		t.Fatal("empty storage")
 	}
 }
+
+func TestStricterThanStorageVolatileMustMatch(t *testing.T) {
+	// CVQualifiers.cpp:116–119 — depth>1 storage volatile must match exactly.
+	// Seed-2 e914: make_init_value pointer path MatchIndirect → StricterThan after
+	// indirect_qualifiers(-1); missing rule admitted non-vol scalars (ok n=10 vs UP n=5).
+	ClearError()
+	// volatile pointer to non-vol int: vols=[true,false]
+	ptrQ := NewCVQualifiers([]bool{false, false}, []bool{true, false})
+	// address-of non-vol scalar: vols=[false,false]
+	nonVolTarget := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	// address-of vol scalar: vols=[true,false]
+	volTarget := NewCVQualifiers([]bool{false, false}, []bool{true, false})
+	if ptrQ.StricterThan(nonVolTarget) {
+		t.Fatal("storage vol mismatch must fail StricterThan (depth>1)")
+	}
+	if HasError() {
+		t.Fatal("complete storage-vol mismatch must not sticky")
+	}
+	if !ptrQ.StricterThan(volTarget) {
+		t.Fatal("matching storage vol must pass StricterThan")
+	}
+	// MatchIndirect path used by make_init_value (pointer qfer vs scalar target)
+	scalarNonVol := NewCVQualifiers([]bool{false}, []bool{false})
+	scalarVol := NewCVQualifiers([]bool{false}, []bool{true})
+	if ptrQ.MatchIndirect(scalarNonVol, false) {
+		t.Fatal("MatchIndirect must reject non-vol scalar for volatile pointer init")
+	}
+	if !ptrQ.MatchIndirect(scalarVol, false) {
+		t.Fatal("MatchIndirect must accept vol scalar for volatile pointer init")
+	}
+}
+
+func TestStricterThanMultiLevelVolatileExact(t *testing.T) {
+	// CVQualifiers.cpp:122–125 — depth-i>2 requires exact volatile match (like const)
+	ClearError()
+	// three-level pointer qfer
+	a := NewCVQualifiers([]bool{false, false, false}, []bool{false, true, false})
+	b := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
+	// index 1 is followed by two * (depth-i=2 is NOT >2); index 0 is depth-i=3 >2
+	// a vols[1]=true, b vols[1]=false — depth-i for i=1 is 2, not >2, so general rule:
+	// other has vol where we don't? b[1]=false, a has true — we are stricter, OK for vol loop
+	// Wait: check is `if (depth-i > 2 && is_volatiles[i] != v_volatiles[i])`
+	// i=0: depth-0=3>2, a[0]=false b[0]=false match
+	// i=1: depth-1=2 not >2, skip exact; other vol false, ok
+	// So a.StricterThan(b) should be true (a has extra vol at level 1)
+	if !a.StricterThan(b) {
+		t.Fatal("extra mid-level vol without ** rule should still be stricter")
+	}
+	// force multi-level exact fail: mismatch at i=0 with depth 3
+	c := NewCVQualifiers([]bool{false, false, false}, []bool{true, false, false})
+	d := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
+	// Also storage rule: depth>1 && vols[0] differ → false
+	if c.StricterThan(d) {
+		t.Fatal("storage vol mismatch at depth 3 must fail")
+	}
+	// exact multi-level: same storage, mismatch at level followed by two *
+	// depth=4 so i=1 has depth-i=3>2
+	e := NewCVQualifiers([]bool{false, false, false, false}, []bool{false, true, false, false})
+	f := NewCVQualifiers([]bool{false, false, false, false}, []bool{false, false, false, false})
+	if e.StricterThan(f) {
+		t.Fatal("multi-level ** volatile mismatch must fail StricterThan")
+	}
+}
