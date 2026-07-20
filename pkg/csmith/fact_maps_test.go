@@ -748,3 +748,46 @@ func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
 		t.Fatalf("const0 must be null, pts=%v", names)
 	}
 }
+
+func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
+	// After may-null lattice, definitive &g assign to array must merge not wipe null.
+	// FactMgr.cpp:378–388 — isArray → merge_fact not renew_fact.
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessRng(NewRng(1))
+
+	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	base := CreateVariableScalars("l_233", elem, false, false)
+	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
+	av.IsArray = true
+	av.AsArray = av
+	av.Name = "l_233"
+	av.Type = elem
+	// primary init &g
+	av.InitExpr = &Expression{Term: TermVariable, Var: g, ExprType: elem}
+
+	fm := NewFactMgr(&Function{Name: "f"})
+	// seed may-null: null + g_127
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{NullPtr, g})}
+	// assign l_233 = &g_127 (address-of as ExpressionVariable with pointer type)
+	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
+	if !fm.UpdateFactForAssign(&av.Variable, 0, rhs) {
+		t.Fatalf("update failed err=%v", HasError())
+	}
+	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
+	if fp == nil {
+		t.Fatal("missing fact")
+	}
+	if !fp.IsNull() {
+		names := []string{}
+		for _, p := range fp.PointTo {
+			if p != nil {
+				names = append(names, p.Name)
+			}
+		}
+		t.Fatalf("array assign must merge keep may-null, pts=%v", names)
+	}
+}
