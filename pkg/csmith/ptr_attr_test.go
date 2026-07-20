@@ -6,6 +6,7 @@ import (
 )
 
 func TestPtrModifiedInRhs(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	lhs := &Lhs{Var: p, Type: GetIntType()} // *p
 	cg := EmptyCGContext()
@@ -18,6 +19,27 @@ func TestPtrModifiedInRhs(t *testing.T) {
 	if cg.PtrModifiedInRhs(lhs, nil) {
 		t.Fatal("clean")
 	}
+	if HasError() {
+		t.Fatal("complete PtrModifiedInRhs must not sticky")
+	}
+	ClearError()
+	// IsWritten residual soft invent was soft-continue unmodified past Type-nil parent shell.
+	// Fair: sticky modified true.
+	parentHole := &Variable{Name: "g_s"} // Type nil
+	field := &Variable{Name: "g_s.f0", Type: PointerTo(GetIntType()), FieldVarOf: parentHole}
+	lhs2 := &Lhs{Var: field, Type: GetIntType()}
+	// IndirectLevelComplete may fail on Type-nil field path — use multi-level pointer with Type-nil parent write
+	// Simpler: incomplete EffectStm IsWritten residual true.
+	cg.EffectStm = IncompleteEffect()
+	if !cg.PtrModifiedInRhs(lhs, nil) {
+		t.Fatal("IsWritten residual (incomplete EffectStm) must fail closed modified true")
+	}
+	if !HasError() {
+		t.Fatal("IsWritten residual PtrModifiedInRhs must SetError sticky")
+	}
+	ClearError()
+	_ = field
+	_ = lhs2
 }
 
 func TestOutputDefWithAttrs(t *testing.T) {

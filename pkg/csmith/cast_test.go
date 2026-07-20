@@ -75,6 +75,37 @@ func TestHasBitfields(t *testing.T) {
 		t.Fatal("complete HasBitfields must not sticky")
 	}
 	ClearError()
+	// nested HasBitfields residual: Type-nil deeper field soft invent was soft-continue later siblings.
+	// Fair: sticky has-bitfields true.
+	innerHole := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
+	outer := &Type{isStruct: true, Fields: []StructField{
+		{Type: innerHole, BitWidth: -1},
+		{Type: GetIntType(), BitWidth: -1},
+	}}
+	if !outer.HasBitfields() {
+		t.Fatal("nested residual HasBitfields must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested residual HasBitfields must SetError sticky")
+	}
+	ClearError()
+	// nested ContainPointerField residual same invent soft-continue pointer-free.
+	if !outer.ContainPointerField() {
+		t.Fatal("nested residual ContainPointerField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested residual ContainPointerField must SetError sticky")
+	}
+	ClearError()
+	// nested HasIntField residual soft invent was soft-continue later fields invent has-int.
+	// Fair: sticky not-has-int false.
+	if outer.HasIntField() {
+		t.Fatal("nested residual HasIntField must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nested residual HasIntField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCheckAndSetCast(t *testing.T) {

@@ -53,6 +53,20 @@ func TestRecordAddressTaken(t *testing.T) {
 		t.Fatal("nil type must SetError sticky")
 	}
 	ClearError()
+	// HasBitfields residual soft invent was soft-count / soft-skip complete stats.
+	// Fair: sticky stop (no invent partial bitfield address-taken count past hole).
+	BookkeeperDoFinalization()
+	holeTy := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
+	hv := &Variable{Name: "g_h", Type: holeTy}
+	before := varsWithBitfieldsAddressTakenCnt
+	RecordAddressTaken(hv)
+	if !HasError() {
+		t.Fatal("HasBitfields residual RecordAddressTaken must SetError sticky")
+	}
+	if varsWithBitfieldsAddressTakenCnt != before {
+		t.Fatal("HasBitfields residual must not invent bitfield address-taken count")
+	}
+	ClearError()
 }
 
 func TestRecordVolatileAccess(t *testing.T) {
@@ -76,6 +90,19 @@ func TestRecordVolatileAccess(t *testing.T) {
 	RecordVolatileAccess(nil, 0, false)
 	if !HasError() {
 		t.Fatal("nil var must SetError sticky")
+	}
+	ClearError()
+	// IsVolatileAfterDeref residual soft invent was soft-continue non-vol peel stats.
+	// Fair: sticky stop (Type-nil peel residual).
+	BookkeeperDoFinalization()
+	hole := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	beforeR := readVolatileCnt + readNonVolatileCnt
+	RecordVolatileAccess(hole, 0, false)
+	if !HasError() {
+		t.Fatal("IsVolatileAfterDeref residual RecordVolatileAccess must SetError sticky")
+	}
+	if readVolatileCnt+readNonVolatileCnt != beforeR {
+		t.Fatal("IsVolatileAfterDeref residual must not invent peel access counts")
 	}
 	ClearError()
 }
@@ -144,6 +171,20 @@ func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
 	RecordPointerComparisons(nil, &Expression{Term: TermConstant})
 	if !HasError() {
 		t.Fatal("nil lhs RecordPointerComparisons must SetError sticky")
+	}
+	ClearError()
+	// HasBitfields residual soft invent was soft-count / soft-skip complete stats.
+	// Fair: sticky stop.
+	BookkeeperDoFinalization()
+	ClearError()
+	holeTy := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
+	beforeS := structsWithBitfields
+	RecordTypeWithBitfields(holeTy)
+	if !HasError() {
+		t.Fatal("HasBitfields residual RecordTypeWithBitfields must SetError sticky")
+	}
+	if structsWithBitfields != beforeS {
+		t.Fatal("HasBitfields residual must not invent structsWithBitfields count")
 	}
 	ClearError()
 	// Type always live; sticky — non-aggregate complete no-op

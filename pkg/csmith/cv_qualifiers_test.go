@@ -260,6 +260,20 @@ func TestHasPadding(t *testing.T) {
 		t.Fatal("nil field Type HasPadding must SetError sticky")
 	}
 	ClearError()
+	// nested HasPadding residual soft invent was soft-continue later fields padding-free.
+	// Fair: sticky has-padding true.
+	innerHole := &Type{isStruct: true, Packed: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
+	outer := &Type{isStruct: true, Packed: true, Fields: []StructField{
+		{Name: "nest", Type: innerHole, BitWidth: -1},
+		{Name: "ok", Type: GetIntType(), BitWidth: -1},
+	}}
+	if !outer.HasPadding() {
+		t.Fatal("nested residual HasPadding must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested residual HasPadding must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomQualifiersSimpleNoVolatile(t *testing.T) {

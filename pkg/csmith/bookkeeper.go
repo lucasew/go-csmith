@@ -173,7 +173,14 @@ func RecordAddressTaken(v *Variable) {
 	v.IsAddrTaken = true
 	addressTakenCnt++
 	if v.Type.HasBitfields() {
+		// residual ERROR sticky — no invent soft-count past HasBitfields hole
+		if HasError() {
+			return
+		}
 		varsWithBitfieldsAddressTakenCnt++
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
+		return
 	}
 }
 
@@ -193,6 +200,10 @@ func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
 	}
 	for i := 0; i <= derefLevel; i++ {
 		vol := v.IsVolatileAfterDeref(i)
+		// residual ERROR sticky — no invent soft-continue peel stats past IsVolatileAfterDeref hole
+		if HasError() {
+			return
+		}
 		if write {
 			if vol {
 				if i > 0 {
@@ -225,7 +236,14 @@ func RecordBitfieldsReads(v *Variable) {
 		return
 	}
 	if v.Type.HasBitfields() {
+		// residual ERROR sticky — no invent soft-count past HasBitfields hole
+		if HasError() {
+			return
+		}
 		rhsBitfieldsStructsVarsCnt++
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
+		return
 	}
 	if v.IsBitfield {
 		rhsBitfieldCnt++
@@ -242,7 +260,14 @@ func RecordBitfieldsWrites(v *Variable) {
 		return
 	}
 	if v.Type.HasBitfields() {
+		// residual ERROR sticky — no invent soft-count past HasBitfields hole
+		if HasError() {
+			return
+		}
 		lhsBitfieldsStructsVarsCnt++
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
+		return
 	}
 	if v.IsBitfield {
 		lhsBitfieldCnt++
@@ -299,6 +324,14 @@ func RecordVarsWithBitfields(t *Type) {
 		return
 	}
 	if !t.HasBitfields() {
+		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
+		if HasError() {
+			return
+		}
+		return
+	}
+	// residual ERROR sticky — no invent soft-count past HasBitfields residual true path
+	if HasError() {
 		return
 	}
 	level := t.IndirectLevel()
@@ -320,6 +353,14 @@ func RecordTypeWithBitfields(t *Type) {
 	}
 	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
 	if !t.HasBitfields() {
+		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
+		if HasError() {
+			return
+		}
+		return
+	}
+	// residual ERROR sticky — no invent soft-count past HasBitfields residual true path
+	if HasError() {
 		return
 	}
 	// Bookkeeper.cpp:482–483 — assert(len == fields.size()); Fields carry BitWidth

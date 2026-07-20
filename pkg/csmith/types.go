@@ -254,7 +254,15 @@ func (t *Type) HasIntField() bool {
 			return false
 		}
 		if f.Type.HasIntField() {
+			// residual ERROR sticky — no invent has-int true past nested HasIntField hole
+			if HasError() {
+				return false
+			}
 			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
+		if HasError() {
+			return false
 		}
 	}
 	return false
@@ -280,6 +288,14 @@ func (t *Type) ContainPointerField() bool {
 				return true
 			}
 			if f.Type.ContainPointerField() {
+				// residual ERROR sticky — no invent has-pointer true past nested hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later fields past nested residual false
+			if HasError() {
 				return true
 			}
 		}
@@ -763,6 +779,14 @@ func (t *Type) HasBitfields() bool {
 			return true
 		}
 		if f.Type.IsStruct() && f.Type.HasBitfields() {
+			// residual ERROR sticky — no invent has-bitfields true past nested hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
+		if HasError() {
 			return true
 		}
 	}
@@ -817,6 +841,14 @@ func (t *Type) HasPadding() bool {
 	}
 	for i, f := range t.Fields {
 		if t.IsBitfieldIndex(i) {
+			// residual ERROR sticky — no invent has-padding true past IsBitfieldIndex hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past IsBitfieldIndex residual
+		if HasError() {
 			return true
 		}
 		if f.Type == nil {
@@ -825,6 +857,14 @@ func (t *Type) HasPadding() bool {
 			return true
 		}
 		if f.Type.HasPadding() {
+			// residual ERROR sticky — no invent has-padding true past nested hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
+		if HasError() {
 			return true
 		}
 	}

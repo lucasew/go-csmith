@@ -280,7 +280,13 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		}
 		if forFieldVar && t.IsStruct() {
 			// Type.cpp:240–242 — reject when depth >= max_nested_struct_level
-			if t.StructDepth() >= opts.MaxNestedStructLevel {
+			d := t.StructDepth()
+			// residual ERROR sticky — no invent soft-continue filter past StructDepth hole
+			// (RndUptoFilter also fails closed on residual; reject candidate immediately)
+			if HasError() {
+				return true
+			}
+			if d >= opts.MaxNestedStructLevel {
 				return true
 			}
 		}

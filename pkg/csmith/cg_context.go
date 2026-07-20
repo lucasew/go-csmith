@@ -1634,6 +1634,14 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	}
 	// if the pointer variable itself was written by RHS
 	if c.EffectStm.IsWritten(lhs.Var) {
+		// residual ERROR sticky — no invent modified true past IsWritten hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue unmodified past IsWritten residual false
+	if HasError() {
 		return true
 	}
 	// incomplete collective sticky as modified (GetCollective already SetError)
@@ -1655,6 +1663,14 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 		}
 		for _, v := range tmp {
 			if c.EffectStm.IsWritten(v) {
+				// residual ERROR sticky — no invent modified true past IsWritten hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later pointees past IsWritten residual
+			if HasError() {
 				return true
 			}
 		}
