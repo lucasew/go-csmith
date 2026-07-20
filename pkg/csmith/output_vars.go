@@ -39,10 +39,12 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 		} else {
 			def = v.OutputDef(forceStatic)
 		}
+		// residual ERROR sticky — no invent soft-continue later vars past OutputDef residual
+		if HasError() {
+			return ""
+		}
 		if def == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(indent)

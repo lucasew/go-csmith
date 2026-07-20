@@ -2269,12 +2269,24 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 	if v.Type.IsSimple() {
 		// Variable.cpp:900–920 — name always live sticky; no invent empty transparent_crc
 		name := v.GetActualName(false)
+		// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
+		if HasError() {
+			return ""
+		}
 		if name == "" || v.Name == "" {
 			SetError(ErrGeneric)
 			return ""
 		}
 		if v.Type.IsFloat() {
+			// residual ERROR sticky — no invent crc_bytes past IsFloat residual hole
+			if HasError() {
+				return ""
+			}
 			return "    transparent_crc_bytes (&" + name + ", sizeof(" + name + "), \"" + v.Name + "\", print_hash_value);\n"
+		}
+		// residual ERROR sticky — no invent transparent_crc past IsFloat residual false path
+		if HasError() {
+			return ""
 		}
 		return "    transparent_crc(" + name + ", \"" + v.Name + "\", print_hash_value);\n"
 	}

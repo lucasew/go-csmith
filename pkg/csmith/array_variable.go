@@ -252,10 +252,24 @@ func (av *ArrayVariable) CDeclType() string {
 	}
 	var b strings.Builder
 	if av.IsConst() {
+		// residual ERROR sticky — no invent soft-const decl past IsConst residual hole
+		if HasError() {
+			return ""
+		}
 		b.WriteString("const ")
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue decl past IsConst residual false
+		return ""
 	}
 	if av.IsVolatile() {
+		// residual ERROR sticky — no invent soft-vol decl past IsVolatile residual hole
+		if HasError() {
+			return ""
+		}
 		b.WriteString("volatile ")
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue decl past IsVolatile residual false
+		return ""
 	}
 	b.WriteString(cn)
 	b.WriteString(" ")
@@ -275,7 +289,32 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	return av.Type.IsAggregate() || av.IsConst() || av.IsGlobal() || len(av.InitValues) > 0
+	if av.Type.IsAggregate() {
+		return true
+	}
+	if av.IsConst() {
+		// residual ERROR sticky — no invent no-loop true past IsConst residual hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue no-loop past IsConst residual false
+	if HasError() {
+		return true
+	}
+	if av.IsGlobal() {
+		// residual ERROR sticky — no invent no-loop true past IsGlobal residual hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue no-loop past IsGlobal residual false
+	if HasError() {
+		return true
+	}
+	return len(av.InitValues) > 0
 }
 
 // CountExprKeyVar mirrors count_expr_key_var (ArrayVariable.cpp:66–90).

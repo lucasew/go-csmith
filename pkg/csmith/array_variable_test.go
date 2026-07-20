@@ -628,6 +628,25 @@ func TestOutputDefInitExprOutputResidualSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestNoLoopInitializerNilSticky(t *testing.T) {
+	// Incomplete shell sticky no-loop true (no invent loop-init eligibility past hole).
+	ClearError()
+	if !(*ArrayVariable)(nil).NoLoopInitializer() {
+		t.Fatal("nil NoLoopInitializer must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil NoLoopInitializer must SetError sticky")
+	}
+	ClearError()
+	if !(&ArrayVariable{Variable: Variable{Name: "g_a"}}).NoLoopInitializer() {
+		t.Fatal("Type-nil NoLoopInitializer must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil NoLoopInitializer must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
 	// index Output residual soft invent was soft-continue later indices invent partial access.
 	ClearError()

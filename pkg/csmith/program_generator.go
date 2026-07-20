@@ -573,7 +573,12 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 	for _, v := range vs.GlobalList {
 		// pre-validated VariablesComplete
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
-		b.WriteString(v.hashOutput(ctrl, unionFacts))
+		part := v.hashOutput(ctrl, unionFacts)
+		// residual ERROR sticky — no invent soft-continue later globals past hash residual hole
+		if HasError() {
+			return ""
+		}
+		b.WriteString(part)
 	}
 	return b.String()
 }
@@ -617,6 +622,10 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 	// OutputMgr.cpp:104 — OutputArrayInitializers for global arrays (ctrl vars + loop inits)
 	b.WriteString(OutputArrayInitializers(g.VS.GlobalList, g.Opts, "    "))
+	// residual ERROR sticky — no invent main body past array-init residual hole
+	if HasError() {
+		return ""
+	}
 
 	// first-function invocation builder (shared by blind_check and normal path)
 	// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation always live when Funcs non-empty
@@ -720,6 +729,10 @@ func (g *ProgramGenerator) OutputMain() string {
 			// (ctrl vars from that path via get_last_ctrl_vars; no soft GetNew here)
 			// also used when step-hash helpers fail closed incomplete ctrl IR
 			b.WriteString(g.hashGlobals())
+			// residual ERROR sticky — no invent main past hashGlobals residual hole
+			if HasError() {
+				return ""
+			}
 		}
 		b.WriteString("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
 	} else {

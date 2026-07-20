@@ -56,6 +56,32 @@ func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestHashGlobalVariablesHashOutputResidualSticky(t *testing.T) {
+	// hashOutput residual soft invent was soft-continue later globals invent partial hash.
+	ClearError()
+	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	// IsArray without AsArray stickies hashOutput
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	vs := NewVariableSelector(Defaults())
+	vs.GlobalList = []*Variable{good, shell}
+	if s := HashGlobalVariables(vs); s != "" {
+		t.Fatal("hashOutput residual must fail closed whole HashGlobalVariables, not invent partial", s)
+	}
+	if !HasError() {
+		t.Fatal("hashOutput residual HashGlobalVariables must SetError sticky")
+	}
+	ClearError()
+	// residual mid-list must not invent hash of later complete globals only
+	vs.GlobalList = []*Variable{shell, good}
+	if s := HashGlobalVariables(vs); s != "" {
+		t.Fatal("early residual must fail closed before later globals", s)
+	}
+	if !HasError() {
+		t.Fatal("early residual HashGlobalVariables must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
 	// incomplete GlobalList must not invent ready via GetMaxArrayDimension -1 <= 0
 	opts := Defaults()
