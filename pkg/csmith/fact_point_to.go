@@ -1851,10 +1851,13 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 		if HasError() {
 			return IncompleteVariables()
 		}
-		// FactPointTo.cpp:694 assert(exist_fact) — non-sticky IncompleteVariables
-		// (generation soft re-pick before fact is installed; no invent empty skip)
+		// FactPointTo.cpp:691–696 — assert(exist_fact); if (exist_fact) merge.
+		// NDEBUG elides assert: missing fact skips that pointer (param mid-create,
+		// or OOS pointee still listed after UpdateFactsForOOSVars). Do not treat as
+		// IncompleteVariables — that invents visit_facts reject when release csmith
+		// continues with remaining pointees (seed-2 e2308: g_134→g_80 no fact).
 		if ft == nil {
-			return IncompleteVariables()
+			continue
 		}
 		for _, pointee := range ft.PointTo {
 			// PointTo Variable* always live; sticky (no invent soft-skip pointee hole)

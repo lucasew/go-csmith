@@ -889,7 +889,60 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							return
 						}
 					}
+					// Block.cpp:706–728 — after strip + reset_stm_fact_maps, always re-enter
+					// find_fixed_point (even with empty stms). Empty body still set_fact_in/out
+					// from inputs. Breaking here left MapFactsIn/Out deleted → complete-empty
+					// postLoop/global_facts (seed-2 e2308: EV rejects ** with nfacts=0).
 					if len(b.Stmts) == 0 {
+						out, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
+						if okEmpty {
+							postFacts = out
+						} else {
+							// install empty-body maps from entry facts (C++ find_fixed_point)
+							if !FactsComplete(factsCopy) {
+								fm.GlobalFacts = IncompleteFactSlice()
+								postFacts = IncompleteFactSlice()
+								fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+								SetError(ErrGeneric)
+								return
+							}
+							fm.SetMapFactsIn(b.StmID, factsCopy)
+							outCopy := CloneFactSlice(factsCopy)
+							for _, v := range b.LocalVars {
+								if v == nil {
+									fm.GlobalFacts = IncompleteFactSlice()
+									postFacts = IncompleteFactSlice()
+									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+									SetError(ErrGeneric)
+									return
+								}
+								AddNewVarFactTo(v, &outCopy)
+								if !FactsComplete(outCopy) {
+									fm.GlobalFacts = IncompleteFactSlice()
+									postFacts = IncompleteFactSlice()
+									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+									SetError(ErrGeneric)
+									return
+								}
+							}
+							if len(b.LocalVars) > 0 {
+								tmp := outCopy
+								saved := fm.GlobalFacts
+								fm.GlobalFacts = tmp
+								fm.UpdateFactsForOOSVars(b.LocalVars)
+								outCopy = fm.GlobalFacts
+								fm.GlobalFacts = saved
+								if !FactsComplete(outCopy) {
+									fm.GlobalFacts = IncompleteFactSlice()
+									postFacts = IncompleteFactSlice()
+									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+									SetError(ErrGeneric)
+									return
+								}
+							}
+							fm.SetMapFactsOut(b.StmID, outCopy)
+							postFacts = outCopy
+						}
 						break
 					}
 				}

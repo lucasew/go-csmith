@@ -445,27 +445,29 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 	ClearError()
 }
 
-func TestMergePointeesMissingFactFailClosed(t *testing.T) {
-	// FactPointTo.cpp:694 assert(exist_fact) — missing related fact fails closed
-	// (no invent soft-skip partial pointees / empty complete)
+func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
+	// FactPointTo.cpp:691–696 — assert(exist_fact); if (exist_fact) merge.
+	// NDEBUG: missing related fact skips that pointer (empty complete, not Incomplete).
 	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	// facts empty / no related fact for p — non-sticky soft re-pick
-	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, nil)) {
-		t.Fatal("missing exist_fact must fail closed incomplete, not invent empty skip")
+	// facts empty / no related fact for p — NDEBUG skip → empty complete
+	got := MergePointeesOfPointers([]*Variable{p}, nil)
+	if !VariablesComplete(got) || len(got) != 0 {
+		t.Fatalf("missing exist_fact must NDEBUG-skip empty complete, got %+v", got)
 	}
 	if HasError() {
-		t.Fatal("missing exist_fact must stay non-sticky soft re-pick")
+		t.Fatal("missing exist_fact must not sticky")
 	}
 	ClearError()
-	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{})) {
-		t.Fatal("empty facts without related must fail closed incomplete")
+	got = MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{})
+	if !VariablesComplete(got) || len(got) != 0 {
+		t.Fatalf("empty facts without related must NDEBUG-skip empty, got %+v", got)
 	}
 	if HasError() {
-		t.Fatal("empty facts missing related must stay non-sticky")
+		t.Fatal("empty facts missing related must not sticky")
 	}
 	ClearError()
-	// incomplete fact map non-sticky
+	// incomplete fact map still fails closed non-sticky
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("incomplete facts must fail closed incomplete")
 	}
@@ -475,7 +477,7 @@ func TestMergePointeesMissingFactFailClosed(t *testing.T) {
 	ClearError()
 	// complete related fact still works
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	got := MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, tgt)})
+	got = MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, tgt)})
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != tgt {
 		t.Fatalf("complete related fact: %+v", got)
 	}
@@ -483,6 +485,12 @@ func TestMergePointeesMissingFactFailClosed(t *testing.T) {
 	sp := MergePointeesOfPointers([]*Variable{NullPtr}, nil)
 	if !VariablesComplete(sp) || len(sp) != 0 {
 		t.Fatal("specials-only must yield empty complete, not fail closed", sp)
+	}
+	// multi: one missing + one present → only present's pointees
+	p2 := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	got = MergePointeesOfPointers([]*Variable{p, p2}, []*FactPointTo{MakeFactPointTo(p, tgt)})
+	if !VariablesComplete(got) || len(got) != 1 || got[0] != tgt {
+		t.Fatalf("partial missing must merge remaining: %+v", got)
 	}
 	// PointTo nil hole is FactsComplete-false → non-sticky incomplete map path
 	bad := MakeFactPointTo(p, tgt)
@@ -499,12 +507,13 @@ func TestMergePointeesMissingFactFailClosed(t *testing.T) {
 func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
 	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	// indirect 1 with missing fact → incomplete non-sticky (not invent empty step)
-	if VariablesComplete(MergePointeesOfPointer(p, 1, nil)) {
-		t.Fatal("missing fact at indir 1 must propagate incomplete")
+	// indirect 1 with missing fact → NDEBUG skip → empty complete (not Incomplete)
+	gotMiss := MergePointeesOfPointer(p, 1, nil)
+	if !VariablesComplete(gotMiss) || len(gotMiss) != 0 {
+		t.Fatalf("missing fact at indir 1 must NDEBUG empty complete, got %+v", gotMiss)
 	}
 	if HasError() {
-		t.Fatal("missing fact MergePointeesOfPointer must stay non-sticky soft re-pick")
+		t.Fatal("missing fact MergePointeesOfPointer must not sticky")
 	}
 	ClearError()
 	// indirect 0 does not look up facts
