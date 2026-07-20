@@ -1640,9 +1640,13 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			return
 		}
 		// map_facts_in: stm in_block(blk) || blk==null
+		// Use parent-chain fall-back so mid-generation for/if bodies (Parent set,
+		// not yet linked into parent.Stmts) still receive the new fact. MapFactsOut
+		// keeps tree-only stmtIDInBlock — unlinked Block keys cannot FindStmtByID
+		// and would IncompleteFactSlice the out slot (generation poison).
 		if fm.MapFactsIn != nil {
 			for id := range fm.MapFactsIn {
-				if blk != nil && !stmtIDInBlock(fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
 					continue
 				}
 				// incomplete map slot — stay incomplete (no invent soft-append past hole)
@@ -1718,7 +1722,10 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 }
 
 // stmtIDInBlock reports Statement::in_block(blk) for a statement id under func.
+// Tree walk (BlockContainsStmID) for MapFactsOut — statement must already be
+// linked so FindStmtByID can resolve it.
 func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
+	_ = f
 	// Block + live StmID always required; sticky false (align BlockContainsStmID)
 	if blk == nil || stmID <= 0 {
 		SetError(ErrGeneric)
@@ -1726,6 +1733,58 @@ func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
 	}
 	// BlockContainsStmID walks nested Then/Else under blk
 	return BlockContainsStmID(blk, stmID)
+}
+
+// stmtIDInBlockMapIn is Statement::in_block for map_facts_in updates.
+// Statement.cpp:380–389 — walk parent chain for blk.
+//
+// Same as stmtIDInBlock when the statement is linked under blk. Additionally:
+// mid-generation for/if bodies exist on Func.Blocks/Stack with Parent set before
+// the enclosing For/If is linked into parent.Stmts — tree walk misses them.
+// Fall back to Block.Parent chain so outer-parent-local facts reach
+// map_facts_in[for-body]. Without that, post_loop Analysis wiped GlobalFacts and
+// Lhs opportunistic_validate rejected the still-live local (seed-2 e9003:
+// UP U120 vs Go F80 after SelectParentLocal l_138).
+func stmtIDInBlockMapIn(f *Function, stmID int, blk *Block) bool {
+	if blk == nil || stmID <= 0 {
+		SetError(ErrGeneric)
+		return false
+	}
+	if BlockContainsStmID(blk, stmID) {
+		return true
+	}
+	// Tree miss: sticky incomplete IR from BlockContainsStmID stays fail closed.
+	if HasError() {
+		return false
+	}
+	if f == nil {
+		return false
+	}
+	for _, b := range f.Blocks {
+		if b != nil && b.StmID == stmID {
+			return blockParentChainContains(b, blk)
+		}
+	}
+	for _, b := range f.Stack {
+		if b != nil && b.StmID == stmID {
+			return blockParentChainContains(b, blk)
+		}
+	}
+	return false
+}
+
+// blockParentChainContains is Statement::in_block for a Block-as-statement:
+// walk Parent (excluding self) looking for target.
+func blockParentChainContains(b, target *Block) bool {
+	if b == nil || target == nil {
+		return false
+	}
+	for tmp := b.Parent; tmp != nil; tmp = tmp.Parent {
+		if tmp == target {
+			return true
+		}
+	}
+	return false
 }
 
 // lhsAssignPointees mirrors merge_pointees_of_pointer used by abstract_fact_for_assign.
