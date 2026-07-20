@@ -241,7 +241,8 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 
 // TestMakeRandomIfSharesEffectAccumWithParent — StatementIf.cpp:93–99 both arms
 // use the same CGContext (shared effect_accum). Forked then/else snapshots lost
-// arm reads for later StatementGoto choose_visible_read_var (seed-2 e12693).
+// arm reads for later StatementGoto choose_visible_read_var (seed-2 e12693:
+// nread 29→46 after share; still short of UP 56 until other units fixed).
 func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
 	ClearError()
 	opts := Defaults()
@@ -249,6 +250,10 @@ func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
+	// assign-only arms so generation writes/reads globals into shared accum
+	tab := &ThresholdTable{}
+	tab.Add(100, int(StmtAssign))
+	opts.MaxBlockSize = 2
 	r := NewRng(2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
@@ -256,20 +261,34 @@ func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
 	f.Stack = []*Block{parent}
 	fm := NewFactMgr(f)
 	pre := CreateVariableScalars("pre_if_rd", GetIntType(), true, false)
+	g1 := CreateVariableScalars("g_if_arm", GetIntType(), true, false)
+	vs.GlobalList = append(vs.GlobalList, g1)
 	accum := EmptyEffect().ReadVar(pre)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &accum
+	cg.Types = vs.Types
 	thenCG := cg.CloneSubcontext()
 	if thenCG.EffectAccum != cg.EffectAccum {
 		t.Fatal("CloneSubcontext must share EffectAccum pointer (C++ same cg_context)")
 	}
-	_ = MakeRandomIf(NewRng(9), opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomIf(NewRng(9), opts, probs, vs, tables, tab, &cg)
 	if cg.EffectAccum == nil {
 		t.Fatal("parent EffectAccum must remain non-nil")
 	}
 	if !cg.EffectAccum.IsRead(pre) {
 		t.Fatal("parent EffectAccum must keep pre-if reads when arms share accum")
 	}
+	// shared pointer: arm generation must not rebind parent to a private snapshot
+	if cg.EffectAccum != &accum {
+		t.Fatal("MakeRandomIf must keep parent EffectAccum pointer identity (C++ shared)")
+	}
+	if st != nil && st.StmID > 0 && fm != nil {
+		// map_stm_effect[if] = cond + then_block + else_block (sequential mutates)
+		if !EffectComplete(fm.GetMapStmEffect(st.StmID)) {
+			t.Fatal("if map_stm_effect must be complete after set_accumulated_effect_after_block")
+		}
+	}
+	_ = g1
 	ClearError()
 }
 

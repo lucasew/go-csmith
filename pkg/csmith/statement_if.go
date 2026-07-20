@@ -188,17 +188,37 @@ func MakeRandomIf(
 	// (combine_branch_facts runs in post_creation_analysis / visit_facts)
 
 	st := &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB, StmID: AllocStmID()}
-	// StatementIf.cpp:105–106 — set_accumulated_effect_after_block(eff, each branch)
-	// Incomplete cond/arm effects fail closed (no invent if stmt with Incomplete map_stm)
-	if !EffectComplete(condEff) || !EffectComplete(thenCG.EffectStm) || !EffectComplete(elseCG.EffectStm) {
-		SetError(ErrGeneric)
-		return nil
-	}
-	SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, cg, condEff)
-	SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, cg, condEff)
-	if cg.FM != nil && !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-		SetError(ErrGeneric)
-		return nil
+	// StatementIf.cpp:105–106 / Statement.cpp:515–520 —
+	// set_accumulated_effect_after_block(eff, block): eff += map_stm_effect[block];
+	// map_stm_effect[this] = eff. C++ mutates the same Effect& across both calls so
+	// final map = cond + then_block + else_block (not cond+else overwriting then).
+	// Do not use arm EffectStm (last statement only); use map_stm_effect of each Block.
+	if cg.FM != nil {
+		thenMap := cg.FM.GetMapStmEffect(thenB.StmID)
+		elseMap := cg.FM.GetMapStmEffect(elseB.StmID)
+		if !EffectComplete(condEff) || !EffectComplete(thenMap) || !EffectComplete(elseMap) {
+			cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
+			SetError(ErrGeneric)
+			return nil
+		}
+		// first call: cond + then
+		SetAccumulatedEffectAfterBlock(st, thenMap, cg, condEff)
+		if HasError() {
+			return nil
+		}
+		// second call: (cond+then) + else — base is stored map from first call
+		mid := cg.FM.GetMapStmEffect(st.StmID)
+		if !EffectComplete(mid) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		SetAccumulatedEffectAfterBlock(st, elseMap, cg, mid)
+		if HasError() || !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return nil
+		}
 	}
 	// effect_accum already holds true+false generation reads (shared pointer)
 	return st

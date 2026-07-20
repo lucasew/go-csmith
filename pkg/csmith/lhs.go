@@ -502,19 +502,33 @@ func MakeRandomLhs(
 	}
 
 	// Lhs.cpp:67–69 — save effects for visit_facts backtrack
+	// C++ Effect effect_accum = *effect_accum is a deep copy of vectors; Clone() matches
+	// (shallow *EffectAccum shares maps and can corrupt the snapshot if later mutated).
 	var accumSave *Effect
 	if cg.EffectAccum != nil {
-		cp := *cg.EffectAccum
+		cp := cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-LHS past Effect Clone residual
+		if HasError() {
+			return nil
+		}
+		if !EffectComplete(cp) {
+			SetError(ErrGeneric)
+			return nil
+		}
 		accumSave = &cp
 	}
-	stmSave := cg.EffectStm
+	stmSave := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-LHS past EffectStm Clone residual
+	if HasError() {
+		return nil
+	}
 
 	restore := func() {
 		// Lhs.cpp:135–139 — reset_effect_accum + reset_effect_stm
 		if accumSave != nil && cg.EffectAccum != nil {
-			*cg.EffectAccum = *accumSave
+			*cg.EffectAccum = accumSave.Clone()
 		}
-		cg.EffectStm = stmSave
+		cg.EffectStm = stmSave.Clone()
 	}
 
 	// Lhs.cpp:70–140 — do { DEPTH_GUARD; select; filters; visit } while (true).

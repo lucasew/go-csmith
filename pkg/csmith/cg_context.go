@@ -4,6 +4,7 @@ package csmith
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -353,6 +354,14 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 	if c == nil {
 		SetError(ErrGeneric)
 		return
+	}
+	if os.Getenv("CSMITH_DEBUG_G32") != "" && c.EffectAccum != nil {
+		had32 := c.EffectAccum.IsReadByName("g_32")
+		ClearError()
+		if had32 {
+			fmt.Fprintf(os.Stderr, "RESET_ACCUM had_g32 nread=%d\n", len(c.EffectAccum.ReadVars()))
+			ClearError()
+		}
 	}
 	cp := e.Clone()
 	// residual ERROR sticky — no invent soft-reset past IncompleteEffect Clone residual
@@ -1266,9 +1275,19 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		SetError(ErrGeneric)
 		return false
 	}
+	// CGContext.cpp:218 — Effect effect_accum_copy = *effect_accum (deep vector copy).
+	// Clone() matches; shallow *EffectAccum shares maps with live accum.
 	var accumCopy *Effect
 	if c.EffectAccum != nil {
-		cp := *c.EffectAccum
+		cp := c.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-read_pointed past Effect Clone residual
+		if HasError() {
+			return false
+		}
+		if !EffectComplete(cp) {
+			SetError(ErrGeneric)
+			return false
+		}
 		accumCopy = &cp
 	}
 	IncrCounter(&dereferenceLevelCnts, indirect)
@@ -1360,9 +1379,18 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 		// not a deref write — complete false (caller uses CheckWriteVar)
 		return false
 	}
+	// CGContext.cpp:257 — Effect effect_accum_copy = *effect_accum (deep copy)
 	var accumCopy *Effect
 	if c.EffectAccum != nil {
-		cp := *c.EffectAccum
+		cp := c.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-write_pointed past Effect Clone residual
+		if HasError() {
+			return false
+		}
+		if !EffectComplete(cp) {
+			SetError(ErrGeneric)
+			return false
+		}
 		accumCopy = &cp
 	}
 	IncrCounter(&dereferenceLevelCnts, indirect)
