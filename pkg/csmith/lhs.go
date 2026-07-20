@@ -541,13 +541,17 @@ func MakeRandomLhs(
 			restore()
 			return nil
 		}
-		// Lhs.cpp:77–87 — flipcoin SelectDerefPointerProb
+		// Lhs.cpp:77–87 — always rnd_flipcoin(SelectDerefPointerProb()) then maybe
+		// select_deref_pointer. Do not skip the draw when prob==0 (still consumes RNG).
 		if v == nil {
 			derefProb := 0
 			if probs != nil {
 				derefProb = probs.Single(PSelectDerefPointerProb)
 			}
-			if derefProb > 0 && r.RndFlipcoin(uint32(derefProb)) {
+			if derefProb < 0 {
+				derefProb = 0
+			}
+			if r.RndFlipcoin(uint32(derefProb)) {
 				v = selectDerefPointerInv(r, opts, probs, vs, *cg, typ, &q, AccessWrite, dummy)
 				// residual ERROR sticky — no invent soft-continue past deref select hole
 				if HasError() {

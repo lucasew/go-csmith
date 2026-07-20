@@ -40,24 +40,57 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 		t.Fatal("incomplete facts must SetError sticky")
 	}
 	ClearError()
-	// null, prob 0 → 0
+	// null, prob 0 → 0; FactPointTo.cpp:455 still rnd_flipcoin(0)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	if OpportunisticValidate(NewRng(1), p, GetIntType(), facts, 0, 0) != 0 {
+	rNull := NewRng(1)
+	d0 := rNull.RandDepth()
+	if OpportunisticValidate(rNull, p, GetIntType(), facts, 0, 0) != 0 {
 		t.Fatal("null blocked")
 	}
-	// live target → 1
+	if rNull.RandDepth() != d0+1 {
+		t.Fatalf("null p=0 must still flipcoin once: depth %d → %d", d0, rNull.RandDepth())
+	}
+	// live target → 1 (no flip when not null/dead)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	facts = []*FactPointTo{MakeFactPointTo(p, tgt)}
-	if OpportunisticValidate(NewRng(1), p, GetIntType(), facts, 0, 0) != 1 {
+	rLive := NewRng(1)
+	dLive := rLive.RandDepth()
+	if OpportunisticValidate(rLive, p, GetIntType(), facts, 0, 0) != 1 {
 		t.Fatal("live")
 	}
-	// garbage, prob 0 → 0
+	if rLive.RandDepth() != dLive {
+		t.Fatalf("live pointees must not flipcoin: depth %d → %d", dLive, rLive.RandDepth())
+	}
+	// garbage, prob 0 → 0; FactPointTo.cpp:464 still rnd_flipcoin(0)
 	facts = []*FactPointTo{NewFactPointTo(p)}
-	if OpportunisticValidate(NewRng(1), p, GetIntType(), facts, 0, 0) != 0 {
+	rDead := NewRng(1)
+	dDead := rDead.RandDepth()
+	if OpportunisticValidate(rDead, p, GetIntType(), facts, 0, 0) != 0 {
 		t.Fatal("dead blocked")
+	}
+	if rDead.RandDepth() != dDead+1 {
+		t.Fatalf("dead p=0 must still flipcoin once: depth %d → %d", dDead, rDead.RandDepth())
 	}
 	if HasError() {
 		t.Fatal("complete dead blocked must not sticky")
+	}
+	// null+dead both set: two flips (null then dead)
+	facts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	// make dead+null fact: NewFactPointTo is garbage/dead; force null+dead via fields
+	fBoth := MakeFactPointTo(p, NullPtr)
+	// IsDead for null pointees? if only null, one flip. dead-only above. allow-unsafe path:
+	rAllow := NewRng(1)
+	if OpportunisticValidate(rAllow, p, GetIntType(), []*FactPointTo{fBoth}, 100, 0) != 2 {
+		// p=100 always allows null unsafe when is_null
+		t.Fatal("null with nullProb=100 must allow ret=2")
+	}
+	// nil r on null path sticky (C++ always has process RNG for flipcoin)
+	ClearError()
+	if OpportunisticValidate(nil, p, GetIntType(), []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 0, 0) != 0 {
+		t.Fatal("nil r null path must reject")
+	}
+	if !HasError() {
+		t.Fatal("nil r null path must SetError sticky")
 	}
 	ClearError()
 }

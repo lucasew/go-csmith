@@ -306,7 +306,8 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 
 // OpportunisticValidate mirrors FactPointTo::opportunistic_validate.
 // FactPointTo.cpp:442–472 — 0 reject, 1 ok, 2 allowed unsafe deref via flipcoin.
-// r may be nil when both probs are 0 (deterministic reject on null/dead).
+// FactPointTo.cpp:455 / 464 — always rnd_flipcoin(prob) when is_null / is_dead,
+// including prob==0 (still consumes RNG + traces F p=0). Do not skip the draw.
 // Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).
 func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
 	// live Variable* + Type* required; sticky no invent "not valid" soft success past hole
@@ -337,7 +338,17 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 		if HasError() {
 			return 0
 		}
-		if nullProb > 0 && r != nil && r.RndFlipcoin(uint32(nullProb)) {
+		// FactPointTo.cpp:455 — rnd_flipcoin(null_pointer_dereference_prob()) always
+		// (p=0 still draws). Process RNG always live; sticky no invent reject without draw.
+		if r == nil {
+			SetError(ErrGeneric)
+			return 0
+		}
+		p := nullProb
+		if p < 0 {
+			p = 0
+		}
+		if r.RndFlipcoin(uint32(p)) {
 			ret = 2
 		} else {
 			return 0
@@ -354,7 +365,16 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 		if HasError() {
 			return 0
 		}
-		if deadProb > 0 && r != nil && r.RndFlipcoin(uint32(deadProb)) {
+		// FactPointTo.cpp:464 — rnd_flipcoin(dead_pointer_dereference_prob()) always
+		if r == nil {
+			SetError(ErrGeneric)
+			return 0
+		}
+		p := deadProb
+		if p < 0 {
+			p = 0
+		}
+		if r.RndFlipcoin(uint32(p)) {
 			ret = 2
 		} else {
 			return 0
