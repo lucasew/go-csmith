@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -36,4 +37,10 @@ func CreateDir(dir string) bool {
 		return true
 	}
 	return false
+}
+
+// IsX8664 mirrors CGOptions::x86_64.
+// CGOptions.cpp:579–585 — true when built for x86_64 host.
+func IsX8664() bool {
+	return runtime.GOARCH == "amd64"
 }

@@ -38,6 +38,8 @@ func DoFinalization() {
 	// Clearing them here would soft-break nested make_random mid-run.
 	// CompatibleChecker process static (re-enable via resolve if needed)
 	ResetCompatibleCheck()
+	// OutputMgr monitored_funcs_ / curr_func_
+	ClearMonitoredFuncs()
 	// RandomNumber::doFinalization — Finalization.cpp:53
 	// Cleared here; ProgramGenerator re-CreateInstance / SetProcessRng after.
 	RandomNumberDoFinalization()

@@ -38,14 +38,14 @@ import (
 // processExprTables mirrors Expression::exprTable_/paramTable_ (InitProbabilityTables).
 // Both are set once from Probabilities::initialize_group_probs; nil = fail closed.
 var (
-	processOptsMu      sync.RWMutex
-	processOpts        = Defaults()
-	processProbs       *Probabilities
-	processRng         *Rng
-	processStmtTab     *ThresholdTable
-	processScopeTab    *ThresholdTable
+	processOptsMu       sync.RWMutex
+	processOpts         = Defaults()
+	processProbs        *Probabilities
+	processRng          *Rng
+	processStmtTab      *ThresholdTable
+	processScopeTab     *ThresholdTable
 	processAssignOpsTab *DistributionTable
-	processExprTables  *ExprTables
+	processExprTables   *ExprTables
 )
 
 // SetProcessOptions installs the active process Options (CGOptions mirror).
@@ -213,11 +213,11 @@ type Options struct {
 	MaxArrayLength       int
 	MaxArrayNumInLoop    int
 	MaxExhaustiveDepth   int
-	InlineFunctionProb  int
-	BuiltinFunctionProb int
-	ArrayOOBProb        int
-	StopByStmt          int
-	CoverageTestSize    int
+	InlineFunctionProb   int
+	BuiltinFunctionProb  int
+	ArrayOOBProb         int
+	StopByStmt           int
+	CoverageTestSize     int
 
 	// Extension/mode switches
 	RandomBased   bool
@@ -228,48 +228,48 @@ type Options struct {
 	DepthProtect  bool
 
 	// Core generation features
-	ComputeHash              bool
-	AcceptArgc               bool
-	Arrays                   bool
-	Bitfields                bool
-	CompoundAssignment       bool
-	Consts                   bool
-	Divs                     bool
-	Muls                     bool
-	EmbeddedAssigns          bool
-	CommaOperators           bool
-	PreIncrOperator          bool
-	PreDecrOperator          bool
-	PostIncrOperator         bool
-	PostDecrOperator         bool
-	UnaryPlusOperator        bool
-	Jumps                    bool
-	LongLong                 bool
-	Int8                     bool
-	UInt8                    bool
-	EnableFloat              bool
-	Math64                   bool
-	InlineFunction           bool
-	Pointers                 bool
-	Structs                  bool
-	ReturnStructs            bool
-	ArgStructs               bool
-	Unions                   bool
-	ReturnUnions             bool
-	ArgUnions                bool
-	TakeUnionFieldAddr       bool
-	VolStructUnionFields     bool
-	ConstStructUnionFields   bool
-	Volatiles                bool
-	VolatilePointers         bool
-	ConstPointers            bool
-	GlobalVariables          bool
-	StrictConstArrays        bool
-	AccessOnce               bool
-	StrictVolatileRule       bool
-	AddrTakenOfLocals        bool
-	DanglingGlobalPointers   bool
-	NoReturnDeadPointer      bool
+	ComputeHash            bool
+	AcceptArgc             bool
+	Arrays                 bool
+	Bitfields              bool
+	CompoundAssignment     bool
+	Consts                 bool
+	Divs                   bool
+	Muls                   bool
+	EmbeddedAssigns        bool
+	CommaOperators         bool
+	PreIncrOperator        bool
+	PreDecrOperator        bool
+	PostIncrOperator       bool
+	PostDecrOperator       bool
+	UnaryPlusOperator      bool
+	Jumps                  bool
+	LongLong               bool
+	Int8                   bool
+	UInt8                  bool
+	EnableFloat            bool
+	Math64                 bool
+	InlineFunction         bool
+	Pointers               bool
+	Structs                bool
+	ReturnStructs          bool
+	ArgStructs             bool
+	Unions                 bool
+	ReturnUnions           bool
+	ArgUnions              bool
+	TakeUnionFieldAddr     bool
+	VolStructUnionFields   bool
+	ConstStructUnionFields bool
+	Volatiles              bool
+	VolatilePointers       bool
+	ConstPointers          bool
+	GlobalVariables        bool
+	StrictConstArrays      bool
+	AccessOnce             bool
+	StrictVolatileRule     bool
+	AddrTakenOfLocals      bool
+	DanglingGlobalPointers bool
+	NoReturnDeadPointer    bool
 	// InterestedFacts is FactMgr meta_facts bitmask (ePointTo|eUnionWrite).
 	// 0 means use DefaultInterestedFacts at generation time.
 	InterestedFacts          int
@@ -332,6 +332,8 @@ type Options struct {
 	EnableBuiltinKinds       string
 	DisableBuiltinKinds      string
 	NoDeltaReduction         bool
+	// VolTestsMach mirrors CGOptions::vol_tests_mach_ (machine string for vol tests).
+	VolTestsMach string
 
 	// Keep an escape hatch for the current simplified generator shape.
 	MaxGlobals int
@@ -358,12 +360,12 @@ func Defaults() Options {
 		MaxNestedStructLevel: 3,
 		// CGOptions::max_indirect_level = CGOPTIONS_DEFAULT_MAX_INDIRECT_LEVEL (5).
 		// Older residual-era default of 2 was wrong vs upstream.
-		MaxPointerDepth:      5,
-		MaxArrayDim:          3,
-		MaxArrayLenPerDim:    10,
-		MaxArrayLength:       256,
-		MaxArrayNumInLoop:    4,
-		MaxExhaustiveDepth:   -1,
+		MaxPointerDepth:     5,
+		MaxArrayDim:         3,
+		MaxArrayLenPerDim:   10,
+		MaxArrayLength:      256,
+		MaxArrayNumInLoop:   4,
+		MaxExhaustiveDepth:  -1,
 		InlineFunctionProb:  50,
 		BuiltinFunctionProb: 50,
 		ArrayOOBProb:        0,
@@ -475,9 +477,24 @@ func Defaults() Options {
 		EnableBuiltinKinds:       "",
 		DisableBuiltinKinds:      "",
 		NoDeltaReduction:         false,
+		VolTestsMach:             "",
 
 		MaxGlobals: 80,
 	}
+}
+
+// FuncAttrFlag mirrors CGOptions::func_attr_flag — FunctionAttributes option.
+// CGOptions.cpp DEFINE_GETTER_SETTER_BOOL(func_attr_flag).
+func (o Options) FuncAttrFlag() bool { return o.FunctionAttributes }
+
+// VolTestsMachValue mirrors CGOptions::vol_tests_mach.
+// CGOptions.cpp:589–591.
+func (o Options) VolTestsMachValue() string { return o.VolTestsMach }
+
+// ApplyMonitoredFuncs installs Options.MonitorFuncs into OutputMgr process list.
+// Call from generation setup (CGOptions::monitored_funcs).
+func (o Options) ApplyMonitoredFuncs() {
+	SetMonitoredFuncs(o.MonitorFuncs)
 }
 
 // AllowInt64 mirrors CGOptions::allow_int64.

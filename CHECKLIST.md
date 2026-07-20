@@ -256,7 +256,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.force_non_uniform_array_init
 - [x] CGOptions.cpp::CGOptions.fresh_array_ctrl_var_names
 - [x] CGOptions.cpp::CGOptions.func1_max_params
-- [ ] CGOptions.cpp::CGOptions.func_attr_flag
+- [x] CGOptions.cpp::CGOptions.func_attr_flag
 - [x] CGOptions.cpp::CGOptions.global_variables
 - [x] CGOptions.cpp::CGOptions.go_delta
 - [x] CGOptions.cpp::CGOptions.has_conflict
@@ -297,7 +297,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.max_split_files
 - [x] CGOptions.cpp::CGOptions.max_struct_fields
 - [x] CGOptions.cpp::CGOptions.max_union_fields
-- [ ] CGOptions.cpp::CGOptions.monitored_funcs
+- [x] CGOptions.cpp::CGOptions.monitored_funcs
 - [x] CGOptions.cpp::CGOptions.muls
 - [x] CGOptions.cpp::CGOptions.no_delta_reduction
 - [x] CGOptions.cpp::CGOptions.no_return_dead_ptr
@@ -306,7 +306,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.output_file
 - [x] CGOptions.cpp::CGOptions.packed_struct
 - [x] CGOptions.cpp::CGOptions.paranoid
-- [ ] CGOptions.cpp::CGOptions.parse_string_options
+- [x] CGOptions.cpp::CGOptions.parse_string_options
 - [x] CGOptions.cpp::CGOptions.partial_expand
 - [x] CGOptions.cpp::CGOptions.pointer_size
 - [x] CGOptions.cpp::CGOptions.pointers
@@ -347,11 +347,11 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.use_union
 - [x] CGOptions.cpp::CGOptions.var_attr_flag
 - [x] CGOptions.cpp::CGOptions.vol_struct_union_fields
-- [ ] CGOptions.cpp::CGOptions.vol_tests_mach
+- [x] CGOptions.cpp::CGOptions.vol_tests_mach
 - [x] CGOptions.cpp::CGOptions.volatile_pointers
 - [x] CGOptions.cpp::CGOptions.volatiles
 - [x] CGOptions.cpp::CGOptions.wrap_volatiles
-- [ ] CGOptions.cpp::CGOptions.x86_64
+- [x] CGOptions.cpp::CGOptions.x86_64
 - [x] CompatibleChecker.cpp::CompatibleChecker.compatible_check
 - [x] CompatibleChecker.cpp::CompatibleChecker.enable_compatible_check
 - [ ] Constant.cpp::Constant.clone
@@ -1212,7 +1212,7 @@ Total items: 2070
 - [ ] LinearSequence.cpp::LinearSequence.sequence_length
 - [ ] LinearSequence.cpp::LinearSequence.~LinearSequence
 - [ ] OutputMgr.cpp::OutputMgr.get_main_out
-- [ ] OutputMgr.cpp::OutputMgr.is_monitored_func
+- [x] OutputMgr.cpp::OutputMgr.is_monitored_func
 - [ ] OutputMgr.cpp::OutputMgr.Output
 - [ ] OutputMgr.cpp::OutputMgr.output_comment_line
 - [ ] OutputMgr.cpp::OutputMgr.output_tab
@@ -1231,7 +1231,7 @@ Total items: 2070
 - [ ] OutputMgr.cpp::OutputMgr.OutputStructUnions
 - [ ] OutputMgr.cpp::OutputMgr.OutputTail
 - [ ] OutputMgr.cpp::OutputMgr.really_outputln
-- [ ] OutputMgr.cpp::OutputMgr.set_curr_func
+- [x] OutputMgr.cpp::OutputMgr.set_curr_func
 - [ ] OutputMgr.cpp::OutputMgr.~OutputMgr
 - [ ] PartialExpander.cpp::PartialExpander.copy_expands
 - [ ] PartialExpander.cpp::PartialExpander.direct_expand_check

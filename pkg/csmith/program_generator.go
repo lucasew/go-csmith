@@ -30,6 +30,8 @@ type ProgramGenerator struct {
 func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// CGOptions process-wide state for Constant::make_random / choose_var / emit.
 	SetProcessOptions(opts)
+	// CGOptions::monitored_funcs → OutputMgr::monitored_funcs_
+	opts.ApplyMonitoredFuncs()
 	seed := opts.Seed
 	// RandomNumber::CreateInstance(rDefaultRndNumGenerator, seed)
 	// RandomNumber.cpp:63–74 — process singleton + DefaultRndNumGenerator.
