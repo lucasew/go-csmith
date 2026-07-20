@@ -368,6 +368,32 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 		t.Fatal("nil field type PrintfDirective must SetError sticky")
 	}
 	ClearError()
+	// nested residual soft invent was soft-continue later fields invent partial "{%d, {%d}}"
+	// nested aggregate with Type-nil field stickies nested PrintfDirective
+	nested := &Type{
+		isStruct:   true,
+		StructName: "Nest",
+		Fields: []StructField{
+			{Name: "x", Type: GetIntType(), BitWidth: -1},
+			{Name: "y", Type: nil, BitWidth: -1},
+		},
+	}
+	st2 := &Type{
+		isStruct:   true,
+		StructName: "S1",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f1", Type: nested, BitWidth: -1},
+			{Name: "f2", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	if s := st2.PrintfDirective(); s != "" {
+		t.Fatal("nested residual must fail closed whole PrintfDirective, not invent partial", s)
+	}
+	if !HasError() {
+		t.Fatal("nested residual PrintfDirective must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasAggregateAndLongLongField(t *testing.T) {

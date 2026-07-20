@@ -598,11 +598,13 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 			return ""
 		}
 		initOut := av.OutputInit(indent, names)
+		// residual ERROR sticky — no invent soft-continue later arrays past OutputInit residual
+		if HasError() {
+			return ""
+		}
 		// incomplete loop-init IR sticky — fail closed whole initializers
 		if initOut == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(initOut)
@@ -1930,24 +1932,45 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
 	if v.IsVirtual() {
+		// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual hole
+		if HasError() {
+			return ""
+		}
 		// field of virtual array is broken IR sticky for this path
 		if v.IsFieldVar() {
+			// residual ERROR sticky — no invent soft-continue dump past IsFieldVar residual
+			if HasError() {
+				return ""
+			}
 			SetError(ErrGeneric)
+			return ""
+		}
+		// residual ERROR sticky — no invent soft-continue dump past IsFieldVar residual false
+		if HasError() {
 			return ""
 		}
 		if v.IsArray || (v.AsArray != nil && len(v.AsArray.Sizes) > 0) {
 			return outputValueDumpArray(v, prefix, indent, unionFacts)
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual false
+		return ""
 	}
 	if v.Type.IsSimple() {
 		// Variable.cpp:1184–1188 — name + printf_directive always live sticky
 		// no invent printf with empty name/directive
 		name := v.GetActualName(false)
+		// residual ERROR sticky — no invent dump past GetActualName residual hole
+		if HasError() {
+			return ""
+		}
 		dir := v.Type.PrintfDirective()
+		// residual ERROR sticky — no invent dump past PrintfDirective residual hole
+		if HasError() {
+			return ""
+		}
 		if name == "" || dir == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"

@@ -177,6 +177,33 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
+	// body Output residual soft invent was soft-continue later funcs invent partial section.
+	ClearError()
+	// incomplete body: Type-nil RV → OutputOpts residual empty sticky
+	bad := &Function{
+		Name: "func_bad", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
+		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2,
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		RV: &Variable{Name: "func_bad_rv"}, // Type nil
+	}
+	good := &Function{
+		Name: "func_ok", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
+		Body: &Block{StmID: 3, Stmts: []Stmt{{Kind: StmtReturn, StmID: 4,
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
+		RV: CreateVariableScalars("func_ok_rv", GetIntType(), false, false),
+	}
+	g := NewProgramGenerator(Defaults())
+	g.Funcs.Funcs = []*Function{bad, good}
+	if s := g.OutputFunctions(); s != "" {
+		t.Fatal("body residual must fail closed whole OutputFunctions, not invent later func", s)
+	}
+	if !HasError() {
+		t.Fatal("body residual OutputFunctions must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestOutputMainNilSticky(t *testing.T) {
 	ClearError()
 	if (*ProgramGenerator)(nil).OutputMain() != "" {

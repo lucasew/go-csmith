@@ -1122,10 +1122,12 @@ func (t *Type) PrintfDirective() string {
 				return ""
 			}
 			part := f.Type.PrintfDirective()
+			// residual ERROR sticky — no invent soft-continue later fields past nested residual
+			if HasError() {
+				return ""
+			}
 			if part == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			if i > 0 {
@@ -1137,14 +1139,35 @@ func (t *Type) PrintfDirective() string {
 		return b.String()
 	}
 	if t.IsSimple() {
-		if t.SizeInBytes() >= 8 {
+		sz := t.SizeInBytes()
+		// residual ERROR sticky — no invent format past SizeInBytes residual hole
+		if HasError() {
+			return ""
+		}
+		if sz >= 8 {
 			if t.IsSigned() {
+				// residual ERROR sticky — no invent %lld past IsSigned residual hole
+				if HasError() {
+					return ""
+				}
 				return "%lld"
+			}
+			// residual ERROR sticky — no invent %llu past IsSigned residual false path
+			if HasError() {
+				return ""
 			}
 			return "%llu"
 		}
 		if t.IsSigned() {
+			// residual ERROR sticky — no invent %d past IsSigned residual hole
+			if HasError() {
+				return ""
+			}
 			return "%d"
+		}
+		// residual ERROR sticky — no invent %u past IsSigned residual false path
+		if HasError() {
+			return ""
 		}
 		return "%u"
 	}

@@ -325,11 +325,13 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		} else {
 			decl = st.OutputStructDecl()
 		}
+		// residual ERROR sticky — no invent soft-continue later structs past decl residual
+		if HasError() {
+			return ""
+		}
 		if decl == "" {
 			// incomplete struct decl IR sticky — no invent types-section header only
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		body.WriteString(decl)
@@ -343,11 +345,13 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		} else {
 			decl = ut.OutputUnionDecl()
 		}
+		// residual ERROR sticky — no invent soft-continue later unions past decl residual
+		if HasError() {
+			return ""
+		}
 		if decl == "" {
 			// incomplete union decl IR sticky — no invent types-section header only
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		body.WriteString(decl)
@@ -488,11 +492,13 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		}
 		// incomplete header IR — fail closed whole functions section
 		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
+		// residual ERROR sticky — no invent soft-continue later funcs past forward residual
+		if HasError() {
+			return ""
+		}
 		if d == "" {
 			// incomplete header IR sticky — no invent partial functions section
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		forwards.WriteString(d)
@@ -500,22 +506,26 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		// Function.cpp:820–826 — alias decls when FunctionAttributes
 		if g.Opts.FunctionAttributes {
 			a := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
+			// residual ERROR sticky — no invent soft-continue later funcs past alias residual
+			if HasError() {
+				return ""
+			}
 			if a == "" {
 				// alias expected when FunctionAttributes; incomplete AliasName sticky
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			aliases.WriteString(a)
 			aliases.WriteString("\n")
 		}
 		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+		// residual ERROR sticky — no invent soft-continue later funcs past body residual
+		if HasError() {
+			return ""
+		}
 		if body == "" {
 			// incomplete body IR sticky — no invent forward-only section
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		bodies.WriteString(body)
@@ -836,11 +846,13 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			av.InitExpr = nil
 			initOut := outputArrayInitForced(av, "    ", names, opts.PostIncrOperator)
 			av.Init, av.InitExpr = savedInit, savedExpr
+			// residual ERROR sticky — no invent soft-continue later resets past init residual
+			if HasError() {
+				return ""
+			}
 			// incomplete array init IR sticky — fail closed whole resets
 			if initOut == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString(initOut)
@@ -848,10 +860,12 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		}
 		// OutputMgr.cpp:337 — Variable::Output always live sticky; no invent " = 0;" without name
 		out := v.OutputC()
+		// residual ERROR sticky — no invent soft-continue later resets past OutputC residual
+		if HasError() {
+			return ""
+		}
 		if out == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString("    " + out + " = 0;\n")
@@ -939,16 +953,22 @@ func (g *ProgramGenerator) GoGenerator() string {
 	g.Initialize()
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
+	// residual ERROR sticky — no invent program past OutputHeader residual hole
+	if HasError() {
+		return ""
+	}
 	g.GenerateAllTypes()
 	if HasError() {
 		return ""
 	}
 	// struct/union inventory non-empty must emit live decls (no invent types-only skip)
 	structsOut := g.OutputStructTypes()
+	// residual ERROR sticky — no invent program past OutputStructTypes residual hole
+	if HasError() {
+		return ""
+	}
 	if (len(g.Types.StructTypes) > 0 || len(g.Types.UnionTypes) > 0) && structsOut == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	b.WriteString(structsOut)
@@ -976,41 +996,59 @@ func (g *ProgramGenerator) GoGenerator() string {
 	}
 	// GlobalList non-empty must emit live defs (no invent drop incomplete globals)
 	globalsOut := g.OutputGlobals()
+	// residual ERROR sticky — no invent program past OutputGlobals residual hole
+	if HasError() {
+		return ""
+	}
 	if g.VS != nil && len(g.VS.GlobalList) > 0 && globalsOut == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	b.WriteString(globalsOut)
 	// functions section always live after successful GenerateFunctions
 	funcsOut := g.OutputFunctions()
+	// residual ERROR sticky — no invent program past OutputFunctions residual hole
+	if HasError() {
+		return ""
+	}
 	if funcsOut == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	b.WriteString(funcsOut)
 	// OutputHashFuncDef empty when helpers off or ctrl IR incomplete (main falls back)
 	// no invent partial helper shells — OutputHashFuncDef already fail-closed empty
 	b.WriteString(g.OutputHashFuncDef())
+	// residual ERROR sticky — no invent program past OutputHashFuncDef residual hole
+	if HasError() {
+		return ""
+	}
 	// OutputMgr always emits main unless --nomain; incomplete main fails whole program sticky
 	mainOut := g.OutputMain()
+	// residual ERROR sticky — no invent program past OutputMain residual hole
+	if HasError() {
+		return ""
+	}
 	if mainOut == "" && !g.Opts.NoMain {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	b.WriteString(mainOut)
 	// DefaultOutputMgr.cpp:194 — OutputTail after main (statistics comment)
 	b.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
+	// residual ERROR sticky — no invent program past OutputTail residual hole
+	if HasError() {
+		return ""
+	}
 	// DefaultProgramGenerator.cpp:73–77 — identify_wrappers writes wrapper.h
 	// Library-first: append N_WRAP definition as a trailing section for consumers.
 	if g.Opts.IdentifyWrappers {
 		b.WriteString("\n/* --- wrapper.h (identify_wrappers) ---\n")
 		b.WriteString(OutputWrapperH())
+		// residual ERROR sticky — no invent program past OutputWrapperH residual hole
+		if HasError() {
+			return ""
+		}
 		b.WriteString("--- end wrapper.h --- */\n")
 	}
 	return b.String()
