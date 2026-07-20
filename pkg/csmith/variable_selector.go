@@ -3,11 +3,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import (
-	"fmt"
-	"os"
-)
-
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
 	AllVars                []*Variable
@@ -2847,7 +2842,6 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	// VariableSelector.cpp:924–928 — enlarge for goto visibility
 	block = ExpandBlockForGoto(block, cg)
 	if block == nil {
-		if os.Getenv("X") != "" { fmt.Fprintln(os.Stderr, "expand-nil") }
 		return nil
 	}
 	var varQfer CVQualifiers
