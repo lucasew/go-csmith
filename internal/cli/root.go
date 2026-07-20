@@ -148,7 +148,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.Flags().IntVar(&opts.NullPointerDerefProb, "null-ptr-deref-prob", opts.NullPointerDerefProb, "probability [0,100]")
 	cmd.Flags().IntVar(&opts.DeadPointerDerefProb, "dangling-ptr-deref-prob", opts.DeadPointerDerefProb, "probability [0,100]")
 	cmd.Flags().IntVar(&opts.StopByStmt, "stop-by-stmt", opts.StopByStmt, "stop generation after N statements")
-	cmd.Flags().IntVar(&opts.MaxGlobals, "max-globals", opts.MaxGlobals, "maximum number of generated globals")
+	cmd.Flags().IntVar(&opts.MaxGlobals, "max-globals", opts.MaxGlobals, "max generated globals (0=unlimited, fair default)")
 	cmd.Flags().IntVar(&opts.MaxSplitFiles, "max-split-files", opts.MaxSplitFiles, "maximum number of split output files")
 	cmd.Flags().IntVar(&opts.CoverageTestSize, "coverage-test-size", opts.CoverageTestSize, "coverage test size")
 	cmd.Flags().StringVar(&opts.SplitFilesDir, "split-files-dir", opts.SplitFilesDir, "directory for split files output")

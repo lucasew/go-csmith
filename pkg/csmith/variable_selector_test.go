@@ -190,6 +190,33 @@ func TestMaxGlobalsFailClosed(t *testing.T) {
 	}
 }
 
+func TestDefaultsMaxGlobalsUnlimited(t *testing.T) {
+	// Defaults MaxGlobals=0: fair with VariableSelector.cpp (no GlobalList cap).
+	// Cap 80 used to soft-nil GenerateNewGlobal mid seed-2 (first_div e25774:
+	// UP createAndInitialize F20 NewArrayVariableProb vs Go Select U100).
+	ResetDefaultGensym()
+	opts := Defaults()
+	if opts.MaxGlobals != 0 {
+		t.Fatalf("Defaults.MaxGlobals want 0 (unlimited), got %d", opts.MaxGlobals)
+	}
+	if err := opts.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	opts.Arrays = false
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	// Past the old unfair default of 80 — still create (upstream has no cap).
+	for i := 0; i < 85; i++ {
+		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(uint64(100+i)))
+		if v == nil || HasError() {
+			t.Fatalf("global %d: unlimited Defaults must create (got nil err=%v list=%d)", i, GetError(), len(vs.GlobalList))
+		}
+	}
+	if len(vs.GlobalList) != 85 {
+		t.Fatal(len(vs.GlobalList))
+	}
+}
+
 func TestCreateArrayVariableEmptyNameFailClosed(t *testing.T) {
 	// name always live from gensym; no invent empty-name array shell
 	opts := Defaults()

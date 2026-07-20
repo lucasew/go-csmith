@@ -1,6 +1,7 @@
 // Upstream: CGOptions.h / CGOptions.cpp (set_default_settings and option fields).
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
-// MaxGlobals is a Go-only limit until full GlobalList modeling lands; not a C++ pad for RNG.
+// MaxGlobals is a Go-only library cap (not CGOptions). 0 = unlimited — fair Defaults
+// match VariableSelector::GenerateNewGlobal which never caps GlobalList.
 package csmith
 
 import (
@@ -337,7 +338,9 @@ type Options struct {
 	// VolTestsMach mirrors CGOptions::vol_tests_mach_ (machine string for vol tests).
 	VolTestsMach string
 
-	// Keep an escape hatch for the current simplified generator shape.
+	// MaxGlobals is a Go-only optional cap on GlobalList length during create.
+	// 0 = unlimited (fair default; upstream VariableSelector has no cap).
+	// Positive N fail-closes GenerateNewGlobal / CreateRandomArray global at N.
 	MaxGlobals int
 }
 
@@ -483,7 +486,9 @@ func Defaults() Options {
 		NoDeltaReduction:         false,
 		VolTestsMach:             "",
 
-		MaxGlobals: 80,
+		// Unlimited — VariableSelector.cpp GenerateNewGlobal has no GlobalList cap.
+		// Positive MaxGlobals remains a library/CLI escape hatch only.
+		MaxGlobals: 0,
 	}
 }
 
@@ -612,8 +617,9 @@ func (o Options) Validate() error {
 	if o.MaxBlockDepth < 1 {
 		return fmt.Errorf("max-stmt-depth must be at least 1")
 	}
-	if o.MaxGlobals < 1 {
-		return fmt.Errorf("max-globals must be at least 1")
+	// 0 = unlimited (fair Defaults); negative is invalid.
+	if o.MaxGlobals < 0 {
+		return fmt.Errorf("max-globals must be non-negative (0 = unlimited)")
 	}
 	if o.Func1MaxParams > o.MaxParams {
 		return fmt.Errorf("func1_max_params() cannot be larger than max_params()")
