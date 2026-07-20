@@ -62,9 +62,16 @@ func (v *Variable) GetActualName(prefixName bool) string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	// IsGlobal residual only on nil (already gated); complete path never stickies
 	if v.IsGlobal() {
+		// residual ERROR sticky — no invent soft-prefix name past IsGlobal residual hole
+		if HasError() {
+			return ""
+		}
 		return GetPrefixedName(v.Name, prefixName)
+	}
+	// residual ERROR sticky — no invent soft-bare name past IsGlobal residual false
+	if HasError() {
+		return ""
 	}
 	return v.Name
 }
@@ -841,7 +848,12 @@ func (v *Variable) IsGlobal() bool {
 		return false
 	}
 	if v.FieldVarOf != nil {
-		return v.FieldVarOf.IsGlobal()
+		ok := v.FieldVarOf.IsGlobal()
+		// residual ERROR sticky — no invent not-global soft-skip past parent IsGlobal residual
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	// ArrayVariable.cpp:414–415 — parent == 0 (no owning block)
 	if v.AsArray != nil {

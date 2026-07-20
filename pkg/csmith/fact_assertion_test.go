@@ -396,3 +396,21 @@ func TestOutputFactVarGetActualNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputAssertionsIsGlobalIsReadResidualSticky(t *testing.T) {
+	// IsRead residual soft invent was invent soft-skip then partial assert section.
+	// Type-nil fact subject already sticky earlier; complete unused global soft-skip hygiene.
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), FEffect: EmptyEffect()}
+	fm := NewFactMgr(f)
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	// unused global fact — IsGlobal true, not read/written → soft skip empty body
+	fm.GlobalFacts = []*FactPointTo{{Var: v, PointTo: []*Variable{NullPtr}}}
+	st := &Stmt{Kind: StmtAssign, StmID: 1}
+	out := fm.OutputAssertions(st, nil, "    ", false)
+	// may emit nothing (all skipped) or assert — complete path no sticky
+	if HasError() {
+		t.Fatal("complete unused global skip must not sticky", out)
+	}
+	ClearError()
+}

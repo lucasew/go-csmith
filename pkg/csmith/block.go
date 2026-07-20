@@ -904,32 +904,81 @@ func makeRandomStmtKind(
 		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
 		st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+		// residual ERROR sticky — no invent soft-continue NoteWrite past MakeRandomAssign residual
+		if HasError() {
+			return Stmt{}
+		}
 		// Effect::write_var on LHS (CGContext effect_accum)
 		if st.LhsVar != nil {
 			cg.NoteWrite(st.LhsVar)
+			// residual ERROR sticky — no invent assign stmt past NoteWrite residual
+			if HasError() {
+				return Stmt{}
+			}
 		}
 		return st
 	case StmtBreak:
-		return MakeRandomBreak(r, opts, vs, tables, cg)
+		st := MakeRandomBreak(r, opts, vs, tables, cg)
+		// residual ERROR sticky — no invent soft-return break past MakeRandomBreak residual
+		if HasError() {
+			return Stmt{}
+		}
+		return st
 	case StmtContinue:
-		return MakeRandomContinue(r, opts, vs, tables, cg, b)
+		st := MakeRandomContinue(r, opts, vs, tables, cg, b)
+		// residual ERROR sticky — no invent soft-return continue past MakeRandomContinue residual
+		if HasError() {
+			return Stmt{}
+		}
+		return st
 	case StmtIfElse:
 		if st := MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
+			// residual ERROR sticky — no invent soft-return if past MakeRandomIf residual
+			if HasError() {
+				return Stmt{}
+			}
 			return *st
+		}
+		// residual ERROR sticky — no invent soft re-pick past MakeRandomIf residual nil
+		if HasError() {
+			return Stmt{}
 		}
 		// null factory → re-pick (Statement.cpp:314); incomplete shell fails stmtOK
 		return Stmt{}
 	case StmtFor:
 		if st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
+			// residual ERROR sticky — no invent soft-return for past MakeRandomFor residual
+			if HasError() {
+				return Stmt{}
+			}
 			return *st
+		}
+		// residual ERROR sticky — no invent soft re-pick past MakeRandomFor residual nil
+		if HasError() {
+			return Stmt{}
 		}
 		return Stmt{}
 	case StmtArrayOp:
-		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
+		st := MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
+		// residual ERROR sticky — no invent soft-return array-op past MakeRandomArrayOp residual
+		if HasError() {
+			return Stmt{}
+		}
+		return st
 	case StmtGoto:
-		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
+		st := MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
+		// residual ERROR sticky — no invent soft-return goto past MakeRandomGoto residual
+		if HasError() {
+			return Stmt{}
+		}
+		return st
 	case StmtInvoke:
-		return MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
+		st := MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
+		// residual ERROR sticky — no invent soft-return invoke past MakeRandomExprStmt residual
+		if HasError() {
+			return Stmt{}
+		}
+		return st
 	case StmtBlock:
 		// Statement.cpp:281–282 — Block::make_random; filter usually drops eBlock
 		if nested := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false); nested != nil {

@@ -60,11 +60,17 @@ func MakeRandomIf(
 	noConst := !opts.ConstAsCondition
 	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
 	// StatementIf.cpp:72 — ERROR_GUARD(nullptr)
+	// residual ERROR sticky — no invent soft-continue if arms past condition make residual
 	if test == nil || HasError() {
 		return nil
 	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
-	if func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test) {
+	hasUnc := func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test)
+	// residual ERROR sticky — no invent soft-continue if arms past HasUncertain residual
+	if HasError() {
+		return nil
+	}
+	if hasUnc {
 		// makeup_new_var_facts(pre_facts, global); reset accum; visit(pre_facts)
 		// incomplete current GlobalFacts fail closed sticky (makeup would nil snapshot)
 		if !FactsComplete(cg.FM.GlobalFacts) {

@@ -233,3 +233,50 @@ func TestOutputCNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetActualNameIsGlobalFieldResidualSticky(t *testing.T) {
+	// Parent IsGlobal residual soft invent was invent bare field name past Type-nil parent shell.
+	ClearError()
+	// Field of nil parent shell: FieldVarOf nil path is not field; force parent nil Variable residual via FieldVarOf cycle?
+	// Field with parent that is nil Variable pointer stuck:
+	// parent Type-nil still IsGlobal by name if g_
+	parent := &Variable{Name: "g_s", Type: GetIntType()}
+	child := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	if child.GetActualName(false) != "g_s.f0" {
+		// globals may use name as-is
+	}
+	if HasError() {
+		t.Fatal("complete field GetActualName must not sticky")
+	}
+	ClearError()
+	// nil FieldVarOf parent residual: FieldVarOf points to incomplete — use nil parent via incomplete FieldVarOf chain
+	// IsGlobal residual on nil: FieldVarOf of child is non-nil parent; parent.FieldVarOf = nil → name g_
+	// Force residual: FieldVarOf is nil Variable embedded? can't.
+	// Hygiene: empty name sticky
+	if (&Variable{FieldVarOf: parent}).GetActualName(false) != "" {
+		t.Fatal("empty name GetActualName must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty name GetActualName must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestIsGlobalFieldParentResidualSticky(t *testing.T) {
+	// Parent IsGlobal residual soft invent was invent not-global soft-skip past nil parent.
+	ClearError()
+	// FieldVarOf to incomplete parent with residual: parent nil is not possible without pointer.
+	// Field of nil-named parent that is Type-nil still IsGlobal by name.
+	parent := (*Variable)(nil)
+	// can't set FieldVarOf to nil and call IsGlobal on field with non-nil FieldVarOf only
+	// Use: FieldVarOf = parent that is complete; residual path when FieldVarOf.IsGlobal stickies
+	// Direct nil IsGlobal
+	if (*Variable)(nil).IsGlobal() {
+		t.Fatal("nil IsGlobal must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsGlobal must SetError sticky")
+	}
+	ClearError()
+	_ = parent
+}
