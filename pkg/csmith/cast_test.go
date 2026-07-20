@@ -6,7 +6,7 @@ import (
 )
 
 func TestIsEquivalentSameSize(t *testing.T) {
-	// int and long may same size on LP64 both 8? our SizeInBytes: int 4 long 4/8
+	// Type.cpp SizeInBytes: int 4, long 4 (fixed; not invent LP64 long==8)
 	if !GetIntType().IsEquivalent(GetIntType()) {
 		t.Fatal("int~int")
 	}

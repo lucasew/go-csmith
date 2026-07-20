@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestSizeInBytesUsesPlatform(t *testing.T) {
+	// Type.cpp:1497–1531 — simple sizes fixed; pointer uses platform_size
 	SetPlatformSizes(4, 8)
 	if GetIntType().SizeInBytes() != 4 {
 		t.Fatal("int")
@@ -10,12 +11,30 @@ func TestSizeInBytesUsesPlatform(t *testing.T) {
 	if PointerTo(GetIntType()).SizeInBytes() != 8 {
 		t.Fatal("ptr")
 	}
-	if GetSimpleType(ELong).SizeInBytes() != 8 {
-		t.Fatal("long LP64")
+	// Type.cpp:1511–1522 — eLong/eULong always 4 (no invent host LP64 long==8)
+	if GetSimpleType(ELong).SizeInBytes() != 4 {
+		t.Fatal("long fixed 4")
+	}
+	if GetSimpleType(EULong).SizeInBytes() != 4 {
+		t.Fatal("ulong fixed 4")
+	}
+	if GetSimpleType(ELongLong).SizeInBytes() != 8 {
+		t.Fatal("long long 8")
+	}
+	if GetSimpleType(EInt128).SizeInBytes() != 16 {
+		t.Fatal("int128 16")
+	}
+	// CName from SizeInBytes*8 — ulong → uint32_t not uint64_t
+	if GetSimpleType(EULong).CName() != "uint32_t" {
+		t.Fatal(GetSimpleType(EULong).CName())
 	}
 	SetPlatformSizes(4, 4)
+	if PointerTo(GetIntType()).SizeInBytes() != 4 {
+		t.Fatal("ptr ILP32")
+	}
+	// long still 4 regardless of pointer size
 	if GetSimpleType(ELong).SizeInBytes() != 4 {
-		t.Fatal("long ILP32")
+		t.Fatal("long still 4 on ILP32 ptr")
 	}
 	// restore common default
 	SetPlatformSizes(4, 8)
