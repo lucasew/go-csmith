@@ -210,10 +210,46 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 }
 
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
-	// incomplete / empty decls must not invent section-only header
+	// Type.cpp:1894–1901 — empty used pool still emits section header; incomplete IR fails closed.
 	ClearError()
 	g := NewProgramGenerator(Defaults())
-	g.Types.StructTypes = []*Type{{isStruct: true}} // unnamed → empty decl
+	// complete empty: only section comment (no invent types past unused inventory)
+	g.Types.StructTypes = nil
+	g.Types.UnionTypes = nil
+	g.Types.AllTypes = nil
+	out := g.OutputStructTypes()
+	if out != "/* --- Struct/Union Declarations --- */\n" {
+		t.Fatalf("empty used pool must still emit section header, got %q", out)
+	}
+	if HasError() {
+		t.Fatal("complete empty OutputStructTypes must not SetError")
+	}
+	// used aggregate emits decl body
+	ClearError()
+	st := &Type{isStruct: true, StructName: "S0", Used: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+	}}
+	g.Types.StructTypes = []*Type{st}
+	g.Types.AllTypes = []*Type{st}
+	out2 := g.OutputStructTypes()
+	if !strings.Contains(out2, "/* --- Struct/Union Declarations --- */") || !strings.Contains(out2, "struct S0") {
+		t.Fatal("used struct must emit under section", out2)
+	}
+	// unused inventory must not invent decl (only header)
+	ClearError()
+	stU := &Type{isStruct: true, StructName: "S1", Used: false, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+	}}
+	g.Types.StructTypes = []*Type{stU}
+	g.Types.AllTypes = []*Type{stU}
+	out3 := g.OutputStructTypes()
+	if out3 != "/* --- Struct/Union Declarations --- */\n" || strings.Contains(out3, "struct S1") {
+		t.Fatal("unused struct must not invent decl", out3)
+	}
+	// incomplete unnamed used → fail closed
+	ClearError()
+	g.Types.StructTypes = []*Type{{isStruct: true, Used: true}} // unnamed → empty decl
+	g.Types.AllTypes = g.Types.StructTypes
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("empty struct decls must fail closed section", out)
 	}
@@ -223,6 +259,7 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	// nil hole fails closed sticky
 	ClearError()
 	g.Types.StructTypes = []*Type{nil}
+	g.Types.AllTypes = nil
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("nil struct hole must fail closed", out)
 	}
@@ -232,6 +269,7 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	ClearError()
 	g.Types.StructTypes = nil
 	g.Types.UnionTypes = []*Type{nil}
+	g.Types.AllTypes = nil
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("nil union hole must fail closed", out)
 	}

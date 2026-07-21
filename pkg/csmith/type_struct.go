@@ -207,18 +207,18 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	if HasError() {
 		return nil
 	}
+	// Type.cpp:1088–1091 make_random_struct_type — does not set used or record_type_with_bitfields.
+	// used + Bookkeeper::record_type_with_bitfields only when first chosen (choose_random*, filters).
 	st := &Type{
 		isStruct:     true,
 		StructName:   tag,
 		Fields:       fields,
 		Packed:       packed,
-		Used:         true,
+		Used:         false,
 		HasAssignOps: hasAssign,
 		// Type.cpp:1094–1096 — hasAssignOps || checkImplicitNontrivialAssignOps(fields)
 		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOps(opts, fields),
 	}
-	// Type.cpp:126 / Bookkeeper::record_type_with_bitfields
-	RecordTypeWithBitfields(st)
 	if env != nil {
 		env.StructTypes = append(env.StructTypes, st)
 		env.AllTypes = append(env.AllTypes, st)
@@ -313,8 +313,12 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	}
 	var b strings.Builder
 	if t.Packed {
-		// Type.cpp:1849–1854 — pack pragmas
-		b.WriteString("#pragma pack(push, 1)\n")
+		// Type.cpp:1823–1829 OutputStructUnion — non-ccomp: pack(push) then pack(1).
+		// ccomp: only pack(1). Defaults CComp=false (CGOptions::ccomp).
+		if !ProcessOptions().CComp {
+			b.WriteString("#pragma pack(push)\n")
+		}
+		b.WriteString("#pragma pack(1)\n")
 	}
 	b.WriteString("struct ")
 	b.WriteString(t.StructName)
@@ -428,9 +432,17 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		j++
 	}
 	b.WriteString("};")
+	// Type.cpp:1877–1887 — after `;`: really_outputln; if packed then pack(pop|()) + ln; always extra blank.
+	b.WriteString("\n")
 	if t.Packed {
-		b.WriteString("\n#pragma pack(pop)")
+		// Type.cpp:1879–1883 — ccomp → pack(); else pack(pop)
+		if ProcessOptions().CComp {
+			b.WriteString("#pragma pack()\n")
+		} else {
+			b.WriteString("#pragma pack(pop)\n")
+		}
 	}
+	// Type.cpp:1887 really_outputln after printed=true — blank line after each aggregate decl
 	b.WriteString("\n")
 	return b.String()
 }
@@ -760,17 +772,17 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if HasError() {
 		return nil
 	}
+	// Type.cpp:1110–1112 make_random_union_type — does not set used or record bitfields.
+	// used + Bookkeeper only when first chosen (choose_random*, NonVoid* filters).
 	ut := &Type{
 		isUnion:      true,
 		StructName:   tag,
 		Fields:       fields,
-		Used:         true,
+		Used:         false,
 		HasAssignOps: hasAssign,
 		// Type.cpp:1146–1148 — hasAssignOps || checkImplicitNontrivialAssignOps
 		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOps(opts, fields),
 	}
-	// Type.cpp:180 — record_type_with_bitfields for unions
-	RecordTypeWithBitfields(ut)
 	if env != nil {
 		env.UnionTypes = append(env.UnionTypes, ut)
 		env.AllTypes = append(env.AllTypes, ut)
@@ -901,7 +913,9 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		b.WriteString(";\n")
 		j++
 	}
-	b.WriteString("};\n")
+	// Type.cpp:1871–1887 — `};` + really_outputln; unions are not packed in make_random_union;
+	// then really_outputln after printed (blank line after decl).
+	b.WriteString("};\n\n")
 	return b.String()
 }
 

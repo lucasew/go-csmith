@@ -59,6 +59,8 @@ type Type struct {
 	Packed bool
 	// Used mirrors Type::used.
 	Used bool
+	// Printed mirrors Type::printed — set when OutputStructUnion has emitted this type.
+	Printed bool
 	// HasAssignOps mirrors Type::has_assign_ops_ (C++ struct/union assign ops).
 	HasAssignOps bool
 	// HasImplicitNontrivialAssignOps mirrors Type::has_implicit_nontrivial_assign_ops_

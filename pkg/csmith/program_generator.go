@@ -399,19 +399,22 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 	return g.Opts.MaxArrayDim >= dimen
 }
 
-// OutputStructTypes emits struct/union definitions (before globals/functions).
-// Incomplete StructTypes/UnionTypes fails closed sticky (no invent empty-section past holes).
+// OutputStructTypes mirrors Type.cpp OutputStructUnionDeclarations.
+// Type.cpp:1894–1901 — always emit section comment; only used struct/union from AllTypes order.
+// Nested aggregate fields are emitted via OutputStructUnion even if not used (Type.cpp:1817–1820).
+// Incomplete StructTypes/UnionTypes fails closed sticky (no invent partial section past holes).
 func (g *ProgramGenerator) OutputStructTypes() string {
 	// ProgramGenerator always live at emit; sticky incomplete no invent empty types section
 	if g == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
-	if len(g.Types.StructTypes) == 0 && len(g.Types.UnionTypes) == 0 {
-		return ""
-	}
 	// incomplete type pools fail closed sticky (no invent partial section / empty shell)
 	if !typesComplete(g.Types.StructTypes) || !typesComplete(g.Types.UnionTypes) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if !typesComplete(g.Types.AllTypes) {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -420,59 +423,84 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		structAttr = EnsureStructTypeAttrGenerator()
 		unionAttr = EnsureUnionTypeAttrGenerator()
 	}
-	var body strings.Builder
-	for _, st := range g.Types.StructTypes {
-		// pre-validated typesComplete
-		var decl string
-		if structAttr != nil {
-			decl = st.OutputStructDeclOpts(g.Rng, structAttr)
-		} else {
-			decl = st.OutputStructDecl()
-		}
-		// residual ERROR sticky — no invent soft-continue later structs past decl residual
-		if HasError() {
-			return ""
-		}
-		if decl == "" {
-			// incomplete struct decl IR sticky — no invent types-section header only
-			SetError(ErrGeneric)
-			return ""
-		}
-		body.WriteString(decl)
-		body.WriteString("\n")
-	}
-	for _, ut := range g.Types.UnionTypes {
-		// pre-validated typesComplete
-		var decl string
-		if unionAttr != nil {
-			decl = ut.OutputUnionDeclOpts(g.Rng, unionAttr)
-		} else {
-			decl = ut.OutputUnionDecl()
-		}
-		// residual ERROR sticky — no invent soft-continue later unions past decl residual
-		if HasError() {
-			return ""
-		}
-		if decl == "" {
-			// incomplete union decl IR sticky — no invent types-section header only
-			SetError(ErrGeneric)
-			return ""
-		}
-		body.WriteString(decl)
-		body.WriteString("\n")
-	}
-	// no invent section header without live type decls
-	if body.Len() == 0 {
-		return ""
-	}
+	// Type.cpp:1895 — output_comment_line always (empty section when no used aggregates)
 	var b strings.Builder
-	// Type.cpp / OutputMgr path comment: "Struct/Union Declarations"
 	b.WriteString("/* --- Struct/Union Declarations --- */\n")
-	b.WriteString(body.String())
+	// reset printed for this emit pass (Type.cpp printed_ is process-lifetime; one emit per run)
+	for _, t := range g.Types.AllTypes {
+		if t != nil && t.IsAggregate() {
+			t.Printed = false
+		}
+	}
+	// Type.cpp:1896–1900 — AllTypes order; only used struct/union start points
+	for _, t := range g.Types.AllTypes {
+		if t == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
+		if !t.Used || !t.IsAggregate() {
+			continue
+		}
+		if !g.outputStructUnion(t, &b, structAttr, unionAttr) {
+			return ""
+		}
+	}
 	return b.String()
 }
 
+// outputStructUnion mirrors Type.cpp:1811–1888 OutputStructUnion.
+// Emits nested aggregate field types first; skips when already Printed.
+func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, structAttr, unionAttr *AttributeGenerator) bool {
+	if t == nil || !t.IsAggregate() {
+		SetError(ErrGeneric)
+		return false
+	}
+	// Type.cpp:1815 — if (!type->printed)
+	if t.Printed {
+		return true
+	}
+	// Type.cpp:1817–1820 — output dependent structs/unions first
+	for _, f := range t.Fields {
+		if f.Type == nil {
+			continue
+		}
+		if f.Type.IsAggregate() {
+			if !g.outputStructUnion(f.Type, b, structAttr, unionAttr) {
+				return false
+			}
+		} else if HasError() {
+			return false
+		}
+	}
+	var decl string
+	if t.IsStruct() {
+		if structAttr != nil {
+			decl = t.OutputStructDeclOpts(g.Rng, structAttr)
+		} else {
+			decl = t.OutputStructDecl()
+		}
+	} else {
+		if unionAttr != nil {
+			decl = t.OutputUnionDeclOpts(g.Rng, unionAttr)
+		} else {
+			decl = t.OutputUnionDecl()
+		}
+	}
+	if HasError() {
+		return false
+	}
+	if decl == "" {
+		SetError(ErrGeneric)
+		return false
+	}
+	b.WriteString(decl)
+	// Type.cpp:1886 — type->printed = true
+	t.Printed = true
+	return true
+}
+
 // OutputGlobals emits GlobalList declarations.
+// VariableSelector.cpp:1551–1558 OutputGlobalVariables — always section comment then list.
 // Incomplete GlobalList / Arrays fails closed sticky (no invent empty-section success
 // past nil holes via soft return "").
 func (g *ProgramGenerator) OutputGlobals() string {
@@ -481,9 +509,9 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	// complete empty globals (no VS or empty list) soft empty section
+	// VariableSelector.cpp:1552 — header always; empty GlobalList still emits section
 	if g.VS == nil || len(g.VS.GlobalList) == 0 {
-		return ""
+		return "/* --- GLOBAL VARIABLES --- */\n"
 	}
 	// incomplete GlobalList fails closed sticky (no invent partial section / empty shell)
 	if !VariablesComplete(g.VS.GlobalList) {
@@ -570,15 +598,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		body.WriteString(def)
 		body.WriteString("\n")
 	}
-	// no invent section header without any live global defs
-	if body.Len() == 0 {
-		return ""
-	}
-	var b strings.Builder
 	// VariableSelector.cpp:1552 — output_comment_line then OutputVariableList.
 	// Each OutputDef already ends with newline; no trailing blank before
 	// OutputForwardDeclarations' two outputln (seed-2: Go had one extra blank
 	// before /* --- FORWARD DECLARATIONS --- */).
+	// Empty body after filtering still keeps the section header (C++ always prints it).
+	var b strings.Builder
 	b.WriteString("/* --- GLOBAL VARIABLES --- */\n")
 	b.WriteString(body.String())
 	return b.String()
@@ -1259,21 +1284,12 @@ func (g *ProgramGenerator) GoGenerator() string {
 	if HasError() {
 		return ""
 	}
+	// DefaultProgramGenerator.cpp:70–72 — GenerateAllTypes; GenerateFunctions; then Output.
+	// OutputStructUnionDeclarations runs after generation so Type::used is set by choose paths.
 	g.GenerateAllTypes()
 	if HasError() {
 		return ""
 	}
-	// struct/union inventory non-empty must emit live decls (no invent types-only skip)
-	structsOut := g.OutputStructTypes()
-	// residual ERROR sticky — no invent program past OutputStructTypes residual hole
-	if HasError() {
-		return ""
-	}
-	if (len(g.Types.StructTypes) > 0 || len(g.Types.UnionTypes) > 0) && structsOut == "" {
-		SetError(ErrGeneric)
-		return ""
-	}
-	b.WriteString(structsOut)
 	g.GenerateFunctions()
 	// Function.cpp:797/805 ERROR_RETURN — stop output when generation failed
 	if HasError() {
@@ -1358,6 +1374,17 @@ func (g *ProgramGenerator) GoGenerator() string {
 		}
 		return sb.String()
 	}
+	// DefaultOutputMgr.cpp:182–185 — OutputStructUnionDeclarations then globals/forwards/funcs
+	structsOut := g.OutputStructTypes()
+	if HasError() {
+		return ""
+	}
+	// Type.cpp always emits at least the section comment; empty string is fail-closed residual
+	if structsOut == "" {
+		SetError(ErrGeneric)
+		return ""
+	}
+	b.WriteString(structsOut)
 	// GlobalList non-empty must emit live defs (no invent drop incomplete globals)
 	globalsOut := g.OutputGlobals()
 	// residual ERROR sticky — no invent program past OutputGlobals residual hole

@@ -16,6 +16,10 @@ func TestMakeRandomStructType(t *testing.T) {
 	if st == nil || !st.IsStruct() || len(st.Fields) < 1 {
 		t.Fatal(st)
 	}
+	// Type.cpp:1088–1091 — make_random_struct_type leaves used=false until choose_random*
+	if st.Used {
+		t.Fatal("make_random_struct_type must not invent used=true at create")
+	}
 	if len(env.StructTypes) != 1 {
 		t.Fatal(env.StructTypes)
 	}
@@ -24,10 +28,48 @@ func TestMakeRandomStructType(t *testing.T) {
 			t.Fatal("no nil-type field invent")
 		}
 	}
+	// mark used for emit contract tests
+	st.Used = true
 	decl := st.OutputStructDecl()
 	if !strings.Contains(decl, "struct S0") || !strings.Contains(decl, "f0") {
 		t.Fatal(decl)
 	}
+}
+
+func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
+	// Type.cpp:1823–1829 / 1879–1883 — non-ccomp pack(push) then pack(1); pack(pop)
+	ClearError()
+	SetProcessOptions(Defaults()) // CComp=false
+	st := &Type{
+		isStruct: true, StructName: "S0", Packed: true, Used: true,
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		},
+	}
+	decl := st.OutputStructDecl()
+	if !strings.Contains(decl, "#pragma pack(push)\n#pragma pack(1)\n") {
+		t.Fatalf("expected split pack(push)/pack(1), got %q", decl)
+	}
+	if strings.Contains(decl, "#pragma pack(push, 1)") {
+		t.Fatalf("must not invent combined pack(push, 1): %q", decl)
+	}
+	if !strings.Contains(decl, "#pragma pack(pop)") {
+		t.Fatalf("expected pack(pop): %q", decl)
+	}
+	// ccomp path: only pack(1) / pack()
+	ClearError()
+	opts := Defaults()
+	opts.CComp = true
+	SetProcessOptions(opts)
+	decl2 := st.OutputStructDecl()
+	if strings.Contains(decl2, "#pragma pack(push)") {
+		t.Fatalf("ccomp must not emit pack(push): %q", decl2)
+	}
+	if !strings.Contains(decl2, "#pragma pack(1)\n") || !strings.Contains(decl2, "#pragma pack()\n") {
+		t.Fatalf("ccomp pack(1)/pack(): %q", decl2)
+	}
+	SetProcessOptions(Defaults())
+	ClearError()
 }
 
 func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
