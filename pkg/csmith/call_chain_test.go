@@ -32,6 +32,39 @@ func TestExtendCallChain(t *testing.T) {
 	}
 }
 
+// Function.cpp:635 / 677 — extend_call_chain(prev) uses CALLER get_current_block().
+// Soft invent set bodyCG.CurrentFunc=callee before generateBodyCore so
+// ExtendCallChain(prev) saw empty callee stack and omitted the caller frame.
+func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
+	ClearError()
+	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	callee := &Function{Name: "callee", ReturnType: GetIntType()}
+	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
+	caller.Stack = []*Block{callerBlk}
+
+	// Fair: prev is still the caller when ExtendCallChain runs (generateBodyCore order).
+	prev := WithFunc(caller, EmptyEffect())
+	prev.CallChain = nil
+	body := prev
+	body.CurrentFunc = callee // only the body context switches
+	body.ExtendCallChain(prev)
+	if len(body.CallChain) != 1 || body.CallChain[0] != callerBlk {
+		t.Fatalf("call_chain must include caller block, got %v", body.CallChain)
+	}
+
+	// Unfair pre-switch: prev.CurrentFunc already callee → empty stack → missing frame.
+	prevBad := WithFunc(caller, EmptyEffect())
+	prevBad.CurrentFunc = callee
+	prevBad.CallChain = nil
+	var bodyBad CGContext
+	bodyBad.CurrentFunc = callee
+	bodyBad.ExtendCallChain(prevBad)
+	if len(bodyBad.CallChain) != 0 {
+		t.Fatalf("callee-as-prev must not invent a frame, got %v", bodyBad.CallChain)
+	}
+	ClearError()
+}
+
 func TestBuildInvocationAndFunction(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1

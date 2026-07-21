@@ -881,9 +881,15 @@ func BuildInvocationAndFunction(
 	calFM.SetGlobalFacts(facts, "auto_function_invocation_832")
 
 	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
+	// Function.cpp:674–677 — CGContext(this, prev.effect_context, &effect_accum);
+	// extend_call_chain(prev) uses CALLER get_current_block(). Do not set
+	// bodyCG.CurrentFunc=callee here: generateBodyCore sets CurrentFunc then
+	// ExtendCallChain(prev); if prev.CurrentFunc were already callee, CurrentBlock()
+	// is empty and the caller's frame is omitted from call_chain (AddVisibleEffect /
+	// RWDirective / frame visibility wrong → bloated lhsAccum on nested call sites,
+	// seed-7 ChooseOKVar n=26 vs UP n=56).
 	effectAccum := EmptyEffect()
 	bodyCG := cg.CloneSubcontext()
-	bodyCG.CurrentFunc = callee
 	bodyCG.FM = calFM
 	bodyCG.Flags = 0
 	bodyCG.EffectAccum = &effectAccum

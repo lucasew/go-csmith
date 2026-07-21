@@ -312,8 +312,10 @@ func MakeRandomFunction(
 			}
 		}
 	}
+	// Function.cpp:635 — CGContext(this, prev.effect_context, &accum); extend_call_chain(prev).
+	// Leave CurrentFunc as caller so generateBodyCore ExtendCallChain(prev) pushes the
+	// caller's current block (see BuildInvocationAndFunction / seed-7 call_chain note).
 	bodyCG := cg
-	bodyCG.CurrentFunc = f
 	bodyCG.FM = fm
 	if list != nil {
 		bodyCG = bodyCG.WithFuncList(list)
@@ -580,7 +582,11 @@ func (f *Function) generateBodyCore(
 	// CGContext.cpp:65–70 / 85–92 — body ctor leaves effect_stm default empty
 	// (not a copy of caller's EffectStm).
 	cg.EffectStm = EmptyEffect()
-	// Function.cpp:635 / 677 — extend_call_chain
+	// Function.cpp:635 / 677 — extend_call_chain(prev_context):
+	// C++ builds a fresh CGContext(this, …) then extend_call_chain(prev) where prev
+	// is still the CALLER (get_current_block = caller's stack top). Callers must not
+	// set prev.CurrentFunc to the callee before this — otherwise CurrentBlock() is
+	// empty and the caller frame is omitted from call_chain.
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual
 	if HasError() {
