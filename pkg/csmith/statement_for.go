@@ -555,6 +555,19 @@ func MakeRandomFor(
 	if HasError() {
 		return nil
 	}
+	// FactMgr.cpp set_fact_in / StatementFor.cpp:299–300 — pre_facts is full FactVec
+	// including eUnionWrite; snapshot UnionFacts with point-to for post_loop restore.
+	if !UnionFactsComplete(cg.FM.UnionFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	preUnion := CloneUnionFactSlice(cg.FM.UnionFacts)
+	if HasError() || !UnionFactsComplete(preUnion) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return nil
+	}
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
 	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
 	bodyCG := cg.WithFlags(FlagInLoop)
@@ -584,7 +597,7 @@ func MakeRandomFor(
 	}
 	// post_loop_analysis (StatementFor.cpp:350–370)
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
-	postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, cg)
+	postLoopAnalysis(cg.FM, st, body, preFacts, preUnion, preEffect, cg)
 	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
 	if !FactsComplete(cg.FM.GlobalFacts) ||
 		!EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
@@ -598,7 +611,8 @@ func MakeRandomFor(
 // postLoopAnalysis mirrors StatementFor::post_loop_analysis.
 // StatementFor.cpp:350–370 — body entry facts; must_return restores pre;
 // break edges + merge_jump_facts; set_accumulated_effect_after_block(pre_effect).
-func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPointTo, preEffect Effect, cg *CGContext) {
+// preUnion is the eUnionWrite partition of pre_facts FactVec (snapshotted with preFacts).
+func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPointTo, preUnion []*FactUnion, preEffect Effect, cg *CGContext) {
 	if fm == nil {
 		return
 	}
@@ -606,56 +620,72 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// StmID 0 fails closed sticky (no invent keep prior GlobalFacts soft-skipping map_facts_in)
 	if body == nil || StmIDUnset(body.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
-	// GetMapFactsIn: StmID 0 Incomplete; missing live → empty complete
-	in := fm.GetMapFactsIn(body.StmID)
-	if !FactsComplete(in) {
+	// Full FactVec: point-to + eUnionWrite (AssignGlobalFactsFromMapIn).
+	fm.AssignGlobalFactsFromMapIn(body.StmID)
+	// residual ERROR sticky — no invent soft-must-return path past map_in assign residual
+	if HasError() || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		SetError(ErrGeneric)
-		return
-	}
-	fm.SetGlobalFacts(CloneFactSlice(in), "auto_statement_for_631")
-	// residual ERROR sticky — no invent soft-must-return path past CloneFactSlice residual
-	if HasError() {
-		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	if body.MustReturn() {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop
-		if !FactsComplete(preFacts) {
+		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop full FactVec
+		if !FactsComplete(preFacts) || !UnionFactsComplete(preUnion) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return
 		}
-		fm.RestoreFacts(preFacts)
+		fm.RestoreFactsPair(preFacts, preUnion)
 	} else if HasError() {
 		// residual ERROR sticky — no invent soft-continue break-merge past MustReturn residual false
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
 	// GetMapFactsOut: breakID 0 Incomplete; incomplete mid-join wipe + stop
+	// Full FactVec merge includes eUnionWrite (map_out union partition).
 	if forSt != nil {
 		for _, breakID := range body.BreakStmIDs {
 			// create_cfg_edge(break, for-stmt, post_dest=true, back=false)
 			fm.CreateCFGEdgeTo(breakID, nil, forSt.StmID, true, false)
 			out := fm.GetMapFactsOut(breakID)
-			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) {
+			outU := fm.GetMapUnionFactsOut(breakID)
+			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) ||
+				!UnionFactsComplete(outU) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				SetError(ErrGeneric)
 				return
 			}
 			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
 				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				SetError(ErrGeneric)
+				return
+			}
+			// eUnionWrite half of merge_jump_facts on full FactVec
+			if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 		}

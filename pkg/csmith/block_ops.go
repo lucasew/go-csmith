@@ -596,15 +596,24 @@ func (b *Block) AppendNestedLoop(
 		return nil
 	}
 	var preFacts []*FactPointTo
+	var preUnion []*FactUnion
 	if cg.FM != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-for snapshot)
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			SetError(ErrGeneric)
 			return nil
 		}
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-append for past CloneFactSlice residual
 		if HasError() {
+			return nil
+		}
+		// FactMgr.cpp set_fact_in — pre_facts full FactVec includes eUnionWrite
+		preUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(preUnion) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 	}
@@ -633,7 +642,7 @@ func (b *Block) AppendNestedLoop(
 		return nil
 	}
 	// Statement.cpp:320 — post_creation_analysis after make_random(eFor)
-	PostCreationAnalysis(st, preFacts, preEffect, cg, opts)
+	PostCreationAnalysis(st, preFacts, preUnion, preEffect, cg, opts)
 	if HasError() {
 		return nil
 	}
@@ -649,13 +658,15 @@ func (b *Block) AppendNestedLoop(
 			return nil
 		}
 		if !MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts) ||
-			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) {
+			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) ||
+			!UnionFactsComplete(preUnion) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			SetError(ErrGeneric)
 			return nil
 		}
-		cg.FM.SetMapFactsIn(st.StmID, preFacts)
+		// map_facts_in keeps pre-make eUnionWrite; map_facts_out pairs live lattice
+		cg.FM.SetMapFactsInPair(st.StmID, preFacts, preUnion)
 		cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
 		// Incomplete accum/stm effects fail closed (no invent MapAccumEffect/map fold success)
 		acc := cg.AccumEffect()
@@ -715,13 +726,21 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	}
 	fm := cg.FM
 	var preFacts []*FactPointTo
+	var preUnion []*FactUnion
 	if fm != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-return snapshot)
-		if !FactsComplete(fm.GlobalFacts) {
+		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			SetError(ErrGeneric)
 			return nil
 		}
 		preFacts = CloneFactSlice(fm.GlobalFacts)
+		preUnion = CloneUnionFactSlice(fm.UnionFacts)
+		if HasError() || !UnionFactsComplete(preUnion) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return nil
+		}
 	}
 	cg.ClearEffectStm()
 	// Block.cpp:378–380 — Statement::make_random(eReturn); ERROR_GUARD(nullptr)
@@ -742,7 +761,8 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			return nil
 		}
 		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) ||
-			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) {
+			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) ||
+			!UnionFactsComplete(preUnion) || !UnionFactsComplete(fm.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			SetError(ErrGeneric)
@@ -757,7 +777,8 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			return nil
 		}
 		// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
-		fm.SetMapFactsIn(st.StmID, preFacts)
+		// set_fact_in full FactVec: pre point-to + pre eUnionWrite
+		fm.SetMapFactsInPair(st.StmID, preFacts, preUnion)
 		// set_fact_out filters function-locals for return (FactMgr.cpp:270–272)
 		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, b)
 		// Incomplete accum/stm effects fail closed (no invent MapAccumEffect/map fold success)

@@ -1195,19 +1195,21 @@ func makeRandomStmt(
 			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make
-		// C++: FactVec pre_facts = fm->global_facts; shallow copy of Fact* vector.
-		// Nested ExpressionAssign merges replace pointers in global_facts only;
-		// pre_facts keeps the pre-make Fact* set for set_fact_in. Deep CloneFactSlice
-		// isolated pointees incorrectly vs that sharing model (seed-2 e10107 may-null).
-		// incomplete GlobalFacts/accum fail closed sticky (no invent cleaned pre-stmt snapshot
-		// or soft re-pick past holes)
+		// C++: FactVec pre_facts = fm->global_facts; shallow copy of Fact* vector
+		// (ePointTo + eUnionWrite). Nested ExpressionAssign merges replace pointers
+		// in global_facts only; pre_facts keeps the pre-make Fact* set for set_fact_in.
+		// Deep CloneFactSlice isolated pointees incorrectly vs that sharing model
+		// (seed-2 e10107 may-null). incomplete GlobalFacts/UnionFacts/accum fail
+		// closed sticky (no invent cleaned pre-stmt snapshot or soft re-pick past holes)
 		var preFacts []*FactPointTo
+		var preUnion []*FactUnion
 		if cg.FM != nil {
-			if !FactsComplete(cg.FM.GlobalFacts) {
+			if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 				SetError(ErrGeneric)
 				return Stmt{}
 			}
 			preFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
+			preUnion = append([]*FactUnion(nil), cg.FM.UnionFacts...)
 		}
 		preEffect := EmptyEffect()
 		if cg.EffectAccum != nil {
@@ -1240,7 +1242,7 @@ func makeRandomStmt(
 		if stmtOK(st) {
 			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
 			// incomplete post-creation must not invent stmt success past wiped facts
-			PostCreationAnalysis(&st, preFacts, preEffect, cg, opts)
+			PostCreationAnalysis(&st, preFacts, preUnion, preEffect, cg, opts)
 			if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
 				if !HasError() {
 					SetError(ErrGeneric)

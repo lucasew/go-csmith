@@ -224,7 +224,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	// no MapFactsIn[10]; not must_return — C++ map[] empty is complete empty
-	postLoopAnalysis(fm, forSt, body, nil, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, body, nil, nil, EmptyEffect(), nil)
 	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
 		t.Fatal("missing body MapFactsIn must clear prior, not invent keep prior")
 	}
@@ -233,7 +233,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	}
 	// body StmID 0 — incomplete IR marker
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
-	postLoopAnalysis(fm, forSt, &Block{StmID: IncompleteStmID}, nil, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, &Block{StmID: IncompleteStmID}, nil, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("body StmID 0 must fail closed incomplete GlobalFacts")
 	}
@@ -250,7 +250,7 @@ func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 		11: {MakeFactPointTo(p, NullPtr), nil},
 	}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
-	postLoopAnalysis(fm, forSt, body, nil, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, body, nil, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body MapFactsIn must fail closed nil GlobalFacts")
 	}
@@ -270,7 +270,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 		22: {MakeFactPointTo(p, NullPtr), nil},
 	}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
-	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, body, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete break MapFactsOut must fail closed nil GlobalFacts")
 	}
@@ -284,7 +284,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 		30: {MakeFactPointTo(p, NullPtr), nil},
 		31: {MakeFactPointTo(p, c)},
 	}
-	postLoopAnalysis(fm2, &Stmt{Kind: StmtFor, StmID: 8, Then: body2}, body2, pre, EmptyEffect(), nil)
+	postLoopAnalysis(fm2, &Stmt{Kind: StmtFor, StmID: 8, Then: body2}, body2, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("incomplete first break must not invent later break merge", fm2.GlobalFacts)
 	}
@@ -303,7 +303,7 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 		14: {MakeFactPointTo(p, NullPtr), nil},
 	}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
-	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 7, Then: body}, body, pre, EmptyEffect(), nil)
+	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 7, Then: body}, body, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body in must not invent must_return restore", fm.GlobalFacts)
 	}
@@ -319,7 +319,7 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtReturn}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
-	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, body, pre, nil, EmptyEffect(), nil)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || fp.IsNull() || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
 		t.Fatalf("want pre fact → a, got %+v", fp)
@@ -341,7 +341,7 @@ func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 	}
 	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
-	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 9, Then: body}, body, pre, EmptyEffect(), nil)
+	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 9, Then: body}, body, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("MustReturn residual must fail closed incomplete GlobalFacts", fm.GlobalFacts)
 	}
@@ -367,7 +367,7 @@ func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, b)})
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	// body entry facts base; merge break outs
-	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, body, pre, nil, EmptyEffect(), nil)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil {
 		t.Fatal("nil")

@@ -476,7 +476,7 @@ func TestPostCreationAssignFacts(t *testing.T) {
 	// pointer assign from variable of type int won't abstract well; use Null
 	st.Expr = &Expression{Term: TermConstant, Con: MakeInt(0)}
 	pre := CloneFactSlice(fm.GlobalFacts)
-	PostCreationAnalysis(st, pre, EmptyEffect(), &cg, Defaults())
+	PostCreationAnalysis(st, pre, nil, EmptyEffect(), &cg, Defaults())
 	if !fm.MapVisited[3] {
 		t.Fatal("visited")
 	}
@@ -514,7 +514,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	if !HasUncertainCallRecursiveStmt(st) {
 		t.Fatal("expect uncertain")
 	}
-	PostCreationAnalysis(st, nil, EmptyEffect(), &cg, Defaults())
+	PostCreationAnalysis(st, nil, nil, EmptyEffect(), &cg, Defaults())
 	// NDEBUG Release: assert(0) elided — no sticky abort; facts still installed.
 	if HasError() {
 		t.Fatal("NDEBUG assert(0) path must not sticky-poison generation", GetError())

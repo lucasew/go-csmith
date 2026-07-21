@@ -56,7 +56,7 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	forSt := &Stmt{Kind: StmtFor, StmID: 24, Then: body}
 	cg := EmptyCGContext().WithFactMgr(fm)
 	cg.CurrentFunc = f
-	postLoopAnalysis(fm, forSt, body, []*FactPointTo{outDef}, EmptyEffect(), &cg)
+	postLoopAnalysis(fm, forSt, body, []*FactPointTo{outDef}, nil, EmptyEffect(), &cg)
 	got := FindRelatedPointTo(fm.GlobalFacts, &arr.Variable)
 	if got == nil || !got.IsNull() {
 		t.Fatalf("post_loop must install map_in may-null (not map_out definitive): %+v", got)

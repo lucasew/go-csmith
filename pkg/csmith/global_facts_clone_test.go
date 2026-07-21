@@ -259,7 +259,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	PostCreationAnalysis(st, pre, EmptyEffect(), &cg, Defaults())
+	PostCreationAnalysis(st, pre, nil, EmptyEffect(), &cg, Defaults())
 	// incomplete pre: fail closed sticky wipe (no invent cleaned assign update)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete pre must clear GlobalFacts, not invent post-creation")
@@ -271,7 +271,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	// incomplete GlobalFacts seed
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	pre2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	PostCreationAnalysis(st, pre2, EmptyEffect(), &cg, Defaults())
+	PostCreationAnalysis(st, pre2, nil, EmptyEffect(), &cg, Defaults())
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete GlobalFacts must fail closed nil")
 	}
@@ -285,7 +285,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	PostCreationAnalysis(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, EmptyEffect(), &cg, Defaults())
+	PostCreationAnalysis(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil, EmptyEffect(), &cg, Defaults())
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("IncompleteStmID must fail closed nil GlobalFacts")
 	}
@@ -295,18 +295,18 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	ClearError()
 	// Statement + CGContext always live; sticky (no invent soft-skip past hole)
 	// Nil FM is non-sticky soft re-pick
-	PostCreationAnalysis(nil, []*FactPointTo{}, EmptyEffect(), &cg, Defaults())
+	PostCreationAnalysis(nil, []*FactPointTo{}, nil, EmptyEffect(), &cg, Defaults())
 	if !HasError() {
 		t.Fatal("nil stmt PostCreationAnalysis must SetError sticky")
 	}
 	ClearError()
-	PostCreationAnalysis(st, []*FactPointTo{}, EmptyEffect(), nil, Defaults())
+	PostCreationAnalysis(st, []*FactPointTo{}, nil, EmptyEffect(), nil, Defaults())
 	if !HasError() {
 		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
 	}
 	ClearError()
 	cgNoFM := EmptyCGContext()
-	PostCreationAnalysis(st, []*FactPointTo{}, EmptyEffect(), &cgNoFM, Defaults())
+	PostCreationAnalysis(st, []*FactPointTo{}, nil, EmptyEffect(), &cgNoFM, Defaults())
 	if HasError() {
 		t.Fatal("nil FM PostCreationAnalysis must stay non-sticky soft re-pick")
 	}

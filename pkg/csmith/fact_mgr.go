@@ -64,6 +64,12 @@ type FactMgr struct {
 	// FactMgr.h:161–163.
 	MapFactsIn  map[int][]*FactPointTo
 	MapFactsOut map[int][]*FactPointTo
+	// MapUnionFactsIn / MapUnionFactsOut are the eUnionWrite partition of
+	// C++ map_facts_in/out FactVec (FactMgr.cpp set_fact_in/out store full FactVec).
+	// Without these, post_loop_analysis / restore_facts only rewind point-to and leave
+	// UnionFacts at post-body last-writes → IsNonreadableField over-filters choose_var.
+	MapUnionFactsIn  map[int][]*FactUnion
+	MapUnionFactsOut map[int][]*FactUnion
 	// MapFactsInFinal / MapFactsOutFinal mirror map_facts_in/out_final.
 	// FactMgr.h — combined across revisits via setup_in_out_maps.
 	MapFactsInFinal  map[int][]*FactPointTo
@@ -81,6 +87,8 @@ func NewFactMgr(f *Function) *FactMgr {
 		MapStmEffect:     make(map[int]Effect),
 		MapFactsIn:       make(map[int][]*FactPointTo),
 		MapFactsOut:      make(map[int][]*FactPointTo),
+		MapUnionFactsIn:  make(map[int][]*FactUnion),
+		MapUnionFactsOut: make(map[int][]*FactUnion),
 		MapFactsInFinal:  make(map[int][]*FactPointTo),
 		MapFactsOutFinal: make(map[int][]*FactPointTo),
 		MapAccumEffect:   make(map[int]Effect),
@@ -134,8 +142,21 @@ func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 }
 
 // SetMapFactsIn records pre-statement facts (FactMgr::map_facts_in[s] = facts).
+// FactMgr.cpp:249–251 — map_facts_in[s] = full FactVec (ePointTo + eUnionWrite).
+// Pairs live fm.UnionFacts as the eUnionWrite partition (block entry / live lattice).
+// For pre-make snapshots taken before generation mutated unions, use SetMapFactsInPair.
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	fm.SetMapFactsInPair(stmID, facts, fm.UnionFacts)
+}
+
+// SetMapFactsInPair stores map_facts_in point-to + eUnionWrite partitions together.
+// FactMgr.cpp set_fact_in — one FactVec assignment covers both categories.
+func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts []*FactUnion) {
 	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return
@@ -143,12 +164,26 @@ func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 	if fm.MapFactsIn == nil {
 		fm.MapFactsIn = make(map[int][]*FactPointTo)
 	}
+	if fm.MapUnionFactsIn == nil {
+		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
+	}
 	fm.MapFactsIn[stmID] = storeFactMapEntry(facts)
+	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntry(unionFacts)
 }
 
 // SetMapFactsOut records post-statement facts.
+// FactMgr.cpp set_fact_out — full FactVec; pairs live fm.UnionFacts.
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	fm.SetMapFactsOutPair(stmID, facts, fm.UnionFacts)
+}
+
+// SetMapFactsOutPair stores map_facts_out point-to + eUnionWrite partitions together.
+func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFacts []*FactUnion) {
 	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return
@@ -156,7 +191,11 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 	if fm.MapFactsOut == nil {
 		fm.MapFactsOut = make(map[int][]*FactPointTo)
 	}
+	if fm.MapUnionFactsOut == nil {
+		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+	}
 	fm.MapFactsOut[stmID] = storeFactMapEntry(facts)
+	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntry(unionFacts)
 }
 
 // storeFactMapEntry normalizes fact-map values so incomplete is not confused with
@@ -172,6 +211,103 @@ func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
 		return []*FactPointTo{}
 	}
 	return cl
+}
+
+// storeUnionFactMapEntry mirrors storeFactMapEntry for FactUnion maps.
+// Incomplete → IncompleteUnionFactSlice; complete empty → non-nil {}.
+func storeUnionFactMapEntry(facts []*FactUnion) []*FactUnion {
+	if !UnionFactsComplete(facts) {
+		return IncompleteUnionFactSlice()
+	}
+	cl := CloneUnionFactSlice(facts)
+	if cl == nil {
+		return []*FactUnion{}
+	}
+	return cl
+}
+
+// GetMapUnionFactsIn returns the eUnionWrite partition of map_facts_in[stm].
+// Missing live key → complete empty {}. Incomplete stored slots stay markers.
+// FactMgr + live stm_id always required; sticky IncompleteUnionFactSlice past hole.
+func (fm *FactMgr) GetMapUnionFactsIn(stmID int) []*FactUnion {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if StmIDUnset(stmID) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if fm.MapUnionFactsIn == nil {
+		return []*FactUnion{}
+	}
+	if facts, ok := fm.MapUnionFactsIn[stmID]; ok {
+		if !UnionFactsComplete(facts) {
+			return IncompleteUnionFactSlice()
+		}
+		return facts
+	}
+	return []*FactUnion{}
+}
+
+// GetMapUnionFactsOut returns the eUnionWrite partition of map_facts_out[stm].
+func (fm *FactMgr) GetMapUnionFactsOut(stmID int) []*FactUnion {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if StmIDUnset(stmID) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if fm.MapUnionFactsOut == nil {
+		return []*FactUnion{}
+	}
+	if facts, ok := fm.MapUnionFactsOut[stmID]; ok {
+		if !UnionFactsComplete(facts) {
+			return IncompleteUnionFactSlice()
+		}
+		return facts
+	}
+	return []*FactUnion{}
+}
+
+// AssignGlobalFactsFromMapIn assigns global_facts from map_facts_in[stm] for both
+// categories. FactMgr.cpp / StatementFor.cpp:355 —
+//   fm->global_facts = fm->map_facts_in[&body];
+// Full FactVec replace (point-to + eUnionWrite). Incomplete either partition wipes both.
+func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
+	if fm == nil || StmIDUnset(stmID) {
+		if fm != nil {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+		}
+		SetError(ErrGeneric)
+		return
+	}
+	pt := fm.GetMapFactsIn(stmID)
+	un := fm.GetMapUnionFactsIn(stmID)
+	if !FactsComplete(pt) || !UnionFactsComplete(un) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_in_assign")
+	cl := CloneUnionFactSlice(un)
+	if !UnionFactsComplete(cl) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	if cl == nil {
+		fm.UnionFacts = []*FactUnion{}
+	} else {
+		fm.UnionFacts = cl
+	}
 }
 
 // GetMapFactsIn returns map_facts_in for a live stm_id.
@@ -307,7 +443,11 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
 		}
+		if fm.MapUnionFactsOut == nil {
+			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
@@ -351,12 +491,18 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
 		}
+		if fm.MapUnionFactsOut == nil {
+			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return
 	}
+	// Full FactVec out: filtered PT + live eUnionWrite (locals already OOS'd on FM
+	// for return via UpdateFactsForOOSVars; break/continue remove_loop_local similarly).
 	fm.SetMapFactsOut(st.StmID, cp)
 }
 
@@ -707,12 +853,71 @@ func (fm *FactMgr) ClearMapVisited() {
 	}
 }
 
-// RestoreFacts mirrors FactMgr::restore_facts.
+// RestoreFacts mirrors FactMgr::restore_facts for the point-to partition only.
+// Prefer RestoreFactsPair when the pre-snapshot also captured eUnionWrite (full FactVec).
 // FactMgr.cpp:489–492 — makeup new vars into old, then replace global_facts.
 // FactMgr always live; sticky (no invent soft-skip restore past hole).
 // Incomplete oldFacts / makeup fail closed sticky (no invent clean clone + partial
 // makeup, no soft re-pick past wiped GlobalFacts).
 func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	// Point-to-only restore keeps current UnionFacts (legacy tests). Generation
+	// paths that snapshot full FactVec use RestoreFactsPair.
+	fm.restoreFactsPT(oldFacts)
+}
+
+// RestoreFactsPair mirrors FactMgr::restore_facts on the full FactVec.
+// FactMgr.cpp:489–492 — makeup_new_var_facts then global_facts = old_facts
+// (ePointTo + eUnionWrite together).
+func (fm *FactMgr) RestoreFactsPair(oldPT []*FactPointTo, oldUnion []*FactUnion) {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	// incomplete either partition — wipe both sticky
+	if (oldPT != nil && !FactsComplete(oldPT)) || !UnionFactsComplete(oldUnion) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	fm.restoreFactsPT(oldPT)
+	if HasError() || !FactsComplete(fm.GlobalFacts) {
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		return
+	}
+	// FactMgr.cpp:489–492 — after makeup on full FactVec, assign. Union partition:
+	// shallow Fact* vector copy of the pre-snapshot (CloneUnionFactSlice).
+	// Makeup for newly created unions is already applied via AddNewVarFact on live
+	// path; pre-snapshot may miss later unions — merge via MakeupNewVarFacts is
+	// PT-centric; re-apply union side by keeping oldUnion subjects and letting
+	// subsequent AddNewVarFact fill gaps (same as C++ makeup_new_var_facts walking
+	// all categories in new_facts).
+	// For vars created after old_facts, C++ add_new_var_fact adds init abstracts
+	// into old_facts for both PT and Union. Go MakeupNewVarFacts only walks PT
+	// in `work`; AddNewVarFact on FM updates both GlobalFacts and UnionFacts live.
+	// After PT restore, re-makeup unions from live → into oldUnion then assign.
+	workU := append([]*FactUnion(nil), oldUnion...)
+	if workU == nil {
+		workU = []*FactUnion{}
+	}
+	// Pull union subjects present in live but missing from old (created mid-body).
+	if !makeupNewUnionFacts(&workU, fm.UnionFacts) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	fm.UnionFacts = workU
+}
+
+// restoreFactsPT is the point-to half of restore_facts (FactMgr.cpp:489–492).
+func (fm *FactMgr) restoreFactsPT(oldFacts []*FactPointTo) {
 	if fm == nil {
 		SetError(ErrGeneric)
 		return
@@ -739,6 +944,75 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 		return
 	}
 	fm.SetGlobalFacts(work, "auto_fact_mgr_restore")
+}
+
+// makeupNewUnionFacts mirrors makeup_new_var_facts for the eUnionWrite partition.
+// FactMgr.cpp:494–508 — for each new_facts entry missing in old, add_new_var_fact.
+// Here we only re-add init FactUnion for union subjects present in live but not old.
+func makeupNewUnionFacts(oldFacts *[]*FactUnion, live []*FactUnion) bool {
+	if oldFacts == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !UnionFactsComplete(*oldFacts) || !UnionFactsComplete(live) {
+		*oldFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return false
+	}
+	for _, f := range live {
+		if f == nil || f.Var == nil {
+			*oldFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return false
+		}
+		if FindRelatedUnion(*oldFacts, f.Var) != nil {
+			if HasError() {
+				*oldFacts = IncompleteUnionFactSlice()
+				return false
+			}
+			continue
+		}
+		if HasError() {
+			*oldFacts = IncompleteUnionFactSlice()
+			return false
+		}
+		// FactMgr.cpp:503–504 — add_new_var_fact(v, old_facts) for missing subjects
+		v := f.Var
+		if !v.IsGlobal() && !v.IsLocal() {
+			if HasError() {
+				*oldFacts = IncompleteUnionFactSlice()
+				return false
+			}
+			continue
+		}
+		if HasError() {
+			*oldFacts = IncompleteUnionFactSlice()
+			return false
+		}
+		_, unInit := AbstractFactForVarInit(v)
+		if !UnionFactsComplete(unInit) {
+			*oldFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		for _, init := range unInit {
+			if init == nil {
+				*oldFacts = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
+				return false
+			}
+			merged := MergeUnionFact(*oldFacts, init)
+			if !UnionFactsComplete(merged) {
+				*oldFacts = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
+				return false
+			}
+			*oldFacts = merged
+		}
+	}
+	return true
 }
 
 // SetupInOutMaps mirrors FactMgr::setup_in_out_maps.
@@ -1808,6 +2082,122 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					return
 				}
 			}
+		}
+	}
+	// FactMgr.cpp:69–110 — abstract_fact_for_var_init also yields eUnionWrite;
+	// push init union facts into map_facts_in/out (MapUnionFacts*) like PT above.
+	// Without this, post_loop AssignGlobalFactsFromMapIn rewinds to entry maps
+	// missing mid-body union init facts → empty/stale UnionFacts → over-filter.
+	if !UnionFactsComplete(fm.UnionFacts) {
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		fm.GlobalFacts = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	_, unInit := AbstractFactForVarInit(v)
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		return
+	}
+	if !UnionFactsComplete(unInit) {
+		if unInit != nil {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+		}
+		return
+	}
+	if fm.MapUnionFactsIn == nil && fm.MapUnionFactsOut == nil {
+		return
+	}
+	for _, uf := range unInit {
+		if uf == nil {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+		// map_facts_in eUnionWrite partition
+		if fm.MapUnionFactsIn != nil {
+			for id := range fm.MapUnionFactsIn {
+				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
+					continue
+				}
+				if !UnionFactsComplete(fm.MapUnionFactsIn[id]) {
+					fm.MapUnionFactsIn[id] = IncompleteUnionFactSlice()
+					continue
+				}
+				// shallow Fact* vector copy (same FactUnion object as C++ push)
+				fm.MapUnionFactsIn[id] = append(fm.MapUnionFactsIn[id], uf)
+			}
+		}
+		// map_facts_out eUnionWrite — all outs when blk==nil; visibility when blk set
+		if fm.MapUnionFactsOut == nil {
+			continue
+		}
+		if blk == nil {
+			for id := range fm.MapUnionFactsOut {
+				if !UnionFactsComplete(fm.MapUnionFactsOut[id]) {
+					fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
+					continue
+				}
+				fm.MapUnionFactsOut[id] = append(fm.MapUnionFactsOut[id], uf)
+			}
+			continue
+		}
+		for id := range fm.MapUnionFactsOut {
+			if !UnionFactsComplete(fm.MapUnionFactsOut[id]) {
+				fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
+				continue
+			}
+			// visibility: globals always; locals via IsVarVisible at map key
+			st := FindStmtByID(fm.Func, id)
+			if HasError() {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				return
+			}
+			if st != nil {
+				parent := FindParentBlockOfStmID(fm.Func, id)
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					return
+				}
+				if fm.Func != nil && !uf.Var.IsGlobal() {
+					vis := fm.Func.IsVarVisible(uf.Var, parent)
+					if HasError() {
+						fm.GlobalFacts = IncompleteFactSlice()
+						fm.UnionFacts = IncompleteUnionFactSlice()
+						return
+					}
+					if !vis {
+						continue
+					}
+				}
+			} else {
+				b := blockByStmID(fm.Func, id)
+				if b == nil {
+					continue
+				}
+				if fm.Func != nil && !uf.Var.IsGlobal() {
+					vis := fm.Func.IsVarVisible(uf.Var, b.Parent)
+					if HasError() {
+						fm.GlobalFacts = IncompleteFactSlice()
+						fm.UnionFacts = IncompleteUnionFactSlice()
+						return
+					}
+					if !vis {
+						continue
+					}
+				}
+			}
+			fm.MapUnionFactsOut[id] = append(fm.MapUnionFactsOut[id], uf)
 		}
 	}
 }

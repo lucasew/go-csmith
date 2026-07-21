@@ -100,6 +100,55 @@ func isReturnVar(v *Variable) bool {
 	return len(n) > 3 && n[len(n)-3:] == "_rv"
 }
 
+// mergeJumpUnionFacts is the eUnionWrite half of FactMgr::merge_jump_facts.
+// FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact; missing → BOTTOM.
+func mergeJumpUnionFacts(facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
+	if facts == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !UnionFactsComplete(*facts) || !UnionFactsComplete(jumpFacts) {
+		*facts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return false
+	}
+	subjects := append([]*FactUnion(nil), *facts...)
+	for _, f := range subjects {
+		if f == nil || f.Var == nil {
+			*facts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return false
+		}
+		if isReturnVar(f.Var) {
+			continue
+		}
+		jumpF := FindRelatedUnion(jumpFacts, f.Var)
+		if HasError() {
+			*facts = IncompleteUnionFactSlice()
+			return false
+		}
+		if jumpF == nil {
+			// FactMgr.cpp:580–582 — jump over init → BOTTOM for eUnionWrite
+			jumpF = MakeFactUnion(f.Var, FactUnionBottom)
+			if jumpF == nil || HasError() {
+				*facts = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+		}
+		merged := MergeUnionFact(*facts, jumpF)
+		if !UnionFactsComplete(merged) {
+			*facts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return false
+		}
+		*facts = merged
+	}
+	return true
+}
+
 // FindEdgesIn mirrors Statement::find_edges_in for dest StmID.
 // Statement.cpp:453–467 — edges with matching dest, post_dest, back_link.
 // Incomplete CFG fails closed sticky nil (no invent soft re-pick empty edges past holes).
@@ -313,10 +362,11 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 // PostCreationAnalysis mirrors Statement::post_creation_analysis.
 // Statement.cpp:844–900 — combine branches / makeup; effect; assign/return facts;
 // func_1 uncertain-call revalidate; set in/out/visited.
+// preUnion is the eUnionWrite partition of pre_facts FactVec (Statement.cpp:260).
 // opts is the session Options (CGOptions); no soft invent Defaults().
 // Statement + CGContext always live; sticky (no invent soft-skip post-creation past hole).
 // Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM).
-func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, cg *CGContext, opts Options) {
+func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUnion, preEffect Effect, cg *CGContext, opts Options) {
 	if st == nil || cg == nil {
 		SetError(ErrGeneric)
 		return
@@ -327,14 +377,16 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	fm := cg.FM
 	// incomplete pre-facts: fail closed sticky (no invent cleaned post-creation)
 	// sticky ERROR so makeRandomStmt ERROR_GUARD aborts without soft re-pick past wipe
-	if !FactsComplete(preFacts) {
+	if !FactsComplete(preFacts) || !UnionFactsComplete(preUnion) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
 	// incomplete GlobalFacts: makeup/branch combine must not invent past holes
-	if !FactsComplete(fm.GlobalFacts) {
+	if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
@@ -471,7 +523,8 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		}
 		return
 	}
-	fm.SetMapFactsIn(st.StmID, preFacts)
+	// FactMgr.cpp set_fact_in — full FactVec (point-to pre + eUnionWrite pre)
+	fm.SetMapFactsInPair(st.StmID, preFacts, preUnion)
 	fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
 	// Incomplete accum fails closed sticky (no invent MapAccumEffect incomplete as recorded success)
 	acc := cg.AccumEffect()
