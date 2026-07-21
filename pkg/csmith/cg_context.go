@@ -242,6 +242,26 @@ func (c CGContext) WithFlags(f uint) CGContext {
 	return c
 }
 
+// WithLoopBody mirrors CGContext::CGContext(cgc, rwd, iv, bound) for loop bodies.
+// CGContext.cpp:95–105 — flags|IN_LOOP, expr_depth(0), curr_rhs(nullptr),
+// effect_stm default empty, share effect_accum/effect_context/call_chain,
+// rw_directive=rwd, optional iv_bounds[iv]=bound.
+// Soft invent was WithFlags(IN_LOOP) alone, which kept parent ExprDepth and
+// CurrRHS into the loop body (C++ zeros both).
+func (c CGContext) WithLoopBody(rwd *RWDirective, iv *Variable, bound int) CGContext {
+	out := c.CloneSubcontext()
+	out.Flags |= FlagInLoop
+	// CGContext.cpp:97–100 — expr_depth(0); curr_rhs(nullptr); effect_stm default
+	out.ExprDepth = 0
+	out.CurrRHS = nil
+	out.EffectStm = EmptyEffect()
+	out.RW = rwd
+	if iv != nil {
+		out.AddIVBound(iv, bound)
+	}
+	return out
+}
+
 // CloneSubcontext returns a value copy whose iv_bounds map is independent.
 // C++ CGContext copy constructors deep-copy std::map iv_bounds (CGContext.cpp:74–100).
 // A shallow Go struct copy would share the map: AddIVBound/RemoveIVBound on a child

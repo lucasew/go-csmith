@@ -568,24 +568,23 @@ func MakeRandomFor(
 		}
 		return nil
 	}
-	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
-	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
-	bodyCG := cg.WithFlags(FlagInLoop)
-	// CGContext.cpp:95–105 — loop-body ctor default-constructs effect_stm() empty.
-	// Do not inherit parent's post-make_iteration EffectStm (IV write/read).
-	bodyCG.EffectStm = EmptyEffect()
-	if lc.IV != nil {
-		bodyCG.AddIVBound(lc.IV, lc.Bound)
-	}
-	// CGContext.cpp:95–101 — loop-body context shares effect_accum pointer with parent.
-	// Do not fork a bodyEff snapshot: an invented copy left parent/mid-body
-	// choose_visible_read_var with fewer read_vars (seed-2 e12693: ok_vars n=11 vs UP n=16).
+	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303 /
+	// CGContext.cpp:95–105. WithLoopBody: IN_LOOP, expr_depth=0, curr_rhs=nil,
+	// empty effect_stm, shared effect_accum, iv_bounds[iv]=bound.
 	// Incomplete parent accum fails closed (no invent body under incomplete shell)
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
 		SetError(ErrGeneric)
 		return nil
 	}
-	// bodyCG.EffectAccum already aliases cg.EffectAccum via CloneSubcontext pointer copy
+	var iv *Variable
+	bound := 0
+	if lc.IV != nil {
+		iv = lc.IV
+		bound = lc.Bound
+	}
+	// StatementFor.cpp:302 — body_cg_context(cg, cg.rw_directive, iv, bound)
+	bodyCG := cg.WithLoopBody(cg.RW, iv, bound)
+	// bodyCG.EffectAccum aliases cg.EffectAccum (CGContext.cpp:101)
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
 	if HasError() || body == nil {

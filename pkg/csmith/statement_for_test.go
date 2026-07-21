@@ -174,10 +174,10 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	accum := EmptyEffect().ReadVar(pre)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &accum
-	// WithFlags copies the EffectAccum pointer (shared).
-	bodyCG := cg.WithFlags(FlagInLoop)
+	// WithLoopBody / C++ loop-body ctor share EffectAccum pointer.
+	bodyCG := cg.WithLoopBody(cg.RW, nil, 0)
 	if bodyCG.EffectAccum != cg.EffectAccum {
-		t.Fatal("WithFlags must share EffectAccum pointer (CGContext.cpp:101)")
+		t.Fatal("WithLoopBody must share EffectAccum pointer (CGContext.cpp:101)")
 	}
 	// Body code path must not rebind EffectAccum to a private snapshot.
 	// MakeRandomFor is the production path; re-check pointer identity after call.

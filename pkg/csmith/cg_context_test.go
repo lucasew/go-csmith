@@ -37,3 +37,49 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	}
 	ClearError()
 }
+
+// CGContext.cpp:95–105 — loop-body ctor: expr_depth=0, curr_rhs=nil, empty stm,
+// share EffectAccum, IN_LOOP, optional iv bound.
+func TestWithLoopBodyMatchesCtor(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	eff := EmptyEffect()
+	parent := WithFunc(f, EmptyEffect())
+	parent.EffectAccum = &eff
+	parent.ExprDepth = 9
+	parent.CurrRHS = rhs
+	parent.EffectStm = EmptyEffect().WriteVar(iv)
+	parent.Flags = FlagNoDanglingPtr
+	body := parent.WithLoopBody(parent.RW, iv, 4)
+	if !body.InLoop() {
+		t.Fatal("must set IN_LOOP")
+	}
+	if body.Flags&FlagNoDanglingPtr == 0 {
+		t.Fatal("must keep parent flags")
+	}
+	if body.ExprDepth != 0 {
+		t.Fatalf("expr_depth must be 0, got %d", body.ExprDepth)
+	}
+	if body.CurrRHS != nil {
+		t.Fatal("curr_rhs must be nil")
+	}
+	if body.EffectAccum != parent.EffectAccum {
+		t.Fatal("must share effect_accum pointer")
+	}
+	if len(body.EffectStm.WrittenVars()) != 0 {
+		t.Fatal("effect_stm must start empty")
+	}
+	if b, ok := body.IVBounds[iv]; !ok || b != 4 {
+		t.Fatalf("iv_bounds[iv]=4, got %v ok=%v", b, ok)
+	}
+	if _, ok := parent.IVBounds[iv]; ok {
+		t.Fatal("parent iv_bounds must not gain body IV")
+	}
+	// parent ExprDepth/CurrRHS unchanged
+	if parent.ExprDepth != 9 || parent.CurrRHS != rhs {
+		t.Fatal("parent must not be mutated")
+	}
+	ClearError()
+}
