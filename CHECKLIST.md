@@ -5,10 +5,18 @@ Format: `- [ ] File.cpp::Item` or `- [ ] File.cpp::Item.subitem`.
 
 Source pin: `.build/csmith-src` (see SPEC.md).
 
-**Process lock (SPEC §3.1a–3.1b):** mark items only when the Go unit matches the
-C++ contract under 1:1 tests. Same flags + seed (and RNG event match) are a
-**consequence** of fair units — not the acceptance metric and not the unit of work.
-Do not chase `first_div` / event streams to “finish” this list.
+**Process lock (SPEC §3.1a–3.1b + §3.5a):** mark items only when the Go unit
+matches the C++ contract under 1:1 tests. Same flags + seed (and RNG event
+match) are a **consequence** of fair units — not the acceptance metric and not
+the unit of work. Do not chase `first_div` / event streams to “finish” this list.
+
+**Multi-seed parity (SPEC §3.5a — mandatory):** seed **2** body match is level
+**A** only. Level **B** requires the **frozen battery**
+`0,1,2,3,4,5,7,10,42,100,123,999` each exact program body vs golden. Method:
+first body diff → owning C++ unit → cite + tests; keep seed 2 green; hang =
+FAIL. Do not shrink the battery, seed-special-case generation, or invent pads
+for multi-seed. Full process: **SPEC.md §3.5 and §3.5a** (do not restate a
+weaker plan).
 
 **If every box is checked but seed defaults still diverge** (events or program
 body vs golden upstream): the list is **not done**. Something was marked done

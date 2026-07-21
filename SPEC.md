@@ -42,7 +42,7 @@ Until that exists, `Generate` may be absent or return a clear `not implemented` 
 |-------|-------------|
 | Default options + seed `N` | Same **bit-identical C program body** as golden upstream |
 | Header line (`Generator: …`) | May differ only if documented |
-| Multi-seed | Defaults hold for an agreed seed range once the spine is real |
+| Multi-seed | Level **B** battery exact body — **SPEC §3.5a** (seed 2 alone is not done) |
 
 Drop-in is **emergent** from fair C++-linked ports and 1:1 function tests. It is **not** achieved by matching RNG event streams with residual burns, invent floors, or packed offline tables.
 
@@ -108,17 +108,136 @@ For each ported unit:
 
 Event numbers (`eNNNN`) are **debug breadcrumbs**, not evidence and not test names of record.
 
-### 3.5 Whole-program gates (only after ProgramGenerator exists)
+### 3.5 Whole-program gates (active)
 
-When the fair spine can emit a full default program:
+The fair spine **can** emit full default programs. Gates below are **active**.
 
-1. Seed **2**, defaults: **source body** match vs golden
-2. Expand seed range (e.g. N = 20) for source match
-3. Flag parity toward full upstream semantics
+**Acceptance metric (only this):** bit-identical **program body** vs golden / instrumented upstream for the same default flags + seed.
 
-Timeouts on all generation/compare steps. Bounded filter/retry loops only where C++ has them.
+| In the gate | Out of the gate |
+|-------------|-----------------|
+| From `static long __undefined` (or first program section after includes) through end of `main` | Header `Generator:` / `Git version:` lines (may differ if documented) |
+| Structs, globals, functions, RW comments, blank lines as emitted | **Statistics** tail (`/************************ statistics` …) |
+| Exact text, not id-normalized “close enough” | Compile checksum alone without body match |
+| | RNG event stream / `first_div` as acceptance |
 
-Until ProgramGenerator exists, these gates are **inactive**. Do not invent residual programs to pre-satisfy them.
+Timeouts on every generate/compare step. Bounded filter/retry loops only where C++ has them.
+
+### 3.5a Multi-seed parity process (lock — agents must comply)
+
+This section is the **mandatory work method** for multi-seed drop-in. It does **not** replace §3.1a–3.1b; it applies them to whole-program parity.
+
+#### Goal levels
+
+| Level | Definition | Status (update only when verified) |
+|-------|------------|--------------------------------------|
+| **A** | Defaults + seed **2**: exact program body vs golden | **Met** (2026-07-21; re-verify after every gen/emit change) |
+| **B** | Defaults + every seed in the **§3.5a battery**: exact program body | **Open** |
+| **C** | Broader seed range (e.g. 0…N or random sample) + optional checksum thermometer | **Open** (only after B) |
+
+**Done for multi-seed** means **level B**, not A alone. Seed 2 green is **not** permission to stop or to invent pads so other seeds “pass.”
+
+#### Frozen battery (level B)
+
+Compare **every** seed in this set under default options (same flags as golden CLI defaults, `-s <seed>`):
+
+```
+0, 1, 2, 3, 4, 5, 7, 10, 42, 100, 123, 999
+```
+
+| Rule | Detail |
+|------|--------|
+| Membership | **Do not** shrink the battery to invent a higher pass rate |
+| Expansion | May **add** seeds after B is green; never remove a failing seed to claim B |
+| Timeout | Generation hard-timeout per side (e.g. ≥60s; ≥300s only when debugging hang). Hang = **FAIL**, not skip |
+| Both sides | Same golden pin / instrumented binary as SPEC §3.2 |
+
+#### One-seed work unit (only allowed method)
+
+For **one** battery seed that fails exact body match:
+
+1. Generate Go and upstream. Diff **program body** (§3.5).
+2. Take the **first real content difference** (not cosmetics listed in Phase 0 after those fixes land).
+3. If types/structs already differ: **stop there** — own the type/struct/pack/field unit. Do not chase later statements or streams.
+4. Map the line to a **C++ file + function (+ predicate)**; implement that path with **same-hunk cite** + **§3.4 tests**.
+5. Re-check: **this seed**, **seed 2 (must stay green)**, and prefer a quick battery smoke.
+6. Commit when that unit is fair — not when `first_div` moved.
+
+| Do | Do not |
+|----|--------|
+| Fix the owning C++ unit | Climb `first_div` / event counts as the objective |
+| Prefer longest shared body prefix among remaining fails | Seed-literal branches (`if seed == 7`) |
+| Keep seed 2 green after every change | Invent may-null / pool sizes / blank draws so a seed matches |
+| Hang → timeout + investigate control/FP loop | Skip hanging seeds when reporting “B” |
+
+#### Phases (order of attack — do not skip for score)
+
+**Phase 0 — Comparison cosmetics (emit-only, unblocks reading diffs)**
+
+| Unit | Evidence | Action |
+|------|----------|--------|
+| Empty `/* --- Struct/Union Declarations --- */` always emitted when C++ does | Seeds **1**, **100** content-match once line is present | Fair header/type-list Output |
+| `#pragma pack(push, 1)` vs `pack(push)` + `pack(1)` | Seeds **4**, **5** first lines | Fair struct/union pack emit (C++ cite) |
+
+Land with cites. Re-run battery. Remaining DIFFs must be IR/content, not print noise.
+
+**Phase 1 — Re-score after Phase 0**
+
+Expect some seeds to flip to MATCH without more gen fixes. Gate remains **exact pre-stats body**.
+
+**Phase 2 — Early type / struct / union**
+
+| Pattern | Example seeds | Own |
+|---------|---------------|-----|
+| Go invents packed struct; UP has none | 0, 10 | When types are created / emitted |
+| Field type differs | 7, 42, 123 | Type/field choose path |
+| Union id/order (`U0` vs `U1`) | 999 | Type gensym / creation order |
+
+**Phase 3 — Mid-body after shared types**
+
+| Pattern | Example seeds | Own |
+|---------|---------------|-----|
+| Qualifier / volatile on same `g_N` | 4 | CV / create global |
+| Array itemize / index form | 5 | Itemize / collective / member Output |
+| Shared prefix then size/lattice drift | various | Same class as pre–seed-2 fair unit fixes (facts, visit, Effect) |
+
+**Phase 4 — Hang / pathological gen**
+
+| Seed | Rule |
+|------|------|
+| **3** (Go hung >300s while UP finished) | Separate bug: finish in the same order of magnitude as UP, **then** body-diff. Do not claim B while any battery seed hangs. |
+
+**Phase 5 — Gate**
+
+1. Level **B**: entire battery exact body.
+2. Only then level **C** / CI sample expansion.
+3. Checksum / compile scripts remain **thermometers** unless body already matches.
+
+#### Uncheatable reporting
+
+Any agent report of multi-seed status **must** include a per-seed table:
+
+| seed | exact body MATCH/DIFF/TIMEOUT | first real body line (if DIFF) |
+
+| Forbidden report | Why |
+|------------------|-----|
+| “Seed 2 matches → multi-seed done” | A ≠ B |
+| Pass rate after removing hard seeds | Battery is frozen |
+| “Events match further” as success | §3.1a — consequence only |
+| Id-normalized or RW-stripped body as MATCH | Gate is exact body (§3.5) |
+| “Checklist 100%” while battery has DIFF | §3.1b — false marks |
+
+#### Anti-patterns specific to multi-seed (reject)
+
+- `if seed == N` or seed-era sticky flags to force one battery seed
+- Residual / invent / blank entropy to force multi-seed streams
+- Shrinking or redefining the battery to improve a dashboard
+- Treating pack/section cosmetics as “close enough” forever without Phase 0 fixes
+- Closing level B while seed 3 (or any battery seed) times out
+
+#### Relation to checklist
+
+CHECKLIST marks stay unit contracts (§3.4). Multi-seed body match is the **consequence** that proves marks are not false (§3.1b). When battery seed S diverges, the incomplete unit is **open** even if its checklist box is checked — re-open that unit; do not invent residual to green the seed.
 
 ## 4. Options policy
 
@@ -254,10 +373,12 @@ Green metrics never override a cheaty diff.
 - “Integrity residual debt” commits that land cheat code while noting debt
 - Scheduled loops whose real objective is `first_div` / `eN→eM` climb
 - Commit subjects that only celebrate event scores (`seed5 e8199→8220 residual`)
+- Multi-seed work that ignores **§3.5a** (battery shrink, seed-literal gen, reporting A as B)
 
 **Allowed**
 
 - Port one C++ path with cite + 1:1 tests
+- Multi-seed via **§3.5a** only: first body diff → C++ unit → cite + tests; keep seed 2 green
 - Local throwaway experiments that **never** merge
 - Diagnostic traces and thermometers
 - Progress notes as **functions ported + tests**, not event tallies
@@ -346,7 +467,7 @@ Patterns observed in session `019f5695-5d12-70a1-a913-c8790f96db54` and residual
 | Unit / table tests | Each ported function: 1:1 behavioral contract (§3.4) |
 | Smoke tests | Small end-to-end of a **layer** (e.g. RNG sequence, type pick, selector choose) vs known upstream vectors |
 | Instrumented upstream | Optional helper to capture vectors; not a substitute for cites |
-| Full program parity scripts | Thermometers only; active as acceptance only after fair ProgramGenerator + read-diff |
+| Full program parity scripts | Thermometers + battery report aid; **acceptance** = exact body (§3.5 / §3.5a), not script exit alone |
 
 Tests must exercise **this** implementation’s logic, not restate third-party trivia. Prefer failing tests when upstream pin behavior is not yet ported over green lies.
 
@@ -367,7 +488,9 @@ Tests must exercise **this** implementation’s logic, not restate third-party t
 | `cmd/csmith`, `internal/cli` | CLI **last** |
 | `scripts/` | Thermometers + instrumented upstream build (not integrity gates alone) |
 | `third_party/csmith-rng-trace.patch` | Fair measurement aid |
-| `SPEC.md` | This document |
+| `SPEC.md` | This document (process + multi-seed §3.5a) |
+| `AGENTS.md` | Always-on pointer for agents → SPEC locks |
+| `CHECKLIST.md` | Unit inventory; process pointer to SPEC |
 | `.build/` | Gitignored upstream extract / instrumented build |
 
 ## 11. Changelog of decisions (grill)
@@ -411,12 +534,17 @@ Superseding integrity text that banned residual while still logging residual cli
 | 13 | North star remains **drop-in bit-identical program body**, emergent from fair ports |
 | 14 | Agent process: function-sized ports + tests; no residual/first_div continue-loops |
 | 15 | SPEC rewrite records cheat catalog from session + tree so patterns stay banned |
+| 16 | Multi-seed parity process locked in §3.5a (battery, phases, exact body, anti-cheat); agents must not rewrite into stream climb |
 
 ## 12. Progress (living)
 
 | Item | Status |
 |------|--------|
 | SPEC fair-rewrite lock | **Done** |
+| SPEC §3.5a multi-seed process lock | **Done** (2026-07-21) |
+| Whole-program level **A** (seed 2 exact body) | **Met** — re-verify after gen/emit changes |
+| Whole-program level **B** (battery exact body) | **Open** — see §3.5a |
+| Whole-program level **C** (expanded range) | **Open** — only after B |
 | Branch `fair-rewrite` + delete residual mass | **Done** (generator/residual/types godfiles removed) |
 | Layer 1: `Rng` | **Done** — `rng.go` + tests |
 | Layer 2: `CGOptions` defaults | **Done** — macros 1:1 tests; `MaxPointerDepth` fixed to 5 (`max_indirect_level`) |
