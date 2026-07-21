@@ -471,10 +471,11 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if !EffectComplete(acc) {
 		return ShortcutNone
 	}
-	if fm.MapAccumEffect == nil {
-		fm.MapAccumEffect = make(map[int]Effect)
+	fm.SetMapAccumEffect(st.StmID, acc)
+	// residual ERROR sticky — no invent ShortcutOK past SetMapAccumEffect residual
+	if HasError() {
+		return ShortcutNone
 	}
-	fm.MapAccumEffect[st.StmID] = acc
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
@@ -593,10 +594,8 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			acc = IncompleteEffect()
 			SetError(ErrGeneric)
 		}
-		if cg.FM.MapAccumEffect == nil {
-			cg.FM.MapAccumEffect = make(map[int]Effect)
-		}
-		cg.FM.MapAccumEffect[st.StmID] = acc
+		cg.FM.SetMapAccumEffect(st.StmID, acc)
+		// residual ERROR sticky — visit already may be false; still record incomplete marker
 		if cg.FM.MapVisited == nil {
 			cg.FM.MapVisited = make(map[int]bool)
 		}

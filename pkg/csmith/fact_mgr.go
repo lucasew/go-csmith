@@ -1659,10 +1659,45 @@ func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 	return EmptyEffect()
 }
 
-// GetMapAccumEffect returns stored map_accum_effect or empty for a live stm_id.
+// SetMapAccumEffect stores map_accum_effect[stm] as a deep copy of acc.
+// Statement.cpp:563 / 622 — Effect is value-copied into the map (Effect.cpp:84–89
+// deep-copies read/write vectors). Go Effect struct copy shares maps; without
+// Clone, later EffectAccum growth/reset can alias-corrupt the snapshot used by
+// StatementGoto choose_visible_read_var (map_accum_effect[other].get_read_vars).
+// Incomplete acc stores IncompleteEffect (no invent empty pure past hole).
+// FactMgr + live stm_id always required; sticky no invent soft-skip store past hole.
+//
+// Pre-existing HasError (e.g. visit_facts already failed) must not block store:
+// stm_visit_facts always records map_accum_effect even when visit returns false.
+func (fm *FactMgr) SetMapAccumEffect(stmID int, acc Effect) {
+	if fm == nil || StmIDUnset(stmID) {
+		SetError(ErrGeneric)
+		return
+	}
+	if fm.MapAccumEffect == nil {
+		fm.MapAccumEffect = make(map[int]Effect)
+	}
+	if acc.incomplete {
+		fm.MapAccumEffect[stmID] = IncompleteEffect()
+		return
+	}
+	// Nil map keys (broken IR) — sticky incomplete marker; do not invent pure empty
+	if !effectMapKeysComplete(acc.read) || !effectMapKeysComplete(acc.written) ||
+		!effectMapKeysComplete(acc.lhsWrite) {
+		SetError(ErrGeneric)
+		fm.MapAccumEffect[stmID] = IncompleteEffect()
+		return
+	}
+	// Deep-copy without requiring global HasError clear (visit_facts may already sticky).
+	fm.MapAccumEffect[stmID] = acc.detachMaps()
+}
+
+// GetMapAccumEffect returns a deep copy of stored map_accum_effect or empty for a live stm_id.
 // FactMgr always live; sticky IncompleteEffect (no invent empty pure past hole).
 // StmID ≤0 fails closed sticky IncompleteEffect (no invent empty-complete zero Effect
 // via map miss on incomplete keys — ReadVars/AddEffect would invent pure).
+// Returned Effect is detached from the map (C++ returns const Effect& but callers
+// only read; Go deep-copy prevents accidental shared-map mutation of the snapshot).
 func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
 	if fm == nil {
 		SetError(ErrGeneric)
@@ -1676,7 +1711,12 @@ func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
 		return EmptyEffect()
 	}
 	if e, ok := fm.MapAccumEffect[stmID]; ok {
-		return e
+		if e.incomplete {
+			return IncompleteEffect()
+		}
+		// Detach without Clone() residual path: callers may read map_accum while
+		// HasError is already sticky from an unrelated visit failure.
+		return e.detachMaps()
 	}
 	return EmptyEffect()
 }

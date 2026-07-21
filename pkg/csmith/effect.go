@@ -81,11 +81,20 @@ func EffectComplete(e Effect) bool {
 // Clone mirrors Effect copy ctor with deep map copies (Go maps are shared refs).
 // Effect.cpp:84–89.
 func (e Effect) Clone() Effect {
-	out := Effect{pure: e.pure, sideEffectFree: e.sideEffectFree, incomplete: e.incomplete}
 	if e.incomplete {
 		// residual ERROR sticky — no invent soft-complete clone past IncompleteEffect hole
 		// (snapshot restore paths must HasError/EffectComplete fail closed)
 		SetError(ErrGeneric)
+		return IncompleteEffect()
+	}
+	return e.detachMaps()
+}
+
+// detachMaps deep-copies maps/slices without touching HasError.
+// Used by MapAccumEffect store/load when ERROR may already be sticky from visit_facts.
+func (e Effect) detachMaps() Effect {
+	out := Effect{pure: e.pure, sideEffectFree: e.sideEffectFree, incomplete: e.incomplete}
+	if e.incomplete {
 		return IncompleteEffect()
 	}
 	if len(e.read) > 0 {

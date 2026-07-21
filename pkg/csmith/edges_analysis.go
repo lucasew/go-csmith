@@ -561,10 +561,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 		SetError(ErrGeneric)
 		return
 	}
-	if fm.MapAccumEffect == nil {
-		fm.MapAccumEffect = make(map[int]Effect)
+	fm.SetMapAccumEffect(st.StmID, acc)
+	// residual ERROR sticky — no invent post_creation success past SetMapAccum residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
 	}
-	fm.MapAccumEffect[st.StmID] = acc
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}

@@ -680,10 +680,12 @@ func (b *Block) AppendNestedLoop(
 			SetError(ErrGeneric)
 			return nil
 		}
-		if cg.FM.MapAccumEffect == nil {
-			cg.FM.MapAccumEffect = make(map[int]Effect)
+		cg.FM.SetMapAccumEffect(st.StmID, acc)
+		// residual ERROR sticky — no invent soft-append past SetMapAccum residual
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
 		}
-		cg.FM.MapAccumEffect[st.StmID] = acc
 		if cg.FM.MapVisited == nil {
 			cg.FM.MapVisited = make(map[int]bool)
 		}
@@ -708,7 +710,12 @@ func (b *Block) AppendNestedLoop(
 			return nil
 		}
 		cg.FM.SetMapStmEffect(b.StmID, merged)
-		cg.FM.MapAccumEffect[b.StmID] = acc
+		cg.FM.SetMapAccumEffect(b.StmID, acc)
+		// residual ERROR sticky — no invent soft-append past block SetMapAccum residual
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 	}
 	return st
 }
@@ -793,10 +800,12 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			SetError(ErrGeneric)
 			return nil
 		}
-		if fm.MapAccumEffect == nil {
-			fm.MapAccumEffect = make(map[int]Effect)
+		fm.SetMapAccumEffect(st.StmID, acc)
+		// residual ERROR sticky — no invent soft-return past SetMapAccum residual
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
 		}
-		fm.MapAccumEffect[st.StmID] = acc
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)
 		}
@@ -821,7 +830,12 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			return nil
 		}
 		fm.SetMapStmEffect(b.StmID, merged)
-		fm.MapAccumEffect[b.StmID] = acc
+		fm.SetMapAccumEffect(b.StmID, acc)
+		// residual ERROR sticky — no invent soft-return past block SetMapAccum residual
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
 	}
 	return st
@@ -1050,10 +1064,11 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if !EffectComplete(acc) {
 		return ShortcutNone
 	}
-	if fm.MapAccumEffect == nil {
-		fm.MapAccumEffect = make(map[int]Effect)
+	fm.SetMapAccumEffect(b.StmID, acc)
+	// residual ERROR sticky — no invent ShortcutOK past SetMapAccum residual
+	if HasError() {
+		return ShortcutNone
 	}
-	fm.MapAccumEffect[b.StmID] = acc
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
