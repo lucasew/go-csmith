@@ -1237,7 +1237,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	// uses get_rhs() (canonized ExpressionFuncall for compounds)
 	if cg.FM != nil && lhsVar != nil {
 		// Statement::stm_id always live; StmID 0 sticky
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}

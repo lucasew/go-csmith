@@ -530,7 +530,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// Restore callee GlobalFacts immediately — do not leave caller lattice installed.
 	fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_531")
 	// body Block::stm_id always live; StmID 0 sticky
-	if f.Body.StmID <= 0 {
+	if StmIDUnset(f.Body.StmID) {
 		restore()
 		SetError(ErrGeneric)
 		return false

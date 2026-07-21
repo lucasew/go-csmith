@@ -57,13 +57,18 @@ func TestFindEdgesIn(t *testing.T) {
 	if none == nil || len(none) != 0 {
 		t.Fatal("complete empty must be non-nil empty", none)
 	}
-	// StmID ≤0 incomplete key sticky
+	// IncompleteStmID key sticky; valid id 0 is a complete empty scan
 	ClearError()
-	if got := fm.FindEdgesIn(0, false, false); got != nil {
-		t.Fatal("destStmID 0 must fail closed", got)
+	if got := fm.FindEdgesIn(IncompleteStmID, false, false); got != nil {
+		t.Fatal("IncompleteStmID must fail closed", got)
 	}
 	if !HasError() {
-		t.Fatal("destStmID 0 FindEdgesIn must SetError sticky")
+		t.Fatal("IncompleteStmID FindEdgesIn must SetError sticky")
+	}
+	ClearError()
+	none0 := fm.FindEdgesIn(0, false, false)
+	if none0 == nil || len(none0) != 0 {
+		t.Fatal("valid dest id 0 empty scan must be non-nil empty", none0)
 	}
 	ClearError()
 	if got := fm.FindEdgesInToBlock(nil, false, false); got != nil {
@@ -210,7 +215,7 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 	// (no invent soft-skip edge merge then validate as complete)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
-		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgr(nil)
@@ -219,7 +224,7 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{}
 	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
-		t.Fatal("StmID 0 must fail closed")
+		t.Fatal("IncompleteStmID must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("StmID 0 AnalyzeWithEdgesIn must SetError sticky")
@@ -358,14 +363,14 @@ func TestFindFixedPointBlock(t *testing.T) {
 	if !fm.MapVisited[1] {
 		t.Fatal("visited")
 	}
-	// StmID 0 + FM fails closed (no invent soft single-pass success)
+	// IncompleteStmID on block + FM fails closed (no invent soft single-pass success)
 	ClearError()
-	bad := &Block{Stmts: []Stmt{{
+	bad := &Block{StmID: IncompleteStmID, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}}}
 	if _, _, ok := FindFixedPointBlock(bad, nil, &cg, Defaults(), false); ok {
-		t.Fatal("block StmID 0 must fail closed")
+		t.Fatal("block IncompleteStmID must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("expect sticky error on incomplete block id")
@@ -459,26 +464,26 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 		t.Fatal("effect")
 	}
 	// StmID 0 — no invent soft no-op that leaves effect unrecorded as success
-	st0 := &Stmt{Kind: StmtFor, StmID: 0}
+	st0 := &Stmt{Kind: StmtFor, StmID: IncompleteStmID}
 	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
-	// GetMapStmEffect(0) IncompleteEffect (IsWritten fail-closed true — use map entry probe)
+	// GetMapStmEffect(IncompleteStmID) IncompleteEffect (IsWritten fail-closed true — use map entry probe)
 	if _, ok := fm.MapStmEffect[0]; ok {
 		t.Fatal("StmID 0 must not invent map effect key 0")
 	}
-	// GetMapStmEffect(0) IncompleteEffect sticky — not invent empty pure default
+	// GetMapStmEffect(IncompleteStmID) IncompleteEffect sticky — not invent empty pure default
 	ClearError()
-	if EffectComplete(fm.GetMapStmEffect(0)) || fm.GetMapStmEffect(0).IsEmpty() {
+	if EffectComplete(fm.GetMapStmEffect(IncompleteStmID)) || fm.GetMapStmEffect(IncompleteStmID).IsEmpty() {
 		t.Fatal("StmID 0 GetMapStmEffect must IncompleteEffect")
 	}
 	if !HasError() {
 		t.Fatal("StmID 0 GetMapStmEffect must SetError sticky")
 	}
 	ClearError()
-	if EffectComplete(fm.GetMapAccumEffect(0)) || fm.GetMapAccumEffect(0).IsPure() {
-		t.Fatal("StmID 0 GetMapAccumEffect must IncompleteEffect")
+	if EffectComplete(fm.GetMapAccumEffect(IncompleteStmID)) || fm.GetMapAccumEffect(IncompleteStmID).IsPure() {
+		t.Fatal("IncompleteStmID GetMapAccumEffect must IncompleteEffect")
 	}
 	if !HasError() {
-		t.Fatal("StmID 0 GetMapAccumEffect must SetError sticky")
+		t.Fatal("IncompleteStmID GetMapAccumEffect must SetError sticky")
 	}
 	// incomplete pre/block effect must sticky Incomplete map entry
 	ClearError()

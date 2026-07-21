@@ -73,7 +73,7 @@ func TestSetAccumulatedEffect(t *testing.T) {
 	}
 	// StmID 0 incomplete sticky — IncompleteEffect (not EmptyEffect invent pure/empty success)
 	ClearError()
-	b2 := &Block{StmID: 11, Stmts: []Stmt{{StmID: 1}, {StmID: 0}}}
+	b2 := &Block{StmID: 11, Stmts: []Stmt{{StmID: 1}, {StmID: IncompleteStmID}}}
 	fm.SetMapStmEffect(11, EmptyEffect().WriteVar(v))
 	eff2 := b2.SetAccumulatedEffect(fm)
 	if EffectComplete(eff2) || eff2.IsEmpty() || eff2.IsPure() {
@@ -258,7 +258,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	}
 	// Block StmID 0 + FM sticky fail closed as escape (no invent "no back edge")
 	ClearError()
-	b0 := &Block{StmID: 0, Stmts: []Stmt{ret}, EmitFM: fm}
+	b0 := &Block{StmID: IncompleteStmID, Stmts: []Stmt{ret}, EmitFM: fm}
 	if b0.MustReturn() {
 		t.Fatal("block StmID 0 must fail closed not must_return")
 	}
@@ -373,5 +373,46 @@ func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 	if lead(forLine) != lead(braceLine) {
 		t.Fatalf("for indent %d vs body brace %d\nfor:%q\nbrace:%q\nout:\n%s",
 			lead(forLine), lead(braceLine), forLine, braceLine, out)
+	}
+}
+
+// Statement.cpp:239,370–371 — sid starts 0; assign then increment.
+func TestAllocStmIDMatchesCppSid(t *testing.T) {
+	ClearError()
+	nextStmID = 0
+	if AllocStmID() != 0 {
+		t.Fatal("first stm_id must be 0")
+	}
+	if AllocStmID() != 1 || AllocStmID() != 2 {
+		t.Fatal("monotonic sid")
+	}
+	if StmIDUnset(0) {
+		t.Fatal("valid id 0 must not be unset")
+	}
+	if !StmIDUnset(IncompleteStmID) {
+		t.Fatal("IncompleteStmID must be unset")
+	}
+}
+
+// Seed-2: func_1 body is block id 0; late id 577 (matches instrumented upstream).
+func TestSeed2BlockIDsMatchUpstream(t *testing.T) {
+	ClearError()
+	nextStmID = 0
+	opts := Defaults()
+	opts.Seed = 2
+	out, err := Generate(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "{ /* block id: 0 */") {
+		t.Fatal("missing block id 0")
+	}
+	if !strings.Contains(out, "block id: 577") {
+		t.Fatal("missing block id 577 (sid desync vs C++)")
+	}
+	// definition (not forward decl) opens with block id 0
+	idx := strings.Index(out, "static uint32_t  func_1(void)\n{ /* block id: 0 */")
+	if idx < 0 {
+		t.Fatal("func_1 definition must open with block id 0")
 	}
 }

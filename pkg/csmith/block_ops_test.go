@@ -110,7 +110,7 @@ func TestFindJumpSources(t *testing.T) {
 		t.Fatal("nil FM FindJumpSources must SetError sticky")
 	}
 	ClearError()
-	if fm.FindJumpSources(0) != nil {
+	if fm.FindJumpSources(IncompleteStmID) != nil {
 		t.Fatal("destStmID 0 FindJumpSources must fail closed")
 	}
 	if !HasError() {
@@ -323,7 +323,7 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	}
 	// Block StmID 0 + FM fails closed (no invent fold into key 0)
 	ClearError()
-	bad := &Block{Func: f, StmID: 0, Parent: nil}
+	bad := &Block{Func: f, StmID: IncompleteStmID, Parent: nil}
 	f.Stack = []*Block{bad}
 	if bad.AppendReturnStmt(NewRng(2), opts, NewVariableSelector(opts), &cg) != nil {
 		t.Fatal("block StmID 0 must fail closed")
@@ -471,7 +471,7 @@ func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 		t.Fatal("must wipe GlobalFacts incomplete")
 	}
 	ClearError()
-	b0 := &Block{StmID: 0, Func: f}
+	b0 := &Block{StmID: IncompleteStmID, Func: f}
 	b0.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
 	if !HasError() {
 		t.Fatal("StmID 0 must SetError")
@@ -546,7 +546,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 		Func:   f,
 		EmitFM: fm,
 		Stmts: []Stmt{
-			{Kind: StmtAssign, StmID: 0, LhsVar: good}, // StmID 0 under FM sticky PreOutput
+			{Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: good}, // StmID 0 under FM sticky PreOutput
 			{Kind: StmtAssign, StmID: 2, LhsVar: good, Expr: &Expression{Term: TermVariable, Var: good, ExprType: GetIntType()}},
 		},
 	}
@@ -991,7 +991,7 @@ func TestFindStmtByID(t *testing.T) {
 		t.Fatal("nil Function FindStmtByID must SetError sticky")
 	}
 	ClearError()
-	if FindStmtByID(f, 0) != nil {
+	if FindStmtByID(f, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtByID must fail closed")
 	}
 	if !HasError() {

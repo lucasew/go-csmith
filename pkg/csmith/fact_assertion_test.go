@@ -187,7 +187,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	}
 	// StmID 0 sticky — no invent empty assertion section past incomplete stmt id
 	ClearError()
-	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	if s := fm.OutputAssertions(st0, nil, "    ", true); s != "" {
 		t.Fatal("StmID 0 OutputAssertions must fail closed", s)
 	}
@@ -317,15 +317,23 @@ func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
 	if tgt || out != "  step_hash(9);\n" {
 		t.Fatal(out, tgt)
 	}
-	// FM + StmID 0 sticky — no invent SourceLabel / step_hash for incomplete id
+	// FM + IncompleteStmID sticky — no invent SourceLabel / step_hash for unset id
+	// (valid StmID 0 is C++ first statement — must not fail closed)
 	fm := NewFactMgr(nil)
-	st0 := &Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "lbl_invent"}
-	out0, tgt0 := PreOutput(st0, fm, true, false, nil, "  ")
+	stBad := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID, SourceLabel: "lbl_invent"}
+	out0, tgt0 := PreOutput(stBad, fm, true, false, nil, "  ")
 	if out0 != "" || tgt0 {
-		t.Fatal("StmID 0 under FM must not invent SourceLabel/step_hash", out0, tgt0)
+		t.Fatal("IncompleteStmID under FM must not invent SourceLabel/step_hash", out0, tgt0)
 	}
 	if !HasError() {
-		t.Fatal("StmID 0 under FM PreOutput must SetError sticky")
+		t.Fatal("IncompleteStmID under FM PreOutput must SetError sticky")
+	}
+	ClearError()
+	// valid id 0 under FM without jump sources → step_hash when enabled
+	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	outOk, tgtOk := PreOutput(st0, fm, true, false, nil, "  ")
+	if tgtOk || outOk != "  step_hash(0);\n" {
+		t.Fatal("valid StmID 0 must step_hash", outOk, tgtOk)
 	}
 	ClearError()
 }

@@ -157,7 +157,7 @@ func MakeRandomIf(
 	// Incomplete then-in / StmID fails closed sticky (no invent else gen past holes)
 	// EffectAccum / EffectStm / BlkDepth continue on the same cg (not reset between arms).
 	if cg.FM != nil {
-		if thenB.StmID <= 0 {
+		if StmIDUnset(thenB.StmID) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
 			SetError(ErrGeneric)
 			return nil

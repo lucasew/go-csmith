@@ -233,7 +233,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	}
 	// body StmID 0 — incomplete IR marker
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
-	postLoopAnalysis(fm, forSt, &Block{StmID: 0}, nil, EmptyEffect(), nil)
+	postLoopAnalysis(fm, forSt, &Block{StmID: IncompleteStmID}, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("body StmID 0 must fail closed incomplete GlobalFacts")
 	}

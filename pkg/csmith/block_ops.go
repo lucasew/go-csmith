@@ -114,7 +114,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		SetError(ErrGeneric)
 		return 0
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		return 0
 	}
 	var removed *Stmt
@@ -201,7 +201,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 			ne = make([]*CFGEdge, 0, len(fm.CFGEdges))
 			scrubIncomplete := false
 			for _, e := range fm.CFGEdges {
-				destIn := e.DestStmID > 0 && ids[e.DestStmID]
+				destIn := !StmIDUnset(e.DestStmID) && ids[e.DestStmID]
 				if !destIn && e.DestBlock != nil {
 					// dest block nested under removed stmt
 					destIn = blockUnderStmt(removed, e.DestBlock)
@@ -329,7 +329,7 @@ func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool 
 		return false
 	}
 	for _, s := range stms {
-		if s != nil && s.StmID > 0 {
+		if s != nil && !StmIDUnset(s.StmID) {
 			ids[s.StmID] = true
 		}
 	}
@@ -443,7 +443,7 @@ func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	if st.StmID > 0 {
+	if !StmIDUnset(st.StmID) {
 		ids[st.StmID] = true
 	}
 	for _, b := range GetBlocksStmt(st) {
@@ -467,7 +467,7 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	if b.StmID > 0 {
+	if !StmIDUnset(b.StmID) {
 		ids[b.StmID] = true
 	}
 	for i := range b.Stmts {
@@ -486,7 +486,7 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
 // Incomplete CFG fails closed sticky nil (no invent soft re-pick empty sources past holes).
 // Complete empty → non-nil [].
 func (fm *FactMgr) FindJumpSources(destStmID int) []int {
-	if fm == nil || destStmID <= 0 {
+	if fm == nil || StmIDUnset(destStmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -531,7 +531,7 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 		return ""
 	}
 	// StmID ≤0 incomplete dest sticky (no invent label for key 0 / soft re-pick)
-	if destStmID <= 0 {
+	if StmIDUnset(destStmID) {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -614,13 +614,13 @@ func (b *Block) AppendNestedLoop(
 	if st == nil || HasError() || !stmtOK(*st) {
 		return nil
 	}
-	if st.StmID == 0 {
+	if StmIDUnset(st.StmID) {
 		st.StmID = AllocStmID()
 	}
 	b.Stmts = append(b.Stmts, *st)
 	if cg.FM != nil {
 		// Block::stm_id always live when FM bound (no invent fold into key 0)
-		if b.StmID <= 0 {
+		if StmIDUnset(b.StmID) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			SetError(ErrGeneric)
 			return nil
@@ -706,14 +706,14 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	if !stmtOK(ret) {
 		return nil
 	}
-	if ret.StmID == 0 {
+	if StmIDUnset(ret.StmID) {
 		ret.StmID = AllocStmID()
 	}
 	b.Stmts = append(b.Stmts, ret)
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
 		// Block::stm_id always live when FM bound (no invent fold into key 0)
-		if b.StmID <= 0 {
+		if StmIDUnset(b.StmID) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			SetError(ErrGeneric)
 			return nil
@@ -924,7 +924,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		SetError(ErrGeneric)
 		return ShortcutNone
 	}
-	if cg.FM == nil || b.StmID == 0 {
+	if cg.FM == nil || StmIDUnset(b.StmID) {
 		return ShortcutNone
 	}
 	fm := cg.FM

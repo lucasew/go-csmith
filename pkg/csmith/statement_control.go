@@ -189,7 +189,7 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	}
 	// Block::stm_id always live for CFG-indexed edges; StmID 0 sticky
 	// possible escape (no invent "no back edge" soft-skipping FindEdgesIn)
-	if b.StmID <= 0 {
+	if StmIDUnset(b.StmID) {
 		SetError(ErrGeneric)
 		return true
 	}

@@ -84,7 +84,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 		t.Fatalf("visit if sticky=%v", HasError())
 	}
 	// incomplete arm StmID must fail closed
-	st.Else.StmID = 0
+	st.Else.StmID = IncompleteStmID
 	if VisitFactsStatementIf(&st, &cg, Defaults()) {
 		t.Fatal("Else StmID 0 must fail closed")
 	}
@@ -591,27 +591,27 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	asg := &Stmt{
-		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	if VisitFactsStatementAssign(asg, &cg, Defaults()) {
-		t.Fatal("assign StmID 0 must fail closed")
+		t.Fatal("assign IncompleteStmID must fail closed")
 	}
 	// assign path may sticky via visit factories
 	ClearError()
 	ret := &Stmt{
-		Kind: StmtReturn,
+		Kind: StmtReturn, StmID: IncompleteStmID,
 		Expr: &Expression{Term: TermVariable, Var: f.RV, ExprType: GetIntType()},
 	}
 	if VisitFactsStatementReturn(ret, &cg, Defaults()) {
-		t.Fatal("return StmID 0 must fail closed")
+		t.Fatal("return IncompleteStmID must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("return StmID 0 must SetError sticky")
 	}
 	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
-	body := &Block{StmID: 0, Func: f}
+	body := &Block{StmID: IncompleteStmID, Func: f}
 	st := &Stmt{
 		Kind: StmtArrayOp, StmID: 15,
 		Loop: &LoopControl{IV: iv},
@@ -810,7 +810,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 	// Body with StmID 0 assign forces FindFixedPoint analyze fail-closed sticky
 	// when FM is bound (StmID 0 incomplete).
 	x := CreateVariableScalars("g_x", GetIntType(), false, false)
-	bad := Stmt{Kind: StmtAssign, StmID: 0, LhsVar: x,
+	bad := Stmt{Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: x,
 		Lhs: &Lhs{Var: x, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple}
 	b := &Block{StmID: 50, Func: f, Stmts: []Stmt{bad}}

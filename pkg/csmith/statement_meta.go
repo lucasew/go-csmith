@@ -196,7 +196,7 @@ func Is1stStm(st *Stmt, parent *Block) bool {
 	if first == st {
 		return true
 	}
-	return first.StmID > 0 && first.StmID == st.StmID
+	return !StmIDUnset(first.StmID) && first.StmID == st.StmID
 }
 
 // FindContainerStm mirrors Statement::find_container_stm for a nested block.
@@ -281,13 +281,13 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	}
 	// same parent: earlier stm_id dominates later (Statement.cpp:399–401)
 	if aParent == sParent {
-		if aParent != nil && (a.StmID == 0 || s.StmID == 0) {
+		if aParent != nil && (StmIDUnset(a.StmID) || StmIDUnset(s.StmID)) {
 			ia, is := -1, -1
 			for i := range aParent.Stmts {
-				if &aParent.Stmts[i] == a || (a.StmID > 0 && aParent.Stmts[i].StmID == a.StmID) {
+				if &aParent.Stmts[i] == a || (!StmIDUnset(a.StmID) && aParent.Stmts[i].StmID == a.StmID) {
 					ia = i
 				}
-				if &aParent.Stmts[i] == s || (s.StmID > 0 && aParent.Stmts[i].StmID == s.StmID) {
+				if &aParent.Stmts[i] == s || (!StmIDUnset(s.StmID) && aParent.Stmts[i].StmID == s.StmID) {
 					is = i
 				}
 			}
@@ -322,7 +322,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 // Nil FactMgr fails closed as jump-target (no invent "not target" without CFG).
 // destStmID ≤0 fails closed sticky as jump-target (no invent "not target" on incomplete id).
 func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, srcParentOf map[int]*Block) bool {
-	if destStmID <= 0 {
+	if StmIDUnset(destStmID) {
 		SetError(ErrGeneric)
 		return true
 	}
@@ -397,10 +397,10 @@ func ContainsStmtTree(root, s *Stmt) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	if root == s || (root.StmID > 0 && root.StmID == s.StmID) {
+	if root == s || (!StmIDUnset(root.StmID) && root.StmID == s.StmID) {
 		return true
 	}
-	if s.StmID <= 0 {
+	if StmIDUnset(s.StmID) {
 		return false
 	}
 	blks := GetBlocksStmt(root)

@@ -136,7 +136,7 @@ func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 // SetMapFactsIn records pre-statement facts (FactMgr::map_facts_in[s] = facts).
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
-	if fm == nil || stmID <= 0 {
+	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return
 	}
@@ -149,7 +149,7 @@ func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 // SetMapFactsOut records post-statement facts.
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
-	if fm == nil || stmID <= 0 {
+	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return
 	}
@@ -185,7 +185,7 @@ func (fm *FactMgr) GetMapFactsIn(stmID int) []*FactPointTo {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
@@ -211,7 +211,7 @@ func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
@@ -234,7 +234,7 @@ func (fm *FactMgr) GetMapFactsInFinal(stmID int) []*FactPointTo {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
@@ -257,7 +257,7 @@ func (fm *FactMgr) GetMapFactsOutFinal(stmID int) []*FactPointTo {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
@@ -281,7 +281,7 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 	var destParent *Block
 	if st != nil && st.Kind == StmtGoto {
 		destParent = st.GotoDestParent
-		if destParent == nil && st.GotoDestStmID > 0 && fm != nil && fm.Func != nil {
+		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && fm != nil && fm.Func != nil {
 			destParent = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
 		}
 	}
@@ -297,7 +297,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	}
 	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent silent
 	// set_fact_out success without map entry / soft re-pick past missing out)
-	if st.StmID <= 0 {
+	if StmIDUnset(st.StmID) {
 		SetError(ErrGeneric)
 		return
 	}
@@ -326,7 +326,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		if dp == nil {
 			dp = st.GotoDestParent
 		}
-		if dp == nil && st.GotoDestStmID > 0 && fm.Func != nil {
+		if dp == nil && !StmIDUnset(st.GotoDestStmID) && fm.Func != nil {
 			dp = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
 		}
 		// FactMgr.cpp:427–428 assert(func); no soft invent RemoveFunctionLocalFacts
@@ -368,7 +368,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 // or invent soft-skip missing arm then find under sibling of same if).
 func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 	// Function + live StmID always required; sticky no invent parent miss soft-success
-	if f == nil || stmID <= 0 {
+	if f == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -416,7 +416,7 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 // Complements FindParentBlockOfStmID for CFG edge source resolution.
 // Function + live StmID always required; sticky nil (no invent miss soft-success past hole).
 func FindStmtByID(f *Function, stmID int) *Stmt {
-	if f == nil || stmID <= 0 {
+	if f == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -445,7 +445,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		return
 	}
 	// StmID 0 fails closed sticky (no invent silent add_fact_out without map entry)
-	if st.StmID <= 0 {
+	if StmIDUnset(st.StmID) {
 		SetError(ErrGeneric)
 		return
 	}
@@ -557,7 +557,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		// FactMgr.cpp:296–300 — drop if var not visible at StatementGoto::dest.
 		// Prefer GotoDestParent; else resolve parent of GotoDestStmID via function blocks.
 		destParent := st.GotoDestParent
-		if destParent == nil && st.GotoDestStmID > 0 && f != nil {
+		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && f != nil {
 			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
 			// residual ERROR sticky — no invent soft-skip dest parent miss past hole
 			if HasError() {
@@ -851,7 +851,7 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 	}
 	if incomplete {
 		// fail closed sticky whole stm backup — not invent complete root + missing nested
-		if st.StmID > 0 {
+		if !StmIDUnset(st.StmID) {
 			factsIn[st.StmID] = IncompleteFactSlice()
 			factsOut[st.StmID] = IncompleteFactSlice()
 		}
@@ -861,7 +861,7 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 	for _, b := range blks {
 		fm.backupBlockFactMaps(b, factsIn, factsOut)
 	}
-	if st.StmID > 0 {
+	if !StmIDUnset(st.StmID) {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
 			factsIn[st.StmID] = storeFactMapEntry(in)
 		}
@@ -878,7 +878,7 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 		SetError(ErrGeneric)
 		return
 	}
-	if b.StmID > 0 {
+	if !StmIDUnset(b.StmID) {
 		if in, ok := fm.MapFactsIn[b.StmID]; ok {
 			factsIn[b.StmID] = storeFactMapEntry(in)
 		}
@@ -917,7 +917,7 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 		}
 	}
 	if incomplete {
-		if st.StmID > 0 {
+		if !StmIDUnset(st.StmID) {
 			fm.MapFactsIn[st.StmID] = IncompleteFactSlice()
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		}
@@ -927,7 +927,7 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 	for _, b := range blks {
 		fm.restoreBlockFactMaps(b, factsIn, factsOut)
 	}
-	if st.StmID > 0 {
+	if !StmIDUnset(st.StmID) {
 		if in, ok := factsIn[st.StmID]; ok {
 			fm.MapFactsIn[st.StmID] = storeFactMapEntry(in)
 		} else {
@@ -948,7 +948,7 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 		SetError(ErrGeneric)
 		return
 	}
-	if b.StmID > 0 {
+	if !StmIDUnset(b.StmID) {
 		if in, ok := factsIn[b.StmID]; ok {
 			fm.MapFactsIn[b.StmID] = storeFactMapEntry(in)
 		} else {
@@ -971,7 +971,7 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 // FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
 // Incomplete in/out maps fail closed sticky IncompleteFactSlice.
 func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
-	if fm == nil || stmID <= 0 {
+	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
@@ -1019,7 +1019,7 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 // FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
 // Incomplete in/out maps fail closed sticky IncompleteFactSlice.
 func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
-	if fm == nil || stmID <= 0 {
+	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
@@ -1249,7 +1249,7 @@ func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo
 // SetMapStmEffect records per-statement effect.
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
-	if fm == nil || stmID <= 0 {
+	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return
 	}
@@ -1269,7 +1269,7 @@ func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
@@ -1291,7 +1291,7 @@ func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	if stmID <= 0 {
+	if StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
@@ -1788,7 +1788,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
 	_ = f
 	// Block + live StmID always required; sticky false (align BlockContainsStmID)
-	if blk == nil || stmID <= 0 {
+	if blk == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -1807,7 +1807,7 @@ func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
 // Lhs opportunistic_validate rejected the still-live local (seed-2 e9003:
 // UP U120 vs Go F80 after SelectParentLocal l_138).
 func stmtIDInBlockMapIn(f *Function, stmID int, blk *Block) bool {
-	if blk == nil || stmID <= 0 {
+	if blk == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -2096,17 +2096,18 @@ func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool
 
 // CreateCFGEdgeTo is create_cfg_edge with optional dest statement id (goto).
 // FactMgr always live; sticky (no invent soft-skip edge create past hole).
-// srcID 0 / missing dest is complete no-op (not incomplete IR shell).
+// Unset srcID (IncompleteStmID) no-op; valid src id 0 must create edges
+// (Statement.cpp:370 — first Statement has stm_id 0).
 func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDest, backLink bool) {
 	if fm == nil {
 		SetError(ErrGeneric)
 		return
 	}
-	if srcID == 0 {
+	if StmIDUnset(srcID) {
 		return
 	}
 	// allow dest nil when destStmID set (break → for-statement edge)
-	if dest == nil && destStmID <= 0 {
+	if dest == nil && StmIDUnset(destStmID) {
 		return
 	}
 	// residual ERROR sticky — no invent soft-append edge past incomplete edge list residual

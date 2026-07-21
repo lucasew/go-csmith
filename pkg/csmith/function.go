@@ -767,7 +767,7 @@ func (f *Function) generateBodyCore(
 	// (no invent EmptyEffect soft-prefer generation bodyEff then Built success)
 	summaryEff := bodyEff
 	if cg.FM != nil && f.Body != nil {
-		if f.Body.StmID <= 0 {
+		if StmIDUnset(f.Body.StmID) {
 			abortUnbuilt()
 			return
 		}

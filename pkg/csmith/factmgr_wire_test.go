@@ -515,14 +515,14 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	ClearError()
 	fm := NewFactMgr(nil)
 	// StmID 0 must IncompleteFactSlice sticky — not invent empty-complete map miss
-	if FactsComplete(fm.GetMapFactsIn(0)) || FactsComplete(fm.GetMapFactsOut(0)) {
+	if FactsComplete(fm.GetMapFactsIn(IncompleteStmID)) || FactsComplete(fm.GetMapFactsOut(IncompleteStmID)) {
 		t.Fatal("StmID 0 must IncompleteFactSlice")
 	}
 	if !HasError() {
 		t.Fatal("StmID 0 GetMapFacts must SetError sticky")
 	}
 	ClearError()
-	if FactsComplete(fm.GetMapFactsInFinal(0)) || FactsComplete(fm.GetMapFactsOutFinal(0)) {
+	if FactsComplete(fm.GetMapFactsInFinal(IncompleteStmID)) || FactsComplete(fm.GetMapFactsOutFinal(IncompleteStmID)) {
 		t.Fatal("StmID 0 final maps must IncompleteFactSlice")
 	}
 	if !HasError() {
@@ -589,7 +589,7 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil FM SetMapFactsIn must SetError sticky")
 	}
 	ClearError()
-	fm.SetMapFactsIn(0, nil)
+	fm.SetMapFactsIn(IncompleteStmID, nil)
 	if !HasError() {
 		t.Fatal("stmID 0 SetMapFactsIn must SetError sticky")
 	}
@@ -689,7 +689,7 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 		t.Fatal("nil Function FindParentBlockOfStmID must SetError sticky")
 	}
 	ClearError()
-	if FindParentBlockOfStmID(&Function{Name: "f"}, 0) != nil {
+	if FindParentBlockOfStmID(&Function{Name: "f"}, IncompleteStmID) != nil {
 		t.Fatal("StmID 0 FindParentBlockOfStmID must fail closed")
 	}
 	if !HasError() {

@@ -29,7 +29,7 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		// Statement::stm_id always live; StmID 0 + FM fails closed sticky
 		// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 		if cg.FM != nil {
-			if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+			if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
 				SetError(ErrGeneric)
 				return false
 			}
@@ -69,7 +69,7 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	// Statement::stm_id always live; StmID 0 + FM fails closed sticky
 	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if cg.FM != nil {
-		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+		if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -113,7 +113,7 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	fm := cg.FM
 	if fm != nil {
 		// Statement::stm_id always live; StmID 0 sticky
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -167,7 +167,7 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 	// Statement::stm_id always live; StmID 0 + FM sticky
 	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if cg.FM != nil {
-		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+		if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -226,7 +226,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		}
 		return false
 	}
-	if cg.FM != nil && b.StmID > 0 {
+	if cg.FM != nil && !StmIDUnset(b.StmID) {
 		// Prefer map_facts_out (C++); fall back to FindFixedPointBlock return
 		mout := cg.FM.GetMapFactsOut(b.StmID)
 		if FactsComplete(mout) {
@@ -379,11 +379,11 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// Block stm_id always live; StmID 0 fails closed (no invent EffectStm soft fallback)
 	// Incomplete arm effects sticky (no invent SetMapStmEffect incomplete then true)
 	if cg.FM != nil {
-		if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
+		if StmIDUnset(st.Then.StmID) || StmIDUnset(st.Else.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -576,7 +576,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	if cg.FM != nil {
 		// StatementFor.cpp:452–458 — body Block always has stm_id sticky
-		if st.Then.StmID <= 0 {
+		if StmIDUnset(st.Then.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -606,7 +606,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
 		// nil FindEdgesIn sticky incomplete CFG; tryMergeJumpFacts already sticky
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -629,7 +629,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	// Incomplete body/pre effect sticky (no invent visit true with IncompleteEffect map)
 	bodyEff := EmptyEffect()
 	if cg.FM != nil {
-		if st.Then.StmID <= 0 || st.StmID <= 0 {
+		if StmIDUnset(st.Then.StmID) || StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -732,7 +732,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		if cg.FM != nil {
 			// Statement::stm_id always live; StmID 0 sticky
-			if st.StmID <= 0 {
+			if StmIDUnset(st.StmID) {
 				SetError(ErrGeneric)
 				return false
 			}
@@ -788,7 +788,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	if cg.FM != nil {
 		// StatementArrayOp.cpp:285–291 — body Block always has stm_id sticky
-		if inner.Then.StmID <= 0 || st.StmID <= 0 {
+		if StmIDUnset(inner.Then.StmID) || StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}

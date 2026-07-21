@@ -188,7 +188,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 		t.Fatal("nil FM ShortcutAnalysis must stay non-sticky soft re-pick")
 	}
 	ClearError()
-	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	if ShortcutAnalysis(st0, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("StmID 0 must ShortcutNone")
 	}
@@ -370,7 +370,7 @@ func TestContainsStmt(t *testing.T) {
 		t.Fatal("nil FindStmtInTree must SetError sticky")
 	}
 	ClearError()
-	if FindStmtInTree(&outer, 0) != nil {
+	if FindStmtInTree(&outer, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtInTree must fail closed")
 	}
 	if !HasError() {
@@ -785,14 +785,14 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	ClearError()
 	// StmID 0 fails closed sticky (no invent soft-skip map_accum/visited)
 	st0 := &Stmt{
-		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts0 := []*FactPointTo{}
 	if StmVisitFacts(st0, &facts0, &cg, Defaults()) {
-		t.Fatal("StmID 0 must fail closed StmVisitFacts")
+		t.Fatal("IncompleteStmID must fail closed StmVisitFacts")
 	}
 	if FactsComplete(facts0) {
 		t.Fatal("StmID 0 must wipe facts incomplete")

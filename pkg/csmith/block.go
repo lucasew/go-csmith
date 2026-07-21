@@ -57,18 +57,26 @@ type Stmt struct {
 	Rhs *Expression
 }
 
-// nextStmID is Statement::sid allocator.
-// Note: C++ Statement.cpp:366–367 assigns then increments (first id 0). Go keeps
-// pre-increment first id 1 because StmID 0 is the incomplete-IR sentinel across
-// visit/eligible paths; block-id emit is thus +1 vs C++ until that sentinel is
-// split from valid id 0 (fair follow-up).
+// nextStmID is Statement::sid (Statement.cpp:239, 370–371).
+// Starts at 0; AllocStmID assigns then increments so first live id is 0.
 var nextStmID int
 
-// AllocStmID allocates a live statement id (never 0 — reserved incomplete).
+// IncompleteStmID is the unset/incomplete sentinel (not a C++ stm_id).
+// Valid C++ ids are 0,1,2,… — never use 0 as “missing”.
+const IncompleteStmID = -1
+
+// AllocStmID mirrors Statement ctor: stm_id = sid; sid++.
+// Statement.cpp:370–371 — first statement gets 0.
 func AllocStmID() int {
+	id := nextStmID
 	nextStmID++
-	return nextStmID
+	return id
 }
+
+// StmIDUnset reports a never-allocated id (zero-value after IncompleteStmID convention,
+// or legacy incomplete shells using IncompleteStmID).
+// Valid id 0 must pass (C++ first Block).
+func StmIDUnset(id int) bool { return id < 0 }
 
 // Block mirrors Block : Statement with local_vars and stms.
 type Block struct {
@@ -270,14 +278,14 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 	}
 	// Block::stm_id always live; StmID 0 fails closed sticky incomplete (no invent
 	// empty-complete accum return without map_stm_effect[block] recorded)
-	if b.StmID <= 0 {
+	if StmIDUnset(b.StmID) {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	eff := EmptyEffect()
 	for i := range b.Stmts {
 		st := &b.Stmts[i]
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
 			SetError(ErrGeneric)
@@ -606,7 +614,9 @@ func MakeRandomBlock(
 		if !stmtOK(st) {
 			break
 		}
-		if st.StmID == 0 {
+		// Factories always AllocStmID (C++ Statement ctor). Do not re-alloc on
+		// StmID==0 — 0 is a valid first id after fair sid.
+		if StmIDUnset(st.StmID) {
 			st.StmID = AllocStmID()
 		}
 		if pendingFwd != "" {
@@ -614,6 +624,7 @@ func MakeRandomBlock(
 				st.SourceLabel = pendingFwd
 			} else {
 				// already labeled — keep pending as no-op marker after previous
+				// StmtLabel is Go emit-only; still needs a sid for map keys if visited.
 				lab := Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()}
 				b.Stmts = append(b.Stmts, lab)
 			}
@@ -663,14 +674,15 @@ func MakeRandomBlock(
 		if !must {
 			ret := MakeRandomReturn(r, opts, vs, cg)
 			if stmtOK(ret) {
-				if ret.StmID == 0 {
+				if StmIDUnset(ret.StmID) {
 					ret.StmID = AllocStmID()
 				}
 				b.Stmts = append(b.Stmts, ret)
 			}
 		}
 	}
-	if b.StmID == 0 {
+	// b.StmID allocated at make (line above); never re-alloc valid id 0
+	if StmIDUnset(b.StmID) {
 		b.StmID = AllocStmID()
 	}
 	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
@@ -727,7 +739,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	if fm == nil {
 		return
 	}
-	if b.StmID <= 0 {
+	if StmIDUnset(b.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		SetError(ErrGeneric)
 		return

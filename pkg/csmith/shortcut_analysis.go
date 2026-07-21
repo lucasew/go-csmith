@@ -132,7 +132,7 @@ func ContainsStmt(root, target *Stmt) bool {
 // Incomplete Statement / StmID sticky nil (no invent soft-skip miss / soft re-pick).
 // Incomplete Block* hole fails closed sticky nil (no invent soft-skip arm / soft re-pick).
 func FindStmtInTree(root *Stmt, stmID int) *Stmt {
-	if root == nil || stmID <= 0 {
+	if root == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -245,7 +245,7 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 		return true
 	}
 	ids := map[int]bool{}
-	if b.StmID > 0 {
+	if !StmIDUnset(b.StmID) {
 		ids[b.StmID] = true
 	}
 	for i := range b.Stmts {
@@ -295,7 +295,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		}
 		visited := fm.MapVisited != nil && fm.MapVisited[e.SrcID]
 		// contains_stmt(dest): dest stm_id in tree (block dest DestStmID==0 rare for goto)
-		destInside := e.DestStmID > 0 && ids[e.DestStmID]
+		destInside := !StmIDUnset(e.DestStmID) && ids[e.DestStmID]
 		// Statement.cpp:781–784 — unvisited goto to dest outside this tree
 		if !visited && !destInside {
 			return true
@@ -359,7 +359,7 @@ func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 	if st == nil {
 		return false
 	}
-	if st.StmID > 0 {
+	if !StmIDUnset(st.StmID) {
 		ids[st.StmID] = true
 	}
 	// get_blocks only — no invent collect via stray Then on assign/break
@@ -394,7 +394,7 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 		return ShortcutNone
 	}
 	// Statement::stm_id always live; StmID 0 is not a map key (no invent reuse via 0)
-	if st.StmID <= 0 {
+	if StmIDUnset(st.StmID) {
 		return ShortcutNone
 	}
 	fm := cg.FM
@@ -578,7 +578,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		}
 		// Statement::stm_id always live; StmID 0 fails closed sticky (C++ always
 		// records map_accum_effect / map_visited — no invent soft-skip maps)
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			*facts = IncompleteFactSlice()
 			if !haveLive {
 				cg.FM.GlobalFacts = IncompleteFactSlice()
@@ -623,7 +623,7 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent
 	// validate success without set_fact_in/out)
-	if cg.FM != nil && st.StmID <= 0 {
+	if cg.FM != nil && StmIDUnset(st.StmID) {
 		SetError(ErrGeneric)
 		return false
 	}

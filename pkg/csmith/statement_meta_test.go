@@ -213,8 +213,8 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	ClearError()
 	// StmID 0 is incomplete IR; orphans not in parent must not invent dominate via 0<=0
 	parent := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
-	orphanA := &Stmt{Kind: StmtAssign, StmID: 0}
-	orphanB := &Stmt{Kind: StmtAssign, StmID: 0}
+	orphanA := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
+	orphanB := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	if Dominate(orphanA, parent, orphanB, parent) {
 		t.Fatal("orphan StmID 0 pair must fail closed not dominate")
 	}
@@ -223,7 +223,7 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	}
 	ClearError()
 	// same-parent members with StmID 0 still order by index
-	parent.Stmts = []Stmt{{Kind: StmtAssign, StmID: 0}, {Kind: StmtAssign, StmID: 0}}
+	parent.Stmts = []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}, {Kind: StmtAssign, StmID: IncompleteStmID}}
 	if !Dominate(&parent.Stmts[0], parent, &parent.Stmts[1], parent) {
 		t.Fatal("index order must dominate when both in parent")
 	}
@@ -257,7 +257,7 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	}
 	// StmID 0 fails closed sticky as jump-target (no invent not-target)
 	ClearError()
-	if !IsJumpTargetFromOtherBlocks(0, destParent, fm, nil) {
+	if !IsJumpTargetFromOtherBlocks(IncompleteStmID, destParent, fm, nil) {
 		t.Fatal("StmID 0 must fail closed jump-target")
 	}
 	if !HasError() {

@@ -538,7 +538,7 @@ func rootBlock(b *Block) *Block {
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findParentOfStmIDInTree(root *Block, stmID int) *Block {
-	if root == nil || stmID <= 0 {
+	if root == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -576,7 +576,7 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findStmtByIDInTree(root *Block, stmID int) *Stmt {
-	if root == nil || stmID <= 0 {
+	if root == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -613,7 +613,7 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 // Statement.cpp:684–705 — parent chain of s includes this block.
 // Block always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmID(b *Block, stmID int) bool {
-	if b == nil || stmID <= 0 {
+	if b == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -695,7 +695,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			if destID <= 0 {
 				// StatementGoto dest may be stored only on the goto stmt
-				if src.GotoDestStmID > 0 {
+				if !StmIDUnset(src.GotoDestStmID) {
 					destID = src.GotoDestStmID
 				}
 			}

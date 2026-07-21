@@ -550,7 +550,7 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 		// PreOutput: with FM, never fall back to SourceLabel
 		// Statement::stm_id always live; StmID 0 fails closed (no invent skip
 		// self-label and still claim complete label list from children only)
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			return false
 		}
 		lab = FindJumpLabel(fm, st.StmID)
@@ -600,7 +600,7 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	}
 	// Block::stm_id always live; StmID 0 + FactsComplete(nil) would invent empty
 	// arm outs as complete (no invent soft empty map for missing block id)
-	if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
+	if StmIDUnset(st.Then.StmID) || StmIDUnset(st.Else.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		SetError(ErrGeneric)
 		return

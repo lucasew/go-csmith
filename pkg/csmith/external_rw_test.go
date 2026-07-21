@@ -258,7 +258,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// body with *p write under may-null would fail; use incomplete as soft fail
-	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{{Kind: StmtAssign, StmID: 0}}} // StmID 0 sticky fail
+	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}}} // StmID 0 sticky fail
 	_ = callee.ensurePairedFactMgr()
 	fi := &Invocation{User: callee}
 	caller := &Function{Name: "caller", ReturnType: GetIntType()}

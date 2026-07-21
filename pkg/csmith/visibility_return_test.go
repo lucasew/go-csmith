@@ -151,7 +151,7 @@ func TestAddBackReturnFacts(t *testing.T) {
 	}
 	// return StmID 0 fails closed sticky (no invent soft-merge MapFactsOut[0])
 	var facts0 []*FactPointTo
-	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0) || FactsComplete(facts0) {
+	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: IncompleteStmID}}}, fm, &facts0) || FactsComplete(facts0) {
 		t.Fatal("return StmID 0 must fail closed", facts0)
 	}
 	if !HasError() {

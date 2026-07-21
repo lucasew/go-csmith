@@ -330,7 +330,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 		return ""
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent empty assertion section)
-	if st.StmID <= 0 {
+	if StmIDUnset(st.StmID) {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -428,7 +428,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 	if fm != nil {
 		// Statement::stm_id always live under FM; StmID 0 sticky fail closed
 		// (no invent SourceLabel / step_hash soft-fallback for incomplete id)
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return "", false
 		}
@@ -488,7 +488,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 	// Statement.cpp:927–931 / OutputMgr.cpp:161–167
 	// emitStepHash is set only when StepHashByStmt && ComputeHash (Block make)
 	// so step_hash(n) is never invented without live helper defs
-	if emitStepHash && st.StmID > 0 {
+	if emitStepHash && !StmIDUnset(st.StmID) {
 		return indent + "step_hash(" + Int2Str(st.StmID) + ");\n", false
 	}
 	return "", false

@@ -458,7 +458,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	} else {
 		// StatementAssign::make_possible_compound_assign
 		incrSt = makePossibleCompoundAssign(*cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr, gensymFromVS(vs))
-		if incrSt.StmID == 0 {
+		if StmIDUnset(incrSt.StmID) {
 			incrSt.StmID = AllocStmID()
 		}
 	}
@@ -604,7 +604,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	}
 	// StatementFor.cpp:355 — body Block always live with stm_id after make
 	// StmID 0 fails closed sticky (no invent keep prior GlobalFacts soft-skipping map_facts_in)
-	if body == nil || body.StmID <= 0 {
+	if body == nil || StmIDUnset(body.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		SetError(ErrGeneric)
 		return
@@ -663,7 +663,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// StatementFor.cpp:369 — set_accumulated_effect_after_block(pre_effect, &body, …)
 	// for-stmt stm_id always live; incomplete body/pre effect fails closed sticky
 	if cg != nil && forSt != nil {
-		if forSt.StmID <= 0 {
+		if StmIDUnset(forSt.StmID) {
 			SetError(ErrGeneric)
 			return
 		}

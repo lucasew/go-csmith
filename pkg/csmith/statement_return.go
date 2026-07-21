@@ -59,7 +59,7 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// Statement::stm_id always live; StmID 0 sticky
-	if st.StmID <= 0 {
+	if StmIDUnset(st.StmID) {
 		SetError(ErrGeneric)
 		return false
 	}

@@ -12,7 +12,7 @@ var stmLabels = map[int]string{}
 // StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present; else gensym("lbl_").
 // no invent fixed "lbl_1" when nextLabel is nil
 func LabelForGotoDest(destStmID int, nextLabel func() string) string {
-	if destStmID > 0 {
+	if !StmIDUnset(destStmID) {
 		if lab, ok := stmLabels[destStmID]; ok && lab != "" {
 			return lab
 		}
@@ -29,7 +29,7 @@ func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	if destStmID > 0 {
+	if !StmIDUnset(destStmID) {
 		stmLabels[destStmID] = lab
 	}
 	return lab
@@ -67,7 +67,7 @@ func (b *Block) ContainsStmt(st *Stmt) bool {
 		if s == st {
 			return true
 		}
-		if st.StmID > 0 && s.StmID == st.StmID {
+		if !StmIDUnset(st.StmID) && s.StmID == st.StmID {
 			return true
 		}
 		blks := GetBlocksStmt(s)
@@ -477,7 +477,7 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 	other := &okBlk.Stmts[ti]
-	if other.StmID == 0 {
+	if StmIDUnset(other.StmID) {
 		other.StmID = AllocStmID()
 	}
 
@@ -529,7 +529,7 @@ func MakeRandomGoto(
 		if label == "" {
 			label = LabelForGotoDest(other.StmID, nextLab)
 			other.SourceLabel = label
-		} else if other.StmID > 0 {
+		} else if !StmIDUnset(other.StmID) {
 			stmLabels[other.StmID] = label
 		}
 		// incomplete LocalVars on intermediate blocks fails closed sticky (Collect nil)
@@ -564,7 +564,7 @@ func MakeRandomGoto(
 		// no stm in curr_blk yet — cannot form forward dest
 		return makeGotoFailed()
 	}
-	if dest.StmID == 0 {
+	if StmIDUnset(dest.StmID) {
 		dest.StmID = AllocStmID()
 	}
 	// StatementGoto.cpp:185 — StatementGoto ctor gensyms label only after DFA
@@ -700,7 +700,7 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		dest.SourceLabel = label
-	} else if dest.StmID > 0 {
+	} else if !StmIDUnset(dest.StmID) {
 		stmLabels[dest.StmID] = label
 	}
 	sg := Stmt{

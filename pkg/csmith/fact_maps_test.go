@@ -300,7 +300,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 		t.Fatal("nil FM FindUpdatedFacts must SetError sticky")
 	}
 	ClearError()
-	if FactsComplete(fm.FindUpdatedFacts(0)) {
+	if FactsComplete(fm.FindUpdatedFacts(IncompleteStmID)) {
 		t.Fatal("stmID 0 FindUpdatedFacts must fail closed incomplete")
 	}
 	if !HasError() {
@@ -668,7 +668,7 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	}
 	ClearError()
 	// StmID 0 fails closed sticky (no invent silent set_fact_out)
-	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	fm.SetMapFactsOutForStmt(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil)
 	if !HasError() {
 		t.Fatal("StmID 0 set_fact_out must SetError sticky")

@@ -111,7 +111,7 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 		return nil
 	}
 	// StmID ≤0 incomplete key sticky (no invent Map miss as empty edges / soft re-pick)
-	if destStmID <= 0 {
+	if StmIDUnset(destStmID) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -147,7 +147,9 @@ func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*C
 	}
 	out := make([]*CFGEdge, 0)
 	for _, e := range fm.CFGEdges {
-		if e.DestBlock == dest && e.DestStmID == 0 && e.PostDest == postDest && e.BackLink == backLink {
+		// CreateCFGEdge stores DestStmID=dest.StmID (block is Statement).
+		// Match DestBlock; id may be 0 for the first block (fair sid).
+		if e.DestBlock == dest && e.PostDest == postDest && e.BackLink == backLink {
 			out = append(out, e)
 		}
 	}
@@ -190,7 +192,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 	if fm != nil {
 		// Statement::stm_id always live; StmID 0 fails closed sticky (no invent
 		// soft-skip edge merge then validate as complete analysis)
-		if st.StmID <= 0 {
+		if StmIDUnset(st.StmID) {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -284,7 +286,7 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 		SetError(ErrGeneric)
 		return
 	}
-	if cg.FM == nil || st.StmID <= 0 {
+	if cg.FM == nil || StmIDUnset(st.StmID) {
 		return
 	}
 	// incomplete inputs fail closed sticky IncompleteEffect map entry (no invent pure merge
@@ -338,7 +340,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	}
 	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent post_creation
 	// success without map_facts_in/out / map_visited)
-	if st.StmID <= 0 {
+	if StmIDUnset(st.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		SetError(ErrGeneric)
 		return
@@ -536,7 +538,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	cnt := 0
 	for {
 		// Block.cpp:526–536 — when already visited, merge back-edge outs into inputs
-		if fm != nil && b.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
+		if fm != nil && !StmIDUnset(b.StmID) && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
 			if cnt++; cnt > 7 {
 				// Block.cpp:526–530 — assert(0); NDEBUG continues do-while.
 				// Returning false+strip invents emptying the body (seed-2 func_54).
@@ -639,7 +641,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		}
 		// Block::stm_id always live when FM bound; StmID 0 fails closed
 		// (no invent soft single-pass success without map_facts_in/out)
-		if b.StmID <= 0 {
+		if StmIDUnset(b.StmID) {
 			SetError(ErrGeneric)
 			return outputs, -1, false
 		}

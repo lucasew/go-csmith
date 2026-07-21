@@ -526,16 +526,17 @@ func MakeRandomArrayInit(
 		}
 	}
 
+	// C++ StatementArrayOp with init_value has body==null — the element assign is
+	// emitted inline in Output, not a Statement (no stm_id). IncompleteStmID here.
 	innerBody := &Block{
 		Func: cg.CurrentFunc,
 		Stmts: []Stmt{{
-			// Statement base ctor always assigns stm_id (Statement.cpp:364–367)
 			Kind:        StmtAssign,
 			Expr:        rhs,
 			AssignOp:    AssignSimple,
 			ArrayAccess: access,
 			LhsVar:      &av.Variable,
-			StmID:       AllocStmID(),
+			StmID:       IncompleteStmID,
 		}},
 	}
 	// nest fors: outermost first dim (StatementArrayOp::output_header)
@@ -568,7 +569,7 @@ func MakeRandomArrayInit(
 	// StmID always allocated above; FM path always records (no invent soft-skip)
 	// Incomplete EffectStm fails closed (no invent map record / create success)
 	if cg.FM != nil {
-		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+		if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
 			SetError(ErrGeneric)
 			return Stmt{}
 		}

@@ -336,7 +336,7 @@ func TestFindContainedLabels(t *testing.T) {
 	ClearError()
 	// FM + StmID 0 — no invent complete child labels while soft-skipping self id
 	fm := NewFactMgr(nil)
-	if LabelsComplete(FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "x"}, fm)) {
+	if LabelsComplete(FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: IncompleteStmID, SourceLabel: "x"}, fm)) {
 		t.Fatal("StmID 0 under FM must fail closed incomplete")
 	}
 	if !HasError() {
@@ -422,7 +422,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	fm4.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st4 := &Stmt{
 		Kind: StmtIfElse,
-		Then: &Block{StmID: 0, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
+		Then: &Block{StmID: IncompleteStmID, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
 	fm4.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
