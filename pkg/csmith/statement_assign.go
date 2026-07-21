@@ -258,11 +258,11 @@ func MakeRandomAssignQfer(
 				SetError(ErrGeneric)
 				return Stmt{}
 			}
-			if !callerQf {
-				qfer.SetVolatile(false, 0)
-			}
+			// StatementAssign.cpp:156–159 — compound always set_volatile(false),
+			// even when caller qf non-nil (ExpressionAssign / MatchExact path).
+			qfer.SetVolatile(false, 0)
 		}
-		// StatementAssign.cpp:163 — always fold RHS into running under strict_volatile
+		// StatementAssign.cpp:161 — always fold RHS into running under strict_volatile
 		runningEff = runningEff.AddEffect(rhsAccum)
 		// residual ERROR sticky — no invent soft-continue strict-vol past AddEffect residual
 		if HasError() {
@@ -272,7 +272,9 @@ func MakeRandomAssignQfer(
 			SetError(ErrGeneric)
 			return Stmt{}
 		}
-		if !callerQf && qfer.IsVolatile() {
+		// StatementAssign.cpp:163–165 — not gated on qf:
+		// if (qfer.get_volatiles().size() && qfer.is_volatile()) set_volatile(false)
+		if qfer.IsVolatile() {
 			// residual ERROR sticky — no invent soft-clear vol past IsVolatile residual
 			if HasError() {
 				return Stmt{}
@@ -307,9 +309,9 @@ func MakeRandomAssignQfer(
 				SetError(ErrGeneric)
 				return Stmt{}
 			}
-			if !callerQf {
-				qfer.SetVolatile(false, 0)
-			}
+			// StatementAssign.cpp:176–179 — compound always set_volatile(false)
+			// regardless of caller qf (func-param ExpressionAssign MatchExact).
+			qfer.SetVolatile(false, 0)
 		}
 	}
 	// StatementAssign.cpp:181 — merge_param_context(rhs_cg_context, true)

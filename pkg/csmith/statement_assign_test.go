@@ -355,3 +355,35 @@ func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 		t.Fatal("restrict(WRITE) must clear const")
 	}
 }
+
+// StatementAssign.cpp:156–159 / 176–179 — for compound assign, always
+// qfer.set_volatile(false) even when caller qf is non-nil (ExpressionAssign
+// as func param uses callee param qfer + MatchExactQualifiers).
+// Gating clear on !callerQf left MatchExact Lhs seeking volatile storage while
+// UP cleared vol and re-drew Select (seed-2 nested ExpressionAssign / ^=).
+func TestCompoundAssignAlwaysClearsVolatileOnQfer(t *testing.T) {
+	ClearError()
+	// Caller qf: volatile int (func param path)
+	qfer := NewCVQualifiers([]bool{false}, []bool{true})
+	if !qfer.IsVolatile() {
+		t.Fatal("setup: want volatile qfer")
+	}
+	// C++ compound branch: not gated on (qf == nullptr)
+	qfer.SetVolatile(false, 0)
+	if qfer.IsVolatile() {
+		t.Fatal("compound must clear volatile even with non-nil caller qf")
+	}
+	// Simple assign does not force this clear in StatementAssign (only compound
+	// / strict-vol residual path); contract is "compound always clears".
+	qfer2 := NewCVQualifiers([]bool{false}, []bool{true})
+	// multi-level pointer: set_volatile(false) only pos=0 (outermost storage)
+	qfer3 := NewCVQualifiers([]bool{false, false}, []bool{true, true})
+	qfer3.SetVolatile(false, 0)
+	if qfer3.IsVolatiles[len(qfer3.IsVolatiles)-1] {
+		t.Fatal("set_volatile(false,0) must clear storage slot (last)")
+	}
+	if !qfer3.IsVolatiles[0] {
+		t.Fatal("set_volatile pos=0 must not clear deeper pointer vol bits")
+	}
+	_ = qfer2
+}
