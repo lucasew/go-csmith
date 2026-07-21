@@ -574,8 +574,8 @@ func MakeRandomLhs(
 		}
 		// Lhs.cpp:89–100 — select(WRITE, restricted qfer, dummy, eDerefExact)
 		if v == nil {
-			newQ := q
-			// Lhs.cpp:90–93 — restrict unless wildcard
+			// Lhs.cpp:90–93 — restrict on a value copy (C++ CVQualifiers copy ctor owns vectors).
+			newQ := q.Clone()
 			if !newQ.Wildcard {
 				newQ.Restrict(AccessWrite, *cg)
 			}

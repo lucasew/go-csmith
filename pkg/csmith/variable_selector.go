@@ -2263,7 +2263,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		// CVQualifiers::random_qualifiers(t, access, cg, false)
 		varQfer = RandomQualifiersDefaultProbs(t, access, cg, false, vs.Opts, vs.Probs, r)
 	} else {
-		varQfer = *qfer
+		// C++ *qfer value-copies vectors; Clone so later Restrict on shared qfer
+		// cannot strip this global's storage volatile (seed-4 g_81).
+		varQfer = qfer.Clone()
 	}
 	// VariableSelector.cpp:555 ERROR_GUARD after random_qualifiers
 	if HasError() {
@@ -2849,7 +2851,8 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		// random_qualifiers(t, access, cg, true) — no_volatile true for locals
 		varQfer = RandomQualifiersDefaultProbs(t, access, cg, true, vs.Opts, vs.Probs, r)
 	} else {
-		varQfer = *qfer
+		// C++ *qfer value-copy; Clone before Restrict mutates vectors
+		varQfer = qfer.Clone()
 	}
 	// VariableSelector.cpp:937 ERROR_GUARD after random_qualifiers
 	if HasError() {

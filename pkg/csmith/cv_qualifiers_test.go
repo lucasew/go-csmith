@@ -471,6 +471,26 @@ func TestRandomQualifiersPointerDrawOrderSeed2(t *testing.T) {
 	}
 }
 
+func TestCVQualifiersCloneIsolatesRestrict(t *testing.T) {
+	// C++ value-copy owns vectors; shallow Go copy + Restrict must not strip source var qfer.
+	ClearError()
+	src := NewCVQualifiers([]bool{false}, []bool{true}) // storage volatile
+	if !src.IsVolatile() {
+		t.Fatal("src must be volatile")
+	}
+	// IndirectQualifiers(0) / Clone used by ExpressionVariable get_qualifiers
+	cp := src.IndirectQualifiers(0)
+	cg := WithEffectContext(WithSideEffects()) // non-SE-free → Restrict clears vol
+	cp.Restrict(AccessWrite, cg)
+	if cp.IsVolatile() {
+		t.Fatal("copy Restrict must clear volatile under non-SE-free")
+	}
+	if !src.IsVolatile() {
+		t.Fatal("Restrict on copy must not mutate source CVQualifiers (seed-4 g_81)")
+	}
+	ClearError()
+}
+
 func TestMakeScalarVolatilesClearsInner(t *testing.T) {
 	opts := Defaults()
 	opts.VolatilePointers = false

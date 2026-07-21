@@ -172,6 +172,24 @@ func boolsEqual(a, b []bool) bool {
 	return true
 }
 
+// Clone returns a deep copy of qfer bit vectors.
+// C++ CVQualifiers value/copy always owns its vectors; Go slices share backing
+// if only struct-copied. Restrict/set_volatile on a shallow copy would otherwise
+// mutate the source Variable::qfer (seed-4 g_81 vol stripped after create).
+func (q CVQualifiers) Clone() CVQualifiers {
+	out := CVQualifiers{
+		Wildcard:       q.Wildcard,
+		AcceptStricter: q.AcceptStricter,
+	}
+	if q.IsConsts != nil {
+		out.IsConsts = append([]bool(nil), q.IsConsts...)
+	}
+	if q.IsVolatiles != nil {
+		out.IsVolatiles = append([]bool(nil), q.IsVolatiles...)
+	}
+	return out
+}
+
 // StricterThan mirrors CVQualifiers::stricter_than (const/vol depth match).
 // CVQualifiers.cpp:95–120 subset — const: no looser const; multi-level ** special.
 // Unpaired const/vol depths sticky false (no invent not-stricter soft-skip past hole).
@@ -290,9 +308,12 @@ func (q *CVQualifiers) RemoveQualifiers(length int) {
 // IndirectQualifiers mirrors CVQualifiers::indirect_qualifiers.
 // CVQualifiers.cpp:504–521 — level<0 address (add); level>0 deref (remove_qualifiers).
 // Over-deref (level > depth) sticky empty via RemoveQualifiers (no invent partial pop).
+// C++ returns a value copy (owning vectors). Always Clone so Restrict/set_* on the
+// result cannot mutate the source Variable.qfer via shared slice backing.
 func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 	if level == 0 || q.Wildcard {
-		return q
+		// CVQualifiers.cpp:505–506 — return *this as value copy
+		return q.Clone()
 	}
 	if level < 0 {
 		// CVQualifiers.cpp:510 — assert(level == -1); multi-level & sticky fail closed as empty
@@ -306,9 +327,9 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
-		out := q
-		out.IsConsts = append(append([]bool(nil), q.IsConsts...), false)
-		out.IsVolatiles = append(append([]bool(nil), q.IsVolatiles...), false)
+		out := q.Clone()
+		out.IsConsts = append(out.IsConsts, false)
+		out.IsVolatiles = append(out.IsVolatiles, false)
 		return out
 	}
 	// dereference: pop_back `level` times; unpaired / over-pop sticky empty
