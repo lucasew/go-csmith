@@ -216,6 +216,68 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	ClearError()
 }
 
+// TestOutputArrayInitializersBraceOnlyStillCtrlDecl — Variable.cpp:829–841 + 861–863.
+// Even when every local array is brace-init (no_loop_initializer true), C++ still
+// allocates get_new_ctrl_vars and emits OutputArrayCtrlVars whenever dimen > 0.
+// Seed-2 func_67: "int i, j, k;" after l_137 brace init with no loop inits.
+func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
+	CtrlVarsDoFinalization()
+	ClearError()
+	opts := Defaults()
+	// local array with alt init_values → NoLoopInitializer true (brace path)
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name:       "l_137",
+			Type:       GetIntType(),
+			IsArray:    true,
+			ArraySizes: []int{2, 3},
+			Init:       MakeInt(0),
+		},
+		Sizes:      []int{2, 3},
+		InitValues: []string{"0", "1"},
+		Block:      &Block{}, // non-nil → not global
+	}
+	av.AsArray = av
+	if !av.NoLoopInitializer() {
+		t.Fatal("brace-init local must NoLoopInitializer")
+	}
+	out := OutputArrayInitializers([]*Variable{&av.Variable}, opts, "    ")
+	if HasError() {
+		t.Fatal("brace-only OutputArrayInitializers must not sticky", GetError())
+	}
+	// still declare ctrl vars for dimen=2
+	if !strings.Contains(out, "int i, j;") {
+		t.Fatalf("want ctrl decl for brace-only arrays, got %q", out)
+	}
+	// no loop body for brace-init
+	if strings.Contains(out, "for (") {
+		t.Fatal("brace-only must not emit loop init", out)
+	}
+	// OutputVariableList for locals must chain OutputArrayInitializers
+	// Variable.cpp:861–863
+	CtrlVarsDoFinalization()
+	ClearError()
+	list := OutputVariableList([]*Variable{&av.Variable}, "  ", false)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if !strings.Contains(list, "l_137") || !strings.Contains(list, "int i, j;") {
+		t.Fatalf("OutputVariableList locals must emit brace def + ctrl decl, got %q", list)
+	}
+	// Block.Output uses OutputVariableList — same contract
+	CtrlVarsDoFinalization()
+	ClearError()
+	blk := &Block{LocalVars: []*Variable{&av.Variable}, StmID: 1}
+	bout := blk.Output(0)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if !strings.Contains(bout, "int i, j;") {
+		t.Fatalf("Block.Output brace-only local array must emit ctrl decl, got %q", bout)
+	}
+	CtrlVarsDoFinalization()
+}
+
 func TestOutputForCommentNilSticky(t *testing.T) {
 	ClearError()
 	if (*Variable)(nil).OutputForComment(false) != "" {

@@ -120,11 +120,11 @@ func TestOutputVariableList(t *testing.T) {
 	a := CreateVariableScalars("g_b", GetIntType(), true, false)
 	b := CreateVariableScalars("g_a", GetIntType(), true, false)
 	out := OutputVariableList([]*Variable{a, b}, "  ", true)
-	// sorted by name: g_a then g_b
+	// Variable.cpp:858–860 — vector order (no invent name-sort)
 	ia := strings.Index(out, "g_a")
 	ib := strings.Index(out, "g_b")
-	if ia < 0 || ib < 0 || ia > ib {
-		t.Fatal(out)
+	if ia < 0 || ib < 0 || ib > ia {
+		t.Fatal("want vector order g_b then g_a", out)
 	}
 	// incomplete OutputDef — sticky no invent indent-only blank lines
 	ClearError()

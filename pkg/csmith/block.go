@@ -1763,103 +1763,22 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(cn + " " + name + " = 0;\n")
 		}
 	}
-	// OutputVariableList(local_vars) — Variable.cpp Output
+	// OutputVariableList(local_vars) — Variable.cpp:855–864
 	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
 	if !VariablesComplete(b.LocalVars) {
 		SetError(ErrGeneric)
 		return ""
 	}
-	var loopInits []*ArrayVariable
-	maxDim := 0
-	for _, lv := range b.LocalVars {
-		if lv.Type == nil {
-			SetError(ErrGeneric)
-			return ""
-		}
-		if lv.IsArray {
-			// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
-			// sticky (no invent synthetic shell from ArraySizes past incomplete AsArray)
-			if lv.AsArray == nil {
-				SetError(ErrGeneric)
-				return ""
-			}
-			av := lv.AsArray
-			// ArrayVariable.cpp:493 — only collective emits def; itemized dual-count skip
-			// (C++ LocalVars may hold itemize() member alongside parent)
-			if av.Collective != nil {
-				continue
-			}
-			// incomplete array def sticky — fail closed whole block
-			def := av.OutputDef()
-			// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
-			if HasError() {
-				return ""
-			}
-			if def == "" {
-				SetError(ErrGeneric)
-				return ""
-			}
-			sb.WriteString(inner)
-			sb.WriteString(def)
-			sb.WriteString("\n")
-			if !av.NoLoopInitializer() {
-				// residual ERROR sticky — no invent soft-continue loop-init past hole
-				if HasError() {
-					return ""
-				}
-				loopInits = append(loopInits, av)
-				if len(av.Sizes) > maxDim {
-					maxDim = len(av.Sizes)
-				}
-			} else if HasError() {
-				// residual ERROR sticky — no invent soft-skip NoLoopInitializer past hole
-				return ""
-			}
-			continue
-		}
-		// Variable::Output for locals (no force static)
-		def := lv.OutputDef(false)
-		// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
+	// Block.cpp:268 — OutputVariableList(local_vars): defs then OutputArrayInitializers
+	// for non-global lists (Variable.cpp:861–863). Do not invent a loopInits-only gate:
+	// C++ still emits "int i, j, k;" when every array is brace-init (seed-2 func_67).
+	if len(b.LocalVars) > 0 {
+		listOut := OutputVariableList(b.LocalVars, inner, false)
+		// residual ERROR sticky — no invent soft-continue stmts past OutputVariableList residual
 		if HasError() {
 			return ""
 		}
-		if def == "" {
-			SetError(ErrGeneric)
-			return ""
-		}
-		sb.WriteString(inner)
-		sb.WriteString(def)
-		sb.WriteString("\n")
-	}
-	// OutputArrayInitializers for locals without brace init
-	// Variable.cpp:829–841 — new_ctrl_vars + OutputArrayCtrlVars
-	if len(loopInits) > 0 {
-		// CGOptions::fresh_array_ctrl_var_names / max dimensions via process opts
-		opts := ProcessOptions()
-		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
-		// sticky no invent inits without live ctrl decl
-		decl := OutputArrayCtrlVars(ctrlVars, maxDim, inner)
-		if decl == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return ""
-		}
-		sb.WriteString(decl)
-		ctrl := CtrlVarNames(ctrlVars)
-		for _, av := range loopInits {
-			initOut := av.OutputInit(inner, ctrl)
-			// residual ERROR sticky — no invent soft-continue later inits past OutputInit residual
-			if HasError() {
-				return ""
-			}
-			if initOut == "" {
-				// incomplete array init IR sticky — fail closed whole block
-				SetError(ErrGeneric)
-				return ""
-			}
-			sb.WriteString(initOut)
-		}
+		sb.WriteString(listOut)
 	}
 	// Block.cpp:235–241 OutputStatementList
 	// Only fail closed on residuals raised during stmt emit (not pre-existing sticky).
