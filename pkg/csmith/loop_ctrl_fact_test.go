@@ -115,6 +115,62 @@ func TestIsVisibleLocal(t *testing.T) {
 	ClearError()
 }
 
+func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
+	// FactPointTo.cpp:506–508 — isArray / is_array_field → get_collective before fact lookup.
+	// Itemized array members share the collective's points-to; without the collective
+	// step, FindRelatedPointTo misses and as_return allows local-pointing elems
+	// (seed-4: return l_897[…] while UP rejects and keeps selecting).
+	ClearError()
+	opts := Defaults()
+	opts.NoReturnDeadPointer = true
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	blk := &Block{LocalVars: []*Variable{loc}}
+	// collective array of int* whose fact points at a local
+	elemT := PointerTo(GetIntType())
+	collAV := &ArrayVariable{
+		Variable: Variable{Name: "l_arr", Type: elemT, IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	collAV.AsArray = collAV
+	collAV.IsArray = true
+	item := collAV.ItemizeConstIndices([]int{1}, nil)
+	if item == nil {
+		t.Fatal("itemize")
+	}
+	// facts keyed on collective only (C++ style)
+	facts := []*FactPointTo{MakeFactPointTo(&collAV.Variable, loc)}
+	// direct collective: pointing to local
+	if !IsPointingToLocals(&collAV.Variable, blk, 0, facts) {
+		t.Fatal("collective array fact must detect local pointee")
+	}
+	// itemized member must use collective — same answer
+	if !IsPointingToLocals(&item.Variable, blk, 0, facts) {
+		t.Fatal("itemized array must use collective points-to (FactPointTo.cpp:506–508)")
+	}
+	// as_return ExpressionVariable must reject itemized local-pointing array
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: elemT, RV: CreateVariableScalars("rv", elemT, false, false)}
+	f.Stack = []*Block{blk}
+	blk.Func = f
+	blk.LocalVars = []*Variable{loc, &collAV.Variable}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = facts
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// Force pool: only the array is choosable as int*
+	vs.GlobalList = nil
+	// Local array available via block
+	for seed := uint64(1); seed < 40; seed++ {
+		ClearError()
+		ev := makeExpressionVariableFlags(NewRng(seed), vs, &cg, elemT, nil, false, true)
+		if ev != nil && (ev.Var == &item.Variable || ev.Var == &collAV.Variable ||
+			(ev.Var != nil && ev.Var.AsArray != nil && ev.Var.AsArray.Collective == collAV) ||
+			(ev.Var != nil && ev.Var.Name == "l_arr")) {
+			t.Fatalf("as_return must not accept local-pointing array seed=%d var=%v", seed, ev.Var)
+		}
+	}
+	ClearError()
+}
+
 func TestIsPointingToLocalsNilHole(t *testing.T) {
 	ClearError()
 	// Variable always live; sticky true (no invent not-local soft-skip)

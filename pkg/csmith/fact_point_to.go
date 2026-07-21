@@ -1943,6 +1943,22 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	if HasError() {
 		return true
 	}
+	// FactPointTo.cpp:506–508 — array / array-field subjects use collective for fact lookup
+	// (itemized members share the collective's points-to; without this, FindRelatedPointTo
+	// misses and as_return/no_return_dead_ptr wrongly allows local-pointing array elems).
+	isAF := v.IsArrayField()
+	if HasError() {
+		return true
+	}
+	if v.IsArray || isAF {
+		coll := varCollective(v)
+		if HasError() {
+			return true
+		}
+		if coll != nil {
+			v = coll
+		}
+	}
 	// incomplete fact maps sticky true
 	if !FactsComplete(facts) {
 		SetError(ErrGeneric)
