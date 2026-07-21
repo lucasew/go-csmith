@@ -572,6 +572,9 @@ func (f *Function) generateBodyCore(
 	cg.IVBounds = nil
 	// CGContext.cpp:66–69 — rw_directive(nullptr); never inherit caller's must_read/write
 	cg.RW = nil
+	// CGContext.cpp:65–70 / 85–92 — body ctor leaves effect_stm default empty
+	// (not a copy of caller's EffectStm).
+	cg.EffectStm = EmptyEffect()
 	// Function.cpp:635 / 677 — extend_call_chain
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual

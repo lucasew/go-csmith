@@ -42,12 +42,31 @@ func TestMergeEffectsUnion(t *testing.T) {
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	e1 := EmptyEffect().WriteVar(a)
 	e2 := EmptyEffect().WriteVar(b)
+	// Effect.cpp:write_var — non-volatile write keeps SE-free true
+	if !e1.IsSideEffectFree() || !e2.IsSideEffectFree() {
+		t.Fatal("non-volatile WriteVar must stay SE-free")
+	}
 	m := MergeEffects(e1, e2)
 	if !m.IsWritten(a) || !m.IsWritten(b) {
 		t.Fatal("union")
 	}
-	if m.IsSideEffectFree() {
-		t.Fatal("SE")
+	// Effect.cpp:add_effect — side_effect_free &= e.side_effect_free only
+	// (not invent SE-free false for every write)
+	if !m.IsSideEffectFree() {
+		t.Fatal("MergeEffects of non-vol writes must stay SE-free")
+	}
+	// volatile write clears SE-free on that arm → merge not SE-free
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	ev := EmptyEffect().WriteVar(v)
+	if ev.IsSideEffectFree() {
+		t.Fatal("volatile WriteVar must clear SE-free")
+	}
+	mv := MergeEffects(e1, ev)
+	if mv.IsSideEffectFree() {
+		t.Fatal("MergeEffects with volatile arm must not be SE-free")
+	}
+	if !mv.IsWritten(a) || !mv.IsWritten(v) {
+		t.Fatal("volatile merge must keep both writes")
 	}
 }
 

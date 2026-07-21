@@ -571,6 +571,9 @@ func MakeRandomFor(
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
 	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
 	bodyCG := cg.WithFlags(FlagInLoop)
+	// CGContext.cpp:95–105 — loop-body ctor default-constructs effect_stm() empty.
+	// Do not inherit parent's post-make_iteration EffectStm (IV write/read).
+	bodyCG.EffectStm = EmptyEffect()
 	if lc.IV != nil {
 		bodyCG.AddIVBound(lc.IV, lc.Bound)
 	}

@@ -1573,9 +1573,10 @@ func MergeEffects(a, b Effect) Effect {
 		out.written[v] = true
 		out.writeOrder = append(out.writeOrder, v)
 	}
-	if len(out.written) > 0 {
-		out.pure = false
-		out.sideEffectFree = false
-	}
+	// Effect.cpp:add_effect — pure &= e.pure; side_effect_free &= e.side_effect_free
+	// already set at construction. write_var only clears SE-free for volatile /
+	// access_once (Effect.cpp:144), not every write. Invent soft-false SE-free here
+	// poisoned revisit EffectAccum → AddVisibleEffect → binary RHS ambient half-size
+	// ok pools (seed-7 e58205 ChooseOKVar n=26 vs UP n=56).
 	return out
 }
