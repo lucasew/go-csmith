@@ -567,13 +567,16 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementFor.cpp:443 — arbitrary bound 0
 	cg.AddIVBound(iv, 0)
-	defer cg.RemoveIVBound(iv)
-	// StatementFor.cpp:445–449 — body under IN_LOOP (body uses shared accum)
-	bodyCG := cg.CloneSubcontext()
-	bodyCG.Flags |= FlagInLoop
-	if !VisitFactsBlock(st.Then, &bodyCG, opts) {
+	// StatementFor.cpp:445–449 — body.visit_facts(inputs, cg_context) on the
+	// SAME CGContext (only iv_bounds mutated). Soft invent was CloneSubcontext +
+	// Flags|=IN_LOOP (C++ visit does not; generation uses loop-body ctor).
+	if !VisitFactsBlock(st.Then, cg, opts) {
+		// StatementFor.cpp:446–448 — erase IV on body fail
+		cg.RemoveIVBound(iv)
 		return false
 	}
+	// Cleanup IV on every exit after body success (StatementFor.cpp:470).
+	defer cg.RemoveIVBound(iv)
 	if cg.FM != nil {
 		// StatementFor.cpp:452–458 — body Block always has stm_id sticky
 		if StmIDUnset(st.Then.StmID) {
@@ -776,14 +779,10 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	if HasError() {
 		return false
 	}
-	bodyCG := cg.CloneSubcontext()
-	bodyCG.Flags |= FlagInLoop
-	// add all IVs as bounds for body analysis
-	for _, iv := range ivs {
-		bodyCG.AddIVBound(iv, 0)
-		defer bodyCG.RemoveIVBound(iv)
-	}
-	if !VisitFactsBlock(inner.Then, &bodyCG, opts) {
+	// StatementArrayOp.cpp:284–287 — body->visit_facts(inputs, cg_context) on the
+	// SAME context (IVs already written via check_write_var above). Soft invent was
+	// CloneSubcontext + IN_LOOP.
+	if !VisitFactsBlock(inner.Then, cg, opts) {
 		return false
 	}
 	if cg.FM != nil {

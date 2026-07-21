@@ -449,6 +449,43 @@ func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 	ClearError()
 }
 
+// StatementFor.cpp:445–449 — body.visit_facts on same CGContext; no invent IN_LOOP clone.
+func TestVisitFactsStatementForSameContextNoInventInLoop(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	body := &Block{StmID: AllocStmID(), Func: f, Looping: true}
+	st := &Stmt{
+		Kind: StmtFor, StmID: AllocStmID(),
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
+		Then: body,
+	}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// Parent not already IN_LOOP (function-level for visit)
+	if cg.InLoop() {
+		t.Fatal("precondition: parent not IN_LOOP")
+	}
+	preFlags := cg.Flags
+	if !VisitFactsStatementFor(st, &cg, Defaults()) {
+		t.Fatalf("visit for: err=%v", HasError())
+	}
+	// Must not invent sticky IN_LOOP on parent after visit
+	if cg.Flags != preFlags {
+		t.Fatalf("visit must not invent flags change: got %#x want %#x", cg.Flags, preFlags)
+	}
+	// IV must be erased after visit (StatementFor.cpp:470)
+	if _, ok := cg.IVBounds[iv]; ok {
+		t.Fatal("IV must be removed from iv_bounds after visit")
+	}
+	ClearError()
+}
+
 func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	ClearError()
 	// StatementFor.cpp:456–458 — !must_return → map_facts_in[body], not merge post
