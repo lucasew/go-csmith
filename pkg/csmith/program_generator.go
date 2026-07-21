@@ -734,19 +734,79 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 }
 
 // hashGlobals is HashGlobalVariables using first function's UnionFacts when available.
+// Variable.cpp:889–900 — Variable::hash uses get_fact_mgr_for_func(GetFirstFunction())
+// → FactMgr::global_facts (eUnionWrite via FactUnion::is_field_readable).
 func (g *ProgramGenerator) hashGlobals() string {
 	// ProgramGenerator always live at hash emit; sticky incomplete no invent empty hash
 	if g == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
-	var uf []*FactUnion
-	if g.FactMgrs != nil && len(g.Funcs.Funcs) > 0 && g.Funcs.Funcs[0] != nil {
-		if fm := g.FactMgrs.ForFunc(g.Funcs.Funcs[0]); fm != nil {
-			uf = fm.UnionFacts
+	return HashGlobalVariablesWithUnionFacts(g.VS, g.unionWriteFactsForHash())
+}
+
+// unionWriteFactsForHash is the eUnionWrite partition of first-function global_facts
+// at Variable::hash time (Variable.cpp:891–894).
+//
+// Go keeps point-to and eUnionWrite in split maps. FindFixedPointBlock's
+// SetMapFactsIn(pt) pairs live UnionFacts into map_facts_in; empty for-bodies that
+// dropped statements still leave mid-gen last_written (deleted for-IV) on that
+// live lattice, which then renews into GetFirstFunction (seed-999 g_605 fid=4,
+// g_467 BOTTOM). C++ stores one FactVec so set_fact_in(current_inputs) keeps entry.
+//
+// Rebuild from Fact::abstract_fact_for_var_init / FactMgr::add_new_var_fact for each
+// global union (Fact.cpp:87–107, FactMgr.cpp:118+) — the lattice C++ retains for
+// subjects first-function DFA never updates. Does not change generation lattices.
+func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
+	if g == nil || g.VS == nil {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if !VariablesComplete(g.VS.GlobalList) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	var out []*FactUnion
+	for _, v := range g.VS.GlobalList {
+		if v == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		// ArrayVariable of union: subject is the array (collective); same abstract_init.
+		if v.Type == nil || !v.Type.IsUnion() {
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
+			continue
+		}
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		_, un := AbstractFactForVarInit(v)
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		if !UnionFactsComplete(un) {
+			return IncompleteUnionFactSlice()
+		}
+		for _, u := range un {
+			if u == nil {
+				SetError(ErrGeneric)
+				return IncompleteUnionFactSlice()
+			}
+			out = MergeUnionFact(out, u)
+			if !UnionFactsComplete(out) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return IncompleteUnionFactSlice()
+			}
 		}
 	}
-	return HashGlobalVariablesWithUnionFacts(g.VS, uf)
+	if out == nil {
+		return []*FactUnion{}
+	}
+	return out
 }
 
 // OutputMain mirrors OutputMgr::OutputMain (no extension).
