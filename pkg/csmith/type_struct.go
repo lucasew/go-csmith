@@ -604,19 +604,28 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 }
 
 // MakeOneUnionField mirrors Type::make_one_union_field.
-// Type.cpp:699–763 — bitfield optional; else non-pointer / no-bitfield structs;
-// no union-in-union; 15% struct fields.
+// Type.cpp:674–738 — bitfield optional; else non-pointer / no-bitfield structs;
+// no union-in-union; pure_rnd 15% struct fields; SIMPLE_TYPES_PROB_FILTER at pick only.
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
 		SetError(ErrGeneric)
 		return StructField{}
 	}
-	// Type.cpp:702–706 — bitfield when bitfields && !ccomp
+	// Type.cpp:677–680 — bitfield when bitfields && !ccomp && flipcoin(BitFieldInNormalStructProb)
+	// bitfield path uses traced rnd_flipcoin (not pure_rnd)
 	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
+		if HasError() {
+			return StructField{}
+		}
 		return MakeOneBitfield(r, opts, probs, fieldIdx, true)
 	}
-	// Build ok_nonstruct_types and struct_types (Type.cpp:708–739)
+	if HasError() {
+		return StructField{}
+	}
+	// Build ok_nonstruct_types and struct_types (Type.cpp:682–713)
+	// C++ keeps weight-0 simples (float/void/…) in the nonstruct pool; filter only at pick
+	// so pure_rnd_upto index space matches. Do not invent a trimmed pool.
 	var nonStruct []*Type
 	var structTypes []*Type
 	if env != nil {
@@ -626,98 +635,95 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 				SetError(ErrGeneric)
 				return StructField{}
 			}
-			// Type.cpp:716–717 — contain_pointer_field rejected
+			// Type.cpp:691–692 — contain_pointer_field rejected (pointers + aggregates with ptr fields)
 			if t.ContainPointerField() {
-				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
 				if HasError() {
 					return StructField{}
 				}
 				continue
 			}
 			isSt := t.IsStruct()
-			// residual ERROR sticky — no invent soft-field past IsStruct residual
 			if HasError() {
 				return StructField{}
 			}
 			isUn := t.IsUnion()
-			// residual ERROR sticky — no invent soft-field past IsUnion residual
 			if HasError() {
 				return StructField{}
 			}
 			if !isSt && !isUn {
-				// skip void / filtered simples
-				simple := t.IsSimple()
-				// residual ERROR sticky — no invent soft-field past IsSimple residual
-				if HasError() {
-					return StructField{}
-				}
-				if simple && t.Simple() == EVoid {
-					continue
-				}
-				if simple && t.IsFloat() && !opts.EnableFloat {
-					// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
-					if HasError() {
-						return StructField{}
-					}
-					continue
-				}
-				// residual ERROR sticky — no invent soft-continue non-float past IsFloat residual false path
-				if HasError() {
-					return StructField{}
-				}
+				// Type.cpp:694–696 — all non-struct/non-union (simples + others) enter pool
 				nonStruct = append(nonStruct, t)
 				continue
 			}
-			// Type.cpp:726–727 — no bitfields in union members for now
+			// Type.cpp:701–702 — no bitfields in union members for now
 			if t.HasBitfields() {
-				// residual ERROR sticky — no invent soft-skip then pick later past bitfield hole
 				if HasError() {
 					return StructField{}
 				}
 				continue
 			}
-			// Type.cpp:730–731 — has_implicit_nontrivial_assign_ops() (not mere has_assign_ops)
+			// Type.cpp:705–706 — has_implicit_nontrivial_assign_ops()
 			if t.HasImplicitNontrivialAssignOps {
 				continue
 			}
 			if t.IsStruct() {
 				structTypes = append(structTypes, t)
 			}
-			// Type.cpp:736–737 — no union in union
+			// Type.cpp:710–712 — no union in union
 		}
 	}
-	// Type.cpp does not soft-seed simples when AllTypes empty (ERROR would fail)
+	// Type.cpp:714–730 — do {
+	//   pure_rnd_flipcoin(15) ? struct_types[pure_rnd_upto] : nonstruct + SIMPLE filter
+	// } while (type == nullptr)
+	// random.cpp: pure_rnd_* == rnd_* when CGOptions::is_random() (defaults). Use session r
+	// (same stream as ProcessRng during Generate; unit tests pass local Rng).
 	var ft *Type
-	// Type.cpp:742–755 — do { 15% struct else nonstruct } while (type == nullptr)
-	// C++ loops until type set; cap high (no soft invent simple early)
 	for tries := 0; tries < 256; tries++ {
 		if len(structTypes) > 0 && r.RndFlipcoin(15) {
+			if HasError() {
+				return StructField{}
+			}
 			ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
+			if HasError() {
+				return StructField{}
+			}
 			break
+		}
+		if HasError() {
+			return StructField{}
 		}
 		if len(nonStruct) == 0 {
 			break
 		}
 		cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
-		// Type.cpp:747–752 — SIMPLE_TYPES_PROB_FILTER reject
-		simple := cand.IsSimple()
-		// residual ERROR sticky — no invent soft-field past IsSimple residual
 		if HasError() {
 			return StructField{}
 		}
-		if simple && probs != nil && probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
-			continue
-		}
-		if simple && cand.Simple() == EVoid {
-			continue
+		// Type.cpp:723–727 — SIMPLE_TYPES_PROB_FILTER reject (weight 0), retry; pool stays full
+		if cand.IsSimple() {
+			if HasError() {
+				return StructField{}
+			}
+			if probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
+				if HasError() {
+					return StructField{}
+				}
+				continue
+			}
+			if HasError() {
+				return StructField{}
+			}
+		} else if HasError() {
+			return StructField{}
 		}
 		ft = cand
 		break
 	}
-	// Type.cpp:755 — while (type == nullptr); no soft invent simple when pools empty
+	// Type.cpp:730 — while (type == nullptr); no soft invent simple when pools empty
 	if ft == nil || HasError() {
 		return StructField{}
 	}
+	// Type.cpp:733–735 — FieldConstProb / FieldVolatileProb (traced random_qualifiers)
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)

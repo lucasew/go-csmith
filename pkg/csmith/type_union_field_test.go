@@ -65,6 +65,45 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 	}
 }
 
+func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
+	// Type.cpp:694–696 / 723–727 — weight-0 simples stay in ok_nonstruct_types;
+	// SIMPLE_TYPES_PROB_FILTER rejects at pick (retry). Trimmed pool changes rnd_upto size.
+	ClearError()
+	opts := Defaults()
+	opts.EnableFloat = false
+	opts.Bitfields = false // always non-bitfield path
+	probs := NewProbabilities(opts)
+	// AllTypes like GenerateSimpleTypes: eChar.. (includes float with weight 0)
+	var env TypeEnv
+	for st := EChar; int(st) < MaxSimpleTypes; st++ {
+		env.AllTypes = append(env.AllTypes, GetSimpleType(st))
+	}
+	// float must have weight 0 under defaults
+	if probs.SimpleTypeWeight(int(EFloat)) != 0 {
+		t.Fatal("expected float weight 0 when EnableFloat false")
+	}
+	// Must successfully pick a weight>0 simple without inventing trimmed pool (no hang / nil)
+	ok := 0
+	for seed := uint64(1); seed < 40; seed++ {
+		ClearError()
+		f := MakeOneUnionField(NewRng(seed), opts, probs, &env, 0)
+		if f.Type == nil || HasError() {
+			continue
+		}
+		if !f.Type.IsSimple() || f.Type.Simple() == EVoid {
+			t.Fatalf("unexpected field type %v seed %d", f.Type, seed)
+		}
+		if probs.SimpleTypeWeight(int(f.Type.Simple())) == 0 {
+			t.Fatalf("picked weight-0 simple %v seed %d", f.Type.Simple(), seed)
+		}
+		ok++
+	}
+	if ok < 10 {
+		t.Fatalf("too few successful picks: %d", ok)
+	}
+	ClearError()
+}
+
 func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	// ContainPointerField/HasBitfields Type-nil field residual: soft invent was soft-skip
 	// then pick good simple. Fair: sticky fail closed whole MakeOneUnionField.
