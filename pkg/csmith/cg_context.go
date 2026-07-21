@@ -73,57 +73,24 @@ func (c CGContext) AccumEffect() Effect {
 	return EmptyEffect()
 }
 
-// NoteWrite records a variable write into EffectAccum if present.
-// CGContext.cpp:write_var — only accum + effect_stm; feffect is set at
-// GenerateBody via add_external_effect(map_stm_effect[body]) (Function.cpp:657).
-// Variable always live; sticky (no invent soft-skip write past hole).
-// Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
-func (c CGContext) NoteWrite(v *Variable) {
-	if v == nil {
-		SetError(ErrGeneric)
-		return
-	}
-	if c.EffectAccum != nil {
-		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
-			return
-		}
-		*c.EffectAccum = c.EffectAccum.WriteVar(v)
-		// residual ERROR sticky — no invent soft-continue past WriteVar residual
-		if HasError() {
-			return
-		}
-		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
-			return
-		}
-	}
+// NoteWrite mirrors CGContext::write_var (same path as WriteVar).
+// CGContext.cpp:307–317 — get_collective; nonwritable assert; effect_accum +
+// effect_stm. Not Function::feffect (Function.cpp:657 / compute_summary).
+// Soft invent was value-receiver NoteWrite updating only EffectAccum (no
+// EffectStm / GetCollective), so map_stm_effect[goto]/post_creation lost
+// the write and later AddVisibleEffect / binary RHS ambient under-reported.
+// Pointer receiver: C++ CGContext& mutates effect_stm on the live context.
+func (c *CGContext) NoteWrite(v *Variable) {
+	c.WriteVar(v)
 }
 
-// NoteRead records a variable read into EffectAccum.
-// CGContext.cpp:read_var — only accum + effect_stm (not Function::feffect).
-// Variable always live; sticky (no invent soft-skip read past hole).
-// Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
-func (c CGContext) NoteRead(v *Variable) {
-	if v == nil {
-		SetError(ErrGeneric)
-		return
-	}
-	if c.EffectAccum != nil {
-		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
-			return
-		}
-		*c.EffectAccum = c.EffectAccum.ReadVar(v)
-		// residual ERROR sticky — no invent soft-continue past ReadVar residual
-		if HasError() {
-			return
-		}
-		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
-			return
-		}
-	}
+// NoteRead mirrors CGContext::read_var (same path as ReadVar).
+// CGContext.cpp:175–185 — get_collective; nonreadable assert; effect_accum +
+// effect_stm. StatementGoto.cpp:131 uses read_var(cond_var) on the live
+// CGContext after choose_visible_read_var. Soft invent was value-receiver
+// NoteRead updating only EffectAccum, so map_stm_effect missed the read.
+func (c *CGContext) NoteRead(v *Variable) {
+	c.ReadVar(v)
 }
 
 // WithEffectContext returns a context with the given effect_context.

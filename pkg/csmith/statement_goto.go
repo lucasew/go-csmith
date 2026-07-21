@@ -523,7 +523,11 @@ func MakeRandomGoto(
 	var cond *Expression
 	if len(readVars) > 0 {
 		if v := ChooseVisibleReadVar(r, condBlk, readVars, GetIntType(), uf); v != nil {
-			cg.NoteRead(v)
+			// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only.
+			// C++ does not call read_var here; visit_facts later uses check_read_var.
+			// Soft invent was NoteRead/ReadVar during make_random, which pushed the
+			// cond into effect_accum+effect_stm early and bloated map_accum_effect
+			// / later ambient (binary RHS seFree / write filters).
 			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		}
 	}

@@ -167,9 +167,40 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 
 func TestNoteWriteNilSticky(t *testing.T) {
 	ClearError()
-	EmptyCGContext().NoteWrite(nil)
+	cg := EmptyCGContext()
+	cg.NoteWrite(nil)
 	if !HasError() {
 		t.Fatal("nil NoteWrite must SetError sticky")
+	}
+	ClearError()
+}
+
+// CGContext.cpp:175–185 / 307–317 — NoteRead/NoteWrite are write_var/read_var:
+// both EffectAccum and EffectStm (not feffect).
+func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect())
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	cg.EffectStm = EmptyEffect()
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	cg.NoteRead(g)
+	if !cg.EffectStm.IsRead(g) || !cg.EffectAccum.IsRead(g) {
+		t.Fatal("NoteRead must update EffectStm and EffectAccum like read_var")
+	}
+	if f.FEffect.IsRead(g) {
+		t.Fatal("NoteRead must not touch feffect")
+	}
+	ClearError()
+	cg.EffectStm = EmptyEffect()
+	w := CreateVariableScalars("g_2", GetIntType(), false, false)
+	cg.NoteWrite(w)
+	if !cg.EffectStm.IsWritten(w) || !cg.EffectAccum.IsWritten(w) {
+		t.Fatal("NoteWrite must update EffectStm and EffectAccum like write_var")
+	}
+	if f.FEffect.IsWritten(w) {
+		t.Fatal("NoteWrite must not touch feffect")
 	}
 	ClearError()
 }

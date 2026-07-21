@@ -67,6 +67,58 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	}
 }
 
+// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only; no read_var
+// during make_random (visit_facts later). Soft invent NoteRead bloated EffectStm/accum.
+func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	vs.AllVars = []*Variable{g}
+	vs.GlobalList = []*Variable{g}
+	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
+	blk := &Block{Func: f, Stmts: []Stmt{tgt, {Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}}}
+	f.Blocks = []*Block{blk}
+	f.Body = blk
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	// accum already has g as read (choose pool); EffectStm empty before make
+	eff := EmptyEffect().ReadVar(g)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	cg.EffectStm = EmptyEffect()
+	found := false
+	for seed := uint64(1); seed < 80; seed++ {
+		blk.Stmts[0].SourceLabel = ""
+		cg.EffectStm = EmptyEffect()
+		// reset accum to only pre-read (no invent re-seed pollution)
+		pre := EmptyEffect().ReadVar(g)
+		cg.EffectAccum = &pre
+		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, blk)
+		if !stmtOK(st) || st.Expr == nil || st.Expr.Var != g {
+			continue
+		}
+		found = true
+		// make_random must not push cond into effect_stm (C++ leaves stm cleared at 112)
+		if cg.EffectStm.IsRead(g) {
+			t.Fatal("goto make_random must not invent read_var into EffectStm")
+		}
+		// EffectAccum should still be only the pre-existing read (not re-pushed as "new")
+		// IsRead stays true; SE-free unchanged for non-vol
+		if !cg.EffectAccum.IsRead(g) {
+			t.Fatal("pre-existing accum read must remain")
+		}
+		break
+	}
+	if !found {
+		t.Skip("no goto with g_c cond in seed sample")
+	}
+	ClearError()
+}
+
 func TestGenerateCanEmitGoto(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
