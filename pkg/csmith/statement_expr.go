@@ -40,14 +40,20 @@ func MakeRandomExprStmt(
 			return Stmt{}
 		}
 	}
+	// StatementExpr.cpp:58 — vector<const Fact *> facts_copy = fm->global_facts
+	// Full FactVec: ePointTo + eUnionWrite. Soft invent was PT-only restore leaving
+	// UnionFacts at post-failed-call last-writes → IsNonreadableField over-filters
+	// choose_var (seed-7 ok pool 26 vs upstream 56).
 	var factsCopy []*FactPointTo
+	var unionCopy []*FactUnion
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			SetError(ErrGeneric)
 			return Stmt{}
 		}
-		// StatementExpr / ExpressionFuncall — shallow Fact* vector snapshot (C++ facts_copy = global_facts)
+		// shallow Fact* vector snapshot (C++ facts_copy = global_facts)
 		factsCopy = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
+		unionCopy = append([]*FactUnion(nil), cg.FM.UnionFacts...)
 	}
 	list := cg.Funcs
 	// is_std_func=false (StatementExpr.cpp:60)
@@ -58,7 +64,7 @@ func MakeRandomExprStmt(
 			*cg.EffectAccum = preEffect
 		}
 		if cg.FM != nil {
-			cg.FM.RestoreFacts(factsCopy)
+			cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		}
 		return Stmt{}
 	}
@@ -68,7 +74,7 @@ func MakeRandomExprStmt(
 			*cg.EffectAccum = preEffect
 		}
 		if cg.FM != nil {
-			cg.FM.RestoreFacts(factsCopy)
+			cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		}
 		// residual ERROR sticky — no invent soft re-pick past Failed residual (restore may residual)
 		if HasError() {
@@ -83,7 +89,7 @@ func MakeRandomExprStmt(
 			*cg.EffectAccum = preEffect
 		}
 		if cg.FM != nil {
-			cg.FM.RestoreFacts(factsCopy)
+			cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		}
 		return Stmt{}
 	}

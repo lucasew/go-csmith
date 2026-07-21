@@ -1859,16 +1859,19 @@ func makeExpressionFuncall(
 	if HasError() {
 		return nil
 	}
-	// incomplete GlobalFacts fail closed sticky (no invent cleaned snapshot for failed call restore)
-	if !FactsComplete(cg.FM.GlobalFacts) {
+	// incomplete GlobalFacts/UnionFacts fail closed sticky (no invent cleaned snapshot)
+	if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 		SetError(ErrGeneric)
 		return nil
 	}
 	// ExpressionFuncall.cpp:78 — vector<const Fact *> facts_copy = fm->global_facts
-	// (shallow copy of the Fact* vector; Fact objects are shared until merge replaces slots).
-	// Deep CloneFactSlice here freezes pre-merge lattice and can drop mid-gen may-null
-	// updates that C++ keeps when Fact objects are still shared across the snapshot.
+	// Full FactVec (ePointTo + eUnionWrite). Shallow Fact* vector copy — Fact objects
+	// shared until merge replaces slots. Deep CloneFactSlice freezes pre-merge lattice
+	// and can drop mid-gen may-null updates C++ keeps via shared Fact*.
+	// Soft invent was RestoreFacts(PT-only): UnionFacts stayed at post-failed-call
+	// last-writes → IsNonreadableField over-filtered choose_var (seed-7).
 	factsCopy := append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
+	unionCopy := append([]*FactUnion(nil), cg.FM.UnionFacts...)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	// ExpressionFuncall.cpp:82 — ERROR_GUARD(nullptr) before fi->failed
 	if HasError() {
@@ -1876,7 +1879,7 @@ func makeExpressionFuncall(
 			*cg.EffectAccum = preAccum
 		}
 		cg.EffectStm = preStm
-		cg.FM.RestoreFacts(factsCopy)
+		cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		return nil
 	}
 	// FunctionInvocation.cpp:119 assert(fi != 0); nil without Failed is incomplete
@@ -1885,7 +1888,7 @@ func makeExpressionFuncall(
 			*cg.EffectAccum = preAccum
 		}
 		cg.EffectStm = preStm
-		cg.FM.RestoreFacts(factsCopy)
+		cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		return nil
 	}
 	if fi.Failed {
@@ -1894,7 +1897,7 @@ func makeExpressionFuncall(
 			*cg.EffectAccum = preAccum
 		}
 		cg.EffectStm = preStm
-		cg.FM.RestoreFacts(factsCopy)
+		cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		return makeExpressionVariable(r, vs, cg, typ, qfer)
 	}
 	return &Expression{Term: TermFunction, Invoke: fi}

@@ -119,6 +119,67 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	}
 }
 
+func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
+	// FactMgr.cpp:489–492 restore_facts on full FactVec (ePointTo + eUnionWrite).
+	// StatementExpr.cpp:58–66 / ExpressionFuncall.cpp:78–91:
+	//   facts_copy = fm->global_facts;  // both categories
+	//   fm->restore_facts(facts_copy);
+	// Soft invent was RestoreFacts(PT-only): UnionFacts kept post-call last_written_fid
+	// so IsNonreadableField over-filtered choose_var (seed-7 eligible pool half size).
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u", ut, false, false)
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) < 2 {
+		t.Fatal("need union fields")
+	}
+	f0 := parent.FieldVars[0]
+	// pre-call: last written field 0 → f0 readable
+	preU := MakeFactUnion(parent, 0)
+	if preU == nil {
+		t.Fatal("MakeFactUnion f0")
+	}
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{}
+	fm.UnionFacts = []*FactUnion{preU}
+	// snapshot like StatementExpr / ExpressionFuncall (shallow vector copy)
+	factsCopy := append([]*FactPointTo(nil), fm.GlobalFacts...)
+	unionCopy := append([]*FactUnion(nil), fm.UnionFacts...)
+	// simulate failed call that wrote a different field
+	mut := MakeFactUnion(parent, 1)
+	if mut == nil {
+		t.Fatal("MakeFactUnion f1")
+	}
+	fm.UnionFacts = []*FactUnion{mut}
+	if !IsNonreadableField(f0, fm.UnionFacts) {
+		t.Fatal("after mutate to f1 write, f0 must be nonreadable")
+	}
+	// full restore (production path after fix)
+	fm.RestoreFactsPair(factsCopy, unionCopy)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil {
+		t.Fatalf("union restore: %#v", fm.UnionFacts)
+	}
+	if fm.UnionFacts[0].LastWrittenFID != 0 {
+		t.Fatalf("want last_written fid 0 after restore, got %d", fm.UnionFacts[0].LastWrittenFID)
+	}
+	if IsNonreadableField(f0, fm.UnionFacts) {
+		t.Fatal("after full restore, f0 must be readable again")
+	}
+	// PT-only restore must NOT be relied on for production: document the hole
+	fm.UnionFacts = []*FactUnion{mut}
+	fm.RestoreFacts(factsCopy) // legacy PT-only
+	if !IsNonreadableField(f0, fm.UnionFacts) {
+		t.Fatal("PT-only RestoreFacts must leave mutated union last-write (hole)")
+	}
+	ClearError()
+}
+
 func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 5
