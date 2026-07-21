@@ -10,16 +10,34 @@ func TestMakeRandomUnionType(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
-	// need some structs first optional
-	GenerateAllTypesEnv(NewRng(2), opts, probs, &env)
-	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "U0")
+	// Type.cpp shared sid: after any prior aggregates, next union is U{seq} not always U0
+	env.AllTypes = []*Type{GetIntType()}
+	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "")
 	if ut == nil || !ut.IsUnion() || len(ut.Fields) < 1 {
 		t.Fatal(ut)
+	}
+	if ut.StructName != "U0" || ut.SID != 0 {
+		t.Fatalf("first aggregate union want U0, got %q sid=%d", ut.StructName, ut.SID)
 	}
 	decl := ut.OutputUnionDecl()
 	if !strings.Contains(decl, "union U0") {
 		t.Fatal(decl)
 	}
+	// after S0, next union is U1
+	st := MakeRandomStructType(NewRng(4), opts, probs, &env, "")
+	if st == nil || st.StructName != "S1" {
+		t.Fatalf("second aggregate want S1, got %v", st)
+	}
+	ut2 := MakeRandomUnionType(NewRng(5), opts, probs, &env, "")
+	if ut2 == nil || ut2.StructName != "U2" {
+		t.Fatalf("third aggregate want U2, got %v name=%q", ut2, func() string {
+			if ut2 == nil {
+				return ""
+			}
+			return ut2.StructName
+		}())
+	}
+	ClearError()
 }
 
 func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
