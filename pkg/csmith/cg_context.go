@@ -74,7 +74,8 @@ func (c CGContext) AccumEffect() Effect {
 }
 
 // NoteWrite records a variable write into EffectAccum if present.
-// Also updates CurrentFunc.FEffect for globals (Function::feffect external).
+// CGContext.cpp:write_var — only accum + effect_stm; feffect is set at
+// GenerateBody via add_external_effect(map_stm_effect[body]) (Function.cpp:657).
 // Variable always live; sticky (no invent soft-skip write past hole).
 // Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
 func (c CGContext) NoteWrite(v *Variable) {
@@ -88,7 +89,7 @@ func (c CGContext) NoteWrite(v *Variable) {
 			return
 		}
 		*c.EffectAccum = c.EffectAccum.WriteVar(v)
-		// residual ERROR sticky — no invent soft-continue FEffect past WriteVar residual
+		// residual ERROR sticky — no invent soft-continue past WriteVar residual
 		if HasError() {
 			return
 		}
@@ -97,30 +98,10 @@ func (c CGContext) NoteWrite(v *Variable) {
 			return
 		}
 	}
-	if c.CurrentFunc != nil && v.IsGlobal() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
-		if HasError() {
-			return
-		}
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-			return
-		}
-		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
-		// residual ERROR sticky — no invent soft-complete write past FEffect WriteVar residual
-		if HasError() {
-			return
-		}
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-		}
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
-		return
-	}
 }
 
-// NoteRead records a variable read into EffectAccum and FEffect for globals.
+// NoteRead records a variable read into EffectAccum.
+// CGContext.cpp:read_var — only accum + effect_stm (not Function::feffect).
 // Variable always live; sticky (no invent soft-skip read past hole).
 // Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
 func (c CGContext) NoteRead(v *Variable) {
@@ -134,7 +115,7 @@ func (c CGContext) NoteRead(v *Variable) {
 			return
 		}
 		*c.EffectAccum = c.EffectAccum.ReadVar(v)
-		// residual ERROR sticky — no invent soft-continue FEffect past ReadVar residual
+		// residual ERROR sticky — no invent soft-continue past ReadVar residual
 		if HasError() {
 			return
 		}
@@ -142,27 +123,6 @@ func (c CGContext) NoteRead(v *Variable) {
 			SetError(ErrGeneric)
 			return
 		}
-	}
-	if c.CurrentFunc != nil && v.IsGlobal() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
-		if HasError() {
-			return
-		}
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-			return
-		}
-		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
-		// residual ERROR sticky — no invent soft-complete read past FEffect ReadVar residual
-		if HasError() {
-			return
-		}
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-		}
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
-		return
 	}
 }
 
@@ -447,16 +407,7 @@ func (c *CGContext) AddExternalEffect(e Effect) {
 		SetError(ErrGeneric)
 		return
 	}
-	if c.CurrentFunc != nil {
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-			return
-		}
-		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.AddExternalEffect(e)
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-		}
-	}
+	// CGContext.cpp:399–404 — only accum + effect_stm (not Function::feffect)
 }
 
 // AddVisibleEffect mirrors CGContext::add_visible_effect with current block.
@@ -514,17 +465,7 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 		SetError(ErrGeneric)
 		return
 	}
-	if c.CurrentFunc != nil {
-		// FEffect remains global-external summary for the function
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-			return
-		}
-		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.AddExternalEffect(e)
-		if !EffectComplete(c.CurrentFunc.FEffect) {
-			SetError(ErrGeneric)
-		}
-	}
+	// CGContext.cpp:411–417 — only accum + effect_stm (not Function::feffect)
 }
 
 // AddEffect mirrors CGContext::add_effect — fold into accum and effect_stm.
@@ -903,24 +844,11 @@ func (c *CGContext) ReadVar(v *Variable) {
 		}
 	}
 	c.EffectStm = c.EffectStm.ReadVar(v)
-	// residual ERROR sticky — no invent soft-continue FEffect past stm ReadVar residual
+	// residual ERROR sticky — no invent soft-continue past stm ReadVar residual
 	if HasError() {
 		return
 	}
-	if c.CurrentFunc != nil && v.IsGlobal() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
-		if HasError() {
-			return
-		}
-		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
-		// residual ERROR sticky — no invent soft-complete read past FEffect ReadVar residual
-		if HasError() {
-			return
-		}
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
-		return
-	}
+	// CGContext.cpp:175–185 — not Function::feffect (only at GenerateBody end)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
 		SetError(ErrGeneric)
 	}
@@ -972,24 +900,11 @@ func (c *CGContext) WriteVar(v *Variable) {
 		}
 	}
 	c.EffectStm = c.EffectStm.WriteVar(v)
-	// residual ERROR sticky — no invent soft-continue FEffect past stm WriteVar residual
+	// residual ERROR sticky — no invent soft-continue past stm WriteVar residual
 	if HasError() {
 		return
 	}
-	if c.CurrentFunc != nil && v.IsGlobal() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual hole
-		if HasError() {
-			return
-		}
-		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
-		// residual ERROR sticky — no invent soft-complete write past FEffect WriteVar residual
-		if HasError() {
-			return
-		}
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-skip FEffect past IsGlobal residual false
-		return
-	}
+	// CGContext.cpp:307–317 — not Function::feffect (only at GenerateBody end)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
 		SetError(ErrGeneric)
 	}

@@ -1404,54 +1404,79 @@ func (e Effect) IsWrittenByName(name string) bool {
 	return false
 }
 
-// CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
-// Effect.cpp:507–529 — " * reads :" / " * writes:" lists.
-// Write names sorted for deterministic emit (Go map iteration is random).
-// Incomplete effect / nil key fails closed sticky as empty comment (no invent partial list).
+// CommentOutput mirrors Effect::Output + OutputMgr::output_comment_line.
+// Effect.cpp:507–529 — insertion-order read_vars/write_vars via OutputForComment;
+// then output_comment_line wraps "/* " + body + " */\n" (OutputMgr.cpp:314–320).
+// Incomplete effect / nil var fails closed sticky empty (no invent partial list).
 func (e Effect) CommentOutput() string {
 	if e.incomplete {
 		SetError(ErrGeneric)
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString("/*\n")
-	b.WriteString(" * reads :")
-	rnames := make([]string, 0, len(e.read))
+	// nil map keys incomplete sticky (no invent skip as absent / partial comment)
 	for v := range e.read {
-		// Effect.cpp: names from live Variable*; no invent blank tokens for empty Name
 		if v == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
-		if e.read[v] && v.Name != "" {
-			rnames = append(rnames, v.Name)
-		}
 	}
-	sort.Strings(rnames)
-	for _, n := range rnames {
-		b.WriteString(" ")
-		b.WriteString(n)
-	}
-	b.WriteString("\n")
-	b.WriteString(" * writes:")
-	names := make([]string, 0, len(e.written))
 	for v := range e.written {
 		if v == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
-		if e.written[v] && v.Name != "" {
-			names = append(names, v.Name)
+	}
+	// Effect.cpp:512–527 — body begins with newline then " * reads :" / " * writes:"
+	var ss strings.Builder
+	ss.WriteString("\n")
+	ss.WriteString(" * reads :")
+	reads := e.ReadVars()
+	// residual ERROR sticky — no invent soft-list past ReadVars residual
+	if HasError() {
+		return ""
+	}
+	if !VariablesComplete(reads) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	for _, v := range reads {
+		// Effect.cpp:518 — Variable::OutputForComment → get_actual_name()
+		name := v.OutputForComment(false)
+		if HasError() {
+			return ""
 		}
+		if name == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		ss.WriteString(" ")
+		ss.WriteString(name)
 	}
-	sort.Strings(names)
-	for _, n := range names {
-		b.WriteString(" ")
-		b.WriteString(n)
+	ss.WriteString("\n")
+	ss.WriteString(" * writes:")
+	writes := e.WrittenVars()
+	if HasError() {
+		return ""
 	}
-	b.WriteString("\n")
-	b.WriteString(" */\n")
-	return b.String()
+	if !VariablesComplete(writes) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	for _, v := range writes {
+		name := v.OutputForComment(false)
+		if HasError() {
+			return ""
+		}
+		if name == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		ss.WriteString(" ")
+		ss.WriteString(name)
+	}
+	ss.WriteString("\n")
+	// OutputMgr.cpp:318 — "/* " + comment + " */" + newline
+	return OutputCommentLine(ss.String(), false, false)
 }
 
 // MergeEffects combines two post-branch effects (union of reads/writes; SE-free only if both are).

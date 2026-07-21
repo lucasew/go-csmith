@@ -57,6 +57,8 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 }
 
 func TestBuildUserInvocationMergesFEffect(t *testing.T) {
+	// CGContext::add_external_effect merges into accum/stm only (not caller feffect).
+	// Function.cpp:657 finalizes caller feffect from map_stm_effect[body].
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
@@ -68,10 +70,10 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	cg.EffectAccum = &eff
 	_ = BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if !eff.IsWritten(g) {
-		t.Fatal("external write")
+		t.Fatal("external write into accum")
 	}
-	if !caller.FEffect.IsWritten(g) {
-		t.Fatal("feffect")
+	if caller.FEffect.IsWritten(g) {
+		t.Fatal("built-callee call must not invent mid-call into caller FEffect")
 	}
 }
 

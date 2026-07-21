@@ -5,7 +5,9 @@ import (
 	"testing"
 )
 
-func TestNoteWriteUpdatesFEffect(t *testing.T) {
+func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
+	// CGContext::write_var does not update Function::feffect (Function.cpp:657
+	// finalizes via map_stm_effect[body] only).
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
@@ -13,11 +15,16 @@ func TestNoteWriteUpdatesFEffect(t *testing.T) {
 	l := CreateVariableQfer("l_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg.NoteWrite(g)
 	cg.NoteWrite(l)
+	if f.FEffect.IsWritten(g) || f.FEffect.IsWritten(l) {
+		t.Fatal("NoteWrite must not invent mid-generation feffect updates")
+	}
+	// ComputeSummary still records globals from body effect
+	f.ComputeSummary(EmptyEffect().WriteVar(g))
 	if !f.FEffect.IsWritten(g) {
-		t.Fatal("global write")
+		t.Fatal("ComputeSummary must add external global write")
 	}
 	if f.FEffect.IsWritten(l) {
-		t.Fatal("local should not be in feffect")
+		t.Fatal("local must not enter feffect via AddExternalEffect")
 	}
 	_ = opts
 }
@@ -49,5 +56,33 @@ func TestGenerateHasEffectComments(t *testing.T) {
 	// at least some function comments with writes (if any globals written)
 	if !strings.Contains(out, " * writes:") {
 		t.Log("no write comments — possible if no global assigns")
+	}
+}
+
+func TestCommentOutputInsertionOrderAndFormat(t *testing.T) {
+	// Effect.cpp:507–529 — vector order; OutputMgr.cpp:318 — "/* " wrap
+	ClearError()
+	a := CreateVariableQfer("g_a", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	b := CreateVariableQfer("g_b", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	c := CreateVariableQfer("g_c", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	// insert b then a then c — not alphabetical
+	eff := EmptyEffect().ReadVar(b).ReadVar(a).ReadVar(c).WriteVar(c).WriteVar(a)
+	out := eff.CommentOutput()
+	if HasError() {
+		t.Fatal("complete CommentOutput sticky")
+	}
+	wantReads := " * reads : g_b g_a g_c"
+	wantWrites := " * writes: g_c g_a"
+	if !strings.Contains(out, wantReads) {
+		t.Fatalf("reads order: %q", out)
+	}
+	if !strings.Contains(out, wantWrites) {
+		t.Fatalf("writes order: %q", out)
+	}
+	if strings.Contains(out, "g_a g_b g_c") {
+		t.Fatal("must not sort alphabetically")
+	}
+	if !strings.HasPrefix(out, "/* \n") || !strings.HasSuffix(out, " */\n") {
+		t.Fatalf("output_comment_line wrap: %q", out)
 	}
 }

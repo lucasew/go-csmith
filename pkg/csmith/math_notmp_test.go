@@ -92,10 +92,11 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 }
 
 func TestNoteReadTracksGlobal(t *testing.T) {
+	// NoteRead does not update feffect (Function.cpp:657 finalizes from body map).
+	// CommentOutput uses insertion-order read_vars via OutputForComment.
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
 	g := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	cg.NoteRead(g)
+	f.FEffect = f.FEffect.ReadVar(g)
 	if !f.FEffect.IsRead(g) {
 		t.Fatal("read")
 	}
@@ -103,22 +104,21 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	if !strings.Contains(out, "reads :") || !strings.Contains(out, "g_1") {
 		t.Fatal(out)
 	}
-	// no invent blank name tokens in reads/writes lists
+	// format: output_comment_line wraps body starting with newline
+	if !strings.HasPrefix(out, "/* \n * reads :") {
+		t.Fatal("want /* + newline + reads, got", out[:40])
+	}
+	// empty actual name sticky fail closed (OutputForComment — no invent blank token)
 	anon := &Variable{Type: GetIntType()}
-	eff := EmptyEffect().ReadVar(anon).WriteVar(g)
-	c := eff.CommentOutput()
-	if strings.Contains(c, "reads :  ") || strings.Contains(c, "reads :\n") {
-		// empty name skipped; only g_1 on writes
+	ClearError()
+	c := EmptyEffect().ReadVar(anon).WriteVar(g).CommentOutput()
+	if c != "" || !HasError() {
+		t.Fatal("empty-name read must fail closed CommentOutput", c)
 	}
-	if strings.Contains(c, "reads : ") && !strings.Contains(c, "g_1") {
-		// reads list should not invent empty token alone with spurious content
-	}
-	if strings.Count(c, "writes:") != 1 || !strings.Contains(c, "g_1") {
-		t.Fatal(c)
-	}
-	// reads of empty name only → no blank token after colon beyond single space path
+	ClearError()
 	onlyAnon := EmptyEffect().ReadVar(anon).CommentOutput()
-	if strings.Contains(onlyAnon, "reads :  ") {
-		t.Fatal("empty name must not invent blank read token", onlyAnon)
+	if onlyAnon != "" || !HasError() {
+		t.Fatal("empty name only must fail closed", onlyAnon)
 	}
+	ClearError()
 }
