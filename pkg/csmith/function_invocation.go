@@ -842,12 +842,40 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
+		// FunctionInvocationUser.cpp:206 — fm->global_facts = caller_fm->global_facts
+		// C++ FactVec includes eUnionWrite; Go splits UnionFacts from GlobalFacts.
+		// Incomplete caller UnionFacts fail closed sticky (no invent empty-complete handover).
+		if !UnionFactsComplete(callerFM.UnionFacts) {
+			SetError(ErrGeneric)
+			fi.Failed = true
+			return fi
+		}
+		calFM.UnionFacts = CloneUnionFactSlice(callerFM.UnionFacts)
+		if HasError() || !UnionFactsComplete(calFM.UnionFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			fi.Failed = true
+			return fi
+		}
 	}
 	calFM.CallerToCalleeHandover(fi.Args, &facts)
 	// residual ERROR sticky — no invent soft-handover past CallerToCallee residual
 	if HasError() {
 		fi.Failed = true
 		return fi
+	}
+	// FactMgr.cpp:324–353 — partition drops non-kept subjects of all Fact categories.
+	// Filter UnionFacts after PT partition so globals/params/transitive pointees remain.
+	if callerFM != nil {
+		calFM.FilterUnionFactsForHandover(facts)
+		if HasError() || !UnionFactsComplete(calFM.UnionFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			fi.Failed = true
+			return fi
+		}
 	}
 	calFM.SetGlobalFacts(facts, "auto_function_invocation_832")
 
@@ -914,6 +942,30 @@ func BuildInvocationAndFunction(
 		_ = RenewFacts(&callerFM.GlobalFacts, retFacts)
 		if !FactsComplete(callerFM.GlobalFacts) {
 			SetError(ErrGeneric)
+			fi.Failed = true
+			return fi
+		}
+		// FunctionInvocationUser.cpp:221 — ret_facts also carry eUnionWrite from
+		// map_facts_out[body] after remove_function_local_facts. Go maps are PT-only;
+		// renew global UnionFacts from callee live lattice (globals only).
+		if !UnionFactsComplete(callerFM.UnionFacts) || !UnionFactsComplete(calFM.UnionFacts) {
+			SetError(ErrGeneric)
+			fi.Failed = true
+			return fi
+		}
+		retUF := GlobalUnionFactsOnly(calFM.UnionFacts)
+		if !UnionFactsComplete(retUF) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			fi.Failed = true
+			return fi
+		}
+		_ = RenewUnionFacts(&callerFM.UnionFacts, retUF)
+		if !UnionFactsComplete(callerFM.UnionFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			fi.Failed = true
 			return fi
 		}

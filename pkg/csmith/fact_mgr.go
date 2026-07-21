@@ -2442,7 +2442,8 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 }
 
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
-// FactMgr.cpp:141–172 — drop facts for oos vars; mark pointees garbage.
+// FactMgr.cpp:141–172 — drop facts for oos vars (all Fact categories incl. eUnionWrite);
+// mark pointees garbage.
 // Delegates to package UpdateFactsForOOSVars (fail closed on fact/var holes).
 // FactMgr always live; sticky (no invent soft-skip OOS update past hole).
 // Empty vars is complete no-op.
@@ -2458,6 +2459,114 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 	facts := fm.GlobalFacts
 	UpdateFactsForOOSVars(vars, &facts)
 	fm.SetGlobalFacts(facts, "auto_fact_mgr_2437")
+	// FactMgr.cpp:143–156 — erase any fact whose subject matches OOS var (FactUnion too).
+	// Go keeps UnionFacts separate from GlobalFacts (point-to only).
+	UpdateUnionFactsForOOSVars(vars, &fm.UnionFacts)
+}
+
+// UpdateUnionFactsForOOSVars drops FactUnion subjects matching OOS vars.
+// FactMgr.cpp:143–156 — match(f->get_var()) erase (category-agnostic).
+// Incomplete maps / vars fail closed sticky IncompleteUnionFactSlice.
+func UpdateUnionFactsForOOSVars(vars []*Variable, facts *[]*FactUnion) {
+	if facts == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if len(vars) == 0 {
+		return
+	}
+	if !UnionFactsComplete(*facts) {
+		*facts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	for _, v := range vars {
+		if v == nil {
+			*facts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+	}
+	out := make([]*FactUnion, 0, len(*facts))
+	for _, f := range *facts {
+		drop := false
+		for _, v := range vars {
+			if v.Match(f.Var) {
+				if HasError() {
+					*facts = IncompleteUnionFactSlice()
+					return
+				}
+				drop = true
+				break
+			}
+			if HasError() {
+				*facts = IncompleteUnionFactSlice()
+				return
+			}
+		}
+		if !drop {
+			out = append(out, f)
+		}
+	}
+	*facts = out
+}
+
+// FilterUnionFactsForHandover keeps FactUnion subjects that survive caller_to_callee
+// partition (FactMgr.cpp:324–353): globals, params, or pointees of kept point-to facts.
+// FunctionInvocationUser.cpp:206 assigns full FactVec then handover partitions it.
+// Must run after CallerToCalleeHandover so keepPT is the post-partition lattice.
+// Incomplete maps fail closed sticky IncompleteUnionFactSlice on fm.UnionFacts.
+func (fm *FactMgr) FilterUnionFactsForHandover(keepPT []*FactPointTo) {
+	if fm == nil || fm.Func == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if !UnionFactsComplete(fm.UnionFacts) {
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	if !FactsComplete(keepPT) {
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	if !VariablesComplete(fm.Func.Param) {
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	out := make([]*FactUnion, 0, len(fm.UnionFacts))
+	for _, uf := range fm.UnionFacts {
+		v := uf.Var
+		isG := v.IsGlobal()
+		if HasError() {
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			return
+		}
+		keep := isG || IsVariableInSet(fm.Func.Param, v)
+		if HasError() {
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			return
+		}
+		if !keep {
+			for _, pt := range keepPT {
+				ptOK := pt.PointsTo(v)
+				if HasError() {
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					return
+				}
+				if ptOK {
+					keep = true
+					break
+				}
+			}
+		}
+		if keep {
+			out = append(out, uf)
+		}
+	}
+	fm.UnionFacts = out
 }
 
 // AddParamFacts mirrors FactMgr::add_param_facts.

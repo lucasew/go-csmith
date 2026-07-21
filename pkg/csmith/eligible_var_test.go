@@ -236,8 +236,8 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	// IsInsideUnionField on Type-nil parent stickies residual true
 	parent.Type = nil
 	cg := EmptyCGContext().WithFactMgr(fm)
-	// plant a fact so len(facts)!=0 — empty UnionFacts soft-returns not nonreadable
-	// Use non-empty incomplete-complete facts with live union var
+	// plant a related FactUnion so IsNonreadableField walks Imply / ancestry
+	// (empty complete facts already nonreadable without residual walk)
 	uv := &Variable{Name: "g_u2", Type: ut}
 	fm.UnionFacts = []*FactUnion{{Var: uv, LastWrittenFID: 0}}
 	if IsEligibleVar(field, 0, AccessRead, cg) {

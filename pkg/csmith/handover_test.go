@@ -101,6 +101,118 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	ClearError()
 }
 
+func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
+	// FunctionInvocationUser.cpp:206 — global_facts = caller includes eUnionWrite;
+	// FactMgr.cpp:324–353 — partition keeps globals/params, drops pure stack subjects.
+	ClearError()
+	defer ClearError()
+	callee := &Function{Name: "c", ReturnType: GetIntType()}
+	fm := NewFactMgr(callee)
+
+	// global union — must survive handover filter
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
+	if ut == nil || len(ut.Fields) < 1 {
+		t.Skip("union type")
+	}
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if gu == nil {
+		t.Fatal("global union var")
+	}
+	// local union — dropped unless pointed-to by kept PT
+	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if lu == nil {
+		t.Fatal("local union var")
+	}
+	fm.UnionFacts = []*FactUnion{
+		MakeFactUnion(gu, 0),
+		MakeFactUnion(lu, 0),
+	}
+	// empty keepPT (no transitive) — only globals/params
+	fm.FilterUnionFactsForHandover([]*FactPointTo{})
+	if !UnionFactsComplete(fm.UnionFacts) {
+		t.Fatal("complete handover filter must stay complete", fm.UnionFacts)
+	}
+	if FindRelatedUnion(fm.UnionFacts, gu) == nil {
+		t.Fatal("global union FactUnion must survive handover")
+	}
+	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
+		t.Fatal("stack-only union FactUnion must drop on handover", fm.UnionFacts)
+	}
+	if HasError() {
+		t.Fatal("complete FilterUnionFactsForHandover must not sticky")
+	}
+
+	// transitive: global pointer to local union keeps local FactUnion
+	ClearError()
+	fm2 := NewFactMgr(callee)
+	gp := CreateVariableScalars("g_p", PointerTo(ut), true, false)
+	fm2.UnionFacts = []*FactUnion{MakeFactUnion(lu, 1)}
+	keepPT := []*FactPointTo{MakeFactPointTo(gp, lu)}
+	fm2.FilterUnionFactsForHandover(keepPT)
+	if FindRelatedUnion(fm2.UnionFacts, lu) == nil {
+		t.Fatal("pointee local union FactUnion must survive transitive keep", fm2.UnionFacts)
+	}
+
+	// Clone + renew round-trip (FunctionInvocationUser.cpp:206 + 221)
+	ClearError()
+	callerUF := []*FactUnion{MakeFactUnion(gu, 0)}
+	cloned := CloneUnionFactSlice(callerUF)
+	if len(cloned) != 1 || FindRelatedUnion(cloned, gu) == nil {
+		t.Fatal("CloneUnionFactSlice", cloned)
+	}
+	// callee wrote field 1 on global
+	retUF := []*FactUnion{MakeFactUnion(gu, 1)}
+	if !RenewUnionFacts(&callerUF, retUF) {
+		t.Fatal("RenewUnionFacts should change")
+	}
+	if FindRelatedUnion(callerUF, gu).LastWrittenFID != 1 {
+		t.Fatal("renew last-write", callerUF)
+	}
+	// GlobalUnionFactsOnly drops locals
+	mixed := []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	onlyG := GlobalUnionFactsOnly(mixed)
+	if FindRelatedUnion(onlyG, gu) == nil || FindRelatedUnion(onlyG, lu) != nil {
+		t.Fatal("GlobalUnionFactsOnly", onlyG)
+	}
+}
+
+func TestUpdateUnionFactsForOOSVars(t *testing.T) {
+	// FactMgr.cpp:143–156 — OOS erase by subject match (FactUnion category too).
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
+	if ut == nil {
+		t.Skip("union")
+	}
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	facts := []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	UpdateUnionFactsForOOSVars([]*Variable{lu}, &facts)
+	if FindRelatedUnion(facts, gu) == nil || FindRelatedUnion(facts, lu) != nil {
+		t.Fatal("OOS must drop local keep global", facts)
+	}
+	if HasError() {
+		t.Fatal("complete OOS must not sticky")
+	}
+	// FM path also drops UnionFacts
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	fm.UpdateFactsForOOSVars([]*Variable{lu})
+	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
+		t.Fatal("FM OOS must drop UnionFacts for OOS var", fm.UnionFacts)
+	}
+	ClearError()
+}
+
 func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVariableInSet false → drop param from keep
 	// fair: VariablesComplete Param fails closed nil inputs sticky

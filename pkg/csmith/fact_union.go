@@ -383,6 +383,112 @@ func IncompleteUnionFactSlice() []*FactUnion {
 	return []*FactUnion{nil}
 }
 
+// CloneUnionFactSlice shallow-copies a complete FactUnion* vector (C++ Fact* vector copy).
+// FunctionInvocationUser.cpp:206 — global_facts = caller_fm->global_facts includes eUnionWrite.
+// Incomplete maps fail closed sticky IncompleteUnionFactSlice (no invent cleaned partial).
+func CloneUnionFactSlice(facts []*FactUnion) []*FactUnion {
+	if facts == nil {
+		return nil
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	out := make([]*FactUnion, len(facts))
+	copy(out, facts)
+	return out
+}
+
+// RenewUnionFact mirrors renew_fact for FactUnion (Fact.cpp:178–201).
+// Related subject replaced; else append. Incomplete maps fail closed sticky wipe.
+func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
+	if facts == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if nf == nil || nf.Var == nil {
+		*facts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return false
+	}
+	if !UnionFactsComplete(*facts) {
+		*facts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return false
+	}
+	for i, f := range *facts {
+		if f.Var == nf.Var {
+			if f.Equal(nf) {
+				if HasError() {
+					*facts = IncompleteUnionFactSlice()
+					return false
+				}
+				return false
+			}
+			if HasError() {
+				*facts = IncompleteUnionFactSlice()
+				return false
+			}
+			(*facts)[i] = nf
+			return true
+		}
+	}
+	*facts = append(*facts, nf)
+	return true
+}
+
+// RenewUnionFacts mirrors renew_facts for FactUnion (Fact.cpp:222–229).
+// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts) includes eUnionWrite.
+func RenewUnionFacts(facts *[]*FactUnion, newFacts []*FactUnion) bool {
+	if facts == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !UnionFactsComplete(*facts) || !UnionFactsComplete(newFacts) {
+		*facts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return false
+	}
+	changed := false
+	for _, nf := range newFacts {
+		if RenewUnionFact(facts, nf) {
+			if HasError() {
+				*facts = IncompleteUnionFactSlice()
+				return false
+			}
+			changed = true
+		} else if HasError() {
+			*facts = IncompleteUnionFactSlice()
+			return false
+		}
+	}
+	return changed
+}
+
+// GlobalUnionFactsOnly keeps FactUnion subjects that are global.
+// FactMgr::remove_function_local_facts drops stack/other-RV; ret_facts for renew
+// are body map_facts_out after that filter — global union last-writes remain.
+func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
+	if facts == nil {
+		return nil
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	out := make([]*FactUnion, 0, len(facts))
+	for _, f := range facts {
+		isG := f.Var.IsGlobal()
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		if isG {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // IsFieldReadable mirrors FactUnion::is_field_readable.
 // FactUnion.cpp:262–270.
 // Incomplete facts fail closed sticky false (no invent readable past UnionFacts hole).
@@ -436,8 +542,9 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 }
 
 // IsNonreadableField mirrors FactUnion::is_nonreadable_field.
-// FactUnion.cpp:178–192 — when analysis active (facts non-empty), unread union fields blocked.
-// When facts empty, returns false (analysis not engaged).
+// FactUnion.cpp:178–192 — inside union field: nonreadable if no related FactUnion
+// or last-write does not imply this field (fu == nullptr || !tmp.imply(*fu)).
+// Empty complete facts ⇒ no related fact ⇒ nonreadable (same as C++ find_related null).
 // Variable always live; sticky nonreadable (no invent readable soft-skip past hole).
 // Incomplete FactUnion maps fail closed nonreadable (no invent readable while
 // FindRelatedUnion returns nil past a hole before a matching parent fact).
@@ -456,10 +563,6 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	// residual ERROR sticky — no invent soft-continue nonreadable past IsInsideUnion residual true path
 	if HasError() {
 		return true
-	}
-	if len(facts) == 0 {
-		// no FactUnion tracking yet — do not ban all union fields
-		return false
 	}
 	if !UnionFactsComplete(facts) {
 		// incomplete union map sticky nonreadable (no invent readable past hole)

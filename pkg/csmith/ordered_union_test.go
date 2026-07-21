@@ -107,10 +107,14 @@ func TestIsNonreadableField(t *testing.T) {
 		t.Skip("fields")
 	}
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
-	// empty facts → not blocked
-	if IsNonreadableField(f1, nil) {
-		t.Fatal("empty")
+	// FactUnion.cpp:188–189 — fu == nullptr → nonreadable (empty complete map)
+	if !IsNonreadableField(f1, nil) {
+		t.Fatal("empty complete facts: no related FactUnion → nonreadable")
 	}
+	if HasError() {
+		t.Fatal("empty complete path must not sticky")
+	}
+	ClearError()
 	// Variable always live; sticky nonreadable (no invent readable soft-skip)
 	ClearError()
 	if !IsNonreadableField(nil, nil) {
