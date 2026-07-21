@@ -325,3 +325,33 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	}
 	ClearError()
 }
+
+// StatementAssign.cpp:151–152 / 172–174 — after RHS quals, only accept_stricter=true.
+// set_const(false) is NOT applied here; Lhs::make_random Select calls restrict(WRITE)
+// which clears const. Early SetConst would change AcceptStricter matching for pointer Lhs
+// (seed-2 func_11 Lhs Select vs UP).
+func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	// Simulate RHS qualifiers: const int
+	rhsQ := NewCVQualifiers([]bool{true}, []bool{false})
+	// What StatementAssign does for !callerQf after expressionQualifiers:
+	qfer := rhsQ
+	qfer.AcceptStricter = true
+	// Must NOT clear const here (C++ does not).
+	if !qfer.IsConsts[0] {
+		t.Fatal("const bit from RHS must remain until Lhs restrict(WRITE)")
+	}
+	if !qfer.AcceptStricter {
+		t.Fatal("want AcceptStricter")
+	}
+	// Lhs Select path: Restrict WRITE clears const
+	qfer.Restrict(AccessWrite, EmptyCGContext())
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if qfer.IsConsts[0] {
+		t.Fatal("restrict(WRITE) must clear const")
+	}
+}

@@ -241,9 +241,11 @@ func MakeRandomAssignQfer(
 		if !callerQf {
 			if q := expressionQualifiers(rhs); q != nil {
 				qfer = *q
-				// StatementAssign.cpp:154–155 — accept_stricter; LHS not const
+				// StatementAssign.cpp:151–152 — accept_stricter only.
+				// Do not SetConst(false) here: C++ leaves const bits from RHS quals;
+				// Lhs::make_random Select path calls restrict(WRITE) → set_const(false).
+				// Early SetConst desyncs AcceptStricter matching for pointer Lhs.
 				qfer.AcceptStricter = true
-				qfer.SetConst(false, 0)
 			}
 		}
 		if op != AssignSimple {
@@ -289,9 +291,10 @@ func MakeRandomAssignQfer(
 		if !callerQf {
 			if q := expressionQualifiers(rhs); q != nil {
 				qfer = *q
-				// StatementAssign.cpp:172–174
+				// StatementAssign.cpp:172–174 — accept_stricter only (no set_const).
+				// Lhs Select restrict(WRITE) clears const; early SetConst unfairly
+				// changes AcceptStricter matching for multi-level pointer Lhs.
 				qfer.AcceptStricter = true
-				qfer.SetConst(false, 0)
 			}
 		}
 		if op != AssignSimple {
