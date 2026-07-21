@@ -639,6 +639,49 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		}
 		return
 	}
+	// Go split maps: FindFixedPointBlock SetMapFactsIn(pt) pairs live mid-gen
+	// UnionFacts into map_facts_in (empty body after deleted for-IVs — seed-999
+	// g_605 last_written=4; seed-7 choose pools shrunk by IsNonreadableField).
+	// C++ set_fact_in(current_inputs) keeps the entry FactVec. preUnion is the
+	// eUnionWrite half of pre_facts after make_iteration (StatementFor.cpp:299).
+	// Restore that partition, then makeup_new_var_facts for subjects created
+	// during the body (FactMgr.cpp:494–508) so new globals keep init facts.
+	if !body.MustReturn() && UnionFactsComplete(preUnion) {
+		liveSnap := CloneUnionFactSlice(fm.UnionFacts)
+		if HasError() || !UnionFactsComplete(liveSnap) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		cl := CloneUnionFactSlice(preUnion)
+		if HasError() || !UnionFactsComplete(cl) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		if cl == nil {
+			cl = []*FactUnion{}
+		}
+		if !makeupNewUnionFacts(&cl, liveSnap) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		fm.UnionFacts = cl
+		ptIn := fm.GetMapFactsIn(body.StmID)
+		if FactsComplete(ptIn) {
+			fm.SetMapFactsInPair(body.StmID, ptIn, cl)
+		}
+	}
 	if body.MustReturn() {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
 		if HasError() {
