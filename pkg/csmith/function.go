@@ -222,7 +222,7 @@ func MakeRandomSignature(
 		SetError(ErrGeneric)
 		return nil
 	}
-	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType}
+	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
 	// rv dummy: CVQualifiers::random_qualifiers(type, READ, cg, true) if qfer nil;
 	// else qfer->random_qualifiers(true, READ, cg) (Function.cpp:416–418).
 	var retQ CVQualifiers
@@ -374,7 +374,7 @@ func MakeFirst(
 		SetError(ErrGeneric)
 		return nil
 	}
-	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}
+	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
 	// Function.cpp:452–453 — CVQualifiers::random_qualifiers(ty); ERROR_GUARD
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	if HasError() {

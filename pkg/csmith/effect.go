@@ -44,6 +44,23 @@ func EmptyEffect() Effect {
 	return Effect{pure: true, sideEffectFree: true}
 }
 
+// normalizeEmptyFlags mirrors C++ Effect::Effect() defaults for a value with no
+// recorded reads/writes. Go's zero Effect has pure=false and sideEffectFree=false
+// (bool zero), unlike C++ which default-constructs pure=true and side_effect_free=true
+// (Effect.cpp:77). Function::accum_eff_context / feffect rely on that empty state;
+// zero-value AccumEffContext poisoned BUILD revisit (seed-2 func_49 volatile writes
+// rejected when effect_context was not SE-free / first_div e37241).
+func (e Effect) normalizeEmptyFlags() Effect {
+	if e.incomplete {
+		return e
+	}
+	if len(e.readOrder) == 0 && len(e.writeOrder) == 0 {
+		e.pure = true
+		e.sideEffectFree = true
+	}
+	return e
+}
+
 // IncompleteEffect is the fail-closed incomplete effect marker.
 // EffectComplete returns false. Distinct from EmptyEffect (complete empty).
 // Use when merge/write-set hits nil holes so callers cannot invent empty-complete
@@ -160,7 +177,7 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 			return IncompleteEffect()
 		}
 	}
-	out := e
+	out := e.normalizeEmptyFlags()
 	for _, v := range reads {
 		if v.IsGlobal() {
 			// residual ERROR sticky — no invent soft-continue merge past IsGlobal hole
