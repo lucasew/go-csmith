@@ -609,9 +609,32 @@ func (b *Block) AppendNestedLoop(
 		}
 	}
 	cg.ClearEffectStm()
-	// Block.cpp:424 — Statement::make_random(eFor); ERROR_GUARD(nullptr)
+	// Block.cpp:424 — Statement::make_random(cg_context, eFor)
+	// Statement.cpp:267–269 / 306–308 — compound eFor bumps blk_depth around factory.
+	// Calling MakeRandomFor alone skipped that bump so nested-loop bodies ran one
+	// BlkDepth too shallow (seed-4 first body-diff: UP blk=5 vs GO blk=3 at e11119).
+	preEffect := EmptyEffect()
+	if cg.EffectAccum != nil {
+		if !EffectComplete(*cg.EffectAccum) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		preEffect = cg.EffectAccum.Clone()
+		if HasError() {
+			return nil
+		}
+	}
+	cg.BlkDepth++
 	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
+	cg.BlkDepth--
+	// Statement.cpp:309 ERROR_GUARD; 314–316 null without error not re-picked here
+	// (append_nested_loop only tries once).
 	if st == nil || HasError() || !stmtOK(*st) {
+		return nil
+	}
+	// Statement.cpp:320 — post_creation_analysis after make_random(eFor)
+	PostCreationAnalysis(st, preFacts, preEffect, cg, opts)
+	if HasError() {
 		return nil
 	}
 	if StmIDUnset(st.StmID) {

@@ -1221,6 +1221,38 @@ func TestBlockProbabilityUniformNotAlwaysMax(t *testing.T) {
 	}
 }
 
+func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
+	// Block.cpp:424 Statement::make_random(eFor) → Statement.cpp:272–274 / 315–317
+	// compound eFor increments blk_depth for the nested body, restores after.
+	// Without the bump, body statements see parent depth (seed-4 e11119: GO blk=3 vs UP blk=5).
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockDepth = 5
+	opts.MaxBlockSize = 1
+	// Minimal process tables so MakeRandomFor can run or fail cleanly
+	prevStmt := ProcessStmtTab()
+	SetProcessStmtTab(InitProbabilityTable(opts))
+	defer SetProcessStmtTab(prevStmt)
+
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	b := &Block{Looping: true, Func: f, StmID: 1}
+	f.Stack = []*Block{b}
+	f.Blocks = []*Block{b}
+	cg := WithFunc(f, EmptyEffect())
+	cg.BlkDepth = 2
+	cg.Flags |= FlagInLoop
+	// FM required by MakeRandomFor
+	cg.FM = NewFactMgr(f)
+
+	pre := cg.BlkDepth
+	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	// Whether for succeeds or null-fails, outer depth must restore (Statement.cpp:315–317).
+	if cg.BlkDepth != pre {
+		t.Fatalf("AppendNestedLoop must restore BlkDepth: got %d want %d", cg.BlkDepth, pre)
+	}
+	ClearError()
+}
+
 func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	// Block.cpp:425 ERROR_GUARD after make for
 	ClearError()
