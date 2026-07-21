@@ -2161,7 +2161,26 @@ func (v *Variable) CreateFieldVars() {
 		if f.BitWidth == 0 {
 			continue
 		}
-		fname := v.Name + ".f" + itoa(j)
+		// Variable.cpp:350–355 — if isArray: Output(ss) (ArrayVariable::Output → name[idx]…);
+		// else name. Then ".f"<<j. Field of itemized array is g_42[1].f0 not g_42.f0.
+		base := v.Name
+		if v.IsArray {
+			if v.AsArray == nil {
+				// isArray without ArrayVariable* shell — fail closed
+				fail()
+				return
+			}
+			base = v.AsArray.OutputAccess()
+			if HasError() || base == "" {
+				fail()
+				return
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-name past IsArray residual false
+			fail()
+			return
+		}
+		fname := base + ".f" + itoa(j)
 		j++
 		// CVQualifiers length = IndirectLevel+1 (pointer levels + storage).
 		// Empty field qfer → all-false at each level (no invent 1-bool then SanityCheck fail

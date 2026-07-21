@@ -669,11 +669,12 @@ func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
 }
 
 func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
-	// ArrayVariable.cpp:261–264 — itemize expands field vars for aggregate element type
+	// ArrayVariable.cpp:261–264 / Variable.cpp:350–355 — itemize expands field vars;
+	// names use ArrayVariable::Output (name[idx]…) + ".fN", not bare collective name.
 	ClearError()
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: st, IsArray: true, ArraySizes: []int{3}},
@@ -687,9 +688,47 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	if len(item.FieldVars) != 2 {
 		t.Fatalf("field vars %d", len(item.FieldVars))
 	}
-	if item.FieldVars[0].Name != "g_a.f0" {
-		t.Fatal(item.FieldVars[0].Name)
+	// Variable.cpp:350–355 — isArray → Output(ss) then .f0 → e.g. g_a[1].f0
+	acc := item.OutputAccess()
+	want0 := acc + ".f0"
+	want1 := acc + ".f1"
+	if item.FieldVars[0].Name != want0 {
+		t.Fatalf("field0 name want %q got %q", want0, item.FieldVars[0].Name)
 	}
+	if item.FieldVars[1].Name != want1 {
+		t.Fatalf("field1 name want %q got %q", want1, item.FieldVars[1].Name)
+	}
+	// OutputC / GetActualName on field must carry indices (seed-5 g_42[1].f0)
+	if item.FieldVars[0].OutputC() != want0 {
+		t.Fatalf("field OutputC want %q got %q", want0, item.FieldVars[0].OutputC())
+	}
+	ClearError()
+}
+
+func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
+	// Variable.cpp:350–352 — isArray parent uses Output not bare name for field paths.
+	ClearError()
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetSimpleType(EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+	}}
+	item := &ArrayVariable{
+		Variable:  Variable{Name: "g_42", Type: st, IsArray: true, ArraySizes: []int{2}},
+		Sizes:     []int{2},
+		Indices:   []string{"1"},
+		Collective: &ArrayVariable{Variable: Variable{Name: "g_42"}, Sizes: []int{2}},
+	}
+	item.AsArray = item
+	item.CreateFieldVars()
+	if HasError() || len(item.FieldVars) != 1 {
+		t.Fatalf("fields err=%v n=%d", HasError(), len(item.FieldVars))
+	}
+	if item.FieldVars[0].Name != "g_42[1].f0" {
+		t.Fatalf("want g_42[1].f0 got %q", item.FieldVars[0].Name)
+	}
+	if item.FieldVars[0].OutputAddrOf(false) != "&g_42[1].f0" {
+		t.Fatalf("addr %q", item.FieldVars[0].OutputAddrOf(false))
+	}
+	ClearError()
 }
 
 func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
