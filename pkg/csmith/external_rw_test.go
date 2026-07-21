@@ -208,6 +208,49 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	ClearError()
 }
 
+// FunctionInvocation.cpp:536–541 — visit_facts builds
+//   CGContext new_context(cg, callee, effect_context, &fresh_accum)
+// before revisit. Parent CurrRHS / EffectAccum must not leak into nested body
+// visit (Lhs.cpp:318–328 overlap uses curr_rhs; effect_accum shares would
+// corrupt the outer StatementAssign analysis — seed-2 func_49 e37241).
+func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	g := CreateVariableScalars("g_overlap", GetIntType(), false, false)
+	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	// body: g_overlap = 1
+	st := Stmt{
+		Kind: StmtAssign, StmID: 51, AssignOp: AssignSimple,
+		LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+	}
+	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{st}}
+	_ = callee.ensurePairedFactMgr()
+	fi := &Invocation{User: callee}
+	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	blk := &Block{StmID: 1, Func: caller, LocalVars: nil}
+	caller.Stack = []*Block{blk}
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(caller))
+	cg.CurrentFunc = caller
+	// Outer assign-like pollution that must not reach nested Lhs visit.
+	outerEff := EmptyEffect().WriteVar(g)
+	cg.EffectAccum = &outerEff
+	cg.CurrRHS = &Expression{Term: TermVariable, Var: g, ExprType: GetIntType()}
+	// Ambient context already has g written — nested body write of g would fail
+	// CheckWriteVar if effect_context wrongly included that write via shared state.
+	// C++ new_context keeps parent effect_context (same ambient) but fresh accum.
+	// Ambient write of g makes body assign fail for both — so clear ambient, only pollute accum/rhs.
+	cg.effectContext = EmptyEffect()
+	if !VisitFactsInvocation(fi, &cg, Defaults()) {
+		t.Fatalf("nested revisit with polluted parent CurrRHS/accum must still ok; err=%v", HasError())
+	}
+	// Parent CurrRHS must remain set (new_context is a clone).
+	if cg.CurrRHS == nil || cg.CurrRHS.Var != g {
+		t.Fatal("parent CurrRHS must be unchanged after nested revisit")
+	}
+	ClearError()
+}
+
 func TestVisitFactsInvocationConflict(t *testing.T) {
 	// Legacy name kept: ambient write conflict on static path removed with always-revisit.
 	// Soft analysis fail remains non-sticky (RevisitUserInvocation ClearError on body fail).

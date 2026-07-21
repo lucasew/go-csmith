@@ -1049,8 +1049,29 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			SetError(ErrGeneric)
 			return false
 		}
+		// FunctionInvocation.cpp:536–541 —
+		//   Effect effect_accum;
+		//   CGContext new_context(cg_context, func_call->func,
+		//                         cg_context.get_effect_context(), &effect_accum);
+		//   ok = func_call->revisit(inputs, new_context);
+		// Must not pass the parent cg: parent EffectAccum/CurrRHS/CurrentFunc would
+		// pollute nested body visit (CheckRead/Write, call_chain) and falsely fail
+		// revisit under fresh param lattices (seed-2 func_49 visited=7 / e37241).
+		effectAccum := EmptyEffect()
+		newCG := cg.CloneSubcontext()
+		newCG.CurrentFunc = fi.User
+		newCG.EffectAccum = &effectAccum
+		newCG.EffectStm = EmptyEffect()
+		newCG.CurrRHS = nil
+		newCG.ExprDepth = 0
+		newCG.BlkDepth = 0
+		newCG.ExtendCallChain(*cg)
+		// residual ERROR sticky — no invent soft-revisit past ExtendCallChain residual
+		if HasError() {
+			return false
+		}
 		// FunctionInvocation.cpp:539–540 — revisit(inputs, new_context)
-		if !RevisitUserInvocation(fi, &cg.FM.GlobalFacts, cg, opts) {
+		if !RevisitUserInvocation(fi, &cg.FM.GlobalFacts, &newCG, opts) {
 			return false
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
@@ -1059,28 +1080,30 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		// FunctionInvocation.cpp:542–550 — assert(curr_blk); add_visible_effect(accum);
-		// feffect.add_external_effect(accum). Revisit already AddEffect(body map_stm_effect).
+		// FunctionInvocation.cpp:542–550 — assert(curr_blk);
+		// add_visible_effect(*new_context.get_effect_accum(), curr_blk);
+		// feffect.add_external_effect(*new_context.get_effect_accum(), call_chain).
+		// Revisit already folded body map_stm_effect into newCG.EffectAccum.
 		blk := cg.CurrentBlock()
 		if blk == nil {
 			SetError(ErrGeneric)
 			return false
 		}
-		vis := fi.User.FEffect
-		if fm := fi.User.PairedFactMgr(); fm != nil && fi.User.Body.StmID > 0 {
-			if be := fm.GetMapStmEffect(fi.User.Body.StmID); EffectComplete(be) {
-				vis = be
+		if !EffectComplete(effectAccum) {
+			if !HasError() {
+				SetError(ErrGeneric)
 			}
+			return false
 		}
-		cg.AddVisibleEffectAt(vis, blk)
+		cg.AddVisibleEffectAt(effectAccum, blk)
 		if HasError() {
 			return false
 		}
-		if !EffectComplete(fi.User.FEffect) || !EffectComplete(vis) {
+		if !EffectComplete(fi.User.FEffect) {
 			SetError(ErrGeneric)
 			return false
 		}
-		fi.User.FEffect = fi.User.FEffect.AddExternalEffectWithCallers(vis, cg.CallChain)
+		fi.User.FEffect = fi.User.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
 		if !EffectComplete(fi.User.FEffect) {
 			if !HasError() {
 				SetError(ErrGeneric)
