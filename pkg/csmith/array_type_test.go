@@ -183,13 +183,20 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 }
 
 func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
-	// FactMgr.cpp:84–104 — always push init fact into maps even when global_facts
-	// already has a related fact (caller new_globals handoff after RenewFacts).
+	// FactMgr.cpp:84–104 — always push *init* abstract into maps even when
+	// global_facts already has a related fact (caller new_globals handoff after
+	// RenewFacts). Must push the init abstract, not the existing related entry
+	// (seed-2: post-analysis g_87→g_62 must not be what maps receive — init
+	// g_87→g_64 is appended so for-body map_in restore can re-surface g_64).
 	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
+	tgt := CreateVariableScalars("g_tgt", GetIntType(), false, false)
 	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	// seed GlobalFacts as if RenewFacts already appended the subject
+	// init &g_tgt for abstract_fact_for_var_init
+	// ExprType pointer + Var int → IndirectLevel() == -1 (address-of)
+	g.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
+	// seed GlobalFacts as if RenewFacts already set a *different* points-to
 	fp := MakeFactPointTo(g, NullPtr)
 	if fp == nil {
 		t.Fatal("MakeFactPointTo")
@@ -203,17 +210,44 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	if HasError() {
 		t.Fatal("must not sticky when fact already present")
 	}
-	if FindRelatedPointTo(fm.MapFactsIn[sid], g) == nil {
-		t.Fatal("must push existing related fact into map_facts_in")
+	inF := FindRelatedPointTo(fm.MapFactsIn[sid], g)
+	if inF == nil {
+		t.Fatal("must push init abstract into map_facts_in")
 	}
-	if FindRelatedPointTo(fm.MapFactsOut[sid], g) == nil {
-		t.Fatal("must push existing related fact into map_facts_out")
+	// maps must carry INIT pointees (g_tgt), not the existing NullPtr related
+	if !IsVariableInSet(inF.PointTo, tgt) {
+		t.Fatalf("map_facts_in must get init pointee g_tgt, got %v", pointToNames(inF))
 	}
-	// GlobalFacts length unchanged (no second invent of same subject)
+	if IsVariableInSet(inF.PointTo, NullPtr) && len(inF.PointTo) == 1 {
+		t.Fatal("must not push existing NullPtr-related fact as the map entry")
+	}
+	outF := FindRelatedPointTo(fm.MapFactsOut[sid], g)
+	if outF == nil || !IsVariableInSet(outF.PointTo, tgt) {
+		t.Fatal("must push init abstract into map_facts_out")
+	}
+	// GlobalFacts length unchanged (no second invent of same subject); still NullPtr
 	if len(fm.GlobalFacts) != 1 {
 		t.Fatalf("GlobalFacts len=%d want 1", len(fm.GlobalFacts))
 	}
+	if gf := FindRelatedPointTo(fm.GlobalFacts, g); gf == nil || !IsVariableInSet(gf.PointTo, NullPtr) {
+		t.Fatal("GlobalFacts must keep post-analysis NullPtr (not overwrite with init)")
+	}
 	ClearError()
+}
+
+func pointToNames(f *FactPointTo) []string {
+	if f == nil {
+		return nil
+	}
+	out := make([]string, 0, len(f.PointTo))
+	for _, v := range f.PointTo {
+		if v == nil {
+			out = append(out, "<nil>")
+			continue
+		}
+		out = append(out, v.Name)
+	}
+	return out
 }
 
 // TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn —

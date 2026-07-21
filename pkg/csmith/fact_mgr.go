@@ -1634,13 +1634,16 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		return
 	}
 	// FactMgr.cpp:77–104 — abstract_fact_for_var_init; push into global_facts if
-	// missing; ALWAYS push the init fact into map_facts_in/out (even when
-	// global_facts already had a related fact). Go used to only push newly
-	// appended GlobalFacts entries — after RenewFacts on call return the fact
-	// already existed, so callee new_globals handoff skipped map updates and
-	// caller for-bodies kept map_in without the new global (seed-2 e2308:
-	// g_134→g_80 with g_80 missing from map_in after nested call creates g_80).
-	beforePT := len(fm.GlobalFacts)
+	// missing; ALWAYS push the *init* abstract fact into map_facts_in/out even
+	// when global_facts already had a related fact (possibly post-analysis).
+	// C++: for each f from abstract_fact_for_var_init:
+	//   if (!find_related) global_facts.push_back(f);
+	//   always map_facts_in/out.push_back(f);  // f is the INIT abstract, not the
+	//   existing related fact. After callee RenewFacts leaves g_87→g_62 in the
+	//   caller, new_globals handoff still appends init g_87→&g_64 into maps so
+	//   StatementFor map_facts_in[body] restore can re-surface init pointees
+	//   (seed-2: UP func_39 writes g_64; Go wrongly pushed existing g_62 into maps).
+	// Also covers seed-2 e2308: handoff must still update maps when related exists.
 	fm.AddNewVarFact(v)
 	// AddNewVarFact may wipe GlobalFacts incomplete — stop map push sticky
 	if !FactsComplete(fm.GlobalFacts) {
@@ -1649,34 +1652,27 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		}
 		return
 	}
-	// Facts to push into maps: newly merged, else existing related (C++ always
-	// iterates abstract results and pushes each f to maps after optional global push).
-	var toPush []*FactPointTo
-	if len(fm.GlobalFacts) > beforePT {
-		toPush = fm.GlobalFacts[beforePT:]
-	} else {
-		// already in GlobalFacts — still update maps (handoff / re-register)
-		subj := varCollective(v)
-		if subj == nil {
+	// Re-abstract init for map push (C++ always uses abstract_fact_for_var_init
+	// results for maps, never the existing related GlobalFacts entry).
+	ptInit, _ := AbstractFactForVarInit(v)
+	// residual ERROR sticky — no invent soft-skip map push past Abstract residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
+	if !FactsComplete(ptInit) {
+		// incomplete init abstract: non-pointer/union subjects return nil,nil
+		// (complete empty) — no map push; incomplete marker is sticky fail
+		if ptInit != nil {
+			fm.GlobalFacts = IncompleteFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return
 		}
-		rel := FindRelatedPointTo(fm.GlobalFacts, subj)
-		if HasError() {
-			return
-		}
-		if rel == nil {
-			rel = FindRelatedPointTo(fm.GlobalFacts, v)
-			if HasError() {
-				return
-			}
-		}
-		if rel != nil {
-			toPush = []*FactPointTo{rel}
-		}
+		return
 	}
+	toPush := ptInit
 	// Fact* always live after add; nil / incomplete Clone fails closed sticky wipe
 	// no invent MapFactsIn-only push when MapFactsOut is nil (one-sided invent)
 	for _, f := range toPush {
