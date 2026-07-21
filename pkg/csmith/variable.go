@@ -2784,17 +2784,26 @@ func hashArrayHasPayload(v *Variable) bool {
 }
 
 // hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
-// ArrayVariable.cpp:735–820 — uses get_last_ctrl_vars names (i,j,k…).
+// ArrayVariable.cpp:721–803 — collective itemized members no-op; get_last_ctrl_vars;
+// transparent_crc body; optional hash_value_printf index printf.
 // Union array elements: exclude unreadable fields when unionFacts non-nil
-// (ArrayVariable.cpp:741–752).
+// (ArrayVariable.cpp:730–737 / get_int_subfield_names excluded_fields).
 // Skips arrays with no hashable payload (e.g. pointer element type).
-// ArrayVariable.cpp:763 — get_last_ctrl_vars only (no letter-name soft-fallback).
-// hashArrayVariable emits looped transparent_crc for array elements.
 // Variable always live; sticky empty (no invent soft-skip hash past hole).
 // Zero-rank / no payload is complete empty (not incomplete IR shell).
 func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
 	if v == nil {
 		SetError(ErrGeneric)
+		return ""
+	}
+	// ArrayVariable.cpp:722–723 — if (collective != 0) return;
+	// GlobalList holds collective + itemized; only collective emits hash loops.
+	// AsArray always live when IsArray at hashOutput entry; missing → sticky.
+	if v.AsArray == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if v.AsArray.Collective != nil {
 		return ""
 	}
 	if len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
@@ -2838,9 +2847,20 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	}
 	var b strings.Builder
 	indent := "    "
+	// ArrayVariable.cpp:758–762 — post_incr_operator → "i++" else "i = i + 1"
+	opts := ProcessOptions()
+	incrSuffix := "++)"
+	if !opts.PostIncrOperator {
+		// rebuilt per dimension with name below
+		incrSuffix = ""
+	}
 	for i, sz := range v.ArraySizes {
 		iv := names[i]
-		b.WriteString(indent + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+		incr := incrSuffix
+		if !opts.PostIncrOperator {
+			incr = " = " + iv + " + 1)"
+		}
+		b.WriteString(indent + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + incr + "\n")
 		b.WriteString(indent + "{\n")
 		indent += "    "
 	}
@@ -2850,6 +2870,7 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		access += "[" + iv + "]"
 		nameStr += "[" + iv + "]"
 	}
+	// ArrayVariable.cpp:770 — body under compute_hash (caller only hashes when on)
 	if v.Type != nil && v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if HasError() {
@@ -2866,7 +2887,7 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 			if f.BitWidth == 0 {
 				continue
 			}
-			// ArrayVariable.cpp:741–752 — skip unreadable union fields
+			// ArrayVariable.cpp:730–737 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
 				// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
 				if HasError() {
@@ -2924,9 +2945,35 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
 		}
 	}
+	// ArrayVariable.cpp:786–788 — if (hash_value_printf) if (print_hash_value) printf(index…)
+	if opts.HashValuePrintf {
+		b.WriteString(indent + "if (print_hash_value) " + makePrintIndexStr(names) + "\n")
+	}
+	// ArrayVariable.cpp:799–801 — first output_close_encloser does outputln (blank
+	// after body) then "}"; subsequent closes only newline between braces.
+	b.WriteString("\n")
 	for range v.ArraySizes {
 		indent = indent[:len(indent)-4]
 		b.WriteString(indent + "}\n")
 	}
+	return b.String()
+}
+
+// makePrintIndexStr mirrors ArrayVariable::make_print_index_str.
+// ArrayVariable.cpp:702–715 — printf("index = [%d]…\n", i, j, …);
+func makePrintIndexStr(ctrlNames []string) string {
+	var b strings.Builder
+	b.WriteString(`printf("index = `)
+	for range ctrlNames {
+		b.WriteString("[%d]")
+	}
+	b.WriteString(`\n", `)
+	for i, n := range ctrlNames {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(n)
+	}
+	b.WriteString(");")
 	return b.String()
 }

@@ -72,6 +72,10 @@ func TestHashArrayLoops(t *testing.T) {
 	if !strings.Contains(out, "for (i = 0") || !strings.Contains(out, "g_4[i]") {
 		t.Fatal(out)
 	}
+	// ArrayVariable.cpp:786–788 — hash_value_printf default true → index printf
+	if !strings.Contains(out, `if (print_hash_value) printf("index = [%d]\n", i);`) {
+		t.Fatal("missing hash_value_printf index line", out)
+	}
 	// undersized ctrl sticky — no invent loops with empty index
 	ClearError()
 	CtrlVarsDoFinalization()
@@ -90,6 +94,79 @@ func TestHashArrayLoops(t *testing.T) {
 	if !HasError() {
 		t.Fatal("IsArray without AsArray HashOutput must SetError sticky")
 	}
+	ClearError()
+	CtrlVarsDoFinalization()
+}
+
+// ArrayVariable.cpp:722–723 — itemized (collective!=0) hash is a no-op.
+// GlobalList holds collective + itemized; only parent emits one loop nest.
+func TestHashArraySkipsItemizedCollective(t *testing.T) {
+	ClearError()
+	CtrlVarsDoFinalization()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	_ = GetNewCtrlVars(opts)
+	parent := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_62", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3},
+			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{2, 3},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_62", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3},
+			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{2, 3}, Collective: parent, Indices: []string{"1", "0"},
+	}
+	item.AsArray = item
+	vs := NewVariableSelector(opts)
+	// C++ create_array_and_itemize: collective then itemized on GlobalList
+	vs.GlobalList = []*Variable{&parent.Variable, &item.Variable}
+	out := HashGlobalVariables(vs)
+	if strings.Count(out, "transparent_crc(g_62") != 1 {
+		t.Fatalf("expected single collective hash, got:\n%s", out)
+	}
+	if !strings.Contains(out, `if (print_hash_value) printf("index = [%d][%d]\n", i, j);`) {
+		t.Fatal("missing multi-dim index printf", out)
+	}
+	// itemized alone must emit nothing
+	if item.Variable.HashOutput() != "" {
+		t.Fatal("itemized ArrayVariable::hash must no-op")
+	}
+	if HasError() {
+		t.Fatal("itemized no-op must not sticky")
+	}
+	ClearError()
+	CtrlVarsDoFinalization()
+}
+
+func TestHashArrayHashValuePrintfOff(t *testing.T) {
+	ClearError()
+	CtrlVarsDoFinalization()
+	opts := Defaults()
+	opts.HashValuePrintf = false
+	SetProcessOptions(opts)
+	_ = GetNewCtrlVars(opts)
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_x", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{2},
+	}
+	av.AsArray = av
+	out := av.Variable.HashOutput()
+	if strings.Contains(out, "print_hash_value) printf") {
+		t.Fatal("hash_value_printf false must omit index printf", out)
+	}
+	if !strings.Contains(out, "transparent_crc(g_x[i]") {
+		t.Fatal(out)
+	}
+	// restore process defaults for later tests
+	SetProcessOptions(Defaults())
 	ClearError()
 	CtrlVarsDoFinalization()
 }
