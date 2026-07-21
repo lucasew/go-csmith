@@ -328,6 +328,52 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	ClearError()
 }
 
+// TestBuildUserInvocationRevisitClearsCallerCurrRHS — FunctionInvocationUser.cpp:282–284
+// / CGContext.cpp:85–93. BUILD revisit must not inherit caller CurrRHS (ExpressionAssign
+// leaves it set); else Lhs::visit_facts in the callee body can fail closed on overlap.
+func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	// Simple built callee: empty body always visits OK; FactChanged forces NeedsRevisit.
+	callee := &Function{
+		Name:            "func_49",
+		ReturnType:      GetIntType(),
+		BuildState:      BuildBuilt,
+		IsBuilt:         true,
+		FactChanged:     true,
+		AccumEffContext: EmptyEffect(),
+		Body:            &Block{StmID: 10, Stmts: []Stmt{}},
+		Param:           nil,
+	}
+	callee.ensurePairedFactMgr()
+	caller := &Function{Name: "func_11", ReturnType: GetIntType()}
+	list := &FunctionList{Funcs: []*Function{caller, callee}}
+	fm := NewFactMgr(caller)
+	cg := WithFunc(caller, EmptyEffect()).WithFuncList(list).WithFactMgr(fm)
+	// Simulate ExpressionAssign: CurrRHS set while building invocation as RHS of assign.
+	rhsDummy := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false), ExprType: GetIntType()}
+	cg.CurrRHS = rhsDummy
+	cg.EffectStm = EmptyEffect()
+	// Mark a write on EffectStm as if RHS gen ran
+	cg.EffectStm = cg.EffectStm.WriteVar(rhsDummy.Var)
+	fi := BuildUserInvocation(NewRng(7), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee)
+	if fi == nil {
+		t.Fatal("BuildUserInvocation returned nil")
+	}
+	if fi.Failed {
+		t.Fatalf("revisit must succeed with empty body despite caller CurrRHS; Failed=%v err=%v", fi.Failed, HasError())
+	}
+	if HasError() {
+		t.Fatalf("must not sticky-error: %v", HasError())
+	}
+	// Caller CurrRHS must remain (BUILD clones, does not clear caller)
+	if cg.CurrRHS != rhsDummy {
+		t.Fatal("caller CurrRHS must be left intact after BuildUserInvocation")
+	}
+	ClearError()
+}
+
 func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	// BuildInvocationAndFunction effect hand-over must not invent success past incomplete
 	ClearError()

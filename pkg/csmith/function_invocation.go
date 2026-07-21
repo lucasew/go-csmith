@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+
 // Invocation is a minimal FunctionInvocation (user call or binary/unary op).
 type Invocation struct {
 	// User is non-nil for program-defined calls.
@@ -617,9 +618,26 @@ func BuildUserInvocation(
 			fi.Failed = true
 			return fi
 		}
+		// FunctionInvocationUser.cpp:282–284 —
+		//   CGContext new_context(cg_context, func, effect_context, &effect_accum);
+		// CGContext.cpp:85–93 — current_func=callee, blk_depth=0, expr_depth=0,
+		// extend_call_chain. Must clear CurrRHS/EffectStm from caller (ExpressionAssign
+		// param gen leaves CurrRHS set); otherwise Lhs::visit_facts overlap / ptr_modified
+		// checks against the outer RHS and falsely fail body revisit (seed-2 func_49
+		// BUILD_REV after ExpressionAssign param / first_div e37241).
 		newCG := cg.CloneSubcontext()
+		newCG.CurrentFunc = callee
 		newCG.effectContext = effectContext
 		newCG.EffectAccum = &effectAccum
+		newCG.EffectStm = EmptyEffect()
+		newCG.CurrRHS = nil
+		newCG.ExprDepth = 0
+		newCG.BlkDepth = 0
+		newCG.ExtendCallChain(*cg)
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 		// FunctionInvocationUser.cpp:284 — revisit(fm->global_facts, new_context)
 		// where fm = get_fact_mgr(&cg_context) is the CALLER FactMgr. C++ mutates
 		// caller global_facts in place (handover drops frame locals, then renew
