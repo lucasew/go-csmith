@@ -1089,7 +1089,8 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 		// add_visible_effect(*new_context.get_effect_accum(), curr_blk);
 		// feffect.add_external_effect(*new_context.get_effect_accum(), call_chain).
 		// Revisit already folded body map_stm_effect into newCG.EffectAccum.
-		blk := cg.CurrentBlock()
+		// curr_blk is set in stm_visit_facts (Statement.cpp:612), not stack-top alone.
+		blk := cg.AnalysisBlock()
 		if blk == nil {
 			SetError(ErrGeneric)
 			return false

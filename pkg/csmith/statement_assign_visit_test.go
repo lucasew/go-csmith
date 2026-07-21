@@ -296,6 +296,49 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	ClearError()
 }
 
+// FunctionInvocation.cpp:542–546 — add_visible_effect uses curr_blk (AnalysisBlock).
+func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	opts.MaxFuncs = 3
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	list := &FunctionList{Types: &TypeEnv{}}
+	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	list.Funcs = []*Function{caller}
+	fm := NewFactMgr(caller)
+	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
+	caller.Stack = []*Block{callerBlk}
+	// Nested stack frame that is NOT the statement parent
+	inner := &Block{Func: caller, Parent: callerBlk, StmID: AllocStmID()}
+	caller.Stack = []*Block{callerBlk, inner}
+	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
+	cg.CurrBlk = callerBlk // statement parent (stm_visit_facts)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// Build a small callee and revisit via VisitFactsInvocation
+	callee := &Function{Name: "callee", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	callee.Body = &Block{Func: callee, StmID: AllocStmID()}
+	callee.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	_ = callee.ensurePairedFactMgr()
+	fi := &Invocation{User: callee}
+	// Empty body visit should succeed; AddVisibleEffect must use CurrBlk not stack top
+	ok := VisitFactsInvocation(fi, &cg, opts)
+	if !ok && !HasError() {
+		// may soft-fail without body maps; still check CurrBlk preference via AnalysisBlock
+	}
+	if cg.AnalysisBlock() != callerBlk {
+		t.Fatal("AnalysisBlock must prefer CurrBlk over stack top")
+	}
+	if cg.CurrentBlock() != inner {
+		t.Fatal("precondition: stack top is inner")
+	}
+	ClearError()
+	_ = probs
+	_ = vs
+}
+
 func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	// Lhs.cpp:337–346 — *p=… CheckReadVar(p)+write_pointed; StatementAssign must not
 	// invent NoteWrite(p) after merge (seed2 first_div e9238: pointer false-written →

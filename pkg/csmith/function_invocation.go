@@ -661,8 +661,13 @@ func BuildUserInvocation(
 		if ok {
 			// FunctionInvocationUser.cpp:284–290
 			// Incomplete effect hand-over fails closed sticky (no invent silent Incomplete FEffect)
-			if cg.CurrentBlock() != nil {
-				cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
+			// Prefer curr_blk (AnalysisBlock) when set (visit path); else stack top (gen path).
+			blk := cg.AnalysisBlock()
+			if blk == nil {
+				blk = cg.CurrentBlock()
+			}
+			if blk != nil {
+				cg.AddVisibleEffectAt(effectAccum, blk)
 				if HasError() {
 					fi.Failed = true
 					return fi
