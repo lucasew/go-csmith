@@ -20,6 +20,10 @@ func TestMakeRandomStructType(t *testing.T) {
 	if st.Used {
 		t.Fatal("make_random_struct_type must not invent used=true at create")
 	}
+	// Type.cpp:298–302 — shared sid sequence; first aggregate → S0
+	if st.StructName != "S0" || st.SID != 0 {
+		t.Fatalf("shared sid name want S0/0 got %q sid=%d", st.StructName, st.SID)
+	}
 	if len(env.StructTypes) != 1 {
 		t.Fatal(env.StructTypes)
 	}
@@ -34,6 +38,44 @@ func TestMakeRandomStructType(t *testing.T) {
 	if !strings.Contains(decl, "struct S0") || !strings.Contains(decl, "f0") {
 		t.Fatal(decl)
 	}
+}
+
+func TestAggregateSharedSIDSequence(t *testing.T) {
+	// Type.cpp:298–302 + 1675–1678 — one static sequence for struct and union tags.
+	// After S0, first union is U1 (not U0).
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType()}
+	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "")
+	if st == nil || st.StructName != "S0" {
+		t.Fatalf("struct: %v name=%q", st, func() string {
+			if st == nil {
+				return ""
+			}
+			return st.StructName
+		}())
+	}
+	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "")
+	if ut == nil || ut.StructName != "U1" || ut.SID != 1 {
+		t.Fatalf("union after S0 must be U1 sid=1, got %v name=%q sid=%d", ut,
+			func() string {
+				if ut == nil {
+					return ""
+				}
+				return ut.StructName
+			}(), func() int {
+				if ut == nil {
+					return -1
+				}
+				return ut.SID
+			}())
+	}
+	if env.AggregateSeq != 2 {
+		t.Fatalf("AggregateSeq want 2 got %d", env.AggregateSeq)
+	}
+	ClearError()
 }
 
 func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {

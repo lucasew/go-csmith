@@ -53,24 +53,32 @@ func TestStructDepthNested(t *testing.T) {
 	ClearError()
 }
 
-func TestChooseRandomFiltersReturnUnions(t *testing.T) {
+func TestChooseRandomTypeFilterNoReturnUnionsGate(t *testing.T) {
+	// Type.cpp:223–244 ChooseRandomTypeFilter — only !return_structs rejects structs;
+	// return_unions is not a ChooseRandom gate (unlike NonVoidNonVolatile arg_unions).
+	ClearError()
 	opts := Defaults()
 	opts.ReturnUnions = false
 	opts.ReturnStructs = true
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{}
-	// seed types manually
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort)}
-	u := &Type{isUnion: true, StructName: "U0"}
-	env.AllTypes = append(env.AllTypes, u)
+	// only union + void-weight simple so choose must accept union
+	u := &Type{isUnion: true, StructName: "U0", Used: false}
+	env.AllTypes = []*Type{u}
 	env.UnionTypes = []*Type{u}
 	r := NewRng(2)
-	for i := 0; i < 40; i++ {
+	found := false
+	for i := 0; i < 20; i++ {
 		ty := env.ChooseRandom(r, opts, probs, false)
 		if ty != nil && ty.IsUnion() {
-			t.Fatal("union returned when ReturnUnions false")
+			found = true
+			break
 		}
 	}
+	if !found {
+		t.Fatal("ChooseRandom must not invent return_unions filter-out of unions")
+	}
+	ClearError()
 }
 
 func TestOkStructUnionSkipsVolatile(t *testing.T) {

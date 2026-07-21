@@ -51,8 +51,10 @@ type Type struct {
 	// Struct/union aggregate.
 	isStruct bool
 	isUnion  bool
-	// StructName is C tag, e.g. "S0" or "U0".
+	// StructName is C tag, e.g. "S0" or "U1" (from Type::sid — shared struct/union sequence).
 	StructName string
+	// SID mirrors Type::sid for aggregates (shared sequence; not used for simples).
+	SID int
 	// Fields are struct/union members (simple or nested struct).
 	Fields []StructField
 	// Packed mirrors Type::packed_ for structs.

@@ -12,6 +12,10 @@ type TypeEnv struct {
 	StructTypes []*Type
 	// UnionTypes are created union types.
 	UnionTypes []*Type
+	// AggregateSeq mirrors Type.cpp Type(struct/union) static sequence for sid.
+	// Shared across structs and unions: first aggregate S0 or U0, next S1/U1, …
+	// Type.cpp:298–302; Output uses "struct S"<<sid / "union U"<<sid.
+	AggregateSeq int
 }
 
 // FindPointerType mirrors Type::find_pointer_type(t, add).
@@ -321,7 +325,7 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		if HasError() {
 			return true
 		}
-		// Type.cpp:229–231 — !return_structs rejects structs
+		// Type.cpp:229–231 — !return_structs rejects structs only (not unions)
 		if t.IsStruct() && !opts.ReturnStructs {
 			// residual ERROR sticky — no invent soft-reject/keep past IsStruct residual
 			if HasError() {
@@ -333,17 +337,7 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		if HasError() {
 			return true
 		}
-		if t.IsUnion() && !opts.ReturnUnions {
-			// residual ERROR sticky — no invent soft-reject/keep past IsUnion residual
-			if HasError() {
-				return true
-			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue filter past IsUnion residual false
-		if HasError() {
-			return true
-		}
+		// Type.cpp ChooseRandomTypeFilter has no return_unions gate (unlike arg_unions on NonVoidNonVolatile)
 		if forFieldVar && t.IsStruct() {
 			// residual ERROR sticky — no invent soft-continue depth filter past IsStruct residual
 			if HasError() {

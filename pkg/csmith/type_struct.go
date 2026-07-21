@@ -209,9 +209,21 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	}
 	// Type.cpp:1088–1091 make_random_struct_type — does not set used or record_type_with_bitfields.
 	// used + Bookkeeper::record_type_with_bitfields only when first chosen (choose_random*, filters).
+	// Type.cpp:298–302 — sid = sequence++ shared with unions; Output "struct S"<<sid.
+	sid := 0
+	name := tag
+	if env != nil {
+		sid = env.AggregateSeq
+		env.AggregateSeq++
+		name = fmt.Sprintf("S%d", sid)
+	} else if name == "" {
+		SetError(ErrGeneric)
+		return nil
+	}
 	st := &Type{
 		isStruct:     true,
-		StructName:   tag,
+		StructName:   name,
+		SID:          sid,
 		Fields:       fields,
 		Packed:       packed,
 		Used:         false,
@@ -264,11 +276,11 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		}
 	}
 	// struct/union generation draws RNG + probs; no invent fixed S0 shells without them
+	// Tag names come from Type.cpp shared sid sequence (env.AggregateSeq), not per-kind 0-based.
 	if opts.Structs && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
 			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
-			tag := fmt.Sprintf("S%d", len(env.StructTypes))
-			if MakeRandomStructType(r, opts, probs, env, tag) == nil || HasError() {
+			if MakeRandomStructType(r, opts, probs, env, "") == nil || HasError() {
 				break
 			}
 			if len(env.StructTypes) > 20 {
@@ -278,8 +290,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	if opts.Unions && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
-			tag := fmt.Sprintf("U%d", len(env.UnionTypes))
-			if MakeRandomUnionType(r, opts, probs, env, tag) == nil || HasError() {
+			if MakeRandomUnionType(r, opts, probs, env, "") == nil || HasError() {
 				break
 			}
 			if len(env.UnionTypes) > 20 {
@@ -780,9 +791,21 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	// Type.cpp:1110–1112 make_random_union_type — does not set used or record bitfields.
 	// used + Bookkeeper only when first chosen (choose_random*, NonVoid* filters).
+	// Type.cpp:298–302 — sid shared with structs; Output "union U"<<sid (not per-union 0-based).
+	sid := 0
+	name := tag
+	if env != nil {
+		sid = env.AggregateSeq
+		env.AggregateSeq++
+		name = fmt.Sprintf("U%d", sid)
+	} else if name == "" {
+		SetError(ErrGeneric)
+		return nil
+	}
 	ut := &Type{
 		isUnion:      true,
-		StructName:   tag,
+		StructName:   name,
+		SID:          sid,
 		Fields:       fields,
 		Used:         false,
 		HasAssignOps: hasAssign,
