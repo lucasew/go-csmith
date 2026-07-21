@@ -26,14 +26,37 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 		t.Fatal("complete visibility paths must not sticky")
 	}
 	ClearError()
-	// Match residual: Type-nil param soft invent was soft-continue then invent on-stack later good.
-	// Fair: sticky fail closed not-on-stack.
+	// Function.cpp:194 — find_variable_in_set only (pointer identity). Fields of a
+	// stack aggregate are not themselves local_vars entries; match/has_field_var
+	// would invent on-stack and mark_func_end would garbage them unfairly.
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	agg := CreateVariableScalars("l_s", st, false, false)
+	agg.CreateFieldVars()
+	if len(agg.FieldVars) == 0 {
+		t.Fatal("need field")
+	}
+	fld := agg.FieldVars[0]
+	blk2 := &Block{Func: f, LocalVars: []*Variable{agg}}
+	if !f.IsVarOnStack(agg, blk2) {
+		t.Fatal("aggregate local must be on stack")
+	}
+	if f.IsVarOnStack(fld, blk2) {
+		t.Fatal("field of stack aggregate must not IsVarOnStack (C++ find_variable_in_set only)")
+	}
+	if HasError() {
+		t.Fatal("field check must not sticky")
+	}
+	ClearError()
+	// Type-nil param soft invent was soft-continue then invent on-stack later good.
+	// Fair: sticky fail closed not-on-stack (StackScanComplete / Param hole).
 	f.Param = []*Variable{&Variable{Name: "p_hole"}, p}
 	if f.IsVarOnStack(p, blk) {
-		t.Fatal("Match residual must fail closed not-on-stack, not invent later param match")
+		t.Fatal("Param hole must fail closed not-on-stack, not invent later param match")
 	}
 	if !HasError() {
-		t.Fatal("Match residual Function.IsVarOnStack must SetError sticky")
+		t.Fatal("Param hole Function.IsVarOnStack must SetError sticky")
 	}
 	ClearError()
 	f.Param = []*Variable{p}

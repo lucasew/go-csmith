@@ -62,6 +62,11 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 			return false
 		}
 	}
+	// Function.cpp:192–198 — find_variable_in_set(b->local_vars, var) is pointer
+	// identity only (Variable.cpp:138–145). Do not invent Variable::match for
+	// locals: match would treat aggregate fields as on-stack when only the parent
+	// struct is in local_vars, and mark_func_end would wrongly garbage those
+	// pointees (seed-2 func_11: l_1325 pts=[garbage,g_32] after nested revisit).
 	for b := stParent; b != nil; b = b.Parent {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
@@ -70,17 +75,6 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 			}
 			if loc == v {
 				return true
-			}
-			if loc.Match(v) {
-				// residual ERROR sticky — no invent on-stack true past Match hole
-				if HasError() {
-					return false
-				}
-				return true
-			}
-			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if HasError() {
-				return false
 			}
 		}
 	}
