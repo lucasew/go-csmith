@@ -110,6 +110,104 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 	ClearError()
 }
 
+func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
+	// Function.cpp:66–69 CGContext ctor rw_directive(nullptr).
+	// Function.cpp:679–685 known-params RW: empty must_reads/writes + external no-*.
+	// Soft invent was cg := prev keeping prev.RW.Must* so callee make_iteration
+	// took array_control (StatementFor.cpp:204–225) while upstream loop_control.
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	opts.MaxBlockDepth = 1
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), vs, nil, nil, "g_16", GetIntType(), MakeInt(0), q)
+	if av == nil {
+		t.Fatal("array")
+	}
+	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
+	cblk := &Block{Func: caller}
+	caller.Stack = []*Block{cblk}
+	fm := caller.ensurePairedFactMgr()
+	fm.AddNewVarFact(&av.Variable)
+	accum := EmptyEffect()
+	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
+	prev.EffectAccum = &accum
+	// Caller is mid array-loop: must-use g_16 (and optional no-write).
+	prev.RW = &RWDirective{
+		MustReadVars: []*Variable{&av.Variable},
+		NoWriteVars:  []*Variable{&av.Variable},
+	}
+	// BuildCallee keeps no-write for reachable frame globals; must stay empty.
+	rwd := prev.BuildCalleeRWDirective(fm.GlobalFacts)
+	if rwd == nil {
+		t.Fatal("expect non-nil external RW from no-write on global array")
+	}
+	if got := rwd.FindMustUseArrays(); len(got) != 0 {
+		t.Fatalf("BuildCalleeRW must not copy must-use arrays, got %d", len(got))
+	}
+	if len(rwd.NoWriteVars) == 0 {
+		t.Fatal("want external no-write preserved")
+	}
+
+	// known-params path must install external no-* only (empty must).
+	callee := &Function{Name: "func_2", ReturnType: GetIntType()}
+	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	_ = callee.ensurePairedFactMgr()
+	callee.GenerateBodyWithKnownParams(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if callee.BuildState != BuildBuilt || callee.Body == nil {
+		t.Fatal(callee.BuildState, callee.Body)
+	}
+	// Caller must-use list must remain (not cleared/stolen by body setup).
+	if len(prev.RW.MustReadVars) != 1 || prev.RW.MustReadVars[0] != &av.Variable {
+		t.Fatalf("caller must-read mutated: %v", prev.RW.MustReadVars)
+	}
+
+	// GenerateBody (!knownParams): ctor leaves RW nil — never inherit must.
+	callee2 := &Function{Name: "func_3", ReturnType: GetIntType()}
+	callee2.RV = CreateVariableQfer("func_3_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	_ = callee2.ensurePairedFactMgr()
+	callee2.GenerateBody(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if callee2.BuildState != BuildBuilt {
+		t.Fatal(callee2.BuildState)
+	}
+	if len(prev.RW.MustReadVars) != 1 {
+		t.Fatal("caller must-read must remain after GenerateBody")
+	}
+
+	// MakeIteration under empty-must RW takes free loop_control (not Itemize on g_16).
+	// StatementFor.cpp:204–225 — only rw_directive->find_must_use_arrays.
+	blk := &Block{Func: callee, LocalVars: []*Variable{}}
+	callee.Stack = []*Block{blk}
+	cg := WithFunc(callee, EmptyEffect()).WithFactMgr(callee.PairedFactMgr())
+	cg.RW = rwd // external no-write only (post–BuildCallee)
+	// IV pool needs a non-array int
+	iv := CreateVariableScalars("g_77", GetIntType(), false, false)
+	vs.GlobalList = append(vs.GlobalList, iv)
+	ClearError()
+	lc := MakeIteration(NewRng(5), opts, NewProbabilities(opts), vs, &cg)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if lc == nil {
+		t.Fatal("MakeIteration nil")
+	}
+	// array path sets Bound from shortest dim; free loop leaves InvalidIVBound / 0 convention
+	// StatementFor.cpp:200 bound=INVALID_BOUND then only array path rewrites it.
+	if lc.Bound != 0 && lc.Bound != InvalidIVBound {
+		// If must leaked, bound would be array size path (e.g. 7 for g_16[7]).
+		// Free control keeps InvalidIVBound (0 after assign in Go loop-control branch).
+		t.Fatalf("MakeIteration with empty-must RW must not take array bound, bound=%d", lc.Bound)
+	}
+	ClearError()
+}
+
 func TestGenerateBodyBuiltinDummy(t *testing.T) {
 	opts := Defaults()
 	f := &Function{

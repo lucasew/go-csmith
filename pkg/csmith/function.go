@@ -551,9 +551,12 @@ func (f *Function) generateBodyCore(
 
 	// Function.cpp:633–634 / 675–676 — CGContext(this, prev.effect_context, &effect_accum)
 	// Constructor: current_func=this, blk_depth(0), expr_depth(0), flags(0),
-	// iv_bounds() empty — not a copy of caller's loop IVs.
+	// iv_bounds() empty, rw_directive(nullptr) — not a copy of caller's loop IVs/RW.
 	// Inheriting BlkDepth hit max-depth filters early (seed-2 e502).
 	// Inheriting IVBounds inflated ItemizeArray ok_ivs (seed-2 e716 n=4 vs n=2).
+	// Inheriting prev.RW.Must* leaked array-loop must-use into callee body so
+	// make_iteration took array_control (choose_ok_var/Itemize) while upstream
+	// make_random_loop_control (seed-42 e1890: GO U7 Itemize vs UP F50).
 	bodyEff := EmptyEffect()
 	if prev.EffectAccum != nil {
 		// known-params path: caller already points EffectAccum at callee accum
@@ -567,6 +570,8 @@ func (f *Function) generateBodyCore(
 	cg.BlkDepth = 0
 	cg.ExprDepth = 0
 	cg.IVBounds = nil
+	// CGContext.cpp:66–69 — rw_directive(nullptr); never inherit caller's must_read/write
+	cg.RW = nil
 	// Function.cpp:635 / 677 — extend_call_chain
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual
@@ -596,7 +601,9 @@ func (f *Function) generateBodyCore(
 		return
 	}
 
-	// Function.cpp:680–685 — inherit external no-reads/writes (known-params only)
+	// Function.cpp:679–685 — known-params only: external no-reads/writes; must_* stay empty.
+	// BuildCalleeRWDirective never copies must_read/write (only NoRead/NoWrite).
+	// When it returns nil (no external restrictions), leave cg.RW nil — do not restore prev.RW.
 	if knownParams {
 		if rwd := prev.BuildCalleeRWDirective(cg.FM.GlobalFacts); rwd != nil {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual
