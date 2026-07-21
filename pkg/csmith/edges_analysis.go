@@ -397,12 +397,31 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 		SetError(ErrGeneric)
 		return
 	}
+	// Statement.cpp:847–852 — makeup / combine on full FactVec pre_facts.
+	// preUnion is the eUnionWrite partition; must track makeup for set_fact_in.
+	workPreUnion := append([]*FactUnion(nil), preUnion...)
+	if workPreUnion == nil {
+		workPreUnion = []*FactUnion{}
+	}
 	if st.Kind == StmtIfElse {
-		CombineBranchFacts(st, preFacts, fm)
+		// StatementIf.cpp:208–231 — combine_branch_facts mutates pre_facts + sets global_facts
+		CombineBranchFacts(st, &preFacts, &workPreUnion, fm)
+		if HasError() {
+			return
+		}
 	} else {
 		// MakeupNewVarFacts fails closed sticky (nils preFacts) on holes; pre already complete
 		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		if !makeupNewUnionFacts(&workPreUnion, fm.UnionFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
@@ -523,8 +542,17 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 		}
 		return
 	}
-	// FactMgr.cpp set_fact_in — full FactVec (point-to pre + eUnionWrite pre)
-	fm.SetMapFactsInPair(st.StmID, preFacts, preUnion)
+	// incomplete union after combine/assign must not invent set_fact_in success
+	if !UnionFactsComplete(fm.UnionFacts) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	// FactMgr.cpp set_fact_in — full FactVec (point-to pre + eUnionWrite pre, after makeup)
+	fm.SetMapFactsInPair(st.StmID, preFacts, workPreUnion)
 	fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
 	// Incomplete accum fails closed sticky (no invent MapAccumEffect incomplete as recorded success)
 	acc := cg.AccumEffect()

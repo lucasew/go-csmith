@@ -349,6 +349,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	preU := []*FactUnion{}
 	thenB := &Block{StmID: 10}
 	elseB := &Block{StmID: 11}
 	fm.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
@@ -364,17 +365,17 @@ func TestCombineBranchFacts(t *testing.T) {
 	_ = elseB
 	// Statement + FactMgr always live; sticky no invent soft-skip combine past hole
 	ClearError()
-	CombineBranchFacts(nil, pre, fm)
+	CombineBranchFacts(nil, &pre, &preU, fm)
 	if !HasError() {
 		t.Fatal("nil Stmt CombineBranchFacts must SetError sticky")
 	}
 	ClearError()
-	CombineBranchFacts(st, pre, nil)
+	CombineBranchFacts(st, &pre, &preU, nil)
 	if !HasError() {
 		t.Fatal("nil FM CombineBranchFacts must SetError sticky")
 	}
 	ClearError()
-	CombineBranchFacts(st, pre, fm)
+	CombineBranchFacts(st, &pre, &preU, fm)
 	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
 		// both must return → pre facts
 	}
@@ -396,7 +397,9 @@ func TestCombineBranchFacts(t *testing.T) {
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	CombineBranchFacts(st2, pre, fm2)
+	pre2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	preU2 := []*FactUnion{}
+	CombineBranchFacts(st2, &pre2, &preU2, fm2)
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil branch fact hole must fail closed", fm2.GlobalFacts)
 	}
@@ -409,7 +412,9 @@ func TestCombineBranchFacts(t *testing.T) {
 	fm3.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st3 := &Stmt{Kind: StmtIfElse, Then: &Block{StmID: 10}, Else: nil}
 	fm3.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
-	CombineBranchFacts(st3, pre, fm3)
+	pre3 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	preU3 := []*FactUnion{}
+	CombineBranchFacts(st3, &pre3, &preU3, fm3)
 	if FactsComplete(fm3.GlobalFacts) {
 		t.Fatal("nil Else arm must fail closed", fm3.GlobalFacts)
 	}
@@ -426,7 +431,9 @@ func TestCombineBranchFacts(t *testing.T) {
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
 	fm4.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	CombineBranchFacts(st4, pre, fm4)
+	pre4 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	preU4 := []*FactUnion{}
+	CombineBranchFacts(st4, &pre4, &preU4, fm4)
 	if FactsComplete(fm4.GlobalFacts) {
 		t.Fatal("Then StmID 0 must fail closed", fm4.GlobalFacts)
 	}
@@ -448,12 +455,64 @@ func TestCombineBranchFacts(t *testing.T) {
 		},
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
-	CombineBranchFacts(st5, pre, fm5)
+	pre5 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	preU5 := []*FactUnion{}
+	CombineBranchFacts(st5, &pre5, &preU5, fm5)
 	if FactsComplete(fm5.GlobalFacts) {
 		t.Fatal("MustReturn residual must fail closed incomplete GlobalFacts", fm5.GlobalFacts)
 	}
 	if !HasError() {
 		t.Fatal("MustReturn residual CombineBranchFacts must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
+	// StatementIf.cpp:228–230 — outputs = then_out; merge_facts(outputs, else_out)
+	// Full FactVec includes eUnionWrite. Soft invent left UnionFacts at else-exit only.
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u", ut, false, false)
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) < 2 {
+		t.Fatal("need fields")
+	}
+	f0, f1 := parent.FieldVars[0], parent.FieldVars[1]
+	thenU := MakeFactUnion(parent, 0) // then wrote f0
+	elseU := MakeFactUnion(parent, 1) // else wrote f1
+	if thenU == nil || elseU == nil {
+		t.Fatal("MakeFactUnion")
+	}
+	fm := NewFactMgr(nil)
+	// empty PT maps; union partitions differ by arm
+	fm.SetMapFactsOutPair(10, []*FactPointTo{}, []*FactUnion{thenU})
+	fm.SetMapFactsOutPair(11, []*FactPointTo{}, []*FactUnion{elseU})
+	fm.GlobalFacts = []*FactPointTo{}
+	fm.UnionFacts = []*FactUnion{elseU} // live = else exit (old bug state)
+	st := &Stmt{
+		Kind: StmtIfElse,
+		Then: &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
+		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
+	}
+	pre := []*FactPointTo{}
+	preU := []*FactUnion{MakeFactUnion(parent, FactUnionTop)}
+	CombineBranchFacts(st, &pre, &preU, fm)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	// join f0 + f1 → BOTTOM; both fields nonreadable
+	got := FindRelatedUnion(fm.UnionFacts, parent)
+	if got == nil {
+		t.Fatal("missing union fact after merge")
+	}
+	if !got.IsBottom() {
+		t.Fatalf("want BOTTOM after f0|f1 branch merge, fid=%d", got.LastWrittenFID)
+	}
+	if !IsNonreadableField(f0, fm.UnionFacts) || !IsNonreadableField(f1, fm.UnionFacts) {
+		t.Fatal("BOTTOM merge: both fields nonreadable")
 	}
 	ClearError()
 }

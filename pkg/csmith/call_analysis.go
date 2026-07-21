@@ -579,12 +579,17 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 
 // CombineBranchFacts mirrors StatementIf::combine_branch_facts.
 // StatementIf.cpp:208–236 — merge then/else outs with must_return precision.
-// Fact maps always complete; nil holes fail closed (GlobalFacts nil, no invent
-// partial then/else join).
+// C++ operates on full FactVec (ePointTo + eUnionWrite). Soft invent was
+// point-to-only GlobalFacts merge leaving UnionFacts at else-exit last-writes
+// so IsNonreadableField over/under-filtered choose_var after every if
+// (seed-7 eligible pool half-size vs upstream).
+// preUnion is the eUnionWrite partition of pre_facts (mutated in place for makeup
+// like preFacts, then used by caller for set_fact_in).
+// Fact maps always complete; nil holes fail closed (both partitions wiped).
 // Statement + FactMgr always live; sticky (no invent soft-skip combine past hole).
 // Non-if Kind is complete no-op.
-func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
-	if st == nil || fm == nil {
+func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUnion, fm *FactMgr) {
+	if st == nil || fm == nil || preFacts == nil || preUnion == nil {
 		SetError(ErrGeneric)
 		return
 	}
@@ -595,6 +600,7 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	// incomplete arms fail closed sticky (no invent empty then/else via nil-out + FactsComplete)
 	if st.Then == nil || st.Else == nil {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
@@ -602,21 +608,35 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	// arm outs as complete (no invent soft empty map for missing block id)
 	if StmIDUnset(st.Then.StmID) || StmIDUnset(st.Else.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
 	thenOut := fm.GetMapFactsOut(st.Then.StmID)
 	elseOut := fm.GetMapFactsOut(st.Else.StmID)
-	// Fact* always live in maps used for branch combine
-	if !FactsComplete(preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) {
+	thenOutU := fm.GetMapUnionFactsOut(st.Then.StmID)
+	elseOutU := fm.GetMapUnionFactsOut(st.Else.StmID)
+	// Fact* always live in maps used for branch combine (both partitions)
+	if !FactsComplete(*preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) ||
+		!UnionFactsComplete(*preUnion) || !UnionFactsComplete(thenOutU) || !UnionFactsComplete(elseOutU) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
-	// makeup new vars from branch outs into preFacts snapshot
+	// makeup new vars from branch outs into pre snapshot (full FactVec)
 	// sequential: first failure must not invent second makeup from cleared empty
-	if !MakeupNewVarFacts(&preFacts, thenOut) || !MakeupNewVarFacts(&preFacts, elseOut) {
+	if !MakeupNewVarFacts(preFacts, thenOut) || !MakeupNewVarFacts(preFacts, elseOut) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	if !makeupNewUnionFacts(preUnion, thenOutU) || !makeupNewUnionFacts(preUnion, elseOutU) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -627,72 +647,148 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	// residual ERROR sticky — no invent soft-continue branch-merge past Then MustReturn residual
 	if HasError() {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
 	falseMust := st.Else.MustReturn()
 	// residual ERROR sticky — no invent soft-continue branch-merge past Else MustReturn residual
 	if HasError() {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
 	switch {
 	case trueMust && falseMust:
-		fm.SetGlobalFacts(CloneFactSlice(preFacts), "auto_call_analysis_596")
-		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
+		// StatementIf.cpp:217–218 — outputs = pre_facts (full)
+		fm.SetGlobalFacts(CloneFactSlice(*preFacts), "auto_call_analysis_596")
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
+		}
+		cl := CloneUnionFactSlice(*preUnion)
+		if !UnionFactsComplete(cl) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+		if cl == nil {
+			fm.UnionFacts = []*FactUnion{}
+		} else {
+			fm.UnionFacts = cl
 		}
 	case trueMust:
+		// StatementIf.cpp:219–222 — outputs = map_facts_out[if_false]
 		fm.SetGlobalFacts(CloneFactSlice(elseOut), "auto_call_analysis_603")
-		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
+		}
+		cl := CloneUnionFactSlice(elseOutU)
+		if !UnionFactsComplete(cl) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+		if cl == nil {
+			fm.UnionFacts = []*FactUnion{}
+		} else {
+			fm.UnionFacts = cl
 		}
 	case falseMust:
+		// StatementIf.cpp:223–227 — outputs = map_facts_out[if_true] + makeup from if_false in
 		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_610")
-		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
-		// C++ map[] always; missing → empty makeup; incomplete fails closed
-		in := fm.GetMapFactsIn(st.Else.StmID)
-		if !FactsComplete(in) {
+		cl := CloneUnionFactSlice(thenOutU)
+		if !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+		if cl == nil {
+			fm.UnionFacts = []*FactUnion{}
+		} else {
+			fm.UnionFacts = cl
+		}
+		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
+		in := fm.GetMapFactsIn(st.Else.StmID)
+		inU := fm.GetMapUnionFactsIn(st.Else.StmID)
+		if !FactsComplete(in) || !UnionFactsComplete(inU) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return
 		}
 		if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		if !makeupNewUnionFacts(&fm.UnionFacts, inU) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return
 		}
 	default:
+		// StatementIf.cpp:228–230 — outputs = then_out; merge_facts(outputs, else_out)
 		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_632")
-		// incomplete clone must not invent empty-complete GlobalFacts (bare nil)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return
 		}
 		if !FactsComplete(elseOut) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return
 		}
-		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed sticky
 		_ = MergeFacts(&fm.GlobalFacts, elseOut)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return
 		}
+		// eUnionWrite half of merge_facts (Fact.cpp:192–199 + FactUnion::join)
+		u := CloneUnionFactSlice(thenOutU)
+		if !UnionFactsComplete(u) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+		if u == nil {
+			u = []*FactUnion{}
+		}
+		for _, nf := range elseOutU {
+			u = MergeUnionFactInto(u, nf)
+			if !UnionFactsComplete(u) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return
+			}
+		}
+		fm.UnionFacts = u
 	}
 }
