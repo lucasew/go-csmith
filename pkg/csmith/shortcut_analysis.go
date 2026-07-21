@@ -505,6 +505,8 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		return false
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
+	// curr_blk = parent is set by ValidateAndUpdateFacts / caller (stmt Parent is
+	// the containing Block, not a Stmt field in Go).
 	cg.ClearEffectStm()
 	// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; does not assign
 	// fm->global_facts = inputs. Go VisitFacts* use GlobalFacts as the working set:
@@ -659,6 +661,10 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 		}
 		return false
 	}
+	// Statement.cpp:612 — curr_blk = parent (containing block of this statement).
+	// Soft invent used only stack-top CurrentBlock(); StatementReturn.cpp:83 and
+	// extend_call_chain fallback need curr_blk = parent during FP revisit.
+	cg.CurrBlk = blk
 	if !StmVisitFacts(st, facts, cg, opts) {
 		return false
 	}

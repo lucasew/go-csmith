@@ -38,6 +38,36 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	ClearError()
 }
 
+// Statement.cpp:612 — stm_visit_facts sets curr_blk = parent before visit_facts.
+func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	parent := &Block{Func: f, StmID: AllocStmID()}
+	st := &Stmt{Kind: StmtReturn, StmID: AllocStmID(), Expr: &Expression{
+		Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType(),
+	}}
+	// Return with const may not need RV; still exercise CurrBlk assignment path
+	// via ValidateAndUpdateFacts which sets CurrBlk before StmVisitFacts.
+	fm := NewFactMgr(f)
+	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	f.ReturnType = GetIntType()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// Valid return expr: variable not pointing to locals
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st.Expr = &Expression{Term: TermVariable, Var: g, ExprType: GetIntType()}
+	fm.AddNewVarFact(g)
+	facts := CloneFactSlice(fm.GlobalFacts)
+	// Parent block must be on stack for other paths; CurrBlk set from blk arg
+	f.Stack = []*Block{parent}
+	_ = ValidateAndUpdateFacts(st, &facts, &cg, Defaults(), parent)
+	if cg.CurrBlk != parent {
+		t.Fatalf("CurrBlk must be statement parent after validate, got %v want %v", cg.CurrBlk, parent)
+	}
+	ClearError()
+}
+
 // CGContext.cpp:95–105 — loop-body ctor: expr_depth=0, curr_rhs=nil, empty stm,
 // share EffectAccum, IN_LOOP, optional iv bound.
 func TestWithLoopBodyMatchesCtor(t *testing.T) {

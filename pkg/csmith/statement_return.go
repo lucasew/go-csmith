@@ -18,8 +18,9 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// no_return_dead_ptr: reject returning local-pointing ptrs
 	if opts.NoReturnDeadPointer && st.Expr.Term == TermVariable && st.Expr.Var != nil {
-		// StatementReturn.cpp:83–84 — assert(b); curr_blk required sticky when missing
-		b := cg.CurrentBlock()
+		// StatementReturn.cpp:83–84 — const Block *b = cg_context.curr_blk; assert(b)
+		// Prefer CurrBlk (set in stm_visit_facts) over stack-top CurrentBlock.
+		b := cg.AnalysisBlock()
 		if b == nil {
 			SetError(ErrGeneric)
 			return false

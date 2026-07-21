@@ -51,6 +51,10 @@ type CGContext struct {
 	// CurrRHS mirrors curr_rhs — RHS expression when validating LHS (assign).
 	// CGContext.h:178.
 	CurrRHS *Expression
+	// CurrBlk mirrors curr_blk — statement-parent block set in stm_visit_facts.
+	// CGContext.h:173; Statement.cpp:612 — curr_blk = parent before visit_facts.
+	// Distinct from CurrentBlock() (func stack top / get_current_block).
+	CurrBlk *Block
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -121,6 +125,15 @@ func (c CGContext) CurrentBlock() *Block {
 		return nil
 	}
 	return c.CurrentFunc.Stack[len(c.CurrentFunc.Stack)-1]
+}
+
+// AnalysisBlock prefers curr_blk when set (Statement.cpp:612), else stack top.
+// StatementReturn.cpp:83 — visit_facts uses curr_blk, not get_current_block.
+func (c CGContext) AnalysisBlock() *Block {
+	if c.CurrBlk != nil {
+		return c.CurrBlk
+	}
+	return c.CurrentBlock()
 }
 
 // CGContext flag bits (CGContext.h).
@@ -336,7 +349,11 @@ func (c *CGContext) ExtendCallChain(from CGContext) {
 		}
 	}
 	c.CallChain = append([]*Block(nil), from.CallChain...)
+	// CGContext.cpp:472–476 — get_current_block(); if null, fall back to curr_blk
 	b := from.CurrentBlock()
+	if b == nil {
+		b = from.CurrBlk
+	}
 	if b != nil {
 		c.CallChain = append(c.CallChain, b)
 	}
