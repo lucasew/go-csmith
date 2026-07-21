@@ -253,6 +253,59 @@ func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) 
 	ClearError()
 }
 
+// TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration —
+// FactMgr.cpp:95–103 add_fact_out for all map_facts_out when blk!=null (no
+// in_block filter on outs). Mid-MakeRandomIf the if is not yet in body.Stmts, so
+// tree-only stmtIDInBlock misses nested gotos; parent-local facts must still
+// reach map_facts_out[goto] or merge_jump_facts invents garbage (seed-2 func_11
+// l_1325 pts=[garbage,g_32] → else FP strip).
+func TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "func_11", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// Function body (declaring blk for parent-local) — if not yet linked in Stmts
+	body := &Block{StmID: 514, Func: f}
+	// Else arm mid-construction: Parent set, not yet reachable via body.Stmts
+	els := &Block{StmID: 523, Func: f, Parent: body}
+	// Back-edge goto target assign + nested for body with goto (as in seed-2 else)
+	asg := Stmt{Kind: StmtAssign, StmID: 524}
+	forBody := &Block{StmID: 530, Func: f, Parent: els, Looping: true}
+	gt := Stmt{
+		Kind: StmtGoto, StmID: 540, GotoBack: true,
+		GotoDestStmID: 524, GotoDestParent: els, Label: "lbl",
+	}
+	forBody.Stmts = []Stmt{gt}
+	forSt := Stmt{Kind: StmtFor, StmID: 556, Then: forBody}
+	els.Stmts = []Stmt{asg, forSt}
+	// body.Stmts intentionally empty (if not yet PushStmt) — tree miss for nested
+	f.Blocks = []*Block{body, els, forBody}
+	// map slots as after post_creation of nested stmts
+	for _, id := range []int{asg.StmID, gt.StmID, forSt.StmID, forBody.StmID, els.StmID} {
+		fm.MapFactsIn[id] = []*FactPointTo{}
+		fm.MapFactsOut[id] = []*FactPointTo{}
+	}
+	// Parent-local int16_t* created while still under else (block = body)
+	loc := CreateVariableScalars("l_1325", PointerTo(GetIntType()), false, false)
+	body.LocalVars = append(body.LocalVars, loc) // visibility at dest via IsVarOnStack
+	loc.Init = nil
+	g32 := CreateVariableScalars("g_32", GetIntType(), false, false)
+	loc.InitExpr = &Expression{Term: TermVariable, Var: g32, ExprType: PointerTo(GetIntType())}
+	fm.AddNewVarFactAndUpdate(body, loc)
+	if HasError() {
+		t.Fatalf("AddNewVarFactAndUpdate sticky: err=%v", GetError())
+	}
+	// Goto out must receive the new fact (C++ add_fact_out, not tree in_block)
+	if FindRelatedPointTo(fm.MapFactsOut[gt.StmID], loc) == nil {
+		t.Fatalf("map_facts_out[goto] must get parent-local mid-if construction; out=%v",
+			fm.MapFactsOut[gt.StmID])
+	}
+	// Assign dest also (visible at dest)
+	if FindRelatedPointTo(fm.MapFactsOut[asg.StmID], loc) == nil {
+		t.Fatal("map_facts_out[assign] must get parent-local")
+	}
+	ClearError()
+}
+
 func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	// GenerateNew* FM path: varCollective nil → SetError, no silent invent success
 	// without facts (AddNewVarFactAndUpdate(nil,nil) no-ops).

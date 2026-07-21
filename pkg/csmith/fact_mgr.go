@@ -1744,19 +1744,15 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)
 			}
 		} else {
-			// FactMgr.cpp:99–100 — add_fact_out(stm, f) with visibility filters
-			// Statement* always resolvable for ids under blk; unresolved id fails closed
-			// IncompleteFactSlice on that out slot only (no invent skip as absent, and no
-			// wipe GlobalFacts mid-generation which would poison ERROR_GUARD paths).
+			// FactMgr.cpp:95–103 — when blk!=null, for every map_facts_out entry call
+			// add_fact_out(stm, f) with visibility filters only. C++ does NOT filter
+			// by stm->in_block(blk) on the out map (in_block is only for map_facts_in
+			// lines 88–93). Tree-only stmtIDInBlock invent skipped mid-generation
+			// nested gotos still under construction (if not yet in body.Stmts), so
+			// new parent-locals never reached map_facts_out[goto] → merge_jump_facts
+			// invented garbage (seed-2 func_11: l_1325 pts=[garbage,g_32] → FP strip).
+			// AddFactOut already drops facts not visible at stm / goto dest.
 			for id := range fm.MapFactsOut {
-				if !stmtIDInBlock(fm.Func, id, blk) {
-					// residual ERROR sticky — no invent soft-continue later outs past stmtIDInBlock hole
-					if HasError() {
-						fm.GlobalFacts = IncompleteFactSlice()
-						return
-					}
-					continue
-				}
 				st := FindStmtByID(fm.Func, id)
 				// residual ERROR sticky — no invent soft-continue partial IncompleteFactSlice past FindStmt hole
 				if HasError() {
@@ -1764,7 +1760,9 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					return
 				}
 				if st == nil {
-					fm.MapFactsOut[id] = IncompleteFactSlice()
+					// id may be a Block StmID (map key for block itself) or orphan;
+					// C++ maps Statement* keys only. Soft-skip unresolved (no invent
+					// IncompleteFactSlice wipe of unrelated out slots mid-gen).
 					continue
 				}
 				parent := FindParentBlockOfStmID(fm.Func, id)
@@ -1774,6 +1772,11 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					return
 				}
 				fm.AddFactOut(st, parent, f)
+				// residual ERROR sticky — AddFactOut fail-closed on incomplete IR
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
 			}
 		}
 	}
