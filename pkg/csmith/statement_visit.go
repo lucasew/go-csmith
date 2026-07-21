@@ -210,15 +210,12 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		if HasError() {
 			return false
 		}
-		// Fresh visit_facts: do not inherit map_visited[this] from a prior visit under
-		// different inputs. Stale map_visited forces find_fixed_point to merge prior
-		// continue/break map_facts_out (post-OOS) into entry (Block.cpp:526–536), which
-		// can mark still-relevant pointees garbage and reject in-scope reads as dangling
-		// (seed-2 l_260 → assign 108 → for 124 strip → e10107). map_visited is set again
-		// on successful find_fixed_point / visit_facts (Block.cpp:478, 561).
-		if b.StmID > 0 && cg.FM.MapVisited != nil {
-			delete(cg.FM.MapVisited, b.StmID)
-		}
+		// Block.cpp:471–480 — visit_facts does NOT clear map_visited[this] before
+		// find_fixed_point. Preserving map_visited enables shortcut_analysis on
+		// re-entry (same_facts vs map_facts_in) and fair back-edge merge when already
+		// visited. Inventing delete(map_visited) forced full re-analysis of every
+		// nested call on each outer FP pass (seed-2 func_49 visited 2..6 via func_33
+		// then BUILD_REV fail at 7 / first_div e37241).
 	}
 	// Block.cpp:473–476 — find_fixed_point; fail → reset_effect_accum(pre_effect)
 	out, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)

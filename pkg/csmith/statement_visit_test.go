@@ -852,29 +852,65 @@ func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 	ClearError()
 }
 
-// TestVisitFactsBlockRevisitClearsStaleVisited — each visit_facts starts without
-// merging prior map_facts_out via stale map_visited[this] (seed-2 e10107 path).
-func TestVisitFactsBlockRevisitClearsStaleVisited(t *testing.T) {
+// TestVisitFactsBlockPreservesMapVisitedForShortcut — Block.cpp:471–480.
+// visit_facts does not clear map_visited[this]; find_fixed_point may merge
+// back-edges when already visited and shortcut when inputs match map_facts_in.
+// Inventing delete(map_visited) caused extra full re-analysis of nested calls
+// (seed-2 func_49 VisitFacts ×5 then BUILD_REV fail / first_div e37241).
+func TestVisitFactsBlockPreservesMapVisitedForShortcut(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	body := &Block{StmID: 50, Func: f, Looping: false, Stmts: nil}
+	// Prior successful visit: map_visited + map_facts_in/out match entry.
+	entry := []*FactPointTo{}
+	fm.MapVisited = map[int]bool{50: true}
+	fm.SetMapFactsIn(50, entry)
+	fm.SetMapFactsOut(50, entry)
+	fm.SetMapStmEffect(50, EmptyEffect())
+	fm.GlobalFacts = entry
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsBlock(body, &cg, Defaults()) {
+		t.Fatalf("VisitFactsBlock must succeed via shortcut/FP err=%v", HasError())
+	}
+	if fm.MapVisited == nil || !fm.MapVisited[50] {
+		t.Fatal("map_visited[body] must remain true after visit_facts")
+	}
+	ClearError()
+}
+
+// TestVisitFactsBlockMergesBackEdgesWhenVisited — Block.cpp:526–536 when
+// map_visited[this]: merge map_facts_out of back edges into current inputs.
+func TestVisitFactsBlockMergesBackEdgesWhenVisited(t *testing.T) {
 	ClearError()
 	SetProcessOptions(Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	body := &Block{StmID: 50, Func: f, Looping: true, Stmts: nil}
 	fm.MapVisited = map[int]bool{50: true}
-	p := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
 	loc := CreateVariableScalars("l_loc", GetIntType(), false, false)
-	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointToSet(p, []*Variable{loc, GarbagePtr})})
+	// Back-edge out includes garbage may-null; merge must not invent strip.
+	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointToSet(ptr, []*Variable{loc, GarbagePtr})})
 	fm.CreateCFGEdge(99, body, false, true)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, loc)}
+	// map_facts_in empty so pure shortcut on unmerged entry is not taken first;
+	// with map_visited, merge runs then full/shortcut path.
+	fm.SetMapFactsIn(50, []*FactPointTo{})
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(ptr, loc)}
 	cg := EmptyCGContext().WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
+	// Empty body: FP should complete (merge + analyze zero stmts).
 	if !VisitFactsBlock(body, &cg, Defaults()) {
-		t.Fatalf("revisit must succeed with clean entry err=%v", HasError())
+		t.Fatalf("empty looping body with back edge must FP err=%v", HasError())
 	}
 	if fm.MapVisited == nil || !fm.MapVisited[50] {
-		t.Fatal("success must set map_visited[body]")
+		t.Fatal("map_visited[body] after success")
 	}
 	ClearError()
 }
