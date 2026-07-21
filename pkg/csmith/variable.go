@@ -773,10 +773,12 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 		SetError(ErrGeneric)
 		return nil
 	}
+	// C++ Variable stores its own CVQualifiers value (owning vectors). Clone so
+	// later Restrict/set_* on a shared qfer argument cannot mutate this Variable.
 	v := &Variable{
 		Name: name,
 		Type: typ,
-		Qfer: qfer,
+		Qfer: qfer.Clone(),
 		Init: init,
 	}
 	if typ.IsAggregate() {

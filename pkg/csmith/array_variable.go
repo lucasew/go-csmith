@@ -121,7 +121,7 @@ func CreateArrayVariable(
 		Variable: Variable{
 			Name:       name,
 			Type:       elem, // element type
-			Qfer:       qfer,
+			Qfer:       qfer.Clone(), // own vectors (C++ Variable value-copy)
 			IsArray:    true,
 			Init:       init,
 			ArraySizes: sizes,
@@ -585,7 +585,7 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 		Variable: Variable{
 			Name:       av.Name,
 			Type:       av.Type,
-			Qfer:       av.Qfer,
+			Qfer:       av.Qfer.Clone(), // do not share collective qfer vectors
 			IsArray:    true,
 			Init:       av.Init,
 			InitExpr:   av.InitExpr,
@@ -1136,7 +1136,7 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 		Variable: Variable{
 			Name:       av.Name,
 			Type:       av.Type,
-			Qfer:       av.Qfer,
+			Qfer:       av.Qfer.Clone(), // do not share collective qfer vectors
 			IsArray:    true,
 			Init:       av.Init,
 			InitExpr:   av.InitExpr,
