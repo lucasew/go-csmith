@@ -2568,7 +2568,8 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 		changed = true
 	}
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
-	ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, rhs)
+	// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
+	ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, rhs)
 	// incomplete abstract must not invent empty union merge success; leave prior
 	// complete UnionFacts for factory re-pick (do not poison)
 	if !UnionFactsComplete(ufacts) {
@@ -2581,6 +2582,21 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 			SetError(ErrGeneric)
 			return false
 		}
+		if lvarCnt == 1 && uf.Var != nil && !uf.Var.IsArray {
+			// definitive assignment — renew (strong replace), FactMgr.cpp:379–381
+			if RenewUnionFact(&fm.UnionFacts, uf) {
+				changed = true
+			}
+			if HasError() || !UnionFactsComplete(fm.UnionFacts) {
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+			continue
+		}
+		// may-assign — merge_fact lattice join
 		merged := MergeUnionFact(fm.UnionFacts, uf)
 		if !UnionFactsComplete(merged) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -2599,7 +2615,9 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	return changed
 }
 
-// MergeUnionFact replaces or appends a union fact by subject.
+// MergeUnionFact mirrors merge_fact for eUnionWrite (Fact.cpp:149–171).
+// Related subject: if old already implies new, keep old; else clone new and join(old).
+// Unrelated: append. Distinct from renew_fact / RenewUnionFact (strong replace).
 // FactUnion* always live; nil f or map hole fails closed sticky IncompleteUnionFactSlice
 // (no invent empty-complete via UnionFactsComplete(nil) / soft re-pick past wipe).
 func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
@@ -2612,11 +2630,38 @@ func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 		return IncompleteUnionFactSlice()
 	}
 	for i, old := range facts {
-		if old.Var == f.Var {
-			facts[i] = f
+		if old == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		if old.Var != f.Var {
+			continue
+		}
+		// Fact.cpp:155–163 — if old.imply(new) keep old; else copy=new.clone(); copy.join(old)
+		if old.Imply(f) {
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
 			return facts
 		}
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		cp := f.Clone()
+		if cp == nil || HasError() {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return IncompleteUnionFactSlice()
+		}
+		cp.Join(old)
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		facts[i] = cp
+		return facts
 	}
+	// Fact.cpp:167–169 — not found: push_back(new_fact)
 	return append(facts, f)
 }
 
@@ -3123,7 +3168,8 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 		changed = true
 	}
 	if fm != nil {
-		ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
+		// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
+		ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
 		// incomplete abstract: fail closed without poisoning prior complete UnionFacts
 		if !UnionFactsComplete(ufacts) {
 			return false
@@ -3134,6 +3180,19 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				SetError(ErrGeneric)
 				return false
+			}
+			if lvarCnt == 1 && uf.Var != nil && !uf.Var.IsArray {
+				if RenewUnionFact(&fm.UnionFacts, uf) {
+					changed = true
+				}
+				if HasError() || !UnionFactsComplete(fm.UnionFacts) {
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return false
+				}
+				continue
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
