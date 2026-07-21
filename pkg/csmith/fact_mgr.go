@@ -1140,16 +1140,23 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 
 // BackupStmFactMaps mirrors FactMgr::backup_stm_fact_maps for a statement tree.
 // FactMgr.cpp:516–531 — copy in/out maps for stm and nested blocks.
+// C++ map_facts_in/out are full FactVec (ePointTo + eUnionWrite). Soft invent was
+// PT-only backup so restore left MapUnionFacts* stale → IsNonreadableField drift
+// after goto revisit / fixed-point (seed-7 eligible pool half-size).
 // Incomplete source maps store hole markers (no invent cleaned partial clones).
 // Incomplete get_blocks tree (nil if-arm) fails closed sticky: root maps backed as
 // IncompleteFactSlice (no invent root-only complete backup / soft re-pick past hole).
 // FactMgr + Statement + dest maps always live; sticky (no invent soft-skip backup past hole).
-func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
+func (fm *FactMgr) BackupStmFactMaps(
+	st *Stmt,
+	factsIn, factsOut map[int][]*FactPointTo,
+	unionIn, unionOut map[int][]*FactUnion,
+) {
 	if fm == nil || st == nil {
 		SetError(ErrGeneric)
 		return
 	}
-	if factsIn == nil || factsOut == nil {
+	if factsIn == nil || factsOut == nil || unionIn == nil || unionOut == nil {
 		SetError(ErrGeneric)
 		return
 	}
@@ -1166,12 +1173,14 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 		if !StmIDUnset(st.StmID) {
 			factsIn[st.StmID] = IncompleteFactSlice()
 			factsOut[st.StmID] = IncompleteFactSlice()
+			unionIn[st.StmID] = IncompleteUnionFactSlice()
+			unionOut[st.StmID] = IncompleteUnionFactSlice()
 		}
 		SetError(ErrGeneric)
 		return
 	}
 	for _, b := range blks {
-		fm.backupBlockFactMaps(b, factsIn, factsOut)
+		fm.backupBlockFactMaps(b, factsIn, factsOut, unionIn, unionOut)
 	}
 	if !StmIDUnset(st.StmID) {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
@@ -1180,12 +1189,22 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 		if out, ok := fm.MapFactsOut[st.StmID]; ok {
 			factsOut[st.StmID] = storeFactMapEntry(out)
 		}
+		if in, ok := fm.MapUnionFactsIn[st.StmID]; ok {
+			unionIn[st.StmID] = storeUnionFactMapEntry(in)
+		}
+		if out, ok := fm.MapUnionFactsOut[st.StmID]; ok {
+			unionOut[st.StmID] = storeUnionFactMapEntry(out)
+		}
 	}
 }
 
 // backupBlockFactMaps walks one block tree for BackupStmFactMaps.
 // Block always live after parent incomplete check; sticky (no invent soft-skip backup past hole).
-func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*FactPointTo) {
+func (fm *FactMgr) backupBlockFactMaps(
+	b *Block,
+	factsIn, factsOut map[int][]*FactPointTo,
+	unionIn, unionOut map[int][]*FactUnion,
+) {
 	if b == nil {
 		SetError(ErrGeneric)
 		return
@@ -1197,20 +1216,34 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 		if out, ok := fm.MapFactsOut[b.StmID]; ok {
 			factsOut[b.StmID] = storeFactMapEntry(out)
 		}
+		if in, ok := fm.MapUnionFactsIn[b.StmID]; ok {
+			unionIn[b.StmID] = storeUnionFactMapEntry(in)
+		}
+		if out, ok := fm.MapUnionFactsOut[b.StmID]; ok {
+			unionOut[b.StmID] = storeUnionFactMapEntry(out)
+		}
 	}
 	for i := range b.Stmts {
-		fm.BackupStmFactMaps(&b.Stmts[i], factsIn, factsOut)
+		fm.BackupStmFactMaps(&b.Stmts[i], factsIn, factsOut, unionIn, unionOut)
 	}
 }
 
 // RestoreStmFactMaps mirrors FactMgr::restore_stm_fact_maps.
-// FactMgr.cpp:533–548.
+// FactMgr.cpp:533–548 — full FactVec (ePointTo + eUnionWrite) partitions.
 // Incomplete backup entries restore as hole markers (storeFactMapEntry).
 // Incomplete get_blocks tree fails closed sticky: root maps set IncompleteFactSlice
 // (no invent soft-skip nil arm then restore root/sibling as complete tree).
 // FactMgr + Statement always live; sticky (no invent soft-skip restore past hole).
-func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
+func (fm *FactMgr) RestoreStmFactMaps(
+	st *Stmt,
+	factsIn, factsOut map[int][]*FactPointTo,
+	unionIn, unionOut map[int][]*FactUnion,
+) {
 	if fm == nil || st == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if factsIn == nil || factsOut == nil || unionIn == nil || unionOut == nil {
 		SetError(ErrGeneric)
 		return
 	}
@@ -1219,6 +1252,12 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 	}
 	if fm.MapFactsOut == nil {
 		fm.MapFactsOut = make(map[int][]*FactPointTo)
+	}
+	if fm.MapUnionFactsIn == nil {
+		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
+	}
+	if fm.MapUnionFactsOut == nil {
+		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
 	blks := GetBlocksStmt(st)
 	incomplete := false
@@ -1232,12 +1271,14 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 		if !StmIDUnset(st.StmID) {
 			fm.MapFactsIn[st.StmID] = IncompleteFactSlice()
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			fm.MapUnionFactsIn[st.StmID] = IncompleteUnionFactSlice()
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 		}
 		SetError(ErrGeneric)
 		return
 	}
 	for _, b := range blks {
-		fm.restoreBlockFactMaps(b, factsIn, factsOut)
+		fm.restoreBlockFactMaps(b, factsIn, factsOut, unionIn, unionOut)
 	}
 	if !StmIDUnset(st.StmID) {
 		if in, ok := factsIn[st.StmID]; ok {
@@ -1250,12 +1291,26 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 		} else {
 			delete(fm.MapFactsOut, st.StmID)
 		}
+		if in, ok := unionIn[st.StmID]; ok {
+			fm.MapUnionFactsIn[st.StmID] = storeUnionFactMapEntry(in)
+		} else {
+			delete(fm.MapUnionFactsIn, st.StmID)
+		}
+		if out, ok := unionOut[st.StmID]; ok {
+			fm.MapUnionFactsOut[st.StmID] = storeUnionFactMapEntry(out)
+		} else {
+			delete(fm.MapUnionFactsOut, st.StmID)
+		}
 	}
 }
 
 // restoreBlockFactMaps walks one block tree for RestoreStmFactMaps.
 // Block always live after parent incomplete check; sticky (no invent soft-skip restore past hole).
-func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*FactPointTo) {
+func (fm *FactMgr) restoreBlockFactMaps(
+	b *Block,
+	factsIn, factsOut map[int][]*FactPointTo,
+	unionIn, unionOut map[int][]*FactUnion,
+) {
 	if b == nil {
 		SetError(ErrGeneric)
 		return
@@ -1271,9 +1326,19 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 		} else {
 			delete(fm.MapFactsOut, b.StmID)
 		}
+		if in, ok := unionIn[b.StmID]; ok {
+			fm.MapUnionFactsIn[b.StmID] = storeUnionFactMapEntry(in)
+		} else {
+			delete(fm.MapUnionFactsIn, b.StmID)
+		}
+		if out, ok := unionOut[b.StmID]; ok {
+			fm.MapUnionFactsOut[b.StmID] = storeUnionFactMapEntry(out)
+		} else {
+			delete(fm.MapUnionFactsOut, b.StmID)
+		}
 	}
 	for i := range b.Stmts {
-		fm.RestoreStmFactMaps(&b.Stmts[i], factsIn, factsOut)
+		fm.RestoreStmFactMaps(&b.Stmts[i], factsIn, factsOut, unionIn, unionOut)
 	}
 }
 

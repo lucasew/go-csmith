@@ -220,11 +220,11 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	in := map[int][]*FactPointTo{}
 	out := map[int][]*FactPointTo{}
-	fm.BackupStmFactMaps(st, in, out)
+	fm.BackupStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	// mutate
 	fm.SetMapFactsIn(10, nil)
 	fm.SetMapFactsOut(21, nil)
-	fm.RestoreStmFactMaps(st, in, out)
+	fm.RestoreStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if FindRelatedPointTo(fm.MapFactsIn[10], p) == nil {
 		t.Fatal("restored in")
 	}
@@ -238,7 +238,7 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	bad := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
 	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
-	fm.BackupStmFactMaps(bad, in2, out2)
+	fm.BackupStmFactMaps(bad, in2, out2, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if _, ok := out2[21]; ok {
 		t.Fatal("incomplete if must not invent nested backup past nil Else")
 	}
@@ -247,6 +247,48 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("incomplete if BackupStmFactMaps must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
+	// FactMgr.cpp:516–548 — map_facts_in/out are full FactVec (ePointTo + eUnionWrite).
+	// Soft invent was PT-only backup: restore left MapUnionFacts* at post-mutate state.
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u", ut, false, false)
+	parent.CreateFieldVars()
+	entryU := MakeFactUnion(parent, 0)
+	exitU := MakeFactUnion(parent, 1)
+	if entryU == nil || exitU == nil {
+		t.Fatal("MakeFactUnion")
+	}
+	fm := NewFactMgr(nil)
+	st := &Stmt{Kind: StmtAssign, StmID: 15}
+	fm.SetMapFactsInPair(15, []*FactPointTo{}, []*FactUnion{entryU})
+	fm.SetMapFactsOutPair(15, []*FactPointTo{}, []*FactUnion{exitU})
+	in := map[int][]*FactPointTo{}
+	out := map[int][]*FactPointTo{}
+	uin := map[int][]*FactUnion{}
+	uout := map[int][]*FactUnion{}
+	fm.BackupStmFactMaps(st, in, out, uin, uout)
+	// mutate union maps after backup
+	fm.SetMapFactsInPair(15, []*FactPointTo{}, []*FactUnion{exitU})
+	fm.SetMapFactsOutPair(15, []*FactPointTo{}, []*FactUnion{entryU})
+	fm.RestoreStmFactMaps(st, in, out, uin, uout)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	gotIn := fm.GetMapUnionFactsIn(15)
+	gotOut := fm.GetMapUnionFactsOut(15)
+	if len(gotIn) != 1 || gotIn[0] == nil || gotIn[0].LastWrittenFID != 0 {
+		t.Fatalf("restored union in want fid 0, got %#v", gotIn)
+	}
+	if len(gotOut) != 1 || gotOut[0] == nil || gotOut[0].LastWrittenFID != 1 {
+		t.Fatalf("restored union out want fid 1, got %#v", gotOut)
 	}
 	ClearError()
 }
@@ -264,7 +306,7 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 	}
 	in := map[int][]*FactPointTo{}
 	out := map[int][]*FactPointTo{}
-	fm.BackupStmFactMaps(st, in, out)
+	fm.BackupStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if FactsComplete(in[15]) {
 		t.Fatal("incomplete MapFactsIn must backup incomplete, not invent cleaned")
 	}
@@ -276,7 +318,7 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 	fm.MapFactsOut[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	in[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	out[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	fm.RestoreStmFactMaps(st, in, out)
+	fm.RestoreStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if FactsComplete(fm.MapFactsIn[15]) || FactsComplete(fm.MapFactsOut[15]) {
 		t.Fatal("restore incomplete backup must fail closed incomplete")
 	}

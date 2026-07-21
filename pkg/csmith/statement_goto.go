@@ -625,10 +625,13 @@ func MakeRandomGoto(
 			foundNewFacts = true
 			factsInCopy := make(map[int][]*FactPointTo)
 			factsOutCopy := make(map[int][]*FactPointTo)
-			fm.BackupStmFactMaps(dest, factsInCopy, factsOutCopy)
+			unionInCopy := make(map[int][]*FactUnion)
+			unionOutCopy := make(map[int][]*FactUnion)
+			fm.BackupStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 			// feed merged facts as global for visit (stm_visit_facts inputs)
+			// Full FactVec: ePointTo + eUnionWrite (FactMgr.cpp backup/restore).
 			if !FactsComplete(stmInMerged) {
-				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				SetError(ErrGeneric)
 				return makeGotoFailed()
@@ -643,14 +646,35 @@ func MakeRandomGoto(
 			// fail → extra Select). MakeupNewVarFacts restores those locals
 			// from the live GlobalFacts into the visit inputs (FactMgr.cpp:494–508).
 			liveSaved := CloneFactSlice(fm.GlobalFacts)
-			if !FactsComplete(liveSaved) {
-				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+			liveSavedU := CloneUnionFactSlice(fm.UnionFacts)
+			if !FactsComplete(liveSaved) || !UnionFactsComplete(liveSavedU) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
 			if !MakeupNewVarFacts(&stmInMerged, liveSaved) {
-				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return makeGotoFailed()
+			}
+			// eUnionWrite half: map_in union + makeup new subjects from live
+			stmInMergedU := fm.GetMapUnionFactsIn(dest.StmID)
+			if !UnionFactsComplete(stmInMergedU) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				SetError(ErrGeneric)
+				return makeGotoFailed()
+			}
+			stmInMergedU = append([]*FactUnion(nil), stmInMergedU...)
+			if stmInMergedU == nil {
+				stmInMergedU = []*FactUnion{}
+			}
+			if !makeupNewUnionFacts(&stmInMergedU, liveSavedU) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				if !HasError() {
 					SetError(ErrGeneric)
@@ -658,16 +682,31 @@ func MakeRandomGoto(
 				return makeGotoFailed()
 			}
 			fm.SetGlobalFacts(CloneFactSlice(stmInMerged), "auto_statement_goto_664")
+			if !UnionFactsComplete(stmInMergedU) {
+				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
+				fm.UnionFacts = liveSavedU
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				SetError(ErrGeneric)
+				return makeGotoFailed()
+			}
+			if stmInMergedU == nil {
+				fm.UnionFacts = []*FactUnion{}
+			} else {
+				fm.UnionFacts = CloneUnionFactSlice(stmInMergedU)
+			}
 			if !VisitFactsStmt(dest, cg, opts) {
 				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
-				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				fm.UnionFacts = liveSavedU
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
 			}
-			// visit may update GlobalFacts as outs; incomplete fails closed sticky
-			if !FactsComplete(fm.GlobalFacts) {
+			// visit may update GlobalFacts/UnionFacts as outs; incomplete fails closed sticky
+			if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
-				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				fm.UnionFacts = liveSavedU
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				SetError(ErrGeneric)
 				return makeGotoFailed()

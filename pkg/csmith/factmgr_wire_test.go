@@ -646,12 +646,12 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil FM SetMapFactsOutForStmtDest must SetError sticky")
 	}
 	ClearError()
-	(*FactMgr)(nil).BackupStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{})
+	(*FactMgr)(nil).BackupStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{}, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if !HasError() {
 		t.Fatal("nil FM BackupStmFactMaps must SetError sticky")
 	}
 	ClearError()
-	(*FactMgr)(nil).RestoreStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{})
+	(*FactMgr)(nil).RestoreStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{}, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if !HasError() {
 		t.Fatal("nil FM RestoreStmFactMaps must SetError sticky")
 	}
