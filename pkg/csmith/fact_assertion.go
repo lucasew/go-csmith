@@ -463,8 +463,10 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		label = st.SourceLabel
 	}
 	if label != "" {
+		// Statement.cpp:910–912 — out << label << ":" << attr << endl;
+		// NO output_tab: labels always column 0 (seed-2 lbl_1269:).
+		_ = indent
 		var b strings.Builder
-		b.WriteString(indent)
 		b.WriteString(label)
 		b.WriteString(":")
 		attr := st.LabelAttr

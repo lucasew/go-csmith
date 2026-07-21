@@ -258,6 +258,57 @@ func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
 	}
 }
 
+// FunctionInvocationUnary.cpp:229–242 — standard unary is "(" + op + arg.Output + ")"
+// with no extra parens around the arg (param_value[0]->Output only).
+// Seed-2: (~(safe_unary_minus…)) not (~((safe_unary_minus…))).
+func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
+	ClearError()
+	// nested: ~ applied to a safe unary-minus invocation
+	innerArg := &Expression{Term: TermConstant, Con: MakeInt(-10)}
+	minus := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "-",
+		Args:        []*Expression{innerArg},
+		Safe:        &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt8},
+		OutSafeMath: true,
+	}
+	innerExpr := &Expression{Term: TermFunction, Invoke: minus}
+	bitNot := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "~",
+		Args: []*Expression{innerExpr},
+	}
+	out := bitNot.Output()
+	// C++ shape: (~(safe_unary_minus_func_int8_t_s((-10L))))
+	if !strings.Contains(out, "safe_unary_minus_func_int8_t_s") {
+		t.Fatal(out)
+	}
+	if strings.Contains(out, "~((") {
+		t.Fatalf("extra parens after ~: %s", out)
+	}
+	if !strings.HasPrefix(out, "(~(") || !strings.HasSuffix(out, "))") {
+		t.Fatalf("want (~(safe…)), got %s", out)
+	}
+	// ! on bare constant: (!4294967295UL) not (!(4294967295UL)) — Constant may already paren
+	// use a simple non-paren-wrapped path via variable name
+	v := CreateVariableScalars("g_x", GetIntType(), true, false)
+	not := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "!",
+		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntType()}},
+	}
+	nout := not.Output()
+	if nout != "(!g_x)" {
+		t.Fatalf("eNot want (!g_x) got %q", nout)
+	}
+	// unary plus
+	plus := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "+",
+		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntType()}},
+	}
+	if plus.Output() != "(+g_x)" {
+		t.Fatalf("ePlus want (+g_x) got %q", plus.Output())
+	}
+	ClearError()
+}
+
 func TestBinaryOutputIdentifyWrappers(t *testing.T) {
 	ClearSafeOpWrapperNames()
 	defer ClearSafeOpWrapperNames()

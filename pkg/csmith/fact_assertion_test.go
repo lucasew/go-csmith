@@ -283,11 +283,18 @@ func TestIsTopEmpty(t *testing.T) {
 
 func TestPreOutputLabelSkipsStepHash(t *testing.T) {
 	// Statement.cpp:905–917 — jump target emits label, not step_hash
+	// Statement.cpp:910 — no output_tab; label always column 0
 	ClearError()
 	st := &Stmt{Kind: StmtAssign, StmID: 5, SourceLabel: "lbl_1"}
 	out, tgt := PreOutput(st, nil, true, false, nil, "    ")
 	if !tgt || !strings.Contains(out, "lbl_1:") {
 		t.Fatal(out, tgt)
+	}
+	if strings.HasPrefix(out, " ") || strings.HasPrefix(out, "\t") {
+		t.Fatalf("label must be column 0, got %q", out)
+	}
+	if out != "lbl_1:\n" {
+		t.Fatalf("want lbl_1:\\n got %q", out)
 	}
 	if strings.Contains(out, "step_hash") {
 		t.Fatal("goto target must not step_hash", out)

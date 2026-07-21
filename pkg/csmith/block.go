@@ -1552,8 +1552,8 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			content.WriteString(")\n")
 			content.WriteString(inner + "    continue;\n")
 		case StmtFor:
-			// StatementFor::Output — header + body Block always live
-			// sticky no invent for(;;) / header without body / body without header
+			// StatementFor.cpp:422–424 — output_header(indent); body.Output(indent)
+			// same indent as for (not indent+1). sticky no invent for(;;) / missing body
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 				SetError(ErrGeneric)
 				return ""
@@ -1563,7 +1563,8 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			if HasError() {
 				return ""
 			}
-			bodyOut := st.Then.Output(indent + 1)
+			// body pad matches statement indent; outer sb prefixes first line with inner
+			bodyOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
 			if HasError() {
 				return ""
@@ -1575,7 +1576,7 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			content.WriteString(hdr + "\n")
 			content.WriteString(bodyOut)
 		case StmtIfElse:
-			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
+			// StatementIf.cpp:139–159 — if_true/if_false.Output(indent) same as condition
 			// sticky no invent if () / missing branches / empty test or branch Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
 				SetError(ErrGeneric)
@@ -1586,12 +1587,12 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			if HasError() {
 				return ""
 			}
-			thenOut := st.Then.Output(indent + 1)
+			thenOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue else past Then residual
 			if HasError() {
 				return ""
 			}
-			elseOut := st.Else.Output(indent + 1)
+			elseOut := st.Else.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past Else residual
 			if HasError() {
 				return ""
@@ -1626,10 +1627,9 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			content.WriteString(")\n")
 			content.WriteString(inner + "    goto " + st.Label + ";\n")
 		case StmtArrayOp:
-			// StatementArrayOp::output_header + body/init block always live
-			// nested dims carry Then; array-loop path reuses for body as Then
-			// sticky no invent header without body
-			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+			// StatementArrayOp.cpp:225–267 — header; body Block OR bare-brace init_value
+			// sticky no invent header without body/init
+			if st.Loop == nil || st.Loop.IV == nil {
 				SetError(ErrGeneric)
 				return ""
 			}
@@ -1638,16 +1638,82 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			if HasError() {
 				return ""
 			}
-			bodyOut := st.Then.Output(indent + 1)
-			// residual ERROR sticky — no invent soft-continue stmt past body residual
-			if HasError() {
-				return ""
-			}
-			if hdr == "" || bodyOut == "" {
+			if hdr == "" {
 				SetError(ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
+			// StatementArrayOp.cpp:231–258 — init_value path: bare "{" (no block id)
+			// ArrayAccess set on make_random_array_init; C++ body==null.
+			if st.ArrayAccess != "" && st.Expr != nil {
+				// pad matches for indent (content gets outer inner on first line only)
+				pad := strings.Repeat("    ", indent)
+				content.WriteString(pad + "{\n")
+				// StatementArrayOp.cpp:237–254 — aggregate constant → tmp; else direct
+				assignPad := strings.Repeat("    ", indent+1)
+				if st.Expr.Term == TermConstant && st.LhsVar != nil && st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
+					ty := st.LhsVar.Type.CName()
+					rhs := st.Expr.Output()
+					if HasError() {
+						return ""
+					}
+					if ty == "" || rhs == "" {
+						SetError(ErrGeneric)
+						return ""
+					}
+					content.WriteString(assignPad + ty + " tmp = " + rhs + ";\n")
+					content.WriteString(assignPad + st.ArrayAccess + " = tmp;\n")
+				} else {
+					rhs := st.Expr.Output()
+					if HasError() {
+						return ""
+					}
+					if rhs == "" {
+						SetError(ErrGeneric)
+						return ""
+					}
+					content.WriteString(assignPad + st.ArrayAccess + " = " + rhs + ";\n")
+				}
+				content.WriteString(pad + "}\n")
+				break
+			}
+			// StatementArrayOp.cpp:229–230 — body->Output(indent) when body non-null
+			if st.Then == nil {
+				SetError(ErrGeneric)
+				return ""
+			}
+			// Nested multi-dim may wrap child StmtArrayOp in a synthetic Block.
+			// Intermediate bare "{" between dims: StatementArrayOp.cpp:198–200.
+			if len(st.Then.Stmts) == 1 && st.Then.Stmts[0].Kind == StmtArrayOp {
+				// emit child at same indent under bare brace like C++ header nest
+				pad := strings.Repeat("    ", indent)
+				content.WriteString(pad + "{\n")
+				// child's for is at indent+1; use output of one statement via temp block
+				child := st.Then.Stmts[0]
+				nest := &Block{Stmts: []Stmt{child}, EmitFM: b.EmitFM, EmitStepHash: b.EmitStepHash,
+					EmitLabelAttrs: b.EmitLabelAttrs, LabelAttrRng: b.LabelAttrRng,
+					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise}
+				childOut := nest.outputStmtsOnly(indent + 1)
+				if HasError() {
+					return ""
+				}
+				if childOut == "" {
+					SetError(ErrGeneric)
+					return ""
+				}
+				content.WriteString(childOut)
+				content.WriteString(pad + "}\n")
+				break
+			}
+			bodyOut := st.Then.Output(indent)
+			// residual ERROR sticky — no invent soft-continue stmt past body residual
+			if HasError() {
+				return ""
+			}
+			if bodyOut == "" {
+				SetError(ErrGeneric)
+				return ""
+			}
 			content.WriteString(bodyOut)
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
@@ -1667,12 +1733,13 @@ func (b *Block) outputStmtsOnly(indent int) string {
 			}
 			content.WriteString(out + ";\n")
 		case StmtBlock:
-			// Statement.cpp:281–282 — nested Block::Output always live sticky
+			// Block is Statement; OutputStatementList calls Block::Output at same indent
+			// sticky no invent empty nested shell
 			if st.Then == nil {
 				SetError(ErrGeneric)
 				return ""
 			}
-			bodyOut := st.Then.Output(indent + 1)
+			bodyOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past nested residual
 			if HasError() {
 				return ""

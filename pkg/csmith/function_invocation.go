@@ -219,10 +219,12 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		// need_cast when Safe flags exist but avoid_signed_overflow off
 		return unaryCastMinus(fi.Safe.SizeToken(), a0)
 	}
-	// FunctionInvocationUnary.cpp:226–239 — standard form (op)(arg)
+	// FunctionInvocationUnary.cpp:192–242 — outer "(" + op + [cast] + arg.Output + ")"
+	// C++ does NOT wrap arg in extra parens after op (param_value[0]->Output only).
+	// Unfair "(%s(%s))" produced (~((safe_unary…))) vs C++ (~(safe_unary…)).
 	switch fi.Unary {
 	case "+", "-", "!", "~":
-		return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
+		return fmt.Sprintf("(%s%s)", fi.Unary, a0)
 	default:
 		// assert invalid operator — sticky no invent emit
 		SetError(ErrGeneric)

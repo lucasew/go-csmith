@@ -325,3 +325,53 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 		t.Fatal("concise should skip block id", out2)
 	}
 }
+
+// StatementFor.cpp:422–424 / StatementArrayOp.cpp:230 — body.Output(indent)
+// same as header (not indent+1). Unfair indent+1: "for\n        {" vs "for\n    {".
+func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
+	ClearError()
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	body := &Block{StmID: 7, Stmts: []Stmt{{
+		Kind: StmtReturn,
+		Expr: &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()},
+	}}}
+	// ArrayOp header only needs IV + InitN/LimitN/IncrN (numeric), same indent rule
+	parent := &Block{StmID: 1, Stmts: []Stmt{{
+		Kind: StmtArrayOp, StmID: 2,
+		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1},
+		Then: body,
+	}}}
+	out := parent.Output(0)
+	if out == "" || HasError() {
+		t.Fatalf("Output empty/err: %q sticky=%v", out, HasError())
+	}
+	lines := strings.Split(out, "\n")
+	var forLine, braceLine string
+	for i, l := range lines {
+		if strings.Contains(l, "for (") {
+			forLine = l
+			if i+1 < len(lines) {
+				braceLine = lines[i+1]
+			}
+			break
+		}
+	}
+	if forLine == "" || braceLine == "" {
+		t.Fatalf("missing for/brace in:\n%s", out)
+	}
+	lead := func(s string) int {
+		n := 0
+		for _, c := range s {
+			if c == ' ' {
+				n++
+			} else {
+				break
+			}
+		}
+		return n
+	}
+	if lead(forLine) != lead(braceLine) {
+		t.Fatalf("for indent %d vs body brace %d\nfor:%q\nbrace:%q\nout:\n%s",
+			lead(forLine), lead(braceLine), forLine, braceLine, out)
+	}
+}
