@@ -535,7 +535,8 @@ func BuildUserInvocation(
 	}
 	fi := &Invocation{User: callee}
 	// FunctionInvocationUser.cpp:249–270 — running effect context across params
-	running := cg.EffectContext()
+	// Effect.cpp:84–89 — ambient is value-copied into child contexts (deep vector copy).
+	running := cg.EffectContext().detachMaps()
 	for _, p := range callee.Param {
 		// FunctionInvocationUser.cpp:256–258 — v->type / &v->qfer; sticky no invent soft-skip param hole
 		if p == nil || p.Type == nil {
@@ -758,7 +759,7 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:181–197 — build all parameters before body
 	fi := &Invocation{User: callee}
-	running := cg.EffectContext()
+	running := cg.EffectContext().detachMaps()
 	for _, p := range callee.Param {
 		// FunctionInvocationUser.cpp:185–187 — v->type; sticky no invent soft-skip param hole
 		if p == nil || p.Type == nil {
@@ -1152,7 +1153,7 @@ func MakeRandomBinaryInvocation(
 	// FunctionInvocation.cpp:208–216 — LHS under dedicated accum + ambient effect_context
 	lhsAccum := EmptyEffect()
 	lhsCG := cg.CloneSubcontext()
-	lhsCG.effectContext = cg.EffectContext()
+	lhsCG.effectContext = cg.EffectContext().detachMaps()
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()
 	// FunctionInvocation.cpp:216 — Expression::make_random(lhs_cg, lhs_type) — no_func=false
@@ -1400,7 +1401,7 @@ func MakeRandomBinaryPtrComparison(
 	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func=true
 	lhsAccum := EmptyEffect()
 	lhsCG := cg.CloneSubcontext()
-	lhsCG.effectContext = cg.EffectContext()
+	lhsCG.effectContext = cg.EffectContext().detachMaps()
 	lhsCG.Flags |= FlagNoDanglingPtr
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()

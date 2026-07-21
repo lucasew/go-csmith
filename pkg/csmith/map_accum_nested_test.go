@@ -108,6 +108,49 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 	ClearError()
 }
 
+// Effect.cpp:84–89 — map_stm_effect assignment deep-copies vectors. Soft invent was
+// shallow SetMapStmEffect(cg.EffectStm) so live EffectStm COW / AddEffect into
+// GetMapStmEffect results shared maps with the store; Block::set_accumulated_effect
+// then alias-corrupted snapshots used as generation ambient (seed-7 ChooseOKVar
+// n=26 vs UP n=56 when effect_context seFree poisoned by shared write sets).
+func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
+	ClearError()
+	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
+	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
+	g3 := CreateVariableScalars("g_3", GetIntType(), false, false)
+
+	live := EmptyEffect().WriteVar(g1).WriteVar(g2)
+	id := AllocStmID()
+	fm.SetMapStmEffect(id, live)
+	// grow live after store — must not appear in map snapshot
+	live = live.WriteVar(g3)
+	got := fm.GetMapStmEffect(id)
+	if !got.IsWritten(g1) || !got.IsWritten(g2) {
+		t.Fatalf("stored map_stm_effect missing g1/g2")
+	}
+	if got.IsWritten(g3) {
+		t.Fatalf("map_stm_effect must not see post-store WriteVar on live Effect: %v",
+			mapAccumNamesOf(got.WrittenVars()))
+	}
+	// Get returns detached: mutating returned Effect must not change map
+	got2 := got.WriteVar(g3)
+	_ = got2
+	again := fm.GetMapStmEffect(id)
+	if again.IsWritten(g3) {
+		t.Fatal("GetMapStmEffect must return detached copy (map not mutated by caller WriteVar)")
+	}
+	// Block accum merge must not leave shared maps between statements
+	id2 := AllocStmID()
+	fm.SetMapStmEffect(id2, EmptyEffect().WriteVar(g3))
+	merged := fm.GetMapStmEffect(id).AddEffect(fm.GetMapStmEffect(id2))
+	fm.SetMapStmEffect(id, EmptyEffect().WriteVar(g1)) // replace id entry
+	if !merged.IsWritten(g2) {
+		t.Fatal("merged snapshot must keep g2 after map entry replaced")
+	}
+	ClearError()
+}
+
 func mapAccumNamesOf(vs []*Variable) []string {
 	out := make([]string, 0, len(vs))
 	for _, v := range vs {

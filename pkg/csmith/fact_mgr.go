@@ -1625,6 +1625,12 @@ func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo
 // SetMapStmEffect records effect for a statement (map_stm_effect).
 // SetMapStmEffect records per-statement effect.
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
+// SetMapStmEffect records map_stm_effect[stm].
+// C++ Effect assignment deep-copies read/write vectors (Effect.cpp:84–89).
+// Go struct copy shares maps: store a detached snapshot so later EffectStm /
+// EffectAccum COW growth cannot alias-corrupt the map entry (and so
+// GetMapStmEffect + AddEffect cannot share live maps with map_stm_effect —
+// seed-7 binary RHS ambient half-size choose_var ok pool vs upstream).
 func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	if fm == nil || StmIDUnset(stmID) {
 		SetError(ErrGeneric)
@@ -1633,14 +1639,21 @@ func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	if fm.MapStmEffect == nil {
 		fm.MapStmEffect = make(map[int]Effect)
 	}
-	fm.MapStmEffect[stmID] = eff
+	if eff.incomplete {
+		fm.MapStmEffect[stmID] = IncompleteEffect()
+		return
+	}
+	// Detach without Clone residual path: visit_facts may already be sticky.
+	fm.MapStmEffect[stmID] = eff.detachMaps()
 }
 
-// GetMapStmEffect returns stored effect or empty for a live stm_id key.
+// GetMapStmEffect returns a deep copy of stored map_stm_effect or empty for a live stm_id.
 // FactMgr always live; sticky IncompleteEffect (no invent empty pure past hole).
 // StmID ≤0 fails closed sticky IncompleteEffect (no invent empty pure map default
 // / soft re-pick past incomplete statement keys for SetAccumulatedEffect merge).
 // Missing map entry for a live id is C++ map[] default empty complete.
+// Detach on read so callers that AddEffect into EffectAccum cannot share maps
+// with the stored snapshot (mirrors GetMapAccumEffect).
 func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 	if fm == nil {
 		SetError(ErrGeneric)
@@ -1654,7 +1667,10 @@ func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 		return EmptyEffect()
 	}
 	if e, ok := fm.MapStmEffect[stmID]; ok {
-		return e
+		if e.incomplete {
+			return IncompleteEffect()
+		}
+		return e.detachMaps()
 	}
 	return EmptyEffect()
 }

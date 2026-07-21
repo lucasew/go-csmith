@@ -192,7 +192,7 @@ func MakeRandomAssignQfer(
 	}
 
 	// StatementAssign.cpp:131–140 — running effect + separate RHS/LHS accum
-	runningEff := cg.EffectContext()
+	runningEff := cg.EffectContext().detachMaps()
 	rhsAccum := EmptyEffect()
 	rhsCG := cg.CloneSubcontext()
 	rhsCG.effectContext = runningEff
@@ -353,7 +353,9 @@ func MakeRandomAssignQfer(
 	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = runningEff
 	lhsCG.EffectAccum = &lhsAccum
-	lhsCG.EffectStm = rhsCG.EffectStm
+	// Effect.cpp:84–89 assignment deep-copies vectors; do not share EffectStm maps
+	// with rhsCG (Lhs visit WriteVar COW would still leave dual refs on no-new-write paths).
+	lhsCG.EffectStm = rhsCG.EffectStm.detachMaps()
 	lhsCG.CurrRHS = rhs
 
 	// StatementAssign.cpp:190–203 — CGOptions::match_exact_qualifiers(true) when qf
@@ -991,7 +993,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			cg.FM.SetGlobalFacts(facts, "auto_statement_assign_978")
 		}
 	} else {
-		running := cg.EffectContext()
+		running := cg.EffectContext().detachMaps()
 		for i, arg := range fi.Args {
 			// FunctionInvocation.cpp: param_value[i] always non-null after ERROR_GUARD sticky
 			if arg == nil {
@@ -1135,7 +1137,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementAssign.cpp:362–367 — RHS in its own accum context
 	// Incomplete ambient/stm/accum sticky (no invent visit under incomplete shell)
-	runningEff := cg.EffectContext()
+	runningEff := cg.EffectContext().detachMaps()
 	if !EffectComplete(runningEff) {
 		SetError(ErrGeneric)
 		return false
@@ -1152,7 +1154,8 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	rhsCG := cg.CloneSubcontext()
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
-	rhsCG.EffectStm = cg.EffectStm
+	// Effect assignment deep-copies; detach from live parent EffectStm maps.
+	rhsCG.EffectStm = cg.EffectStm.detachMaps()
 
 	if !VisitFactsExpression(st.Expr, &rhsCG, opts) {
 		return false
@@ -1202,7 +1205,8 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = runningEff
 	lhsCG.EffectAccum = &lhsAccum
-	lhsCG.EffectStm = rhsCG.EffectStm
+	// Effect.cpp:84–89 deep copy (same as generation path).
+	lhsCG.EffectStm = rhsCG.EffectStm.detachMaps()
 	lhsCG.CurrRHS = st.Expr
 
 	var lhsVar *Variable
