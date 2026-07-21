@@ -659,13 +659,14 @@ func BuildUserInvocation(
 		ok := RevisitUserInvocation(fi, &cg.FM.GlobalFacts, &newCG, opts)
 		fi.Failed = !ok
 		if ok {
-			// FunctionInvocationUser.cpp:284–290
+			// FunctionInvocationUser.cpp:287–289 — gen-time revisit handoff:
+			//   assert(cg_context.get_current_block());
+			//   add_visible_effect(*accum, get_current_block());
+			// Visit path uses curr_blk (FunctionInvocation.cpp:543–546 / VisitFactsInvocation).
+			// Do not prefer AnalysisBlock here: mid-gen FP leaves CurrBlk on a nested
+			// statement parent; C++ gen always folds visible effect at stack top.
 			// Incomplete effect hand-over fails closed sticky (no invent silent Incomplete FEffect)
-			// Prefer curr_blk (AnalysisBlock) when set (visit path); else stack top (gen path).
-			blk := cg.AnalysisBlock()
-			if blk == nil {
-				blk = cg.CurrentBlock()
-			}
+			blk := cg.CurrentBlock()
 			if blk != nil {
 				cg.AddVisibleEffectAt(effectAccum, blk)
 				if HasError() {

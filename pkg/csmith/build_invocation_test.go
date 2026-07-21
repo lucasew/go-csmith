@@ -328,6 +328,88 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	ClearError()
 }
 
+// TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock — gen-time revisit handoff
+// uses get_current_block(), not curr_blk.
+// FunctionInvocationUser.cpp:287–289:
+//   assert(cg_context.get_current_block());
+//   add_visible_effect(*accum, get_current_block());
+// Visit path uses curr_blk (FunctionInvocation.cpp:543–546 / VisitFactsInvocation).
+// Mid-gen FP leaves CurrBlk on a nested statement parent; preferring AnalysisBlock
+// folds visible effects against the wrong frame (ok-var eligibility / seed-7 pool size).
+func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	// Frame local lives only on stack-top (inner). Outer parent is stale CurrBlk.
+	// IsVarOnStack walks Parent: inner sees l_inner; outer alone does not.
+	innerLoc := CreateVariableScalars("l_inner", GetIntType(), false, false)
+	if innerLoc == nil {
+		t.Fatal("create inner local")
+	}
+	innerLoc.Name = "l_inner"
+	outer := &Block{StmID: AllocStmID()}
+	inner := &Block{Parent: outer, LocalVars: []*Variable{innerLoc}, StmID: AllocStmID()}
+	caller := &Function{Name: "func_1", ReturnType: GetIntType(), Stack: []*Block{outer, inner}}
+	outer.Func = caller
+	inner.Func = caller
+	list := &FunctionList{Funcs: []*Function{caller}}
+	fm := NewFactMgr(caller)
+	cg := WithFunc(caller, EmptyEffect()).WithFuncList(list).WithFactMgr(fm)
+	// Stale curr_blk from prior ValidateAndUpdateFacts on outer statement parent
+	cg.CurrBlk = outer
+	if cg.CurrentBlock() != inner {
+		t.Fatal("precondition: stack top is inner")
+	}
+	if cg.AnalysisBlock() != outer {
+		t.Fatal("precondition: AnalysisBlock prefers stale CurrBlk=outer")
+	}
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	writeInner := EmptyEffect().WriteVar(innerLoc)
+	// Gen path: CurrentBlock (inner) — l_inner is frame of inner → folded
+	cg.AddVisibleEffectAt(writeInner, cg.CurrentBlock())
+	if HasError() {
+		t.Fatalf("CurrentBlock handoff sticky: %v", HasError())
+	}
+	if !cg.EffectAccum.IsWritten(innerLoc) {
+		t.Fatal("gen path CurrentBlock=inner must fold inner-frame write")
+	}
+	// Visit-style wrong block: AnalysisBlock (outer) alone — l_inner not on outer → not folded
+	eff2 := EmptyEffect()
+	cg.EffectAccum = &eff2
+	cg.AddVisibleEffectAt(writeInner, cg.AnalysisBlock())
+	if HasError() {
+		t.Fatalf("AnalysisBlock handoff sticky: %v", HasError())
+	}
+	if cg.EffectAccum.IsWritten(innerLoc) {
+		t.Fatal("AnalysisBlock=outer must not invent fold of inner-only frame write")
+	}
+	// Full BuildUserInvocation revisit with stale CurrBlk must still succeed (gen uses stack top)
+	ClearError()
+	callee := &Function{
+		Name:            "func_rev",
+		ReturnType:      GetIntType(),
+		BuildState:      BuildBuilt,
+		IsBuilt:         true,
+		FactChanged:     true,
+		AccumEffContext: EmptyEffect(),
+		Body:            &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
+	}
+	callee.ensurePairedFactMgr()
+	list.Funcs = []*Function{caller, callee}
+	cg.CurrBlk = outer
+	cg.EffectAccum = &eff
+	cg.EffectStm = EmptyEffect()
+	fi := BuildUserInvocation(NewRng(11), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee)
+	if fi == nil || fi.Failed {
+		t.Fatalf("gen revisit with stale CurrBlk must succeed; Failed=%v err=%v", fi != nil && fi.Failed, HasError())
+	}
+	if HasError() {
+		t.Fatalf("must not sticky: %v", HasError())
+	}
+	ClearError()
+}
+
 // TestBuildUserInvocationRevisitClearsCallerCurrRHS — FunctionInvocationUser.cpp:282–284
 // / CGContext.cpp:85–93. BUILD revisit must not inherit caller CurrRHS (ExpressionAssign
 // leaves it set); else Lhs::visit_facts in the callee body can fail closed on overlap.
