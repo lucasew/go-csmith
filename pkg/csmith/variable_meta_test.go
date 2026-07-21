@@ -160,6 +160,49 @@ func TestGetSeqNum(t *testing.T) {
 	ClearError()
 }
 
+func TestGetCollectiveTopLevelArray(t *testing.T) {
+	// ArrayVariable.h:83–85 — get_collective returns collective ? collective : this.
+	// Soft invent: is_array_field true for top-level arrays (Variable.cpp:270–276)
+	// then base Variable::get_collective path assert(parent) — but C++ never runs that
+	// for ArrayVariable* (virtual override). Go must take AsArray override first.
+	// Broken path rejected every collective array in IsEligibleVar (seed-7 ok pool).
+	ClearError()
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_16", Type: GetIntType(), IsArray: true, ArraySizes: []int{7}},
+		Sizes:    []int{7},
+	}
+	av.AsArray = av
+	// IsArrayField is true for top-level array (C++ returns isArray when no field_var_of)
+	if !av.IsArrayField() {
+		t.Fatal("top-level array IsArrayField must match C++ isArray when field_var_of null")
+	}
+	got := av.GetCollective()
+	if got != &av.Variable {
+		t.Fatalf("top-level collective GetCollective want self, got %v err=%v", got, HasError())
+	}
+	if HasError() {
+		t.Fatal("top-level collective GetCollective must not sticky", GetError())
+	}
+	// itemized member → collective parent
+	item := av.ItemizeConstIndices([]int{3}, nil)
+	if item == nil {
+		t.Fatal("itemize")
+	}
+	got = item.GetCollective()
+	if got != &av.Variable {
+		t.Fatalf("itemized GetCollective want parent, got %v", got)
+	}
+	// IsEligibleVar must not reject collective array solely via GetCollective hole
+	ClearError()
+	if !IsEligibleVar(&av.Variable, 0, AccessRead, EmptyCGContext()) {
+		t.Fatal("collective array must be eligible under empty context", HasError())
+	}
+	if HasError() {
+		t.Fatal("eligible collective array must not sticky")
+	}
+	ClearError()
+}
+
 func TestGetCollectiveArrayField(t *testing.T) {
 	// Variable.cpp:583–612 — field of itemized array maps to collective field
 	ClearError()

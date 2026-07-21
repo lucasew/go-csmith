@@ -1130,13 +1130,20 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 // Parent IsArray without AsArray sticky true (restrictive — no invent not-array-field
 // soft-skip past broken array parent shell).
 func (v *Variable) IsArrayField() bool {
+	// Variable.cpp:270–276 — if field_var_of recurse; else return isArray.
+	// Soft invent was return false when FieldVarOf==nil (missed top-level arrays).
 	// Variable always live; sticky incomplete no invent not-array-field soft-skip
 	if v == nil {
 		SetError(ErrGeneric)
 		return false
 	}
 	if v.FieldVarOf == nil {
-		return false
+		// C++ return isArray; IsArray without AsArray sticky restrictive true
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return true
+		}
+		return v.IsArray || v.AsArray != nil
 	}
 	p := v.FieldVarOf
 	// C++ isArray always ArrayVariable*; missing AsArray sticky true restrictive
@@ -1692,8 +1699,12 @@ func MakeDummyStaticVariable(name string) *Variable {
 	return &Variable{Name: name, Type: nil}
 }
 
-// GetCollective mirrors Variable::get_collective.
-// Variable.cpp:581–615 — itemized array → parent; array field maps onto collective fields.
+// GetCollective mirrors Variable::get_collective / ArrayVariable override.
+// ArrayVariable.h:83–85 — return collective ? collective : this (before base path).
+// Variable.cpp:581–615 — array fields map onto collective parent fields.
+// Soft invent was treating top-level arrays as is_array_field (IsArray true) then
+// failing on nil FieldVarOf — GetCollective sticky nil so IsEligibleVar rejected
+// every collective array (seed-7 choose_var ok pool half-size vs upstream).
 // Incomplete FieldVars / missing parent / OOB field path fails closed sticky nil
 // (no invent return self as collective / soft re-pick past broken field map).
 func (v *Variable) GetCollective() *Variable {
@@ -1701,84 +1712,88 @@ func (v *Variable) GetCollective() *Variable {
 		SetError(ErrGeneric)
 		return nil
 	}
-	// special handling for array fields (Variable.cpp:583–612)
+	// ArrayVariable::get_collective override — must run before is_array_field path.
+	// Top-level collective (Collective==nil) returns self; itemized returns parent.
+	// C++ isArray always ArrayVariable*; missing AsArray sticky.
+	if v.IsArray || v.AsArray != nil {
+		if v.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if v.AsArray.Collective != nil {
+			return &v.AsArray.Collective.Variable
+		}
+		return v
+	}
+	// special handling for array fields only (Variable.cpp:583–612)
+	// is_array_field is true for top-level arrays too, but those took the override above.
 	isAF := v.IsArrayField()
 	// residual ERROR sticky — no invent soft-collective past IsArrayField residual
 	if HasError() {
 		return nil
 	}
-	if isAF {
-		// find top-level array ancestor
-		parent := v.FieldVarOf
-		for parent != nil && !parent.IsArray && parent.AsArray == nil {
-			parent = parent.FieldVarOf
-		}
-		// Variable.cpp:589 assert(parent) — incomplete ancestry sticky
-		if parent == nil {
-			SetError(ErrGeneric)
-			return nil
-		}
-		// C++ isArray always ArrayVariable*; missing AsArray sticky
-		// (no invent self-collective past broken array ancestor shell)
-		if parent.IsArray && parent.AsArray == nil {
-			SetError(ErrGeneric)
-			return nil
-		}
-		// incomplete field IR on path or parent sticky (no invent soft self-collective)
-		if !v.FieldVarsComplete() || !parent.FieldVarsComplete() {
-			SetError(ErrGeneric)
-			return nil
-		}
-		// if parent is already collective parent, this field is on collective
-		pColl := parent.GetCollective()
-		if pColl == nil {
-			// child already sticky when ancestry/fields incomplete
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return nil
-		}
-		if pColl == parent {
-			return v
-		}
-		// map field path onto coll parent's fields (Variable.cpp:596–611)
-		coll := pColl
-		// build field index path from array ancestor down to v
-		var path []int
-		for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
-			fid := cur.GetFieldID()
-			// residual ERROR sticky — no invent soft-collective past GetFieldID residual
-			if HasError() {
-				return nil
-			}
-			// incomplete FieldVars → GetFieldID -1 — sticky (no invent self)
-			if fid < 0 {
-				SetError(ErrGeneric)
-				return nil
-			}
-			path = append([]int{fid}, path...)
-		}
-		for _, idx := range path {
-			// Variable.cpp:608 assert(index < coll->field_vars.size()) sticky
-			if coll == nil || !coll.FieldVarsComplete() || idx < 0 || idx >= len(coll.FieldVars) {
-				SetError(ErrGeneric)
-				return nil
-			}
-			coll = coll.FieldVars[idx]
-		}
-		return coll
+	if !isAF {
+		return v
 	}
-	// C++ isArray always ArrayVariable*; missing AsArray sticky
-	// (no invent self as collective past broken array shell)
-	if v.IsArray && v.AsArray == nil {
+	// find top-level array ancestor
+	parent := v.FieldVarOf
+	for parent != nil && !parent.IsArray && parent.AsArray == nil {
+		parent = parent.FieldVarOf
+	}
+	// Variable.cpp:589 assert(parent) — incomplete ancestry sticky
+	if parent == nil {
 		SetError(ErrGeneric)
 		return nil
 	}
-	// non-field: itemized array member → collective parent
-	if v.AsArray != nil && v.AsArray.Collective != nil {
-		return &v.AsArray.Collective.Variable
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent self-collective past broken array ancestor shell)
+	if parent.IsArray && parent.AsArray == nil {
+		SetError(ErrGeneric)
+		return nil
 	}
-	return v
+	// incomplete field IR on path or parent sticky (no invent soft self-collective)
+	if !v.FieldVarsComplete() || !parent.FieldVarsComplete() {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// if parent is already collective parent, this field is on collective
+	pColl := parent.GetCollective()
+	if pColl == nil {
+		// child already sticky when ancestry/fields incomplete
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return nil
+	}
+	if pColl == parent {
+		return v
+	}
+	// map field path onto coll parent's fields (Variable.cpp:596–611)
+	coll := pColl
+	// build field index path from array ancestor down to v
+	var path []int
+	for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
+		fid := cur.GetFieldID()
+		// residual ERROR sticky — no invent soft-collective past GetFieldID residual
+		if HasError() {
+			return nil
+		}
+		// incomplete FieldVars → GetFieldID -1 — sticky (no invent self)
+		if fid < 0 {
+			SetError(ErrGeneric)
+			return nil
+		}
+		path = append([]int{fid}, path...)
+	}
+	for _, idx := range path {
+		// Variable.cpp:608 assert(index < coll->field_vars.size()) sticky
+		if coll == nil || !coll.FieldVarsComplete() || idx < 0 || idx >= len(coll.FieldVars) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		coll = coll.FieldVars[idx]
+	}
+	return coll
 }
 
 // GetSeqNum mirrors Variable::get_seq_num — digits after first '_'.
