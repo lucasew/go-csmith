@@ -1,0 +1,88 @@
+package csmith
+
+import (
+	"strings"
+	"testing"
+)
+
+// CreateArrayVariable: total=8 → pure_rnd_upto(4) ∈ 0..3 alts.
+// Seed-2 func_11 brace multi-value needs InitExprs; empty alts → single-value only.
+func TestCreateArrayVariableProducesAlts(t *testing.T) {
+	opts := Defaults()
+	SetProcessOptions(opts)
+	probs := NewProbabilities(opts)
+	elem := GetSimpleType(EUInt)
+	if elem == nil {
+		t.Fatal("no uint")
+	}
+	withAlts := 0
+	n8 := 0
+	for seed := uint64(1); seed <= 500; seed++ {
+		ClearError()
+		ResetArrayInitSeed()
+		r := NewRng(seed)
+		SetProcessRng(r)
+		vs := NewVariableSelector(opts)
+		vs.Probs = probs
+		blk := &Block{StmID: 1}
+		init := MakeRandom(elem, opts, probs, r)
+		if init == nil {
+			continue
+		}
+		r = NewRng(seed)
+		SetProcessRng(r)
+		av := CreateArrayVariable(r, opts, probs, vs, nil, blk, "l_arr", elem, init, NewCVQualifiers(nil, nil))
+		if av == nil || HasError() {
+			continue
+		}
+		total := 1
+		for _, s := range av.Sizes {
+			total *= s
+		}
+		if total != 8 {
+			continue
+		}
+		n8++
+		if len(av.InitExprs) > 0 {
+			withAlts++
+		}
+	}
+	if n8 < 5 {
+		t.Fatalf("too few size-8 arrays in band: %d", n8)
+	}
+	// P(init_num=0)=1/4 for pure_rnd_upto(4); expect majority with alts
+	if withAlts*4 < n8*2 {
+		t.Fatalf("size-8 with alts %d/%d too low", withAlts, n8)
+	}
+	t.Logf("size-8 arrays=%d withAlts=%d", n8, withAlts)
+}
+
+// force_non_uniform with n=3 (not power-of-2) must vary indices and emit
+// more than one init token. ArrayVariable.cpp:433–437 seed formula.
+func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
+	ClearError()
+	ResetArrayInitSeed()
+	SetProcessOptions(Defaults())
+	elem := GetSimpleType(EUInt)
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "l_t", Type: elem, IsArray: true,
+			InitExpr: &Expression{Term: TermConstant, Con: &Constant{Value: "A", Type: elem}, ExprType: elem},
+		},
+		Sizes: []int{8},
+		InitExprs: []*Expression{
+			{Term: TermConstant, Con: &Constant{Value: "B", Type: elem}, ExprType: elem},
+			{Term: TermConstant, Con: &Constant{Value: "C", Type: elem}, ExprType: elem},
+		},
+		InitValues: []string{"B", "C"},
+	}
+	av.AsArray = av
+	def := av.OutputDef()
+	if def == "" || HasError() {
+		t.Fatalf("OutputDef fail err=%v", GetError())
+	}
+	// With n=3, seed 0xABCDEF yields varied indices (not all A).
+	if !strings.Contains(def, "B") && !strings.Contains(def, "C") {
+		t.Fatalf("want non-primary tokens in non-uniform brace, got %s", def)
+	}
+}
