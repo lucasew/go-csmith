@@ -557,15 +557,20 @@ func (f *Function) generateBodyCore(
 	// Inheriting prev.RW.Must* leaked array-loop must-use into callee body so
 	// make_iteration took array_control (choose_ok_var/Itemize) while upstream
 	// make_random_loop_control (seed-42 e1890: GO U7 Itemize vs UP F50).
+	// Function.cpp:633–634 / 675–677 — CGContext(this, prev.effect_context, &effect_accum).
+	// GenerateBody: local Effect effect_accum. generate_body_with_known_params: caller
+	// Effect& shared (same object). Soft invent was bodyEff=*prev.EffectAccum shallow
+	// copy (shared maps, different pointer) then copy-back — C++ shares one Effect*.
 	bodyEff := EmptyEffect()
-	if prev.EffectAccum != nil {
-		// known-params path: caller already points EffectAccum at callee accum
-		// pre-validated EffectComplete(*EffectAccum)
-		bodyEff = *prev.EffectAccum
-	}
 	cg := prev
 	cg.CurrentFunc = f
-	cg.EffectAccum = &bodyEff
+	if knownParams && prev.EffectAccum != nil {
+		// known-params: share caller's Effect object (Function.cpp:674–677)
+		cg.EffectAccum = prev.EffectAccum
+	} else {
+		// GenerateBody: fresh local accum (Function.cpp:632–634)
+		cg.EffectAccum = &bodyEff
+	}
 	cg.Flags = 0
 	cg.BlkDepth = 0
 	cg.ExprDepth = 0
@@ -802,14 +807,11 @@ func (f *Function) generateBodyCore(
 		return
 	}
 
-	// keep EffectAccum in sync for caller of known-params
-	// Incomplete body accum fails closed (no invent caller handoff of incomplete shell)
-	if prev.EffectAccum != nil {
-		if !EffectComplete(bodyEff) {
-			abortUnbuilt()
-			return
-		}
-		*prev.EffectAccum = bodyEff
+	// known-params: EffectAccum is the caller's object (shared). GenerateBody: local
+	// bodyEff discarded. Incomplete shared accum fails closed (no invent Built past hole).
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		abortUnbuilt()
+		return
 	}
 
 	// Function.cpp:764–766 — global_facts = map_facts_out[body] + add_back_return_facts
