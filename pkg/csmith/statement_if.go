@@ -26,7 +26,7 @@ func MakeRandomIf(
 		SetError(ErrGeneric)
 		return nil
 	}
-	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+	if cg.FM != nil && (!FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts)) {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -35,18 +35,28 @@ func MakeRandomIf(
 		return nil
 	}
 	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition
+	// pre_facts = full FactVec (ePointTo + eUnionWrite). Soft invent was PT-only
+	// snapshot so re-analyze left UnionFacts at post-condition last-writes.
 	var func1PreFacts []*FactPointTo
+	var func1PreUnion []*FactUnion
 	var func1PreEffect Effect
 	func1Hack := cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop()
 	if func1Hack && cg.FM != nil {
-		// incomplete GlobalFacts fail closed (no invent cleaned pre-facts snapshot)
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		// incomplete GlobalFacts/UnionFacts fail closed (no invent cleaned pre-facts snapshot)
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			SetError(ErrGeneric)
 			return nil
 		}
 		func1PreFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if past CloneFactSlice residual
 		if HasError() {
+			return nil
+		}
+		func1PreUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(func1PreUnion) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		if cg.EffectAccum != nil {
@@ -79,15 +89,18 @@ func MakeRandomIf(
 		return nil
 	}
 	if hasUnc {
-		// makeup_new_var_facts(pre_facts, global); reset accum; visit(pre_facts)
-		// incomplete current GlobalFacts fail closed sticky (makeup would nil snapshot)
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		// StatementIf.cpp:79–89 — makeup_new_var_facts(pre_facts, global);
+		// reset accum; visit_facts(pre_facts); global_facts = pre_facts.
+		// incomplete current GlobalFacts/UnionFacts fail closed sticky
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if !MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts) {
-			// incomplete makeup / snapshot — fail closed sticky
-			SetError(ErrGeneric)
+		// FactMgr.cpp:489–492 restore_facts on full FactVec (makeup + assign both cats)
+		// Install pre-condition FactVec; VisitFactsExpression then mutates FM in place
+		// (C++ visit mutates pre_facts then assigns back — same end state).
+		cg.FM.RestoreFactsPair(func1PreFacts, func1PreUnion)
+		if HasError() {
 			return nil
 		}
 		if cg.EffectAccum != nil {
@@ -96,11 +109,6 @@ func MakeRandomIf(
 			if HasError() {
 				return nil
 			}
-		}
-		cg.FM.SetGlobalFacts(CloneFactSlice(func1PreFacts), "auto_statement_if_100")
-		// residual ERROR sticky — no invent soft-restore past CloneFactSlice residual
-		if HasError() {
-			return nil
 		}
 		if !VisitFactsExpression(test, cg, opts) {
 			// StatementIf.cpp:84–88 — assert(ok) sticky; no invent soft re-pick past visit fail
@@ -119,7 +127,7 @@ func MakeRandomIf(
 			}
 			return nil
 		}
-		// StatementIf.cpp:89 — global_facts = pre_facts (already in FM via visit)
+		// StatementIf.cpp:89 — global_facts = pre_facts (already in FM via visit on restored env)
 	}
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
 	condEff := cg.EffectStm.Clone()
@@ -153,22 +161,23 @@ func MakeRandomIf(
 	}
 
 	// StatementIf.cpp:97–98 — else starts from map_facts_in[if_true]
-	// C++ map[] always assigns (missing → empty); no invent pre-branch GlobalFacts fallback
+	//   fm->global_facts = fm->map_facts_in[if_true];  // full FactVec
+	// Soft invent was SetGlobalFacts(PT-only): UnionFacts stayed at then-branch
+	// last-writes so IsNonreadableField over-filtered choose_var in else / later
+	// (seed-7 eligible pool half-size vs upstream).
 	// Incomplete then-in / StmID fails closed sticky (no invent else gen past holes)
 	// EffectAccum / EffectStm / BlkDepth continue on the same cg (not reset between arms).
 	if cg.FM != nil {
 		if StmIDUnset(thenB.StmID) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
+			cg.FM.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return nil
 		}
-		in := cg.FM.GetMapFactsIn(thenB.StmID)
-		if !FactsComplete(in) {
-			cg.FM.GlobalFacts = IncompleteFactSlice()
-			SetError(ErrGeneric)
+		cg.FM.AssignGlobalFactsFromMapIn(thenB.StmID)
+		if HasError() {
 			return nil
 		}
-		cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_if_170")
 	}
 
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)

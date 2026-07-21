@@ -188,6 +188,57 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	}
 }
 
+func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
+	// StatementIf.cpp:97–98 — fm->global_facts = fm->map_facts_in[if_true]
+	// Full FactVec (ePointTo + eUnionWrite). Soft invent was SetGlobalFacts(PT-only)
+	// so else generation kept then-exit UnionFacts last-writes → IsNonreadableField
+	// over-filtered choose_var (seed-7 eligible pool half-size).
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u", ut, false, false)
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) < 2 {
+		t.Fatal("need union fields")
+	}
+	f0 := parent.FieldVars[0]
+	entryU := MakeFactUnion(parent, 0) // then-entry: last write f0
+	exitU := MakeFactUnion(parent, 1)  // then-exit: last write f1
+	if entryU == nil || exitU == nil {
+		t.Fatal("MakeFactUnion")
+	}
+	fm := NewFactMgr(nil)
+	// Live env after then-branch: advanced union write
+	fm.GlobalFacts = []*FactPointTo{}
+	fm.UnionFacts = []*FactUnion{exitU}
+	// map_facts_in[then] stored entry FactVec (both partitions)
+	thenID := 42
+	fm.SetMapFactsInPair(thenID, []*FactPointTo{}, []*FactUnion{entryU})
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	// Production path: AssignGlobalFactsFromMapIn (full FactVec)
+	fm.AssignGlobalFactsFromMapIn(thenID)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil || fm.UnionFacts[0].LastWrittenFID != 0 {
+		t.Fatalf("want entry last_written 0, got %#v", fm.UnionFacts)
+	}
+	if IsNonreadableField(f0, fm.UnionFacts) {
+		t.Fatal("after map_facts_in assign, f0 must be readable")
+	}
+	// Document PT-only hole: SetGlobalFacts alone leaves exit union write
+	fm.UnionFacts = []*FactUnion{exitU}
+	fm.SetGlobalFacts([]*FactPointTo{}, "test_pt_only")
+	if !IsNonreadableField(f0, fm.UnionFacts) {
+		t.Fatal("PT-only SetGlobalFacts must leave exit union last-write (hole)")
+	}
+	ClearError()
+}
+
 func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell
 	ClearError()

@@ -310,6 +310,44 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 	}
 }
 
+// AssignGlobalFactsFromMapOut assigns global_facts from map_facts_out[stm] for both
+// categories. FactMgr.cpp / Block.cpp:729 —
+//   fm->global_facts = fm->map_facts_out[this];
+// Full FactVec replace (point-to + eUnionWrite). Incomplete either partition wipes both.
+func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
+	if fm == nil || StmIDUnset(stmID) {
+		if fm != nil {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+		}
+		SetError(ErrGeneric)
+		return
+	}
+	pt := fm.GetMapFactsOut(stmID)
+	un := fm.GetMapUnionFactsOut(stmID)
+	if !FactsComplete(pt) || !UnionFactsComplete(un) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_out_assign")
+	cl := CloneUnionFactSlice(un)
+	if !UnionFactsComplete(cl) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	if cl == nil {
+		fm.UnionFacts = []*FactUnion{}
+	} else {
+		fm.UnionFacts = cl
+	}
+}
+
 // GetMapFactsIn returns map_facts_in for a live stm_id.
 // FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 // StmID ≤0 fails closed sticky IncompleteFactSlice (no invent MapFactsIn[0] miss as

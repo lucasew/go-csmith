@@ -1007,25 +1007,28 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 						break
 					}
 				}
-				// Block.cpp:729 — global_facts = map_facts_out[this]
+				// Block.cpp:729 — global_facts = map_facts_out[this]  // full FactVec
 				// post_facts already set by find_fixed_point (pre-OOS) or line-690
+				// Soft invent was SetGlobalFacts(PT-only): UnionFacts left mid-FP.
 				// incomplete out fails closed (hole marker — no invent keep prior / empty)
 				out := fm.GetMapFactsOut(b.StmID)
-				if !FactsComplete(out) {
+				unOut := fm.GetMapUnionFactsOut(b.StmID)
+				if !FactsComplete(out) || !UnionFactsComplete(unOut) {
 					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 					SetError(ErrGeneric)
 					return
-				} else {
-					fm.SetGlobalFacts(CloneFactSlice(out), "auto_block_959")
-					// residual ERROR sticky — no invent soft-out past CloneFactSlice residual
-					if HasError() {
-						fm.GlobalFacts = IncompleteFactSlice()
-						postFacts = IncompleteFactSlice()
-						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-						return
-					}
+				}
+				fm.AssignGlobalFactsFromMapOut(b.StmID)
+				// residual ERROR sticky — no invent soft-out past full FactVec assign residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					return
 				}
 			}
 		} else {
