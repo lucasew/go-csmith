@@ -822,7 +822,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			return
 		}
-		fm.SetMapFactsOut(b.StmID, outPost)
+		// FactMgr.cpp:268–270 — set_fact_out(Block*): parent==nullptr → remove_function_local_facts
+		fm.SetMapFactsOutForBlock(b, outPost)
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			return
+		}
 
 		// Block.cpp:696–697 — fixed-point when:
 		//   is_loop_body || need_revisit || has_edge_in(false, true)
@@ -1002,7 +1008,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									return
 								}
 							}
-							fm.SetMapFactsOut(b.StmID, outCopy)
+							fm.SetMapFactsOutForBlock(b, outCopy)
+							if HasError() {
+								fm.GlobalFacts = IncompleteFactSlice()
+								postFacts = IncompleteFactSlice()
+								return
+							}
 						}
 						break
 					}
@@ -1089,12 +1100,16 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			}
 			// Block.cpp:740 — set_fact_out(this, map_facts_out[sr])
 			// C++ map[] always reads sr out (missing → empty); no invent skip set_fact_out
+			// Body parent==nullptr → remove_function_local_facts again (FactMgr.cpp:268–270).
 			if len(b.Stmts) > 0 {
 				sr := &b.Stmts[len(b.Stmts)-1]
 				// return stm_id always live after append_return; StmID 0 → Incomplete via getter
 				out := fm.GetMapFactsOut(sr.StmID)
 				if FactsComplete(out) {
-					fm.SetMapFactsOut(b.StmID, out)
+					fm.SetMapFactsOutForBlock(b, out)
+					if HasError() {
+						return
+					}
 				} else {
 					// incomplete sr out — fail closed sticky hole marker (not empty complete)
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())

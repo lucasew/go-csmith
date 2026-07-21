@@ -836,7 +836,12 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
-		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
+		// FactMgr.cpp:268–270 — set_fact_out(Block*) with parent==nullptr filter
+		fm.SetMapFactsOutForBlock(b, fm.GlobalFacts)
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 	}
 	return st
 }

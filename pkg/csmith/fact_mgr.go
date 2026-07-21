@@ -174,12 +174,53 @@ func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts
 // SetMapFactsOut records post-statement facts.
 // FactMgr.cpp set_fact_out — full FactVec; pairs live fm.UnionFacts.
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
+// Prefer SetMapFactsOutForBlock for Block* so parent==nullptr filtering applies.
 func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 	if fm == nil {
 		SetError(ErrGeneric)
 		return
 	}
 	fm.SetMapFactsOutPair(stmID, facts, fm.UnionFacts)
+}
+
+// SetMapFactsOutForBlock mirrors FactMgr::set_fact_out when the Statement is a Block.
+// FactMgr.cpp:257–274 + Block.cpp:693 / 561 — after OOS locals / remove_rv, store out.
+// FactMgr.cpp:268–270 — eReturn || s->parent == nullptr → remove_function_local_facts
+// (drop params/stack subjects + mark_func_end garbage on remaining pointees).
+// Nested blocks (parent != nil) store facts as-is (OOS already applied by caller).
+// Function-body map_facts_out is ret_facts source (FunctionInvocationUser.cpp:212–221);
+// skipping remove_function_local_facts left param pointees live after callee return.
+func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
+	if fm == nil || b == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if StmIDUnset(b.StmID) {
+		SetError(ErrGeneric)
+		return
+	}
+	if !FactsComplete(facts) {
+		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	cp := facts
+	// FactMgr.cpp:268 — s->parent == nullptr (function body Block)
+	if b.Parent == nil {
+		// stm is the body; is_var_on_stack uses stm->parent (== nil) so only params
+		// match as stack subjects; mark_func_end still marks param pointees garbage.
+		cp = RemoveFunctionLocalFactsAt(facts, b.Func, b.Parent)
+		if !FactsComplete(cp) {
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+	}
+	fm.SetMapFactsOut(b.StmID, cp)
 }
 
 // SetMapFactsOutPair stores map_facts_out point-to + eUnionWrite partitions together.
@@ -1534,6 +1575,9 @@ func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo 
 
 // RemoveFunctionLocalFactsAt mirrors FactMgr::remove_function_local_facts.
 // FactMgr.cpp:179–205 — drop stack/other-rv subjects; mark_func_end on remaining.
+// stParent is Statement::parent for is_var_on_stack (nil when s is the function body
+// Block with parent==nullptr). Params are still on-stack when stParent is nil
+// (Function.cpp:187–190); do not invent soft-skip of param subjects in that case.
 // Fact* always live; incomplete PointTo/fact holes or incomplete Param/LocalVars
 // stack lists fail closed sticky (no invent keep stack locals when IsVarOnStack
 // returns false past a hole, or soft re-pick past wiped return out maps).
@@ -1542,7 +1586,8 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if f != nil && stParent != nil && !f.StackScanComplete(stParent) {
+	// StackScanComplete(nil) still validates Param completeness
+	if f != nil && !f.StackScanComplete(stParent) {
 		// residual ERROR sticky — no invent soft-clean facts past StackScan residual
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -1557,7 +1602,9 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:191–195 — is_var_on_stack OR other-function RV
-		if f != nil && stParent != nil && f.IsVarOnStack(fact.Var, stParent) {
+		// stParent may be nil (function body set_fact_out); IsVarOnStack still
+		// matches params (Function.cpp:187–190).
+		if f != nil && f.IsVarOnStack(fact.Var, stParent) {
 			// residual ERROR sticky — no invent soft-skip stack fact past hard IR hole
 			if HasError() {
 				return IncompleteFactSlice()

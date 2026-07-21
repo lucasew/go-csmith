@@ -759,9 +759,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 		}
 		// Block.cpp:561 — set_fact_out(this, outputs) after OOS only.
+		// FactMgr.cpp:268–270 — function body (parent==nullptr) remove_function_local_facts.
 		// Do not mergeMayNullFromLive / SetGlobalFacts here (Block.cpp:513–568
 		// never assigns global_facts; post_creation installs map_facts_out at 729).
-		fm.SetMapFactsOut(b.StmID, outCopy)
+		fm.SetMapFactsOutForBlock(b, outCopy)
+		if HasError() {
+			return outCopy, -1, false
+		}
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)
 		}
