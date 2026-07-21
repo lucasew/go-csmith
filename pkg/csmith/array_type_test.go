@@ -287,6 +287,49 @@ func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) 
 	ClearError()
 }
 
+// TestAddNewVarFactAndUpdatePushesBlockMapOut —
+// FactMgr.cpp:99–100 add_fact_out on every map_facts_out key including Block*
+// (C++ Block : Statement). Parent-local created mid-else must still reach
+// map_facts_out[if_true] so combine_branch_facts merges then-arm init points-to
+// (seed-2 func_11: l_1326=&g_99 then reassigned in else → *l_1326 must read g_99).
+func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "func_11", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// body owns parent-locals; then arm is a nested Block with its own StmID key
+	body := &Block{StmID: 10, Func: f}
+	thenB := &Block{StmID: 20, Func: f, Parent: body}
+	elseB := &Block{StmID: 21, Func: f, Parent: body}
+	f.Blocks = []*Block{body, thenB, elseB}
+	// if statement already recorded map slots for both arms (post then gen, mid else)
+	fm.MapFactsIn[thenB.StmID] = []*FactPointTo{}
+	fm.MapFactsOut[thenB.StmID] = []*FactPointTo{}
+	fm.MapFactsIn[elseB.StmID] = []*FactPointTo{}
+	fm.MapFactsOut[elseB.StmID] = []*FactPointTo{}
+	tgt := CreateVariableScalars("g_99", GetIntType(), false, false)
+	loc := CreateVariableScalars("l_1326", PointerTo(GetIntType()), false, false)
+	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
+	// create as body parent-local while "in else" (maps already open for both arms)
+	body.LocalVars = append(body.LocalVars, loc)
+	fm.AddNewVarFactAndUpdate(body, loc)
+	if HasError() {
+		t.Fatalf("sticky: %v", GetError())
+	}
+	// then arm Block out must receive init fact (Block key, not FindStmtByID)
+	thenF := FindRelatedPointTo(fm.MapFactsOut[thenB.StmID], loc)
+	if thenF == nil {
+		t.Fatal("map_facts_out[if_true Block] must get parent-local init fact")
+	}
+	if !IsVariableInSet(thenF.PointTo, tgt) {
+		t.Fatalf("then out must point to g_99, got %v", pointToNames(thenF))
+	}
+	elseF := FindRelatedPointTo(fm.MapFactsOut[elseB.StmID], loc)
+	if elseF == nil || !IsVariableInSet(elseF.PointTo, tgt) {
+		t.Fatal("map_facts_out[if_false Block] must also get init fact")
+	}
+	ClearError()
+}
+
 // TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration —
 // FactMgr.cpp:95–103 add_fact_out for all map_facts_out when blk!=null (no
 // in_block filter on outs). Mid-MakeRandomIf the if is not yet in body.Stmts, so

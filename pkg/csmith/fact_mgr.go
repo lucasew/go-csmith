@@ -1743,10 +1743,13 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			// FactMgr.cpp:95–103 — when blk!=null, for every map_facts_out entry call
 			// add_fact_out(stm, f) with visibility filters only. C++ does NOT filter
 			// by stm->in_block(blk) on the out map (in_block is only for map_facts_in
-			// lines 88–93). Tree-only stmtIDInBlock invent skipped mid-generation
-			// nested gotos still under construction (if not yet in body.Stmts), so
-			// new parent-locals never reached map_facts_out[goto] → merge_jump_facts
-			// invented garbage (seed-2 func_11: l_1325 pts=[garbage,g_32] → FP strip).
+			// lines 88–93).
+			// C++ Block : Statement, so map_facts_out[&if_true] is a Statement* key.
+			// Go keys Block.StmID the same way; FindStmtByID only walks Stmts and
+			// misses then/else/for-body blocks. Soft-skipping those left parent-locals
+			// created mid-else off map_facts_out[if_true], so combine_branch_facts
+			// never merged then-arm init points-to (seed-2 func_11: *l_1326 never
+			// read g_99 after l_1326=&g_99 then reassigned in else).
 			// AddFactOut already drops facts not visible at stm / goto dest.
 			for id := range fm.MapFactsOut {
 				st := FindStmtByID(fm.Func, id)
@@ -1756,9 +1759,40 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					return
 				}
 				if st == nil {
-					// id may be a Block StmID (map key for block itself) or orphan;
-					// C++ maps Statement* keys only. Soft-skip unresolved (no invent
-					// IncompleteFactSlice wipe of unrelated out slots mid-gen).
+					// Block StmID (if_true/if_false/for-body) — C++ add_fact_out(Block*)
+					b := blockByStmID(fm.Func, id)
+					if b == nil {
+						// orphan map key soft-skip (no invent IncompleteFactSlice wipe)
+						continue
+					}
+					// FactMgr.cpp:283 — is_var_visible(var, stm); for Block, is_var_on_stack
+					// walks stm->parent (Block.cpp/Function.cpp:192).
+					if fm.Func != nil {
+						vis := fm.Func.IsVarVisible(f.Var, b.Parent)
+						if HasError() {
+							fm.GlobalFacts = IncompleteFactSlice()
+							return
+						}
+						if !vis {
+							continue
+						}
+					}
+					// eBlock: no return/break/continue/goto special cases in add_fact_out
+					if !FactsComplete(fm.MapFactsOut[id]) {
+						fm.MapFactsOut[id] = IncompleteFactSlice()
+						continue
+					}
+					c2 := f.Clone()
+					if HasError() {
+						fm.GlobalFacts = IncompleteFactSlice()
+						return
+					}
+					if c2 == nil {
+						fm.GlobalFacts = IncompleteFactSlice()
+						SetError(ErrGeneric)
+						return
+					}
+					fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)
 					continue
 				}
 				parent := FindParentBlockOfStmID(fm.Func, id)
@@ -1776,6 +1810,21 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			}
 		}
 	}
+}
+
+// blockByStmID finds a Block on f.Blocks with the given StmID (Block is Statement
+// in C++; map_facts_* keys may be Block.StmID for if_true/if_false/for-body).
+// Soft-miss nil when not found (no sticky — map key may be orphan).
+func blockByStmID(f *Function, stmID int) *Block {
+	if f == nil || StmIDUnset(stmID) {
+		return nil
+	}
+	for _, b := range f.Blocks {
+		if b != nil && b.StmID == stmID {
+			return b
+		}
+	}
+	return nil
 }
 
 // stmtIDInBlock reports Statement::in_block(blk) for a statement id under func.

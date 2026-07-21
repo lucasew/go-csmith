@@ -575,10 +575,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		return ""
 	}
 	var b strings.Builder
-	// VariableSelector.cpp:1552 — output_comment_line then globals; no invent blank line.
+	// VariableSelector.cpp:1552 — output_comment_line then OutputVariableList.
+	// Each OutputDef already ends with newline; no trailing blank before
+	// OutputForwardDeclarations' two outputln (seed-2: Go had one extra blank
+	// before /* --- FORWARD DECLARATIONS --- */).
 	b.WriteString("/* --- GLOBAL VARIABLES --- */\n")
 	b.WriteString(body.String())
-	b.WriteString("\n")
 	return b.String()
 }
 
@@ -640,8 +642,9 @@ func (g *ProgramGenerator) OutputFunctions() string {
 			SetError(ErrGeneric)
 			return ""
 		}
+		// Function::Output already ends with two outputln (Function.cpp:594–595);
+		// no invent third blank between functions.
 		bodies.WriteString(body)
-		bodies.WriteString("\n")
 	}
 	// no invent section headers without live content
 	if forwards.Len() == 0 && aliases.Len() == 0 && bodies.Len() == 0 {

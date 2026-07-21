@@ -1262,10 +1262,14 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		s += "return "
 		s += retVal
 		s += ";\n"
+		// Function.cpp:594–595 — two outputln after body
+		s += "\n\n"
 		return s
 	}
 	// body without complete depth_protect wrap (void / missing ret_c)
 	// no soft invent "if (DEPTH…)" without else ret_c
 	s += bodyOut
+	// Function.cpp:594–595 — two outputln after function body
+	s += "\n\n"
 	return s
 }
