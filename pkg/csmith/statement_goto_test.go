@@ -1,6 +1,7 @@
 package csmith
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -399,6 +400,34 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	}
 	if !inserted {
 		t.Skip("no forward insert in seed sample (RNG)")
+	}
+}
+
+// StatementGoto.cpp:185 — StatementGoto ctor gensyms lbl_ only after DFA ok.
+// Pre-visit gensym on failed forward burned seed-2 names (extra lbl_710 →
+// g_733/l_718). After fix, surviving names match upstream (g_732, l_717, lbl_1269).
+func TestSeed2GensymNamesMatchUpstreamAfterGotoFix(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	opts.Seed = 2
+	out, err := Generate(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Upstream seed-2 survivors (not the intermediate burned-then-discarded gensyms)
+	for _, want := range []string{
+		"g_732", "l_717", "lbl_1269",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %s (early forward-goto gensym burn shifts names)", want)
+		}
+	}
+	// Pre-fix wrong names must not appear as the shifted survivors
+	if strings.Contains(out, "static volatile int32_t g_733") {
+		t.Fatal("g_733 is the pre-fix +1-shifted volatile; gensym still desynced")
+	}
+	if regexp.MustCompile(`\bl_718\b`).MatchString(out) && !strings.Contains(out, "l_717") {
+		t.Fatal("l_718 without l_717 indicates post-l_692 gensym shift")
 	}
 }
 

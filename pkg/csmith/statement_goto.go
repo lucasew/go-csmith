@@ -567,13 +567,9 @@ func MakeRandomGoto(
 	if dest.StmID == 0 {
 		dest.StmID = AllocStmID()
 	}
-	label := dest.SourceLabel
-	if label == "" {
-		label = LabelForGotoDest(dest.StmID, nextLab)
-		dest.SourceLabel = label
-	} else if dest.StmID > 0 {
-		stmLabels[dest.StmID] = label
-	}
+	// StatementGoto.cpp:185 — StatementGoto ctor gensyms label only after DFA
+	// validation succeeds. Do not gensym here: failed visit_facts/merge must not
+	// burn util.cpp gensym_count (seed-2: extra lbl_710 desynced all later names).
 
 	fm := cg.FM
 	foundNewFacts := false
@@ -692,6 +688,20 @@ func MakeRandomGoto(
 	if !VariablesComplete(skippedFwd) {
 		SetError(ErrGeneric)
 		return makeGotoFailed()
+	}
+	// StatementGoto.cpp:185 + ctor 220–229 — gensym only on successful insert path
+	label := dest.SourceLabel
+	if label == "" {
+		label = LabelForGotoDest(dest.StmID, nextLab)
+		if label == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return makeGotoFailed()
+		}
+		dest.SourceLabel = label
+	} else if dest.StmID > 0 {
+		stmLabels[dest.StmID] = label
 	}
 	sg := Stmt{
 		Kind:            StmtGoto,
