@@ -485,12 +485,13 @@ func MakeRandomGoto(
 	cg.ClearEffectStm()
 
 	// condition: prefer already-read visible var (StatementGoto.cpp:117–132)
-	// C++ FactUnion::is_nonreadable_field uses FactVec (global or map_facts_out);
-	// Go keeps UnionFacts separate — use FM.UnionFacts for both edges.
+	// C++ choose_visible_read_var facts arg:
+	//   back:  fm->global_facts (live ePointTo+eUnionWrite)
+	//   forward: fm->map_facts_out[other_stm] (historical out lattice at jump src)
+	// Go splits eUnionWrite → UnionFacts / MapUnionFactsOut. Soft invent was
+	// always using live UnionFacts on forward → IsNonreadableField over-filter
+	// (or wrong last-writes) → empty cond pool → goto fail → first_div (seed 42).
 	var uf []*FactUnion
-	if cg.FM != nil {
-		uf = cg.FM.UnionFacts
-	}
 	var readVars []*Variable
 	condBlk := blk
 	if backEdge {
@@ -498,12 +499,25 @@ func MakeRandomGoto(
 		if cg.EffectAccum != nil {
 			readVars = cg.EffectAccum.ReadVars()
 		}
+		if cg.FM != nil {
+			uf = cg.FM.UnionFacts
+		}
 	} else {
-		// StatementGoto.cpp:125–128 — map_accum_effect[other] read_vars
+		// StatementGoto.cpp:125–128 — map_accum_effect[other] read_vars +
+		// map_facts_out[other] for is_nonreadable_field
 		// C++ map[] always (missing live id → empty); StmID 0 IncompleteEffect
 		condBlk = okBlk
 		if cg.FM != nil {
 			readVars = cg.FM.GetMapAccumEffect(other.StmID).ReadVars()
+			// residual ERROR sticky — no invent soft-empty read past GetMapAccum residual
+			if HasError() {
+				return makeGotoFailed()
+			}
+			uf = cg.FM.GetMapUnionFactsOut(other.StmID)
+			// residual ERROR sticky — no invent soft-live UnionFacts past MapUnionOut hole
+			if HasError() {
+				return makeGotoFailed()
+			}
 		}
 	}
 	var cond *Expression

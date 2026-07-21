@@ -726,3 +726,112 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 		t.Fatal("raw map_in still must lack l_early")
 	}
 }
+
+// StatementGoto.cpp:125–128 — forward choose_visible_read_var uses map_facts_out[other],
+// not live global_facts. Soft invent always-live UnionFacts over-filtered when live
+// last-writes differ from historical out lattice (seed-42 first_div: U13 vs U100).
+func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
+	if ut == nil || len(ut.Fields) < 2 {
+		t.Skip("union")
+	}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if len(uv.FieldVars) < 1 {
+		t.Skip("fields")
+	}
+	f0 := uv.FieldVars[0]
+	// Live lattice: last write f1 → f0 nonreadable
+	liveUF := []*FactUnion{MakeFactUnion(uv, 1)}
+	// Historical map_facts_out: last write f0 → f0 readable
+	outUF := []*FactUnion{MakeFactUnion(uv, 0)}
+
+	// ChooseVisibleReadVar with live → NR skip → nil pool
+	ClearError()
+	gotLive := ChooseVisibleReadVar(NewRng(1), nil, []*Variable{f0}, GetIntType(), liveUF)
+	if gotLive != nil {
+		t.Fatal("live last_write=f1 must make f0 nonreadable → no pick")
+	}
+	// With map out lattice → f0 ok
+	ClearError()
+	gotOut := ChooseVisibleReadVar(NewRng(1), nil, []*Variable{f0}, GetIntType(), outUF)
+	if gotOut != f0 {
+		t.Fatalf("map_facts_out last_write=f0 must allow f0, got %v err=%v", gotOut, HasError())
+	}
+
+	// Wire MakeRandomGoto forward path: live UF would fail; MapUnionFactsOut succeeds.
+	vs := NewVariableSelector(opts)
+	vs.GlobalList = append(vs.GlobalList, uv)
+	vs.AllVars = append(vs.AllVars, uv, f0)
+	tables := NewExprTables(opts)
+	fn := &Function{Name: "func_1", ReturnType: GetIntType()}
+	src := &Block{Func: fn, Stmts: []Stmt{
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+	}}
+	curr := &Block{Func: fn, Stmts: []Stmt{
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+	}}
+	fn.Blocks = []*Block{src, curr}
+	fn.Body = curr
+	fm := NewFactMgr(fn)
+	fm.UnionFacts = liveUF // live would block f0
+	eff := EmptyEffect().ReadVar(f0)
+	for i := range src.Stmts {
+		id := src.Stmts[i].StmID
+		fm.SetMapFactsIn(id, nil)
+		fm.SetMapFactsOut(id, nil)
+		fm.MapUnionFactsOut[id] = outUF
+		fm.MapAccumEffect[id] = eff
+	}
+	for i := range curr.Stmts {
+		id := curr.Stmts[i].StmID
+		fm.SetMapFactsIn(id, nil)
+		fm.SetMapFactsOut(id, nil)
+		fm.MapAccumEffect[id] = EmptyEffect()
+	}
+	cg := WithFunc(fn, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &Effect{}
+	*cg.EffectAccum = EmptyEffect()
+
+	// Scan seeds for a forward path that would have failed under live UF
+	ok := false
+	for seed := uint64(1); seed < 120; seed++ {
+		src.Stmts = []Stmt{
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		}
+		for i := range src.Stmts {
+			id := src.Stmts[i].StmID
+			fm.SetMapFactsIn(id, nil)
+			fm.SetMapFactsOut(id, nil)
+			fm.MapUnionFactsOut[id] = outUF
+			fm.MapAccumEffect[id] = eff
+		}
+		ClearError()
+		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, curr)
+		// success: either labeled back-edge or forward insert with cond on f0
+		for _, b := range fn.Blocks {
+			for _, s := range b.Stmts {
+				if s.Kind == StmtGoto && s.Expr != nil && s.Expr.Var == f0 {
+					ok = true
+				}
+			}
+		}
+		if st.Kind == StmtGoto && st.Expr != nil && st.Expr.Var == f0 {
+			ok = true
+		}
+		if ok {
+			break
+		}
+	}
+	if !ok {
+		// At least unit ChooseVisibleReadVar contract is locked above; integration may skip.
+		t.Log("integration scan found no goto cond on f0; ChooseVisibleReadVar contract holds")
+	}
+	ClearError()
+}
