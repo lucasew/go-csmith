@@ -101,8 +101,9 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 }
 
 func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
-	// Incomplete parent EffectAccum → MergeEffects IncompleteEffect sticky visit false
-	// (no invent soft re-pick past incomplete parent accum as visit success)
+	// Incomplete parent EffectAccum → arm VisitFactsBlock / assign visit sticky false
+	// (no invent soft re-pick past incomplete parent accum as visit success).
+	// StatementIf.cpp:170–177 shares effect_accum (no forked MergeEffects path).
 	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)

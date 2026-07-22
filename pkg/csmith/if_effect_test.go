@@ -258,6 +258,62 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	ClearError()
 }
 
+// TestVisitFactsStatementIfSharesEffectAccum — StatementIf.cpp:170–177.
+// Both arms visit with the same CGContext& so effect_accum grows through true
+// then false. Soft invent forked arm accums → StmVisitFacts rewrote
+// map_accum_effect[nested] without outer history (seed-42 choose_visible nOk).
+func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
+	inner := CreateVariableScalars("g_inner", GetIntType(), false, false)
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(fn)
+	// then: read g_inner via return expr (visit records CheckReadVar)
+	thenRet := Stmt{
+		Kind: StmtReturn, StmID: AllocStmID(),
+		Expr: &Expression{Term: TermVariable, Var: inner, ExprType: GetIntType()},
+	}
+	elseRet := Stmt{
+		Kind: StmtReturn, StmID: AllocStmID(),
+		Expr: &Expression{Term: TermVariable, Var: outer, ExprType: GetIntType()},
+	}
+	thenBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{thenRet}}
+	elseBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{elseRet}}
+	fm.MapStmEffect = map[int]Effect{
+		thenBlk.StmID: EmptyEffect(),
+		elseBlk.StmID: EmptyEffect(),
+	}
+	st := &Stmt{
+		Kind: StmtIfElse, StmID: AllocStmID(),
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Then: thenBlk, Else: elseBlk,
+	}
+	fn.RV = CreateVariableScalars("g_rv", GetIntType(), false, false)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = fn
+	// parent accum already observed g_outer (as if prior statements in the block)
+	eff := EmptyEffect().ReadVar(outer)
+	cg.EffectAccum = &eff
+	if !VisitFactsStatementIf(st, &cg, opts) {
+		t.Fatalf("visit if err=%v", HasError())
+	}
+	// After shared-arm visit, accum must include outer (pre) + both arm reads.
+	if cg.EffectAccum == nil || !cg.EffectAccum.IsRead(outer) {
+		t.Fatal("shared effect_accum must keep pre-if outer read")
+	}
+	if !cg.EffectAccum.IsRead(inner) {
+		t.Fatal("shared effect_accum must record true-arm read of g_inner")
+	}
+	// Nested then stmt map_accum must include pre-if history (not arm-local only).
+	thenAcc := fm.GetMapAccumEffect(thenRet.StmID)
+	if !EffectComplete(thenAcc) || !thenAcc.IsRead(outer) {
+		t.Fatalf("map_accum_effect[then] must include outer pre-history, reads=%v", thenAcc.ReadVars())
+	}
+	ClearError()
+}
+
 // TestVisitFactsStatementIfRewindsUnionBeforeElse — StatementIf.cpp:170–177.
 // Else arm starts from post-condition full FactVec (ePointTo + eUnionWrite).
 // Soft invent restored only GlobalFacts so UnionFacts stayed at then-exit

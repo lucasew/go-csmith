@@ -323,25 +323,18 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 	}
-	preAccum := EmptyEffect()
-	if cg.EffectAccum != nil {
-		preAccum = cg.EffectAccum.Clone()
-		// residual ERROR sticky — no invent soft-if arms past EffectAccum Clone residual
-		if HasError() {
-			return false
-		}
-	}
-
 	// StatementIf.cpp:170–177 — both arms always live Blocks sticky
 	if st.Then == nil || st.Else == nil {
 		SetError(ErrGeneric)
 		return false
 	}
+	// StatementIf.cpp:170–177 — both arms use the SAME cg_context (shared
+	// effect_accum). Soft invent forked thenAccum/elseAccum so StmVisitFacts
+	// rewrote map_accum_effect[nested] with arm-local history only (seed-42:
+	// generation map_accum nRead=37 → post-visit overwrite nRead=7 →
+	// choose_visible_read_var ok 1 vs UP 13).
 	// StatementIf.cpp:170–173 — true branch from post-cond facts
-	thenAccum := preAccum
-	thenCG := cg.CloneSubcontext()
-	thenCG.EffectAccum = &thenAccum
-	if !VisitFactsBlock(st.Then, &thenCG, opts) {
+	if !VisitFactsBlock(st.Then, cg, opts) {
 		return false
 	}
 	var thenFacts []*FactPointTo
@@ -370,6 +363,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		// Full FactVec: generation uses AssignGlobalFactsFromMapIn (PT+union).
 		// Soft invent was SetGlobalFacts(PT-only) → else kept then-exit last-writes
 		// (seed-7 nested loop FP over-strip of back-edge gotos).
+		// effect_accum is NOT reset (C++ continues growing through false arm).
 		cg.FM.SetGlobalFacts(CloneFactSlice(postCond), "auto_statement_visit_317")
 		// residual ERROR sticky — no invent soft-else start past CloneFactSlice residual
 		if HasError() {
@@ -389,11 +383,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 	}
 
-	// StatementIf.cpp:174–177 — false branch
-	elseAccum := preAccum
-	elseCG := cg.CloneSubcontext()
-	elseCG.EffectAccum = &elseAccum
-	if !VisitFactsBlock(st.Else, &elseCG, opts) {
+	// StatementIf.cpp:174–177 — false branch (same cg_context / effect_accum)
+	if !VisitFactsBlock(st.Else, cg, opts) {
 		return false
 	}
 	var elseFacts []*FactPointTo
@@ -568,18 +559,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 		}
 	}
-	// parent accum: both arms observed (generation-time separates; visit matches merge)
-	// Incomplete arm accum sticky (MergeEffects IncompleteEffect — no invent pure merge success)
-	if cg.EffectAccum != nil {
-		merged := MergeEffects(thenAccum, elseAccum)
-		if !EffectComplete(merged) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return false
-		}
-		*cg.EffectAccum = merged
-	}
+	// StatementIf.cpp:170–177 — effect_accum already grew through both arms on
+	// the shared cg_context; do not MergeEffects of forked arm snapshots.
 	return true
 }
 
