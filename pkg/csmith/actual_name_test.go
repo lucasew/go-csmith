@@ -38,18 +38,26 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 }
 
 func TestOutputDefVolatileComment(t *testing.T) {
+	// Variable.cpp:662–667 — is_volatile() only (locals included; text still "GLOBAL")
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	v.Init = MakeInt(0)
 	s := v.OutputDefOpts(true, false)
 	if !strings.Contains(s, "VOLATILE GLOBAL g_v") {
 		t.Fatal(s)
 	}
-	// local volatile — no comment
+	// local volatile still gets the comment (seed 95 l_1341)
 	l := CreateVariableScalars("l_v", GetIntType(), false, true)
 	l.Init = MakeInt(1)
 	s2 := l.OutputDefOpts(false, false)
-	if strings.Contains(s2, "VOLATILE GLOBAL") {
+	if !strings.Contains(s2, "VOLATILE GLOBAL l_v") {
 		t.Fatal(s2)
+	}
+	// non-volatile local: no comment
+	n := CreateVariableScalars("l_n", GetIntType(), false, false)
+	n.Init = MakeInt(2)
+	s3 := n.OutputDefOpts(false, false)
+	if strings.Contains(s3, "VOLATILE GLOBAL") {
+		t.Fatal(s3)
 	}
 }
 
