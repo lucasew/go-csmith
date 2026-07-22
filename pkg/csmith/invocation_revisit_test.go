@@ -380,6 +380,93 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 	}
 }
 
+// TestRevisitInstallsCallerUnionFacts — FunctionInvocationUser.cpp:206+324 full FactVec
+// handover includes eUnionWrite. Soft invent left stale callee UnionFacts across
+// revisits (seed-7 ChooseOKVar / IsNonreadableField skew).
+func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
+	ClearError()
+	// Callee with empty body (always visits OK)
+	callee := &Function{
+		Name: "func_u", ReturnType: GetIntType(),
+		Body:        &Block{StmID: 200, Stmts: nil},
+		FactChanged: true,
+	}
+	callee.RV = CreateVariableScalars("func_u_rv", GetIntType(), false, false)
+	calFM := callee.ensurePairedFactMgr()
+	callee.Body.Func = callee
+	// Stale last-written field on callee from a prior visit (g_ prefix → IsGlobal)
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	uParent := CreateVariableScalars("g_u", ut, false, false)
+	stale := MakeFactUnion(uParent, 1) // last-written f1
+	calFM.UnionFacts = []*FactUnion{stale}
+
+	// Caller lattice has last-written f0 for same union
+	callerU := MakeFactUnion(uParent, 0)
+	callerFM := NewFactMgr(&Function{Name: "caller"})
+	callerFM.UnionFacts = []*FactUnion{callerU}
+	callerFM.GlobalFacts = []*FactPointTo{}
+
+	eff := EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(callerFM)
+	cg.EffectAccum = &eff
+	calFM.SetMapStmEffect(200, EmptyEffect())
+	calFM.SetMapFactsOut(200, []*FactPointTo{})
+
+	fi := &Invocation{User: callee}
+	facts := []*FactPointTo{}
+	if !RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
+		t.Fatalf("revisit ok expected err=%v", HasError())
+	}
+	// After success, callee live UnionFacts must come from caller (f0), not stale f1
+	if !UnionFactsComplete(calFM.UnionFacts) {
+		t.Fatal("post-revisit UnionFacts incomplete")
+	}
+	found := false
+	for _, uf := range calFM.UnionFacts {
+		if uf != nil && uf.Var == uParent {
+			found = true
+			if uf.LastWrittenFID != 0 {
+				t.Fatalf("expected caller last-written f0, got %d (stale f1 not replaced)", uf.LastWrittenFID)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected g_u union fact from caller after revisit, got %d unions", len(calFM.UnionFacts))
+	}
+	ClearError()
+}
+
+func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
+	ClearError()
+	callee := &Function{
+		Name: "func_v", ReturnType: GetIntType(),
+		Body: &Block{StmID: 201, Stmts: nil},
+	}
+	callee.RV = CreateVariableScalars("func_v_rv", GetIntType(), false, false)
+	calFM := callee.ensurePairedFactMgr()
+	callee.Body.Func = callee
+	calFM.SetMapStmEffect(201, EmptyEffect())
+	calFM.UnionFacts = []*FactUnion{}
+
+	callerFM := NewFactMgr(&Function{Name: "caller2"})
+	callerFM.UnionFacts = IncompleteUnionFactSlice()
+	eff := EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(callerFM)
+	cg.EffectAccum = &eff
+	fi := &Invocation{User: callee}
+	facts := []*FactPointTo{}
+	if RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
+		t.Fatal("incomplete caller UnionFacts must fail closed revisit")
+	}
+	if !HasError() {
+		t.Fatal("incomplete caller UnionFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
 	ClearError()
 	if (*Function)(nil).NeedsRevisit() {

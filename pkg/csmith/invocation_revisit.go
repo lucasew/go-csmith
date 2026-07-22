@@ -463,11 +463,16 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		SetError(ErrGeneric)
 		return false
 	}
-	// backup maps
+	// backup maps — FactVec partitions (ePointTo + eUnionWrite) + effects
+	// FactMgr.cpp map_facts_in/out are full FactVec; Go splits PT/union maps.
 	inCopy := cloneFactMap(fm.MapFactsIn)
 	outCopy := cloneFactMap(fm.MapFactsOut)
+	unionInCopy := cloneUnionFactMap(fm.MapUnionFactsIn)
+	unionOutCopy := cloneUnionFactMap(fm.MapUnionFactsOut)
 	effCopy := cloneEffectMap(fm.MapStmEffect)
 	accCopy := cloneEffectMap(fm.MapAccumEffect)
+	// Live UnionFacts on callee FM (replaced for visit; restored on fail).
+	savedUnion := fm.UnionFacts
 	// FunctionInvocationUser.cpp:315 — inputs_copy = inputs (pre-handover caller lattice).
 	// Deep-clone so handover/body cannot orphan mid-gen may-null on the live *facts slice
 	// when *facts aliases caller GlobalFacts (build_invocation passes global_facts by ref).
@@ -481,8 +486,11 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	restore := func() {
 		fm.MapFactsIn = inCopy
 		fm.MapFactsOut = outCopy
+		fm.MapUnionFactsIn = unionInCopy
+		fm.MapUnionFactsOut = unionOutCopy
 		fm.MapStmEffect = effCopy
 		fm.MapAccumEffect = accCopy
+		fm.UnionFacts = savedUnion
 		*facts = inputsCopy
 	}
 
@@ -491,9 +499,45 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if f.VisitedCnt == 1 {
 		fm.SetupInOutMaps(true)
 	}
+	// FunctionInvocationUser.cpp:206+324 — full FactVec handover includes eUnionWrite.
+	// Build path clones caller UnionFacts then FilterUnionFactsForHandover (function_invocation.go).
+	// Soft invent left stale callee UnionFacts across revisits → IsNonreadableField /
+	// shortcut same_facts skew (seed-7 ChooseOKVar n=26 vs UP n=56).
+	// Caller FM: VisitFactsInvocation / BuildUserInvocation pass newCG cloned from parent
+	// (FM still caller's). When cg.FM is already the callee, keep existing UnionFacts
+	// and only filter after PT partition.
+	if cg.FM != nil && cg.FM != fm {
+		if !UnionFactsComplete(cg.FM.UnionFacts) {
+			restore()
+			SetError(ErrGeneric)
+			return false
+		}
+		clU := CloneUnionFactSlice(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(clU) {
+			restore()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		fm.UnionFacts = clU
+	} else if !UnionFactsComplete(fm.UnionFacts) {
+		restore()
+		SetError(ErrGeneric)
+		return false
+	}
 	// handover params into working lattice (not directly into caller GlobalFacts)
 	fm.CallerToCalleeHandover(fi.Args, &work)
 	if !FactsComplete(work) {
+		restore()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return false
+	}
+	// FactMgr.cpp:324–353 — drop union subjects not kept by PT partition
+	fm.FilterUnionFactsForHandover(work)
+	if HasError() || !UnionFactsComplete(fm.UnionFacts) {
 		restore()
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -631,6 +675,19 @@ func cloneFactMap(m map[int][]*FactPointTo) map[int][]*FactPointTo {
 	for k, v := range m {
 		// incomplete → hole marker (not bare nil invent empty complete)
 		out[k] = storeFactMapEntry(v)
+	}
+	return out
+}
+
+// cloneUnionFactMap deep-copies MapUnionFactsIn/Out for revisit restore
+// (FactMgr.cpp map_facts_in/out full FactVec backup includes eUnionWrite).
+func cloneUnionFactMap(m map[int][]*FactUnion) map[int][]*FactUnion {
+	if m == nil {
+		return make(map[int][]*FactUnion)
+	}
+	out := make(map[int][]*FactUnion, len(m))
+	for k, v := range m {
+		out[k] = storeUnionFactMapEntry(v)
 	}
 	return out
 }
