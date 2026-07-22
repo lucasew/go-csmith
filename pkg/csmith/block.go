@@ -1043,7 +1043,14 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				}
 			}
 		} else {
-			// No FP: C++ leaves global_facts post-OOS (Block.cpp:690–693 only).
+			// No FP: Block.cpp:723–726 mutates live global_facts in place
+			// (OOS locals + remove_rv); set_fact_out only fills map_out.
+			// Block.cpp:772 assigns map_facts_out → global_facts only on the FP
+			// arm. Soft invent (1) SetGlobalFacts(PT-only) left live UnionFacts
+			// mid-body (local eUnionWrite subjects) → same_facts size skew;
+			// (2) AssignGlobalFactsFromMapOut wrongly applied remove_function_local
+			// (parent==nullptr) to the *live* env — C++ never does that on no-FP.
+			// Live = post-OOS full FactVec: outPost for PT + OOS UnionFacts locals.
 			if !FactsComplete(outPost) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
@@ -1058,19 +1065,33 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 				return
 			}
-			if b.Looping {
-				fromTail := b.FromTailToHead()
-				// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
-				if HasError() {
+			// FactMgr.cpp:141–156 — OOS erase is category-agnostic (eUnionWrite too).
+			if !UnionFactsComplete(fm.UnionFacts) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				postFacts = IncompleteFactSlice()
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				SetError(ErrGeneric)
+				return
+			}
+			if len(b.LocalVars) > 0 {
+				UpdateUnionFactsForOOSVars(b.LocalVars, &fm.UnionFacts)
+				if !UnionFactsComplete(fm.UnionFacts) || HasError() {
 					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return
 				}
-				if fromTail {
-					fm.CreateCFGEdge(b.StmID, b, false, true)
-				}
 			}
+			// C++ does not create self-back outside the FP branch (is_loop_body ||
+			// need_revisit || has_edge_in). Soft invent created self-back when
+			// Looping && !isLoopBody (must_break_or_return) && from_tail — that
+			// path never runs FP strip, so later re-visits merge a never-validated
+			// self-back. Only create self-back when C++ would (isLoopBody arm above).
 		}
 	}
 	// Block.cpp:687 already set map_visited; find_fixed_point also sets (561). Reaffirm.

@@ -1953,3 +1953,168 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	}
 	ClearError()
 }
+
+// TestPostCreationNoFPOOSsLiveUnionsNotMapOut — Block.cpp:723–726 + 735–773.
+// No-FP path mutates live global_facts (OOS locals) and never assigns map_facts_out.
+// Soft invent (1) left live UnionFacts mid-body; (2) AssignGlobalFactsFromMapOut
+// applied remove_function_local to live env on function body (parent==nullptr).
+func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	ut := &Type{isUnion: true, StructName: "U_nofp", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	param := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	fn.Param = []*Variable{param}
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	// Nested no-FP block: parent != nil so map_out keeps full post-OOS without
+	// remove_function_local; live must OOS lu but not invent map_out install.
+	parent := &Block{StmID: AllocStmID(), Func: fn}
+	x := CreateVariableScalars("g_x", GetIntType(), false, false)
+	asg := Stmt{
+		Kind: StmtAssign, StmID: AllocStmID(),
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	inner := &Block{
+		StmID: AllocStmID(), Func: fn, Parent: parent, Looping: false, NeedRevisit: false,
+		LocalVars: []*Variable{lu},
+		Stmts:     []Stmt{asg},
+	}
+	fm := NewFactMgr(fn)
+	fm.GlobalFacts = []*FactPointTo{
+		MakeFactPointTo(param, NullPtr),
+		MakeFactPointTo(gp, param),
+	}
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	if fm.MapStmEffect == nil {
+		fm.MapStmEffect = make(map[int]Effect)
+	}
+	fm.MapStmEffect[inner.StmID] = EmptyEffect()
+	fm.MapStmEffect[asg.StmID] = EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = fn
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	inner.PostCreationAnalysis(&cg, opts, EmptyEffect(), nil, nil)
+	if HasError() {
+		t.Fatalf("no-FP post_creation sticky: %v", GetError())
+	}
+	// live Union: local subject dropped; global kept
+	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
+		t.Fatal("no-FP live UnionFacts must OOS body-local union subject", fm.UnionFacts)
+	}
+	if FindRelatedUnion(fm.UnionFacts, gu) == nil {
+		t.Fatal("no-FP live UnionFacts must keep global union", fm.UnionFacts)
+	}
+	// map_union_out also OOS (SetMapFactsOutForBlock)
+	outU := fm.GetMapUnionFactsOut(inner.StmID)
+	if FindRelatedUnion(outU, lu) != nil {
+		t.Fatal("map_union_out must drop local", outU)
+	}
+	// Function-body no-FP: live must NOT apply remove_function_local (param subject stays).
+	// map_out for parent==nil does strip params.
+	ClearError()
+	bodyLoc := CreateVariableQfer("l_bu", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	bodyAsg := Stmt{
+		Kind: StmtAssign, StmID: AllocStmID(),
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
+	}
+	body := &Block{
+		StmID: AllocStmID(), Func: fn, Parent: nil, Looping: false, NeedRevisit: false,
+		LocalVars: []*Variable{bodyLoc},
+		Stmts:     []Stmt{bodyAsg},
+	}
+	fn.Body = body
+	fm2 := NewFactMgr(fn)
+	fm2.GlobalFacts = []*FactPointTo{
+		MakeFactPointTo(param, NullPtr),
+		MakeFactPointTo(gp, param),
+	}
+	fm2.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(bodyLoc, 0)}
+	fm2.MapStmEffect = map[int]Effect{
+		body.StmID:    EmptyEffect(),
+		bodyAsg.StmID: EmptyEffect(),
+	}
+	cg2 := EmptyCGContext().WithFactMgr(fm2)
+	cg2.CurrentFunc = fn
+	eff2 := EmptyEffect()
+	cg2.EffectAccum = &eff2
+	body.PostCreationAnalysis(&cg2, opts, EmptyEffect(), nil, nil)
+	if HasError() {
+		t.Fatalf("function-body no-FP sticky: %v", GetError())
+	}
+	// live: param subject still present (C++ OOS only local_vars, not remove_function_local)
+	if FindRelatedPointTo(fm2.GlobalFacts, param) == nil {
+		t.Fatal("no-FP live must not remove_function_local param subject", fm2.GlobalFacts)
+	}
+	// map_out: parent==nil strips params
+	outPT := fm2.GetMapFactsOut(body.StmID)
+	for _, f := range outPT {
+		if f != nil && f.Var != nil && (f.Var == param || f.Var.Match(param)) {
+			t.Fatal("function-body map_facts_out must remove param subject", outPT)
+		}
+	}
+	if FindRelatedUnion(fm2.UnionFacts, bodyLoc) != nil {
+		t.Fatal("no-FP live must OOS body local union", fm2.UnionFacts)
+	}
+	ClearError()
+}
+
+// TestPostCreationNoFPNoSelfBackWhenMustBreak — Block.cpp:735–739.
+// Self-back only when is_loop_body && from_tail_to_head inside the FP arm.
+// Soft invent created self-back on no-FP when Looping && must_break_or_return
+// (is_loop_body false) && from_tail.
+func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	parent := &Block{StmID: AllocStmID(), Func: fn}
+	// Last stmt is return → must_break_or_return true → is_loop_body false
+	// even though Looping (Block.cpp:729).
+	ret := Stmt{
+		Kind: StmtReturn, StmID: AllocStmID(),
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+	}
+	// Fall-through last would be from_tail; with return last, from_tail is false
+	// unless continue/break topology. Use looping + return last and assert no edge.
+	b := &Block{
+		StmID: AllocStmID(), Func: fn, Parent: parent,
+		Looping: true, NeedRevisit: false,
+		Stmts: []Stmt{ret},
+	}
+	fm := NewFactMgr(fn)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.UnionFacts = []*FactUnion{}
+	fm.MapStmEffect = map[int]Effect{
+		b.StmID:   EmptyEffect(),
+		ret.StmID: EmptyEffect(),
+	}
+	nEdgesBefore := len(fm.CFGEdges)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = fn
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	b.PostCreationAnalysis(&cg, opts, EmptyEffect(), nil, nil)
+	if HasError() {
+		t.Fatalf("sticky: %v", GetError())
+	}
+	// No self-back: is_loop_body false so FP arm (and its CreateCFGEdge) never runs.
+	for _, e := range fm.CFGEdges[nEdgesBefore:] {
+		if e != nil && e.BackLink && e.SrcID == b.StmID && e.DestBlock == b {
+			t.Fatal("no-FP must not invent self-back when !is_loop_body", e)
+		}
+	}
+	// must_break_or_return true for return last
+	if !b.MustBreakOrReturnFull(fm) {
+		t.Fatal("setup: return last must must_break_or_return")
+	}
+	ClearError()
+}
