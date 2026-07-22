@@ -145,13 +145,14 @@ func TestBodyParityBattery(t *testing.T) {
 //
 //	CSMITH_UPSTREAM=... go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s
 //
-// Seed corpus = level-B battery. Crashers under testdata/fuzz/ re-run until
-// fixed or removed — commit only as intentional regressions while C is open.
+// Does **not** re-seed the level-B battery (that is TestBodyParityBattery only).
+// Mutator starts from the zero seed; interesting/failing inputs accumulate under
+// testdata/fuzz/. Commit crashers only as intentional regressions while C is open.
 func FuzzBodyParity(f *testing.F) {
 	f.Logf("upstream=%s", upstreamCsmith(f))
-	for _, seed := range bodyParityBattery {
-		f.Add(seed)
-	}
+	// One trivial entry so continuous -fuzz has a root; avoids re-running the
+	// full battery as baseline (duplicate of TestBodyParityBattery).
+	f.Add(uint64(0))
 	f.Fuzz(func(t *testing.T, seed uint64) {
 		assertSeedBodyParity(t, seed)
 	})
