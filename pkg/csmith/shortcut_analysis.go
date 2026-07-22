@@ -479,12 +479,10 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
 	}
-	// Statement.cpp:551 — same_facts on full FactVec. PT partition via SameFacts;
-	// eUnionWrite half is installed from map_facts_out on ShortcutOK (below).
-	// Full SameFactVec requires live UnionFacts == map_in unions; FP must keep the
-	// working eUnionWrite env paired with current_inputs (see FindFixedPointBlock).
-	// Until that pairing is complete end-to-end, comparing unions here false-refuses
-	// shortcuts C++ takes (seed-999 regression). Out-union install still required.
+	// Statement.cpp:551 — same_facts(inputs, map_facts_in[this]) on full FactVec.
+	// PT via SameFacts; eUnionWrite half installed from map_facts_out on ShortcutOK.
+	// SameFactVec production gate needs working inputs unions paired with *facts
+	// at every caller (FP currentUnions + gen-time) first.
 	if !SameFacts(*facts, in) || IsCtrlStmt(st) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
 		if HasError() {

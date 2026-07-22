@@ -133,8 +133,7 @@ func TestIsCtrlStmt(t *testing.T) {
 
 
 func TestSameFactVec(t *testing.T) {
-	// Fact.cpp:237–246 full FactVec (helpers ready; production shortcut still PT-gated
-	// until FindFixedPoint pairs current_inputs with entry eUnionWrite).
+	// Fact.cpp:237–246 full FactVec (ePointTo + eUnionWrite).
 	ClearError()
 	ut := &Type{isUnion: true, StructName: "U_sfv", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -144,8 +143,8 @@ func TestSameFactVec(t *testing.T) {
 	parent.CreateFieldVars()
 	u0 := MakeFactUnion(parent, 0)
 	u1 := MakeFactUnion(parent, 1)
-	p := CreateVariableScalars("g_p_sfv", PointerTo(GetIntType()), false, false)
-	pt := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	pvar := CreateVariableScalars("g_p_sfv", PointerTo(GetIntType()), false, false)
+	pt := []*FactPointTo{MakeFactPointTo(pvar, NullPtr)}
 	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnion(parent, 0)}) {
 		t.Fatal("same full vec")
 	}

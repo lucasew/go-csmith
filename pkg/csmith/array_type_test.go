@@ -557,3 +557,36 @@ func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAddNewVarFactAndUpdateFillsUnionMapFromPTKeys(t *testing.T) {
+	// FactMgr.cpp:69–110 — one FactVec map; eUnionWrite shares keys with ePointTo.
+	// Soft invent iterated only MapUnionFactsIn keys → PT-only slots missed union init.
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// PT map key without union map key (historical dual-map hole)
+	sid := 42
+	fm.MapFactsIn = map[int][]*FactPointTo{sid: {}}
+	fm.MapFactsOut = map[int][]*FactPointTo{sid: {}}
+	// MapUnionFactsIn intentionally nil / missing key
+	ut := &Type{isUnion: true, StructName: "U_fill", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	// Init required for complete union abstract (FactUnion assign transfer)
+	g := &Variable{Name: "g_ufill", Type: ut, Init: MakeInt(0)}
+	fm.AddNewVarFactAndUpdate(nil, g) // global create
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	got := fm.GetMapUnionFactsIn(sid)
+	if !UnionFactsComplete(got) {
+		t.Fatalf("incomplete union map_in: %#v", got)
+	}
+	if len(got) == 0 {
+		t.Fatal("PT map key must receive eUnionWrite init fact for new global union")
+	}
+	if got[0].LastWrittenFID != 0 {
+		t.Fatalf("want init last_write 0, got %d", got[0].LastWrittenFID)
+	}
+	ClearError()
+}

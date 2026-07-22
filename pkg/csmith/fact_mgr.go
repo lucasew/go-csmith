@@ -2134,15 +2134,18 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	}
 	// Re-abstract init for map push (C++ always uses abstract_fact_for_var_init
 	// results for maps, never the existing related GlobalFacts entry).
-	ptInit, _ := AbstractFactForVarInit(v)
+	// Soft invent returned early on nil ptInit (union-only subjects) before the
+	// eUnionWrite map push below — mid-gen union globals never entered map_facts_in.
+	ptInit, unInitEarly := AbstractFactForVarInit(v)
 	// residual ERROR sticky — no invent soft-skip map push past Abstract residual
 	if HasError() {
 		fm.GlobalFacts = IncompleteFactSlice()
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
 	if !FactsComplete(ptInit) {
-		// incomplete init abstract: non-pointer/union subjects return nil,nil
-		// (complete empty) — no map push; incomplete marker is sticky fail
+		// incomplete init abstract sticky fail; nil = complete empty (non-pointer /
+		// pure union) — skip ePointTo map push, still do eUnionWrite below.
 		if ptInit != nil {
 			fm.GlobalFacts = IncompleteFactSlice()
 			if !HasError() {
@@ -2150,7 +2153,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			}
 			return
 		}
-		return
+		// fall through to union map push
 	}
 	toPush := ptInit
 	// Fact* always live after add; nil / incomplete Clone fails closed sticky wipe
@@ -2294,6 +2297,11 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	// push init union facts into map_facts_in/out (MapUnionFacts*) like PT above.
 	// Without this, post_loop AssignGlobalFactsFromMapIn rewinds to entry maps
 	// missing mid-body union init facts → empty/stale UnionFacts → over-filter.
+	//
+	// C++ map_facts_in is one FactVec (both categories share keys). Soft invent
+	// iterated only MapUnionFactsIn keys — stmts that had MapFactsIn but no
+	// MapUnionFactsIn entry never received mid-gen eUnionWrite init facts, so
+	// facts_copy = map_facts_in[body] lacked unions C++ has (FP / IsNonreadableField).
 	if !UnionFactsComplete(fm.UnionFacts) {
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -2302,11 +2310,15 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		}
 		return
 	}
-	_, unInit := AbstractFactForVarInit(v)
-	if HasError() {
-		fm.GlobalFacts = IncompleteFactSlice()
-		fm.UnionFacts = IncompleteUnionFactSlice()
-		return
+	// Prefer first abstract's eUnionWrite (same call as PT); re-abstract only if nil.
+	unInit := unInitEarly
+	if unInit == nil {
+		_, unInit = AbstractFactForVarInit(v)
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			return
+		}
 	}
 	if !UnionFactsComplete(unInit) {
 		if unInit != nil {
@@ -2318,8 +2330,16 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		}
 		return
 	}
-	if fm.MapUnionFactsIn == nil && fm.MapUnionFactsOut == nil {
+	if fm.MapFactsIn == nil && fm.MapFactsOut == nil &&
+		fm.MapUnionFactsIn == nil && fm.MapUnionFactsOut == nil {
 		return
+	}
+	// Ensure union partitions exist whenever PT maps do (single FactVec keys)
+	if fm.MapFactsIn != nil && fm.MapUnionFactsIn == nil {
+		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
+	}
+	if fm.MapFactsOut != nil && fm.MapUnionFactsOut == nil {
+		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
 	for _, uf := range unInit {
 		if uf == nil {
@@ -2328,8 +2348,28 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			SetError(ErrGeneric)
 			return
 		}
-		// map_facts_in eUnionWrite partition
-		if fm.MapUnionFactsIn != nil {
+		// map_facts_in eUnionWrite — iterate PT keys (C++ one map); create missing union slots
+		if fm.MapFactsIn != nil {
+			for id := range fm.MapFactsIn {
+				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
+					continue
+				}
+				if fm.MapUnionFactsIn == nil {
+					fm.MapUnionFactsIn = make(map[int][]*FactUnion)
+				}
+				slot, ok := fm.MapUnionFactsIn[id]
+				if !ok {
+					// complete empty eUnionWrite half for a PT-only key
+					slot = []*FactUnion{}
+				} else if !UnionFactsComplete(slot) {
+					fm.MapUnionFactsIn[id] = IncompleteUnionFactSlice()
+					continue
+				}
+				// shallow Fact* vector copy (same FactUnion object as C++ push)
+				fm.MapUnionFactsIn[id] = append(slot, uf)
+			}
+		} else if fm.MapUnionFactsIn != nil {
+			// union-only map (tests): keep prior behavior
 			for id := range fm.MapUnionFactsIn {
 				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
 					continue
@@ -2338,26 +2378,61 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					fm.MapUnionFactsIn[id] = IncompleteUnionFactSlice()
 					continue
 				}
-				// shallow Fact* vector copy (same FactUnion object as C++ push)
 				fm.MapUnionFactsIn[id] = append(fm.MapUnionFactsIn[id], uf)
 			}
 		}
 		// map_facts_out eUnionWrite — all outs when blk==nil; visibility when blk set
-		if fm.MapUnionFactsOut == nil {
+		if fm.MapFactsOut == nil && fm.MapUnionFactsOut == nil {
 			continue
 		}
 		if blk == nil {
-			for id := range fm.MapUnionFactsOut {
-				if !UnionFactsComplete(fm.MapUnionFactsOut[id]) {
+			// prefer PT out keys (single FactVec); fall back to union-only
+			ids := map[int]struct{}{}
+			if fm.MapFactsOut != nil {
+				for id := range fm.MapFactsOut {
+					ids[id] = struct{}{}
+				}
+			}
+			if fm.MapUnionFactsOut != nil {
+				for id := range fm.MapUnionFactsOut {
+					ids[id] = struct{}{}
+				}
+			}
+			if fm.MapUnionFactsOut == nil {
+				fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+			}
+			for id := range ids {
+				slot, ok := fm.MapUnionFactsOut[id]
+				if !ok {
+					slot = []*FactUnion{}
+				} else if !UnionFactsComplete(slot) {
 					fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
 					continue
 				}
-				fm.MapUnionFactsOut[id] = append(fm.MapUnionFactsOut[id], uf)
+				fm.MapUnionFactsOut[id] = append(slot, uf)
 			}
 			continue
 		}
-		for id := range fm.MapUnionFactsOut {
-			if !UnionFactsComplete(fm.MapUnionFactsOut[id]) {
+		// blk != nil: visibility-filtered outs — union keys = PT out keys ∪ union out keys
+		outIDs := map[int]struct{}{}
+		if fm.MapFactsOut != nil {
+			for id := range fm.MapFactsOut {
+				outIDs[id] = struct{}{}
+			}
+		}
+		if fm.MapUnionFactsOut != nil {
+			for id := range fm.MapUnionFactsOut {
+				outIDs[id] = struct{}{}
+			}
+		}
+		if fm.MapUnionFactsOut == nil {
+			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+		}
+		for id := range outIDs {
+			slot, ok := fm.MapUnionFactsOut[id]
+			if !ok {
+				slot = []*FactUnion{}
+			} else if !UnionFactsComplete(slot) {
 				fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
 				continue
 			}
@@ -2403,7 +2478,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					}
 				}
 			}
-			fm.MapUnionFactsOut[id] = append(fm.MapUnionFactsOut[id], uf)
+			fm.MapUnionFactsOut[id] = append(slot, uf)
 		}
 	}
 }

@@ -1005,8 +1005,8 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	// Statement.cpp:551 — same_facts full FactVec. PT via SameFacts; eUnionWrite
-	// installed from map_facts_out on ShortcutOK. See ShortcutAnalysis note on
-	// deferred SameFactVec until FP pairs current_inputs with entry unions.
+	// installed from map_facts_out on ShortcutOK. SameFactVec gate deferred until
+	// FindFixedPoint pairs current_inputs with map_facts_in eUnionWrite.
 	if !SameFacts(*facts, in) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
 		if HasError() {
