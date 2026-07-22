@@ -692,6 +692,22 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			SetError(ErrGeneric)
 			return currentInputs, -1, false
 		}
+		// Entry eUnionWrite for set_fact_in (C++ current_inputs unchanged by analyze).
+		// Soft invent was SetMapFactsIn pairing post-analyze live UnionFacts.
+		var entryUnions []*FactUnion
+		if fm != nil {
+			if !UnionFactsComplete(fm.UnionFacts) {
+				SetError(ErrGeneric)
+				return currentInputs, -1, false
+			}
+			entryUnions = CloneUnionFactSliceDeep(fm.UnionFacts)
+			if !UnionFactsComplete(entryUnions) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, -1, false
+			}
+		}
 		outputs := CloneFactSlice(currentInputs)
 		// Block.cpp:546–549 — facts for locals
 		// Variable* always live on LocalVars; nil hole fails closed (no invent skip)
@@ -728,7 +744,8 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			SetError(ErrGeneric)
 			return outputs, -1, false
 		}
-		fm.SetMapFactsIn(b.StmID, currentInputs)
+		// Block.cpp:557 — set_fact_in(this, current_inputs) full FactVec entry env
+		fm.SetMapFactsInPair(b.StmID, currentInputs, entryUnions)
 		// Block.cpp:558 — post_facts = outputs (pre-OOS)
 		// incomplete outputs after analyze fail closed (no invent cleaned out)
 		if !FactsComplete(outputs) {

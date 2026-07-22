@@ -37,6 +37,79 @@ func SameFacts(a, b []*FactPointTo) bool {
 	return true
 }
 
+// SameUnionFacts mirrors same_facts for the eUnionWrite partition of a FactVec.
+// Fact.cpp:237–246 — C++ same_facts walks the full FactVec (ePointTo + eUnionWrite).
+// Soft invent was PT-only SameFacts in shortcut → reuse when last-written field lattice
+// differed (IsNonreadableField over/under-filters choose_var).
+func SameUnionFacts(a, b []*FactUnion) bool {
+	if !UnionFactsComplete(a) || !UnionFactsComplete(b) {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(a) != len(b) {
+		return false
+	}
+	for _, f := range a {
+		idx := FindUnionFact(b, f)
+		if HasError() {
+			return false
+		}
+		if idx < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// FindUnionFact mirrors find_fact for FactUnion (equal by subject + last_written_fid).
+func FindUnionFact(facts []*FactUnion, want *FactUnion) int {
+	if want == nil {
+		return -1
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return -1
+	}
+	if !UnionFactsComplete([]*FactUnion{want}) {
+		SetError(ErrGeneric)
+		return -1
+	}
+	for i, f := range facts {
+		if f.Equal(want) {
+			if HasError() {
+				return -1
+			}
+			return i
+		}
+		if HasError() {
+			return -1
+		}
+	}
+	return -1
+}
+
+// SameFactVec mirrors same_facts on a full FactVec (ePointTo + eUnionWrite partitions).
+// Fact.cpp:237–246 — total size must match; each fact finds an equal in the other env.
+func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
+	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(ptA)+len(uA) != len(ptB)+len(uB) {
+		return false
+	}
+	if !SameFacts(ptA, ptB) {
+		return false
+	}
+	if HasError() {
+		return false
+	}
+	if !SameUnionFacts(uA, uB) {
+		return false
+	}
+	return !HasError()
+}
+
 // FindFact mirrors find_fact — equal fact in vector, or -1.
 // Fact.cpp find_fact by equal().
 // Incomplete map fails closed sticky -1 (no invent soft-skip hole and match later).
@@ -406,6 +479,12 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
 	}
+	// Statement.cpp:551 — same_facts on full FactVec. PT partition via SameFacts;
+	// eUnionWrite half is installed from map_facts_out on ShortcutOK (below).
+	// Full SameFactVec requires live UnionFacts == map_in unions; FP must keep the
+	// working eUnionWrite env paired with current_inputs (see FindFixedPointBlock).
+	// Until that pairing is complete end-to-end, comparing unions here false-refuses
+	// shortcuts C++ takes (seed-999 regression). Out-union install still required.
 	if !SameFacts(*facts, in) || IsCtrlStmt(st) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
 		if HasError() {
@@ -458,7 +537,19 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if !ok || !FactsComplete(out) {
 		return ShortcutNone
 	}
+	// Statement.cpp:559 — full FactVec assign: ePointTo + eUnionWrite.
+	// Soft invent was PT-only *facts = out leaving live UnionFacts at entry lattice
+	// → IsNonreadableField over-filtered choose_var (seed-7 ok 26 vs UP 56).
+	outU := fm.GetMapUnionFactsOut(st.StmID)
+	if !UnionFactsComplete(outU) {
+		return ShortcutNone
+	}
 	*facts = CloneFactSlice(out)
+	clU := CloneUnionFactSliceDeep(outU)
+	if !UnionFactsComplete(clU) {
+		return ShortcutNone
+	}
+	fm.UnionFacts = clU
 	cg.AddEffect(eff, false)
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past AddEffect residual
 	if HasError() {
@@ -653,6 +744,9 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 		return false
 	}
 	// Statement.cpp:600–605 — copy pre-visit inputs; stm_visit; set in/out only on success
+	// inputs_copy is full FactVec (ePointTo + eUnionWrite). Soft invent was PT-only
+	// clone then SetMapFactsIn pairing live (post-visit) UnionFacts → map_facts_in held
+	// post last-writes while point-to was pre (same_facts / IsNonreadableField skew).
 	inputsCopy := CloneFactSlice(*facts)
 	// incomplete pre-visit clone sticky (CloneFactSlice already sticks on holes)
 	if !FactsComplete(inputsCopy) {
@@ -660,6 +754,21 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 			SetError(ErrGeneric)
 		}
 		return false
+	}
+	var unionInCopy []*FactUnion
+	if cg.FM != nil {
+		if !UnionFactsComplete(cg.FM.UnionFacts) {
+			SetError(ErrGeneric)
+			return false
+		}
+		// deep clone: visit may Join/SetBottom in place on live FactUnion objects
+		unionInCopy = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		if !UnionFactsComplete(unionInCopy) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
 	}
 	// Statement.cpp:612 — curr_blk = parent (containing block of this statement).
 	// Soft invent used only stack-top CurrentBlock(); StatementReturn.cpp:83 and
@@ -676,8 +785,8 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 		return false
 	}
 	if cg.FM != nil {
-		// Statement.cpp:604–605 — set_fact_in(pre); set_fact_out(post)
-		cg.FM.SetMapFactsIn(st.StmID, inputsCopy)
+		// Statement.cpp:604–605 — set_fact_in(pre full FactVec); set_fact_out(post full)
+		cg.FM.SetMapFactsInPair(st.StmID, inputsCopy, unionInCopy)
 		cg.FM.SetMapFactsOutForStmt(st, *facts, blk)
 	}
 	return true

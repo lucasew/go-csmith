@@ -131,6 +131,96 @@ func TestIsCtrlStmt(t *testing.T) {
 	ClearError()
 }
 
+
+func TestSameFactVec(t *testing.T) {
+	// Fact.cpp:237–246 full FactVec (helpers ready; production shortcut still PT-gated
+	// until FindFixedPoint pairs current_inputs with entry eUnionWrite).
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_sfv", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u_sfv", ut, false, false)
+	parent.CreateFieldVars()
+	u0 := MakeFactUnion(parent, 0)
+	u1 := MakeFactUnion(parent, 1)
+	p := CreateVariableScalars("g_p_sfv", PointerTo(GetIntType()), false, false)
+	pt := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnion(parent, 0)}) {
+		t.Fatal("same full vec")
+	}
+	if SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{u1}) {
+		t.Fatal("union mismatch")
+	}
+	ClearError()
+}
+
+func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
+	// Statement.cpp:559 — inputs = map_facts_out[this] full FactVec (eUnionWrite too).
+	// Soft invent left live UnionFacts at entry after ShortcutOK.
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_sc", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u_sc", ut, false, false)
+	parent.CreateFieldVars()
+	entryU := MakeFactUnion(parent, 0)
+	outU := MakeFactUnion(parent, 1)
+	if entryU == nil || outU == nil {
+		t.Fatal("facts")
+	}
+	fm := NewFactMgr(nil)
+	pt := []*FactPointTo{}
+	fm.SetMapFactsInPair(9, pt, []*FactUnion{entryU})
+	fm.SetMapFactsOutPair(9, pt, []*FactUnion{outU})
+	fm.SetMapStmEffect(9, EmptyEffect())
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)} // entry lattice live
+	st := &Stmt{Kind: StmtAssign, StmID: 9}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := append([]*FactPointTo(nil), pt...)
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatalf("want ShortcutOK err=%v", HasError())
+	}
+	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil || fm.UnionFacts[0].LastWrittenFID != 1 {
+		t.Fatalf("shortcut must install map_out unions last_write=1, got %#v", fm.UnionFacts)
+	}
+	// entry snapshot must not be mutated by install (deep clone)
+	if entryU.LastWrittenFID != 0 {
+		t.Fatal("entry fact object must stay fid 0")
+	}
+	ClearError()
+}
+
+func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
+	// Statement.cpp:600–605 inputs_copy before visit; set_fact_in(pre full FactVec).
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_vin2", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u_vin2", ut, false, false)
+	parent.CreateFieldVars()
+	pre := MakeFactUnion(parent, 0)
+	fm := NewFactMgr(nil)
+	fm.UnionFacts = []*FactUnion{pre}
+	// deep snapshot then in-place mutate live (Join path)
+	snap := CloneUnionFactSliceDeep(fm.UnionFacts)
+	fm.UnionFacts[0].LastWrittenFID = 1
+	if snap[0].LastWrittenFID != 0 {
+		t.Fatal("deep clone must isolate lattice from live mutate")
+	}
+	fm.SetMapFactsInPair(88, []*FactPointTo{}, snap)
+	fm.SetMapFactsOutPair(88, []*FactPointTo{}, fm.UnionFacts)
+	got := fm.GetMapUnionFactsIn(88)
+	if len(got) != 1 || got[0].LastWrittenFID != 0 {
+		t.Fatalf("map_in pre fid 0, got %#v", got)
+	}
+	ClearError()
+}
+
 func TestShortcutAnalysisReuse(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{

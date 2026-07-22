@@ -399,6 +399,32 @@ func CloneUnionFactSlice(facts []*FactUnion) []*FactUnion {
 	return out
 }
 
+// CloneUnionFactSliceDeep copies FactUnion objects (subject pointer shared, lattice value owned).
+// Use for pre-visit snapshots where visit may Join/SetBottom in place on live facts;
+// shallow CloneUnionFactSlice would alias and observe post-visit last_written_fid.
+// Incomplete maps fail closed sticky IncompleteUnionFactSlice.
+func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
+	if facts == nil {
+		return nil
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	out := make([]*FactUnion, len(facts))
+	for i, f := range facts {
+		cp := f.Clone()
+		if cp == nil || HasError() {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return IncompleteUnionFactSlice()
+		}
+		out[i] = cp
+	}
+	return out
+}
+
 // RenewUnionFact mirrors renew_fact for FactUnion (Fact.cpp:178–201).
 // Related subject replaced; else append. Incomplete maps fail closed sticky wipe.
 func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
