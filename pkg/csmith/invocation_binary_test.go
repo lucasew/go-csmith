@@ -114,6 +114,73 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	_ = b
 }
 
+// TestVisitFactsBinaryOrderedMergesUnionWrite —
+// FunctionInvocationBinary.cpp:494–499 merge_facts is full FactVec (ePointTo +
+// eUnionWrite). Soft invent was PT-only: RHS ExpressionAssign renew of a union
+// field left last=f1 without joining post-left last=f0 → nonreadable field
+// became choose_var-eligible (seed-58 g_697.f1).
+func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
+	ClearError()
+	// Manual 2-field union (MakeRandomUnionType may emit 1-field).
+	i32 := GetIntType()
+	i64 := GetSimpleType(ELongLong)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	ut := &Type{
+		isUnion:    true,
+		StructName: "U_ord",
+		Fields: []StructField{
+			{Name: "f0", Type: i32, Qfer: q, BitWidth: -1},
+			{Name: "f1", Type: i64, Qfer: q, BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u", ut, q)
+	if uv == nil || len(uv.FieldVars) < 2 {
+		t.Fatalf("want 2 field vars, got %v (fields=%d)", uv, len(uv.FieldVars))
+	}
+	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
+	// pointer to f1 so *p = … renews union last=f1
+	p := CreateVariableQfer("l_p", PointerTo(f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
+	fm := NewFactMgr(nil)
+	// post-left lattice: last written f0
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	// p points to f1
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, f1)}
+	eff := EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	// RHS: *p = 1  (ExpressionAssign) — renews g_u last to f1's field id
+	rhsAssign := &Stmt{
+		Kind:     StmtAssign,
+		LhsVar:   p,
+		Lhs:      &Lhs{Var: p, Type: f1.Type}, // indir = ptr - pointee = 1
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1)},
+		AssignOp: AssignSimple,
+		StmID:    AllocStmID(),
+	}
+	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermAssignment, Assign: rhsAssign},
+	}}
+	if !VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
+		t.Fatalf("visit sticky=%v", GetError())
+	}
+	fu := FindRelatedUnion(fm.UnionFacts, uv)
+	if fu == nil {
+		t.Fatal("union fact missing after ordered visit")
+	}
+	// post-left last=f0 join post-right last=f1 → BOTTOM (neither implies)
+	if !fu.IsBottom() {
+		t.Fatalf("want BOTTOM after && merge of f0|f1, got last=%d", fu.LastWrittenFID)
+	}
+	// both fields nonreadable under BOTTOM
+	if !IsNonreadableField(f0, fm.UnionFacts) || !IsNonreadableField(f1, fm.UnionFacts) {
+		t.Fatal("BOTTOM must make both union fields nonreadable")
+	}
+	if HasError() {
+		t.Fatal("complete ordered visit must not sticky")
+	}
+}
+
 func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 	// FunctionInvocationUnary.cpp:117 — assert invalid operator sticky; no invent eInt
 	ClearError()

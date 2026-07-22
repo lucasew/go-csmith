@@ -401,7 +401,12 @@ func (fi *Invocation) EqualsInt(num int) bool {
 }
 
 // VisitFactsBinaryOrdered mirrors FunctionInvocationBinary::visit_facts for &&/||.
-// FunctionInvocationBinary.cpp:487–508 — evaluate left; merge right with post-left.
+// FunctionInvocationBinary.cpp:487–508 — evaluate left; snapshot post-left;
+// evaluate right; merge_facts(post-right, post-left).
+// C++ FactVec is full (ePointTo + eUnionWrite). Soft invent was PT-only snapshot/
+// merge so RHS ExpressionAssign renew of a union field (e.g. (*p)= via p=&u.f1)
+// stayed last=f1 without joining the post-left last=f0 → choose_var ok pool
+// gained a nonreadable field (seed-58: n=48 with g_697.f1 vs UP n=47).
 // Hard IR incomplete sticky (nil fi/args, incomplete maps); visit policy fails non-sticky.
 func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	// incomplete IR sticky (no soft invent visit success / soft re-pick)
@@ -422,16 +427,33 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if HasError() {
 		return false
 	}
-	// snapshot after left — incomplete GlobalFacts sticky
-	var afterLeft []*FactPointTo
+	// FunctionInvocationBinary.cpp:494 — inputs_copy = inputs (full FactVec)
+	// incomplete GlobalFacts/UnionFacts sticky
+	var afterLeftPT []*FactPointTo
+	var afterLeftUnion []*FactUnion
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return false
 		}
-		afterLeft = CloneFactSlice(cg.FM.GlobalFacts)
+		afterLeftPT = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-continue past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
+		// Shallow clone of union pointers: RenewUnionFact replaces live slice
+		// entries so post-left still holds the pre-RHS FactUnion* (same as C++
+		// Fact* vector copy). Deep clone would freeze post-left at post-left
+		// values but is not required for merge_facts semantics.
+		afterLeftUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(afterLeftUnion) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
 	}
 	// right may or may not evaluate (short-circuit still visits for facts merge)
 	if !VisitFactsExpression(fi.Args[1], cg, opts) {
@@ -441,16 +463,17 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if HasError() {
 		return false
 	}
-	// merge post-right with post-left
+	// FunctionInvocationBinary.cpp:499 — merge_facts(inputs, inputs_copy)
+	// full FactVec: ePointTo + eUnionWrite
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeft) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeftPT) ||
+			!UnionFactsComplete(cg.FM.UnionFacts) || !UnionFactsComplete(afterLeftUnion) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return false
 		}
-		// MergeFacts sticky on incomplete mid-join
-		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeft)
+		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeftPT)
 		// residual ERROR sticky — no invent visit success past MergeFacts residual hole
 		if HasError() {
 			return false
@@ -460,6 +483,20 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 				SetError(ErrGeneric)
 			}
 			return false
+		}
+		// eUnionWrite half of merge_facts (mirror make_random ordered path)
+		for _, f := range afterLeftUnion {
+			if f == nil {
+				SetError(ErrGeneric)
+				return false
+			}
+			cg.FM.UnionFacts = MergeUnionFactInto(cg.FM.UnionFacts, f)
+			if HasError() || !UnionFactsComplete(cg.FM.UnionFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
 		}
 	}
 	return true
