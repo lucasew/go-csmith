@@ -204,10 +204,10 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	b.WriteString(" = ")
 	b.WriteString(initOut)
 	b.WriteString(";")
-	// Variable.cpp:662–667 — is_volatile → output_comment_line("VOLATILE GLOBAL "+name)
+	// Variable.cpp:662–667 — is_volatile() only (locals too; comment text still says GLOBAL)
 	// OutputMgr.cpp:314–319 — immediately "/* " + comment + " */" (no invent space before /*)
-	if v.IsGlobal() && v.IsVolatile() {
-		// residual ERROR sticky — no invent soft-skip comment past IsGlobal/IsVolatile residual
+	if v.IsVolatile() {
+		// residual ERROR sticky — no invent soft-skip comment past IsVolatile residual
 		if HasError() {
 			return ""
 		}
@@ -222,7 +222,7 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 			b.WriteString(" */")
 		}
 	} else if HasError() {
-		// residual ERROR sticky — no invent complete def past IsGlobal residual false path
+		// residual ERROR sticky — no invent complete def past IsVolatile residual false path
 		return ""
 	}
 	return b.String()

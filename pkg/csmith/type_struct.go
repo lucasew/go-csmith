@@ -38,13 +38,13 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 		SetError(ErrGeneric)
 		return StructField{}
 	}
-	// Type.cpp:687–691 — ChooseRandomTypeFilter(for_field_var=true) over AllTypes
-	// (no soft invent 15% nested-struct path then simple-only)
+	// Type.cpp:658–666 make_one_struct_field — rnd_upto(AllTypes, filter for_field_var)
+	// without marking used (Type.cpp:1186–1190 used only in choose_random).
 	var ft *Type
 	if env != nil {
-		ft = env.ChooseRandom(r, opts, probs, true)
+		ft = env.chooseRandomForStructField(r, opts, probs)
 	}
-	// Type.cpp:687–691 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
+	// Type.cpp:661 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
 	if ft == nil || HasError() {
 		return StructField{}
 	}

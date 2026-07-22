@@ -287,11 +287,24 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 }
 
 // ChooseRandom mirrors Type::choose_random via ChooseRandomTypeFilter.
-// Type.cpp:1206–1216 / ChooseRandomTypeFilter::filter (Type.cpp:223–244).
-// forFieldVar=false for return types.
+// Type.cpp:1181–1191 / ChooseRandomTypeFilter::filter (Type.cpp:223–244).
+// forFieldVar=false for return types; marks used + bitfields bookkeeping.
 // Type* always live on AllTypes; nil hole fails closed (nil — no invent filter-out
 // hole as absent and still pick from remaining types).
 func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, forFieldVar bool) *Type {
+	return env.chooseRandomTypeFilter(r, opts, probs, forFieldVar, true)
+}
+
+// chooseRandomForStructField mirrors Type::make_one_struct_field type pick:
+// Type.cpp:658–666 — rnd_upto(AllTypes, ChooseRandomTypeFilter for_field_var=true)
+// without marking used (only Type::choose_random sets used).
+func (env *TypeEnv) chooseRandomForStructField(r *Rng, opts Options, probs *Probabilities) *Type {
+	return env.chooseRandomTypeFilter(r, opts, probs, true, false)
+}
+
+// chooseRandomTypeFilter is ChooseRandomTypeFilter + rnd_upto (Type.cpp:223–244, 1181–1191).
+// markUsed mirrors Type::choose_random (true) vs make_one_struct_field (false).
+func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabilities, forFieldVar, markUsed bool) *Type {
 	if r == nil {
 		// Type.cpp always has RNG; sticky no invent AllTypes[0]
 		SetError(ErrGeneric)
@@ -365,8 +378,8 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		return nil
 	}
 	t := env.AllTypes[idx]
-	// Type.cpp:1211–1214 — record bitfields + mark used
-	if !t.Used {
+	// Type.cpp:1186–1190 choose_random only — make_one_struct_field does not mark used
+	if markUsed && !t.Used {
 		RecordTypeWithBitfields(t)
 		t.Used = true
 	}

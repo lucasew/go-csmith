@@ -40,6 +40,48 @@ func TestMakeRandomStructType(t *testing.T) {
 	}
 }
 
+// Type.cpp:658–666 make_one_struct_field must not mark nested field types used
+// (only Type::choose_random does). Regression: seed 56 emitted unused S1.
+func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{}
+	// Seed AllTypes with simples + one unused prior struct.
+	s0 := &Type{
+		isStruct: true, StructName: "S0", SID: 0, Used: false,
+		Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}},
+	}
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt), s0}
+	env.StructTypes = []*Type{s0}
+	// Many field picks; S0 may be chosen as nested type — must stay unused.
+	for seed := uint64(1); seed < 80; seed++ {
+		ClearError()
+		s0.Used = false
+		f := MakeOneStructField(NewRng(seed), opts, probs, env, 0)
+		if f.Type == nil {
+			continue
+		}
+		if s0.Used {
+			t.Fatalf("seed %d: make_one_struct_field must not mark nested S0 used", seed)
+		}
+	}
+	// choose_random still marks used when it picks the type
+	ClearError()
+	s0.Used = false
+	picked := false
+	for seed := uint64(1); seed < 200 && !picked; seed++ {
+		s0.Used = false
+		ty := env.ChooseRandom(NewRng(seed), opts, probs, false)
+		if ty == s0 {
+			if !s0.Used {
+				t.Fatal("ChooseRandom must mark picked struct used")
+			}
+			picked = true
+		}
+	}
+}
+
 func TestAggregateSharedSIDSequence(t *testing.T) {
 	// Type.cpp:298–302 + 1675–1678 — one static sequence for struct and union tags.
 	// After S0, first union is U1 (not U0).
