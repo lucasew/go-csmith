@@ -140,22 +140,59 @@ func TestAddBackReturnFacts(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	retFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st := Stmt{Kind: StmtReturn, StmID: 42}
-	fm.SetMapFactsOut(42, retFacts)
+	fm.SetMapFactsOutPair(42, retFacts, []*FactUnion{})
 	body := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
 		st,
 	}}
 	var facts []*FactPointTo
-	if !AddBackReturnFacts(body, fm, &facts) || len(facts) != 1 || facts[0].Var != p {
+	var unions []*FactUnion
+	if !AddBackReturnFacts(body, fm, &facts, &unions) || len(facts) != 1 || facts[0].Var != p {
 		t.Fatal(facts)
 	}
-	// return StmID 0 fails closed sticky (no invent soft-merge MapFactsOut[0])
+	// return StmID unset fails closed sticky (no invent soft-merge MapFactsOut[0])
 	var facts0 []*FactPointTo
-	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: IncompleteStmID}}}, fm, &facts0) || FactsComplete(facts0) {
+	var unions0 []*FactUnion
+	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: IncompleteStmID}}}, fm, &facts0, &unions0) || FactsComplete(facts0) {
 		t.Fatal("return StmID 0 must fail closed", facts0)
 	}
 	if !HasError() {
 		t.Fatal("return StmID 0 must SetError sticky")
+	}
+	ClearError()
+}
+
+// Statement.cpp:528 — merge_facts full FactVec joins eUnionWrite from return outs.
+// Body exit last=0 + early-return last=1 → BOTTOM (seed-123 g_135 lattice).
+func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	ut := &Type{
+		isUnion: true, StructName: "U",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.CreateFieldVars()
+	// body-out style entry: last field 0; return wrote field 1
+	bodyU := []*FactUnion{MakeFactUnion(uv, 0)}
+	retU := []*FactUnion{MakeFactUnion(uv, 1)}
+	fm.SetMapFactsOutPair(7, []*FactPointTo{}, retU)
+	body := &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 7}}}
+	facts := []*FactPointTo{}
+	unions := CloneUnionFactSliceDeep(bodyU)
+	if !AddBackReturnFacts(body, fm, &facts, &unions) {
+		t.Fatal("add_back must succeed")
+	}
+	got := FindRelatedUnion(unions, uv)
+	if got == nil || !got.IsBottom() {
+		t.Fatalf("0 join 1 must BOTTOM, got %v", got)
+	}
+	if HasError() {
+		t.Fatal("complete path must not sticky")
 	}
 	ClearError()
 }
@@ -172,12 +209,17 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 		10: {MakeFactPointTo(p, NullPtr), nil},
 		20: {MakeFactPointTo(q, NullPtr)},
 	}
+	fm.MapUnionFactsOut = map[int][]*FactUnion{
+		10: {},
+		20: {},
+	}
 	body := &Block{Stmts: []Stmt{
 		{Kind: StmtReturn, StmID: 10},
 		{Kind: StmtReturn, StmID: 20},
 	}}
 	var facts []*FactPointTo
-	if AddBackReturnFacts(body, fm, &facts) || FactsComplete(facts) {
+	var unions []*FactUnion
+	if AddBackReturnFacts(body, fm, &facts, &unions) || FactsComplete(facts) {
 		t.Fatal("incomplete out must fail closed nil accumulator, not invent later return", facts)
 	}
 	if !HasError() {
@@ -190,13 +232,18 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 		30: {MakeFactPointTo(p, NullPtr), nil},
 		40: {MakeFactPointTo(q, NullPtr)},
 	}
+	fm2.MapUnionFactsOut = map[int][]*FactUnion{
+		30: {},
+		40: {},
+	}
 	body2 := &Block{Stmts: []Stmt{{
 		Kind: StmtIfElse,
 		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 30}}},
 		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 40}}},
 	}}}
 	var facts2 []*FactPointTo
-	if AddBackReturnFacts(body2, fm2, &facts2) || FactsComplete(facts2) {
+	var unions2 []*FactUnion
+	if AddBackReturnFacts(body2, fm2, &facts2, &unions2) || FactsComplete(facts2) {
 		t.Fatal("nested incomplete must fail closed without inventing Else return", facts2)
 	}
 	if !HasError() {

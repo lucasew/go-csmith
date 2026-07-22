@@ -173,34 +173,44 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 }
 
 // AddBackReturnFacts mirrors Statement::add_back_return_facts / Block walk.
-// Statement.cpp:525–537 — merge map_facts_out of every return into facts.
+// Statement.cpp:525–537 — merge_facts(facts, map_facts_out[return]) for the full
+// FactVec (ePointTo + eUnionWrite). Soft invent was point-to-only: return outs
+// that wrote a union field (last_written=1) never joined the live lattice, so
+// IsNonreadableField kept f0 eligible after early-return paths (seed-123
+// ChooseOKVar n=51 vs UP n=50 → g_831 vs g_1248).
 // Incomplete map_facts_out / mid-join / nil block hole fails closed sticky:
-// *facts = IncompleteFactSlice() + SetError and the walk stops (no invent keep
-// merging later returns after a failed merge / soft re-pick past wiped facts).
-// Returns false when incomplete (*facts wiped) so callers do not invent success
-// via FactsComplete(nil)==true after a fail-closed wipe.
-func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
-	if b == nil || fm == nil || facts == nil {
+// both partitions wiped + SetError; walk stops (no invent keep merging later
+// returns after a failed merge).
+// Returns false when incomplete so callers do not invent success via
+// FactsComplete(nil)==true after a fail-closed wipe.
+func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo, unions *[]*FactUnion) bool {
+	if b == nil || fm == nil || facts == nil || unions == nil {
 		if facts != nil {
 			*facts = IncompleteFactSlice()
-			SetError(ErrGeneric)
 		}
+		if unions != nil {
+			*unions = IncompleteUnionFactSlice()
+		}
+		SetError(ErrGeneric)
 		return false
 	}
-	return addBackReturnFactsBlock(b, fm, facts)
+	return addBackReturnFactsBlock(b, fm, facts, unions)
 }
 
 // addBackReturnFactsBlock returns false when the accumulator is fail-closed incomplete.
-func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
-	if b == nil || fm == nil || facts == nil {
+func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo, unions *[]*FactUnion) bool {
+	if b == nil || fm == nil || facts == nil || unions == nil {
 		if facts != nil {
 			*facts = IncompleteFactSlice()
-			SetError(ErrGeneric)
 		}
+		if unions != nil {
+			*unions = IncompleteUnionFactSlice()
+		}
+		SetError(ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {
-		if !addBackReturnFactsStmt(&b.Stmts[i], fm, facts) {
+		if !addBackReturnFactsStmt(&b.Stmts[i], fm, facts, unions) {
 			return false
 		}
 	}
@@ -208,31 +218,55 @@ func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool 
 }
 
 // addBackReturnFactsStmt returns false when facts must stay fail-closed incomplete.
-func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
-	if st == nil || facts == nil {
+func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions *[]*FactUnion) bool {
+	if st == nil || facts == nil || unions == nil {
 		if facts != nil {
 			*facts = IncompleteFactSlice()
-			SetError(ErrGeneric)
 		}
+		if unions != nil {
+			*unions = IncompleteUnionFactSlice()
+		}
+		SetError(ErrGeneric)
 		return false
 	}
 	if st.Kind == StmtReturn {
-		// Statement.cpp:528 — merge_facts(facts, map_facts_out[this])
-		// GetMapFactsOut: StmID 0 IncompleteFactSlice (no invent empty-complete)
+		// Statement.cpp:528 — merge_facts(facts, map_facts_out[this]) full FactVec
+		// GetMapFactsOut / GetMapUnionFactsOut: StmID unset → Incomplete
 		out := fm.GetMapFactsOut(st.StmID)
-		if !FactsComplete(out) || !FactsComplete(*facts) {
+		outU := fm.GetMapUnionFactsOut(st.StmID)
+		if !FactsComplete(out) || !FactsComplete(*facts) ||
+			!UnionFactsComplete(outU) || !UnionFactsComplete(*unions) {
 			*facts = IncompleteFactSlice()
+			*unions = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return false
 		}
-		// MergeFacts clears *facts sticky on incomplete mid-join
 		_ = MergeFacts(facts, out)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
+			*unions = IncompleteUnionFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
 			return false
+		}
+		// eUnionWrite half of merge_facts (Fact.cpp:192–199 + FactUnion::join)
+		for _, nf := range outU {
+			if nf == nil {
+				*facts = IncompleteFactSlice()
+				*unions = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
+				return false
+			}
+			*unions = MergeUnionFact(*unions, nf)
+			if !UnionFactsComplete(*unions) {
+				*facts = IncompleteFactSlice()
+				*unions = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
 		}
 		return true
 	}
@@ -241,10 +275,11 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 		// Block* always live from get_blocks; nil hole fails closed sticky
 		if blk == nil {
 			*facts = IncompleteFactSlice()
+			*unions = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return false
 		}
-		if !addBackReturnFactsBlock(blk, fm, facts) {
+		if !addBackReturnFactsBlock(blk, fm, facts, unions) {
 			return false
 		}
 	}

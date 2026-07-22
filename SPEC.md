@@ -132,7 +132,7 @@ This section is the **mandatory work method** for multi-seed drop-in. It does **
 | Level | Definition | Status (update only when verified) |
 |-------|------------|--------------------------------------|
 | **A** | Defaults + seed **2**: exact program body vs golden | **Met** (2026-07-21; re-verify after every gen/emit change) |
-| **B** | Defaults + every seed in the **§3.5a battery**: exact program body | **Open** |
+| **B** | Defaults + every seed in the **§3.5a battery**: exact program body | **Met** (2026-07-22; re-verify after every gen/emit change) |
 | **C** | Broader seed range (e.g. 0…N or random sample) + optional checksum thermometer | **Open** (only after B) |
 
 **Done for multi-seed** means **level B**, not A alone. Seed 2 green is **not** permission to stop or to invent pads so other seeds “pass.”
@@ -543,7 +543,7 @@ Superseding integrity text that banned residual while still logging residual cli
 | SPEC fair-rewrite lock | **Done** |
 | SPEC §3.5a multi-seed process lock | **Done** (2026-07-21) |
 | Whole-program level **A** (seed 2 exact body) | **Met** — re-verify after gen/emit changes |
-| Whole-program level **B** (battery exact body) | **Open** — see §3.5a |
+| Whole-program level **B** (battery exact body) | **Met** (2026-07-22) — frozen battery exact pre-stats body |
 | Whole-program level **C** (expanded range) | **Open** — only after B |
 | Branch `fair-rewrite` + delete residual mass | **Done** (generator/residual/types godfiles removed) |
 | Layer 1: `Rng` | **Done** — `rng.go` + tests |

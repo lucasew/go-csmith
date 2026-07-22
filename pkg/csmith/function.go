@@ -450,18 +450,20 @@ func MakeFirst(
 	fm.SetupInOutMaps(true)
 
 	// Function.cpp:468–470 — global_facts = map_facts_out[body] + add_back_return_facts
-	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
+	// Full FactVec (point-to + eUnionWrite). Soft invent set only GlobalFacts.
 	// Incomplete out / add_back fail closed sticky — no invent soft-merge / success first
 	if f.Body != nil {
-		out := fm.GetMapFactsOut(f.Body.StmID)
-		if !FactsComplete(out) {
+		fm.AssignGlobalFactsFromMapOut(f.Body.StmID)
+		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return nil
 		}
-		fm.SetGlobalFacts(CloneFactSlice(out), "auto_function_460")
-		if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) || !FactsComplete(fm.GlobalFacts) {
+		if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts, &fm.UnionFacts) ||
+			!FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 			return nil
 		}
@@ -821,18 +823,19 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:764–766 — global_facts = map_facts_out[body] + add_back_return_facts
-	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
-	// Incomplete outs fail closed Unbuilt (no invent markBuilt with IncompleteFactSlice)
+	// Full FactVec (point-to + eUnionWrite). Incomplete outs fail closed Unbuilt.
 	if cg.FM != nil && f.Body != nil {
-		out := cg.FM.GetMapFactsOut(f.Body.StmID)
-		if !FactsComplete(out) {
+		cg.FM.AssignGlobalFactsFromMapOut(f.Body.StmID)
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
+			cg.FM.UnionFacts = IncompleteUnionFactSlice()
 			abortUnbuilt()
 			return
 		}
-		cg.FM.SetGlobalFacts(CloneFactSlice(out), "auto_function_815")
-		if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) || !FactsComplete(cg.FM.GlobalFacts) {
+		if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts, &cg.FM.UnionFacts) ||
+			!FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
+			cg.FM.UnionFacts = IncompleteUnionFactSlice()
 			abortUnbuilt()
 			return
 		}

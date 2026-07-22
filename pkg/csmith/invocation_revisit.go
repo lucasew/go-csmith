@@ -606,17 +606,13 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	// FunctionInvocationUser.cpp: ret from map_facts_out[body] + add_back_return_facts
-	bodyOut := fm.GetMapFactsOut(f.Body.StmID)
-	if !FactsComplete(bodyOut) {
-		restore()
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
-		return false
-	}
-	retFacts := CloneFactSlice(bodyOut)
-	if !AddBackReturnFacts(f.Body, fm, &retFacts) || !FactsComplete(retFacts) || !FactsComplete(work) {
+	// FunctionInvocationUser.cpp:336–341 — ret_facts starts empty then
+	// add_back_return_facts; merge_facts(inputs, ret_facts). Full FactVec.
+	// Soft invent was point-to body-out only (missed return eUnionWrite joins).
+	retFacts := []*FactPointTo{}
+	retUnions := []*FactUnion{}
+	if !AddBackReturnFacts(f.Body, fm, &retFacts, &retUnions) ||
+		!FactsComplete(retFacts) || !UnionFactsComplete(retUnions) || !FactsComplete(work) {
 		restore()
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -632,8 +628,31 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
+	// eUnionWrite half of merge_facts(inputs, ret_facts)
+	if !UnionFactsComplete(fm.UnionFacts) {
+		restore()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return false
+	}
+	for _, nf := range retUnions {
+		if nf == nil {
+			restore()
+			SetError(ErrGeneric)
+			return false
+		}
+		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, nf)
+		if !UnionFactsComplete(fm.UnionFacts) {
+			restore()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+	}
 	// FunctionInvocationUser.cpp:344 — update_facts_for_oos_vars(func->param, inputs)
-	// Full FactVec: ePointTo + eUnionWrite. Soft invent was PT-only on work.
+	// Full FactVec: ePointTo + eUnionWrite.
 	UpdateFactsForOOSVars(f.Param, &work)
 	if !FactsComplete(work) {
 		restore()
@@ -642,7 +661,6 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	// Live callee UnionFacts is the eUnionWrite half of C++ `inputs` after body.
 	UpdateUnionFactsForOOSVars(f.Param, &fm.UnionFacts)
 	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()

@@ -56,10 +56,12 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	calFM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	// no MapFactsOut[20]
 	var retFacts []*FactPointTo
+	var retUnions []*FactUnion
 	out := calFM.MapFactsOut[callee.Body.StmID]
 	if FactsComplete(out) {
 		retFacts = CloneFactSlice(out)
-		AddBackReturnFacts(callee.Body, calFM, &retFacts)
+		retUnions = []*FactUnion{}
+		AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions)
 	}
 	// missing MapFactsOut — retFacts never populated (no invent from GlobalFacts)
 	if retFacts != nil {
@@ -72,11 +74,14 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 		20: {MakeFactPointTo(p, NullPtr), nil},
 		99: {MakeFactPointTo(p, GarbagePtr)},
 	}
+	calFM.MapUnionFactsOut = map[int][]*FactUnion{20: {}, 99: {}}
 	retFacts = nil
+	retUnions = nil
 	out = calFM.MapFactsOut[callee.Body.StmID]
 	if FactsComplete(out) {
 		retFacts = CloneFactSlice(out)
-		if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
+		retUnions = []*FactUnion{}
+		if !AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) {
 			retFacts = IncompleteFactSlice()
 		}
 	}
@@ -89,9 +94,11 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 		20: {MakeFactPointTo(p, NullPtr)},
 		99: {MakeFactPointTo(p, GarbagePtr), nil},
 	}
+	calFM.MapUnionFactsOut = map[int][]*FactUnion{20: {}, 99: {}}
 	retFacts = CloneFactSlice(calFM.MapFactsOut[20])
+	retUnions = []*FactUnion{}
 	ClearError()
-	if AddBackReturnFacts(callee.Body, calFM, &retFacts) || FactsComplete(retFacts) {
+	if AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) || FactsComplete(retFacts) {
 		t.Fatal("incomplete return out must fail closed AddBackReturnFacts", retFacts)
 	}
 	if !HasError() {

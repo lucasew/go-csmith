@@ -906,9 +906,10 @@ func BuildInvocationAndFunction(
 	callee.GenerateBodyWithKnownParams(r, opts, probs, vs, tables, stmtTab, bodyCG)
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
-	// then add_back_return_facts. GetMapFactsOut: StmID 0 Incomplete; missing → empty.
-	// Incomplete out / add_back / missing body fail closed sticky — no invent soft-merge returns
+	// then add_back_return_facts (full FactVec: ePointTo + eUnionWrite).
+	// Incomplete out / add_back / missing body fail closed sticky.
 	var retFacts []*FactPointTo
+	var retUnions []*FactUnion
 	if callee.Body == nil {
 		// GenerateBody must leave live body; sticky Failed (no invent soft-skip without body)
 		if !HasError() {
@@ -918,23 +919,27 @@ func BuildInvocationAndFunction(
 		return fi
 	}
 	out := calFM.GetMapFactsOut(callee.Body.StmID)
-	// residual ERROR sticky — no invent soft-ret facts past GetMapFactsOut residual
+	outU := calFM.GetMapUnionFactsOut(callee.Body.StmID)
+	// residual ERROR sticky — no invent soft-ret facts past GetMap* residual
 	if HasError() {
 		fi.Failed = true
 		return fi
 	}
-	if !FactsComplete(out) {
+	if !FactsComplete(out) || !UnionFactsComplete(outU) {
 		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	retFacts = CloneFactSlice(out)
-	// residual ERROR sticky — no invent soft-ret facts past CloneFactSlice residual
-	if HasError() {
+	retUnions = CloneUnionFactSliceDeep(outU)
+	if HasError() || !FactsComplete(retFacts) || !UnionFactsComplete(retUnions) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		fi.Failed = true
 		return fi
 	}
-	if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
+	if !AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -946,7 +951,7 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:219 — setup_in_out_maps(true)
 	calFM.SetupInOutMaps(true)
 
-	// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts)
+	// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts) full FactVec
 	if callerFM != nil {
 		// complete retFacts (may be empty nil) required; incomplete caller fails closed sticky
 		// (no invent RenewFacts no-op success past incomplete then keep prior)
@@ -961,15 +966,14 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
-		// FunctionInvocationUser.cpp:221 — ret_facts also carry eUnionWrite from
-		// map_facts_out[body] after remove_function_local_facts. Go maps are PT-only;
-		// renew global UnionFacts from callee live lattice (globals only).
-		if !UnionFactsComplete(callerFM.UnionFacts) || !UnionFactsComplete(calFM.UnionFacts) {
+		// eUnionWrite half of ret_facts after add_back_return_facts (globals only
+		// for caller renew — locals stripped by remove_function_local on body out).
+		if !UnionFactsComplete(callerFM.UnionFacts) || !UnionFactsComplete(retUnions) {
 			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
-		retUF := GlobalUnionFactsOnly(calFM.UnionFacts)
+		retUF := GlobalUnionFactsOnly(retUnions)
 		if !UnionFactsComplete(retUF) {
 			if !HasError() {
 				SetError(ErrGeneric)
