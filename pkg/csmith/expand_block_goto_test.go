@@ -143,6 +143,61 @@ func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 	ClearError()
 }
 
+// TestExpandBlockForGotoMidGenUnlinkedThenArm — seed-62 body parity.
+// StatementIf builds then fully before StmtIfElse is linked under parent.
+// Forward goto may already sit on parent; dest is first then-stmt. Expand during
+// then-arm GenerateNewParentLocal must climb via Statement::parent chain
+// (Statement.cpp:689–696), not root GetBlocksStmt tree membership only.
+func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	// parent already has a forward goto; then-arm is NOT yet a child of any IfElse
+	parent := &Block{Func: f, StmID: 298}
+	thenArm := &Block{Func: f, Parent: parent, StmID: 322}
+	dest := Stmt{Kind: StmtAssign, StmID: 323, SourceLabel: "lbl_x"}
+	thenArm.Stmts = []Stmt{dest}
+	// goto lives on parent; thenArm only Parent-linked (mid MakeRandomIf)
+	gotoSt := Stmt{Kind: StmtGoto, StmID: 324, Label: "lbl_x", GotoDestStmID: 323, GotoForward: true}
+	parent.Stmts = []Stmt{{Kind: StmtFor, StmID: 304, Then: &Block{Func: f, Parent: parent, StmID: 301}}, gotoSt}
+	// Func.Blocks lists both; root tree under a fake body does not include thenArm
+	body := &Block{Func: f, StmID: 16, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 20, Then: parent, Else: &Block{Func: f, StmID: 21}}}}
+	f.Blocks = []*Block{body, parent, thenArm}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 324, DestStmID: 323, DestBlock: thenArm, BackLink: false}}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+
+	// contains_stmt: dest under thenArm via parent chain (not root tree alone)
+	if !BlockContainsStmID(thenArm, 323) {
+		t.Fatal("thenArm must contain dest mid-gen")
+	}
+	if BlockContainsStmID(thenArm, 324) {
+		t.Fatal("thenArm must not contain parent goto")
+	}
+	if !BlockContainsStmID(parent, 324) {
+		t.Fatal("parent must contain goto")
+	}
+
+	got := ExpandBlockForGoto(thenArm, cg)
+	if got != parent {
+		t.Fatalf("mid-gen expand must climb thenArm->parent, got %#v sticky=%v", got, HasError())
+	}
+	// Create local on thenArm must land on parent after expand
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f.Stack = []*Block{parent, thenArm}
+	beforeP, beforeT := len(parent.LocalVars), len(thenArm.LocalVars)
+	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntType(), nil, NewRng(5))
+	if v == nil {
+		t.Fatal("nil var", HasError())
+	}
+	if len(parent.LocalVars) != beforeP+1 || !IsVariableInSet(parent.LocalVars, v) {
+		t.Fatalf("var must land on parent: parent=%d then=%d v=%s",
+			len(parent.LocalVars)-beforeP, len(thenArm.LocalVars)-beforeT, v.Name)
+	}
+	ClearError()
+}
+
 // TestExpandBlockForGotoSkipsOrphanGotoEdges — aborted make_random leaves Blocks
 // on Func.Blocks with CFGEdges to live dests (C++ delete frees IR; edges gone).
 // Expand must not climb-fail on those orphans (seed-2 e15453 GenerateNewParentLocal).

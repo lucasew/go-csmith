@@ -610,7 +610,13 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 }
 
 // BlockContainsStmID mirrors Block::contains_stmt for a statement id.
-// Statement.cpp:684–705 — parent chain of s includes this block.
+// Statement.cpp:684–705 — for eBlock: walk s->parent chain; this is ancestor.
+//
+// Mid-generation (StatementIf then-arm): the arm Block is on Func.Blocks with
+// Parent set, but not yet linked via StmtIfElse under the root tree. C++ still
+// has live Statement::parent. Prefer ownership under b first, then Func.Blocks
+// parent lookup — not findParentOfStmIDInTree(root) only (misses unlinked arms
+// and spuriously treated live gotos as orphans; seed-62 locals on then vs parent).
 // Block always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmID(b *Block, stmID int) bool {
 	if b == nil || StmIDUnset(stmID) {
@@ -620,9 +626,21 @@ func BlockContainsStmID(b *Block, stmID int) bool {
 	if b.StmID == stmID {
 		return true
 	}
-	root := rootBlock(b)
-	p := findParentOfStmIDInTree(root, stmID)
-	for cur := p; cur != nil; cur = cur.Parent {
+	// Resolve owning parent of stmID (C++ s->parent).
+	// 1) Under b only — works when dest is in current then-arm mid-gen.
+	owner := findParentOfStmIDInTree(b, stmID)
+	if HasError() {
+		return false
+	}
+	// 2) Func.Blocks scan — finds stmts on sibling/parent blocks not yet in root tree.
+	if owner == nil && b.Func != nil {
+		owner = FindParentBlockOfStmID(b.Func, stmID)
+		if HasError() {
+			return false
+		}
+	}
+	// Statement.cpp:689–696 — walk parent chain for membership
+	for cur := owner; cur != nil; cur = cur.Parent {
 		if cur == b {
 			return true
 		}
@@ -635,12 +653,16 @@ func BlockContainsStmID(b *Block, stmID int) bool {
 // both a goto dest inside b and the goto source outside b.
 // Block always live; sticky nil (no invent soft-skip expand past hole).
 //
-// Stale CFG edges: aborted StatementGoto::make_random leaves orphan Blocks on
+// Stale CFG edges: aborted StatementGoto::make_random leaves Blocks on
 // Func.Blocks with CFGEdges whose src Statement* would be freed in C++ (edge
 // gone). FindStmtByID still finds those orphans via Func.Blocks. Skip edges
-// whose src is not under rootBlock(b) — otherwise climb fails and
-// GenerateNewParentLocal returns nil without create RNG (seed-2 e15453:
-// first_div after type select F10 vs U100).
+// whose src parent cannot be resolved — otherwise climb fails and
+// GenerateNewParentLocal returns nil without create RNG (seed-2 e15453).
+//
+// Do not require findParentOfStmIDInTree(rootBlock(b), src): mid-gen then-arms
+// are unlinked from the root GetBlocksStmt tree, so live parent-block gotos
+// looked "orphan" and Expand left locals on the then-arm (seed-62 l_806 int32
+// on blk 322 vs upstream int16 after empty-block choose_random_simple on climb).
 func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if b == nil {
 		SetError(ErrGeneric)
@@ -650,7 +672,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if fm == nil {
 		return b
 	}
-	// C++ edge->src is a live Statement*; look up via function tree (not only root of b)
+	// C++ edge->src is a live Statement*; look up via function tree
 	// CFGEdge* always live; nil hole fails closed (no invent soft-skip edge)
 	for {
 		expanded := false
@@ -660,7 +682,8 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				SetError(ErrGeneric)
 				return nil
 			}
-			if e.SrcID <= 0 {
+			// Statement.cpp / fair sid: stm_id 0 is valid; only IncompleteStmID is unset
+			if StmIDUnset(e.SrcID) {
 				continue
 			}
 			// VariableSelector.cpp:773 — edge->src->eType == eGoto
@@ -679,56 +702,69 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			if src == nil || src.Kind != StmtGoto {
 				continue
 			}
-			// Skip orphan/stale edges: src not under the live root of b.
-			// C++ would not keep a CFGEdge after freeing the abort-path Statement*.
-			root := rootBlock(b)
-			if root == nil || findParentOfStmIDInTree(root, e.SrcID) == nil {
-				// residual ERROR sticky from incomplete tree walk
+			// Orphan/stale: cannot resolve owning parent of src (abort-path IR).
+			// C++ edge->src is a live Statement* with parent; no root-tree membership.
+			srcParent := (*Block)(nil)
+			if b.Func != nil {
+				srcParent = FindParentBlockOfStmID(b.Func, e.SrcID)
 				if HasError() {
 					return nil
 				}
+			}
+			if srcParent == nil {
+				srcParent = findParentOfStmIDInTree(rootBlock(b), e.SrcID)
+				if HasError() {
+					return nil
+				}
+			}
+			if srcParent == nil {
 				continue
 			}
 			destID := e.DestStmID
-			if destID <= 0 && e.DestBlock != nil {
+			if StmIDUnset(destID) && e.DestBlock != nil {
 				destID = e.DestBlock.StmID
 			}
-			if destID <= 0 {
+			if StmIDUnset(destID) {
 				// StatementGoto dest may be stored only on the goto stmt
 				if !StmIDUnset(src.GotoDestStmID) {
 					destID = src.GotoDestStmID
 				}
 			}
-			if destID <= 0 {
+			if StmIDUnset(destID) {
 				continue
 			}
 			// VariableSelector.cpp:773–779
-			if BlockContainsStmID(b, destID) && !BlockContainsStmID(b, e.SrcID) {
-				// residual ERROR sticky from contains_stmt walks
+			// b->contains_stmt(edge->dest) && !b->contains_stmt(edge->src)
+			if !BlockContainsStmID(b, destID) {
 				if HasError() {
 					return nil
 				}
-				// climb on a copy so a failed climb does not wipe caller's b
-				cur := b
-				for cur != nil && !BlockContainsStmID(cur, e.SrcID) {
-					if HasError() {
-						return nil
-					}
-					cur = cur.Parent
+				continue
+			}
+			if BlockContainsStmID(b, e.SrcID) {
+				if HasError() {
+					return nil
 				}
-				// VariableSelector.cpp:778 — assert(b). Orphan edges already skipped
-				// above; remaining climb-fail is defensive skip (no invent soft-nil
-				// GenerateNewParentLocal past a stale edge).
-				if cur == nil {
-					continue
-				}
-				b = cur
-				expanded = true
-				break
+				continue
 			}
 			if HasError() {
 				return nil
 			}
+			// climb until block contains goto src (C++ while (!b->contains_stmt(src)))
+			cur := b
+			for cur != nil && !BlockContainsStmID(cur, e.SrcID) {
+				if HasError() {
+					return nil
+				}
+				cur = cur.Parent
+			}
+			// VariableSelector.cpp:778 — assert(b). Climb-fail: skip edge (no invent nil).
+			if cur == nil {
+				continue
+			}
+			b = cur
+			expanded = true
+			break
 		}
 		if !expanded {
 			break
