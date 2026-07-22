@@ -2,7 +2,10 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // TestMakeRandomArrayInitOneStmIDMultiDim — StatementArrayOp.cpp:145–150 creates
 // one StatementArrayOp for all dimensions (single Statement ctor / stm_id).
@@ -70,4 +73,56 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 		}
 	}
 	check(st)
+}
+
+// TestMultiDimArrayOpLabelOnce — Statement.cpp:905–917 pre_output once per
+// Statement. Multi-dim ArrayOp nests Output-only shells sharing stm_id; emitting
+// PreOutput on each shell duplicated lbl_N (seed 86: UP one lbl_1132 vs GO three
+// inside nested fors for 3D array-init). Nested shells skip PreOutput.
+func TestMultiDimArrayOpLabelOnce(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	// 3-dim shells: outer + 2 nested
+	iv0 := CreateVariableScalars("i", GetIntType(), false, false)
+	iv1 := CreateVariableScalars("j", GetIntType(), false, false)
+	iv2 := CreateVariableScalars("k", GetIntType(), false, false)
+	if iv0 == nil || iv1 == nil || iv2 == nil {
+		t.Fatal("iv")
+	}
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:    []int{2, 3, 1},
+	}
+	av.AsArray = av
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	// Innermost → mid → outer (same StmID)
+	sid := 42
+	inner := Stmt{
+		Kind: StmtArrayOp, StmID: sid, Loop: &LoopControl{IV: iv2, InitN: 0, LimitN: 1, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		ArrayAccess: "g_a[i][j][k]", Expr: rhs, LhsVar: &av.Variable, Then: &Block{},
+	}
+	mid := Stmt{
+		Kind: StmtArrayOp, StmID: sid, Loop: &LoopControl{IV: iv1, InitN: 0, LimitN: 3, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Expr: rhs, Then: &Block{Stmts: []Stmt{inner}},
+	}
+	outer := Stmt{
+		Kind: StmtArrayOp, StmID: sid, Loop: &LoopControl{IV: iv0, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Expr: rhs, Then: &Block{Stmts: []Stmt{mid}}, SourceLabel: "lbl_1132",
+	}
+	// FM with jump source → PreOutput finds label via SourceLabel path without FM,
+	// or use SourceLabel when FM nil.
+	b := &Block{Stmts: []Stmt{outer}, EmitFM: nil}
+	out := b.outputStmtsOnly(0)
+	if HasError() || out == "" {
+		t.Fatalf("emit empty/err: %q err=%v", out, HasError())
+	}
+	n := strings.Count(out, "lbl_1132:")
+	if n != 1 {
+		t.Fatalf("want label once (C++ one Statement pre_output), got %d in:\n%s", n, out)
+	}
+	// nested fors still present
+	if strings.Count(out, "for (") != 3 {
+		t.Fatalf("want 3 for headers, got %q", out)
+	}
+	ClearError()
 }

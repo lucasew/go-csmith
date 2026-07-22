@@ -1615,6 +1615,16 @@ func stmtOK(st Stmt) bool {
 // outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
 // indent is statement base indent (spaces/4); uses Emit* flags on b.
 func (b *Block) outputStmtsOnly(indent int) string {
+	return b.outputStmtsOnlyOpts(indent, false)
+}
+
+// outputStmtsOnlyOpts is outputStmtsOnly with optional PreOutput skip.
+// skipPre: multi-dim StatementArrayOp nests Output-only shells that share one
+// C++ stm_id (MakeRandomArrayInit). C++ Statement::pre_output runs once per
+// Statement; re-running PreOutput on nested shells re-emits the same lbl_N
+// (seed 86: UP one lbl_1132 vs GO three inside nested fors). Nested shells
+// still emit for-headers/body; only pre_output is suppressed.
+func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 	if b == nil {
 		SetError(ErrGeneric)
 		return ""
@@ -1624,10 +1634,14 @@ func (b *Block) outputStmtsOnly(indent int) string {
 	for _, st := range b.Stmts {
 		// Statement::pre_output — label from jump sources / SourceLabel, else step_hash
 		// Statement.cpp:905–917 — goto target skips output_hash
-		pre, isGotoTarget := PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
-		// residual ERROR sticky — no invent soft-continue stmt emit past PreOutput hole
-		if HasError() {
-			return ""
+		var pre string
+		var isGotoTarget bool
+		if !skipPre {
+			pre, isGotoTarget = PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
+			// residual ERROR sticky — no invent soft-continue stmt emit past PreOutput hole
+			if HasError() {
+				return ""
+			}
 		}
 		if pre != "" {
 			sb.WriteString(pre)
@@ -1896,11 +1910,13 @@ func (b *Block) outputStmtsOnly(indent int) string {
 				pad := strings.Repeat("    ", indent)
 				content.WriteString(pad + "{\n")
 				// child's for is at indent+1; use output of one statement via temp block
+				// skipPre: nested shells share outermost stm_id — one pre_output only
+				// (Statement.cpp:905–917 once per StatementArrayOp object).
 				child := st.Then.Stmts[0]
 				nest := &Block{Stmts: []Stmt{child}, EmitFM: b.EmitFM, EmitStepHash: b.EmitStepHash,
 					EmitLabelAttrs: b.EmitLabelAttrs, LabelAttrRng: b.LabelAttrRng,
 					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise}
-				childOut := nest.outputStmtsOnly(indent + 1)
+				childOut := nest.outputStmtsOnlyOpts(indent+1, true)
 				if HasError() {
 					return ""
 				}
