@@ -44,3 +44,64 @@ func TestPostLoopRestoresEntryUnionAndMakeupNewGlobals(t *testing.T) {
 		t.Fatal("new global union fact must be makeup from body")
 	}
 }
+
+// Block.cpp:703 facts_copy = map_facts_in full FactVec; find_fixed_point starts
+// current_inputs from that entry — not the post-generation live lattice.
+// Soft invent: FindFixedPointBlock currentUnions = live UnionFacts (BOTTOM after
+// if-combine) while map_in still had entry last=0 → set_fact_in wrote BOTTOM;
+// post_loop + break merge left g_721 nonreadable (seed-123 choose ok 36 vs 37).
+func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f.Stack = []*Block{}
+	ut := &Type{
+		isUnion: true, StructName: "U_pc",
+		Fields: []StructField{
+			{Name: "f0", Type: GetSimpleType(EChar), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u_pc", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.CreateFieldVars()
+	entryU := MakeFactUnion(uv, 0)
+	bottomU := MakeFactUnion(uv, 0)
+	if entryU == nil || bottomU == nil {
+		t.Fatal("facts")
+	}
+	bottomU.SetBottom()
+	fm := NewFactMgr(f)
+	// outer function body (non-looping) so post_creation does not append return
+	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
+	// looping for-body, empty stms → no self-back (FromTailToHead false when empty)
+	body := &Block{StmID: AllocStmID(), Func: f, Looping: true, Parent: outer}
+	f.Body = outer
+	f.Stack = []*Block{outer, body}
+	// map_facts_in = entry last=0 (Block::make_random set_fact_in at start)
+	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, []*FactUnion{entryU})
+	// live = post-generation BOTTOM (if-combine only-in-else IV write)
+	fm.UnionFacts = []*FactUnion{bottomU}
+	fm.GlobalFacts = []*FactPointTo{}
+	if fm.MapStmEffect == nil {
+		fm.MapStmEffect = make(map[int]Effect)
+	}
+	fm.MapStmEffect[body.StmID] = EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), NewRng(1), NewVariableSelector(Defaults()))
+	if HasError() {
+		t.Fatal("post_creation", GetError())
+	}
+	// map_facts_in must retain entry last=0 (no self-back merge of BOTTOM live)
+	inU := fm.GetMapUnionFactsIn(body.StmID)
+	got := FindRelatedUnion(inU, uv)
+	if got == nil {
+		t.Fatal("map_in must keep union subject")
+	}
+	if got.IsBottom() || got.LastWrittenFID != 0 {
+		t.Fatalf("post_creation FP must seed from map_in entry last=0, got %#v", got)
+	}
+}

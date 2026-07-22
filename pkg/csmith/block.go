@@ -887,6 +887,41 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 					return
 				}
+				// Block.cpp:703 — facts_copy = map_facts_in[this] is a full FactVec
+				// (ePointTo + eUnionWrite). Go splits categories: factsCopy is the
+				// point-to half. Snapshot eUnionWrite entry here (before FP / strip
+				// retries): FindFixedPointBlock seeds currentUnions from live
+				// UnionFacts (visit path: caller already installed entry). At
+				// post_creation, live is still the post-generation lattice (e.g.
+				// BOTTOM after if-combine) while map_facts_in holds the block entry.
+				// Soft invent left live as currentUnions → set_fact_in wrote BOTTOM
+				// into map_in and break re-visits saw BOTTOM (seed-123 g_721:
+				// post_loop map_in BOTTOM + break merge after for body with
+				// if/else for-IV-only-in-else). Install this snapshot as live before
+				// each find_fixed_point so currentUnions matches C++ facts_copy.
+				inU0 := fm.GetMapUnionFactsIn(b.StmID)
+				if !UnionFactsComplete(inU0) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					SetError(ErrGeneric)
+					return
+				}
+				entryUnionsSnap := CloneUnionFactSliceDeep(inU0)
+				if HasError() || !UnionFactsComplete(entryUnionsSnap) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return
+				}
+				if entryUnionsSnap == nil {
+					entryUnionsSnap = []*FactUnion{}
+				}
 				// reset accum to pre-block effect
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preEffect.Clone()
@@ -899,6 +934,24 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					}
 				}
 				for {
+					// Re-install entry eUnionWrite each attempt (reset_stm_fact_maps
+					// / prior FP may have left live at mid-body last-writes).
+					entryU := CloneUnionFactSliceDeep(entryUnionsSnap)
+					if HasError() || !UnionFactsComplete(entryU) {
+						fm.GlobalFacts = IncompleteFactSlice()
+						fm.UnionFacts = IncompleteUnionFactSlice()
+						postFacts = IncompleteFactSlice()
+						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+						if !HasError() {
+							SetError(ErrGeneric)
+						}
+						return
+					}
+					if entryU == nil {
+						fm.UnionFacts = []*FactUnion{}
+					} else {
+						fm.UnionFacts = entryU
+					}
 					fpOut, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
 					if ok {
 						// Block.cpp:706–728 + find_fixed_point Block.cpp:558 —
@@ -957,6 +1010,22 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					// from inputs. Breaking here left MapFactsIn/Out deleted → complete-empty
 					// postLoop/global_facts (seed-2 e2308: EV rejects ** with nfacts=0).
 					if len(b.Stmts) == 0 {
+						entryUEmpty := CloneUnionFactSliceDeep(entryUnionsSnap)
+						if HasError() || !UnionFactsComplete(entryUEmpty) {
+							fm.GlobalFacts = IncompleteFactSlice()
+							fm.UnionFacts = IncompleteUnionFactSlice()
+							postFacts = IncompleteFactSlice()
+							fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+							if !HasError() {
+								SetError(ErrGeneric)
+							}
+							return
+						}
+						if entryUEmpty == nil {
+							fm.UnionFacts = []*FactUnion{}
+						} else {
+							fm.UnionFacts = entryUEmpty
+						}
 						fpEmpty, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
 						if okEmpty {
 							if fpEmpty != nil {
