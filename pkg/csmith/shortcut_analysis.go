@@ -337,6 +337,12 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 }
 
 // containsUnfixedGotoIDs is the CFG scan for Statement.cpp:769–804.
+//
+// Statement.cpp:781–784 (cond1): goto *src* inside this tree, unvisited, dest outside.
+// Statement.cpp:785–803 (cond2): visited goto whose *dest* is inside this tree —
+// src need not be inside (nGotoIn to a plain assign / label target). Soft invent
+// required ids[src] for both arms → missed inbound gotos → false ShortcutOK
+// (seed-7 func_33 remaining assign: UP unfixed=1 nGotoIn=1, GO SC_OK).
 func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 	if fm == nil || len(ids) == 0 {
 		return false
@@ -350,7 +356,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		if e.SrcID <= 0 {
 			continue
 		}
-		// Statement.cpp:781 — edge->src is eGoto and contains_stmt(src)
+		// Statement.cpp:781/785 — edge->src is eGoto (not loop/block CFG edges).
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue fixed-scan past FindStmt hole
@@ -361,19 +367,23 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			if src == nil || src.Kind != StmtGoto {
 				continue
 			}
-		}
-		if !ids[e.SrcID] {
+		} else if !ids[e.SrcID] {
+			// No Func to Kind-check: only edges whose src is in the tree were
+			// considered historically (tests without Func). Cond2 for external
+			// goto requires Func + Kind.
 			continue
 		}
-		visited := fm.MapVisited != nil && fm.MapVisited[e.SrcID]
-		// contains_stmt(dest): dest stm_id in tree (block dest DestStmID==0 rare for goto)
+		srcInside := ids[e.SrcID]
+		// contains_stmt(dest): dest stm_id in tree
 		destInside := !StmIDUnset(e.DestStmID) && ids[e.DestStmID]
-		// Statement.cpp:781–784 — unvisited goto to dest outside this tree
-		if !visited && !destInside {
+		visited := fm.MapVisited != nil && fm.MapVisited[e.SrcID]
+		// Statement.cpp:781–784 — unvisited goto *contained in this*, dest outside
+		if srcInside && !visited && !destInside {
 			return true
 		}
-		// Statement.cpp:785–803 — visited goto into this tree; re-analyze if dest
-		// facts not implied by jump-src outs (or dest in empty while src out nonempty)
+		// Statement.cpp:785–803 — visited goto *into* this tree (src may be outside);
+		// re-analyze if dest facts not implied by jump-src outs
+		// (or dest in empty while src out nonempty)
 		if visited && destInside {
 			srcOut := fm.GetMapFactsOut(e.SrcID)
 			destIn := fm.GetMapFactsIn(e.DestStmID)

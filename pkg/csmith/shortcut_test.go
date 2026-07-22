@@ -693,6 +693,61 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	ClearError()
 }
 
+func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
+	// Statement.cpp:785–803 — visited goto whose *dest* is inside this statement;
+	// src need not be contained (nGotoIn to a plain assign). Soft invent required
+	// ids[src] for cond2 → false ShortcutOK on seed-7 func_33 remaining assign.
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	// body: assign (label target) then later for that holds the goto
+	body := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 10, SourceLabel: "lbl"},
+		{Kind: StmtFor, StmID: 30, Then: &Block{Func: f, Stmts: []Stmt{
+			{Kind: StmtGoto, StmID: 20, Label: "lbl", GotoDestStmID: 10},
+		}}},
+	}}
+	f.Blocks = []*Block{body}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	fm.MapVisited = map[int]bool{20: true}
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
+	// Root is only the assign — goto lives outside this tree (sibling for)
+	assign := &body.Stmts[0]
+	if !ContainsUnfixedGoto(assign, fm) {
+		t.Fatal("inbound visited goto with non-imply dest facts must be unfixed")
+	}
+	// equal jump facts → fixed (no invent permanent unfixed)
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	if ContainsUnfixedGoto(assign, fm) {
+		t.Fatal("inbound goto with equal facts must be fixed")
+	}
+	// empty dest in + nonempty src out → unfixed (StatementGoto visit_facts special case)
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsIn(10, []*FactPointTo{})
+	if !ContainsUnfixedGoto(assign, fm) {
+		t.Fatal("nonempty srcOut + empty destIn must be unfixed")
+	}
+	// Shortcut must not reuse when unfixed (Statement.cpp:551–553)
+	ClearError()
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
+	facts := []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.UnionFacts = []*FactUnion{}
+	fm.SetMapFactsInPair(10, facts, []*FactUnion{})
+	fm.SetMapFactsOutPair(10, facts, []*FactUnion{})
+	fm.SetMapStmEffect(10, EmptyEffect())
+	cg := EmptyCGContext()
+	cg.FM = fm
+	cg.CurrentFunc = f
+	if sc := ShortcutAnalysis(assign, &facts, &cg, Defaults()); sc != ShortcutNone {
+		t.Fatalf("unfixed inbound goto must yield ShortcutNone, got %d", sc)
+	}
+}
+
 func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 	// block shortcut must not fire with unfixed internal goto
 	f := &Function{Name: "f"}
