@@ -662,7 +662,12 @@ func (b *Block) AppendNestedLoop(
 			SetError(ErrGeneric)
 			return nil
 		}
+		// Block.cpp:429 — makeup_new_var_facts(pre_facts, global_facts) full FactVec
+		// Soft invent was PT-only MakeupNewVarFacts then SetMapFactsInPair with
+		// preUnion without makeupNewUnionFacts — undid PostCreationAnalysis union
+		// makeup and left map_facts_in missing mid-for union subjects.
 		if !MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts) ||
+			!makeupNewUnionFacts(&preUnion, cg.FM.UnionFacts) ||
 			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) ||
 			!UnionFactsComplete(preUnion) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
@@ -670,7 +675,7 @@ func (b *Block) AppendNestedLoop(
 			SetError(ErrGeneric)
 			return nil
 		}
-		// map_facts_in keeps pre-make eUnionWrite; map_facts_out pairs live lattice
+		// map_facts_in pre-make full FactVec after makeup; map_facts_out pairs live
 		cg.FM.SetMapFactsInPair(st.StmID, preFacts, preUnion)
 		cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
 		// Incomplete accum/stm effects fail closed (no invent MapAccumEffect/map fold success)
@@ -772,7 +777,10 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			SetError(ErrGeneric)
 			return nil
 		}
+		// Block.cpp:383 — makeup_new_var_facts(pre_facts, global_facts) full FactVec
+		// Soft invent was PT-only MakeupNewVarFacts before set_fact_in.
 		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) ||
+			!makeupNewUnionFacts(&preUnion, fm.UnionFacts) ||
 			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) ||
 			!UnionFactsComplete(preUnion) || !UnionFactsComplete(fm.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
@@ -789,7 +797,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			return nil
 		}
 		// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
-		// set_fact_in full FactVec: pre point-to + pre eUnionWrite
+		// set_fact_in full FactVec: pre point-to + pre eUnionWrite after makeup
 		fm.SetMapFactsInPair(st.StmID, preFacts, preUnion)
 		// set_fact_out filters function-locals for return (FactMgr.cpp:270–272)
 		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, b)

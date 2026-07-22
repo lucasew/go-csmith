@@ -1871,3 +1871,34 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
+	// Block.cpp:429 makeup_new_var_facts(pre_facts, global) full FactVec then set_fact_in.
+	// Soft invent was MakeupNewVarFacts (PT) only — preUnion map_in missed mid-for unions.
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_nloop", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	// Simulate pre-snapshot without g_newu, then live gains union fact (created mid-for).
+	preU := []*FactUnion{}
+	g := &Variable{Name: "g_newu", Type: ut, Init: MakeInt(0)}
+	liveU := []*FactUnion{MakeFactUnion(g, 0)}
+	if liveU[0] == nil {
+		t.Fatal("MakeFactUnion")
+	}
+	if !makeupNewUnionFacts(&preU, liveU) {
+		t.Fatal("makeup", HasError(), GetError())
+	}
+	if len(preU) != 1 || preU[0].Var != g {
+		t.Fatalf("makeup must add init union for mid-for global: %#v", preU)
+	}
+	// PT-only path must not leave preU empty when live has unions (regression lock)
+	preU2 := []*FactUnion{}
+	if UnionFactsComplete(preU2) && len(preU2) == 0 {
+		// without makeupNewUnionFacts this would be what SetMapFactsInPair stored
+		if FindRelatedUnion(preU2, g) != nil {
+			t.Fatal("empty pre should not find g")
+		}
+	}
+	ClearError()
+}

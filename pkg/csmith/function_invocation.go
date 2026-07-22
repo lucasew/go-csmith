@@ -1186,15 +1186,24 @@ func MakeRandomBinaryInvocation(
 
 	// FunctionInvocation.cpp:222 — snapshot facts before RHS (ordered merge)
 	// incomplete GlobalFacts fail closed sticky (no invent cleaned snapshot)
+	// Full FactVec: ePointTo + eUnionWrite (C++ facts_copy = global_facts).
 	var factsCopy []*FactPointTo
+	var unionCopy []*FactUnion
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			SetError(ErrGeneric)
 			return nil
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-binary past CloneFactSlice residual
 		if HasError() {
+			return nil
+		}
+		unionCopy = CloneUnionFactSlice(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(unionCopy) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 	}
@@ -1324,9 +1333,12 @@ func MakeRandomBinaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:275–279 — ordered ops merge facts (short-circuit RHS may skip)
+	// full FactVec: makeup_new_var_facts then merge_facts(global, facts_copy)
 	if IsOrderedBinary(op) && cg.FM != nil && factsCopy != nil {
 		if !MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts) ||
-			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) {
+			!makeupNewUnionFacts(&unionCopy, cg.FM.UnionFacts) ||
+			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) ||
+			!UnionFactsComplete(unionCopy) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup/merge base — fail closed sticky, no invent bare binary
 			SetError(ErrGeneric)
 			return nil
@@ -1339,6 +1351,20 @@ func MakeRandomBinaryInvocation(
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			SetError(ErrGeneric)
 			return nil
+		}
+		// eUnionWrite half of merge_facts(global_facts, facts_copy)
+		for _, f := range unionCopy {
+			if f == nil {
+				SetError(ErrGeneric)
+				return nil
+			}
+			cg.FM.UnionFacts = MergeUnionFactInto(cg.FM.UnionFacts, f)
+			if HasError() || !UnionFactsComplete(cg.FM.UnionFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return nil
+			}
 		}
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags, Tmp1: tmp1, Tmp2: tmp2}
