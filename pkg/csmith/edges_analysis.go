@@ -264,9 +264,14 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				// Statement.cpp:819–820 — always merge_jump_facts / add_effect
 				// C++ map[] missing → empty; no invent skip merge when out absent
 				// Incomplete out fails closed sticky (no invent partial jump merge)
+				// FactMgr.cpp:569–588 — full FactVec (ePointTo + eUnionWrite)
 				out := fm.GetMapFactsOut(e.SrcID)
 				if _, ok := tryMergeJumpFacts(facts, out); !ok {
 					// tryMergeJumpFacts already SetError sticky
+					return false
+				}
+				outU := fm.GetMapUnionFactsOut(e.SrcID)
+				if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
 					return false
 				}
 				// map_accum_effect[src] — missing live id → empty; SrcID 0 IncompleteEffect
@@ -299,9 +304,13 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			if fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
 				continue
 			}
-			// Statement.cpp:830–831 — always merge_jump_facts / add_effect
+			// Statement.cpp:830–831 — always merge_jump_facts / add_effect (full FactVec)
 			out := fm.GetMapFactsOut(e.SrcID)
 			if _, ok := tryMergeJumpFacts(facts, out); !ok {
+				return false
+			}
+			outU := fm.GetMapUnionFactsOut(e.SrcID)
+			if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
 				return false
 			}
 			accE := fm.GetMapAccumEffect(e.SrcID)

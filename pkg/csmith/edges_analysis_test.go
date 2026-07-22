@@ -564,3 +564,48 @@ func TestCreateCFGEdgeBlockDestUsesStmID(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAnalyzeWithEdgesInMergesJumpUnions(t *testing.T) {
+	// Statement.cpp:819–820 merge_jump_facts on full FactVec (eUnionWrite too).
+	// Soft invent was PT-only tryMergeJumpFacts in AnalyzeWithEdgesIn.
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_jmp", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_uj", ut, false, false)
+	parent.CreateFieldVars()
+	fm := NewFactMgr(nil)
+	// dest stmt already visited so back-edge merge runs
+	dest := &Stmt{Kind: StmtAssign, StmID: 20}
+	// live entry: field 0 last-write
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	fm.GlobalFacts = []*FactPointTo{}
+	// jump out: field 1 last-write
+	fm.SetMapFactsOutPair(10, []*FactPointTo{}, []*FactUnion{MakeFactUnion(parent, 1)})
+	fm.SetMapFactsInPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnion(parent, 0)})
+	fm.SetMapStmEffect(20, EmptyEffect())
+	fm.SetMapAccumEffect(10, EmptyEffect())
+	fm.MapVisited = map[int]bool{10: true, 20: true}
+	// back edge src→dest
+	fm.CFGEdges = []*CFGEdge{{SrcID: 10, DestStmID: 20, PostDest: false, BackLink: true}}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := []*FactPointTo{}
+	blk := &Block{StmID: 1}
+	// validate may fail (empty assign shell) but jump merge runs first
+	_ = AnalyzeWithEdgesIn(dest, &facts, &cg, Defaults(), blk)
+	if !UnionFactsComplete(fm.UnionFacts) {
+		t.Fatalf("union merge incomplete err=%v", GetError())
+	}
+	fu := FindRelatedUnion(fm.UnionFacts, parent)
+	if fu == nil {
+		t.Fatal("missing union fact after jump merge")
+	}
+	// 0 join 1 must not stay fid 0 (merge_jump_facts eUnionWrite)
+	if fu.LastWrittenFID == 0 {
+		t.Fatalf("jump out fid 1 must join entry 0; got still 0 (no union merge?)")
+	}
+	ClearError()
+}
