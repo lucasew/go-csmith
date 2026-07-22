@@ -3,6 +3,7 @@
 package csmith
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"unicode"
@@ -154,7 +155,11 @@ func IsSpaceChar(c byte) bool {
 // Str2Int mirrors StringUtils::str2int — strip outer parens; hex 0x prefix.
 // StringUtils.cpp:151–165 — stringstream extraction stops at first non-digit
 // (so "0L" / "0UL" / "1L" from Constant small-path suffixes parse as 0/1).
-// C++ initializes i=-1; failed extraction returns -1.
+// C++ initializes i=-1; failed extraction (no digits) returns -1.
+// On overflow, operator>> for int sets the value to numeric_limits min/max
+// (not -1). Atoi-error→-1 made huge UL constants fold as equals(-1), so
+// FunctionInvocationBinary::equals(0) treated `x % 18446744073709551607UL` as 0
+// and re-picked div→add (seed 105: UP safe_div…<g_1972 vs GO safe_add…<4UL).
 func Str2Int(s string) int {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -186,11 +191,7 @@ func Str2Int(s string) int {
 		if end == 0 {
 			return -1
 		}
-		n, err := strconv.ParseInt(hexPart[:end], 16, 64)
-		if err != nil {
-			return -1
-		}
-		return int(n)
+		return streamExtractInt(hexPart[:end], 16)
 	}
 	// decimal: optional sign + digits; stop before U/L suffix (stringstream >> int)
 	i := 0
@@ -205,11 +206,23 @@ func Str2Int(s string) int {
 		// no digits extracted — C++ leaves i=-1
 		return -1
 	}
-	n, err := strconv.Atoi(s[:i])
-	if err != nil {
-		return -1
+	return streamExtractInt(s[:i], 10)
+}
+
+// streamExtractInt mirrors stringstream >> int: out-of-range → MaxInt/MinInt
+// (not -1). bitSize 0 = host int width for ParseInt limits.
+func streamExtractInt(num string, base int) int {
+	n, err := strconv.ParseInt(num, base, 0)
+	if err == nil {
+		return int(n)
 	}
-	return n
+	var ne *strconv.NumError
+	if errors.As(err, &ne) && errors.Is(ne.Err, strconv.ErrRange) {
+		// ParseInt still returns the limit value of the appropriate sign.
+		return int(n)
+	}
+	// non-range parse failure — leave as C++ failed extraction default -1
+	return -1
 }
 
 // Str2Int64 mirrors StringUtils::str2longlong.

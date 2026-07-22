@@ -36,6 +36,45 @@ func TestStr2Int(t *testing.T) {
 	if Str2Int("0xAL") != 10 {
 		t.Fatalf("0xAL want 10 got %d", Str2Int("0xAL"))
 	}
+	// stringstream >> int on overflow → numeric_limits::max (not -1).
+	// 18446744073709551607UL is common as ~0ULL-8; Atoi-error→-1 made
+	// FunctionInvocationBinary::equals(0) treat `x % BIGUL` as 0 (equals(-1) on RHS).
+	big := "18446744073709551607UL"
+	got := Str2Int(big)
+	if got == -1 {
+		t.Fatalf("overflow %s must not invent -1 (C++ clamps to MaxInt), got %d", big, got)
+	}
+	if got != int(^uint(0)>>1) { // math.MaxInt
+		// On 64-bit host, ParseInt bitSize 0 still fits? 18446744073709551607 > MaxInt64
+		// so ErrRange → MaxInt64 for signed parse... bitSize 0 uses int width.
+		// int is 64-bit here: MaxInt = 2^63-1
+		want := int(^uint(0) >> 1)
+		if got != want {
+			t.Fatalf("overflow %s: got %d want MaxInt %d", big, got, want)
+		}
+	}
+	// FunctionInvocationBinary.cpp:171–173 — equals(-1) must not fire on BIGUL
+	c := &Constant{Type: GetSimpleType(EULongLong), Value: big}
+	if c.Equals(-1) {
+		t.Fatal("BIGUL must not Equals(-1) after overflow clamp")
+	}
+}
+
+// TestModHugeConstNotEqualsZero — FunctionInvocationBinary.cpp:154–177 + 246–253.
+// div/mod re-pick uses rhs.equals(0)||is_0_or_1(); mod with RHS=BIGUL must not
+// fold to 0 via Str2Int overflow→-1 (seed 105 safe_div vs safe_add).
+func TestModHugeConstNotEqualsZero(t *testing.T) {
+	ClearError()
+	left := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: "1L"}, ExprType: GetIntType()}
+	right := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleType(EULongLong), Value: "18446744073709551607UL"}, ExprType: GetSimpleType(EULongLong)}
+	fi := &Invocation{IsStd: true, Binary: "%", Args: []*Expression{left, right}}
+	if fi.EqualsInt(0) {
+		t.Fatal("1 % BIGUL must not EqualsInt(0) (would re-pick div/mod)")
+	}
+	if HasError() {
+		t.Fatal("EqualsInt sticky")
+	}
+	ClearError()
 }
 
 func TestChopEmptyEndWith(t *testing.T) {
