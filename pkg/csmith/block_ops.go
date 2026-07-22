@@ -1012,17 +1012,23 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
 	}
-	// Statement.cpp:551 — same_facts full FactVec. PT via SameFacts; eUnionWrite
-	// installed from map_facts_out on ShortcutOK. SameFactVec gate deferred until
-	// FindFixedPoint pairs current_inputs with map_facts_in eUnionWrite.
-	if !SameFacts(*facts, in) {
-		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
+	// Statement.cpp:551 — same_facts full FactVec (ePointTo + eUnionWrite).
+	// Live fm.UnionFacts paired with *facts by FindFixedPointBlock currentUnions.
+	if !UnionFactsComplete(fm.UnionFacts) {
+		return ShortcutNone
+	}
+	inU := fm.GetMapUnionFactsIn(b.StmID)
+	if !UnionFactsComplete(inU) {
+		return ShortcutNone
+	}
+	if !SameFactVec(*facts, fm.UnionFacts, in, inU) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
 		if HasError() {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
-	// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual true path
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts true path
 	if HasError() {
 		return ShortcutNone
 	}

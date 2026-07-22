@@ -154,6 +154,45 @@ func TestSameFactVec(t *testing.T) {
 	ClearError()
 }
 
+func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
+	// Statement.cpp:551 — same_facts on full FactVec; PT match + union lattice
+	// mismatch must not ShortcutOK (soft invent was PT-only SameFacts).
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_scu", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u_scu", ut, false, false)
+	parent.CreateFieldVars()
+	entryU := MakeFactUnion(parent, 0)
+	liveU := MakeFactUnion(parent, 1)
+	if entryU == nil || liveU == nil {
+		t.Fatal("facts")
+	}
+	fm := NewFactMgr(nil)
+	pt := []*FactPointTo{}
+	fm.SetMapFactsInPair(11, pt, []*FactUnion{entryU})
+	fm.SetMapFactsOutPair(11, pt, []*FactUnion{entryU})
+	fm.SetMapStmEffect(11, EmptyEffect())
+	fm.UnionFacts = []*FactUnion{liveU} // live last_write differs from map_in
+	st := &Stmt{Kind: StmtAssign, StmID: 11}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := append([]*FactPointTo(nil), pt...)
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatalf("want ShortcutNone when eUnionWrite lattice differs, err=%v", HasError())
+	}
+	ClearError()
+	// matching live + map_in → still ShortcutOK
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	facts = append([]*FactPointTo(nil), pt...)
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatalf("want ShortcutOK when full FactVec matches, err=%v", HasError())
+	}
+	ClearError()
+}
+
 func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	// Statement.cpp:559 — inputs = map_facts_out[this] full FactVec (eUnionWrite too).
 	// Soft invent left live UnionFacts at entry after ShortcutOK.

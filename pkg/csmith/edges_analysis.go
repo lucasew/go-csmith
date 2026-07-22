@@ -3,6 +3,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+)
+
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
 // Fact* always live in maps; nil subject/jump holes fail closed (*facts nil —
@@ -329,7 +334,13 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			}
 		}
 	}
-	return ValidateAndUpdateFacts(st, facts, cg, opts, blk)
+	ok := ValidateAndUpdateFacts(st, facts, cg, opts, blk)
+	if !ok && os.Getenv("CSMITH_DEBUG_STRIP") != "" && blk != nil && blk.Func != nil && blk.Parent == nil {
+		fmt.Fprintf(os.Stderr, "GO_ANALYZE_FAIL %s stm=%d kind=%v nFacts=%d visited=%v\n",
+			blk.Func.Name, st.StmID, st.Kind, len(*facts),
+			cg.FM != nil && cg.FM.MapVisited != nil && cg.FM.MapVisited[st.StmID])
+	}
+	return ok
 }
 
 // SetAccumulatedEffectAfterBlock mirrors Statement::set_accumulated_effect_after_block.
@@ -604,6 +615,23 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	}
 	fm := cg.FM
 	currentInputs := CloneFactSlice(inputs)
+	// currentUnions is the eUnionWrite half of C++ current_inputs (FactVec).
+	// Only back-edge merge_facts grow it — not sequential stmt analyze (Block.cpp:520–536).
+	// Soft invent reused post-analyze live UnionFacts as entry → same_facts / map_in skew.
+	var currentUnions []*FactUnion
+	if fm != nil {
+		if !UnionFactsComplete(fm.UnionFacts) {
+			SetError(ErrGeneric)
+			return inputs, -1, false
+		}
+		currentUnions = CloneUnionFactSliceDeep(fm.UnionFacts)
+		if !UnionFactsComplete(currentUnions) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return inputs, -1, false
+		}
+	}
 	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
 	var lastPreOOS []*FactPointTo
 	// Generation-time stack: make_random already has `b` on func.Stack during
@@ -653,6 +681,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 			for _, e := range back {
 				// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src])
+				// Full FactVec: ePointTo + eUnionWrite (soft invent was PT-only).
 				// C++ map[] always; missing → empty merge; incomplete fails closed
 				out := fm.GetMapFactsOut(e.SrcID)
 				if !FactsComplete(currentInputs) || !FactsComplete(out) {
@@ -669,7 +698,49 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					SetError(ErrGeneric)
 					return currentInputs, -1, false
 				}
+				outU := fm.GetMapUnionFactsOut(e.SrcID)
+				if !UnionFactsComplete(currentUnions) || !UnionFactsComplete(outU) {
+					SetError(ErrGeneric)
+					return currentInputs, -1, false
+				}
+				for _, uf := range outU {
+					if uf == nil {
+						SetError(ErrGeneric)
+						return currentInputs, -1, false
+					}
+					// MergeUnionFact appends without clone on new subject; deep-clone
+					// so map_facts_out lattice is not aliased into current_inputs.
+					cp := uf.Clone()
+					if cp == nil || HasError() {
+						if !HasError() {
+							SetError(ErrGeneric)
+						}
+						return currentInputs, -1, false
+					}
+					currentUnions = MergeUnionFact(currentUnions, cp)
+					if !UnionFactsComplete(currentUnions) {
+						if !HasError() {
+							SetError(ErrGeneric)
+						}
+						return currentInputs, -1, false
+					}
+				}
 			}
+		}
+		// Install entry eUnionWrite as live before shortcut / sequential (C++ one FactVec).
+		if fm != nil {
+			if !UnionFactsComplete(currentUnions) {
+				SetError(ErrGeneric)
+				return currentInputs, -1, false
+			}
+			liveU := CloneUnionFactSliceDeep(currentUnions)
+			if !UnionFactsComplete(liveU) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, -1, false
+			}
+			fm.UnionFacts = liveU
 		}
 		// Block.cpp:537–541 — shortcut when inputs match previous
 		if !visitOnce && fm != nil {
@@ -702,14 +773,14 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			return currentInputs, -1, false
 		}
 		// Entry eUnionWrite for set_fact_in (C++ current_inputs unchanged by analyze).
-		// Soft invent was SetMapFactsIn pairing post-analyze live UnionFacts.
+		// Snapshot from currentUnions — not post-analyze live (which includes locals).
 		var entryUnions []*FactUnion
 		if fm != nil {
-			if !UnionFactsComplete(fm.UnionFacts) {
+			if !UnionFactsComplete(currentUnions) {
 				SetError(ErrGeneric)
 				return currentInputs, -1, false
 			}
-			entryUnions = CloneUnionFactSliceDeep(fm.UnionFacts)
+			entryUnions = CloneUnionFactSliceDeep(currentUnions)
 			if !UnionFactsComplete(entryUnions) {
 				if !HasError() {
 					SetError(ErrGeneric)
@@ -718,8 +789,18 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 		}
 		outputs := CloneFactSlice(currentInputs)
-		// Block.cpp:546–549 — facts for locals
+		// Block.cpp:546–549 — facts for locals (full FactVec: ePointTo + eUnionWrite)
 		// Variable* always live on LocalVars; nil hole fails closed (no invent skip)
+		workUnions := entryUnions
+		if fm != nil {
+			workUnions = CloneUnionFactSliceDeep(currentUnions)
+			if !UnionFactsComplete(workUnions) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, -1, false
+			}
+		}
 		for _, v := range b.LocalVars {
 			if v == nil {
 				SetError(ErrGeneric)
@@ -731,11 +812,52 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				SetError(ErrGeneric)
 				return nil, -1, false
 			}
+			// FactMgr.cpp:118–131 add_new_var_fact — eUnionWrite half into outputs FactVec
+			if fm != nil && MetaFactUnionEnabled() {
+				_, unInit := AbstractFactForVarInit(v)
+				if HasError() || !UnionFactsComplete(unInit) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return nil, -1, false
+				}
+				for _, uf := range unInit {
+					if uf == nil || uf.Var == nil {
+						SetError(ErrGeneric)
+						return nil, -1, false
+					}
+					if FindRelatedUnion(workUnions, uf.Var) != nil {
+						if HasError() {
+							return nil, -1, false
+						}
+						continue
+					}
+					if HasError() {
+						return nil, -1, false
+					}
+					cp := uf.Clone()
+					if cp == nil || HasError() {
+						if !HasError() {
+							SetError(ErrGeneric)
+						}
+						return nil, -1, false
+					}
+					workUnions = append(workUnions, cp)
+				}
+			}
 		}
 		// incomplete after local makeup fails closed
 		if !FactsComplete(outputs) {
 			SetError(ErrGeneric)
 			return outputs, -1, false
+		}
+		// Sequential analyze uses outputs FactVec = PT + live unions (with locals).
+		if fm != nil {
+			if !UnionFactsComplete(workUnions) {
+				SetError(ErrGeneric)
+				return outputs, -1, false
+			}
+			fm.UnionFacts = workUnions
 		}
 		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {

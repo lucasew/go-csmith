@@ -2,7 +2,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-
 // Shortcut result codes (Statement::shortcut_analysis).
 const (
 	// ShortcutOK reused previous analysis (return 0).
@@ -479,18 +478,26 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
 	}
-	// Statement.cpp:551 — same_facts(inputs, map_facts_in[this]) on full FactVec.
-	// PT via SameFacts; eUnionWrite half installed from map_facts_out on ShortcutOK.
-	// SameFactVec production gate needs working inputs unions paired with *facts
-	// at every caller (FP currentUnions + gen-time) first.
-	if !SameFacts(*facts, in) || IsCtrlStmt(st) {
-		// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual
+	// Statement.cpp:551 — same_facts(inputs, map_facts_in[this]) on full FactVec
+	// (ePointTo + eUnionWrite). Soft invent was PT-only SameFacts → ShortcutOK when
+	// last-written field lattice differed (IsNonreadableField / choose_var skew).
+	// Live fm.UnionFacts is the working eUnionWrite half paired with *facts
+	// (FindFixedPointBlock currentUnions + ValidateAndUpdateFacts pre-visit).
+	if !UnionFactsComplete(fm.UnionFacts) {
+		return ShortcutNone
+	}
+	inU := fm.GetMapUnionFactsIn(st.StmID)
+	if !UnionFactsComplete(inU) {
+		return ShortcutNone
+	}
+	if !SameFactVec(*facts, fm.UnionFacts, in, inU) || IsCtrlStmt(st) {
+		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
 		if HasError() {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
-	// residual ERROR sticky — no invent soft-continue ShortcutOK past SameFacts residual true path
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts true path
 	if HasError() {
 		return ShortcutNone
 	}

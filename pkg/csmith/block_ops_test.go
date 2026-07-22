@@ -1608,6 +1608,57 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	ClearError()
 }
 
+func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
+	// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src]) full FactVec.
+	// Soft invent was PT-only merge; eUnionWrite half stayed at entry last_write.
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	ut := &Type{isUnion: true, StructName: "U_fpbe", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u_fpbe", ut, false, false)
+	parent.CreateFieldVars()
+	entryU := MakeFactUnion(parent, 0)
+	outU := MakeFactUnion(parent, 1)
+	if entryU == nil || outU == nil {
+		t.Fatal("union facts")
+	}
+	fm := NewFactMgr(f)
+	pt := []*FactPointTo{}
+	fm.UnionFacts = []*FactUnion{entryU}
+	b := &Block{StmID: 60, Func: f, Looping: true}
+	fm.SetMapFactsInPair(60, pt, []*FactUnion{entryU})
+	// self-back map_out carries last_write=1
+	fm.SetMapFactsOutPair(60, pt, []*FactUnion{outU})
+	fm.MapVisited = map[int]bool{60: true}
+	fm.CreateCFGEdge(60, b, false, true)
+	fm.SetMapStmEffect(60, EmptyEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// visitOnce false + map_in unions entry vs current after merge → no pure shortcut;
+	// full pass must still merge eUnionWrite into current_inputs before set_fact_in.
+	_, _, ok := FindFixedPointBlock(b, pt, &cg, Defaults(), true)
+	if !ok {
+		t.Fatalf("FP must succeed sticky=%v", HasError())
+	}
+	// After first full pass + second merge: entryUnions for set_fact_in should reflect
+	// merge of map_out (fid 1) into currentUnions. map_facts_in[block] is entry of last pass.
+	// After merge fid1 into currentUnions then set_fact_in(currentUnions):
+	inU := fm.GetMapUnionFactsIn(60)
+	got := FindRelatedUnion(inU, parent)
+	if got == nil {
+		t.Fatal("map_in must have union subject after FP")
+	}
+	// Join of fid 0 and fid 1 → BOTTOM for eUnionWrite (or at least not stay fid 0 only)
+	if got.LastWrittenFID == 0 {
+		t.Fatalf("back-edge must merge map_out last_write into currentUnions, got fid=%d", got.LastWrittenFID)
+	}
+	ClearError()
+}
+
 // TestFindFixedPointRecreatesMayNullFromAssign — after reset_stm_fact_maps clears
 // mid-gen map_facts_out, re-visit of p=0 must recreate null lattice (C++ inputs path).
 // Statement.cpp:609–626 + FactMgr::update_fact_for_assign(sa, inputs).
