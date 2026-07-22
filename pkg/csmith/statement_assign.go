@@ -1160,9 +1160,12 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	rhsCG := cg.CloneSubcontext()
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
-	// Effect assignment deep-copies; detach from live parent EffectStm maps.
-	// CGContext.cpp:74–82 — curr_rhs(nullptr) until Lhs sets it after RHS visit.
-	rhsCG.EffectStm = cg.EffectStm.detachMaps()
+	// CGContext.cpp:74–82 — (cgc, running_eff, &rhs_accum): effect_stm() default empty,
+	// curr_rhs(nullptr). Do not inherit parent effect_stm: Lhs::ptr_modified_in_rhs
+	// (Lhs.cpp:240–261) must see only this assign's RHS writes, not sibling effects
+	// already on the parent (e.g. left of && before a nested ExpressionAssign).
+	// Generation path (MakeRandomAssign) already uses EmptyEffect here.
+	rhsCG.EffectStm = EmptyEffect()
 	rhsCG.CurrRHS = nil
 
 	if !VisitFactsExpression(st.Expr, &rhsCG, opts) {

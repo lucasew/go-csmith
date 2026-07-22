@@ -413,3 +413,44 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 		}
 	}
 }
+
+func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
+	// StatementAssign.cpp:365 + CGContext.cpp:74–82 — rhs_cg_context starts with
+	// default-empty effect_stm. Parent may already hold sibling writes (e.g. left
+	// of && before a nested ExpressionAssign). Lhs::ptr_modified_in_rhs
+	// (Lhs.cpp:240–261) must see only this assign's RHS writes.
+	// Seed 80: (***l_108)=… after (**l_108)=… under && must not FP-fail.
+	ClearError()
+	opts := Defaults()
+	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
+	mid := CreateVariableScalars("l_mid", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalars("l_p", PointerTo(PointerTo(GetIntType())), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = []*FactPointTo{
+		MakeFactPointTo(ptr, mid),
+		MakeFactPointTo(mid, pointee),
+	}
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	// Parent EffectStm pretends a sibling already wrote the intermediate pointer.
+	// If visit inherited this into rhs/lhs EffectStm, PtrModifiedInRhs would reject **p=.
+	cg.EffectStm = EmptyEffect().WriteVar(mid)
+	lhs := &Lhs{Var: ptr, Type: GetIntType()}
+	if lhs.IndirectLevel() != 2 {
+		t.Fatalf("precondition: want indir=2 got %d", lhs.IndirectLevel())
+	}
+	// Direct PtrModifiedInRhs against parent EffectStm must be true (sibling case).
+	if !cg.PtrModifiedInRhs(lhs, fm.GlobalFacts) {
+		t.Fatal("precondition: parent EffectStm write of mid must mark **p modified")
+	}
+	ClearError()
+	st := Stmt{
+		Kind: StmtAssign, Lhs: lhs, LhsVar: ptr,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	if !VisitFactsStatementAssign(&st, &cg, opts) {
+		t.Fatalf("visit must succeed with fresh rhs EffectStm; err=%v", GetError())
+	}
+}
