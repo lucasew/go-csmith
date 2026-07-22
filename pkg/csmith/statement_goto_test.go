@@ -887,3 +887,29 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGotoOkStmsPointerNotStmID(t *testing.T) {
+	// StatementGoto.cpp:97–106 — exclude only s==stm pointer, not StmID match.
+	// Two distinct statements may share no identity even if tests assign equal ids.
+	ClearError()
+	// Build ok_stms logic inline (same as MakeRandomGoto)
+	dest := &Stmt{Kind: StmtAssign, StmID: 5}
+	other := &Stmt{Kind: StmtAssign, StmID: 5} // same id, different pointer
+	okBlk := &Block{Stmts: []Stmt{*other, {Kind: StmtAssign, StmID: 6}}}
+	var okStms []int
+	for i := range okBlk.Stmts {
+		s := &okBlk.Stmts[i]
+		if dest != nil && s == dest {
+			continue
+		}
+		if s.MustReturn() {
+			continue
+		}
+		okStms = append(okStms, i)
+	}
+	if len(okStms) != 2 {
+		t.Fatalf("want both stmts (pointer != dest), got %v", okStms)
+	}
+	// StmID-based exclusion would drop other (id 5) unfairly
+	ClearError()
+}

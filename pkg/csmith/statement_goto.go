@@ -447,15 +447,13 @@ func MakeRandomGoto(
 		dest = &blk.Stmts[len(blk.Stmts)-1]
 	}
 
-	// StatementGoto.cpp:97–106 — s != stm && !must_return only (not soft-filter break/continue)
+	// StatementGoto.cpp:97–106 — s != stm && !must_return only (pointer identity).
+	// Soft invent also excluded by StmID equality across blocks (not in C++) which
+	// could shrink ok_stms / cond pool when ids collided or were reused incorrectly.
 	var okStms []int
 	for i := range okBlk.Stmts {
 		s := &okBlk.Stmts[i]
 		if dest != nil && s == dest {
-			continue
-		}
-		// also match by StmID when dest is in a different slice cell with same id
-		if dest != nil && s.StmID != 0 && dest.StmID != 0 && s.StmID == dest.StmID {
 			continue
 		}
 		if s.MustReturn() {
