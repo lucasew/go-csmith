@@ -227,17 +227,16 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		return false
 	}
 	if cg.FM != nil && !StmIDUnset(b.StmID) {
-		// Prefer map_facts_out (C++); fall back to FindFixedPointBlock return
+		// Block.cpp:477 — inputs = fm->map_facts_out[this] (full FactVec).
+		// Soft invent was SetGlobalFacts(PT-only): UnionFacts stayed at last-stmt
+		// pre-OOS lattice → IsNonreadableField / same_facts skew on outer re-visit
+		// (seed-7 nested loop FP over-strip of back-edge gotos).
 		mout := cg.FM.GetMapFactsOut(b.StmID)
 		if FactsComplete(mout) {
-			cl := CloneFactSlice(mout)
-			if HasError() || !FactsComplete(cl) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+			cg.FM.AssignGlobalFactsFromMapOut(b.StmID)
+			if HasError() {
 				return false
 			}
-			cg.FM.SetGlobalFacts(cl, "auto_statement_visit_215")
 		} else if FactsComplete(out) {
 			cl := CloneFactSlice(out)
 			if HasError() || !FactsComplete(cl) {
@@ -266,16 +265,24 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	// StatementIf.cpp:164 — inputs_copy before condition
+	// StatementIf.cpp:164 — inputs_copy before condition (full FactVec)
 	var inputsCopy []*FactPointTo
+	var inputsCopyU []*FactUnion
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			SetError(ErrGeneric)
 			return false
 		}
 		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if visit past CloneFactSlice residual
 		if HasError() {
+			return false
+		}
+		inputsCopyU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(inputsCopyU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
@@ -293,10 +300,11 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if HasError() {
 		return false
 	}
-	// post-condition env shared as entry to both arms
+	// post-condition env shared as entry to both arms (full FactVec)
 	var postCond []*FactPointTo
+	var postCondU []*FactUnion
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
@@ -305,6 +313,13 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		postCond = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if arms past CloneFactSlice residual
 		if HasError() {
+			return false
+		}
+		postCondU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(postCondU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
@@ -330,9 +345,10 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	var thenFacts []*FactPointTo
+	var thenUnions []*FactUnion
 	if cg.FM != nil {
 		// incomplete then-arm facts sticky (no invent soft re-pick past hole as visit success)
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
@@ -343,11 +359,33 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if HasError() {
 			return false
 		}
+		thenUnions = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(thenUnions) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
 		// StatementIf.cpp:174 — false starts from same post-cond inputs (not after true)
+		// Full FactVec: generation uses AssignGlobalFactsFromMapIn (PT+union).
+		// Soft invent was SetGlobalFacts(PT-only) → else kept then-exit last-writes
+		// (seed-7 nested loop FP over-strip of back-edge gotos).
 		cg.FM.SetGlobalFacts(CloneFactSlice(postCond), "auto_statement_visit_317")
 		// residual ERROR sticky — no invent soft-else start past CloneFactSlice residual
 		if HasError() {
 			return false
+		}
+		clU := CloneUnionFactSliceDeep(postCondU)
+		if HasError() || !UnionFactsComplete(clU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		if clU == nil {
+			cg.FM.UnionFacts = []*FactUnion{}
+		} else {
+			cg.FM.UnionFacts = clU
 		}
 	}
 
@@ -359,9 +397,10 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	var elseFacts []*FactPointTo
+	var elseUnions []*FactUnion
 	if cg.FM != nil {
 		// incomplete else-arm facts sticky (no invent soft re-pick past hole as visit success)
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
@@ -370,6 +409,13 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-else facts past CloneFactSlice residual
 		if HasError() {
+			return false
+		}
+		elseUnions = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(elseUnions) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
@@ -424,7 +470,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 	}
 
-	// StatementIf.cpp:185–196 — must_return pruning
+	// StatementIf.cpp:185–196 — must_return pruning (full FactVec)
 	if cg.FM != nil {
 		trueMust := st.Then.MustReturn()
 		// residual ERROR sticky — no invent soft-continue merge path past Then MustReturn residual
@@ -436,48 +482,89 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if HasError() {
 			return false
 		}
+		installU := func(u []*FactUnion) bool {
+			if !UnionFactsComplete(u) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+			cl := CloneUnionFactSliceDeep(u)
+			if HasError() || !UnionFactsComplete(cl) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+			if cl == nil {
+				cg.FM.UnionFacts = []*FactUnion{}
+			} else {
+				cg.FM.UnionFacts = cl
+			}
+			return true
+		}
 		switch {
 		case trueMust && falseMust:
-			// pre-condition env (inputs_copy), not post-condition
-			// incomplete inputs sticky (no invent soft re-pick past hole as visit success)
-			if !FactsComplete(inputsCopy) {
+			if !FactsComplete(inputsCopy) || !UnionFactsComplete(inputsCopyU) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(CloneFactSlice(inputsCopy), "auto_statement_visit_419")
+			if HasError() || !installU(inputsCopyU) {
+				return false
+			}
 		case trueMust:
-			if !FactsComplete(elseFacts) {
+			if !FactsComplete(elseFacts) || !UnionFactsComplete(elseUnions) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(elseFacts, "auto_statement_visit_427")
+			if HasError() || !installU(elseUnions) {
+				return false
+			}
 		case falseMust:
-			if !FactsComplete(thenFacts) {
+			if !FactsComplete(thenFacts) || !UnionFactsComplete(thenUnions) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_435")
+			if HasError() || !installU(thenUnions) {
+				return false
+			}
 		default:
-			if !FactsComplete(thenFacts) || !FactsComplete(elseFacts) {
+			if !FactsComplete(thenFacts) || !FactsComplete(elseFacts) ||
+				!UnionFactsComplete(thenUnions) || !UnionFactsComplete(elseUnions) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_443")
-			// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit sticky
 			_ = MergeFacts(&cg.FM.GlobalFacts, elseFacts)
 			if !FactsComplete(cg.FM.GlobalFacts) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
+			}
+			if !installU(thenUnions) {
+				return false
+			}
+			for _, uf := range elseUnions {
+				merged := MergeUnionFact(cg.FM.UnionFacts, uf)
+				if !UnionFactsComplete(merged) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return false
+				}
+				cg.FM.UnionFacts = merged
 			}
 		}
 	}
@@ -519,10 +606,11 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
 		return false
 	}
-	// StatementFor.cpp:433–434 — facts_copy / effect_stm after init
+	// StatementFor.cpp:433–434 — facts_copy / effect_stm after init (full FactVec)
 	var factsCopy []*FactPointTo
+	var factsCopyU []*FactUnion
 	if cg.FM != nil {
-		if !FactsComplete(cg.FM.GlobalFacts) {
+		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
@@ -531,6 +619,13 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-for visit past CloneFactSlice residual
 		if HasError() {
+			return false
+		}
+		factsCopyU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		if HasError() || !UnionFactsComplete(factsCopyU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
@@ -588,23 +683,39 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			if HasError() {
 				return false
 			}
-			// control reaches end of for with pre-loop (post-init) env
-			cg.FM.SetGlobalFacts(CloneFactSlice(factsCopy), "auto_statement_visit_559")
-		} else {
-			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
-			if HasError() {
-				return false
-			}
-			// map_facts_in[&body] — fixed-point entry, not merge(pre,post)
-			// C++ map[] always assigns (missing → empty); no invent keep prior
-			in := cg.FM.GetMapFactsIn(st.Then.StmID)
-			if !FactsComplete(in) {
+			// control reaches end of for with pre-loop (post-init) env — full FactVec
+			if !UnionFactsComplete(factsCopyU) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
-			cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_visit_574")
+			cg.FM.SetGlobalFacts(CloneFactSlice(factsCopy), "auto_statement_visit_559")
+			if HasError() {
+				return false
+			}
+			clU := CloneUnionFactSliceDeep(factsCopyU)
+			if HasError() || !UnionFactsComplete(clU) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+			if clU == nil {
+				cg.FM.UnionFacts = []*FactUnion{}
+			} else {
+				cg.FM.UnionFacts = clU
+			}
+		} else {
+			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
+			if HasError() {
+				return false
+			}
+			// map_facts_in[&body] — fixed-point entry full FactVec
+			cg.FM.AssignGlobalFactsFromMapIn(st.Then.StmID)
+			if HasError() {
+				return false
+			}
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)

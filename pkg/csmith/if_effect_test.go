@@ -258,6 +258,66 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	ClearError()
 }
 
+// TestVisitFactsStatementIfRewindsUnionBeforeElse — StatementIf.cpp:170–177.
+// Else arm starts from post-condition full FactVec (ePointTo + eUnionWrite).
+// Soft invent restored only GlobalFacts so UnionFacts stayed at then-exit
+// last-writes (seed-7 nested over-strip).
+func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	ut := &Type{isUnion: true, StructName: "U_vif", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_uv", ut, false, false)
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) < 1 {
+		t.Fatal("need field")
+	}
+	f0 := parent.FieldVars[0]
+	entryU := MakeFactUnion(parent, 0)
+	exitU := MakeFactUnion(parent, 1)
+	if entryU == nil || exitU == nil {
+		t.Fatal("MakeFactUnion")
+	}
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(fn)
+	fm.GlobalFacts = []*FactPointTo{}
+	fm.UnionFacts = []*FactUnion{entryU}
+	thenBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{}}
+	elseBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{}}
+	fm.MapStmEffect = map[int]Effect{thenBlk.StmID: EmptyEffect(), elseBlk.StmID: EmptyEffect()}
+	// then out has exit last-write; else out re-entry
+	fm.SetMapFactsInPair(thenBlk.StmID, []*FactPointTo{}, []*FactUnion{entryU})
+	fm.SetMapFactsOutPair(thenBlk.StmID, []*FactPointTo{}, []*FactUnion{exitU})
+	fm.SetMapFactsInPair(elseBlk.StmID, []*FactPointTo{}, []*FactUnion{entryU})
+	fm.SetMapFactsOutPair(elseBlk.StmID, []*FactPointTo{}, []*FactUnion{entryU})
+	fm.MapVisited = map[int]bool{thenBlk.StmID: true, elseBlk.StmID: true}
+	st := &Stmt{
+		Kind: StmtIfElse, StmID: AllocStmID(),
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Then: thenBlk, Else: elseBlk,
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = fn
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsStatementIf(st, &cg, opts) {
+		t.Fatalf("visit if failed err=%v", HasError())
+	}
+	if !UnionFactsComplete(fm.UnionFacts) {
+		t.Fatal("UnionFacts incomplete")
+	}
+	if FindRelatedUnion(fm.UnionFacts, parent) == nil {
+		t.Fatal("union subject missing after if visit")
+	}
+	// Sanity: exit-only would make f0 nonreadable; merged then+else should not be stuck
+	// solely in a way that loses completeness.
+	_ = f0
+	ClearError()
+}
+
 func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell
 	ClearError()
