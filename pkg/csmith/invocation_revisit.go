@@ -122,7 +122,11 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 }
 
 // RenewFact mirrors renew_fact — replace related or append.
-// Fact.cpp:175–191.
+// Fact.cpp:175–191 — related by Fact::is_related only.
+// FactPointTo.h:65–68 — is_related is ePointTo + var pointer identity.
+// Soft invent used Variable.Match (aggregate-has-field) so renew of a field
+// could replace an earlier aggregate subject's fact and leave the field's
+// garbage fact in place (seed-7 l_1402: {garbage,g_1183} dangling on re-read).
 // Fact* always live; incomplete subject map or nf PointTo fails closed
 // (*facts IncompleteFactSlice, false — no invent renew / leave incomplete as no-op).
 func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
@@ -149,33 +153,34 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		if f.Var == nf.Var || f.Var.Match(nf.Var) {
-			// residual ERROR sticky — no invent soft-continue later match past Match hole
+		// Fact.cpp:177 — new_fact->is_related(*facts[i]) only (not Variable::match)
+		if !f.IsRelated(nf) {
+			// residual ERROR sticky — no invent soft-skip not-related then renew later
 			if HasError() {
 				*facts = IncompleteFactSlice()
 				return false
 			}
-			if f.Equal(nf) {
-				// residual ERROR sticky — no invent no-change soft-success past Equal hole
-				if HasError() {
-					*facts = IncompleteFactSlice()
-					return false
-				}
-				return false
-			}
-			// residual ERROR sticky — no invent replace past Equal hole
-			if HasError() {
-				*facts = IncompleteFactSlice()
-				return false
-			}
-			(*facts)[i] = nf
-			return true
+			continue
 		}
-		// residual ERROR sticky — no invent soft-skip not-match then renew later
 		if HasError() {
 			*facts = IncompleteFactSlice()
 			return false
 		}
+		if f.Equal(nf) {
+			// residual ERROR sticky — no invent no-change soft-success past Equal hole
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return false
+			}
+			return false
+		}
+		// residual ERROR sticky — no invent replace past Equal hole
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false
+		}
+		(*facts)[i] = nf
+		return true
 	}
 	*facts = append(*facts, nf)
 	return true

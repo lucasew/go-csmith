@@ -161,21 +161,19 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil facts applyPointToAssignFacts must SetError sticky")
 	}
 	ClearError()
-	// RenewFact Match residual: Type-nil Var in subject map soft invent was merge later.
-	// Fair: sticky wipe incomplete fail closed ok=false.
+	// FactPointTo is_related is var identity only (FactPointTo.h:65–68).
+	// Unrelated Type-nil subject is not related to p — renew appends p's fact (C++).
+	// Soft invent Match residual sticky-wipe is gone with is_related-only RenewFact.
 	brokenSubj := &Variable{Name: "g_broken"} // Type nil
 	factsR := []*FactPointTo{{Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
-	// lvarCnt path: use pointer lhs with indir 0 and newFacts for p
-	// When lvars empty and lhs not pointer, goes to merge path with Type-nil Match residual.
-	// Use merge path: lvarCnt != 1 definitive renew
-	if _, ok := applyPointToAssignFacts(&factsR, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
-		t.Fatal("Match residual applyPointTo must fail closed ok=false")
+	if _, ok := applyPointToAssignFacts(&factsR, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); !ok {
+		t.Fatal("unrelated Type-nil subject must not block renew of p")
 	}
-	if FactsComplete(factsR) {
-		t.Fatal("Match residual applyPointTo must wipe incomplete")
+	if FindRelatedPointTo(factsR, p) == nil || !FindRelatedPointTo(factsR, p).IsNull() {
+		t.Fatal("p must renew to null", factsR)
 	}
-	if !HasError() {
-		t.Fatal("Match residual applyPointTo must SetError sticky")
+	if FindRelatedPointTo(factsR, brokenSubj) == nil {
+		t.Fatal("unrelated subject fact must remain")
 	}
 	ClearError()
 }

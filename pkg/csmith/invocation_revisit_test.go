@@ -58,32 +58,42 @@ func TestRenewFacts(t *testing.T) {
 		t.Fatal("nil nf RenewFact must SetError sticky")
 	}
 	ClearError()
-	// Match residual: Type-nil Var on existing fact soft invent was soft-skip not-match
-	// then append nf inventing partial renew. Fair: sticky wipe incomplete fail closed.
-	brokenSubj := &Variable{Name: "g_broken"} // Type nil
-	factsMatch := []*FactPointTo{{Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
-	nfMatch := MakeFactPointTo(p, GarbagePtr)
-	if RenewFact(&factsMatch, nfMatch) {
-		t.Fatal("Match residual must fail closed RenewFact, not invent append")
+	// FactPointTo.h:65–68 is_related is var identity only — not Variable.Match.
+	// Soft invent Match could replace an aggregate fact when renewing a field and
+	// leave the field's garbage fact in place (dangling on later check_read_var).
+	parent := CreateVariableScalars("g_agg", GetIntType(), true, false)
+	// synthetic aggregate shell with field p for Match
+	parent.Type = &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1}}}
+	parent.FieldVars = []*Variable{p}
+	p.FieldVarOf = parent
+	if !parent.Match(p) {
+		t.Fatal("setup: parent must Match field for this anti-soft-invent test")
 	}
-	if FactsComplete(factsMatch) {
-		t.Fatal("Match residual RenewFact must wipe incomplete")
+	factsX := []*FactPointTo{
+		MakeFactPointToSet(parent, []*Variable{NullPtr}), // unrelated aggregate subject
+		MakeFactPointToSet(p, []*Variable{GarbagePtr}),  // field pointer still dead
 	}
-	if !HasError() {
-		t.Fatal("Match residual RenewFact must SetError sticky")
+	tgt := CreateVariableScalars("g_tgt", GetIntType(), true, false)
+	nfField := MakeFactPointTo(p, tgt) // definitive p = &tgt
+	if !RenewFact(&factsX, nfField) {
+		t.Fatal("renew field by var identity must succeed")
+	}
+	// parent fact must remain (not replaced via Match)
+	if ft := FindRelatedPointTo(factsX, parent); ft == nil || !ft.IsNull() {
+		t.Fatalf("parent fact must stay null after field renew: %+v", ft)
+	}
+	// field fact renewed — garbage cleared
+	if ft := FindRelatedPointTo(factsX, p); ft == nil || ft.IsDead() || len(ft.PointTo) != 1 || ft.PointTo[0] != tgt {
+		t.Fatalf("field must renew to tgt only: %+v", ft)
 	}
 	ClearError()
-	// RenewFacts residual: Type-nil subject among facts when renewing later complete nf
-	p2 := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
-	factsRF := []*FactPointTo{MakeFactPointTo(p, NullPtr), {Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
-	if RenewFacts(&factsRF, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), MakeFactPointTo(p2, NullPtr)}) {
-		t.Fatal("Match residual must fail closed RenewFacts")
-	}
-	if FactsComplete(factsRF) {
-		t.Fatal("Match residual RenewFacts must wipe incomplete")
+	// nil-hole subject in map still fails closed sticky (FactsComplete false path)
+	factsHole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	if RenewFact(&factsHole, MakeFactPointTo(p, GarbagePtr)) {
+		t.Fatal("incomplete map RenewFact must fail closed")
 	}
 	if !HasError() {
-		t.Fatal("Match residual RenewFacts must SetError sticky")
+		t.Fatal("incomplete map RenewFact must SetError sticky")
 	}
 	ClearError()
 }
