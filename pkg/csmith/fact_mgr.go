@@ -220,7 +220,47 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 			return
 		}
 	}
-	fm.SetMapFactsOut(b.StmID, cp)
+	// FactMgr.cpp:141–156 — OOS erase is category-agnostic (ePointTo + eUnionWrite).
+	// Soft invent paired post-OOS point-to map_out with live UnionFacts that still
+	// held body-local union subjects → same_facts size skew / extra re-visits.
+	// Clone + OOS locals into map_union_out; do not mutate live UnionFacts here
+	// (Block post_creation keeps pre-OOS live during find_fixed_point).
+	if !UnionFactsComplete(fm.UnionFacts) {
+		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	outU := CloneUnionFactSliceDeep(fm.UnionFacts)
+	if !UnionFactsComplete(outU) {
+		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	if len(b.LocalVars) > 0 {
+		UpdateUnionFactsForOOSVars(b.LocalVars, &outU)
+		if !UnionFactsComplete(outU) {
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+	}
+	if b.Parent == nil && b.Func != nil {
+		outU = RemoveFunctionLocalUnionFactsAt(outU, b.Func, b.Parent)
+		if !UnionFactsComplete(outU) {
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+	}
+	fm.SetMapFactsOutPair(b.StmID, cp, outU)
 }
 
 // SetMapFactsOutPair stores map_facts_out point-to + eUnionWrite partitions together.
@@ -1644,6 +1684,57 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 			SetError(ErrGeneric)
 		}
 		return IncompleteFactSlice()
+	}
+	return out
+}
+
+// RemoveFunctionLocalUnionFactsAt is the eUnionWrite half of
+// FactMgr::remove_function_local_facts (FactMgr.cpp:179–195 subject erase).
+// Category-agnostic erase by is_var_on_stack / other-function RV; no mark_func_end
+// (ePointTo only). Incomplete maps fail closed IncompleteUnionFactSlice.
+func RemoveFunctionLocalUnionFactsAt(facts []*FactUnion, f *Function, stParent *Block) []*FactUnion {
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if f != nil && !f.StackScanComplete(stParent) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return IncompleteUnionFactSlice()
+	}
+	out := make([]*FactUnion, 0, len(facts))
+	for _, fact := range facts {
+		if fact == nil || fact.Var == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		if f != nil && f.IsVarOnStack(fact.Var, stParent) {
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
+			continue
+		}
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
+			continue
+		}
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		cl := fact.Clone()
+		if cl == nil || HasError() {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return IncompleteUnionFactSlice()
+		}
+		out = append(out, cl)
 	}
 	return out
 }

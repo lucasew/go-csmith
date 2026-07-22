@@ -213,6 +213,50 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	ClearError()
 }
 
+func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
+	// FactMgr.cpp:141–156 + Block.cpp:690–693 — set_fact_out after OOS is full FactVec.
+	// Soft invent stored post-OOS point-to with live UnionFacts still holding body locals
+	// → map_union_out too large → same_facts false → extra full re-visits / over-strip.
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U1")
+	if ut == nil {
+		t.Skip("union")
+	}
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	body := &Block{StmID: 10, Func: f, LocalVars: []*Variable{lu}, Parent: &Block{StmID: 1, Func: f}}
+	f.Body = body
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	// Nested block: OOS locals only (parent != nil skips remove_function_local)
+	outPT := CloneFactSlice(fm.GlobalFacts)
+	UpdateFactsForOOSVars(body.LocalVars, &outPT)
+	fm.SetMapFactsOutForBlock(body, outPT)
+	if HasError() {
+		t.Fatal("SetMapFactsOutForBlock sticky", HasError())
+	}
+	// live UnionFacts must remain pre-OOS (post_creation keeps live during FP)
+	if FindRelatedUnion(fm.UnionFacts, lu) == nil {
+		t.Fatal("live UnionFacts must not be mutated by SetMapFactsOutForBlock")
+	}
+	gotU := fm.GetMapUnionFactsOut(body.StmID)
+	if FindRelatedUnion(gotU, lu) != nil {
+		t.Fatal("map_union_out must drop body-local union subject", gotU)
+	}
+	if FindRelatedUnion(gotU, gu) == nil {
+		t.Fatal("map_union_out must keep global union", gotU)
+	}
+	ClearError()
+}
+
 func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVariableInSet false → drop param from keep
 	// fair: VariablesComplete Param fails closed nil inputs sticky
