@@ -20,3 +20,17 @@ stream-climbing, battery shrinkage, or seed-literal generation.
 
 Default options + seed → **bit-identical C program body** as golden upstream
 (emergent from fair C++-linked units). Seed 2 alone is not multi-seed done.
+
+## Body parity vs upstream (integration)
+
+```bash
+# Level B (testing.T)
+CSMITH_UPSTREAM=.build/csmith-instrumented/src/csmith \
+  go test ./pkg/csmith -run UpstreamBodyParityBattery -count=1
+
+# Level C (testing.F)
+CSMITH_UPSTREAM=.build/csmith-instrumented/src/csmith \
+  go test ./pkg/csmith -run '^$' -fuzz=FuzzUpstreamBodyParityFuzzy -fuzztime=16x
+```
+
+Unset `CSMITH_UPSTREAM` → tests **warn**, try discovery, then skip if none. Body mismatches use **go-cmp** (`-upstream +go`). Details: SPEC §3.5a.

@@ -137,6 +137,15 @@ This section is the **mandatory work method** for multi-seed drop-in. It does **
 
 **Done for multi-seed** means **level B**, not A alone. Seed 2 green is **not** permission to stop or to invent pads so other seeds “pass.”
 
+**Body parity harness (integration, not unit marks):**
+
+| Command | Role |
+|---------|------|
+| `go test ./pkg/csmith -run UpstreamBodyParityBattery -count=1` | Level **B** battery (`testing.T`); skips if no upstream |
+| `go test ./pkg/csmith -run '^$' -fuzz=FuzzUpstreamBodyParityFuzzy -fuzztime=16x` | Level **C** continuous fuzz (`testing.F`) |
+
+Set `CSMITH_UPSTREAM` to the golden binary (preferred). If unset, tests **warn** and try well-known paths / `PATH`, then skip if nothing is found. Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Fuzzy seed corpus = level-B battery; crashers under `testdata/fuzz/` — commit only as intentional regression work items while C is open.
+
 #### Frozen battery (level B)
 
 Compare **every** seed in this set under default options (same flags as golden CLI defaults, `-s <seed>`):
@@ -468,6 +477,7 @@ Patterns observed in session `019f5695-5d12-70a1-a913-c8790f96db54` and residual
 | Smoke tests | Small end-to-end of a **layer** (e.g. RNG sequence, type pick, selector choose) vs known upstream vectors |
 | Instrumented upstream | Optional helper to capture vectors; not a substitute for cites |
 | Full program parity scripts | Thermometers + battery report aid; **acceptance** = exact body (§3.5 / §3.5a), not script exit alone |
+| `TestUpstreamBodyParityBattery` / `FuzzUpstreamBodyParityFuzzy` | Upstream vs Go **exact program body** (B=`testing.T`, C=`testing.F`); go-cmp on DIFF; warn if `CSMITH_UPSTREAM` unset |
 
 Tests must exercise **this** implementation’s logic, not restate third-party trivia. Prefer failing tests when upstream pin behavior is not yet ported over green lies.
 
