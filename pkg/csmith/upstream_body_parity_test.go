@@ -3,9 +3,8 @@
 // Compares generated C program bodies from this library vs an upstream csmith
 // binary. Not a unit contract test — integration thermometer + level B/C gate.
 //
-// Skipped unless an upstream binary is available (env or well-known paths),
-// so normal `go test ./pkg/csmith` stays offline-friendly. Logs a warning when
-// CSMITH_UPSTREAM is unset even if a binary is discovered.
+// Skipped unless CSMITH_UPSTREAM points at an upstream binary (no path search).
+// Unset → WARNING + Skip so plain `go test ./pkg/csmith` stays offline-friendly.
 //
 //	# Level B battery (testing.T)
 //	CSMITH_UPSTREAM=/path/to/csmith go test ./pkg/csmith -run UpstreamBodyParityBattery -count=1
@@ -68,40 +67,24 @@ func ProgramBody(src string) (string, error) {
 	return src[start:end], nil
 }
 
+// findUpstreamCsmith returns the path from CSMITH_UPSTREAM only.
+// Unset → log a warning and return "" (callers Skip). No auto-discovery of
+// .build or PATH — that looked like "upstream in radar" when the env was empty.
 func findUpstreamCsmith(tb testing.TB) string {
 	tb.Helper()
 	env := strings.TrimSpace(os.Getenv("CSMITH_UPSTREAM"))
 	if env == "" {
-		tb.Log("WARNING: CSMITH_UPSTREAM is not set; searching well-known paths / PATH")
-	} else {
-		if st, err := os.Stat(env); err == nil && !st.IsDir() {
-			return env
-		}
+		tb.Log("WARNING: CSMITH_UPSTREAM is not set; skipping upstream body parity")
+		return ""
+	}
+	if st, err := os.Stat(env); err != nil || st.IsDir() {
 		tb.Fatalf("CSMITH_UPSTREAM=%q not a file", env)
 	}
-
-	wd, _ := os.Getwd()
-	candidates := []string{
-		filepath.Join(wd, ".build/csmith-instrumented/src/csmith"),
-		filepath.Join(wd, ".build/csmith/src/csmith"),
-		filepath.Join(wd, "..", ".build", "csmith-instrumented", "src", "csmith"),
-		filepath.Join(wd, "..", "..", ".build", "csmith-instrumented", "src", "csmith"),
-		".build/csmith-instrumented/src/csmith",
-		".build/csmith/src/csmith",
+	abs, err := filepath.Abs(env)
+	if err != nil {
+		return env
 	}
-	if p, err := exec.LookPath("csmith"); err == nil {
-		candidates = append(candidates, p)
-	}
-	for _, c := range candidates {
-		if st, err := os.Stat(c); err == nil && !st.IsDir() && st.Mode().Perm()&0o111 != 0 {
-			abs, err := filepath.Abs(c)
-			if err == nil {
-				return abs
-			}
-			return c
-		}
-	}
-	return ""
+	return abs
 }
 
 func genTimeout(tb testing.TB) time.Duration {
@@ -209,7 +192,7 @@ func TestUpstreamBodyParityBattery(t *testing.T) {
 	}
 	up := findUpstreamCsmith(t)
 	if up == "" {
-		t.Skip("upstream csmith not found; set CSMITH_UPSTREAM or build .build/csmith-instrumented")
+		t.Skip("set CSMITH_UPSTREAM to the golden csmith binary")
 	}
 	t.Logf("upstream=%s", up)
 	timeout := genTimeout(t)
@@ -249,7 +232,7 @@ func FuzzUpstreamBodyParityFuzzy(f *testing.F) {
 	}
 	up := findUpstreamCsmith(f)
 	if up == "" {
-		f.Skip("upstream csmith not found; set CSMITH_UPSTREAM or build .build/csmith-instrumented")
+		f.Skip("set CSMITH_UPSTREAM to the golden csmith binary")
 	}
 	f.Logf("upstream=%s", up)
 	timeout := genTimeout(f)

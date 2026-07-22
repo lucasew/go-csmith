@@ -144,7 +144,7 @@ This section is the **mandatory work method** for multi-seed drop-in. It does **
 | `go test ./pkg/csmith -run UpstreamBodyParityBattery -count=1` | Level **B** battery (`testing.T`); skips if no upstream |
 | `go test ./pkg/csmith -run '^$' -fuzz=FuzzUpstreamBodyParityFuzzy -fuzztime=16x` | Level **C** continuous fuzz (`testing.F`) |
 
-Set `CSMITH_UPSTREAM` to the golden binary (preferred). If unset, tests **warn** and try well-known paths / `PATH`, then skip if nothing is found. Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Fuzzy seed corpus = level-B battery; crashers under `testdata/fuzz/` — commit only as intentional regression work items while C is open.
+Set `CSMITH_UPSTREAM` to the golden binary. If unset, tests **warn and skip** (no auto-discovery). Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Fuzzy seed corpus = level-B battery; crashers under `pkg/csmith/testdata/fuzz/` re-run on every fuzz/test until fixed or removed — commit only as intentional regression work items while C is open.
 
 #### Frozen battery (level B)
 

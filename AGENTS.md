@@ -33,4 +33,4 @@ CSMITH_UPSTREAM=.build/csmith-instrumented/src/csmith \
   go test ./pkg/csmith -run '^$' -fuzz=FuzzUpstreamBodyParityFuzzy -fuzztime=16x
 ```
 
-Unset `CSMITH_UPSTREAM` → tests **warn**, try discovery, then skip if none. Body mismatches use **go-cmp** (`-upstream +go`). Details: SPEC §3.5a.
+Unset `CSMITH_UPSTREAM` → **warn + skip** (no `.build`/`PATH` search). Body mismatches use **go-cmp** (`-upstream +go`). Failing `-fuzz` inputs land in `pkg/csmith/testdata/fuzz/` and re-run until fixed or deleted. Details: SPEC §3.5a.
