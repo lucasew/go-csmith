@@ -91,3 +91,62 @@ func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
 	}
 	_ = u1
 }
+
+// After for-IV write to union.f1 (last=1), empty if/else combine must keep last=1.
+// seed-123: combine then=0 else=1 bottomed g_721 after for(g_721.f1) post_loop left last=1.
+func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	ut := &Type{
+		isUnion: true, StructName: "U0",
+		Fields: []StructField{
+			{Name: "f0", Type: GetSimpleType(EChar), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_721", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.CreateFieldVars()
+	if len(uv.FieldVars) < 2 {
+		t.Fatal("need f0 f1")
+	}
+	f1 := uv.FieldVars[1]
+	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	body := &Block{StmID: AllocStmID(), Func: f}
+	f.Body = body
+	f.Stack = []*Block{body}
+	fm := NewFactMgr(f)
+	// init fact last=0 (constant init of union)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	fm.GlobalFacts = []*FactPointTo{}
+	// IV assign g_721.f1 = 0
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
+	if !fm.UpdateFactForAssign(f1, 0, rhs) {
+		t.Fatal("assign f1", HasError(), GetError())
+	}
+	got := FindRelatedUnion(fm.UnionFacts, uv)
+	if got == nil || got.LastWrittenFID != 1 {
+		t.Fatalf("after f1 write want last=1 got %#v", got)
+	}
+	// empty then/else blocks with entry last=1
+	thenB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
+	elseB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
+	fm.SetMapFactsInPair(thenB.StmID, CloneFactSlice(fm.GlobalFacts), CloneUnionFactSliceDeep(fm.UnionFacts))
+	fm.SetMapFactsOutForBlock(thenB, CloneFactSlice(fm.GlobalFacts))
+	// else starts from then map_in (StatementIf.cpp:97)
+	fm.AssignGlobalFactsFromMapIn(thenB.StmID)
+	fm.SetMapFactsOutForBlock(elseB, CloneFactSlice(fm.GlobalFacts))
+	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmID(), Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	prePT := CloneFactSlice(fm.GlobalFacts)
+	preU := CloneUnionFactSliceDeep(fm.UnionFacts)
+	CombineBranchFacts(ifSt, &prePT, &preU, fm)
+	if HasError() {
+		t.Fatal("combine", GetError())
+	}
+	got = FindRelatedUnion(fm.UnionFacts, uv)
+	if got == nil || got.IsBottom() {
+		t.Fatalf("empty if/else after f1 IV must not bottom g_721, got %#v", got)
+	}
+	if got.LastWrittenFID != 1 {
+		t.Fatalf("want last=1 after combine, got %d", got.LastWrittenFID)
+	}
+}
