@@ -143,6 +143,57 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	CtrlVarsDoFinalization()
 }
 
+// ArrayVariable.cpp:742–744 — field_names empty after union exclusions → give up
+// before for-loops (no empty for+index shell). Seed 94: g_336[5] all unreadable.
+func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
+	ClearError()
+	CtrlVarsDoFinalization()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	_ = GetNewCtrlVars(opts)
+	ut := &Type{
+		isUnion:    true,
+		StructName: "U2",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_336", Type: ut, IsArray: true, ArraySizes: []int{5},
+			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{5},
+	}
+	av.AsArray = av
+	// BOTTOM last-write → no field readable (FactUnion.cpp / seed 94-style)
+	facts := []*FactUnion{MakeFactUnion(&av.Variable, FactUnionBottom)}
+	out := hashArrayVariable(&av.Variable, nil, facts)
+	if out != "" {
+		t.Fatalf("empty field_names must skip hash entirely, got:\n%s", out)
+	}
+	if HasError() {
+		t.Fatal("complete BOTTOM facts must not sticky", GetError())
+	}
+	// without facts (nil) still has type leaves → would hash both fields
+	all := hashArrayVariable(&av.Variable, nil, nil)
+	if !strings.Contains(all, "for (i = 0") || !strings.Contains(all, "g_336[i].f0") {
+		t.Fatal("nil facts must hash all leaves", all)
+	}
+	// partial: only f0 readable → loops + f0 only
+	f0 := []*FactUnion{MakeFactUnion(&av.Variable, 0)}
+	part := hashArrayVariable(&av.Variable, nil, f0)
+	if !strings.Contains(part, "g_336[i].f0") || strings.Contains(part, "g_336[i].f1") {
+		t.Fatal("want only f0", part)
+	}
+	if !strings.Contains(part, "for (i = 0") {
+		t.Fatal("readable payload must still emit loops", part)
+	}
+	ClearError()
+	CtrlVarsDoFinalization()
+}
+
 func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	ClearError()
 	CtrlVarsDoFinalization()

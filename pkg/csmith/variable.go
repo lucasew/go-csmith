@@ -2765,37 +2765,43 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 	return ""
 }
 
-// hashArrayHasPayload reports whether array hashing would emit any transparent_crc.
-// ArrayVariable.cpp:742–744 — get_int_subfield_names empty → give up.
-// Type* always live on Fields; nil hole sticky false (no invent has-payload / soft re-pick).
-func hashArrayHasPayload(v *Variable) bool {
-	// Variable + Type always live; sticky incomplete no invent no-payload soft-skip
-	if v == nil || v.Type == nil {
-		SetError(ErrGeneric)
-		return false
+// hashArrayUnionExcludedFields mirrors ArrayVariable::hash excluded_fields build.
+// ArrayVariable.cpp:729–737 — unreadable union fields → indices for
+// Type::get_int_subfield_names (j after padding skip; Type.cpp:1622–1634).
+func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
+	if v == nil || v.Type == nil || !v.Type.IsUnion() || unionFacts == nil {
+		return nil
 	}
-	if v.Type.IsSimple() {
-		// residual ERROR sticky — no invent soft-payload past IsSimple residual true
-		if HasError() {
-			return false
+	var excluded []int
+	j := 0
+	for i := range v.Type.Fields {
+		f := &v.Type.Fields[i]
+		if f.BitWidth == 0 {
+			continue
 		}
-		return true
+		if !IsFieldReadable(v, i, unionFacts) {
+			// residual ERROR sticky — no invent soft-skip then partial array hash past hole
+			if HasError() {
+				return nil
+			}
+			excluded = append(excluded, j)
+		} else if HasError() {
+			return nil
+		}
+		j++
 	}
-	// residual ERROR sticky — no invent soft-continue past IsSimple residual false
-	if HasError() {
-		return false
-	}
-	// Type.cpp:1615–1636 — any flattened simple leaf
-	subs := v.Type.GetIntSubfieldNames("", nil)
-	if HasError() {
-		return false
-	}
-	return len(subs) > 0
+	return excluded
 }
 
 // hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
 // ArrayVariable.cpp:721–803 — collective itemized members no-op; get_last_ctrl_vars;
 // transparent_crc body; optional hash_value_printf index printf.
+//
+// Order matches C++: excluded_fields + get_int_subfield_names first; if
+// field_names.size()==0 give up BEFORE for-loops (ArrayVariable.cpp:742–744).
+// Seed 94: union U2 g_336[5] with all fields unreadable → empty field_names → no
+// empty for/index shell (GO used to emit loops then zero transparent_crc leaves).
+//
 // Union array elements: exclude unreadable fields when unionFacts non-nil
 // (ArrayVariable.cpp:730–737 / get_int_subfield_names excluded_fields).
 // Skips arrays with no hashable payload (e.g. pointer element type).
@@ -2816,7 +2822,46 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	if v.AsArray.Collective != nil {
 		return ""
 	}
-	if len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
+	if len(v.ArraySizes) == 0 {
+		return ""
+	}
+	// ArrayVariable.cpp:724–743 — field_names BEFORE loops; empty → give up.
+	// Must apply union excluded_fields (hashArrayHasPayload without facts wrongly
+	// treated "has type leaves" as payload and emitted empty for+index shells).
+	var (
+		subs      []IntSubfield
+		useSimple bool
+	)
+	if v.Type == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if v.Type.IsSimple() {
+		// residual ERROR sticky — no invent soft-payload past IsSimple residual true
+		if HasError() {
+			return ""
+		}
+		useSimple = true
+	} else if v.Type.IsAggregate() {
+		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
+		if HasError() {
+			return ""
+		}
+		excluded := hashArrayUnionExcludedFields(v, unionFacts)
+		if HasError() {
+			return ""
+		}
+		// Type.cpp:1615–1636 — flatten nested simple leaves
+		subs = v.Type.GetIntSubfieldNames("", excluded)
+		if HasError() {
+			return ""
+		}
+		// ArrayVariable.cpp:742–744 — if (field_names.size() == 0) return;
+		if len(subs) == 0 {
+			return ""
+		}
+	} else {
+		// ePointer etc. — get_int_subfield_names yields empty → give up
 		return ""
 	}
 	if ctrl == nil {
@@ -2880,47 +2925,20 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		access += "[" + iv + "]"
 		nameStr += "[" + iv + "]"
 	}
-	// ArrayVariable.cpp:740–766 — get_int_subfield_names then transparent_crc each leaf
+	// ArrayVariable.cpp:770–784 — transparent_crc each precomputed leaf
 	// (nested struct fields expand: .f0.f0 not top-level .f0 only — seed-51 g_359).
-	if v.Type != nil && v.Type.IsAggregate() {
-		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
+	if useSimple {
+		isF := v.Type.IsFloat()
+		// residual ERROR sticky — no invent soft-hash past IsFloat residual
 		if HasError() {
 			return ""
 		}
-		// ArrayVariable.cpp:730–737 — excluded union field indices for get_int_subfield_names
-		var excluded []int
-		if v.Type.IsUnion() && unionFacts != nil {
-			// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
-			if HasError() {
-				return ""
-			}
-			// Field index j after padding skip matches get_int_subfield_names
-			j := 0
-			for i := range v.Type.Fields {
-				f := &v.Type.Fields[i]
-				if f.BitWidth == 0 {
-					continue
-				}
-				if !IsFieldReadable(v, i, unionFacts) {
-					// residual ERROR sticky — no invent soft-skip then partial array hash past hole
-					if HasError() {
-						return ""
-					}
-					excluded = append(excluded, j)
-				} else if HasError() {
-					return ""
-				}
-				j++
-			}
-		} else if HasError() {
-			// residual ERROR sticky — no invent soft-continue past IsUnion residual false
-			return ""
+		if isF {
+			b.WriteString(indent + "transparent_crc_bytes (&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
+		} else {
+			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
 		}
-		// Type.cpp:1615–1636 — flatten nested simple leaves
-		subs := v.Type.GetIntSubfieldNames("", excluded)
-		if HasError() {
-			return ""
-		}
+	} else {
 		for _, sub := range subs {
 			if sub.Type == nil {
 				SetError(ErrGeneric)
@@ -2937,21 +2955,6 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 			} else {
 				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
 			}
-		}
-	} else if v.Type != nil && v.Type.IsSimple() {
-		// residual ERROR sticky — no invent soft-hash past IsSimple residual
-		if HasError() {
-			return ""
-		}
-		isF := v.Type.IsFloat()
-		// residual ERROR sticky — no invent soft-hash past IsFloat residual
-		if HasError() {
-			return ""
-		}
-		if isF {
-			b.WriteString(indent + "transparent_crc_bytes (&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
-		} else {
-			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
 		}
 	}
 	// ArrayVariable.cpp:786–788 — if (hash_value_printf) if (print_hash_value) printf(index…)
