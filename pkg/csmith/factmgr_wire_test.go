@@ -861,3 +861,36 @@ func TestSanityCheckMap(t *testing.T) {
 	}
 	ClearError()
 }
+
+// storeUnionFactMapEntry must deep-clone so renew/join on live cannot rewrite maps.
+// Soft invent CloneUnionFactSlice left *FactUnion shared (seed-123 g_721 combine).
+func TestStoreUnionFactMapEntryDeepIsolatesLive(t *testing.T) {
+	ClearError()
+	ut := &Type{
+		isUnion: true, StructName: "U",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.CreateFieldVars()
+	fm := NewFactMgr(nil)
+	live := MakeFactUnion(uv, 0)
+	fm.UnionFacts = []*FactUnion{live}
+	fm.SetMapFactsInPair(10, []*FactPointTo{}, fm.UnionFacts)
+	// mutate live lattice after store
+	live.LastWrittenFID = 1
+	got := fm.GetMapUnionFactsIn(10)
+	stored := FindRelatedUnion(got, uv)
+	if stored == nil {
+		t.Fatal("missing stored union fact")
+	}
+	if stored.LastWrittenFID != 0 {
+		t.Fatalf("map_in must keep fid 0 after live mutate, got %d (shared alias)", stored.LastWrittenFID)
+	}
+	if live.LastWrittenFID != 1 {
+		t.Fatal("live must still be 1")
+	}
+	ClearError()
+}

@@ -296,11 +296,21 @@ func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
 
 // storeUnionFactMapEntry mirrors storeFactMapEntry for FactUnion maps.
 // Incomplete → IncompleteUnionFactSlice; complete empty → non-nil {}.
+//
+// Deep-clone FactUnion objects (not shallow slice copy). C++ FactVec stores
+// Fact* that are replaced on renew/join (new heap Fact); soft invent shallow
+// CloneUnionFactSlice left map_facts_in/out sharing live *FactUnion so a later
+// Join/SetBottom on the live lattice rewrote historical arm outs (seed-123:
+// combine_branch_facts then_fid=0 else_fid=1 bottomed g_721 while sibling
+// unions kept init f0 → choose_var ok pool 36 vs UP 37).
 func storeUnionFactMapEntry(facts []*FactUnion) []*FactUnion {
 	if !UnionFactsComplete(facts) {
 		return IncompleteUnionFactSlice()
 	}
-	cl := CloneUnionFactSlice(facts)
+	cl := CloneUnionFactSliceDeep(facts)
+	if HasError() {
+		return IncompleteUnionFactSlice()
+	}
 	if cl == nil {
 		return []*FactUnion{}
 	}
@@ -375,8 +385,10 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 		return
 	}
 	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_in_assign")
-	cl := CloneUnionFactSlice(un)
-	if !UnionFactsComplete(cl) {
+	// Deep install: live lattice must not alias map_facts_in FactUnion objects
+	// (renew/join replace or mutate; maps must retain historical arm/entry lattice).
+	cl := CloneUnionFactSliceDeep(un)
+	if HasError() || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		if !HasError() {
@@ -413,8 +425,8 @@ func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 		return
 	}
 	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_out_assign")
-	cl := CloneUnionFactSlice(un)
-	if !UnionFactsComplete(cl) {
+	cl := CloneUnionFactSliceDeep(un)
+	if HasError() || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		if !HasError() {

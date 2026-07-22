@@ -666,11 +666,13 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		cl := CloneUnionFactSlice(*preUnion)
-		if !UnionFactsComplete(cl) {
+		cl := CloneUnionFactSliceDeep(*preUnion)
+		if HasError() || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 		if cl == nil {
@@ -686,11 +688,13 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		cl := CloneUnionFactSlice(elseOutU)
-		if !UnionFactsComplete(cl) {
+		cl := CloneUnionFactSliceDeep(elseOutU)
+		if HasError() || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 		if cl == nil {
@@ -706,11 +710,13 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		cl := CloneUnionFactSlice(thenOutU)
-		if !UnionFactsComplete(cl) {
+		cl := CloneUnionFactSliceDeep(thenOutU)
+		if HasError() || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 		if cl == nil {
@@ -768,18 +774,29 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			return
 		}
 		// eUnionWrite half of merge_facts (Fact.cpp:192–199 + FactUnion::join)
-		u := CloneUnionFactSlice(thenOutU)
-		if !UnionFactsComplete(u) {
+		// Deep-clone then arm outs so merge_fact join cannot alias map_facts_out.
+		u := CloneUnionFactSliceDeep(thenOutU)
+		if HasError() || !UnionFactsComplete(u) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 		if u == nil {
 			u = []*FactUnion{}
 		}
+		// Fact.cpp:192–199 merge_facts → merge_fact (not always-join).
+		// MergeUnionFact matches Fact.cpp:149–171; MergeUnionFactInto always joins.
 		for _, nf := range elseOutU {
-			u = MergeUnionFactInto(u, nf)
+			if nf == nil {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
+				return
+			}
+			u = MergeUnionFact(u, nf)
 			if !UnionFactsComplete(u) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()

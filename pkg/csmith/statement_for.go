@@ -561,7 +561,9 @@ func MakeRandomFor(
 		SetError(ErrGeneric)
 		return nil
 	}
-	preUnion := CloneUnionFactSlice(cg.FM.UnionFacts)
+	// Deep: pre_facts eUnionWrite must not alias live FactUnion objects that
+	// body generation renews/joins (StatementFor.cpp:299–300 snapshot).
+	preUnion := CloneUnionFactSliceDeep(cg.FM.UnionFacts)
 	if HasError() || !UnionFactsComplete(preUnion) {
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -662,7 +664,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// Restore that partition, then makeup_new_var_facts for subjects created
 	// during the body (FactMgr.cpp:494–508) so new globals keep init facts.
 	if !body.MustReturn() && UnionFactsComplete(preUnion) {
-		liveSnap := CloneUnionFactSlice(fm.UnionFacts)
+		liveSnap := CloneUnionFactSliceDeep(fm.UnionFacts)
 		if HasError() || !UnionFactsComplete(liveSnap) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -671,7 +673,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			}
 			return
 		}
-		cl := CloneUnionFactSlice(preUnion)
+		cl := CloneUnionFactSliceDeep(preUnion)
 		if HasError() || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
