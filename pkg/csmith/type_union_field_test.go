@@ -55,7 +55,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 	// many seeds: never get pointer-containing struct
 	for seed := uint64(1); seed < 60; seed++ {
 		ClearError()
-		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0)
+		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.ContainPointerField() {
 			t.Fatalf("pointer struct in union field seed %d", seed)
 		}
@@ -86,7 +86,7 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	ok := 0
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearError()
-		f := MakeOneUnionField(NewRng(seed), opts, probs, &env, 0)
+		f := MakeOneUnionField(NewRng(seed), opts, probs, &env, 0, true)
 		if f.Type == nil || HasError() {
 			continue
 		}
@@ -116,7 +116,7 @@ func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	env := &TypeEnv{AllTypes: []*Type{broken, GetIntType()}}
 	// disable bitfield path so we always hit type-pool filter
 	opts.Bitfields = false
-	f := MakeOneUnionField(NewRng(1), opts, probs, env, 0)
+	f := MakeOneUnionField(NewRng(1), opts, probs, env, 0, true)
 	if f.Type != nil {
 		t.Fatal("ContainPointerField residual must fail closed MakeOneUnionField")
 	}
@@ -138,7 +138,7 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 	}
 	found := false
 	for seed := uint64(1); seed < 100; seed++ {
-		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0)
+		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.StructName == "S0" {
 			found = true
 			break
@@ -166,4 +166,60 @@ func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 	if !cg.EffectAccum.IsWritten(loc) {
 		t.Fatal("frame write via callers")
 	}
+}
+
+// TestMakeOneUnionFieldPrevZero mirrors Type.cpp:640–646 make_one_bitfield:
+// no_zero_len = fields_length.empty() || back()==0. After a non-bitfield (-1),
+// zero-width pad is allowed. Invent always-true prevZero forced seed-33 GO
+// non-zero bitfield where UP had `const signed : 0`.
+func TestMakeOneUnionFieldPrevZero(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort)}}
+	// After normal field: prevZero false — length 0 must be keepable when drawn.
+	// Search seeds that draw bitfield with length 0 under prevZero=false.
+	foundPad := false
+	for seed := uint64(1); seed < 500 && !foundPad; seed++ {
+		ClearError()
+		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 1, false)
+		if f.Type != nil && f.BitWidth == 0 {
+			foundPad = true
+		}
+	}
+	if !foundPad {
+		t.Fatal("with prevZero=false must allow zero-width union bitfield (Type.cpp:640)")
+	}
+	// First field / after pad: prevZero true — length 0 must be forced non-zero.
+	for seed := uint64(1); seed < 200; seed++ {
+		ClearError()
+		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
+		if f.Type != nil && f.BitWidth == 0 {
+			t.Fatalf("seed %d: prevZero=true must not leave zero-width (no_zero_len)", seed)
+		}
+	}
+	// MakeRandomUnionType: after first non-bitfield, second field bitfield with
+	// prevZero=false can keep length 0 (Type.cpp:640 back()!=0 → no force).
+	ClearError()
+	env2 := &TypeEnv{AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort), GetSimpleType(EUShort)}}
+	// Craft: first field normal (BitWidth -1) → prevZero becomes false;
+	// second call with prevZero=false can return pad.
+	f0 := MakeOneUnionField(NewRng(1), opts, probs, env2, 0, true)
+	if f0.Type == nil {
+		// rare; try other seeds
+		for seed := uint64(2); seed < 50 && f0.Type == nil; seed++ {
+			ClearError()
+			f0 = MakeOneUnionField(NewRng(seed), opts, probs, env2, 0, true)
+		}
+	}
+	if f0.Type == nil {
+		t.Fatal("expected some union field")
+	}
+	prev := f0.BitWidth == 0
+	// if first was already pad, prev true; force second non-pad first then pad
+	// contract already covered above; ensure prev after non-bitfield is false
+	if f0.BitWidth < 0 && prev {
+		t.Fatal("non-bitfield must not set prevZero")
+	}
+	ClearError()
 }

@@ -615,7 +615,11 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 // MakeOneUnionField mirrors Type::make_one_union_field.
 // Type.cpp:674–738 — bitfield optional; else non-pointer / no-bitfield structs;
 // no union-in-union; pure_rnd 15% struct fields; SIMPLE_TYPES_PROB_FILTER at pick only.
-func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
+// prevZero mirrors Type.cpp:640 no_zero_len = fields_length.empty() || back()==0
+// (non-bitfield pushes -1, so after a normal field zero-width bitfields are allowed).
+// Invent always-true prevZero forced every union bitfield non-zero (seed 33: UP
+// `const signed : 0` vs GO `const signed f3 : 2` after normal fields).
+func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int, prevZero bool) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
 		SetError(ErrGeneric)
@@ -627,7 +631,8 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		if HasError() {
 			return StructField{}
 		}
-		return MakeOneBitfield(r, opts, probs, fieldIdx, true)
+		// Type.cpp:680 make_one_bitfield(fields, qfers, lens) — no_zero_len from lens
+		return MakeOneBitfield(r, opts, probs, fieldIdx, prevZero)
 	}
 	if HasError() {
 		return StructField{}
@@ -766,8 +771,11 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)
+	// Type.cpp:640 — no_zero_len = fields_length.empty() || (fields_length.back() == 0)
+	// empty → true; non-bitfield pushes -1 (back()!=0); pad pushes 0.
+	prevZero := true
 	for i := 0; i < fieldCnt; i++ {
-		f := MakeOneUnionField(r, opts, probs, env, i)
+		f := MakeOneUnionField(r, opts, probs, env, i, prevZero)
 		// Type.cpp:1140–1141 — make_one_union_field; assert no bitfields on last
 		// no soft invent nil-type union field
 		if f.Type == nil || HasError() {
@@ -781,6 +789,9 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 			}
 			return nil
 		}
+		// Type.cpp:649 fields_length.push_back(length); -1 for non-bitfield
+		// next no_zero_len: only true when last length was 0 (pad)
+		prevZero = f.BitWidth == 0
 		fields = append(fields, f)
 	}
 	hasAssign := IfUnionWillHaveAssignOps(r, opts, probs)

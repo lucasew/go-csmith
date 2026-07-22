@@ -249,7 +249,7 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 		t.Fatal("nil probs MakeOneStructField must SetError sticky")
 	}
 	ClearError()
-	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0, true); f.Type != nil {
 		t.Fatal("nil RNG MakeOneUnionField must fail closed")
 	}
 	if !HasError() {
