@@ -632,9 +632,19 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	// drop param locals OOS
+	// FunctionInvocationUser.cpp:344 — update_facts_for_oos_vars(func->param, inputs)
+	// Full FactVec: ePointTo + eUnionWrite. Soft invent was PT-only on work.
 	UpdateFactsForOOSVars(f.Param, &work)
 	if !FactsComplete(work) {
+		restore()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return false
+	}
+	// Live callee UnionFacts is the eUnionWrite half of C++ `inputs` after body.
+	UpdateUnionFactsForOOSVars(f.Param, &fm.UnionFacts)
+	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -660,6 +670,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	}
 	// FunctionInvocationUser.cpp:348–350 — renew_facts(inputs_copy, inputs); inputs = inputs_copy
 	// Restore pre-handover caller lattice (incl. frame-local may-null) then apply body deltas.
+	// Full FactVec renew: ePointTo + global eUnionWrite (build path
+	// function_invocation.go GlobalUnionFactsOnly + RenewUnionFacts).
 	_ = RenewFacts(&inputsCopy, work)
 	if !FactsComplete(inputsCopy) {
 		restore()
@@ -669,6 +681,30 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	*facts = inputsCopy
+	// Renew caller's UnionFacts when cg.FM is the caller (VisitFactsInvocation path).
+	if cg.FM != nil && cg.FM != fm {
+		if !UnionFactsComplete(cg.FM.UnionFacts) {
+			restore()
+			SetError(ErrGeneric)
+			return false
+		}
+		retUF := GlobalUnionFactsOnly(fm.UnionFacts)
+		if !UnionFactsComplete(retUF) {
+			restore()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		_ = RenewUnionFacts(&cg.FM.UnionFacts, retUF)
+		if !UnionFactsComplete(cg.FM.UnionFacts) {
+			restore()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+	}
 	return true
 }
 

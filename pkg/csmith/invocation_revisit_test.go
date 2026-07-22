@@ -449,6 +449,66 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 	ClearError()
 }
 
+func TestRevisitOOSsParamUnions(t *testing.T) {
+	// FunctionInvocationUser.cpp:344 — update_facts_for_oos_vars(func->param, inputs)
+	// Full FactVec includes eUnionWrite. Soft invent was PT-only OOS on work.
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	ut := MakeRandomUnionType(NewRng(9), opts, probs, &env, "U2")
+	if ut == nil {
+		t.Skip("union")
+	}
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableQfer("p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	callee := &Function{
+		Name: "func_p", ReturnType: GetIntType(),
+		Body:        &Block{StmID: 300, Stmts: nil},
+		Param:       []*Variable{p},
+		FactChanged: true,
+	}
+	callee.RV = CreateVariableScalars("func_p_rv", GetIntType(), false, false)
+	callee.Body.Func = callee
+	calFM := callee.ensurePairedFactMgr()
+	calFM.SetMapStmEffect(300, EmptyEffect())
+	calFM.SetMapFactsOut(300, []*FactPointTo{})
+	// Caller lattice: global union only.
+	callerFM := NewFactMgr(&Function{Name: "caller"})
+	callerFM.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0)}
+	callerFM.GlobalFacts = []*FactPointTo{}
+	eff := EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(callerFM)
+	cg.EffectAccum = &eff
+	fi := &Invocation{User: callee, Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+	}}
+	facts := []*FactPointTo{}
+	// Seed callee param union as if body abstract had it after handover (params kept by filter)
+	// Revisit installs caller unions first; inject param after by pre-setting and relying on
+	// Filter keeping params when PT work has param from handover.
+	// Pre-seed: put param on caller temporarily so install+filter retain it, then OOS drops.
+	callerFM.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(p, 0)}
+	if !RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
+		t.Fatalf("revisit expected ok err=%v", HasError())
+	}
+	// After success, callee live UnionFacts must not still list the param subject
+	if FindRelatedUnion(calFM.UnionFacts, p) != nil {
+		t.Fatal("revisit must OOS param union subject from callee lattice", calFM.UnionFacts)
+	}
+	if FindRelatedUnion(calFM.UnionFacts, gu) == nil {
+		t.Fatal("callee must still hold global union after param OOS")
+	}
+	// Caller renews globals-only from callee; param subject on caller is not removed by renew
+	// (renew joins/replaces related only). Clear residual caller param for contract of renew path:
+	if uf := FindRelatedUnion(callerFM.UnionFacts, gu); uf == nil {
+		t.Fatal("caller must retain global union after revisit renew")
+	}
+	ClearError()
+}
+
 func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
 	ClearError()
 	callee := &Function{
