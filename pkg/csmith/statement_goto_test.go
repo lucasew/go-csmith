@@ -455,6 +455,104 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	}
 }
 
+// TestForwardGotoSameBlockInsertPreservesDestID — StatementGoto.cpp:184–203.
+// When ok_blk == curr_blk, insert shifts slice elements after other. C++ Statement*
+// stays heap-stable; Go must not use &Stmts[i] after insert for dest StmID
+// (CFG edge / set_fact). seed-42: mis-aimed edge labeled the pre-dest assign.
+func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	// single block: other candidate + dest last (pre-sized capacity so insert
+	// shifts in place without always reallocating away from the bug)
+	otherID := AllocStmID()
+	destID := AllocStmID()
+	midID := AllocStmID()
+	blk := &Block{Func: f, Stmts: make([]Stmt, 0, 8)}
+	blk.Stmts = append(blk.Stmts,
+		Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: otherID},
+		Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: midID},
+		Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: destID},
+	)
+	f.Blocks = []*Block{blk}
+	f.Body = blk
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	vs.AllVars = append(vs.AllVars, g)
+	eff := EmptyEffect().ReadVar(g)
+	for i := range blk.Stmts {
+		id := blk.Stmts[i].StmID
+		fm.SetMapFactsIn(id, nil)
+		fm.SetMapFactsOut(id, nil)
+		fm.MapAccumEffect[id] = eff
+	}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	// force many seeds until same-block forward insert lands
+	var got *Stmt
+	for seed := uint64(1); seed < 200; seed++ {
+		// restore three assigns (prior seeds may have inserted)
+		blk.Stmts = blk.Stmts[:0]
+		blk.Stmts = append(blk.Stmts,
+			Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: otherID},
+			Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: midID},
+			Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: destID},
+		)
+		for i := range blk.Stmts {
+			id := blk.Stmts[i].StmID
+			fm.SetMapFactsIn(id, nil)
+			fm.SetMapFactsOut(id, nil)
+			fm.MapAccumEffect[id] = eff
+		}
+		fm.CFGEdges = nil
+		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, blk)
+		if st.Label != "" {
+			continue // back-edge
+		}
+		for i := range blk.Stmts {
+			if blk.Stmts[i].Kind == StmtGoto && blk.Stmts[i].GotoForward {
+				got = &blk.Stmts[i]
+				break
+			}
+		}
+		if got != nil {
+			break
+		}
+	}
+	if got == nil {
+		t.Skip("no same-block forward insert in seed sample")
+	}
+	if got.GotoDestStmID != destID {
+		t.Fatalf("GotoDestStmID=%d want dest last %d", got.GotoDestStmID, destID)
+	}
+	// CFG edge must name dest by id (not a shifted slot)
+	foundEdge := false
+	for _, e := range fm.CFGEdges {
+		if e.SrcID == got.StmID {
+			foundEdge = true
+			if e.DestStmID != destID {
+				t.Fatalf("CFG edge DestStmID=%d want %d (post-insert pointer bug)", e.DestStmID, destID)
+			}
+		}
+	}
+	if !foundEdge {
+		t.Fatal("missing CFG edge from inserted goto")
+	}
+	// PreOutput labels dest, not mid
+	preDest, okDest := PreOutput(&Stmt{Kind: StmtAssign, StmID: destID}, fm, false, false, nil, "")
+	if !okDest || !strings.Contains(preDest, got.Label) {
+		t.Fatalf("dest PreOutput want label %q, got %q ok=%v", got.Label, preDest, okDest)
+	}
+	preMid, okMid := PreOutput(&Stmt{Kind: StmtAssign, StmID: midID}, fm, false, false, nil, "")
+	if okMid && strings.Contains(preMid, got.Label) {
+		t.Fatalf("mid must not carry dest label; pre=%q", preMid)
+	}
+	ClearError()
+}
+
 // StatementGoto.cpp:185 — StatementGoto ctor gensyms lbl_ only after DFA ok.
 // Pre-visit gensym on failed forward burned seed-2 names (extra lbl_710 →
 // g_733/l_718). After fix, surviving names match upstream (g_732, l_717, lbl_1269).

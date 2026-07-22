@@ -744,10 +744,27 @@ func MakeRandomGoto(
 		SetError(ErrGeneric)
 		return makeGotoFailed()
 	}
-	// StatementGoto.cpp:185 + ctor 220–229 — gensym only on successful insert path
+	// StatementGoto.cpp:185 + ctor 220–229 — gensym only on successful insert path.
+	// Capture dest identity by StmID before any slice insert: C++ Statement* is heap-
+	// stable; Go Stmt values live in slices. Mid-slice insert into the same block
+	// (okBlk == blk) shifts elements so &blk.Stmts[i] no longer names dest
+	// (seed-42: CreateCFGEdgeTo / set_fact used the shifted slot → label on the
+	// wrong statement: UP lbl before p_64 assign, GO before prior assign).
+	if dest == nil {
+		return makeGotoFailed()
+	}
+	if StmIDUnset(dest.StmID) {
+		dest.StmID = AllocStmID()
+	}
+	destID := dest.StmID
+	destIsCtrl := IsCtrlStmt(dest) || dest.Kind == StmtReturn
+	// residual ERROR sticky — no invent soft-insert past IsCtrlStmt residual
+	if HasError() {
+		return makeGotoFailed()
+	}
 	label := dest.SourceLabel
 	if label == "" {
-		label = LabelForGotoDest(dest.StmID, nextLab)
+		label = LabelForGotoDest(destID, nextLab)
 		if label == "" {
 			if !HasError() {
 				SetError(ErrGeneric)
@@ -755,8 +772,8 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		dest.SourceLabel = label
-	} else if !StmIDUnset(dest.StmID) {
-		stmLabels[dest.StmID] = label
+	} else {
+		stmLabels[destID] = label
 	}
 	sg := Stmt{
 		Kind:            StmtGoto,
@@ -764,14 +781,15 @@ func MakeRandomGoto(
 		Label:           label,
 		StmID:           AllocStmID(),
 		GotoForward:     true,
-		GotoDestStmID:   dest.StmID,
+		GotoDestStmID:   destID,
 		GotoDestParent:  blk,
 		InitSkippedVars: skippedFwd,
 	}
-	// re-resolve other index (slice stable until insert)
+	// re-resolve other index by StmID (other *Stmt may also be invalid after insert)
+	otherID := other.StmID
 	insertAt := -1
 	for i := range okBlk.Stmts {
-		if okBlk.Stmts[i].StmID == other.StmID {
+		if okBlk.Stmts[i].StmID == otherID {
 			insertAt = i
 			break
 		}
@@ -780,7 +798,16 @@ func MakeRandomGoto(
 		insertAt = ti
 	}
 	okBlk.Stmts = append(okBlk.Stmts[:insertAt+1], append([]Stmt{sg}, okBlk.Stmts[insertAt+1:]...)...)
-	// pointer to inserted stmt for fact maps
+	// re-apply SourceLabel on dest by id after possible same-slice shift
+	if blk != nil {
+		for i := range blk.Stmts {
+			if blk.Stmts[i].StmID == destID {
+				blk.Stmts[i].SourceLabel = label
+				break
+			}
+		}
+	}
+	// pointer to inserted stmt for fact maps (valid after append)
 	ins := &okBlk.Stmts[insertAt+1]
 
 	if fm != nil {
@@ -793,24 +820,24 @@ func MakeRandomGoto(
 		fm.MapVisited[ins.StmID] = true
 		if foundNewFacts {
 			// StatementGoto.cpp:200–201 — set_fact_in(stm, stm_in); set_fact_out(stm, stm_out)
-			fm.SetMapFactsIn(dest.StmID, stmInMerged)
-			fm.SetMapFactsOut(dest.StmID, stmOut)
+			fm.SetMapFactsIn(destID, stmInMerged)
+			fm.SetMapFactsOut(destID, stmOut)
 		}
 		// StatementGoto.cpp:203 — create_cfg_edge(sg, stm, false, false)
-		fm.CreateCFGEdgeTo(ins.StmID, blk, dest.StmID, false, false)
+		fm.CreateCFGEdgeTo(ins.StmID, blk, destID, false, false)
 		// StatementGoto.cpp:204–210 — global_facts = map_facts_out[stm]
 		// GetMapFacts*: StmID 0 Incomplete; missing live → empty complete
 		// Incomplete out/in fails closed sticky (no invent soft re-pick past wiped facts)
-		out := fm.GetMapFactsOut(dest.StmID)
+		out := fm.GetMapFactsOut(destID)
 		if !FactsComplete(out) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			SetError(ErrGeneric)
 		} else {
 			fm.SetGlobalFacts(CloneFactSlice(out), "auto_statement_goto_742")
 		}
-		if IsCtrlStmt(dest) || dest.Kind == StmtReturn {
+		if destIsCtrl {
 			// ctrl/return: use map_facts_in[stm] (altered outs for OOS)
-			in := fm.GetMapFactsIn(dest.StmID)
+			in := fm.GetMapFactsIn(destID)
 			if !FactsComplete(in) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				SetError(ErrGeneric)
