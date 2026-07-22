@@ -875,7 +875,25 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			SetError(ErrGeneric)
 			return outputs, -1, false
 		}
-		// Block.cpp:557 — set_fact_in(this, current_inputs) full FactVec entry env
+		// Block.cpp:557 — set_fact_in(this, current_inputs) full FactVec entry env.
+		// Strip this block's LocalVars subjects if back-edge merge reintroduced them
+		// (see DropFactSubjectsByVars). Entry must not list body locals.
+		if len(b.LocalVars) > 0 {
+			currentInputs = DropFactSubjectsByVars(currentInputs, b.LocalVars)
+			if !FactsComplete(currentInputs) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, -1, false
+			}
+			entryUnions = DropUnionSubjectsByVars(entryUnions, b.LocalVars)
+			if !UnionFactsComplete(entryUnions) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, -1, false
+			}
+		}
 		fm.SetMapFactsInPair(b.StmID, currentInputs, entryUnions)
 		// Block.cpp:558 — post_facts = outputs (pre-OOS)
 		// incomplete outputs after analyze fail closed (no invent cleaned out)

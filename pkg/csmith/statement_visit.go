@@ -716,6 +716,17 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			if HasError() {
 				return false
 			}
+			// Drop body LocalVars from restored entry (see post_loop / DropFactSubjectsByVars).
+			if len(st.Then.LocalVars) > 0 {
+				cg.FM.GlobalFacts = DropFactSubjectsByVars(cg.FM.GlobalFacts, st.Then.LocalVars)
+				cg.FM.UnionFacts = DropUnionSubjectsByVars(cg.FM.UnionFacts, st.Then.LocalVars)
+				if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return false
+				}
+			}
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)

@@ -259,6 +259,83 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 // MarkDeadVar cannot see past a FieldVars hole).
 // facts always live; sticky (no invent soft-skip OOS cleanup past hole).
 // Empty vars is complete no-op.
+
+// DropFactSubjectsByVars removes point-to facts whose subject is in vars
+// (pointer identity). Does not MarkDeadVar pointees.
+//
+// Used to keep map_facts_in[block] as a true entry env without the block's own
+// LocalVars. Back-edge merge of goto outs can reintroduce body locals into
+// current_inputs before set_fact_in (Block.cpp:531–557); StatementFor
+// post_loop / visit then merge_jump_facts invents garbage for those subjects
+// because break map_facts_out correctly strips them via remove_loop_local
+// (seed-7 for 640: l_1402 in map_in + body LocalVars, missing from break out).
+// FactMgr.cpp:257–262 remove_loop_local + 575–579 invent-garbage path.
+func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPointTo {
+	if len(vars) == 0 {
+		return facts
+	}
+	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
+	// incomplete vars list fail closed
+	for _, v := range vars {
+		if v == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
+	}
+	drop := make(map[*Variable]bool, len(vars))
+	for _, v := range vars {
+		drop[v] = true
+	}
+	out := make([]*FactPointTo, 0, len(facts))
+	for _, f := range facts {
+		if f == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
+		if f.Var != nil && drop[f.Var] {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// DropUnionSubjectsByVars removes eUnionWrite facts whose subject is in vars.
+func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion {
+	if len(vars) == 0 {
+		return facts
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	for _, v := range vars {
+		if v == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+	}
+	drop := make(map[*Variable]bool, len(vars))
+	for _, v := range vars {
+		drop[v] = true
+	}
+	out := make([]*FactUnion, 0, len(facts))
+	for _, f := range facts {
+		if f == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		if f.Var != nil && drop[f.Var] {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 	if facts == nil {
 		SetError(ErrGeneric)

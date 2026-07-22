@@ -638,6 +638,22 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		}
 		return
 	}
+	// StatementFor.cpp:355 — map_facts_in[&body] is entry (no body locals).
+	// If map_in was polluted with body LocalVars, break merge invents garbage
+	// (FactMgr.cpp:575–579) because remove_loop_local already dropped them
+	// (seed-7 for 640 / l_1402). Drop subjects only — match entry semantics.
+	if len(body.LocalVars) > 0 {
+		fm.GlobalFacts = DropFactSubjectsByVars(fm.GlobalFacts, body.LocalVars)
+		fm.UnionFacts = DropUnionSubjectsByVars(fm.UnionFacts, body.LocalVars)
+		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+	}
 	// Go split maps: FindFixedPointBlock SetMapFactsIn(pt) pairs live mid-gen
 	// UnionFacts into map_facts_in (empty body after deleted for-IVs — seed-999
 	// g_605 last_written=4; seed-7 choose pools shrunk by IsNonreadableField).
