@@ -539,20 +539,30 @@ func MakeRandomArrayInit(
 			StmID:       IncompleteStmID,
 		}},
 	}
-	// nest fors: outermost first dim (StatementArrayOp::output_header)
-	// StatementArrayOp Expression ctor: body=0, init_value=e — store init on Expr
-	// so get_exprs matches C++ (get_blocks stays empty for array-init shape).
+	// nest fors: outermost first dim (StatementArrayOp::output_header).
+	// StatementArrayOp.cpp:145–150 — ONE StatementArrayOp for all dimensions
+	// (single Statement ctor / single stm_id). Nested StmtArrayOp shells are
+	// Output-only (bare "{" between dims, StatementArrayOp.cpp:198–200). Soft
+	// invent AllocStmID per dim shifted all later block ids (seed-7: UP 525 vs
+	// GO 526 after 2D l_1254 array-init in func_41).
+	// Expression ctor: body=0, init_value=e — store init on Expr so get_exprs
+	// matches C++ (get_blocks stays empty for array-init shape).
 	if len(dims) == 0 {
 		// StatementArrayOp is a Statement; always has stm_id
 		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, Expr: rhs, StmID: AllocStmID()}
 	}
+	// Single stm_id for the whole multi-dim StatementArrayOp (C++ one ctor).
+	// Nested dim shells share that id for Output structure only — they are not
+	// separate C++ Statement objects (no second AllocStmID).
+	sid := AllocStmID()
+	// Innermost dim carries ArrayAccess + init_value.
 	st := Stmt{
 		Kind:        StmtArrayOp,
 		Loop:        dims[len(dims)-1],
 		Then:        innerBody,
 		ArrayAccess: access,
 		Expr:        rhs,
-		StmID:       AllocStmID(),
+		StmID:       sid,
 	}
 	for i := len(dims) - 2; i >= 0; i-- {
 		// keep init_value on outermost only (C++ one StatementArrayOp / one init_value)
@@ -562,7 +572,7 @@ func MakeRandomArrayInit(
 			Loop:  dims[i],
 			Then:  &Block{Func: cg.CurrentFunc, Stmts: []Stmt{inner}},
 			Expr:  rhs,
-			StmID: AllocStmID(),
+			StmID: sid, // same Statement::stm_id as C++ single object
 		}
 	}
 	// map_stm_effect[sa] = effect_stm (StatementArrayOp.cpp:151)
