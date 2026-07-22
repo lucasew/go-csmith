@@ -697,7 +697,7 @@ func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	inputs := []*FactPointTo{}
-	_, _, ok := FindFixedPointBlock(b, inputs, &cg, Defaults(), true)
+	_, _, _, ok := FindFixedPointBlock(b, inputs, &cg, Defaults(), true)
 	if ok {
 		t.Fatal("nil LocalVars hole must fail closed fixed-point")
 	}
@@ -722,7 +722,7 @@ func TestFindFixedPointShortcut(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// second call should shortcut on matching inputs
-	out, _, ok := FindFixedPointBlock(b, in, &cg, Defaults(), false)
+	out, _, _, ok := FindFixedPointBlock(b, in, &cg, Defaults(), false)
 	if !ok {
 		t.Fatal("fp")
 	}
@@ -1472,7 +1472,7 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	out, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), true)
+	out, _, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), true)
 	if !ok {
 		t.Fatal("empty-body fixed-point must succeed")
 	}
@@ -1605,7 +1605,7 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// entry to FP is map_facts_in (facts_copy)
-	out, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
+	out, _, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
 	if !ok {
 		t.Fatalf("FP must succeed sticky=%v", HasError())
 	}
@@ -1648,7 +1648,7 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	cg.EffectAccum = &eff
 	// visitOnce false + map_in unions entry vs current after merge → no pure shortcut;
 	// full pass must still merge eUnionWrite into current_inputs before set_fact_in.
-	_, _, ok := FindFixedPointBlock(b, pt, &cg, Defaults(), true)
+	_, _, _, ok := FindFixedPointBlock(b, pt, &cg, Defaults(), true)
 	if !ok {
 		t.Fatalf("FP must succeed sticky=%v", HasError())
 	}
@@ -1698,7 +1698,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	_, idx, ok := FindFixedPointBlock(body, entry, &cg, opts, true)
+	_, _, idx, ok := FindFixedPointBlock(body, entry, &cg, opts, true)
 	if ok {
 		t.Fatal("FP must fail analyze of *p write under may-null (null_prob=0)")
 	}
@@ -1740,7 +1740,7 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	out, idx, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
+	out, _, idx, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
 	if !ok {
 		t.Fatalf("FP must succeed idx=%d err=%v", idx, HasError())
 	}
@@ -1755,6 +1755,8 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 // find_fixed_point assigns post_facts = outputs (pre-OOS); map_facts_out is
 // post-OOS. Pure shortcut returns nil so the caller keeps its line-690 snapshot.
 // Top-level return path (734–735) restores post_facts, not map_facts_out.
+// Full FactVec: pre-OOS eUnionWrite is returned with post_facts (seed-49:
+// append_return must not re-read live after ShortcutAnalysis installs map_out).
 func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	ClearError()
 	SetProcessOptions(Defaults())
@@ -1762,43 +1764,83 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
+	ut := &Type{isUnion: true, StructName: "U_fp", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu.Init = MakeInt(0)
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu.Init = MakeInt(0)
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
 	if mid == nil {
 		t.Fatal("mid")
 	}
-	body := &Block{StmID: 1, Func: f, Looping: true, Parent: nil, Stmts: nil, LocalVars: []*Variable{loc}}
+	// Empty stmts + visitOnce: single full visit path without shortcut pressure.
+	body := &Block{StmID: 1, Func: f, Looping: false, Parent: nil, Stmts: nil, LocalVars: []*Variable{loc, lu}}
 	fm := NewFactMgr(f)
 	fm.GlobalFacts = []*FactPointTo{mid}
-	fm.SetMapFactsIn(1, entry)
-	// pre-FP map out after OOS of locals — p may-null, no l_1
-	fm.SetMapFactsOut(1, []*FactPointTo{mid})
-	fm.MapVisited = map[int]bool{1: true}
-	fm.CreateCFGEdge(1, body, false, true)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0)}
+	fm.SetMapFactsInPair(1, entry, []*FactUnion{MakeFactUnion(gu, 0)})
+	fm.SetMapFactsOutPair(1, []*FactPointTo{mid}, []*FactUnion{MakeFactUnion(gu, 0)})
 	cg := EmptyCGContext().WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// visitOnce true → full sequential visit (no pure shortcut)
-	post, _, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
+	post, postU, _, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
 	if !ok || post == nil {
-		t.Fatalf("full visit must return pre-OOS post_facts ok=%v post=%v", ok, post)
+		t.Fatalf("full visit must return pre-OOS post_facts ok=%v post=%v err=%v", ok, post, HasError())
 	}
 	// pre-OOS outputs include local facts
 	if FindRelatedPointTo(post, loc) == nil {
 		t.Fatal("post_facts (pre-OOS) must include local var fact")
 	}
-	// self-back may-null on p preserved in pre-OOS
-	if g := FindRelatedPointTo(post, p); g == nil || !g.IsNull() {
-		t.Fatalf("post_facts must keep self-back may-null: %+v", g)
+	// pre-OOS eUnionWrite half includes body-local union subject (AddNewVarFact)
+	if !UnionFactsComplete(postU) {
+		t.Fatal("post_facts unions incomplete")
+	}
+	if FindRelatedUnion(postU, lu) == nil {
+		t.Fatal("post_facts unions (pre-OOS) must include body-local union subject", postU)
+	}
+	if FindRelatedUnion(postU, gu) == nil {
+		t.Fatal("post_facts unions must keep global union", postU)
 	}
 	// map_facts_out is post-OOS — local removed
 	mout := fm.GetMapFactsOut(1)
 	if FindRelatedPointTo(mout, loc) != nil {
 		t.Fatal("map_facts_out must OOS local var")
 	}
-	if g := FindRelatedPointTo(mout, p); g == nil || !g.IsNull() {
-		t.Fatalf("map_facts_out must keep non-local may-null: %+v", g)
+	moutU := fm.GetMapUnionFactsOut(1)
+	if FindRelatedUnion(moutU, lu) != nil {
+		t.Fatal("map_union_out must OOS body-local union", moutU)
+	}
+	// Returned unions are independent of live after ShortcutAnalysis may install
+	// map_union_out into fm.UnionFacts on a later loop iteration.
+	ClearError()
+}
+
+// TestIsNonreadableFieldNeedsUnionFact — FactUnion.cpp:178–192 + Block.cpp:747.
+// Body-local union field is nonreadable without related FactUnion; readable with
+// the pre-OOS post_facts subject that append_return restores.
+func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_nr", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if !lu.FieldVarsComplete() || len(lu.FieldVars) == 0 {
+		t.Fatal("union field_vars")
+	}
+	f0 := lu.FieldVars[0]
+	// no fact → nonreadable
+	if !IsNonreadableField(f0, []*FactUnion{}) {
+		t.Fatal("empty facts: union field must be nonreadable")
+	}
+	// related last-write f0 → readable
+	facts := []*FactUnion{MakeFactUnion(lu, 0)}
+	if IsNonreadableField(f0, facts) {
+		t.Fatal("matching FactUnion must make field readable")
 	}
 	ClearError()
 }

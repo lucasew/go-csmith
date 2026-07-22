@@ -218,7 +218,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		// then BUILD_REV fail at 7 / first_div e37241).
 	}
 	// Block.cpp:473–476 — find_fixed_point; fail → reset_effect_accum(pre_effect)
-	out, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
+	out, _, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
 	if !ok {
 		// Block.cpp:474–475 — cg_context.reset_effect_accum(pre_effect)
 		if havePre && cg.EffectAccum != nil {

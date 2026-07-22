@@ -768,10 +768,16 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	}
 	// incomplete GlobalFacts fail closed sticky (no invent cleaned postFacts / OOS from holes)
 	// Use IncompleteFactSlice — bare nil invents empty success via FactsComplete(nil)
+	// postFacts / postUnion split C++ post_facts FactVec (ePointTo + eUnionWrite).
+	// Block.cpp:690 snapshots full global_facts before OOS; 747 restores for
+	// append_return_stmt. Soft invent restored PT-only → body-local union fields
+	// nonreadable at return choose (seed-49 l_593[3][2].f0 pool n=17 vs UP n=18).
 	var postFacts []*FactPointTo
+	var postUnion []*FactUnion
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		postFacts = IncompleteFactSlice()
+		postUnion = IncompleteUnionFactSlice()
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 		SetError(ErrGeneric)
 		return
@@ -787,8 +793,34 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
+			postUnion = IncompleteUnionFactSlice()
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			return
+		}
+		// Block.cpp:690 — full FactVec copy includes eUnionWrite.
+		if !UnionFactsComplete(fm.UnionFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			postFacts = IncompleteFactSlice()
+			postUnion = IncompleteUnionFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			SetError(ErrGeneric)
+			return
+		}
+		postUnion = CloneUnionFactSliceDeep(fm.UnionFacts)
+		if HasError() || !UnionFactsComplete(postUnion) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			fm.GlobalFacts = IncompleteFactSlice()
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			postFacts = IncompleteFactSlice()
+			postUnion = IncompleteUnionFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
+		}
+		if postUnion == nil {
+			postUnion = []*FactUnion{}
 		}
 		outPost := CloneFactSlice(fm.GlobalFacts)
 		if HasError() || !FactsComplete(outPost) {
@@ -952,14 +984,30 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					} else {
 						fm.UnionFacts = entryU
 					}
-					fpOut, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
+					fpOut, fpUnions, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
 					if ok {
 						// Block.cpp:706–728 + find_fixed_point Block.cpp:558 —
 						// full visit assigns post_facts = pre-OOS outputs; pure
 						// shortcut leaves post_facts (line-690 snapshot) unchanged.
-						// FindFixedPointBlock returns nil on pure shortcut.
+						// FindFixedPointBlock returns nil,nil on pure shortcut.
+						// Full FactVec: also refresh postUnion from pre-OOS eUnionWrite
+						// captured at the same visit (not live after ShortcutAnalysis
+						// installs post-OOS map_union_out).
 						if fpOut != nil {
 							postFacts = fpOut
+							if !UnionFactsComplete(fpUnions) {
+								fm.GlobalFacts = IncompleteFactSlice()
+								fm.UnionFacts = IncompleteUnionFactSlice()
+								postFacts = IncompleteFactSlice()
+								postUnion = IncompleteUnionFactSlice()
+								fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+								SetError(ErrGeneric)
+								return
+							}
+							postUnion = fpUnions
+							if postUnion == nil {
+								postUnion = []*FactUnion{}
+							}
 						}
 						break
 					}
@@ -1026,10 +1074,23 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 						} else {
 							fm.UnionFacts = entryUEmpty
 						}
-						fpEmpty, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
+						fpEmpty, fpEmptyU, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
 						if okEmpty {
 							if fpEmpty != nil {
 								postFacts = fpEmpty
+								if !UnionFactsComplete(fpEmptyU) {
+									fm.GlobalFacts = IncompleteFactSlice()
+									fm.UnionFacts = IncompleteUnionFactSlice()
+									postFacts = IncompleteFactSlice()
+									postUnion = IncompleteUnionFactSlice()
+									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+									SetError(ErrGeneric)
+									return
+								}
+								postUnion = fpEmptyU
+								if postUnion == nil {
+									postUnion = []*FactUnion{}
+								}
 							}
 						} else {
 							// install empty-body maps from entry facts (C++ find_fixed_point)
@@ -1061,19 +1122,19 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 								}
 							}
 							postFacts = preOOS
+							// PT-only OOS on outCopy; SetMapFactsOutForBlock OOS-clones
+							// live unions for map_union_out (do not mutate live via
+							// fm.UpdateFactsForOOSVars — that also strips UnionFacts).
 							outCopy := CloneFactSlice(preOOS)
 							if len(b.LocalVars) > 0 {
-								tmp := outCopy
-								saved := fm.GlobalFacts
-								fm.SetGlobalFacts(tmp, "auto_block_931")
-								fm.UpdateFactsForOOSVars(b.LocalVars)
-								outCopy = fm.GlobalFacts
-								fm.SetGlobalFacts(saved, "auto_block_934")
+								UpdateFactsForOOSVars(b.LocalVars, &outCopy)
 								if !FactsComplete(outCopy) {
+									if !HasError() {
+										SetError(ErrGeneric)
+									}
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()
 									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-									SetError(ErrGeneric)
 									return
 								}
 							}
@@ -1178,12 +1239,36 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			return
 		}
 		if !must {
-			if !FactsComplete(postFacts) {
+			// Block.cpp:747 — fm->global_facts = post_facts (full FactVec pre-OOS).
+			// Soft invent restored PT-only; live UnionFacts stayed post-OOS so
+			// is_nonreadable_field dropped body-local union fields at return choose.
+			if !FactsComplete(postFacts) || !UnionFactsComplete(postUnion) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				SetError(ErrGeneric)
 				return
 			}
 			fm.SetGlobalFacts(postFacts, "auto_block_1002")
+			// AppendReturnStmt soft-nils without RNG (MakeDummyBlock tests). C++ only
+			// reaches 747 when make_random(eReturn) has live RNG — restore eUnionWrite
+			// only when we will actually append so a soft-skip does not reinstall
+			// pre-OOS body-local unions after the no-FP OOS path.
+			if r != nil {
+				restU := CloneUnionFactSliceDeep(postUnion)
+				if HasError() || !UnionFactsComplete(restU) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					return
+				}
+				if restU == nil {
+					fm.UnionFacts = []*FactUnion{}
+				} else {
+					fm.UnionFacts = restU
+				}
+			}
 			if b.AppendReturnStmt(r, opts, vs, cg) == nil {
 				// append_return_stmt ERROR_GUARD / assert(visited) leave sticky error
 				return

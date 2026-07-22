@@ -333,7 +333,7 @@ func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	_, _, ok := FindFixedPointBlock(b, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}, &cg, Defaults(), false)
+	_, _, _, ok := FindFixedPointBlock(b, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}, &cg, Defaults(), false)
 	if ok {
 		t.Fatal("incomplete back-edge MapFactsOut must fail closed")
 	}
@@ -355,7 +355,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	out, _, ok := FindFixedPointBlock(b, nil, &cg, Defaults(), false)
+	out, _, _, ok := FindFixedPointBlock(b, nil, &cg, Defaults(), false)
 	if !ok {
 		t.Fatal("fp")
 	}
@@ -369,7 +369,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}}}
-	if _, _, ok := FindFixedPointBlock(bad, nil, &cg, Defaults(), false); ok {
+	if _, _, _, ok := FindFixedPointBlock(bad, nil, &cg, Defaults(), false); ok {
 		t.Fatal("block IncompleteStmID must fail closed")
 	}
 	if !HasError() {
@@ -399,7 +399,7 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	before := len(f.Stack)
-	_, _, ok := FindFixedPointBlock(body, []*FactPointTo{}, &cg, Defaults(), true)
+	_, _, _, ok := FindFixedPointBlock(body, []*FactPointTo{}, &cg, Defaults(), true)
 	if !ok {
 		t.Fatalf("fp failed sticky=%v", HasError())
 	}
@@ -411,7 +411,7 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 	}
 	// Off-stack visit: temporary push then pop.
 	f.Stack = []*Block{outer}
-	_, _, ok = FindFixedPointBlock(body, []*FactPointTo{}, &cg, Defaults(), true)
+	_, _, _, ok = FindFixedPointBlock(body, []*FactPointTo{}, &cg, Defaults(), true)
 	if !ok {
 		t.Fatalf("fp off-stack failed sticky=%v", HasError())
 	}
@@ -441,7 +441,7 @@ func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// visitOnce false so shortcut is attempted; conflict must fall through
-	out, idx, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
+	out, _, idx, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
 	if !ok {
 		t.Fatalf("block shortcut conflict must fall through to full re-analysis, idx=%d err=%v", idx, HasError())
 	}

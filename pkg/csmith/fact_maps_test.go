@@ -904,7 +904,7 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 	cg.EffectAccum = &eff
 	opts2 := Defaults()
 
-	out, failIdx, ok := FindFixedPointBlock(body, CloneFactSlice(entry), &cg, opts2, true)
+	out, _, failIdx, ok := FindFixedPointBlock(body, CloneFactSlice(entry), &cg, opts2, true)
 	if !ok {
 		t.Fatalf("fixed-point failed idx=%d err=%v", failIdx, HasError())
 	}

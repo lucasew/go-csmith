@@ -92,7 +92,7 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	_, _, ok := FindFixedPointBlock(b, factsCopy, &cg, Defaults(), true)
+	_, _, _, ok := FindFixedPointBlock(b, factsCopy, &cg, Defaults(), true)
 	if !ok {
 		t.Fatalf("FP after reset must succeed err=%v", HasError())
 	}

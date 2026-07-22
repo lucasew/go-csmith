@@ -218,7 +218,7 @@ func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	_, _, ok := FindFixedPointBlock(b, in, &cg, Defaults(), false)
+	_, _, _, ok := FindFixedPointBlock(b, in, &cg, Defaults(), false)
 	if ok {
 		t.Fatal("incomplete inputs must fail closed FindFixedPointBlock")
 	}
