@@ -697,29 +697,47 @@ func MakeRandomGoto(
 				}
 				return makeGotoFailed()
 			}
-			fm.SetGlobalFacts(CloneFactSlice(stmInMerged), "auto_statement_goto_664")
 			if !UnionFactsComplete(stmInMergedU) {
-				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
-				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
+			// eUnionWrite visit inputs (StmVisitFacts swaps only ePointTo GlobalFacts)
 			if stmInMergedU == nil {
 				fm.UnionFacts = []*FactUnion{}
 			} else {
 				fm.UnionFacts = CloneUnionFactSlice(stmInMergedU)
 			}
-			if !VisitFactsStmt(dest, cg, opts) {
-				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
+			// StatementGoto.cpp:171 — stm->stm_visit_facts(stm_out, cg_context)
+			// Statement.cpp:611 — get_effect_stm().clear() before visit_facts.
+			// Soft invent called VisitFactsStmt after add_effect(map_accum[other]),
+			// so EffectStm kept pollution and StatementFor::visit_facts snapshotted
+			// a non-empty pre-init effect into map_stm_effect[for] (seed-42 func_68:
+			// gen IV read g_77 first vs UP visit order g_16 g_22 g_77).
+			// Do not SetGlobalFacts(work) here: StmVisitFacts captures live
+			// GlobalFacts as restore target then loads *facts as the working set.
+			work := CloneFactSlice(stmInMerged)
+			if HasError() || !FactsComplete(work) {
+				fm.UnionFacts = liveSavedU
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return makeGotoFailed()
+			}
+			// Statement.cpp:612 — curr_blk = parent of dest (forward: curr/blk)
+			cg.CurrBlk = blk
+			if !StmVisitFacts(dest, &work, cg, opts) {
+				// StmVisitFacts restores point-to GlobalFacts to pre-call live
 				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
 			}
-			// visit may update GlobalFacts/UnionFacts as outs; incomplete fails closed sticky
-			if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
+			// visit outs are in work (C++ stm_out); incomplete fails closed sticky
+			if !FactsComplete(work) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
 				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
@@ -727,7 +745,10 @@ func MakeRandomGoto(
 				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
-			stmOut = CloneFactSlice(fm.GlobalFacts)
+			stmOut = work
+			// C++ leaves global_facts alone until StatementGoto.cpp:204; restore
+			// union half to pre-visit live (StmVisitFacts already restored PT).
+			fm.UnionFacts = liveSavedU
 			// StatementGoto.cpp:178–181 — if dest contains other, recompute goto_out
 			if ContainsStmt(dest, other) {
 				gotoOut = nil

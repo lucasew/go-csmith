@@ -181,6 +181,78 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 	ClearError()
 }
 
+// TestStmVisitFactsClearsEffectStmBeforeForVisit — Statement.cpp:611 +
+// StatementGoto.cpp:165–171. Forward dest re-analysis must clear effect_stm
+// before visit_facts so StatementFor map_stm_effect is init+body only.
+// Soft invent VisitFactsStmt after add_effect(map_accum) kept pollution and
+// froze gen IV-first reads (seed-42 func_68: g_77 before g_16).
+func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "func_68", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	pollute := CreateVariableScalars("g_77", GetIntType(), false, false)
+	bodyRead := CreateVariableScalars("g_16", GetIntType(), false, false)
+	tmp := CreateVariableScalars("l_1", GetIntType(), false, false)
+	body := &Block{
+		StmID: AllocStmID(), Func: f, Looping: true,
+		Stmts: []Stmt{{
+			Kind: StmtAssign, StmID: AllocStmID(), LhsVar: tmp,
+			Lhs:      &Lhs{Var: tmp, Type: GetIntType()},
+			Expr:     &Expression{Term: TermVariable, Var: bodyRead, ExprType: GetIntType()},
+			AssignOp: AssignSimple,
+		}},
+	}
+	forSt := &Stmt{
+		Kind: StmtFor, StmID: AllocStmID(),
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
+		Then: body,
+	}
+	// gen-style map_stm: IV read first (make_iteration read_var) then body
+	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
+	fm.SetMapStmEffect(body.StmID, EmptyEffect().ReadVar(bodyRead))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	acc := EmptyEffect()
+	cg.EffectAccum = &acc
+	// pollution as after add_effect(map_accum[other]) on the forward path
+	cg.EffectStm = EmptyEffect().ReadVar(pollute)
+	facts := []*FactPointTo{}
+	if !StmVisitFacts(forSt, &facts, &cg, opts) {
+		t.Fatalf("StmVisitFacts for: err=%v", HasError())
+	}
+	got := fm.GetMapStmEffect(forSt.StmID)
+	if !EffectComplete(got) {
+		t.Fatal("incomplete map_stm after StmVisitFacts")
+	}
+	reads := got.ReadVars()
+	if len(reads) == 0 || !got.IsRead(bodyRead) {
+		t.Fatalf("want body read g_16 in map_stm, got %v", mapAccumNamesOf(reads))
+	}
+	// clean visit: init is simple const assign (no IV read); body reads g_16 first
+	if reads[0] == pollute {
+		t.Fatalf("map_stm still pollution/IV-first after StmVisitFacts clear: %v", mapAccumNamesOf(reads))
+	}
+	// negative: VisitFactsStmt without clear keeps pollution in the pre-init snapshot
+	ClearError()
+	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	acc2 := EmptyEffect()
+	cg2.EffectAccum = &acc2
+	cg2.EffectStm = EmptyEffect().ReadVar(pollute)
+	if !VisitFactsStmt(forSt, &cg2, opts) {
+		t.Fatalf("VisitFactsStmt for: err=%v", HasError())
+	}
+	polluted := fm.GetMapStmEffect(forSt.StmID)
+	if !polluted.IsRead(pollute) {
+		t.Fatal("precondition: VisitFactsStmt without clear should keep EffectStm pollution in map_stm")
+	}
+	ClearError()
+}
+
 func TestMarkNeedRevisitLCA(t *testing.T) {
 	// outer → then(inner with assign) — back-edge LCA is outer when dest in then
 	dest := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 7}
