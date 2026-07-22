@@ -233,12 +233,20 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 	if !b.MustBreakOrReturnFull(fm) {
 		t.Fatal("expect must break/return")
 	}
-	// continue-like edge from outside into block
+	// continue-like edge from outside into block (dest = Block*, DestStmID = block.StmID)
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{
-		SrcID: 99, DestBlock: b, BackLink: true,
+		SrcID: 99, DestBlock: b, DestStmID: b.StmID, BackLink: true,
 	})
 	if b.MustBreakOrReturnFull(fm) {
 		t.Fatal("back edge escapes return")
+	}
+	// goto-to-label: DestStmID is label stmt, not block — must not escape
+	// (Block.cpp:346–353 find_edges_in e->dest == this only)
+	fm.CFGEdges = []*CFGEdge{{
+		SrcID: 5, DestBlock: b, DestStmID: 51, BackLink: true,
+	}}
+	if !b.MustBreakOrReturnFull(fm) {
+		t.Fatal("goto-to-label must not escape must_break_or_return")
 	}
 	// Block always live; sticky no invent not-must-break soft-skip past hole
 	ClearError()

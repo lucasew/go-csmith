@@ -249,12 +249,24 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	if !b.MustReturn() {
 		t.Fatal("return last")
 	}
-	// continue edge into block escapes
+	// continue edge into block escapes — CreateCFGEdge(src, block) stores DestStmID=block.StmID
+	// (FactMgr.cpp:597–598 e->dest == Block*; Statement.cpp:453–467 find_edges_in).
 	fm := NewFactMgr(nil)
 	b.EmitFM = fm
-	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestBlock: b, BackLink: true}}
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestBlock: b, DestStmID: b.StmID, BackLink: true}}
 	if b.MustReturn() {
 		t.Fatal("back edge escapes")
+	}
+	// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm): DestStmID is the label
+	// statement, not the parent block. Parent DestBlock bookkeeping must not escape
+	// must_return (seed-79 double return / append_return).
+	ClearError()
+	fm.CFGEdges = []*CFGEdge{{SrcID: 5, DestBlock: b, DestStmID: 2 /* labeled stmt */, BackLink: true}}
+	if !b.MustReturn() {
+		t.Fatal("goto-to-label edge must not escape block must_return")
+	}
+	if HasError() {
+		t.Fatal("complete goto-to-label must_return must not sticky")
 	}
 	// Block StmID 0 + FM sticky fail closed as escape (no invent "no back edge")
 	ClearError()

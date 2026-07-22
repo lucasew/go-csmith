@@ -180,34 +180,25 @@ func (b *Block) MustJump() bool {
 }
 
 // hasEscapeBackEdge reports a back_link edge into b whose src is not the block itself.
-// Block.cpp:318–326 / 346–353 — continue into loop body can bypass end return.
+// Block.cpp:318–326 / 346–353 — Statement::find_edges_in(this, false, true) then
+// any edge with src != this. C++ matches e->dest == this (Block* as Statement*):
+// continue / self-back use dest=Block*; goto uses dest=labeled Statement* and must
+// not count (seed-79: DestBlock bookkeeping on goto falsely escaped → double return).
 // Incomplete CFG sticky possible escape — no invent "no edge" soft re-pick.
 // Nil FactMgr: no edges known (C++ find_edges_in empty) → no escape (not invent escape).
 func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	if b == nil || fm == nil {
 		return false
 	}
-	// Block::stm_id always live for CFG-indexed edges; StmID 0 sticky
-	// possible escape (no invent "no back edge" soft-skipping FindEdgesIn)
+	// Block::stm_id always live for CFG-indexed edges; StmID 0 is valid (fair sid).
+	// IncompleteStmID sticky possible escape (no invent "no back edge").
 	if StmIDUnset(b.StmID) {
 		SetError(ErrGeneric)
 		return true
 	}
-	// edges targeting the block as DestBlock
-	toBlk := fm.FindEdgesInToBlock(b, false, true)
-	// incomplete CFG (nil hole) sticky possible escape
-	if toBlk == nil {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
-		return true
-	}
-	for _, e := range toBlk {
-		if e.SrcID != b.StmID {
-			return true
-		}
-	}
-	// edges targeting block stm_id
+	// Statement.cpp:453–467 — e->dest == this only (DestStmID == block.StmID).
+	// Do not use FindEdgesInToBlock: goto CreateCFGEdgeTo stores DestBlock=parent
+	// for bookkeeping while DestStmID is the label stmt (StatementGoto.cpp:139).
 	back := fm.FindEdgesIn(b.StmID, false, true)
 	// incomplete CFG sticky possible escape
 	if back == nil {
