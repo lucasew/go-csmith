@@ -192,12 +192,14 @@ func MakeRandomAssignQfer(
 	}
 
 	// StatementAssign.cpp:131–140 — running effect + separate RHS/LHS accum
+	// CGContext.cpp:74–82 — (cgc, running_eff, &rhs_accum): curr_rhs(nullptr)
 	runningEff := cg.EffectContext().detachMaps()
 	rhsAccum := EmptyEffect()
 	rhsCG := cg.CloneSubcontext()
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = EmptyEffect()
+	rhsCG.CurrRHS = nil
 
 	var rhs *Expression
 	// StatementAssign.cpp:147–148 — qfer from caller or derived from RHS
@@ -1002,9 +1004,12 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			paramAccum := EmptyEffect()
+			// CGContext.cpp:74–82 — (cgc, running, &param_accum): effect_stm default, curr_rhs null
 			paramCG := cg.CloneSubcontext()
 			paramCG.effectContext = running
 			paramCG.EffectAccum = &paramAccum
+			paramCG.EffectStm = EmptyEffect()
+			paramCG.CurrRHS = nil
 			if !VisitFactsExpression(arg, &paramCG, opts) {
 				return false
 			}
@@ -1156,7 +1161,9 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	// Effect assignment deep-copies; detach from live parent EffectStm maps.
+	// CGContext.cpp:74–82 — curr_rhs(nullptr) until Lhs sets it after RHS visit.
 	rhsCG.EffectStm = cg.EffectStm.detachMaps()
+	rhsCG.CurrRHS = nil
 
 	if !VisitFactsExpression(st.Expr, &rhsCG, opts) {
 		return false

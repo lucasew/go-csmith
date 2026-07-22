@@ -548,11 +548,13 @@ func BuildUserInvocation(
 		q := p.Qfer
 		qfer := &q
 		// FunctionInvocationUser.cpp:252–254 — param_cg(cg, running_eff_context, &param_eff_accum)
+		// CGContext.cpp:74–82 — curr_rhs(nullptr) on (cgc, eff_context, accum)
 		paramAccum := EmptyEffect()
 		paramCG := cg.CloneSubcontext()
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
+		paramCG.CurrRHS = nil
 		// Expression::make_random_param bumps paramCG.ExprDepth; merge copies it
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		// FunctionInvocationUser.cpp:259 — ERROR_GUARD(false); sticky error or null param → fail
@@ -777,11 +779,12 @@ func BuildInvocationAndFunction(
 		q := p.Qfer
 		qfer := &q
 		paramAccum := EmptyEffect()
-		// CGContext.cpp:74–82 — param context deep-copies iv_bounds
+		// CGContext.cpp:74–82 — param context deep-copies iv_bounds; curr_rhs(nullptr)
 		paramCG := cg.CloneSubcontext()
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
+		paramCG.CurrRHS = nil
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		// FunctionInvocationUser.cpp:186–187 — make_random_param; ERROR_GUARD after sticky error
 		// null param without sticky invents soft re-pick past ERROR_GUARD miss
@@ -1163,11 +1166,15 @@ func MakeRandomBinaryInvocation(
 	}
 
 	// FunctionInvocation.cpp:208–216 — LHS under dedicated accum + ambient effect_context
+	// CGContext.cpp:74–82 — CGContext(cgc, eff_context, accum): curr_rhs(nullptr), effect_stm().
+	// Soft invent kept outer CurrRHS (e.g. assign Lhs binary) into operand subcontexts so
+	// nested Lhs::visit_facts ran overlap checks against the wrong RHS (C++ always nulls).
 	lhsAccum := EmptyEffect()
 	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = cg.EffectContext().detachMaps()
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()
+	lhsCG.CurrRHS = nil
 	// FunctionInvocation.cpp:216 — Expression::make_random(lhs_cg, lhs_type) — no_func=false
 	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, false, false, MaxTermTypes, lhsCG.ExprDepth)
 	// FunctionInvocation.cpp:217 — ERROR_GUARD_AND_DEL1(nullptr, fi)
@@ -1223,9 +1230,11 @@ func MakeRandomBinaryInvocation(
 			SetError(ErrGeneric)
 			return nil
 		}
+		// CGContext.cpp:74–82 — curr_rhs(nullptr) on (cgc, eff_context, accum)
 		rhsCG.effectContext = rhsCtx
 		rhsCG.EffectAccum = &rhsAccum
 		rhsCG.EffectStm = EmptyEffect()
+		rhsCG.CurrRHS = nil
 		if op == BinLShift || op == BinRShift {
 			// FunctionInvocation.cpp:236–244 — rnd_flipcoin(ShiftByNonConstantProb())
 			// C++ Probabilities singleton; nil session → 0% (no invent hard-coded 50)
@@ -1437,12 +1446,14 @@ func MakeRandomBinaryPtrComparison(
 		return nil
 	}
 	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func=true
+	// CGContext.cpp:74–82 — curr_rhs(nullptr) on param/binary-style subcontext.
 	lhsAccum := EmptyEffect()
 	lhsCG := cg.CloneSubcontext()
 	lhsCG.effectContext = cg.EffectContext().detachMaps()
 	lhsCG.Flags |= FlagNoDanglingPtr
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()
+	lhsCG.CurrRHS = nil
 	// make_random(lhs_cg, type, 0, true) — no_func true
 	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, MaxTermTypes, lhsCG.ExprDepth)
 	if left == nil || HasError() {
@@ -1489,6 +1500,7 @@ func MakeRandomBinaryPtrComparison(
 		rhsCG.effectContext = rhsCtx
 		rhsCG.EffectAccum = &rhsAccum
 		rhsCG.EffectStm = EmptyEffect()
+		rhsCG.CurrRHS = nil
 		rhsCG.Flags |= FlagNoDanglingPtr
 		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, rhsCG.ExprDepth)
 		// FunctionInvocation.cpp:345
