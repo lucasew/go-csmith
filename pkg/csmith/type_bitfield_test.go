@@ -117,6 +117,60 @@ func TestBitfieldDeclEmit(t *testing.T) {
 	_ = opts
 }
 
+// TestOutputStructDeclPaddingFieldIndex mirrors Type.cpp:1836–1858 OutputStructUnion:
+// zero-width bitfields do not advance j; non-bitfield names are always "f"<<j++, never
+// the raw creation slot Name (make_one uses i including padding — seed 118 f4 vs f3).
+func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	// Names deliberately wrong/raw-slot so emit must not trust them.
+	st := &Type{
+		isStruct: true, StructName: "S0", Used: true,
+		Fields: []StructField{
+			{Name: "f0", Type: GetSimpleType(EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
+			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f2", Type: GetSimpleType(EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{true})},
+			// raw slot i=3 — Name "f3" would be invent if emit used Name after pad skip
+			{Name: "f3", Type: GetSimpleType(EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
+			{Name: "f4", Type: GetSimpleType(EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
+			{Name: "f5", Type: GetSimpleType(EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
+		},
+	}
+	decl := st.OutputStructDecl()
+	if decl == "" || HasError() {
+		t.Fatalf("decl empty/err: %q err=%v", decl, HasError())
+	}
+	// Type.cpp:1851–1852 length==0 → " : 0;" no fN, j unchanged
+	if !strings.Contains(decl, " : 0;") {
+		t.Fatalf("want zero-width pad, got %q", decl)
+	}
+	// After pad, named fields must be f3/f4 (j=3,4), not stored Name f4/f5.
+	if !strings.Contains(decl, " f3;") || !strings.Contains(decl, " f4;") {
+		t.Fatalf("want emit-time f3/f4 after padding, got %q", decl)
+	}
+	if strings.Contains(decl, " f5;") {
+		t.Fatalf("must not invent raw-slot f5 after padding: %q", decl)
+	}
+	// union same contract
+	ClearError()
+	ut := &Type{
+		isUnion: true, StructName: "U0", Used: true,
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f2", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		},
+	}
+	udecl := ut.OutputUnionDecl()
+	if !strings.Contains(udecl, " f0;") || !strings.Contains(udecl, " f1;") {
+		t.Fatalf("union want f0 then f1 after pad, got %q", udecl)
+	}
+	if strings.Contains(udecl, " f2;") {
+		t.Fatalf("union must not use raw-slot f2: %q", udecl)
+	}
+	ClearError()
+}
+
 func TestGenerateEmitsBitfieldSyntax(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {

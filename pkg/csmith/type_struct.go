@@ -432,13 +432,11 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		}
 		b.WriteString("   ")
 		b.WriteString(ty)
-		// Type.cpp uses f0,f1…; field Name may already be fN from make_one
-		name := f.Name
-		if name == "" {
-			name = fmt.Sprintf("f%d", j)
-		}
-		b.WriteString(" ")
-		b.WriteString(name)
+		// Type.cpp:1857–1858 — always " f"<<j++ (not stored field name / raw index).
+		// make_one_struct_field labels fN with raw slot i; zero-width bitfields do not
+		// advance j, so inventing emit from f.Name desyncs names after padding (seed 118:
+		// GO f4/f5 vs UP f3/f4 after `volatile unsigned : 0`).
+		b.WriteString(fmt.Sprintf(" f%d", j))
 		b.WriteString(";\n")
 		j++
 	}
@@ -933,12 +931,9 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		}
 		b.WriteString("   ")
 		b.WriteString(ty)
-		name := f.Name
-		if name == "" {
-			name = fmt.Sprintf("f%d", j)
-		}
-		b.WriteString(" ")
-		b.WriteString(name)
+		// Type.cpp:1857–1858 — always " f"<<j++ (not stored Name / raw creation index).
+		// Same as OutputStructDeclOpts: skip j on zero-width padding bitfields.
+		b.WriteString(fmt.Sprintf(" f%d", j))
 		b.WriteString(";\n")
 		j++
 	}
