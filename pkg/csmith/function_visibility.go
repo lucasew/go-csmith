@@ -146,6 +146,13 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	if HasError() {
 		return true
 	}
+	// Function.cpp:217–220 — find_variable_in_set(blocks[i]->local_vars, var)
+	// is pointer identity only (Variable.cpp:138–145). Do not invent
+	// Variable::match for locals: match would treat aggregate fields as
+	// function-locals when only the parent is in local_vars → IsVarOOS true
+	// for field pointees still in scope → UpdateFactsForDest/OOS mark_dead
+	// garbage (seed 86: l_1226 pts=[garbage,l_1053.f3] while &l_1053[…].f3
+	// still live; IsValidPtr dead → strip func_19 if).
 	for _, b := range f.Blocks {
 		if b == nil {
 			// incomplete Blocks sticky OOS
@@ -157,14 +164,7 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 				SetError(ErrGeneric)
 				return true
 			}
-			if loc.Match(v) || loc == v {
-				// residual ERROR sticky — no invent OOS-true past Match hole
-				if HasError() {
-					return true
-				}
-				return true
-			}
-			if HasError() {
+			if loc == v {
 				return true
 			}
 		}
