@@ -832,15 +832,20 @@ func RhsToLhsTransferUnion(
 		}
 		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
 	case TermFunction:
-		// FactUnion.cpp:99–109 — return fact for invocation RV (union category).
+		// FactUnion.cpp:99–109 — get_return_fact_for_invocation(…, eUnionWrite).
+		// Soft invent looked up ambient unionFacts by RV subject (missed registry).
 		// missing Invoke/User/RV or related union fact during generation —
 		// non-sticky hole (soft re-pick; no invent fid 0)
 		if rhs.Invoke == nil || rhs.Invoke.User == nil || rhs.Invoke.User.RV == nil {
 			return IncompleteUnionFactSlice()
 		}
+		// only user func calls have return-fact registry (eFuncCall)
+		if rhs.Invoke.IsStd {
+			return IncompleteUnionFactSlice()
+		}
 		rv := rhs.Invoke.User.RV
-		uf := FindRelatedUnion(unionFacts, rv)
-		// residual ERROR sticky — no invent soft-union transfer past FindRelatedUnion residual
+		uf := GetReturnUnionFactForInvocation(rhs.Invoke, rv)
+		// residual ERROR sticky — no invent soft-union transfer past registry residual
 		if HasError() {
 			return IncompleteUnionFactSlice()
 		}

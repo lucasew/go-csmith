@@ -5,12 +5,16 @@
 package csmith
 
 // return-fact registry (FunctionInvocationUser.cpp static invocations/return_facts).
+// C++ stores Fact* of any eCat; Go splits ePointTo / eUnionWrite into parallel registries
+// (same inv may appear once per category — FunctionInvocationUser.cpp:91–102).
 var (
 	returnFactInvocations []*Invocation
 	returnFactPoints      []*FactPointTo
+	returnUnionInvocations []*Invocation
+	returnUnionFacts       []*FactUnion
 )
 
-// AddReturnFactForInvocation mirrors add_return_fact_for_invocation.
+// AddReturnFactForInvocation mirrors add_return_fact_for_invocation for ePointTo.
 // FunctionInvocationUser.cpp:91–102 — assert(invocations.size() == return_facts.size()).
 // Incomplete PointTo fails closed (no invent registry of broken facts).
 // Incomplete invocation registry slots fail closed wipe (no invent soft-skip
@@ -45,8 +49,38 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 	returnFactPoints = append(returnFactPoints, f)
 }
 
+// AddReturnUnionFactForInvocation mirrors add_return_fact_for_invocation for eUnionWrite.
+// FunctionInvocationUser.cpp:91–102 — same registry, is_related by eUnionWrite + subject.
+func AddReturnUnionFactForInvocation(fi *Invocation, f *FactUnion) {
+	if fi == nil || f == nil || !UnionFactsComplete([]*FactUnion{f}) {
+		SetError(ErrGeneric)
+		return
+	}
+	if len(returnUnionInvocations) != len(returnUnionFacts) {
+		returnUnionInvocations = nil
+		returnUnionFacts = nil
+		SetError(ErrGeneric)
+		return
+	}
+	for i, inv := range returnUnionInvocations {
+		if inv == nil || returnUnionFacts[i] == nil {
+			returnUnionInvocations = nil
+			returnUnionFacts = nil
+			SetError(ErrGeneric)
+			return
+		}
+		// FactUnion::is_related — eUnionWrite + var pointer identity
+		if inv == fi && returnUnionFacts[i].Var == f.Var {
+			returnUnionFacts[i] = f
+			return
+		}
+	}
+	returnUnionInvocations = append(returnUnionInvocations, fi)
+	returnUnionFacts = append(returnUnionFacts, f)
+}
+
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
-// FunctionInvocationUser.cpp:76–91 — assert parallel sizes.
+// FunctionInvocationUser.cpp:76–91 — assert parallel sizes; eCat == ePointTo.
 // Incomplete Invocation/Variable/registry sticky nil (no invent soft-skip hole to later match).
 func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 	// Invocation + subject always live; sticky incomplete no invent miss soft-skip
@@ -74,14 +108,42 @@ func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 	return nil
 }
 
+// GetReturnUnionFactForInvocation mirrors get_return_fact_for_invocation(…, eUnionWrite).
+// FunctionInvocationUser.cpp:76–91; FactUnion.cpp:103–106.
+func GetReturnUnionFactForInvocation(fi *Invocation, v *Variable) *FactUnion {
+	if fi == nil || v == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if len(returnUnionInvocations) != len(returnUnionFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	for i, inv := range returnUnionInvocations {
+		if inv == nil || returnUnionFacts[i] == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if inv != fi {
+			continue
+		}
+		if returnUnionFacts[i].Var == v {
+			return returnUnionFacts[i]
+		}
+	}
+	return nil
+}
+
 // InvocationReturnFactsDoFinalization mirrors FunctionInvocationUser::doFinalization.
 // FunctionInvocationUser.cpp:368–371.
 func InvocationReturnFactsDoFinalization() {
 	returnFactInvocations = nil
 	returnFactPoints = nil
+	returnUnionInvocations = nil
+	returnUnionFacts = nil
 }
 
-// SaveReturnFacts mirrors FunctionInvocationUser::save_return_fact.
+// SaveReturnFacts mirrors FunctionInvocationUser::save_return_fact for ePointTo.
 // FunctionInvocationUser.cpp:358–365 — facts matching func.rv.
 // Incomplete maps fail closed (no invent soft-skip holes and still save later).
 func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
@@ -116,6 +178,39 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 			}
 		} else if HasError() {
 			// residual ERROR sticky — no invent soft-skip not-match then save later
+			return
+		}
+	}
+}
+
+// SaveReturnUnionFacts mirrors save_return_fact for eUnionWrite facts.
+// FunctionInvocationUser.cpp:358–365 — full FactVec includes FactUnion for union RV.
+func (fi *Invocation) SaveReturnUnionFacts(facts []*FactUnion) {
+	if fi == nil || fi.User == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if fi.User.RV == nil {
+		return
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return
+	}
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			SetError(ErrGeneric)
+			return
+		}
+		if fi.User.RV.Match(f.Var) {
+			if HasError() {
+				return
+			}
+			AddReturnUnionFactForInvocation(fi, f)
+			if HasError() {
+				return
+			}
+		} else if HasError() {
 			return
 		}
 	}
@@ -619,7 +714,13 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
+	// FunctionInvocationUser.cpp:358–365 — save full FactVec matching rv (ePointTo + eUnionWrite).
 	fi.SaveReturnFacts(retFacts)
+	fi.SaveReturnUnionFacts(retUnions)
+	if HasError() {
+		restore()
+		return false
+	}
 	_ = MergeFacts(&work, retFacts)
 	if !FactsComplete(work) {
 		restore()

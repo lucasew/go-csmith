@@ -113,6 +113,40 @@ func TestReturnFactRegistry(t *testing.T) {
 	}
 }
 
+// TestSaveReturnUnionFactsRegistry — FunctionInvocationUser.cpp:76–106 / 358–365.
+// Full FactVec return registry includes eUnionWrite so FactUnion::rhs_to_lhs_transfer
+// for FuncCall (FactUnion.cpp:103–106) finds rv_fact. Soft invent was PT-only registry
+// → AddParamFacts left union params without FactUnion → nonreadable fields dropped
+// from choose_var (seed-213 p_34.f0 vs p_33.f0 pool).
+func TestSaveReturnUnionFactsRegistry(t *testing.T) {
+	ClearError()
+	InvocationReturnFactsDoFinalization()
+	defer InvocationReturnFactsDoFinalization()
+	ut := &Type{isUnion: true, StructName: "U_ret", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	rv := CreateVariableQfer("rv", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	f := &Function{Name: "func_u", ReturnType: ut, RV: rv}
+	fi := &Invocation{User: f}
+	uf := MakeFactUnion(rv, 0)
+	fi.SaveReturnUnionFacts([]*FactUnion{uf})
+	if HasError() {
+		t.Fatal("SaveReturnUnionFacts sticky", GetError())
+	}
+	got := GetReturnUnionFactForInvocation(fi, rv)
+	if got == nil || got.LastWrittenFID != 0 {
+		t.Fatalf("registry must return eUnionWrite fact for rv, got %+v", got)
+	}
+	// transfer to param-like LHS uses registry, not ambient
+	param := CreateVariableQfer("p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: ut}
+	out := RhsToLhsTransferUnion(nil, nil, []*Variable{param}, rhs)
+	if !UnionFactsComplete(out) || len(out) != 1 || out[0].Var != param || out[0].LastWrittenFID != 0 {
+		t.Fatalf("FuncCall union transfer must use return registry: %+v", out)
+	}
+	ClearError()
+}
+
 func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	// incomplete maps sticky (no invent soft-skip hole and still register later)
 	ClearError()

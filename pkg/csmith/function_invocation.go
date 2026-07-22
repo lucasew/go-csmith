@@ -946,7 +946,15 @@ func BuildInvocationAndFunction(
 		fi.Failed = true
 		return fi
 	}
+	// FunctionInvocationUser.cpp:214 / 358–365 — save_return_fact full FactVec
+	// (ePointTo + eUnionWrite). Soft invent was PT-only registry so FactUnion
+	// rhs_to_lhs_transfer for FuncCall params missed rv_fact (seed-213 p_34).
 	fi.SaveReturnFacts(retFacts)
+	fi.SaveReturnUnionFacts(retUnions)
+	if HasError() {
+		fi.Failed = true
+		return fi
+	}
 
 	// FunctionInvocationUser.cpp:219 — setup_in_out_maps(true)
 	calFM.SetupInOutMaps(true)
