@@ -5,6 +5,87 @@ import (
 	"testing"
 )
 
+// TestArrayOpAggregateConstantTmp mirrors StatementArrayOp.cpp:235–247 Output:
+// constant init_value + array_var.is_aggregate() → type tmp = init; a[i] = tmp;
+// (cannot assign brace init directly to array member of struct/union).
+func TestArrayOpAggregateConstantTmp(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	ut := &Type{
+		isUnion: true, StructName: "U0", Used: true,
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		},
+	}
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_134", Type: ut, IsArray: true},
+		Sizes:    []int{4},
+	}
+	av.AsArray = av
+	iv := CreateVariableScalars("g_1287.f3", GetIntType(), false, false)
+	if iv == nil {
+		t.Fatal("iv")
+	}
+	rhs := &Expression{
+		Term: TermConstant, Con: &Constant{Value: "{0x818A33E5L}", Type: ut}, ExprType: ut,
+	}
+	st := Stmt{
+		Kind:        StmtArrayOp,
+		Loop:        &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		ArrayAccess: "g_134[g_1287.f3]",
+		Expr:        rhs,
+		LhsVar:      &av.Variable,
+		Then:        &Block{}, // unused when ArrayAccess+Expr set
+		StmID:       1,
+	}
+	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	if HasError() || out == "" {
+		t.Fatalf("output empty/err: %q err=%v", out, HasError())
+	}
+	if !strings.Contains(out, "union U0 tmp = {0x818A33E5L};") {
+		t.Fatalf("want aggregate tmp init, got %q", out)
+	}
+	if !strings.Contains(out, "g_134[g_1287.f3] = tmp;") {
+		t.Fatalf("want a[i] = tmp, got %q", out)
+	}
+	if strings.Contains(out, "g_134[g_1287.f3] = {0x818A33E5L}") {
+		t.Fatalf("must not invent direct brace assign to aggregate array member: %q", out)
+	}
+	// non-aggregate: direct assign (StatementArrayOp.cpp:248–254)
+	ClearError()
+	avInt := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:    []int{2},
+	}
+	avInt.AsArray = avInt
+	rhsInt := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	stInt := Stmt{
+		Kind:        StmtArrayOp,
+		Loop:        &LoopControl{IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		ArrayAccess: "g_a[g_1287.f3]",
+		Expr:        rhsInt,
+		LhsVar:      &avInt.Variable,
+		Then:        &Block{},
+		StmID:       2,
+	}
+	outInt := (&Block{Stmts: []Stmt{stInt}}).Output(0)
+	if strings.Contains(outInt, " tmp =") {
+		t.Fatalf("scalar array must not invent tmp: %q", outInt)
+	}
+	if !strings.Contains(outInt, "g_a[g_1287.f3] = ") {
+		t.Fatalf("want direct scalar assign: %q", outInt)
+	}
+	// LhsVar missing (pre-fix invent): must not use aggregate path via soft guess
+	ClearError()
+	stNoLhs := st
+	stNoLhs.LhsVar = nil
+	outNo := (&Block{Stmts: []Stmt{stNoLhs}}).Output(0)
+	if strings.Contains(outNo, " tmp =") {
+		t.Fatalf("nil LhsVar must not invent aggregate tmp: %q", outNo)
+	}
+	ClearError()
+}
+
 func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

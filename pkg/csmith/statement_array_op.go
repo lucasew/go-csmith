@@ -528,6 +528,8 @@ func MakeRandomArrayInit(
 
 	// C++ StatementArrayOp with init_value has body==null — the element assign is
 	// emitted inline in Output, not a Statement (no stm_id). IncompleteStmID here.
+	// LhsVar = array_var: StatementArrayOp.cpp:237 uses array_var->is_aggregate()
+	// for the constant-init tmp rewrite (seed 53: union U0 tmp = …; a[i] = tmp).
 	innerBody := &Block{
 		Func: cg.CurrentFunc,
 		Stmts: []Stmt{{
@@ -549,19 +551,23 @@ func MakeRandomArrayInit(
 	// matches C++ (get_blocks stays empty for array-init shape).
 	if len(dims) == 0 {
 		// StatementArrayOp is a Statement; always has stm_id
-		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, Expr: rhs, StmID: AllocStmID()}
+		return Stmt{
+			Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, Expr: rhs,
+			LhsVar: &av.Variable, StmID: AllocStmID(),
+		}
 	}
 	// Single stm_id for the whole multi-dim StatementArrayOp (C++ one ctor).
 	// Nested dim shells share that id for Output structure only — they are not
 	// separate C++ Statement objects (no second AllocStmID).
 	sid := AllocStmID()
-	// Innermost dim carries ArrayAccess + init_value.
+	// Innermost dim carries ArrayAccess + init_value + array_var (for is_aggregate).
 	st := Stmt{
 		Kind:        StmtArrayOp,
 		Loop:        dims[len(dims)-1],
 		Then:        innerBody,
 		ArrayAccess: access,
 		Expr:        rhs,
+		LhsVar:      &av.Variable,
 		StmID:       sid,
 	}
 	for i := len(dims) - 2; i >= 0; i-- {
