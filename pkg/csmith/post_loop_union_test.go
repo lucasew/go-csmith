@@ -2,8 +2,9 @@ package csmith
 
 import "testing"
 
-// StatementFor.cpp:355 map_facts_in entry FactVec; makeup FactMgr.cpp:494–508.
-func TestPostLoopRestoresEntryUnionAndMakeupNewGlobals(t *testing.T) {
+// StatementFor.cpp:355 — non-must_return: global_facts = map_facts_in[body] only.
+// Soft invent rewrote from preUnion + makeup; fair path keeps map_in last_written.
+func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -17,13 +18,13 @@ func TestPostLoopRestoresEntryUnionAndMakeupNewGlobals(t *testing.T) {
 	newU := CreateVariableQfer("g_new", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	newU.CreateFieldVars()
 	newU.Init = MakeInt(0)
-	// preUnion: only old at fid 0
+	// preUnion (make_iteration snap) differs from map_in — must not clobber map_in
 	preU := []*FactUnion{MakeFactUnion(oldU, 0)}
-	// map_in / live polluted: old at 4, plus new global created in body
-	polluted := []*FactUnion{MakeFactUnion(oldU, 4), MakeFactUnion(newU, 0)}
+	// map_in after fair FP: old last_write 4 + body-created new global
+	mapIn := []*FactUnion{MakeFactUnion(oldU, 4), MakeFactUnion(newU, 0)}
 	body := &Block{Func: f, Looping: true, StmID: AllocStmID()}
-	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, polluted)
-	fm.UnionFacts = CloneUnionFactSlice(polluted)
+	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, mapIn)
+	fm.UnionFacts = CloneUnionFactSliceDeep(mapIn)
 	fm.GlobalFacts = []*FactPointTo{}
 	if fm.MapStmEffect == nil {
 		fm.MapStmEffect = make(map[int]Effect)
@@ -36,12 +37,12 @@ func TestPostLoopRestoresEntryUnionAndMakeupNewGlobals(t *testing.T) {
 		t.Fatal(GetError())
 	}
 	gotOld := FindRelatedUnion(fm.UnionFacts, oldU)
-	if gotOld == nil || gotOld.LastWrittenFID != 0 {
-		t.Fatalf("old want fid 0 (entry), got %#v", gotOld)
+	if gotOld == nil || gotOld.LastWrittenFID != 4 {
+		t.Fatalf("non-must_return must keep map_in last_write 4, got %#v", gotOld)
 	}
 	gotNew := FindRelatedUnion(fm.UnionFacts, newU)
 	if gotNew == nil {
-		t.Fatal("new global union fact must be makeup from body")
+		t.Fatal("map_in body-created union must remain")
 	}
 }
 

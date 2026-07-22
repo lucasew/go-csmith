@@ -656,49 +656,14 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			return
 		}
 	}
-	// Go split maps: FindFixedPointBlock SetMapFactsIn(pt) pairs live mid-gen
-	// UnionFacts into map_facts_in (empty body after deleted for-IVs — seed-999
-	// g_605 last_written=4; seed-7 choose pools shrunk by IsNonreadableField).
-	// C++ set_fact_in(current_inputs) keeps the entry FactVec. preUnion is the
-	// eUnionWrite half of pre_facts after make_iteration (StatementFor.cpp:299).
-	// Restore that partition, then makeup_new_var_facts for subjects created
-	// during the body (FactMgr.cpp:494–508) so new globals keep init facts.
-	if !body.MustReturn() && UnionFactsComplete(preUnion) {
-		liveSnap := CloneUnionFactSliceDeep(fm.UnionFacts)
-		if HasError() || !UnionFactsComplete(liveSnap) {
-			fm.GlobalFacts = IncompleteFactSlice()
-			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return
-		}
-		cl := CloneUnionFactSliceDeep(preUnion)
-		if HasError() || !UnionFactsComplete(cl) {
-			fm.GlobalFacts = IncompleteFactSlice()
-			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return
-		}
-		if cl == nil {
-			cl = []*FactUnion{}
-		}
-		if !makeupNewUnionFacts(&cl, liveSnap) {
-			fm.GlobalFacts = IncompleteFactSlice()
-			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return
-		}
-		fm.UnionFacts = cl
-		ptIn := fm.GetMapFactsIn(body.StmID)
-		if FactsComplete(ptIn) {
-			fm.SetMapFactsInPair(body.StmID, ptIn, cl)
-		}
-	}
+	// StatementFor.cpp:355–359 — non-must_return keeps map_facts_in[body] as
+	// global_facts (full FactVec after AssignGlobalFactsFromMapIn above). Soft invent
+	// rewrote UnionFacts from preUnion (make_iteration snapshot) + makeup, which
+	// undid fair post_creation find_fixed_point set_fact_in (self-back / sequential
+	// last_written). C++ has no such restore: only must_return restores pre_facts.
+	// Entry eUnionWrite pollution was fixed by installing map_in unions before FP
+	// (Block::post_creation_analysis / block.go); do not re-clobber here.
+	// preUnion is still used by the must_return path below.
 	if body.MustReturn() {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
 		if HasError() {
