@@ -2766,6 +2766,7 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 }
 
 // hashArrayHasPayload reports whether array hashing would emit any transparent_crc.
+// ArrayVariable.cpp:742–744 — get_int_subfield_names empty → give up.
 // Type* always live on Fields; nil hole sticky false (no invent has-payload / soft re-pick).
 func hashArrayHasPayload(v *Variable) bool {
 	// Variable + Type always live; sticky incomplete no invent no-payload soft-skip
@@ -2784,39 +2785,12 @@ func hashArrayHasPayload(v *Variable) bool {
 	if HasError() {
 		return false
 	}
-	if v.Type.IsAggregate() {
-		// residual ERROR sticky — no invent soft-payload past IsAggregate residual true
-		if HasError() {
-			return false
-		}
-		j := 0
-		for _, f := range v.Type.Fields {
-			if f.Type == nil {
-				// incomplete field Type sticky no-payload (restrictive — no invent payload)
-				SetError(ErrGeneric)
-				return false
-			}
-			if f.BitWidth == 0 {
-				continue
-			}
-			if f.Type.IsSimple() {
-				// residual ERROR sticky — no invent soft-payload past field IsSimple residual true
-				if HasError() {
-					return false
-				}
-				return true
-			}
-			// residual ERROR sticky — no invent soft-continue past field IsSimple residual false
-			if HasError() {
-				return false
-			}
-			j++
-		}
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft no-payload past IsAggregate residual false
+	// Type.cpp:1615–1636 — any flattened simple leaf
+	subs := v.Type.GetIntSubfieldNames("", nil)
+	if HasError() {
 		return false
 	}
-	return false
+	return len(subs) > 0
 }
 
 // hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
@@ -2906,64 +2880,63 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		access += "[" + iv + "]"
 		nameStr += "[" + iv + "]"
 	}
-	// ArrayVariable.cpp:770 — body under compute_hash (caller only hashes when on)
+	// ArrayVariable.cpp:740–766 — get_int_subfield_names then transparent_crc each leaf
+	// (nested struct fields expand: .f0.f0 not top-level .f0 only — seed-51 g_359).
 	if v.Type != nil && v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if HasError() {
 			return ""
 		}
-		j := 0
-		for i, f := range v.Type.Fields {
-			// Type* always live; nil hole fails closed sticky (no invent skip partial
-			// hash / soft re-pick past incomplete field type as empty success)
-			if f.Type == nil {
-				SetError(ErrGeneric)
+		// ArrayVariable.cpp:730–737 — excluded union field indices for get_int_subfield_names
+		var excluded []int
+		if v.Type.IsUnion() && unionFacts != nil {
+			// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
+			if HasError() {
 				return ""
 			}
-			if f.BitWidth == 0 {
-				continue
-			}
-			// ArrayVariable.cpp:730–737 — skip unreadable union fields
-			if v.Type.IsUnion() && unionFacts != nil {
-				// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
-				if HasError() {
-					return ""
+			// Field index j after padding skip matches get_int_subfield_names
+			j := 0
+			for i := range v.Type.Fields {
+				f := &v.Type.Fields[i]
+				if f.BitWidth == 0 {
+					continue
 				}
 				if !IsFieldReadable(v, i, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial array hash past hole
 					if HasError() {
 						return ""
 					}
-					j++
-					continue
-				}
-				// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
-				if HasError() {
+					excluded = append(excluded, j)
+				} else if HasError() {
 					return ""
 				}
-			} else if HasError() {
-				// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+				j++
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+			return ""
+		}
+		// Type.cpp:1615–1636 — flatten nested simple leaves
+		subs := v.Type.GetIntSubfieldNames("", excluded)
+		if HasError() {
+			return ""
+		}
+		for _, sub := range subs {
+			if sub.Type == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
-			simple := f.Type.IsSimple()
-			// residual ERROR sticky — no invent soft-continue field hash past IsSimple residual
+			isF := sub.Type.IsFloat()
+			// residual ERROR sticky — no invent soft-continue field hash past IsFloat residual
 			if HasError() {
 				return ""
 			}
-			if simple {
-				isF := f.Type.IsFloat()
-				// residual ERROR sticky — no invent soft-continue field hash past IsFloat residual
-				if HasError() {
-					return ""
-				}
-				fn := ".f" + itoa(j)
-				if isF {
-					b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
-				} else {
-					b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
-				}
+			fn := sub.Name
+			if isF {
+				b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
+			} else {
+				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
 			}
-			j++
 		}
 	} else if v.Type != nil && v.Type.IsSimple() {
 		// residual ERROR sticky — no invent soft-hash past IsSimple residual

@@ -119,6 +119,80 @@ func (t *Type) IsAggregate() bool {
 	return t != nil && (t.isStruct || t.isUnion)
 }
 
+// IntSubfield is one flattened simple leaf from Type::get_int_subfield_names.
+// Type.cpp:1615–1636 — prefix ".f0.f1"; types parallel names.
+type IntSubfield struct {
+	Name string // e.g. ".f0.f0"
+	Type *Type  // always simple
+}
+
+// GetIntSubfieldNames mirrors Type::get_int_subfield_names.
+// Type.cpp:1615–1636 — recurse aggregates; skip 0-length bitfields; exclude
+// union field indices (j after padding skip) when listed in excluded.
+// Incomplete field Type sticky empty (no invent partial name list past hole).
+func (t *Type) GetIntSubfieldNames(prefix string, excluded []int) []IntSubfield {
+	if t == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if t.IsSimple() {
+		// residual ERROR sticky — no invent soft-leaf past IsSimple residual
+		if HasError() {
+			return nil
+		}
+		return []IntSubfield{{Name: prefix, Type: t}}
+	}
+	// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+	if HasError() {
+		return nil
+	}
+	if !t.IsAggregate() {
+		// residual ERROR sticky — no invent soft-empty past IsAggregate residual
+		if HasError() {
+			return nil
+		}
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-empty past IsAggregate residual true path
+	if HasError() {
+		return nil
+	}
+	var out []IntSubfield
+	j := 0
+	for i := range t.Fields {
+		f := &t.Fields[i]
+		// Type.cpp:1623 — is_unamed_padding (0-length bitfield)
+		if f.BitWidth == 0 {
+			continue
+		}
+		// Type.cpp:1625–1629 — excluded by field index j (post-padding)
+		skip := false
+		for _, ex := range excluded {
+			if ex == j {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			j++
+			continue
+		}
+		if f.Type == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		// Type.cpp:1631–1634 — prefix+".f"+j; recurse with empty excluded
+		subPrefix := prefix + ".f" + itoa(j)
+		j++
+		nested := f.Type.GetIntSubfieldNames(subPrefix, nil)
+		if HasError() {
+			return nil
+		}
+		out = append(out, nested...)
+	}
+	return out
+}
+
 // IsConstStructUnion mirrors Type::is_const_struct_union.
 // Type.cpp:437–451 — any field const or nested const aggregate.
 // Type* always live on Fields; nil hole sticky fail closed as const (no invent non-const).
