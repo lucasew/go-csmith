@@ -23,14 +23,16 @@ Default options + seed → **bit-identical C program body** as golden upstream
 
 ## Body parity vs upstream (integration)
 
-```bash
-# Level B (testing.T)
-CSMITH_UPSTREAM=.build/csmith-instrumented/src/csmith \
-  go test ./pkg/csmith -run UpstreamBodyParityBattery -count=1
+Lives in **`./test/bodyparity`** (not `pkg/csmith`) so core unit tests stay fast.
 
-# Level C (testing.F)
+```bash
+# Level B battery
 CSMITH_UPSTREAM=.build/csmith-instrumented/src/csmith \
-  go test ./pkg/csmith -run '^$' -fuzz=FuzzUpstreamBodyParityFuzzy -fuzztime=16x
+  go test ./test/bodyparity -run TestBodyParityBattery -count=1
+
+# Level C fuzz (usual day-to-day while closing residual seeds)
+CSMITH_UPSTREAM=.build/csmith-instrumented/src/csmith \
+  go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s
 ```
 
-Unset `CSMITH_UPSTREAM` → **warn + skip** (no `.build`/`PATH` search). Body mismatches use **go-cmp** (`-upstream +go`). Failing `-fuzz` inputs land in `pkg/csmith/testdata/fuzz/` and re-run until fixed or deleted. Details: SPEC §3.5a.
+`CSMITH_UPSTREAM` required. Body mismatches use **go-cmp**. Crashers: `test/bodyparity/testdata/fuzz/`. Details: SPEC §3.5a.
