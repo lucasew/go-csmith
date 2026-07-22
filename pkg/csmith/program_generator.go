@@ -745,67 +745,37 @@ func (g *ProgramGenerator) hashGlobals() string {
 	return HashGlobalVariablesWithUnionFacts(g.VS, g.unionWriteFactsForHash())
 }
 
-// unionWriteFactsForHash is the eUnionWrite partition of first-function global_facts
-// at Variable::hash time (Variable.cpp:891–894).
+// unionWriteFactsForHash is the eUnionWrite lattice used at Variable::hash time.
 //
-// Go keeps point-to and eUnionWrite in split maps. FindFixedPointBlock's
-// SetMapFactsIn(pt) pairs live UnionFacts into map_facts_in; empty for-bodies that
-// dropped statements still leave mid-gen last_written (deleted for-IV) on that
-// live lattice, which then renews into GetFirstFunction (seed-999 g_605 fid=4,
-// g_467 BOTTOM). C++ stores one FactVec so set_fact_in(current_inputs) keeps entry.
+// Variable.cpp:891–898 — FactMgr *fm = get_fact_mgr_for_func(GetFirstFunction());
+// is_field_readable(this, i, fm->global_facts). That is the **live** first-function
+// FactMgr global_facts after generation, not a rebuild from abstract_fact_for_var_init.
 //
-// Rebuild from Fact::abstract_fact_for_var_init / FactMgr::add_new_var_fact for each
-// global union (Fact.cpp:87–107, FactMgr.cpp:118+) — the lattice C++ retains for
-// subjects first-function DFA never updates. Does not change generation lattices.
+// Seed 34: live g_26 last=BOTTOM (no field hashed); g_255 last=4 → hash g_255.f4.
+// Init-abstract rebuild wrongly marked f0 readable (extra transparent_crc).
+// Seed 999: live g_605/g_467 last=0 matches upstream f0 hashes.
 func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
-	if g == nil || g.VS == nil {
+	if g == nil || g.FactMgrs == nil {
 		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
-	if !VariablesComplete(g.VS.GlobalList) {
-		SetError(ErrGeneric)
-		return IncompleteUnionFactSlice()
-	}
-	var out []*FactUnion
-	for _, v := range g.VS.GlobalList {
-		if v == nil {
-			SetError(ErrGeneric)
-			return IncompleteUnionFactSlice()
-		}
-		// ArrayVariable of union: subject is the array (collective); same abstract_init.
-		if v.Type == nil || !v.Type.IsUnion() {
-			if HasError() {
-				return IncompleteUnionFactSlice()
-			}
-			continue
-		}
-		if HasError() {
-			return IncompleteUnionFactSlice()
-		}
-		_, un := AbstractFactForVarInit(v)
-		if HasError() {
-			return IncompleteUnionFactSlice()
-		}
-		if !UnionFactsComplete(un) {
-			return IncompleteUnionFactSlice()
-		}
-		for _, u := range un {
-			if u == nil {
-				SetError(ErrGeneric)
-				return IncompleteUnionFactSlice()
-			}
-			out = MergeUnionFact(out, u)
-			if !UnionFactsComplete(out) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				return IncompleteUnionFactSlice()
-			}
-		}
-	}
-	if out == nil {
+	first := GetFirstFunction(&g.Funcs)
+	if first == nil {
+		// no first function → empty eUnionWrite partition (complete)
 		return []*FactUnion{}
 	}
+	fm := g.FactMgrs.ForFunc(first)
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if !UnionFactsComplete(fm.UnionFacts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	// shallow copy so hash path cannot mutate FM lattice
+	out := make([]*FactUnion, len(fm.UnionFacts))
+	copy(out, fm.UnionFacts)
 	return out
 }
 
