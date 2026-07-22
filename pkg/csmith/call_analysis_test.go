@@ -580,6 +580,58 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	}
 }
 
+// TestPostCreationUncertainFunc1KeepsGenStmEffect — Statement.cpp:854–875.
+// Gen-time map_stm_effect (line 857) must survive special validate for func_1
+// uncertain calls. Soft invent let VisitFactsAssign overwrite map_stm_effect
+// with re-analysis lattice that under-collected first-build callee reads
+// (seed-12 func_1 missing g_208/g_1489/g_1939).
+func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	gExtra := CreateVariableScalars("g_extra", GetIntType(), true, false)
+	gKeep := CreateVariableScalars("g_keep", GetIntType(), true, false)
+	// Gen-time effect_stm already includes a global read from a nested call.
+	genEff := EmptyEffect().ReadVar(gKeep).ReadVar(gExtra)
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	cg.EffectStm = genEff
+	// Uncertain call RHS so special path runs validate (may fail/clear EffectStm).
+	a := userCall("func_a")
+	b := userCall("func_b")
+	rhs := &Expression{
+		Term: TermFunction,
+		Invoke: &Invocation{
+			User: &Function{Name: "func_c", ReturnType: GetIntType(), IsBuilt: true, Body: &Block{StmID: AllocStmID()}},
+			Args: []*Expression{a, b},
+		},
+	}
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: AllocStmID(),
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: rhs, AssignOp: AssignSimple,
+	}
+	if !HasUncertainCallRecursiveStmt(st) {
+		t.Fatal("expect uncertain for special path")
+	}
+	// Pre-install gen map as PostCreation would after saving EffectStm, then run
+	// full post_creation (saves EffectStm then special validate).
+	pre := []*FactPointTo{MakeFactPointTo(v, NullPtr)}
+	PostCreationAnalysis(st, pre, []*FactUnion{}, EmptyEffect(), &cg, opts)
+	if HasError() {
+		t.Fatal("post_creation sticky", GetError())
+	}
+	got := fm.GetMapStmEffect(st.StmID)
+	if !got.IsRead(gExtra) || !got.IsRead(gKeep) {
+		t.Fatalf("gen-time reads must survive special validate: got reads=%v", got.ReadVars())
+	}
+}
+
 func TestFindContainedLabelsFM(t *testing.T) {
 	f := &Function{Name: "f"}
 	thenB := &Block{Stmts: []Stmt{

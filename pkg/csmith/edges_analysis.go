@@ -3,11 +3,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import (
-	"fmt"
-	"os"
-)
-
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
 // Fact* always live in maps; nil subject/jump holes fail closed (*facts nil —
@@ -334,13 +329,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			}
 		}
 	}
-	ok := ValidateAndUpdateFacts(st, facts, cg, opts, blk)
-	if !ok && os.Getenv("CSMITH_DEBUG_STRIP") != "" && blk != nil && blk.Func != nil && blk.Parent == nil {
-		fmt.Fprintf(os.Stderr, "GO_ANALYZE_FAIL %s stm=%d kind=%v nFacts=%d visited=%v\n",
-			blk.Func.Name, st.StmID, st.Kind, len(*facts),
-			cg.FM != nil && cg.FM.MapVisited != nil && cg.FM.MapVisited[st.StmID])
-	}
-	return ok
+	return ValidateAndUpdateFacts(st, facts, cg, opts, blk)
 }
 
 // SetAccumulatedEffectAfterBlock mirrors Statement::set_accumulated_effect_after_block.
@@ -493,8 +482,24 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// Do not sticky-poison generation: match NDEBUG continue (same class as
 			// FactUnion indirect==-1 under NDEBUG). Always-revisit may SetError on
 			// incomplete callee IR; clear soft fail like elided assert(0).
+			//
+			// Statement.cpp:854–857 saves gen-time effect_stm into map_stm_effect
+			// *before* special validate. validate → stm_visit_facts clears effect_stm
+			// then StatementAssign::visit_facts reassigns map_stm_effect from the
+			// re-analysis lattice. Generation-time AddVisibleEffect from first-build
+			// callees can record globals that visit-time revisit under-collects
+			// (seed-12 func_1: g_208/g_1489/g_1939 present pre-validate, dropped
+			// post). Keep the gen-time map for summary/feffect; special path is for
+			// DFA facts, not re-deriving make_random effect_stm.
+			genStmEff := EmptyEffect()
+			if !StmIDUnset(st.StmID) {
+				genStmEff = fm.GetMapStmEffect(st.StmID)
+			}
 			_ = ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
 			ClearError()
+			if !StmIDUnset(st.StmID) && EffectComplete(genStmEff) {
+				fm.SetMapStmEffect(st.StmID, genStmEff)
+			}
 			if !FactsComplete(outputs) {
 				// incomplete outputs still fail closed sticky
 				fm.GlobalFacts = IncompleteFactSlice()
