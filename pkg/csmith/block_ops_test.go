@@ -729,6 +729,70 @@ func TestFindFixedPointShortcut(t *testing.T) {
 	_ = out
 }
 
+// TestFindFixedPointMultiPassMapAccumProgressive — Block.cpp:703–704 resets
+// EffectAccum only before the outer while, not between find_fixed_point do-while
+// iterations. A second full visit with EffectAccum still holding the first pass's
+// full-body reads rewrote map_accum_effect[early] (seed-189: other nRead 39→83
+// with g_6 → forward StatementGoto.cpp:125–128 choose_visible_read_var pick
+// g_6 vs UP g_1192). Observable contract: each full walk rebuilds from entry
+// EffectAccum so early stmts stay progressive (no later-only reads).
+func TestFindFixedPointMultiPassMapAccumProgressive(t *testing.T) {
+	ClearError()
+	early := CreateVariableScalars("g_early", GetIntType(), false, false)
+	late := CreateVariableScalars("g_late", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// Looping body with self-back edge path: force multi-pass when out differs.
+	b := &Block{
+		StmID:   100,
+		Func:    f,
+		Looping: true,
+		Stmts: []Stmt{
+			{
+				Kind: StmtAssign, StmID: 101, LhsVar: early,
+				Lhs:      &Lhs{Var: early, Type: GetIntType()},
+				Expr:     &Expression{Term: TermConstant, Con: MakeInt(1)},
+				AssignOp: AssignSimple,
+			},
+			{
+				Kind: StmtAssign, StmID: 102, LhsVar: late,
+				Lhs:      &Lhs{Var: late, Type: GetIntType()},
+				Expr:     &Expression{Term: TermVariable, Var: late, ExprType: GetIntType()},
+				AssignOp: AssignSimple,
+			},
+		},
+	}
+	fm := NewFactMgr(f)
+	entry := []*FactPointTo{}
+	fm.SetMapFactsIn(100, entry)
+	// Pre-seed visited + self-back so first iter merges then may re-walk.
+	fm.MapVisited = map[int]bool{100: true}
+	fm.SetMapFactsOut(100, entry)
+	fm.SetMapStmEffect(100, EmptyEffect())
+	fm.CreateCFGEdge(100, b, false, true)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	// Entry accum empty (post_creation reset to pre_effect).
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// First FP pass: progressive maps; if a second full walk runs, must not
+	// leave g_late on map_accum[101] when 101 only wrote g_early.
+	_, _, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
+	if !ok {
+		t.Fatalf("FindFixedPointBlock failed sticky=%v", HasError())
+	}
+	accEarly := fm.GetMapAccumEffect(101)
+	if !EffectComplete(accEarly) {
+		t.Fatal("map_accum[early] incomplete")
+	}
+	// late must not appear as a read on early stmt's progressive map_accum
+	// solely because a later pass held full-body EffectAccum.
+	if accEarly.IsRead(late) {
+		t.Fatalf("map_accum[early] polluted with later-only read g_late: reads=%v",
+			namesOf(accEarly.ReadVars()))
+	}
+	ClearError()
+}
+
 func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 	// Block.cpp:696–697 — FP only when is_loop_body || need_revisit || has_edge_in(false,true).
 	// has_edge_in: Statement.cpp:434–446 e->dest == this (the block).
