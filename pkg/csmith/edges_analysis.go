@@ -3,6 +3,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
 // Fact* always live in maps; nil subject/jump holes fail closed (*facts nil —
@@ -463,76 +464,62 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 				SetError(ErrGeneric)
 				return
 			}
-			// Statement.cpp:988 — FactVec outputs = pre_facts.
-			// C++ Fact* are shared with gen-time global_facts when renew/merge
-			// leave the same objects; mid-gen may-null often lives only on the
-			// post-gen lattice (new Fact* after merge replace). Starting special
-			// revalidate from pre_facts alone wiped that lattice (seed-363 g_73:
-			// WIPE StmVisitFacts_work / auto_edges_analysis_408 at d≈47294).
-			// Use live global_facts as the revalidate base (post-makeup pre is
-			// still stored as map_facts_in). Deep clone so visit mutations do not
-			// alias map_facts_in Fact objects.
+			// Statement.cpp:1006–1012 — FactVec outputs = pre_facts (after makeup);
+			// reset_effect_accum(pre_effect); validate_and_update_facts.
+			// Soft invent used post-gen GlobalFacts as the only revalidate base so
+			// visit ran under a richer lattice and failed on seed-561037, leaving
+			// gen-time map_stm_effect (first-build AddVisibleEffect effect_accum IV
+			// order: g_39 after g_35 vs UP after g_2402 once visit rewrites via
+			// feffect). Fair path: validate from pre_facts like C++.
+			//
+			// When visit fails (NDEBUG continues), C++ installs pre_facts. Go's
+			// visit still fails on some seeds where C++ succeeds (seed-363), and
+			// pre_facts lacks renew-replaced may-null Fact* that live only on the
+			// post-gen lattice. On visit failure keep post-gen GlobalFacts for the
+			// facts lattice only; map_stm_effect stays gen-time (visit did not
+			// rewrite) matching both. On visit success leave visit outputs +
+			// rewritten map. Never reinstall gen-time map after a successful visit.
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				SetError(ErrGeneric)
 				return
 			}
-			outputs := CloneFactSlice(fm.GlobalFacts)
-			// residual ERROR sticky — no invent soft-validate past CloneFactSlice residual
-			if HasError() {
-				fm.GlobalFacts = IncompleteFactSlice()
-				return
-			}
-			// Capture gen-time effect_stm + effect_accum BEFORE reset to pre_effect.
-			// Statement.cpp:854–857 / 988–994: special validate resets accum then
-			// re-walks; gen-time ReadVars (and map_stm_effect) can be richer than
-			// visit re-collection (seed-12 map_stm_effect; seed-294 goto cond
-			// ChooseVisibleReadVar nRead 233 vs 222 → ok 64 vs 60 → g_1501 vs g_81).
-			// Must snapshot accum before pre_effect clone or "gen" is actually pre.
-			genStmEff := EmptyEffect()
-			if !StmIDUnset(st.StmID) {
-				genStmEff = fm.GetMapStmEffect(st.StmID)
-			}
-			genAccumEff := EmptyEffect()
-			if cg.EffectAccum != nil && EffectComplete(*cg.EffectAccum) {
-				genAccumEff = cg.EffectAccum.Clone()
-				// residual ERROR sticky — no invent soft-validate past Accum Clone residual
-				if HasError() {
-					fm.GlobalFacts = IncompleteFactSlice()
-					return
-				}
-			}
-			// Statement.cpp:989 — reset_effect_accum(pre_effect) then validate
+			// Shallow Fact* copies (C++ FactVec assignment).
+			postGenFacts := append([]*FactPointTo(nil), fm.GlobalFacts...)
+			outputs := append([]*FactPointTo(nil), preFacts...)
+			// Statement.cpp:1007 — reset_effect_accum(pre_effect)
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
-				// residual ERROR sticky — no invent soft-validate past Effect Clone residual
 				if HasError() {
 					fm.GlobalFacts = IncompleteFactSlice()
 					return
 				}
 			}
-			// Statement.cpp:868–871 — assert(0) if !validate; NDEBUG elides assert and
-			// still installs outputs + special_handled (Release csmith does not abort).
-			// Do not sticky-poison generation: match NDEBUG continue (same class as
-			// FactUnion indirect==-1 under NDEBUG). Always-revisit may SetError on
-			// incomplete callee IR; clear soft fail like elided assert(0).
-			_ = ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
+			// Statement.cpp:1008–1010 — assert(0) if !validate; NDEBUG continues.
+			okV := ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
 			ClearError()
-			if !StmIDUnset(st.StmID) && EffectComplete(genStmEff) {
-				fm.SetMapStmEffect(st.StmID, genStmEff)
-			}
-			if !FactsComplete(outputs) {
-				// incomplete outputs still fail closed sticky
-				fm.GlobalFacts = IncompleteFactSlice()
-				SetError(ErrGeneric)
-				return
-			}
-			fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
-			// Restore gen-time effect_accum so trailing SetMapAccumEffect records it
-			// and subsequent back-edge goto cond (get_effect_accum read_vars) sees
-			// gen-time ReadVars (StatementGoto.cpp:119–122).
-			if cg.EffectAccum != nil && EffectComplete(genAccumEff) {
-				*cg.EffectAccum = genAccumEff
+			if okV {
+				if !FactsComplete(outputs) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					SetError(ErrGeneric)
+					return
+				}
+				fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
+				// map_stm_effect / effect_accum: post-validate (visit rewrite or
+				// pure-shortcut re-fold). Do not reinstall gen-time map.
+			} else {
+				// Visit failed under NDEBUG: C++ installs pre_facts. Go visit still
+				// fails on seeds where C++ succeeds; pre_facts then lacks
+				// renew-replaced may-null Fact* that only live on post-gen
+				// GlobalFacts (seed-363). Keep post-gen facts lattice only;
+				// map_stm_effect remains gen-time (visit did not rewrite);
+				// effect_accum stays at reset pre_effect (C++ on visit fail).
+				if !FactsComplete(postGenFacts) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					SetError(ErrGeneric)
+					return
+				}
+				fm.SetGlobalFacts(postGenFacts, "auto_edges_analysis_408")
 			}
 			specialHandled = true
 		}
