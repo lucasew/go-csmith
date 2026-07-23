@@ -926,6 +926,162 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	fm.MapFactsOut[st.StmID] = append(fm.MapFactsOut[st.StmID], cl)
 }
 
+// AddFactOutUnion is the eUnionWrite half of FactMgr::add_fact_out.
+// FactMgr.cpp:281–308 — same visibility filters as AddFactOut (return /
+// break+continue loop head / goto dest). Soft invent of AddNewVarFactAndUpdate
+// union-out path used only IsVarVisible(parent) → re-appended loop-nested
+// union subjects onto continue/break map_out after remove_loop_local (seed
+// 2020240685: continue 39 map_out kept l_237 → body 26 map_in pollution →
+// post_loop break invent BOTTOM → VisitFacts nonreadable).
+func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
+	if fm == nil || st == nil || fact == nil || fact.Var == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if StmIDUnset(st.StmID) {
+		SetError(ErrGeneric)
+		return
+	}
+	if fm.MapUnionFactsOut == nil {
+		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+	}
+	if !UnionFactsComplete([]*FactUnion{fact}) {
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	if prev, ok := fm.MapUnionFactsOut[st.StmID]; ok && !UnionFactsComplete(prev) {
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	f := fm.Func
+	if f != nil && !fact.Var.IsGlobal() {
+		if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+		if !f.StackScanComplete(stParent) {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		if !f.IsVarVisible(fact.Var, stParent) {
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+	} else if f != nil {
+		if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+		if !f.IsVarVisible(fact.Var, stParent) {
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+	}
+	switch st.Kind {
+	case StmtReturn:
+		if !fact.Var.IsGlobal() {
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+	case StmtBreak, StmtContinue:
+		// FactMgr.cpp:288–296 — visible at enclosing looping block
+		b := stParent
+		for b != nil && !b.Looping {
+			b = b.Parent
+		}
+		if f != nil && !fact.Var.IsGlobal() {
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				return
+			}
+			if !f.StackScanComplete(b) {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
+				return
+			}
+		} else if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+		if f != nil && !f.IsVarVisible(fact.Var, b) {
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+			return
+		}
+	case StmtGoto:
+		destParent := st.GotoDestParent
+		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && f != nil {
+			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				return
+			}
+		}
+		if destParent != nil && f != nil {
+			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				return
+			}
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				return
+			}
+			if !f.IsVarVisible(fact.Var, destParent) {
+				if HasError() {
+					fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				}
+				return
+			}
+			if HasError() {
+				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+				return
+			}
+		}
+	}
+	cl := fact.Clone()
+	if HasError() {
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+		return
+	}
+	if cl == nil {
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	fm.MapUnionFactsOut[st.StmID] = append(fm.MapUnionFactsOut[st.StmID], cl)
+}
+
 // UpdateFactsForDest mirrors FactMgr::update_facts_for_dest.
 // FactMgr.cpp:424–456 — merge facts; OOS locals at dest become garbage/dropped.
 // Incomplete inputs fail closed sticky via IncompleteFactSlice (not bare nil —
@@ -2647,12 +2803,15 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				fm.MapUnionFactsIn[id] = append(fm.MapUnionFactsIn[id], uf)
 			}
 		}
-		// map_facts_out eUnionWrite — all outs when blk==nil; visibility when blk set
+		// map_facts_out eUnionWrite — FactMgr.cpp:96–105: blk==nil push_all;
+		// blk!=nil add_fact_out (return/break/continue/goto filters). Soft invent
+		// used IsVarVisible(parent) only → continue map_out re-gained nested
+		// union locals after remove_loop_local (seed 2020240685 l_237).
 		if fm.MapFactsOut == nil && fm.MapUnionFactsOut == nil {
 			continue
 		}
 		if blk == nil {
-			// prefer PT out keys (single FactVec); fall back to union-only
+			// FactMgr.cpp:102–103 — global var: append to all outs (no add_fact_out)
 			ids := map[int]struct{}{}
 			if fm.MapFactsOut != nil {
 				for id := range fm.MapFactsOut {
@@ -2675,11 +2834,20 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
 					continue
 				}
-				fm.MapUnionFactsOut[id] = append(slot, uf)
+				cp := uf.Clone()
+				if cp == nil || HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return
+				}
+				fm.MapUnionFactsOut[id] = append(slot, cp)
 			}
 			continue
 		}
-		// blk != nil: visibility-filtered outs — union keys = PT out keys ∪ union out keys
+		// FactMgr.cpp:100–101 — add_fact_out for every map_facts_out key
 		outIDs := map[int]struct{}{}
 		if fm.MapFactsOut != nil {
 			for id := range fm.MapFactsOut {
@@ -2695,39 +2863,14 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 		}
 		for id := range outIDs {
-			slot, ok := fm.MapUnionFactsOut[id]
-			if !ok {
-				slot = []*FactUnion{}
-			} else if !UnionFactsComplete(slot) {
-				fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
-				continue
-			}
-			// visibility: globals always; locals via IsVarVisible at map key
 			st := FindStmtByID(fm.Func, id)
 			if HasError() {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
 			}
-			if st != nil {
-				parent := FindParentBlockOfStmID(fm.Func, id)
-				if HasError() {
-					fm.GlobalFacts = IncompleteFactSlice()
-					fm.UnionFacts = IncompleteUnionFactSlice()
-					return
-				}
-				if fm.Func != nil && !uf.Var.IsGlobal() {
-					vis := fm.Func.IsVarVisible(uf.Var, parent)
-					if HasError() {
-						fm.GlobalFacts = IncompleteFactSlice()
-						fm.UnionFacts = IncompleteUnionFactSlice()
-						return
-					}
-					if !vis {
-						continue
-					}
-				}
-			} else {
+			if st == nil {
+				// Block StmID key (if_true / for-body): eBlock path — IsVarVisible(parent)
 				b := blockByStmID(fm.Func, id)
 				if b == nil {
 					continue
@@ -2743,8 +2886,37 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 						continue
 					}
 				}
+				slot, ok := fm.MapUnionFactsOut[id]
+				if !ok {
+					slot = []*FactUnion{}
+				} else if !UnionFactsComplete(slot) {
+					fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
+					continue
+				}
+				cp := uf.Clone()
+				if cp == nil || HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return
+				}
+				fm.MapUnionFactsOut[id] = append(slot, cp)
+				continue
 			}
-			fm.MapUnionFactsOut[id] = append(slot, uf)
+			parent := FindParentBlockOfStmID(fm.Func, id)
+			if HasError() {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				return
+			}
+			fm.AddFactOutUnion(st, parent, uf)
+			if HasError() {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				return
+			}
 		}
 	}
 }

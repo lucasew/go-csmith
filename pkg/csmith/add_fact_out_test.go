@@ -221,3 +221,88 @@ func TestArrayIsVariant(t *testing.T) {
 	}
 	ClearError()
 }
+
+// TestAddFactOutUnionContinueDropsNestedLoopLocal —
+// FactMgr.cpp:288–296 + add_new_var_fact_and_update_inout_maps:96–105.
+// Soft invent: eUnionWrite half of AddNewVarFactAndUpdate used IsVarVisible(parent)
+// only → continue map_out re-gained nested loop-local unions after remove_loop_local
+// (seed 2020240685: continue 39 kept l_237 → for-body map_in pollution →
+// post_loop break invent BOTTOM → VisitFacts nonreadable → FP strip).
+func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	// loop body (looping)
+	body := &Block{Func: f, Looping: true, StmID: 26}
+	// nested block declares union local
+	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	l237 := CreateVariableScalars("l_237", ut, false, false)
+	nested := &Block{Func: f, Parent: body, Looping: false, StmID: 27, LocalVars: []*Variable{l237}}
+	// continue lives deeper under nested
+	contParent := &Block{Func: f, Parent: nested, Looping: false, StmID: 31}
+	cont := &Stmt{Kind: StmtContinue, StmID: 39}
+	contParent.Stmts = []Stmt{*cont}
+	// point cont at slice element for AddFactOut
+	cont = &contParent.Stmts[0]
+	f.Blocks = []*Block{body, nested, contParent}
+	fm := NewFactMgr(f)
+	// seed map_out with empty complete (as after set_fact_out remove_loop_local)
+	fm.MapFactsOut = map[int][]*FactPointTo{39: {}}
+	fm.MapUnionFactsOut = map[int][]*FactUnion{39: {}}
+	// add_fact_out union for nested local must drop (not visible at loop head body)
+	uf := MakeFactUnion(l237, 0)
+	fm.AddFactOutUnion(cont, contParent, uf)
+	if HasError() {
+		t.Fatal("AddFactOutUnion sticky", GetError())
+	}
+	outU := fm.GetMapUnionFactsOut(39)
+	if !UnionFactsComplete(outU) {
+		t.Fatal("map_union_out incomplete", outU)
+	}
+	if FindRelatedUnion(outU, l237) != nil {
+		t.Fatalf("continue map_out must drop nested loop-local union l_237, got %v", outU)
+	}
+	// global union still accepted
+	gU := CreateVariableScalars("g_u", ut, true, false)
+	fm.AddFactOutUnion(cont, contParent, MakeFactUnion(gU, 0))
+	if FindRelatedUnion(fm.GetMapUnionFactsOut(39), gU) == nil {
+		t.Fatal("continue map_out must keep global union subject")
+	}
+}
+
+// TestAddNewVarFactAndUpdateUnionContinueFilter —
+// end-to-end: AddNewVarFactAndUpdate must not re-append nested union onto continue out.
+func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	body := &Block{Func: f, Looping: true, StmID: 26}
+	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	// Init required for complete union abstract (array_type_test.go:576)
+	l237 := &Variable{Name: "l_237", Type: ut, Init: MakeInt(0)}
+	nested := &Block{Func: f, Parent: body, Looping: false, StmID: 27, LocalVars: []*Variable{l237}}
+	contParent := &Block{Func: f, Parent: nested, Looping: false, StmID: 31}
+	contParent.Stmts = []Stmt{{Kind: StmtContinue, StmID: 39}}
+	f.Blocks = []*Block{body, nested, contParent}
+	f.Body = body
+	fm := NewFactMgr(f)
+	// pre-seed continue map_out empty complete (post remove_loop_local)
+	fm.MapFactsOut = map[int][]*FactPointTo{39: {}}
+	fm.MapUnionFactsOut = map[int][]*FactUnion{39: {}}
+	// also seed an assign out (non-jump) so PT map has keys
+	fm.MapFactsOut[100] = []*FactPointTo{}
+	fm.MapUnionFactsOut[100] = []*FactUnion{}
+	// declare nested local under nested block
+	fm.AddNewVarFactAndUpdate(nested, l237)
+	if HasError() {
+		t.Fatal("AddNewVarFactAndUpdate sticky", GetError())
+	}
+	if FindRelatedUnion(fm.GetMapUnionFactsOut(39), l237) != nil {
+		t.Fatalf("AddNewVarFactAndUpdate must not re-append l_237 onto continue map_out, got %v",
+			fm.GetMapUnionFactsOut(39))
+	}
+}
