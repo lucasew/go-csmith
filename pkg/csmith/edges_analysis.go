@@ -463,7 +463,21 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 				SetError(ErrGeneric)
 				return
 			}
-			outputs := CloneFactSlice(preFacts)
+			// Statement.cpp:988 — FactVec outputs = pre_facts.
+			// C++ Fact* are shared with gen-time global_facts when renew/merge
+			// leave the same objects; mid-gen may-null often lives only on the
+			// post-gen lattice (new Fact* after merge replace). Starting special
+			// revalidate from pre_facts alone wiped that lattice (seed-363 g_73:
+			// WIPE StmVisitFacts_work / auto_edges_analysis_408 at d≈47294).
+			// Use live global_facts as the revalidate base (post-makeup pre is
+			// still stored as map_facts_in). Deep clone so visit mutations do not
+			// alias map_facts_in Fact objects.
+			if !FactsComplete(fm.GlobalFacts) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
+				return
+			}
+			outputs := CloneFactSlice(fm.GlobalFacts)
 			// residual ERROR sticky — no invent soft-validate past CloneFactSlice residual
 			if HasError() {
 				fm.GlobalFacts = IncompleteFactSlice()
