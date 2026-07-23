@@ -1963,7 +1963,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		if HasError() {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
 		}
-		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, rhs)
+		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, nil, rhs)
 		// residual ERROR sticky — no invent soft-empty init past AbstractFactUnion residual
 		if HasError() {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
@@ -2819,11 +2819,20 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	return true, true
 }
 
-// UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts).
-// FactMgr.cpp:370–395 — renew vs merge; FactUnion abstract_fact_for_assign.
+// UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts)
+// with bare Variable (lhsWant = Variable.Type). Prefer UpdateFactForAssignWant when
+// Lhs::get_type() is available (deref-to-union / ExpressionAssign).
+func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
+	return fm.UpdateFactForAssignWant(lhs, lhsIndir, nil, rhs)
+}
+
+// UpdateFactForAssignWant is update_fact_for_assign with Lhs desired type.
+// FactMgr.cpp:370–395 + FactUnion.cpp:133 — abstract uses lhs->get_type(), not
+// var->type. Soft invent passed Variable only: (*union_ptr)= never transferred
+// eUnionWrite (seed-177 g_88 stayed BOTTOM while UP renewed via (*l_90)=).
 // Incomplete point-to apply or union merge fails closed (false; GlobalFacts and/or
 // UnionFacts cleared — no invent continue union after wiped point-to or partial maps).
-func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
+func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant *Type, rhs *Expression) bool {
 	// FactMgr always has live Lhs subject; sticky no invent soft-skip assign update
 	if fm == nil || lhs == nil {
 		SetError(ErrGeneric)
@@ -2850,7 +2859,8 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	}
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
 	// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
-	ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, rhs)
+	// lhsWant = Lhs::get_type(); nil → Variable.Type
+	ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, lhsWant, rhs)
 	// incomplete abstract must not invent empty union merge success; leave prior
 	// complete UnionFacts for factory re-pick (do not poison)
 	if !UnionFactsComplete(ufacts) {
@@ -3429,6 +3439,11 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 // Incomplete point-to apply or union merge fails closed like UpdateFactForAssign
 // (no invent continue union after wiped *facts).
 func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
+	return fm.UpdateFactForAssignIntoWant(lhs, lhsIndir, nil, rhs, facts)
+}
+
+// UpdateFactForAssignIntoWant is assign-into with Lhs desired type (see UpdateFactForAssignWant).
+func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsWant *Type, rhs *Expression, facts *[]*FactPointTo) bool {
 	// FactMgr assign-into always has live lhs + facts accumulator; sticky no invent soft-skip
 	if facts == nil || lhs == nil {
 		SetError(ErrGeneric)
@@ -3450,7 +3465,7 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 	}
 	if fm != nil {
 		// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
-		ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
+		ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, lhsWant, rhs)
 		// incomplete abstract: fail closed without poisoning prior complete UnionFacts
 		if !UnionFactsComplete(ufacts) {
 			return false

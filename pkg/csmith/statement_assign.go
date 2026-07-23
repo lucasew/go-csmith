@@ -1261,7 +1261,16 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
 		// Go: GlobalFacts is the visit working set (cloned into by StmVisitFacts).
-		_ = cg.FM.UpdateFactForAssign(lhsVar, indir, st.GetAssignRhs())
+		// FactUnion.cpp:133 — pass Lhs::get_type() (desired), not Variable.Type.
+		// Soft invent UpdateFactForAssign(var,…) missed (*union*) eUnionWrite transfer.
+		var lhsWant *Type
+		if st.Lhs != nil {
+			lhsWant = st.Lhs.GetType()
+			if HasError() {
+				return false
+			}
+		}
+		_ = cg.FM.UpdateFactForAssignWant(lhsVar, indir, lhsWant, st.GetAssignRhs())
 		// incomplete assign sticky (no invent visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			if !HasError() {

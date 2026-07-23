@@ -568,7 +568,7 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	// Type-nil non-special already sticky; complete non-union empty transfer hygiene.
 	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
-	out, n := AbstractFactUnionForAssign(nil, nil, iv, 0, nil)
+	out, n := AbstractFactUnionForAssign(nil, nil, iv, 0, nil, nil)
 	if !UnionFactsComplete(out) && out != nil {
 		// IncompleteUnionFactSlice when incomplete maps — nil maps are complete empty
 	}
@@ -580,7 +580,7 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	ClearError()
 	// Type-nil non-special sticky
 	hole := &Variable{Name: "g_x", Type: nil}
-	uf, _ := AbstractFactUnionForAssign(nil, nil, hole, 0, nil)
+	uf, _ := AbstractFactUnionForAssign(nil, nil, hole, 0, nil, nil)
 	if UnionFactsComplete(uf) {
 		// IncompleteUnionFactSlice is not complete
 		t.Fatal("Type-nil must fail closed incomplete", uf)
@@ -675,7 +675,7 @@ func TestAbstractFactUnionForAssignGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-abstract union past array shell.
 	ClearError()
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	out, _ := AbstractFactUnionForAssign(nil, nil, shell, 0, nil)
+	out, _ := AbstractFactUnionForAssign(nil, nil, shell, 0, nil, nil)
 	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}

@@ -884,6 +884,13 @@ func RhsToLhsTransferUnion(
 // AbstractFactUnionForAssign mirrors FactUnion::abstract_fact_for_assign.
 // FactUnion.cpp:121–154 — union-typed LHS transfers fid; union-field write
 // records parent fid; padding/packed-after-bitfield → BOTTOM on container.
+//
+// lhsWant is Lhs::get_type() (FactUnion.cpp:133) — the *desired* type after
+// dereference, not Variable::type. Soft invent used lhs.Type (the pointer
+// shell for `(*p)=…` where p is union*) so whole-union assigns never took
+// rhs_to_lhs_transfer; eUnionWrite stayed BOTTOM while UP renewed from (*p)=.
+// nil lhsWant falls back to lhs.Type (bare Variable paths / tests).
+//
 // Returns (factsOut, lvarCount). Hard IR (nil lhs, nil pointee, MakeFact fail)
 // sticky; incomplete maps/MergePointees stay non-sticky hole markers.
 func AbstractFactUnionForAssign(
@@ -891,6 +898,7 @@ func AbstractFactUnionForAssign(
 	ptFacts []*FactPointTo,
 	lhs *Variable,
 	lhsIndir int,
+	lhsWant *Type,
 	rhs *Expression,
 ) (out []*FactUnion, lvarCnt int) {
 	if lhs == nil {
@@ -916,15 +924,21 @@ func AbstractFactUnionForAssign(
 		return IncompleteUnionFactSlice(), 0
 	}
 	lvarCnt = len(lvars)
+	// FactUnion.cpp:133 — lhs->get_type() (Lhs desired type), not var->type.
+	// Soft invent used Variable.Type: (*union*) never matched eUnion.
+	want := lhsWant
+	if want == nil {
+		want = lhs.Type
+	}
 	// FactUnion.cpp:129 — lhs->get_type() always live Type&; Type-nil shell sticky
 	// (no invent non-union complete transfer soft-skip past incomplete LHS type)
 	// Special null/garbage/tbd have Type nil by design — complete non-union path.
-	if lhs.Type == nil {
+	if want == nil {
 		if !IsSpecialPtr(lhs) {
 			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
-	} else if lhs.Type.IsUnion() {
+	} else if want.IsUnion() {
 		// residual ERROR sticky — no invent union transfer past IsUnion residual hole
 		if HasError() {
 			return IncompleteUnionFactSlice(), lvarCnt

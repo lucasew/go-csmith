@@ -305,7 +305,7 @@ func TestAbstractFactUnionForAssignField(t *testing.T) {
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0, {Name: "g_u.f1", Type: GetIntType(), FieldVarOf: parent}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
-	out, n := AbstractFactUnionForAssign(nil, nil, f0, 0, rhs)
+	out, n := AbstractFactUnionForAssign(nil, nil, f0, 0, nil, rhs)
 	if n != 1 || len(out) != 1 || out[0].Var != parent || out[0].LastWrittenFID != 0 {
 		t.Fatalf("n=%d out=%+v", n, out)
 	}
@@ -317,7 +317,7 @@ func TestAbstractFactUnionForAssignUnionTypedLHS(t *testing.T) {
 	}}
 	lhs := &Variable{Name: "g_u", Type: ut}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
-	out, n := AbstractFactUnionForAssign(nil, nil, lhs, 0, rhs)
+	out, n := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
 	if n != 1 || len(out) != 1 || out[0].LastWrittenFID != 0 {
 		t.Fatalf("n=%d out=%+v", n, out)
 	}
@@ -340,7 +340,7 @@ func TestAbstractFactUnionPaddingBottom(t *testing.T) {
 	nested := &Variable{Name: "g_u.f0.sub", Type: st, FieldVarOf: ufield}
 	parent.FieldVars = []*Variable{ufield}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	out, _ := AbstractFactUnionForAssign(nil, nil, nested, 0, rhs)
+	out, _ := AbstractFactUnionForAssign(nil, nil, nested, 0, nil, rhs)
 	if len(out) != 1 || out[0].Var != parent || !out[0].IsBottom() {
 		t.Fatalf("%+v", out)
 	}
@@ -351,7 +351,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	ClearError()
 	lhs := &Variable{Name: "g_x", Type: nil}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
-	out, _ := AbstractFactUnionForAssign(nil, nil, lhs, 0, rhs)
+	out, _ := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
 	if UnionFactsComplete(out) {
 		t.Fatal("Type-nil LHS must IncompleteUnionFactSlice, not invent non-union complete")
 	}
@@ -360,7 +360,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	}
 	ClearError()
 	// special null Type-nil is complete non-union path (by design)
-	out2, n := AbstractFactUnionForAssign(nil, nil, NullPtr, 0, rhs)
+	out2, n := AbstractFactUnionForAssign(nil, nil, NullPtr, 0, nil, rhs)
 	if !UnionFactsComplete(out2) || n != 1 {
 		t.Fatalf("special Type-nil must complete non-union path n=%d out=%+v", n, out2)
 	}
@@ -373,7 +373,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	parentHole := &Variable{Name: "g_u", Type: nil}
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parentHole}
 	parentHole.FieldVars = []*Variable{f0}
-	out3, _ := AbstractFactUnionForAssign(nil, nil, f0, 0, rhs)
+	out3, _ := AbstractFactUnionForAssign(nil, nil, f0, 0, nil, rhs)
 	if UnionFactsComplete(out3) {
 		t.Fatal("IsUnionField residual AbstractFactUnion must fail closed incomplete")
 	}

@@ -72,7 +72,15 @@ func MakeExpressionAssign(
 		if HasError() {
 			return nil
 		}
-		_ = cg.FM.UpdateFactForAssign(st.LhsVar, indir, rhs)
+		// FactUnion.cpp:133 — Lhs::get_type() for eUnionWrite abstract (not Variable.Type).
+		var lhsWant *Type
+		if st.Lhs != nil {
+			lhsWant = st.Lhs.GetType()
+			if HasError() {
+				return nil
+			}
+		}
+		_ = cg.FM.UpdateFactForAssignWant(st.LhsVar, indir, lhsWant, rhs)
 		// residual ERROR sticky — no invent ExpressionAssign shell past UpdateFact residual
 		// incomplete assign must not invent ExpressionAssign shell with wiped facts
 		if HasError() || !FactsComplete(cg.FM.GlobalFacts) {
