@@ -2300,7 +2300,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	}
 	// pointer (Fact.cpp:94–95)
 	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
-	pt = AbstractFactForAssign(nil, v, 0, rhs)
+	pt, _ = AbstractFactForAssign(nil, v, 0, rhs)
 	// residual ERROR sticky — no invent soft-empty init past AbstractFact residual
 	if HasError() {
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
@@ -2326,7 +2326,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 				SetError(ErrGeneric)
 				return IncompleteFactSlice(), nil
 			}
-			more := AbstractFactForAssign(nil, v, 0, e)
+			more, _ := AbstractFactForAssign(nil, v, 0, e)
 			// live Expression* alt path: incomplete abstract sticky
 			// (no invent soft-skip incomplete init alt / soft re-pick past hole)
 			if !FactsComplete(more) {
@@ -3060,12 +3060,14 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 }
 
 // applyPointToAssignFacts applies point-to facts from abstract_fact_for_assign.
-// FactMgr.cpp:376–388 — renew when definitive single non-array LHS; else merge.
+// FactMgr.cpp:376–388 — renew when lvar_cnt==1 non-array; else merge (may-point-to).
+// lvarCnt is abstract_fact_for_assign's return (lvars.size(), includes specials
+// that make_facts skips — seed-363: *p with p→{null,g_73} must merge not renew).
 // Returns (changed, ok). ok=false means incomplete map/merge — no invent apply success.
 // Incomplete *facts is wiped to IncompleteFactSlice. Incomplete newFacts alone fails
 // closed without wiping prior complete *facts (factory re-pick must not poison FM).
 // empty complete newFacts is ok with changed=false.
-func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) (changed bool, ok bool) {
+func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo, lvarCnt int) (changed bool, ok bool) {
 	// facts accumulator always live; sticky (no invent soft-skip assign apply past hole)
 	if facts == nil {
 		SetError(ErrGeneric)
@@ -3082,31 +3084,11 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	if !FactsComplete(newFacts) {
 		return false, false
 	}
+	// FactMgr.cpp:376 — if (facts.size() > 0)
 	if len(newFacts) == 0 {
 		return false, true
 	}
-	lvars := lhsAssignPointees(*facts, lhs, lhsIndir)
-	// incomplete pointees must not invent lvar_cnt via len(IncompleteVariables)==1 renew
-	// or len(nil)==0 merge-as-empty success
-	if !VariablesComplete(lvars) {
-		*facts = IncompleteFactSlice()
-		SetError(ErrGeneric)
-		return false, false
-	}
-	lvarCnt := len(lvars)
-	// when AbstractFactForAssign used direct pointer path, lvarCnt matches transfer targets
-	if lvarCnt == 0 && lhs != nil && lhsIndir == 0 && lhs.IsPointer() {
-		// residual ERROR sticky — no invent soft-lvarCnt past IsPointer residual hole
-		if HasError() {
-			*facts = IncompleteFactSlice()
-			return false, false
-		}
-		lvarCnt = 1
-	} else if HasError() {
-		// residual ERROR sticky — no invent soft-continue merge past IsPointer residual false
-		*facts = IncompleteFactSlice()
-		return false, false
-	}
+	// FactMgr.cpp:380 — lvar_cnt == 1 && !isArray → renew; else merge
 	if lvarCnt == 1 && newFacts[0] != nil && newFacts[0].Var != nil && !newFacts[0].Var.IsArray {
 		// definitive assignment — renew (strong replace)
 		// residual ERROR sticky — no invent soft-continue merge later past RenewFact hole
@@ -3174,9 +3156,9 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 		return false
 	}
 	changed := false
-	newFacts := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
+	newFacts, lvarCnt := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
 	// incomplete abstract must not invent empty apply success then union merge
-	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts)
+	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// if GlobalFacts was wiped (was already incomplete), also wipe union;
 		// incomplete newFacts alone leaves complete GlobalFacts for factory re-pick
@@ -3785,8 +3767,8 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 		return false
 	}
 	changed := false
-	newFacts := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
-	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts)
+	newFacts, lvarCnt := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
+	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// only wipe union when *facts was incomplete (wiped); incomplete abstract alone
 		// leaves prior complete map for factory re-pick

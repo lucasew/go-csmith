@@ -208,7 +208,7 @@ func TestAbstractFactNonPointerLHS(t *testing.T) {
 	v := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	// non-pointer scalar: complete empty (no pointer facts), not incomplete marker
-	if out := AbstractFactForAssign(nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
+	if out, _ := AbstractFactForAssign(nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
 		t.Fatal("non-ptr must be complete empty", out)
 	}
 }
@@ -428,7 +428,7 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 	}
 	// assign non-pointer field x = 0 → union path updates p0 and p1
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
-	facts := AbstractFactForAssign(nil, xField, 0, rhs)
+	facts, _ := AbstractFactForAssign(nil, xField, 0, rhs)
 	got0 := FindRelatedPointTo(facts, p0)
 	got1 := FindRelatedPointTo(facts, p1)
 	if got0 == nil || got1 == nil {
@@ -529,7 +529,8 @@ func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 
 func TestAbstractFactForAssignNilLhsSticky(t *testing.T) {
 	ClearError()
-	if FactsComplete(AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})) {
+	outAF, _ := AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})
+	if FactsComplete(outAF) {
 		t.Fatal("nil lhs AbstractFactForAssign must fail closed incomplete")
 	}
 	if !HasError() {
@@ -553,7 +554,7 @@ func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 		MakeFactPointTo(q, shell),
 	}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
-	out := AbstractFactForAssign(factsIn, p, 1, rhs)
+	out, _ := AbstractFactForAssign(factsIn, p, 1, rhs)
 	if FactsComplete(out) {
 		t.Fatal("Type-nil more pointee must fail closed incomplete, not partial transfer", out)
 	}
@@ -661,7 +662,7 @@ func TestAbstractFactForAssignGetCollectiveResidualSticky(t *testing.T) {
 	ClearError()
 	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
-	out := AbstractFactForAssign(nil, shell, 0, rhs)
+	out, _ := AbstractFactForAssign(nil, shell, 0, rhs)
 	if FactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}

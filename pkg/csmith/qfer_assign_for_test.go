@@ -205,7 +205,7 @@ func TestAbstractFactAggregatePointerFields(t *testing.T) {
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	// address-of style: indirect -1 on tgt would need expr; use null const
 	rhs = &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
-	facts := AbstractFactForAssign(nil, parent, 0, rhs)
+	facts, _ := AbstractFactForAssign(nil, parent, 0, rhs)
 	if len(facts) == 0 {
 		t.Fatal("no facts")
 	}

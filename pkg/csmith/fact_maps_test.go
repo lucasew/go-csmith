@@ -799,7 +799,7 @@ func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
 	av.Name = "p"
 	av.Type = elem
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
-	pt := AbstractFactForAssign(nil, &av.Variable, 0, rhs)
+	pt, _ := AbstractFactForAssign(nil, &av.Variable, 0, rhs)
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("n=%d complete=%v err=%v", len(pt), FactsComplete(pt), HasError())
 	}
