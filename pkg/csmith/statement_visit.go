@@ -725,8 +725,14 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		for _, e := range edges {
 			out := cg.FM.GetMapFactsOut(e.SrcID)
-			// incomplete jump facts sticky via tryMergeJumpFacts
+			// FactMgr.cpp:569–588 — merge_jump_facts is full FactVec (ePointTo + eUnionWrite).
+			// Soft invent was PT-only tryMergeJumpFacts; break arms' eUnionWrite never joined
+			// (post_loop already merges both; visit path must match StatementFor.cpp:465).
 			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
+				return false
+			}
+			outU := cg.FM.GetMapUnionFactsOut(e.SrcID)
+			if !mergeJumpUnionFacts(&cg.FM.UnionFacts, outU) {
 				return false
 			}
 		}

@@ -619,6 +619,49 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 	}
 }
 
+// StatementFor.cpp:465 + FactMgr.cpp:569–588 — break merge_jump_facts is full FactVec
+// (ePointTo + eUnionWrite). Soft invent was PT-only on the visit path.
+func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.CreateFieldVars()
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	body := &Block{StmID: 40, Func: f, Looping: true}
+	st := &Stmt{
+		Kind: StmtFor, StmID: 12,
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 1, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
+		Then: body,
+	}
+	// live last=f0; break arm last=f1 → join BOTTOM (FactUnion.cpp merge_jump_facts)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	fm.GlobalFacts = []*FactPointTo{}
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 12, PostDest: true}}
+	fm.SetMapFactsOutPair(99, []*FactPointTo{}, []*FactUnion{MakeFactUnion(uv, 1)})
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsStatementFor(st, &cg, Defaults()) {
+		t.Fatal("visit", GetError())
+	}
+	got := FindRelatedUnion(fm.UnionFacts, uv)
+	if got == nil {
+		t.Fatal("missing union after break merge")
+	}
+	if !got.IsBottom() {
+		t.Fatalf("break last=f1 join live last=f0 must BOTTOM, got %#v", got)
+	}
+}
+
 func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	// Statement::stm_id always live; StmID 0 + FM sticky
 	// (no invent visit success without map_stm_effect / soft re-pick)
