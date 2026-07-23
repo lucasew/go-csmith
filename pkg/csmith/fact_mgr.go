@@ -967,6 +967,73 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 	}
 }
 
+// UpdateUnionFactsForDest is the eUnionWrite half of FactMgr::update_facts_for_dest.
+// FactMgr.cpp:450–482 — merge non-rv facts into facts_out; drop OOS subjects.
+// Used by StatementGoto forward path (full FactVec with UpdateFactsForDest).
+// Incomplete inputs fail closed sticky IncompleteUnionFactSlice.
+func UpdateUnionFactsForDest(factsIn []*FactUnion, factsOut *[]*FactUnion, f *Function, destParent *Block) {
+	if factsOut == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if f == nil {
+		*factsOut = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	if !UnionFactsComplete(factsIn) {
+		*factsOut = IncompleteUnionFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	if *factsOut == nil {
+		*factsOut = []*FactUnion{}
+	}
+	var oosVars []*Variable
+	seen := map[*Variable]bool{}
+	addOOS := func(v *Variable) {
+		if v == nil || seen[v] {
+			return
+		}
+		seen[v] = true
+		oosVars = append(oosVars, v)
+	}
+	for _, fact := range factsIn {
+		if fact == nil || fact.Var == nil {
+			*factsOut = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
+		if isReturnVar(fact.Var) {
+			continue
+		}
+		if f.IsVarOOS(fact.Var, destParent) {
+			if HasError() {
+				*factsOut = IncompleteUnionFactSlice()
+				return
+			}
+			addOOS(fact.Var)
+		} else if HasError() {
+			*factsOut = IncompleteUnionFactSlice()
+			return
+		}
+		// FactMgr.cpp:479 — merge_fact(facts_out, f) for every non-rv subject
+		merged := MergeUnionFact(*factsOut, fact)
+		if !UnionFactsComplete(merged) {
+			*factsOut = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		*factsOut = merged
+	}
+	UpdateUnionFactsForOOSVars(oosVars, factsOut)
+	if HasError() {
+		*factsOut = IncompleteUnionFactSlice()
+	}
+}
+
 // ClearMapVisited mirrors FactMgr::clear_map_visited.
 // FactMgr.cpp:510–514 — set all visited flags false (keep keys).
 // FactMgr always live; sticky (no invent soft-skip clear past hole).

@@ -107,6 +107,97 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	}
 }
 
+// StatementGoto.cpp:167 + FactMgr.cpp:569–588 — forward goto merge_jump_facts is
+// full FactVec. Soft invent merged PT-only then never rewound UnionFacts from
+// map_facts_out[dest] (seed-104: else-start goto left g_111 last=0 vs UP BOTTOM).
+// Contract: dest map_in last=0 + empty goto_out unions → BOTTOM after merge_jump;
+// AssignGlobalFactsFromMapOut installs that lattice into live UnionFacts.
+func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := CreateVariableScalars("g_u_goto", ut, false, false)
+	parent.CreateFieldVars()
+	// dest map_facts_in: last=0 (readable f0)
+	entryU := MakeFactUnion(parent, 0)
+	if entryU == nil {
+		t.Fatal("entry")
+	}
+	// goto_out lacks g_u → merge_jump synthesizes BOTTOM (FactMgr.cpp:580–582)
+	stmInU := []*FactUnion{entryU.Clone()}
+	if stmInU[0] == nil {
+		t.Fatal("clone")
+	}
+	gotoOutU := []*FactUnion{} // missing subject
+	if !mergeJumpUnionFacts(&stmInU, gotoOutU) {
+		t.Fatal("merge_jump union", GetError())
+	}
+	got := FindRelatedUnion(stmInU, parent)
+	if got == nil || !got.IsBottom() {
+		t.Fatalf("dest last=0 ⊕ missing goto_out must BOTTOM, got %#v", got)
+	}
+	// set_fact_out pairs then AssignGlobalFactsFromMapOut rewinds live
+	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
+	// live still last=0 (as before fix)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	fm.GlobalFacts = []*FactPointTo{}
+	destID := 42
+	fm.SetMapFactsOutPair(destID, []*FactPointTo{}, stmInU)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	fm.AssignGlobalFactsFromMapOut(destID)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	live := FindRelatedUnion(fm.UnionFacts, parent)
+	if live == nil || !live.IsBottom() {
+		t.Fatalf("AssignGlobalFactsFromMapOut must install BOTTOM, got %#v", fm.UnionFacts)
+	}
+	// f0 nonreadable under BOTTOM (ChooseOKVar filter)
+	if len(parent.FieldVars) < 1 {
+		t.Fatal("fields")
+	}
+	if !IsNonreadableField(parent.FieldVars[0], fm.UnionFacts) {
+		t.Fatal("BOTTOM must make f0 nonreadable for ChooseOKVar")
+	}
+	ClearError()
+}
+
+// FactMgr.cpp:450–482 eUnionWrite half of update_facts_for_dest.
+func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_dest", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	g := CreateVariableScalars("g_u_dest", ut, false, false)
+	g.CreateFieldVars()
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	body := &Block{Func: fn}
+	fn.Body = body
+	// local union is OOS at dest outside its block — use global only
+	in := []*FactUnion{MakeFactUnion(g, 0)}
+	var out []*FactUnion
+	UpdateUnionFactsForDest(in, &out, fn, body)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	got := FindRelatedUnion(out, g)
+	if got == nil || got.LastWrittenFID != 0 {
+		t.Fatalf("global union must copy to dest out, got %#v", out)
+	}
+	// nil func fail closed
+	var out2 []*FactUnion
+	UpdateUnionFactsForDest(in, &out2, nil, body)
+	if !HasError() {
+		t.Fatal("nil func must sticky")
+	}
+	ClearError()
+}
+
 // SetMapFactsOut pairs live UnionFacts (FactMgr.cpp set_fact_out full FactVec).
 func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	ClearError()

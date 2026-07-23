@@ -590,22 +590,54 @@ func MakeRandomGoto(
 	fm := cg.FM
 	foundNewFacts := false
 	var gotoIn, gotoOut, stmInMerged, stmOut []*FactPointTo
+	var gotoInU, gotoOutU, stmInMergedU, stmOutU []*FactUnion
 	if fm != nil {
 		// StatementGoto.cpp:159–162 — ctrl uses facts_in, else facts_out
+		// Full FactVec (ePointTo + eUnionWrite). Soft invent was PT-only:
+		// merge_jump never BOTTOM-joined missing eUnionWrite, and post-insert
+		// global_facts install never rewound UnionFacts (seed-104: else-start
+		// forward goto left g_111 last=0 vs UP BOTTOM → ChooseOKVar +1).
 		// C++ map[] always; incomplete maps fail closed (no invent partial goto)
 		var srcFacts []*FactPointTo
+		var srcUnions []*FactUnion
 		if IsCtrlStmt(other) {
 			srcFacts = fm.GetMapFactsIn(other.StmID)
+			srcUnions = fm.GetMapUnionFactsIn(other.StmID)
 		} else {
 			srcFacts = fm.GetMapFactsOut(other.StmID)
+			srcUnions = fm.GetMapUnionFactsOut(other.StmID)
 		}
-		if !FactsComplete(srcFacts) {
+		if !FactsComplete(srcFacts) || !UnionFactsComplete(srcUnions) {
 			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		gotoIn = CloneFactSlice(srcFacts)
+		gotoInU = CloneUnionFactSliceDeep(srcUnions)
+		if HasError() || !UnionFactsComplete(gotoInU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return makeGotoFailed()
+		}
+		if gotoInU == nil {
+			gotoInU = []*FactUnion{}
+		}
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
+		// Full FactVec: PT half + eUnionWrite half (merge then OOS drop).
 		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
+		if HasError() || !FactsComplete(gotoOut) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return makeGotoFailed()
+		}
+		UpdateUnionFactsForDest(gotoInU, &gotoOutU, fm.Func, blk)
+		if HasError() || !UnionFactsComplete(gotoOutU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return makeGotoFailed()
+		}
 		// StatementGoto.cpp:164–166 — merge effect from goto src (map[] zero if missing live id)
 		// Incomplete map_accum_effect fails closed sticky (no invent AddEffect poison then success)
 		preEffect := cg.AccumEffect()
@@ -623,12 +655,31 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		// StatementGoto.cpp:167–182
+		// FactMgr.cpp:569–588 merge_jump_facts is full FactVec.
 		destIn := fm.GetMapFactsIn(dest.StmID)
-		if !FactsComplete(destIn) {
+		destInU := fm.GetMapUnionFactsIn(dest.StmID)
+		if !FactsComplete(destIn) || !UnionFactsComplete(destInU) {
 			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		stmInMerged = CloneFactSlice(destIn)
+		stmInMergedU = CloneUnionFactSliceDeep(destInU)
+		if HasError() || !UnionFactsComplete(stmInMergedU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return makeGotoFailed()
+		}
+		if stmInMergedU == nil {
+			stmInMergedU = []*FactUnion{}
+		}
+		// Snapshot lattice for change detection (merge_jump may BOTTOM missing unions).
+		preUnionLast := map[*Variable]int{}
+		for _, uf := range stmInMergedU {
+			if uf != nil && uf.Var != nil {
+				preUnionLast[uf.Var] = uf.LastWrittenFID
+			}
+		}
 		// tryMerge distinguishes incomplete wipe from complete no-change
 		// (no invent treat MergeJumpFacts false as "unchanged" after wipe)
 		changed, mok := tryMergeJumpFacts(&stmInMerged, gotoOut)
@@ -636,8 +687,36 @@ func MakeRandomGoto(
 			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
-		if changed {
+		if !mergeJumpUnionFacts(&stmInMergedU, gotoOutU) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return makeGotoFailed()
+		}
+		unionChanged := false
+		if len(stmInMergedU) != len(preUnionLast) {
+			unionChanged = true
+		} else {
+			for _, uf := range stmInMergedU {
+				if uf == nil || uf.Var == nil {
+					unionChanged = true
+					break
+				}
+				if prev, ok := preUnionLast[uf.Var]; !ok || prev != uf.LastWrittenFID {
+					unionChanged = true
+					break
+				}
+			}
+		}
+		if changed || unionChanged {
 			stmOut = CloneFactSlice(stmInMerged)
+			stmOutU = CloneUnionFactSliceDeep(stmInMergedU)
+			if HasError() || !UnionFactsComplete(stmOutU) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return makeGotoFailed()
+			}
 			foundNewFacts = true
 			factsInCopy := make(map[int][]*FactPointTo)
 			factsOutCopy := make(map[int][]*FactPointTo)
@@ -646,7 +725,7 @@ func MakeRandomGoto(
 			fm.BackupStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 			// feed merged facts as global for visit (stm_visit_facts inputs)
 			// Full FactVec: ePointTo + eUnionWrite (FactMgr.cpp backup/restore).
-			if !FactsComplete(stmInMerged) {
+			if !FactsComplete(stmInMerged) || !UnionFactsComplete(stmInMergedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				SetError(ErrGeneric)
@@ -661,12 +740,15 @@ func MakeRandomGoto(
 			// locals (seed-2 e19427: l_432 fact lost → opportunistic_validate
 			// fail → extra Select). MakeupNewVarFacts restores those locals
 			// from the live GlobalFacts into the visit inputs (FactMgr.cpp:494–508).
+			// Keep post–merge_jump lattice (e.g. BOTTOM) — do not reload map_in.
 			liveSaved := CloneFactSlice(fm.GlobalFacts)
-			liveSavedU := CloneUnionFactSlice(fm.UnionFacts)
+			liveSavedU := CloneUnionFactSliceDeep(fm.UnionFacts)
 			if !FactsComplete(liveSaved) || !UnionFactsComplete(liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				SetError(ErrGeneric)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return makeGotoFailed()
 			}
 			if !MakeupNewVarFacts(&stmInMerged, liveSaved) {
@@ -676,18 +758,6 @@ func MakeRandomGoto(
 					SetError(ErrGeneric)
 				}
 				return makeGotoFailed()
-			}
-			// eUnionWrite half: map_in union + makeup new subjects from live
-			stmInMergedU := fm.GetMapUnionFactsIn(dest.StmID)
-			if !UnionFactsComplete(stmInMergedU) {
-				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
-				cg.ResetEffectAccum(preEffect)
-				SetError(ErrGeneric)
-				return makeGotoFailed()
-			}
-			stmInMergedU = append([]*FactUnion(nil), stmInMergedU...)
-			if stmInMergedU == nil {
-				stmInMergedU = []*FactUnion{}
 			}
 			if !makeupNewUnionFacts(&stmInMergedU, liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
@@ -704,10 +774,25 @@ func MakeRandomGoto(
 				return makeGotoFailed()
 			}
 			// eUnionWrite visit inputs (StmVisitFacts swaps only ePointTo GlobalFacts)
+			// Deep install so visit join/renew cannot alias map_facts_in subjects.
 			if stmInMergedU == nil {
 				fm.UnionFacts = []*FactUnion{}
 			} else {
-				fm.UnionFacts = CloneUnionFactSlice(stmInMergedU)
+				clU := CloneUnionFactSliceDeep(stmInMergedU)
+				if HasError() || !UnionFactsComplete(clU) {
+					fm.UnionFacts = liveSavedU
+					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+					cg.ResetEffectAccum(preEffect)
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return makeGotoFailed()
+				}
+				if clU == nil {
+					fm.UnionFacts = []*FactUnion{}
+				} else {
+					fm.UnionFacts = clU
+				}
 			}
 			// StatementGoto.cpp:171 — stm->stm_visit_facts(stm_out, cg_context)
 			// Statement.cpp:611 — get_effect_stm().clear() before visit_facts.
@@ -736,7 +821,7 @@ func MakeRandomGoto(
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
 			}
-			// visit outs are in work (C++ stm_out); incomplete fails closed sticky
+			// visit outs are in work (C++ stm_out) + fm.UnionFacts; incomplete fails closed
 			if !FactsComplete(work) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
 				fm.UnionFacts = liveSavedU
@@ -746,13 +831,39 @@ func MakeRandomGoto(
 				return makeGotoFailed()
 			}
 			stmOut = work
+			// Capture post-visit eUnionWrite before restoring pre-visit live
+			// (set_fact_out pairs this lattice; C++ stm_out is the visit inputs FactVec).
+			stmOutU = CloneUnionFactSliceDeep(fm.UnionFacts)
+			if HasError() || !UnionFactsComplete(stmOutU) {
+				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
+				fm.UnionFacts = liveSavedU
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return makeGotoFailed()
+			}
+			if stmOutU == nil {
+				stmOutU = []*FactUnion{}
+			}
 			// C++ leaves global_facts alone until StatementGoto.cpp:204; restore
 			// union half to pre-visit live (StmVisitFacts already restored PT).
 			fm.UnionFacts = liveSavedU
 			// StatementGoto.cpp:178–181 — if dest contains other, recompute goto_out
 			if ContainsStmt(dest, other) {
 				gotoOut = nil
+				gotoOutU = nil
 				UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
+				UpdateUnionFactsForDest(gotoInU, &gotoOutU, fm.Func, blk)
+				if HasError() || !FactsComplete(gotoOut) || !UnionFactsComplete(gotoOutU) {
+					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+					cg.ResetEffectAccum(preEffect)
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return makeGotoFailed()
+				}
 			}
 		}
 	}
@@ -832,39 +943,43 @@ func MakeRandomGoto(
 	ins := &okBlk.Stmts[insertAt+1]
 
 	if fm != nil {
-		// StatementGoto.cpp:195–202
-		fm.SetMapFactsIn(ins.StmID, gotoIn)
-		fm.SetMapFactsOut(ins.StmID, gotoOut)
+		// StatementGoto.cpp:195–202 — set_fact_in/out for goto is full FactVec
+		// (goto_in / goto_out from update_facts_for_dest, both partitions).
+		if gotoInU == nil {
+			gotoInU = []*FactUnion{}
+		}
+		if gotoOutU == nil {
+			gotoOutU = []*FactUnion{}
+		}
+		fm.SetMapFactsInPair(ins.StmID, gotoIn, gotoInU)
+		fm.SetMapFactsOutPair(ins.StmID, gotoOut, gotoOutU)
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)
 		}
 		fm.MapVisited[ins.StmID] = true
 		if foundNewFacts {
 			// StatementGoto.cpp:200–201 — set_fact_in(stm, stm_in); set_fact_out(stm, stm_out)
-			fm.SetMapFactsIn(destID, stmInMerged)
-			fm.SetMapFactsOut(destID, stmOut)
+			// Full FactVec including post–merge_jump / post-visit eUnionWrite.
+			if stmInMergedU == nil {
+				stmInMergedU = []*FactUnion{}
+			}
+			if stmOutU == nil {
+				stmOutU = []*FactUnion{}
+			}
+			fm.SetMapFactsInPair(destID, stmInMerged, stmInMergedU)
+			fm.SetMapFactsOutPair(destID, stmOut, stmOutU)
 		}
 		// StatementGoto.cpp:203 — create_cfg_edge(sg, stm, false, false)
 		fm.CreateCFGEdgeTo(ins.StmID, blk, destID, false, false)
 		// StatementGoto.cpp:204–210 — global_facts = map_facts_out[stm]
-		// GetMapFacts*: StmID 0 Incomplete; missing live → empty complete
+		// Full FactVec (ePointTo + eUnionWrite). Soft invent was SetGlobalFacts(PT-only)
+		// so live UnionFacts never rewound after forward goto (seed-104 g_111).
 		// Incomplete out/in fails closed sticky (no invent soft re-pick past wiped facts)
-		out := fm.GetMapFactsOut(destID)
-		if !FactsComplete(out) {
-			fm.GlobalFacts = IncompleteFactSlice()
-			SetError(ErrGeneric)
-		} else {
-			fm.SetGlobalFacts(CloneFactSlice(out), "auto_statement_goto_742")
-		}
 		if destIsCtrl {
 			// ctrl/return: use map_facts_in[stm] (altered outs for OOS)
-			in := fm.GetMapFactsIn(destID)
-			if !FactsComplete(in) {
-				fm.GlobalFacts = IncompleteFactSlice()
-				SetError(ErrGeneric)
-			} else {
-				fm.SetGlobalFacts(CloneFactSlice(in), "auto_statement_goto_751")
-			}
+			fm.AssignGlobalFactsFromMapIn(destID)
+		} else {
+			fm.AssignGlobalFactsFromMapOut(destID)
 		}
 	}
 	// StatementGoto.cpp:211
