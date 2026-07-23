@@ -409,6 +409,34 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
+		// Arm map_facts_out is post-OOS of that arm's LocalVars only (Block.cpp:560–561).
+		// Soft invent left foreign locals from the other arm in an arm's exit env when
+		// entry was polluted (else-local l_2590 surviving on then after else OOS'd it).
+		// C++ arm outs are map_facts_out[arm] post-OOS; other-arm locals are not in
+		// scope on that path. Drop sibling-arm LocalVars from each arm exit before
+		// must_return merge so if-output cannot re-inject out-of-scope eUnionWrite
+		// subjects (seed-58: pure-shortcut same_facts size skew on for 1169 wiped
+		// nested make_iteration IV reads from feffect).
+		if len(st.Else.LocalVars) > 0 {
+			thenFacts = DropFactSubjectsByVars(thenFacts, st.Else.LocalVars)
+			thenUnions = DropUnionSubjectsByVars(thenUnions, st.Else.LocalVars)
+			if !FactsComplete(thenFacts) || !UnionFactsComplete(thenUnions) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+		}
+		if len(st.Then.LocalVars) > 0 {
+			elseFacts = DropFactSubjectsByVars(elseFacts, st.Then.LocalVars)
+			elseUnions = DropUnionSubjectsByVars(elseUnions, st.Then.LocalVars)
+			if !FactsComplete(elseFacts) || !UnionFactsComplete(elseUnions) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+		}
 	}
 
 	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block(eff, &if_true/false)

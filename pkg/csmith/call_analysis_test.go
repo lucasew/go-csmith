@@ -517,6 +517,38 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 	ClearError()
 }
 
+// DropUnionSubjectsByVars is the sibling-arm strip used by VisitFactsStatementIf
+// and CombineBranchFacts (seed-58 else-local must not re-enter if-output).
+func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	elseLocal := CreateVariableScalars("l_else_u", ut, false, false)
+	g := CreateVariableScalars("g_u2", ut, false, false)
+	if elseLocal == nil || g == nil {
+		t.Fatal("vars")
+	}
+	thenU := MakeFactUnion(g, 0)
+	foreign := MakeFactUnion(elseLocal, 0)
+	if thenU == nil || foreign == nil || HasError() {
+		t.Fatal("MakeFactUnion", GetError())
+	}
+	stripped := DropUnionSubjectsByVars([]*FactUnion{thenU, foreign}, []*Variable{elseLocal})
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if FindRelatedUnion(stripped, elseLocal) != nil {
+		t.Fatal("must drop else-local from then-out")
+	}
+	if FindRelatedUnion(stripped, g) == nil {
+		t.Fatal("must keep global subject")
+	}
+	ClearError()
+}
+
 func TestPostCreationAssignFacts(t *testing.T) {
 	f := &Function{Name: "func_2", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
