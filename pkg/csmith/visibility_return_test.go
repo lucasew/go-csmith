@@ -26,9 +26,9 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 		t.Fatal("complete visibility paths must not sticky")
 	}
 	ClearError()
-	// Function.cpp:194 — find_variable_in_set only (pointer identity). Fields of a
-	// stack aggregate are not themselves local_vars entries; match/has_field_var
-	// would invent on-stack and mark_func_end would garbage them unfairly.
+	// Function.cpp:194 — find_variable_in_set uses Variable::match (not ==).
+	// Aggregate local match(field) via has_field_var → field is on-stack so
+	// mark_func_end / eReturn set_fact_out garbage field pointees (seed-30).
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -42,8 +42,8 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	if !f.IsVarOnStack(agg, blk2) {
 		t.Fatal("aggregate local must be on stack")
 	}
-	if f.IsVarOnStack(fld, blk2) {
-		t.Fatal("field of stack aggregate must not IsVarOnStack (C++ find_variable_in_set only)")
+	if !f.IsVarOnStack(fld, blk2) {
+		t.Fatal("field of stack aggregate must IsVarOnStack (C++ find_variable_in_set+match)")
 	}
 	if HasError() {
 		t.Fatal("field check must not sticky")
