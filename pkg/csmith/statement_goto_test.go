@@ -254,6 +254,7 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 }
 
 func TestMarkNeedRevisitLCA(t *testing.T) {
+	// Statement.cpp:789–795 Block contains_stmt: dest on parent chain, not Stmts walk.
 	// outer → then(inner with assign) — back-edge LCA is outer when dest in then
 	dest := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 7}
 	inner := &Block{Stmts: []Stmt{dest}}
@@ -262,29 +263,72 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 		Stmts: []Stmt{{Kind: StmtIfElse, Then: inner, Else: &Block{}, StmID: 1}},
 	}
 	inner.Parent = outer
-	// dest pointer must be into slice
+	// dest pointer must be into slice; destParent is inner
 	d := &inner.Stmts[0]
-	MarkNeedRevisitLCA(inner, d)
+	MarkNeedRevisitLCAParent(inner, d, inner)
 	if !inner.NeedRevisit {
-		t.Fatal("inner contains dest → mark inner")
+		t.Fatal("inner is destParent → mark inner")
 	}
 	// from a sibling-ish curr that does not contain dest → walk to outer
 	curr := &Block{Parent: outer, Stmts: []Stmt{{Kind: StmtAssign, StmID: 8}}}
 	outer.NeedRevisit = false
 	inner.NeedRevisit = false
-	MarkNeedRevisitLCA(curr, d)
+	MarkNeedRevisitLCAParent(curr, d, inner)
 	if !outer.NeedRevisit {
-		t.Fatal("outer is LCA containing dest")
+		t.Fatal("outer is LCA on dest parent chain")
 	}
 	if curr.NeedRevisit {
 		t.Fatal("curr should not be marked when outer contains dest")
 	}
 	// StatementGoto.cpp:147 assert(b) — no soft invent NeedRevisit when dest not in ancestry
 	orphan := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 9}}}
-	MarkNeedRevisitLCA(orphan, d)
+	MarkNeedRevisitLCAParent(orphan, d, inner)
 	if orphan.NeedRevisit {
 		t.Fatal("orphan must not invent NeedRevisit when dest not found")
 	}
+}
+
+// Statement.cpp:789–795 — Block contains_stmt walks s->parent, so the function
+// body contains a dest in an if-arm that is not yet in body.Stmts (MakeRandomIf
+// builds then/else before the if is appended). Soft invent Stmts-walk missed body.
+func TestMarkNeedRevisitLCABodyWhileIfNotAppended(t *testing.T) {
+	ClearError()
+	body := &Block{StmID: 1, Func: &Function{Name: "func_21", ReturnType: GetIntType()}}
+	// then arm holds dest; else is curr (back-edge from else to then)
+	dest := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 10}
+	thenB := &Block{StmID: 2, Parent: body, Stmts: []Stmt{dest}}
+	elseB := &Block{StmID: 3, Parent: body}
+	// body.Stmts empty — if not appended yet (MakeRandomIf mid-build)
+	d := &thenB.Stmts[0]
+	MarkNeedRevisitLCAParent(elseB, d, thenB)
+	if !body.NeedRevisit {
+		t.Fatal("body must be LCA via dest parent chain while if not in body.Stmts")
+	}
+	if elseB.NeedRevisit {
+		t.Fatal("else does not contain then dest")
+	}
+	ClearError()
+}
+
+func TestBlockContainsViaParent(t *testing.T) {
+	ClearError()
+	body := &Block{StmID: 1}
+	mid := &Block{StmID: 2, Parent: body}
+	leaf := &Block{StmID: 3, Parent: mid}
+	if !BlockContainsViaParent(body, leaf) || !BlockContainsViaParent(mid, leaf) || !BlockContainsViaParent(leaf, leaf) {
+		t.Fatal("ancestors and self must contain via parent chain")
+	}
+	sib := &Block{StmID: 4, Parent: body}
+	if BlockContainsViaParent(sib, leaf) {
+		t.Fatal("sibling must not contain")
+	}
+	if BlockContainsViaParent(nil, leaf) {
+		t.Fatal("nil block sticky false")
+	}
+	if !HasError() {
+		t.Fatal("nil block must SetError")
+	}
+	ClearError()
 }
 
 func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {

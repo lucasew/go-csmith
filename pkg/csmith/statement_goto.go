@@ -53,7 +53,8 @@ func goodGotoTarget(st Stmt) bool {
 }
 
 // ContainsStmt reports whether b (or nested get_blocks) holds st.
-// Block::contains_stmt light — used for NeedRevisit LCA on back-edge goto.
+// Used by tests and tree walks. For NeedRevisit LCA, prefer BlockContainsViaParent
+// (Statement.cpp:789–795 Block case).
 // Kind-gated get_blocks only; nil arm sticky false (no invent membership
 // by soft-skipping a missing if-arm / stray Then on assign).
 func (b *Block) ContainsStmt(st *Stmt) bool {
@@ -87,13 +88,56 @@ func (b *Block) ContainsStmt(st *Stmt) bool {
 	return false
 }
 
+// BlockContainsViaParent mirrors Statement::contains_stmt when *this is a Block
+// (Statement.cpp:789–795): true if b is on destParent's parent chain
+// (destParent is Statement::parent of the dest statement).
+// Soft invent walked b.Stmts / GetBlocksStmt so LCA missed the function body when
+// the if holding dest was not yet appended to body.Stmts during MakeRandomIf
+// (seed-154: body NeedRevisit stayed false → no body FP → effect_accum kept
+// make_iteration IV reads in feffect vs UP body FP cleaning them).
+func BlockContainsViaParent(b, destParent *Block) bool {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	// destParent nil: dest has no parent (impossible for live stmt in C++) sticky false
+	for d := destParent; d != nil; d = d.Parent {
+		if d == b {
+			return true
+		}
+	}
+	return false
+}
+
 // MarkNeedRevisitLCA sets NeedRevisit on the least incomplete ancestor of curr
 // that contains dest (StatementGoto.cpp:141–147).
+// destParent is dest->parent (ok_blk for the chosen other_stm).
 func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
+	MarkNeedRevisitLCAParent(curr, dest, nil)
+}
+
+// MarkNeedRevisitLCAParent is the StatementGoto.cpp:141–147 LCA walk with an
+// explicit dest parent for Block contains_stmt (parent-chain) semantics.
+func MarkNeedRevisitLCAParent(curr *Block, dest *Stmt, destParent *Block) {
 	// StatementGoto.cpp:143–147 — while (!contains) b=parent; assert(b); need_revisit
 	// no soft invent NeedRevisit on curr when no ancestor contains dest
+	if dest == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	// Prefer destParent (C++ other_stm->parent). When nil, fall back to tree walk
+	// ContainsStmt (tests / incomplete IR).
 	for b := curr; b != nil; b = b.Parent {
-		if b.ContainsStmt(dest) {
+		var has bool
+		if destParent != nil {
+			has = BlockContainsViaParent(b, destParent)
+		} else {
+			has = b.ContainsStmt(dest)
+		}
+		if HasError() {
+			return
+		}
+		if has {
 			b.NeedRevisit = true
 			return
 		}
@@ -567,7 +611,8 @@ func MakeRandomGoto(
 			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, other.StmID, false, true)
 		}
 		// StatementGoto.cpp:141–147 — LCA need_revisit
-		MarkNeedRevisitLCA(blk, other)
+		// okBlk is other_stm->parent (dest Statement::parent).
+		MarkNeedRevisitLCAParent(blk, other, okBlk)
 		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
 		RecordBackwardJump()
 		return st
