@@ -621,8 +621,11 @@ func MakeRandomLhs(
 				restore()
 				return nil
 			}
+			// Lhs.cpp:139 — filter reject: dummy only. Do not restore effects.
+			// VariableSelector.cpp:221–227 is_eligible may have polluted effect_accum
+			// via cg_tmp.read_indices on itemized candidates; C++ keeps that pollution
+			// until visit_facts fails (Lhs.cpp:135–137) or success returns.
 			dummy = append(dummy, v)
-			restore()
 			continue
 		}
 
@@ -725,8 +728,13 @@ func MakeRandomLhs(
 			}
 		}
 		if !valid {
+			// Lhs.cpp:103–122,139 — filter reject (valid=false): dummy.push only.
+			// Soft invent restore() here wiped is_eligible_var itemized read_indices
+			// pollution of effect_accum (VariableSelector.cpp:221–227 cg_tmp shares
+			// effect_accum). C++ only reset_effect_* on visit_facts fail (135–137).
+			// seed-46: l_998 ^= … map_stm_effect lost g_952.f8 IV pollution → nested
+			// for pure-shortcut body lacked IV → outer for visit dropped func_44 read.
 			dummy = append(dummy, v)
-			restore()
 			continue
 		}
 

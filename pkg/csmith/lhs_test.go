@@ -732,3 +732,55 @@ func TestLhsCloneDereferencedComplexity(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
+	// Lhs.cpp:103–122,139 — valid=false: dummy only (no reset_effect_*).
+	// VariableSelector.cpp:221–227 — is_eligible itemized read_indices pollutes
+	// shared effect_accum via cg_tmp. Soft invent restore() on filter reject wiped
+	// that pollution so map_stm_effect missed outer-loop IV reads (seed-46 g_952.f8).
+	ClearError()
+	opts := Defaults()
+	iv := CreateVariableScalars("g_iv", GetIntType(), false, false)
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Sizes:    []int{8},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Sizes:      []int{8},
+		Collective: parent,
+		Indices:    []string{"g_iv"},
+		IndexExprs: []*Expression{{Term: TermVariable, Var: iv, ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+
+	// Precondition: is_eligible on itemized writes g_iv into effect_accum.
+	acc := EmptyEffect()
+	cgElig := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cgElig.EffectAccum = &acc
+	_ = IsEligibleVar(&item.Variable, 0, AccessWrite, cgElig)
+	if !acc.IsRead(iv) {
+		t.Fatal("precondition: is_eligible itemized must ReadVar index IV on effect_accum")
+	}
+
+	// Residual pollution (as after filter-reject keep) must survive a successful Lhs
+	// that does not itself re-run is_eligible on the itemized member.
+	ClearError()
+	vs := NewVariableSelector(opts)
+	vs.GlobalList = []*Variable{ok}
+	vs.AllVars = []*Variable{ok}
+	eff := EmptyEffect().ReadVar(iv)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	if lhs == nil || HasError() {
+		t.Fatalf("expected Lhs from l_ok-only pool err=%v", HasError())
+	}
+	if !cg.EffectAccum.IsRead(iv) {
+		t.Fatal("filter-reject path must not wipe residual is_eligible effect_accum reads")
+	}
+}
