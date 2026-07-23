@@ -472,26 +472,56 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// order: g_39 after g_35 vs UP after g_2402 once visit rewrites via
 			// feffect). Fair path: validate from pre_facts like C++.
 			//
+			// C++ FactVec is full (ePointTo + eUnionWrite). Soft invent restored
+			// only pre point-to while FM.UnionFacts stayed post-gen: nested
+			// func_30 last-write of g_582.f4 made g_582.f0 IsNonreadableField
+			// during special revalidate arg visit (seed-10054), aborting visit
+			// and leaving gen-time map_stm_effect IV extras (g_39.f4, g_356).
+			// Install workPreUnion (makeup pre eUnionWrite) before validate;
+			// deep-clone so visit Join/SetBottom does not mutate workPreUnion
+			// used later for set_fact_in.
+			//
 			// When visit fails (NDEBUG continues), C++ installs pre_facts. Go's
 			// visit still fails on some seeds where C++ succeeds (seed-363), and
 			// pre_facts lacks renew-replaced may-null Fact* that live only on the
-			// post-gen lattice. On visit failure keep post-gen GlobalFacts for the
-			// facts lattice only; map_stm_effect stays gen-time (visit did not
+			// post-gen lattice. On visit failure keep post-gen GlobalFacts +
+			// post-gen UnionFacts; map_stm_effect stays gen-time (visit did not
 			// rewrite) matching both. On visit success leave visit outputs +
-			// rewritten map. Never reinstall gen-time map after a successful visit.
-			if !FactsComplete(fm.GlobalFacts) {
+			// rewritten map + visit-mutated UnionFacts. Never reinstall gen-time
+			// map after a successful visit.
+			if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				SetError(ErrGeneric)
 				return
 			}
-			// Shallow Fact* copies (C++ FactVec assignment).
+			if !UnionFactsComplete(workPreUnion) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
+				return
+			}
+			// Shallow Fact* copies (C++ FactVec assignment) for point-to;
+			// deep clone for union work lattice (visit may mutate in place).
 			postGenFacts := append([]*FactPointTo(nil), fm.GlobalFacts...)
+			postGenUnion := append([]*FactUnion(nil), fm.UnionFacts...)
 			outputs := append([]*FactPointTo(nil), preFacts...)
+			preUnionWork := CloneUnionFactSliceDeep(workPreUnion)
+			if HasError() || !UnionFactsComplete(preUnionWork) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				fm.UnionFacts = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return
+			}
+			fm.UnionFacts = preUnionWork
 			// Statement.cpp:1007 — reset_effect_accum(pre_effect)
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
 				if HasError() {
 					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
 					return
 				}
 			}
@@ -499,27 +529,30 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			okV := ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
 			ClearError()
 			if okV {
-				if !FactsComplete(outputs) {
+				if !FactsComplete(outputs) || !UnionFactsComplete(fm.UnionFacts) {
 					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
 					SetError(ErrGeneric)
 					return
 				}
 				fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
-				// map_stm_effect / effect_accum: post-validate (visit rewrite or
-				// pure-shortcut re-fold). Do not reinstall gen-time map.
+				// map_stm_effect / effect_accum / UnionFacts: post-validate
+				// (visit rewrite). Do not reinstall gen-time map or unions.
 			} else {
 				// Visit failed under NDEBUG: C++ installs pre_facts. Go visit still
 				// fails on seeds where C++ succeeds; pre_facts then lacks
 				// renew-replaced may-null Fact* that only live on post-gen
-				// GlobalFacts (seed-363). Keep post-gen facts lattice only;
+				// GlobalFacts (seed-363). Keep post-gen PT + eUnionWrite lattice;
 				// map_stm_effect remains gen-time (visit did not rewrite);
 				// effect_accum stays at reset pre_effect (C++ on visit fail).
-				if !FactsComplete(postGenFacts) {
+				if !FactsComplete(postGenFacts) || !UnionFactsComplete(postGenUnion) {
 					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
 					SetError(ErrGeneric)
 					return
 				}
 				fm.SetGlobalFacts(postGenFacts, "auto_edges_analysis_408")
+				fm.UnionFacts = postGenUnion
 			}
 			specialHandled = true
 		}
