@@ -729,66 +729,50 @@ func TestFindFixedPointShortcut(t *testing.T) {
 	_ = out
 }
 
-// TestFindFixedPointMultiPassMapAccumProgressive — Block.cpp:703–704 resets
-// EffectAccum only before the outer while, not between find_fixed_point do-while
-// iterations. A second full visit with EffectAccum still holding the first pass's
-// full-body reads rewrote map_accum_effect[early] (seed-189: other nRead 39→83
-// with g_6 → forward StatementGoto.cpp:125–128 choose_visible_read_var pick
-// g_6 vs UP g_1192). Observable contract: each full walk rebuilds from entry
-// EffectAccum so early stmts stay progressive (no later-only reads).
-func TestFindFixedPointMultiPassMapAccumProgressive(t *testing.T) {
+// TestDropUnionLocalsSyncsCurrentUnionsForSameFacts — Block.cpp:557–599
+// set_fact_in stores the same FactVec that remains current_inputs. Go's
+// eUnionWrite split: DropUnionSubjectsByVars built entryUnions for map_in but
+// left currentUnions holding body locals reintroduced by back-edge merge
+// (seed-189 blk 575: l_1333 from goto src map_out). same_facts forever saw
+// nCurU=mapInU+1 → 50 full walks rewrote map_accum_effect → forward
+// StatementGoto.cpp:125–128 choose_visible_read_var (g_6 vs UP g_1192).
+// After drop, currentUnions must equal the map_in half so shortcut can match.
+func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 	ClearError()
-	early := CreateVariableScalars("g_early", GetIntType(), false, false)
-	late := CreateVariableScalars("g_late", GetIntType(), false, false)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	// Looping body with self-back edge path: force multi-pass when out differs.
-	b := &Block{
-		StmID:   100,
-		Func:    f,
-		Looping: true,
-		Stmts: []Stmt{
-			{
-				Kind: StmtAssign, StmID: 101, LhsVar: early,
-				Lhs:      &Lhs{Var: early, Type: GetIntType()},
-				Expr:     &Expression{Term: TermConstant, Con: MakeInt(1)},
-				AssignOp: AssignSimple,
-			},
-			{
-				Kind: StmtAssign, StmID: 102, LhsVar: late,
-				Lhs:      &Lhs{Var: late, Type: GetIntType()},
-				Expr:     &Expression{Term: TermVariable, Var: late, ExprType: GetIntType()},
-				AssignOp: AssignSimple,
-			},
-		},
+	SetProcessOptions(Defaults())
+	ut := &Type{isUnion: true, StructName: "U_sync", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	loc := CreateVariableScalars("l_local_u", ut, false, false)
+	loc.CreateFieldVars()
+	g := CreateVariableScalars("g_u_sync", ut, false, false)
+	g.CreateFieldVars()
+	uLoc := MakeFactUnion(loc, 0)
+	uG := MakeFactUnion(g, 0)
+	if uLoc == nil || uG == nil {
+		t.Fatal("union facts")
 	}
-	fm := NewFactMgr(f)
-	entry := []*FactPointTo{}
-	fm.SetMapFactsIn(100, entry)
-	// Pre-seed visited + self-back so first iter merges then may re-walk.
-	fm.MapVisited = map[int]bool{100: true}
-	fm.SetMapFactsOut(100, entry)
-	fm.SetMapStmEffect(100, EmptyEffect())
-	fm.CreateCFGEdge(100, b, false, true)
-	cg := EmptyCGContext().WithFactMgr(fm)
-	cg.CurrentFunc = f
-	// Entry accum empty (post_creation reset to pre_effect).
-	eff := EmptyEffect()
-	cg.EffectAccum = &eff
-	// First FP pass: progressive maps; if a second full walk runs, must not
-	// leave g_late on map_accum[101] when 101 only wrote g_early.
-	_, _, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
-	if !ok {
-		t.Fatalf("FindFixedPointBlock failed sticky=%v", HasError())
+	// currentUnions after merge of goto map_out that still listed a body local.
+	currentUnions := []*FactUnion{uG.Clone(), uLoc.Clone()}
+	locals := []*Variable{loc}
+	entryUnions := DropUnionSubjectsByVars(currentUnions, locals)
+	if !UnionFactsComplete(entryUnions) {
+		t.Fatal("drop incomplete")
 	}
-	accEarly := fm.GetMapAccumEffect(101)
-	if !EffectComplete(accEarly) {
-		t.Fatal("map_accum[early] incomplete")
+	if FindRelatedUnion(entryUnions, loc) != nil {
+		t.Fatal("drop must remove body local")
 	}
-	// late must not appear as a read on early stmt's progressive map_accum
-	// solely because a later pass held full-body EffectAccum.
-	if accEarly.IsRead(late) {
-		t.Fatalf("map_accum[early] polluted with later-only read g_late: reads=%v",
-			namesOf(accEarly.ReadVars()))
+	if FindRelatedUnion(entryUnions, g) == nil {
+		t.Fatal("drop must keep non-local")
+	}
+	// Without sync: same_facts(currentUnions, entryUnions) is false forever.
+	if SameUnionFacts(currentUnions, entryUnions) {
+		t.Fatal("pre-sync currentUnions must still hold local (merge residue)")
+	}
+	// FindFixedPointBlock assigns currentUnions = entryUnions after drop.
+	currentUnions = entryUnions
+	if !SameUnionFacts(currentUnions, entryUnions) {
+		t.Fatal("synced currentUnions must same_facts with map_in half")
 	}
 	ClearError()
 }

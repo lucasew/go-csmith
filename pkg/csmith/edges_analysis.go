@@ -652,28 +652,6 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
 	var lastPreOOS []*FactPointTo
 	var lastPreOOSUnions []*FactUnion
-	// Snapshot EffectAccum at entry for multi-pass rebuild.
-	// Block.cpp:703–704 resets to pre_effect only before the outer while, not
-	// between find_fixed_point do-while iterations. When a second full visit
-	// runs with EffectAccum still holding the first pass's full-body reads,
-	// stm_visit_facts rewrites map_accum_effect[early] with later-only reads
-	// (seed-189: map_accum[other] nRead 39→83 with g_6, forward goto cond
-	// choose_visible_read_var picks g_6 vs UP g_1192). Observable C++ contract
-	// (StatementGoto.cpp:125–128 + map_accum_effect at generation/first pass):
-	// progressive per-stmt maps. Rebuild each full walk from entry snapshot.
-	var entryAccum Effect
-	haveEntryAccum := false
-	if cg.EffectAccum != nil {
-		if !EffectComplete(*cg.EffectAccum) {
-			SetError(ErrGeneric)
-			return inputs, nil, -1, false
-		}
-		entryAccum = cg.EffectAccum.Clone()
-		if HasError() {
-			return inputs, nil, -1, false
-		}
-		haveEntryAccum = true
-	}
 	// Generation-time stack: make_random already has `b` on func.Stack during
 	// post_creation. Always-push here double-entered `b` (seed-2 e13830).
 	// VisitFactsBlock (off stack) still needs CurrentBlock() for some visit paths.
@@ -900,14 +878,6 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 			fm.UnionFacts = workUnions
 		}
-		// Rebuild EffectAccum from entry before each full walk so map_accum_effect
-		// stays progressive (see entryAccum snapshot above; seed-189 forward goto).
-		if haveEntryAccum && cg.EffectAccum != nil {
-			*cg.EffectAccum = entryAccum.Clone()
-			if HasError() {
-				return outputs, nil, -1, false
-			}
-		}
 		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {
 			if !AnalyzeWithEdgesIn(&b.Stmts[i], &outputs, cg, opts, b) {
@@ -942,6 +912,15 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				}
 				return currentInputs, nil, -1, false
 			}
+			// Keep currentUnions in sync with map_facts_in eUnionWrite half.
+			// Drop mutates entryUnions for set_fact_in but left currentUnions holding
+			// body locals reintroduced by back-edge merge (seed-189 blk 575: l_1333
+			// from goto src map_out). same_facts then forever saw nCurU=mapInU+1 and
+			// never shortcut — multi-pass rewrote map_accum_effect and polluted
+			// StatementGoto.cpp:125–128 forward choose_visible_read_var pools
+			// (if (g_6) vs UP if (g_1192)). C++ current_inputs is the same FactVec
+			// stored via set_fact_in (Block.cpp:557–599).
+			currentUnions = entryUnions
 		}
 		fm.SetMapFactsInPair(b.StmID, currentInputs, entryUnions)
 		// Block.cpp:558 — post_facts = outputs (pre-OOS)
