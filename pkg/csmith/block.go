@@ -1308,6 +1308,26 @@ func makeRandomStmt(
 	cg *CGContext,
 	b *Block,
 ) Stmt {
+	// Statement.cpp:243 default t = MAX_STATEMENT_TYPE → random via filter
+	return makeRandomStmtForced(r, opts, probs, vs, tables, stmtTab, cg, b, MaxStatementType)
+}
+
+// makeRandomStmtForced mirrors Statement::make_random(cg, t) with optional forced kind.
+// forceKind == MaxStatementType → StatementProbability each try (default make_random).
+// forceKind otherwise → first try uses forceKind; null without error re-picks randomly
+// (Statement.cpp:314–316 recursive make_random() without forced t).
+// Block::append_nested_loop calls make_random(cg, eFor) — Statement.cpp / Block.cpp:424.
+func makeRandomStmtForced(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	cg *CGContext,
+	b *Block,
+	forceKind StatementType,
+) Stmt {
 	// Statement.cpp always has RNG + CGContext; sticky no invent MAX-kind shell without them
 	if r == nil || cg == nil {
 		SetError(ErrGeneric)
@@ -1320,8 +1340,12 @@ func makeRandomStmt(
 		return Stmt{}
 	}
 	// Statement.cpp:243–244 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtStatement, t, nullptr)
-	// t is MAX_STATEMENT_TYPE when choosing randomly (flag = MaxStatementType).
-	if DepthGuardByTypeFlag(opts, DtStatement, int(MaxStatementType)) == BadDepth {
+	// flag is the requested t (eFor for append_nested_loop; MAX when choosing randomly).
+	guardT := int(forceKind)
+	if forceKind == MaxStatementType {
+		guardT = int(MaxStatementType)
+	}
+	if DepthGuardByTypeFlag(opts, DtStatement, guardT) == BadDepth {
 		return Stmt{}
 	}
 	// Statement static ProbabilityTable always live; sticky no invent NewStatementThresholdTable
@@ -1382,7 +1406,13 @@ func makeRandomStmt(
 		// Statement.cpp:261–265 — clear effect_stm; expr_depth = 0
 		cg.EffectStm = EmptyEffect()
 		cg.ExprDepth = 0
-		kind := StatementProbabilityFilter(r, stmtTab, f)
+		var kind StatementType
+		if tries == 0 && forceKind != MaxStatementType {
+			// Block.cpp:424 / Statement.cpp:259 — caller passed eFor (or other forced t)
+			kind = forceKind
+		} else {
+			kind = StatementProbabilityFilter(r, stmtTab, f)
+		}
 		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
 		if opts.StopByStmt >= 0 && nextStmID >= opts.StopByStmt {
 			kind = StmtReturn

@@ -1261,6 +1261,46 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	ClearError()
 }
 
+func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
+	// Block.cpp:424 — Statement::make_random(cg, eFor), not bare MakeRandomFor.
+	// makeRandomStmtForced zeros expr_depth and bumps blk_depth (Statement.cpp:288–291).
+	// Leftover ExprDepth=7 must not stick as the starting depth of make_iteration:
+	// after append returns, either factory ran (depth may be non-zero from exprs)
+	// or null-failed; BlkDepth must restore either way.
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockDepth = 5
+	opts.MaxBlockSize = 1
+	prevStmt := ProcessStmtTab()
+	SetProcessStmtTab(InitProbabilityTable(opts))
+	defer SetProcessStmtTab(prevStmt)
+
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	b := &Block{Looping: true, Func: f, StmID: 1}
+	f.Stack = []*Block{b}
+	f.Blocks = []*Block{b}
+	cg := WithFunc(f, EmptyEffect())
+	cg.BlkDepth = 2
+	cg.Flags |= FlagInLoop
+	cg.FM = NewFactMgr(f)
+	cg.ExprDepth = 7 // leftover from prior sibling assign
+
+	preBlk := cg.BlkDepth
+	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	if cg.BlkDepth != preBlk {
+		t.Fatalf("BlkDepth restore after make_random(eFor): got %d want %d", cg.BlkDepth, preBlk)
+	}
+	// Injected 7 must have been cleared at factory entry (Statement.cpp:288).
+	// After a live factory, expr_depth may be left non-zero by nested exprs —
+	// only require we did not keep 7 untouched without ever entering make_random.
+	if cg.ExprDepth == 7 && len(b.Stmts) == 0 {
+		// null path still zeros depth each try; if nothing appended and depth still 7,
+		// makeRandomStmtForced never ran (regression).
+		t.Fatal("AppendNestedLoop must enter makeRandomStmtForced (ExprDepth still 7, no stmt)")
+	}
+	ClearError()
+}
+
 func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	// Block.cpp:425 ERROR_GUARD after make for
 	ClearError()

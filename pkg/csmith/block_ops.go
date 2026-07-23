@@ -600,6 +600,13 @@ func (b *Block) AppendNestedLoop(
 		SetError(ErrGeneric)
 		return nil
 	}
+	// Block.cpp:422–427 — outer pre_facts snapshot, clear effect_stm, then
+	// Statement::make_random(cg, eFor). make_random does its own pre_facts for
+	// post_creation; outer pre_facts is for makeup_new_var_facts / set_fact_in.
+	// Must go through makeRandomStmtForced (not MakeRandomFor alone) so
+	// expr_depth=0, compound blk_depth bump, shallow post_creation pre_facts,
+	// and null→re-pick any kind match Statement.cpp:314–316 (seed 2020240685
+	// NeedNested append path; seed-4 blk_depth).
 	var preFacts []*FactPointTo
 	var preUnion []*FactUnion
 	if cg.FM != nil {
@@ -608,49 +615,17 @@ func (b *Block) AppendNestedLoop(
 			SetError(ErrGeneric)
 			return nil
 		}
-		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
-		// residual ERROR sticky — no invent soft-append for past CloneFactSlice residual
-		if HasError() {
-			return nil
-		}
-		// FactMgr.cpp set_fact_in — pre_facts full FactVec includes eUnionWrite
-		preUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
-		if HasError() || !UnionFactsComplete(preUnion) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return nil
-		}
+		// Block.cpp:426 — FactVec pre_facts = fm->global_facts (shallow)
+		preFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
+		preUnion = append([]*FactUnion(nil), cg.FM.UnionFacts...)
 	}
 	cg.ClearEffectStm()
-	// Block.cpp:424 — Statement::make_random(cg_context, eFor)
-	// Statement.cpp:267–269 / 306–308 — compound eFor bumps blk_depth around factory.
-	// Calling MakeRandomFor alone skipped that bump so nested-loop bodies ran one
-	// BlkDepth too shallow (seed-4 first body-diff: UP blk=5 vs GO blk=3 at e11119).
-	preEffect := EmptyEffect()
-	if cg.EffectAccum != nil {
-		if !EffectComplete(*cg.EffectAccum) {
-			SetError(ErrGeneric)
-			return nil
-		}
-		preEffect = cg.EffectAccum.Clone()
-		if HasError() {
-			return nil
-		}
-	}
-	cg.BlkDepth++
-	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
-	cg.BlkDepth--
-	// Statement.cpp:309 ERROR_GUARD; 314–316 null without error not re-picked here
-	// (append_nested_loop only tries once).
-	if st == nil || HasError() || !stmtOK(*st) {
+	// Statement.cpp make_random(eFor): full factory + post_creation + null re-pick
+	made := makeRandomStmtForced(r, opts, probs, vs, tables, stmtTab, cg, b, StmtFor)
+	if HasError() || !stmtOK(made) {
 		return nil
 	}
-	// Statement.cpp:320 — post_creation_analysis after make_random(eFor)
-	PostCreationAnalysis(st, preFacts, preUnion, preEffect, cg, opts)
-	if HasError() {
-		return nil
-	}
+	st := &made
 	if StmIDUnset(st.StmID) {
 		st.StmID = AllocStmID()
 	}
