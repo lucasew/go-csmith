@@ -342,8 +342,18 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		// ExpressionVariable(*v) then optional (v + offset)
 		// VariableSelector.cpp:1492–1497 — FunctionInvocationBinary(eAdd, …, flags=0)
 		// null op_flags → Output emits plain "a + b" (FunctionInvocationBinary.cpp:357–361)
+		// Indices string form must match Expression.Output (virtual Variable::Output),
+		// not v.Name — itemized array IVs print as name[i]… (seed-48 g_106[4]).
 		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
-		idx := v.Name
+		idx := idxExpr.Output()
+		// residual ERROR sticky — no invent soft-continue later dims past index Output residual
+		if HasError() {
+			return nil
+		}
+		if idx == "" {
+			SetError(ErrGeneric)
+			return nil
+		}
 		remain := dimenLen - boundOf[v]
 		if remain > 1 {
 			off := int(r.RndUpto(uint32(remain)))

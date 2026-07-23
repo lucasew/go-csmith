@@ -439,11 +439,16 @@ func MakeRandomArrayInit(
 		return Stmt{}
 	}
 
-	// access with ctrl vars: a[i0][i1]… (C++ always has cvs[i] live name)
+	// access with ctrl vars: a[i0][i1]… —
+	// ArrayVariable.cpp:708–709 + StatementArrayOp.cpp:245–250 —
+	// output_with_indices uses cvs[i]->Output (virtual). Soft invent used
+	// IV.Name (bare get_actual_name) so itemized array IVs lost indices in the
+	// body assign (seed-48: UP l_91[…][g_106[4]] vs GO …[g_106]; for-header was
+	// already OutputC and matched g_106[4]).
 	access := av.Name
 	for _, d := range dims {
-		// sticky no invent "a[]" / "[0]" for missing IV or empty name
-		if d == nil || d.IV == nil || d.IV.Name == "" {
+		// sticky no invent "a[]" / "[0]" for missing IV
+		if d == nil || d.IV == nil {
 			for _, x := range dims {
 				if x != nil && x.IV != nil {
 					cg.RemoveIVBound(x.IV)
@@ -452,7 +457,26 @@ func MakeRandomArrayInit(
 			SetError(ErrGeneric)
 			return Stmt{}
 		}
-		access += "[" + d.IV.Name + "]"
+		ivOut := d.IV.OutputC()
+		// residual ERROR sticky — no invent soft-continue access past OutputC residual
+		if HasError() {
+			for _, x := range dims {
+				if x != nil && x.IV != nil {
+					cg.RemoveIVBound(x.IV)
+				}
+			}
+			return Stmt{}
+		}
+		if ivOut == "" {
+			for _, x := range dims {
+				if x != nil && x.IV != nil {
+					cg.RemoveIVBound(x.IV)
+				}
+			}
+			SetError(ErrGeneric)
+			return Stmt{}
+		}
+		access += "[" + ivOut + "]"
 	}
 
 	// StatementArrayOp.cpp:141 — get_current_block()->random_parent_block()
