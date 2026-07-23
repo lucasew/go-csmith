@@ -1354,8 +1354,13 @@ func MakeRandomBinaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:275–279 — ordered ops merge facts (short-circuit RHS may skip)
-	// full FactVec: makeup_new_var_facts then merge_facts(global, facts_copy)
-	if IsOrderedBinary(op) && cg.FM != nil && factsCopy != nil {
+	// full FactVec: makeup_new_var_facts then merge_facts(global, facts_copy).
+	// C++ always runs this on the post-LHS snapshot vector, including empty
+	// (n=0). Soft invent: `factsCopy != nil` skipped the whole block when
+	// GlobalFacts was nil (CloneFactSlice(nil)==nil; NewFactMgr zero value),
+	// so the first-program && never makeup-joined empty post-LHS with post-RHS
+	// live last=fN → BOTTOM (seed 199: UP nCopy=0 then JOIN 0⊕3, Go kept f3).
+	if IsOrderedBinary(op) && cg.FM != nil {
 		if !MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts) ||
 			!makeupNewUnionFacts(&unionCopy, cg.FM.UnionFacts) ||
 			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) ||
