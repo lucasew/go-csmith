@@ -3,13 +3,14 @@ package csmith
 import "testing"
 
 // FactPointTo.cpp:415–426 is_valid_ptr exact var*; facts abstract onto get_collective
-// (FactPointTo.cpp:276–277). local_vars holds itemized (create_array_and_itemize).
-// AddNewVarFactInto(itemized) must leave a fact keyed on the itemized subject so
-// IsValidPtr(itemized) succeeds (seed-10054 nested revisit).
-func TestAddNewVarFactIntoItemizedRegistersSubject(t *testing.T) {
+// (FactPointTo.cpp:276–277). During revisit, IsValidPtr falls back to collective
+// without dual-registering itemized subjects into the FactVec (that inflates
+// same_facts and breaks nested for shortcut reuse — seed-90).
+func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
 	ClearError()
 	SetProcessOptions(Defaults())
 	i32 := GetIntType()
+	tgt := CreateVariableScalars("g_t", i32, false, false)
 	l118 := CreateVariableScalars("l_118", PointerTo(i32), false, false)
 	elem := PointerTo(PointerTo(i32))
 	addr := &Expression{Term: TermVariable, Var: l118, ExprType: elem}
@@ -26,26 +27,23 @@ func TestAddNewVarFactIntoItemizedRegistersSubject(t *testing.T) {
 	}
 	item.AsArray = item
 
-	var facts []*FactPointTo
+	// Only collective on lattice with live pointee (not dead/garbage).
+	facts := []*FactPointTo{MakeFactPointTo(&coll.Variable, tgt)}
+	if FindRelatedPointTo(facts, &item.Variable) != nil {
+		t.Fatal("itemized must not be dual-keyed on lattice")
+	}
+	inUserInvocationRevisit = false
+	if IsValidPtr(&item.Variable, facts, 0, 0) {
+		t.Fatal("gen IsValidPtr(itemized) must miss without dual-reg")
+	}
+	ClearError()
 	inUserInvocationRevisit = true
 	defer func() { inUserInvocationRevisit = false }()
-	AddNewVarFactInto(&item.Variable, &facts)
-	if HasError() || !FactsComplete(facts) {
-		t.Fatalf("add err=%v complete=%v", HasError(), FactsComplete(facts))
-	}
-	// collective fact present
-	if FindRelatedPointTo(facts, &coll.Variable) == nil {
-		t.Fatal("missing collective fact")
-	}
-	// itemized subject must also be keyed for is_valid_ptr
-	if FindRelatedPointTo(facts, &item.Variable) == nil {
-		t.Fatal("missing itemized subject fact")
-	}
 	if !IsValidPtr(&item.Variable, facts, 0, 0) {
-		t.Fatal("IsValidPtr(itemized) must succeed after dual registration")
+		t.Fatalf("revisit IsValidPtr(itemized) must fall back to collective err=%v", GetError())
 	}
-	if IsValidPtr(&item.Variable, facts, 0, 0) && HasError() {
-		t.Fatal("sticky after valid")
+	if FindRelatedPointTo(facts, &item.Variable) != nil {
+		t.Fatal("fallback must not invent dual-reg entry")
 	}
 	ClearError()
 }

@@ -600,7 +600,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if f.VisitedCnt == 1 {
 		fm.SetupInOutMaps(true)
 	}
-	// Dual-register itemized array facts only while revisiting (see AddNewVarFactInto).
+	// IsValidPtr collective fallback for itemized arrays only while revisiting.
 	prevRevisit := inUserInvocationRevisit
 	inUserInvocationRevisit = true
 	defer func() { inUserInvocationRevisit = prevRevisit }()
