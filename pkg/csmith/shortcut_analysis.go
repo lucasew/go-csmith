@@ -384,18 +384,28 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		}
 		// Statement.cpp:785–803 — visited goto *into* this tree (src may be outside);
 		// re-analyze if dest facts not implied by jump-src outs
-		// (or dest in empty while src out nonempty)
+		// (or dest in empty while src out nonempty).
+		// C++ map_facts_in/out are full FactVec (ePointTo + eUnionWrite). Soft invent
+		// was PT-only: seed-895 if-926 pure-shortcut when goto925→905 eUnionWrite
+		// dest-in did not imply jump-src out (UP unfixed=1 → visit for g_924.f2
+		// drops IV read → feffect order).
 		if visited && destInside {
 			srcOut := fm.GetMapFactsOut(e.SrcID)
 			destIn := fm.GetMapFactsIn(e.DestStmID)
+			srcOutU := fm.GetMapUnionFactsOut(e.SrcID)
+			destInU := fm.GetMapUnionFactsIn(e.DestStmID)
 			// incomplete maps sticky unfixed (GetMap may already SetError)
-			if !FactsComplete(srcOut) || !FactsComplete(destIn) {
+			if !FactsComplete(srcOut) || !FactsComplete(destIn) ||
+				!UnionFactsComplete(srcOutU) || !UnionFactsComplete(destInU) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return true
 			}
-			if len(srcOut) > 0 && len(destIn) == 0 {
+			// Statement.cpp:901–903 — full FactVec empty check
+			srcNonEmpty := len(srcOut) > 0 || len(srcOutU) > 0
+			destEmpty := len(destIn) == 0 && len(destInU) == 0
+			if srcNonEmpty && destEmpty {
 				return true
 			}
 			for _, f := range destIn {
@@ -423,6 +433,35 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 				if jumpSrc != nil {
 					ok := f.Imply(jumpSrc)
 					// residual ERROR sticky — no invent soft-continue fixed past Imply hole
+					if HasError() {
+						return true
+					}
+					if !ok {
+						return true
+					}
+				}
+			}
+			// eUnionWrite half of full FactVec (same imply gate as ePointTo)
+			for _, fu := range destInU {
+				if fu == nil || fu.Var == nil {
+					SetError(ErrGeneric)
+					return true
+				}
+				if fu.Var.IsRV() {
+					if HasError() {
+						return true
+					}
+					continue
+				}
+				if HasError() {
+					return true
+				}
+				jumpSrcU := FindRelatedUnion(srcOutU, fu.Var)
+				if HasError() {
+					return true
+				}
+				if jumpSrcU != nil {
+					ok := fu.Imply(jumpSrcU)
 					if HasError() {
 						return true
 					}
@@ -712,8 +751,6 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	}
 	return ok
 }
-
-
 
 // ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts.
 // Statement.cpp:569–606 — shortcut; else stm_visit_facts then set_fact_in/out.

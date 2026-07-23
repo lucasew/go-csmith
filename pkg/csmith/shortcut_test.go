@@ -137,7 +137,6 @@ func TestIsCtrlStmt(t *testing.T) {
 	ClearError()
 }
 
-
 func TestSameFactVec(t *testing.T) {
 	// Fact.cpp:237–246 full FactVec (ePointTo + eUnionWrite).
 	ClearError()
@@ -752,6 +751,55 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 	if sc := ShortcutAnalysis(assign, &facts, &cg, Defaults()); sc != ShortcutNone {
 		t.Fatalf("unfixed inbound goto must yield ShortcutNone, got %d", sc)
 	}
+}
+
+// TestContainsUnfixedGotoUnionImply — Statement.cpp:785–803 full FactVec.
+// Soft invent was ePointTo-only: equal PT lattices but eUnionWrite dest-in not
+// imply jump-src out still pure-shortcut (seed-895 if-926 unfixed=0 vs UP=1 →
+// nested for IV read kept → feffect g_924.f2 order).
+func TestContainsUnfixedGotoUnionImply(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	// union subject for eUnionWrite lattice
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	u := CreateVariableScalars("g_u", ut, false, false)
+	u.CreateFieldVars()
+	body := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 10, SourceLabel: "lbl"},
+		{Kind: StmtGoto, StmID: 20, Label: "lbl", GotoDestStmID: 10},
+	}}
+	f.Blocks = []*Block{body}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	fm.MapVisited = map[int]bool{20: true}
+	// dest in: last-write field 0; jump src out: last-write field 1 — not imply
+	destU := MakeFactUnion(u, 0)
+	srcU := MakeFactUnion(u, 1)
+	if destU == nil || srcU == nil {
+		t.Fatal("need FactUnion helpers")
+	}
+	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{srcU})
+	fm.SetMapFactsInPair(10, []*FactPointTo{}, []*FactUnion{destU})
+	root := &Stmt{Kind: StmtBlock, Then: body, StmID: 1}
+	if !ContainsUnfixedGoto(root, fm) {
+		t.Fatal("eUnionWrite dest-in not imply jump-src out must be unfixed")
+	}
+	// matching union last-write → fixed
+	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnion(u, 0)})
+	if ContainsUnfixedGoto(root, fm) {
+		t.Fatal("equal eUnionWrite must be fixed when PT empty-equal")
+	}
+	// nonempty union srcOut + empty full dest in → unfixed (full FactVec empty)
+	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnion(u, 0)})
+	fm.SetMapFactsInPair(10, []*FactPointTo{}, []*FactUnion{})
+	if !ContainsUnfixedGoto(root, fm) {
+		t.Fatal("nonempty union srcOut + empty destIn must be unfixed")
+	}
+	ClearError()
 }
 
 func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
