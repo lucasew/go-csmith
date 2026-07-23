@@ -35,8 +35,11 @@ func MakeRandomIf(
 		return nil
 	}
 	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition
-	// pre_facts = full FactVec (ePointTo + eUnionWrite). Soft invent was PT-only
-	// snapshot so re-analyze left UnionFacts at post-condition last-writes.
+	// C++: FactVec pre_facts = fm->global_facts (shallow Fact* vector copy).
+	// Soft invent was CloneFactSlice (deep), which freezes the pre-condition
+	// lattice so mid-condition Join on shared Fact* (what C++ pre_facts observes)
+	// is lost on StatementIf.cpp:80–89 restore + re-visit. Soft invent was also
+	// PT-only snapshot so re-analyze left UnionFacts at post-condition last-writes.
 	var func1PreFacts []*FactPointTo
 	var func1PreUnion []*FactUnion
 	var func1PreEffect Effect
@@ -47,11 +50,9 @@ func MakeRandomIf(
 			SetError(ErrGeneric)
 			return nil
 		}
-		func1PreFacts = CloneFactSlice(cg.FM.GlobalFacts)
-		// residual ERROR sticky — no invent soft-if past CloneFactSlice residual
-		if HasError() {
-			return nil
-		}
+		// StatementIf.cpp:69 — shallow Fact* vector (same as restoreFactsPT).
+		func1PreFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
+		// CloneUnionFactSlice is already a shallow FactUnion* copy (FactVec partition).
 		func1PreUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
 		if HasError() || !UnionFactsComplete(func1PreUnion) {
 			if !HasError() {
