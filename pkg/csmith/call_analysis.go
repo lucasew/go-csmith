@@ -343,16 +343,23 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 }
 
 // HasUncertainCallRecursiveStmt mirrors Statement::has_uncertain_call_recursive.
-// Assign/Invoke/If via expr; for via get_exprs test; default false.
-// Incomplete for/expr sticky true (no invent skip for-test calls).
+// Statement.h:185 — base returns false. Only StatementAssign and StatementExpr
+// override (StatementAssign.cpp:411–412 / StatementExpr.cpp:134–135) and
+// delegate to Expression::has_uncertain_call_recursive.
+// Soft invent treated StmtIfElse/Return/For/ArrayOp/jump like Assign (walk
+// expr/body). That fired Statement.cpp:969 special validate for a long-lived
+// func_1 if whose pre_facts was empty (capture before pointer globals), wiping
+// post-combine may-null lattices (seed-250 g_67 → init-only; Lhs F0 miss).
+// C++ StatementIf never overrides — special path never runs for if (combine
+// result kept). StatementIf.cpp:79 is condition re-analyze at make_random only.
 func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 	if st == nil {
 		SetError(ErrGeneric)
 		return true
 	}
 	switch st.Kind {
-	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
-		// C++ always has live get_exprs entries for these kinds
+	case StmtAssign, StmtInvoke:
+		// StatementAssign / StatementExpr overrides only
 		if st.Expr == nil {
 			SetError(ErrGeneric)
 			return true
@@ -363,87 +370,8 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 			return true
 		}
 		return ok
-	case StmtFor:
-		// StatementFor::get_exprs → test (not st.Expr)
-		if st.Loop == nil || st.Loop.TestExpr == nil {
-			SetError(ErrGeneric)
-			return true
-		}
-		if HasUncertainCallRecursiveExpr(st.Loop.TestExpr) {
-			// residual ERROR sticky — no invent uncertain true past test-expr hole
-			if HasError() {
-				return true
-			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue body past test residual
-		if HasError() {
-			return true
-		}
-		// get_blocks body only — sticky no invent soft-skip nil body as "no uncertain call"
-		blks := GetBlocksStmt(st)
-		// residual ERROR sticky — no invent certain soft-skip past GetBlocksStmt residual
-		if HasError() {
-			return true
-		}
-		for _, b := range blks {
-			if b == nil {
-				SetError(ErrGeneric)
-				return true
-			}
-			for i := range b.Stmts {
-				if HasUncertainCallRecursiveStmt(&b.Stmts[i]) {
-					// residual ERROR sticky — no invent uncertain true past nested stmt hole
-					if HasError() {
-						return true
-					}
-					return true
-				}
-				// residual ERROR sticky — no invent soft-continue later stmts past residual
-				if HasError() {
-					return true
-				}
-			}
-		}
-		return false
-	case StmtArrayOp:
-		// StatementArrayOp.h:65–68 — if (init_value) only; NOT For test.
-		// Fair: array_init numeric LoopControl has no TestExpr.
-		if st.Expr != nil {
-			if HasUncertainCallRecursiveExpr(st.Expr) {
-				if HasError() {
-					return true
-				}
-				return true
-			}
-			if HasError() {
-				return true
-			}
-		}
-		// get_blocks body (Go array_init nests assign under Then)
-		blks := GetBlocksStmt(st)
-		if HasError() {
-			return true
-		}
-		for _, b := range blks {
-			if b == nil {
-				SetError(ErrGeneric)
-				return true
-			}
-			for i := range b.Stmts {
-				if HasUncertainCallRecursiveStmt(&b.Stmts[i]) {
-					if HasError() {
-						return true
-					}
-					return true
-				}
-				if HasError() {
-					return true
-				}
-			}
-		}
-		return false
 	default:
+		// Statement.h:185 — base false (If/For/Return/ArrayOp/jump/…)
 		return false
 	}
 }

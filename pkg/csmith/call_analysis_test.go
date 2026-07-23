@@ -93,11 +93,13 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 		t.Fatal("for without TestExpr must SetError sticky")
 	}
 	ClearError()
-	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
-		t.Fatal("incomplete for must fail closed uncertain")
+	// Statement.h:185 — StatementFor does not override has_uncertain_call_recursive
+	// (base false). Soft invent walked for-test/body as uncertain (unfair special path).
+	if HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
+		t.Fatal("StatementFor must be certain (base false), not invent body walk")
 	}
-	if !HasError() {
-		t.Fatal("incomplete for must SetError sticky")
+	if HasError() {
+		t.Fatal("StatementFor HasUncertainCallRecursive must not SetError")
 	}
 	ClearError()
 	// StatementArrayOp.h:65–68 — get_exprs is if(init_value) only, not For test.
@@ -709,6 +711,32 @@ func TestGetDirectInvocationNilSticky(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("nil Stmt GetDirectInvocation must SetError sticky")
+	}
+	ClearError()
+}
+
+
+// Statement.h:185 — StatementIf does not override has_uncertain_call_recursive.
+// Soft invent checked condition expr and took Statement.cpp:969 special path for
+// if (seed-250: empty pre_facts wipe of g_67 may-null). C++ never specials if.
+func TestHasUncertainCallRecursiveIfElseBaseFalse(t *testing.T) {
+	ClearError()
+	// Condition with multi-arg call would look "uncertain" if we walked Expr.
+	a := userCall("func_a")
+	b := userCall("func_b")
+	cond := &Expression{
+		Term: TermFunction,
+		Invoke: &Invocation{
+			User: &Function{Name: "func_c", ReturnType: GetIntType(), IsBuilt: true},
+			Args: []*Expression{a, b},
+		},
+	}
+	st := &Stmt{Kind: StmtIfElse, StmID: 1, Expr: cond, Then: &Block{}, Else: &Block{}}
+	if HasUncertainCallRecursiveStmt(st) {
+		t.Fatal("StatementIf must return false (base), not invent condition walk")
+	}
+	if HasError() {
+		t.Fatal("StatementIf must not SetError")
 	}
 	ClearError()
 }
