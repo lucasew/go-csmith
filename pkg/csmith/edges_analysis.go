@@ -483,6 +483,26 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
+			// Capture gen-time effect_stm + effect_accum BEFORE reset to pre_effect.
+			// Statement.cpp:854–857 / 988–994: special validate resets accum then
+			// re-walks; gen-time ReadVars (and map_stm_effect) can be richer than
+			// visit re-collection (seed-12 map_stm_effect; seed-294 goto cond
+			// ChooseVisibleReadVar nRead 233 vs 222 → ok 64 vs 60 → g_1501 vs g_81).
+			// Must snapshot accum before pre_effect clone or "gen" is actually pre.
+			genStmEff := EmptyEffect()
+			if !StmIDUnset(st.StmID) {
+				genStmEff = fm.GetMapStmEffect(st.StmID)
+			}
+			genAccumEff := EmptyEffect()
+			if cg.EffectAccum != nil && EffectComplete(*cg.EffectAccum) {
+				genAccumEff = cg.EffectAccum.Clone()
+				// residual ERROR sticky — no invent soft-validate past Accum Clone residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
+			}
+			// Statement.cpp:989 — reset_effect_accum(pre_effect) then validate
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
 				// residual ERROR sticky — no invent soft-validate past Effect Clone residual
@@ -496,19 +516,6 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// Do not sticky-poison generation: match NDEBUG continue (same class as
 			// FactUnion indirect==-1 under NDEBUG). Always-revisit may SetError on
 			// incomplete callee IR; clear soft fail like elided assert(0).
-			//
-			// Statement.cpp:854–857 saves gen-time effect_stm into map_stm_effect
-			// *before* special validate. validate → stm_visit_facts clears effect_stm
-			// then StatementAssign::visit_facts reassigns map_stm_effect from the
-			// re-analysis lattice. Generation-time AddVisibleEffect from first-build
-			// callees can record globals that visit-time revisit under-collects
-			// (seed-12 func_1: g_208/g_1489/g_1939 present pre-validate, dropped
-			// post). Keep the gen-time map for summary/feffect; special path is for
-			// DFA facts, not re-deriving make_random effect_stm.
-			genStmEff := EmptyEffect()
-			if !StmIDUnset(st.StmID) {
-				genStmEff = fm.GetMapStmEffect(st.StmID)
-			}
 			_ = ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
 			ClearError()
 			if !StmIDUnset(st.StmID) && EffectComplete(genStmEff) {
@@ -521,6 +528,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 				return
 			}
 			fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
+			// Restore gen-time effect_accum so trailing SetMapAccumEffect records it
+			// and subsequent back-edge goto cond (get_effect_accum read_vars) sees
+			// gen-time ReadVars (StatementGoto.cpp:119–122).
+			if cg.EffectAccum != nil && EffectComplete(genAccumEff) {
+				*cg.EffectAccum = genAccumEff
+			}
 			specialHandled = true
 		}
 	}
