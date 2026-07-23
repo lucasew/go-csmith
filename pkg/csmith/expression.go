@@ -1335,6 +1335,13 @@ func MakeRandomExpression(
 	return e
 }
 
+// exprVarSelectRetryCeiling is the Go soft bound for ExpressionVariable.cpp:71–132
+// do { select; filters; visit_facts } while (true). C++ is unbounded; 256 was too
+// low (seed-599096333: exhausted mid-EV → Statement::make_random re-pick while UP
+// continued SelectParentLocal). Same order as MakeRandomLhs (Lhs.cpp:70–145 /
+// seed-2 e4412 SelectDeref path).
+const exprVarSelectRetryCeiling = 10000
+
 // makeExpressionVariable — ExpressionVariable.cpp:56+ :
 // VariableSelector::select(READ, type, qfer, eFlexible); as_param / as_return filters.
 // cg is *CGContext (C++ CGContext&) so visit_facts writes stick for merge_param_context.
@@ -1391,11 +1398,11 @@ func makeExpressionVariableFlags(
 	if HasError() {
 		return nil
 	}
-	// ExpressionVariable.cpp:71–132 — do { select; filters; visit_facts } while (!ev)
-	// dummy is invalid_vars passed into select (ExpressionVariable.cpp:78, 131)
-	// C++ loops until success or ERROR_GUARD; cap high to avoid soft invent nil early
+	// ExpressionVariable.cpp:71–132 — do { select; filters; visit_facts } while (true).
+	// dummy is invalid_vars passed into select (ExpressionVariable.cpp:78, 131).
+	// C++ is unbounded; Go uses exprVarSelectRetryCeiling (see const).
 	var dummy []*Variable
-	for tries := 0; tries < 256; tries++ {
+	for tries := 0; tries < exprVarSelectRetryCeiling; tries++ {
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
 		v := vs.SelectMustUseVar(r, AccessRead, *cg, typ, qfer)
 		// residual ERROR sticky — no invent fall through soft select past must-use hole

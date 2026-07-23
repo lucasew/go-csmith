@@ -1543,3 +1543,16 @@ func TestExpressionConstantOutputParensNegatives(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestExprVarSelectRetryCeiling(t *testing.T) {
+	// ExpressionVariable.cpp:71–132 — do { ... } while (true) (unbounded).
+	// Go soft ceiling must stay >>256: seed-599096333 exhausted at try 256
+	// (depth≈70004) while UP continued the same EV loop (SelectParentLocal).
+	// Lock the named constant (same order as MakeRandomLhs 10000).
+	if exprVarSelectRetryCeiling < 1000 {
+		t.Fatalf("exprVarSelectRetryCeiling=%d too low for C++ unbounded EV loop", exprVarSelectRetryCeiling)
+	}
+	if exprVarSelectRetryCeiling != 10000 {
+		t.Fatalf("exprVarSelectRetryCeiling=%d want 10000 (Lhs parity / seed-599096333)", exprVarSelectRetryCeiling)
+	}
+}
