@@ -517,6 +517,11 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// StatementAssign always has live Lhs; incomplete IR — no invent skip update
 			lhs := st.LhsVar
 			indir := 0
+			// FactUnion.cpp:133 / FactMgr.cpp:370 — abstract uses Lhs::get_type()
+			// (desired type after deref), not Variable::type. Soft invent was
+			// UpdateFactForAssign(var,…) only: post_creation of (*union*) and
+			// visit path diverged (visit already used UpdateFactForAssignWant).
+			var lhsWant *Type
 			if st.Lhs != nil {
 				lhs = st.Lhs.Var
 				// incomplete Lhs type IR must not invent indir 0 assign facts
@@ -526,14 +531,18 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 					return
 				}
 				indir = n
+				lhsWant = st.Lhs.GetType()
+				if HasError() {
+					return
+				}
 			}
 			if lhs == nil {
 				SetError(ErrGeneric)
 				return
 			}
-			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs()
+			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs() + lhs
 			// incomplete assign fails closed sticky — no invent mark visited with wiped facts
-			_ = fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
+			_ = fm.UpdateFactForAssignWant(lhs, indir, lhsWant, st.GetAssignRhs())
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				if !HasError() {

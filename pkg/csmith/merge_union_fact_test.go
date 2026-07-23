@@ -2,6 +2,39 @@ package csmith
 
 import "testing"
 
+// Fact.cpp:149–171 — MergeUnionFactInto is the same merge_fact contract as MergeUnionFact
+// (imply short-circuit; copy=new.clone(); join(old)). Soft invent always-joined without
+// imply short-circuit.
+func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
+	ClearError()
+	ut := &Type{
+		isUnion: true, StructName: "U",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f3", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.CreateFieldVars()
+	// old already implies new → keep old (must not join-to-BOTTOM)
+	facts := []*FactUnion{MakeFactUnion(uv, 3)}
+	got := MergeUnionFactInto(facts, MakeFactUnion(uv, 3))
+	if !UnionFactsComplete(got) || HasError() {
+		t.Fatal("into incomplete", HasError(), GetError())
+	}
+	fu := FindRelatedUnion(got, uv)
+	if fu == nil || fu.LastWrittenFID != 3 || fu.IsBottom() {
+		t.Fatalf("want keep fid 3, got %#v", fu)
+	}
+	// 0 join 3 → BOTTOM
+	ClearError()
+	got2 := MergeUnionFactInto([]*FactUnion{MakeFactUnion(uv, 0)}, MakeFactUnion(uv, 3))
+	fu2 := FindRelatedUnion(got2, uv)
+	if fu2 == nil || !fu2.IsBottom() {
+		t.Fatalf("want BOTTOM after 0 join 3, got %#v", fu2)
+	}
+}
+
 // Fact.cpp:149–171 merge_fact for eUnionWrite — join lattice, not replace.
 func TestMergeUnionFactJoinsLattice(t *testing.T) {
 	ClearError()

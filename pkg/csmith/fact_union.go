@@ -691,48 +691,13 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 }
 
 // MergeUnionFactInto merges nf into facts slice (join if related).
-// FactUnion* always live; nil nf or map hole fails closed sticky IncompleteUnionFactSlice
-// (no invent empty-complete via UnionFactsComplete(nil) / soft re-pick past wipe).
+// Fact.cpp:149–171 merge_fact — same as MergeUnionFact (imply short-circuit,
+// copy=new.clone(); copy.join(old)). Soft invent always-joined old.clone().join(new)
+// without imply short-circuit (see call_analysis comment at if-combine).
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
-	if nf == nil {
-		SetError(ErrGeneric)
-		return IncompleteUnionFactSlice()
-	}
-	if !UnionFactsComplete(facts) {
-		SetError(ErrGeneric)
-		return IncompleteUnionFactSlice()
-	}
-	for i, old := range facts {
-		if old.Var == nf.Var {
-			cp := old.Clone()
-			// residual ERROR sticky — no invent soft-merge past Clone residual
-			if HasError() {
-				return IncompleteUnionFactSlice()
-			}
-			if cp == nil {
-				SetError(ErrGeneric)
-				return IncompleteUnionFactSlice()
-			}
-			cp.Join(nf)
-			// residual ERROR sticky — no invent soft-merge past Join residual
-			if HasError() {
-				return IncompleteUnionFactSlice()
-			}
-			facts[i] = cp
-			return facts
-		}
-	}
-	cl := nf.Clone()
-	// residual ERROR sticky — no invent soft-append past Clone residual
-	if HasError() {
-		return IncompleteUnionFactSlice()
-	}
-	if cl == nil {
-		SetError(ErrGeneric)
-		return IncompleteUnionFactSlice()
-	}
-	return append(facts, cl)
+	return MergeUnionFact(facts, nf)
 }
+
 
 // RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.
 // FactUnion.cpp:74–118 — constant→fid 0; variable→join RHS union facts;
