@@ -3,11 +3,11 @@ package csmith
 import "testing"
 
 
-// TestIsVarOOSLocalAggregateField — Function.cpp:214–224.
-// find_variable_in_set(local_vars) is pointer identity only. A field of a
-// stack aggregate is not itself in local_vars → not OOS (even when Match would
-// hit the parent). Seed 86: IsVarOOS(l_1053.f3) invent-true via Match then
-// mark_dead on l_1226=&l_1053.f3.
+// TestIsVarOOSLocalAggregateField — Function.cpp:187–224 / find_variable_in_set.
+// C++ find_variable_in_set uses Variable::match: a field of a stack aggregate
+// matches the parent in local_vars → is_var_on_stack true (not OOS). Soft invent
+// was pointer-identity only (field never in local_vars) then wrong OOS/mark_dead.
+// 5b8ae90: IsVarOnStack uses Match like find_variable_in_set.
 func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	ClearError()
 	st := &Type{
@@ -33,17 +33,17 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	if !f.IsVarOnStack(arr, body) {
 		t.Fatal("array must be on stack")
 	}
-	// Field is not on stack by identity (Function.cpp:194 find_variable_in_set)
-	if f.IsVarOnStack(field, body) {
-		t.Fatal("field must not be on-stack by identity")
+	// Field of stack aggregate: Match(parent) in local_vars → on-stack
+	if !f.IsVarOnStack(field, body) {
+		t.Fatal("field of stack aggregate must be IsVarOnStack via Match")
 	}
-	// Field is not visible (not global, not on-stack identity)
-	if f.IsVarVisible(field, body) {
-		t.Fatal("field not visible by identity stack walk")
+	// Visible when on-stack
+	if !f.IsVarVisible(field, body) {
+		t.Fatal("on-stack field must be visible")
 	}
-	// Field must NOT be OOS: C++ only finds pointer identity in local_vars
+	// Not OOS while parent remains on stack
 	if f.IsVarOOS(field, body) {
-		t.Fatal("field of stack aggregate must not be IsVarOOS (no Match invent)")
+		t.Fatal("field of live stack aggregate must not be IsVarOOS")
 	}
 	if HasError() {
 		t.Fatal(GetError())
