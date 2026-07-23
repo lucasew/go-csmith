@@ -174,7 +174,8 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 	return true
 }
 
-// IsCtrlStmt mirrors Statement::is_ctrl_stmt — break/continue/goto/return.
+// IsCtrlStmt mirrors Statement::is_ctrl_stmt — break/continue/goto only.
+// Statement.h:164–167 — eContinue | eBreak | eGoto (not eReturn; return may pure-shortcut).
 // Statement always live; sticky false (no invent not-ctrl soft-skip past hole).
 func IsCtrlStmt(st *Stmt) bool {
 	if st == nil {
@@ -182,7 +183,7 @@ func IsCtrlStmt(st *Stmt) bool {
 		return false
 	}
 	switch st.Kind {
-	case StmtBreak, StmtContinue, StmtGoto, StmtReturn:
+	case StmtBreak, StmtContinue, StmtGoto:
 		return true
 	default:
 		return false

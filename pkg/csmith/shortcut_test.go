@@ -117,8 +117,14 @@ func TestSubsetFacts(t *testing.T) {
 }
 
 func TestIsCtrlStmt(t *testing.T) {
-	if !IsCtrlStmt(&Stmt{Kind: StmtBreak}) || IsCtrlStmt(&Stmt{Kind: StmtAssign}) {
-		t.Fatal("ctrl")
+	// Statement.h:164–167 — continue/break/goto only; not return (may pure-shortcut)
+	if !IsCtrlStmt(&Stmt{Kind: StmtBreak}) || !IsCtrlStmt(&Stmt{Kind: StmtContinue}) ||
+		!IsCtrlStmt(&Stmt{Kind: StmtGoto}) {
+		t.Fatal("break/continue/goto must be ctrl")
+	}
+	if IsCtrlStmt(&Stmt{Kind: StmtAssign}) || IsCtrlStmt(&Stmt{Kind: StmtReturn}) ||
+		IsCtrlStmt(&Stmt{Kind: StmtFor}) {
+		t.Fatal("assign/return/for must not be is_ctrl_stmt")
 	}
 	// Statement always live; sticky no invent not-ctrl soft-skip
 	ClearError()
