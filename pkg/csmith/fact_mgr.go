@@ -21,9 +21,14 @@ const (
 
 // meta_facts enable flags (FactMgr.cpp:67 meta_facts vector).
 // When false, corresponding abstract_fact paths are skipped.
+//
+// inUserInvocationRevisit is true during FunctionInvocationUser::revisit
+// (nested body re-analysis). Used to dual-register itemized array facts
+// only on revisit so gen-time ExpressionVariable select stream is unchanged.
 var (
-	metaFactPointToEnabled = true
-	metaFactUnionEnabled   = true
+	metaFactPointToEnabled   = true
+	metaFactUnionEnabled     = true
+	inUserInvocationRevisit  bool
 )
 
 // AddInterestedFacts mirrors FactMgr::add_interested_facts.
@@ -3515,6 +3520,35 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		} else if HasError() {
 			*facts = IncompleteFactSlice()
 			return
+		}
+		// ArrayVariable::itemize: local_vars holds itemized member; facts abstract
+		// onto get_collective() (FactPointTo.cpp:276–277). ExpressionVariable may
+		// still hold the itemized Variable* (create_array_and_itemize return).
+		// is_valid_ptr uses exact var* match (FactPointTo.cpp:415–426). Without a
+		// fact keyed on the itemized subject, nested revisit IsValidPtr misses
+		// while collective has live fact (seed-10054). Dual-register under itemized
+		// only during FunctionInvocationUser::revisit — gen-time FP would otherwise
+		// unlock itemized select and burn a different ExpressionVariable stream.
+		if inUserInvocationRevisit && v.AsArray != nil && v.AsArray.Collective != nil && f.Var != v {
+			if FindRelatedPointTo(*facts, v) == nil {
+				if HasError() {
+					*facts = IncompleteFactSlice()
+					return
+				}
+				itemCl := f.Clone()
+				if HasError() || itemCl == nil {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					*facts = IncompleteFactSlice()
+					return
+				}
+				itemCl.Var = v
+				*facts = append(*facts, itemCl)
+			} else if HasError() {
+				*facts = IncompleteFactSlice()
+				return
+			}
 		}
 	}
 }

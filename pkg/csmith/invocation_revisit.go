@@ -4,6 +4,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+
 // return-fact registry (FunctionInvocationUser.cpp static invocations/return_facts).
 // C++ stores Fact* of any eCat; Go splits ePointTo / eUnionWrite into parallel registries
 // (same inv may appear once per category — FunctionInvocationUser.cpp:91–102).
@@ -599,6 +600,10 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if f.VisitedCnt == 1 {
 		fm.SetupInOutMaps(true)
 	}
+	// Dual-register itemized array facts only while revisiting (see AddNewVarFactInto).
+	prevRevisit := inUserInvocationRevisit
+	inUserInvocationRevisit = true
+	defer func() { inUserInvocationRevisit = prevRevisit }()
 	// FunctionInvocationUser.cpp:206+324 — full FactVec handover includes eUnionWrite.
 	// Build path clones caller UnionFacts then FilterUnionFactsForHandover (function_invocation.go).
 	// Soft invent left stale callee UnionFacts across revisits → IsNonreadableField /

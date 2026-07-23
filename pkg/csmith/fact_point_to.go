@@ -2,6 +2,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+
 import "strings"
 
 // Special points-to targets (FactPointTo.cpp:61–66).
@@ -232,10 +233,22 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 		SetError(ErrGeneric)
 		return false
 	}
+	// FactPointTo.cpp:415–426 — exact var* match. Array facts live on get_collective()
+	// (add_new_var_fact_and_update_inout_maps(..., get_collective())). ExpressionVariable
+	// may hold itemized (Collective!=nil). During FunctionInvocationUser::revisit only,
+	// fall back to collective so IsValidPtr matches opportunistic_validate's lookup
+	// without unlocking itemized during gen ExpressionVariable select (stream-stable).
+	// seed-10054: nested revisit miss itemized while collective has live fact.
 	fact := FindRelatedPointTo(facts, p)
 	// residual ERROR sticky — no invent valid false/true soft-skip past FindRelated hole
 	if HasError() {
 		return false
+	}
+	if fact == nil && inUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
+		fact = FindRelatedPointTo(facts, &p.AsArray.Collective.Variable)
+		if HasError() {
+			return false
+		}
 	}
 	if fact == nil {
 		// missing subject is complete invalid
