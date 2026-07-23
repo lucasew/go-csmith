@@ -520,10 +520,8 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 		return ShortcutNone
 	}
 	fm := cg.FM
-	in, ok := fm.MapFactsIn[st.StmID]
-	if !ok {
-		return ShortcutNone
-	}
+	// C++ map_facts_in[this] — missing key is empty FactVec (std::map::operator[]).
+	in := fm.GetMapFactsIn(st.StmID)
 	// Fact* always live in maps; incomplete in/inputs fail closed (SameFacts also rejects holes)
 	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
@@ -586,10 +584,9 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if HasError() {
 		return ShortcutConflict
 	}
-	// Statement.cpp:559 — inputs = map_facts_out[this]; out must be present and complete
-	// no invent ShortcutOK when out missing (would keep inputs) or has nil holes
-	out, ok := fm.MapFactsOut[st.StmID]
-	if !ok || !FactsComplete(out) {
+	// Statement.cpp:559 — inputs = map_facts_out[this]; C++ map[] empty if missing.
+	out := fm.GetMapFactsOut(st.StmID)
+	if !FactsComplete(out) {
 		return ShortcutNone
 	}
 	// Statement.cpp:559 — full FactVec assign: ePointTo + eUnionWrite.

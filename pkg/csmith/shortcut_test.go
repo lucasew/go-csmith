@@ -283,9 +283,11 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	if sc != ShortcutOK {
 		t.Fatal(sc)
 	}
-	// ctrl stmt never shortcuts
-	st2 := &Stmt{Kind: StmtReturn, StmID: 6}
+	// ctrl stmt (break/continue/goto) never shortcuts — Statement.h:164–167
+	st2 := &Stmt{Kind: StmtBreak, StmID: 6, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	fm.SetMapFactsIn(6, facts)
+	fm.SetMapFactsOut(6, facts)
+	fm.SetMapStmEffect(6, EmptyEffect())
 	if ShortcutAnalysis(st2, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("ctrl")
 	}
@@ -876,9 +878,9 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	ClearError()
 }
 
-func TestShortcutAnalysisMissingOutFailClosed(t *testing.T) {
+func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 	// Statement.cpp:559 — inputs = map_facts_out[this]
-	// missing out must not invent ShortcutOK while leaving inputs unchanged
+	// C++ map[] default-inserts empty FactVec; missing key is not fail-closed None.
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -887,16 +889,16 @@ func TestShortcutAnalysisMissingOutFailClosed(t *testing.T) {
 	fm := NewFactMgr(nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(7, facts)
-	// no MapFactsOut[7]
+	// no MapFactsOut[7] — empty complete (C++ map[])
 	fm.SetMapStmEffect(7, EmptyEffect())
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
-		t.Fatal("missing MapFactsOut must fail closed ShortcutNone")
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatal("missing MapFactsOut must be empty complete ShortcutOK (C++ map[])")
 	}
-	if fm.MapVisited[7] {
-		t.Fatal("must not mark visited on incomplete shortcut")
+	if !fm.MapVisited[7] {
+		t.Fatal("ShortcutOK must mark visited")
 	}
 }
 
@@ -930,18 +932,18 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 	}
 }
 
-func TestShortcutAnalysisBlockMissingOutFailClosed(t *testing.T) {
+func TestShortcutAnalysisBlockMissingOutIsEmpty(t *testing.T) {
 	body := &Block{StmID: 60, Stmts: []Stmt{{Kind: StmtAssign, StmID: 61}}}
 	fm := NewFactMgr(nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(60, facts)
-	// no MapFactsOut[60]
+	// no MapFactsOut[60] — empty complete (C++ map[])
 	fm.SetMapStmEffect(60, EmptyEffect())
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutNone {
-		t.Fatal("block missing MapFactsOut must fail closed")
+	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutOK {
+		t.Fatal("block missing MapFactsOut must be empty complete ShortcutOK (C++ map[])")
 	}
 }
 

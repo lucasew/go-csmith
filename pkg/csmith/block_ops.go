@@ -965,8 +965,13 @@ func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
 
 // ShortcutAnalysisBlock mirrors Statement::shortcut_analysis for a Block.
 // Statement.cpp:545–567 — same_facts && !is_ctrl_stmt && !contains_unfixed_goto.
-// Incomplete or missing map_facts_out fails closed (ShortcutNone) — no invent
-// reuse success while leaving inputs unchanged or cloning past nil holes.
+// Incomplete map_facts_out fails closed (ShortcutNone) — no invent reuse past holes.
+// Missing map_facts_in/out keys: C++ std::map::operator[] default-inserts empty
+// FactVec (Block.cpp post_creation find_fixed_point uses map_facts_in[this] before
+// any set_fact_in). Soft invent treated missing as ShortcutNone → forced full
+// re-visit of loop bodies, rewriting gen map_stm_effect and dropping nested-call
+// make_iteration IV reads from caller feffect (seed-90: func_57 missing g_188 /
+// g_262.f2). Fair: missing key = empty complete lattice (same as GetMapFactsIn).
 // Block + facts + CGContext always live; sticky ShortcutNone
 // (no invent soft-skip shortcut past hole).
 // Nil FM / StmID 0 is non-sticky ShortcutNone (intentional reuse miss / soft re-pick).
@@ -979,10 +984,8 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	fm := cg.FM
-	in, ok := fm.MapFactsIn[b.StmID]
-	if !ok {
-		return ShortcutNone
-	}
+	// C++ map_facts_in[this] — missing key is empty FactVec, not "no shortcut".
+	in := fm.GetMapFactsIn(b.StmID)
 	// Fact* always live in maps; incomplete in/inputs fail closed
 	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
@@ -1043,10 +1046,10 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if HasError() {
 		return ShortcutConflict
 	}
-	// Statement.cpp:559 — inputs = map_facts_out[this]; out must be present and complete
+	// Statement.cpp:559 — inputs = map_facts_out[this]; C++ map[] empty if missing.
 	// Full FactVec (ePointTo + eUnionWrite); soft invent was PT-only assign.
-	out, ok := fm.MapFactsOut[b.StmID]
-	if !ok || !FactsComplete(out) {
+	out := fm.GetMapFactsOut(b.StmID)
+	if !FactsComplete(out) {
 		return ShortcutNone
 	}
 	outU := fm.GetMapUnionFactsOut(b.StmID)
