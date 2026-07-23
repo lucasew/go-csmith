@@ -4,8 +4,12 @@ import "testing"
 
 // StatementFor.cpp:193–194 — write_var(var); read_var(var) before init.visit_facts.
 // Generation post_loop pre_effect → map_stm_effect[for] → function feffect reads.
-// seed-46: after FP re-analysis, Go lost g_952.f8 from func_44 reads while UP kept it
-// (statement shortcut same_facts false on Go → visit_facts wiped gen header reads).
+// seed-46: func_44 reads missing g_952.f8. Gen post_loop has IV read; parent loop
+// body (stm 469) self-back merge expands g_325 3→6 pointees → block/statement
+// same_facts fails → VisitFactsStatementFor (init-write only) overwrites
+// map_stm_effect and drops make_iteration IV read. visit re-apply of write+read
+// restores g_952.f8 but over-adds other IV reads (g_82.f7). Next: pure-shortcut
+// / PT lattice for g_325 so first FP sc=0 like UP (keep gen map_stm_effect).
 func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	ClearError()
 	opts := Defaults()
