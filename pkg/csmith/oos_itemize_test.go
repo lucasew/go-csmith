@@ -119,3 +119,53 @@ func TestMarkDeadVarNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMarkDeadVarStructFieldPointee(t *testing.T) {
+	// FactPointTo.cpp:108–124 + find_field_variable_in_set: OOS aggregate marks
+	// field pointees (l_531.f0) as garbage — seed-30 g_113 held l_531.f0 live.
+	ClearError()
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	agg := CreateVariableScalars("l_531", st, false, false)
+	agg.CreateFieldVars()
+	if len(agg.FieldVars) == 0 {
+		t.Fatal("need field")
+	}
+	fld := agg.FieldVars[0]
+	p := CreateVariableScalars("g_113", PointerTo(GetIntType()), false, false)
+	f := MakeFactPointToSet(p, []*Variable{fld, NullPtr})
+	nf := f.MarkDeadVar(agg)
+	if nf == nil {
+		t.Fatal("MarkDeadVar aggregate must hit field pointee")
+	}
+	if !nf.IsDead() {
+		t.Fatalf("want garbage for field, got %+v", nf.PointTo)
+	}
+	// OOS path
+	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld, NullPtr})}
+	UpdateFactsForOOSVars([]*Variable{agg}, &facts)
+	fp := FindRelatedPointTo(facts, p)
+	if fp == nil || !fp.IsDead() {
+		t.Fatalf("OOS aggregate must garbage field pointee, got %+v", fp)
+	}
+	if HasError() {
+		t.Fatal("complete path must not sticky")
+	}
+}
+
+func TestMarkFuncEndLocalsStructFieldPointee(t *testing.T) {
+	ClearError()
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	agg := CreateVariableScalars("l_531", st, false, false)
+	agg.CreateFieldVars()
+	fld := agg.FieldVars[0]
+	p := CreateVariableScalars("g_113", PointerTo(GetIntType()), false, false)
+	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld, NullPtr})}
+	nf := facts[0].MarkFuncEndLocals([]*Variable{agg})
+	if nf == nil || !nf.IsDead() {
+		t.Fatalf("MarkFuncEndLocals must garbage field pointee via CollectExpandable, got %+v", nf)
+	}
+}
