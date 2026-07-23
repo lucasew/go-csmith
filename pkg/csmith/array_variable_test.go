@@ -1237,3 +1237,33 @@ func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 		t.Fatal("invent space before comment:", s)
 	}
 }
+
+func TestOutputInitNegativeConstParen(t *testing.T) {
+	// ArrayVariable.cpp:649 + Expression::to_string → Constant::Output
+	// Constant.cpp:532–536 — enclose negatives in parentheses.
+	ClearError()
+	// Local array: IsGlobal for ArrayVariable is Block==nil (ArrayVariable.cpp:414–415).
+	blk := &Block{}
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "l_52", Type: GetIntType(), IsArray: true, ArraySizes: []int{3},
+			Init: &Constant{Type: GetIntType(), Value: "-3L"},
+		},
+		Sizes: []int{3},
+		Block: blk,
+	}
+	av.AsArray = av
+	if av.NoLoopInitializer() {
+		t.Fatal("test array must use loop initializer")
+	}
+	if got := av.Init.Output(); got != "(-3L)" {
+		t.Fatalf("Init.Output got %q", got)
+	}
+	out := av.OutputInitOpts("", []string{"i"}, true)
+	if HasError() {
+		t.Fatalf("OutputInit sticky err=%v out=%q", HasError(), out)
+	}
+	if !strings.Contains(out, " = (-3L);") {
+		t.Fatalf("want paren-negative init, got %q", out)
+	}
+}

@@ -1063,6 +1063,8 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 		}
 	}
 	// ArrayVariable.cpp:649 — init->Output; always live Expression* sticky (no invent "0")
+	// Expression.cpp:120–123 to_string → Output (Constant.cpp:532–536 paren negatives).
+	// Soft invent Init.Value skipped Output → " = -3L;" vs " = (-3L);" (seed-353 l_52).
 	var initVal string
 	if av.InitExpr != nil {
 		initVal = av.InitExpr.Output()
@@ -1071,7 +1073,11 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 			return ""
 		}
 	} else if av.Init != nil {
-		initVal = av.Init.Value
+		initVal = av.Init.Output()
+		// residual ERROR sticky — no invent loop-init past Constant Output residual hole
+		if HasError() {
+			return ""
+		}
 	}
 	if initVal == "" {
 		SetError(ErrGeneric)
