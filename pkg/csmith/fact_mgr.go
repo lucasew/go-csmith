@@ -2271,11 +2271,21 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if HasError() {
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
+	// Fact.cpp:96–109 — primary Variable::init, then ArrayVariable more_init_values.
+	// CreateArrayVariable stores alts only in InitExprs; createAndInitialize sets
+	// InitExpr primary. Soft invent used nil primary + first AbstractFactForAssign(nil)
+	// → GarbagePtr then merge alts still IsDead (seed-10054 IsValidPtr on local
+	// pointer arrays during nested revisit). When InitExpr is unset, use InitExprs[0]
+	// as primary and remaining as more (no invent garbage-first past empty primary).
 	var rhs *Expression
+	var moreStart int
 	if v.InitExpr != nil {
 		rhs = v.InitExpr
 	} else if v.Init != nil {
 		rhs = &Expression{Term: TermConstant, Con: v.Init, ExprType: v.Type}
+	} else if v.AsArray != nil && len(v.AsArray.InitExprs) > 0 {
+		rhs = v.AsArray.InitExprs[0]
+		moreStart = 1
 	}
 	if v.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-continue union abstract past IsUnion residual
@@ -2320,7 +2330,8 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if av := v.AsArray; av != nil {
 		// Fact.cpp:100–106 — get_more_init_values() Expression* only
 		// no invent Constant from InitValues to_string() list
-		for _, e := range av.InitExprs {
+		// moreStart skips InitExprs[0] when it was promoted to primary above
+		for _, e := range av.InitExprs[moreStart:] {
 			// Expression* always live in C++; nil hole is broken IR — sticky
 			if e == nil {
 				SetError(ErrGeneric)
