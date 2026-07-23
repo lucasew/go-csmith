@@ -365,7 +365,9 @@ func (fm *FactMgr) GetMapUnionFactsOut(stmID int) []*FactUnion {
 
 // AssignGlobalFactsFromMapIn assigns global_facts from map_facts_in[stm] for both
 // categories. FactMgr.cpp / StatementFor.cpp:355 —
-//   fm->global_facts = fm->map_facts_in[&body];
+//
+//	fm->global_facts = fm->map_facts_in[&body];
+//
 // Full FactVec replace (point-to + eUnionWrite). Incomplete either partition wipes both.
 func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 	if fm == nil || StmIDUnset(stmID) {
@@ -405,7 +407,9 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 
 // AssignGlobalFactsFromMapOut assigns global_facts from map_facts_out[stm] for both
 // categories. FactMgr.cpp / Block.cpp:729 —
-//   fm->global_facts = fm->map_facts_out[this];
+//
+//	fm->global_facts = fm->map_facts_out[this];
+//
 // Full FactVec replace (point-to + eUnionWrite). Incomplete either partition wipes both.
 func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 	if fm == nil || StmIDUnset(stmID) {
@@ -583,16 +587,58 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		return
 	}
 	cp := CloneFactSlice(facts)
+	// FactMgr.cpp:257–274 — set_fact_out filters full FactVec (ePointTo + eUnionWrite).
+	// Soft invent was PT-only RemoveLoopLocalFacts / RemoveFunctionLocalFacts then
+	// SetMapFactsOut pairing unfiltered live UnionFacts → continue/break map_out kept
+	// parent-block eUnionWrite subjects (seed-30: continue 379 map_out still had l_810,
+	// back-edge into for body 333 polluted current_inputs → same_facts failed on for
+	// g_37 → VisitFactsStatementFor overwrote make_iteration IV read in feffect).
+	if !UnionFactsComplete(fm.UnionFacts) {
+		if fm.MapFactsOut == nil {
+			fm.MapFactsOut = make(map[int][]*FactPointTo)
+		}
+		if fm.MapUnionFactsOut == nil {
+			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+		}
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	outU := CloneUnionFactSliceDeep(fm.UnionFacts)
+	if HasError() || !UnionFactsComplete(outU) {
+		if fm.MapFactsOut == nil {
+			fm.MapFactsOut = make(map[int][]*FactPointTo)
+		}
+		if fm.MapUnionFactsOut == nil {
+			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
+		}
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	if outU == nil {
+		outU = []*FactUnion{}
+	}
 	switch st.Kind {
 	case StmtContinue, StmtBreak:
-		// FactMgr.cpp:257–262 — remove_loop_local_facts(s, facts_copy)
+		// FactMgr.cpp:257–262 — remove_loop_local_facts(s, facts_copy) full FactVec
 		cp = RemoveLoopLocalFactsForStmt(cp, st, blk)
+		outU = RemoveLoopLocalUnionFactsForStmt(outU, st, blk)
 	case StmtReturn:
 		// FactMgr.cpp:268–270 — remove_function_local_facts(facts_copy, s)
 		// stack check uses s->parent (blk); no invent f.Body-only walk
 		cp = RemoveFunctionLocalFactsAt(cp, fm.Func, blk)
+		outU = RemoveFunctionLocalUnionFactsAt(outU, fm.Func, blk)
 	case StmtGoto:
 		// FactMgr.cpp:263–266 — update_facts_for_dest(facts, facts_copy, sg->dest)
+		// ePointTo half only here; eUnionWrite dest filter is UpdateUnionFactsForDest
+		// when that unit is linked (PT-only dest path kept until then).
 		dp := destParent
 		if dp == nil {
 			dp = st.GotoDestParent
@@ -615,10 +661,11 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		// FactMgr.cpp:268 — eReturn || s->parent == nullptr → remove function locals
 		if blk == nil {
 			cp = RemoveFunctionLocalFactsAt(cp, fm.Func, nil)
+			outU = RemoveFunctionLocalUnionFactsAt(outU, fm.Func, nil)
 		}
 	}
 	// incomplete after filter/dest — store hole sticky (no invent complete out map)
-	if !FactsComplete(cp) {
+	if !FactsComplete(cp) || !UnionFactsComplete(outU) {
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
 		}
@@ -632,9 +679,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		return
 	}
-	// Full FactVec out: filtered PT + live eUnionWrite (locals already OOS'd on FM
-	// for return via UpdateFactsForOOSVars; break/continue remove_loop_local similarly).
-	fm.SetMapFactsOut(st.StmID, cp)
+	// Full FactVec out: filtered ePointTo + filtered eUnionWrite (not raw live unions).
+	fm.SetMapFactsOutPair(st.StmID, cp, outU)
 }
 
 // FindParentBlockOfStmID walks function blocks for the parent of stm_id.
@@ -1658,6 +1704,56 @@ func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) 
 		b = st.Then
 	}
 	return RemoveLoopLocalFacts(facts, b)
+}
+
+// RemoveLoopLocalUnionFacts is the eUnionWrite half of remove_loop_local_facts.
+// FactMgr.cpp:629–639 — update_facts_for_oos_vars is category-agnostic (FactVec).
+// Soft invent left map_union_out[continue/break] with parent-block union subjects
+// that are OOS at the loop head (seed-30 l_810 via continue back-edge into for body).
+func RemoveLoopLocalUnionFacts(facts []*FactUnion, blk *Block) []*FactUnion {
+	if blk == nil {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	locals := collectLoopLocalVars(blk)
+	if !VariablesComplete(locals) {
+		SetError(ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	out := CloneUnionFactSliceDeep(facts)
+	if !UnionFactsComplete(out) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return IncompleteUnionFactSlice()
+	}
+	if len(locals) > 0 {
+		UpdateUnionFactsForOOSVars(locals, &out)
+		if !UnionFactsComplete(out) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return IncompleteUnionFactSlice()
+		}
+	}
+	if out == nil {
+		return []*FactUnion{}
+	}
+	return out
+}
+
+// RemoveLoopLocalUnionFactsForStmt is remove_loop_local_facts eUnionWrite for Statement*.
+// FactMgr.cpp:603–605 — block stmt uses itself; else use parent.
+func RemoveLoopLocalUnionFactsForStmt(facts []*FactUnion, st *Stmt, parent *Block) []*FactUnion {
+	b := parent
+	if st != nil && st.Kind == StmtBlock && st.Then != nil {
+		b = st.Then
+	}
+	return RemoveLoopLocalUnionFacts(facts, b)
 }
 
 // collectLoopLocalVars walks blk → parents until a looping block (inclusive).

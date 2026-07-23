@@ -718,7 +718,6 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	ClearError()
 }
 
-
 func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
 	// FactMgr.cpp:378 — array LHS merges.
 	ClearError()
@@ -884,7 +883,7 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 	nullRHS := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 2, LhsVar: &av.Variable,
-		Lhs: &Lhs{Var: &av.Variable, Type: elem},
+		Lhs:  &Lhs{Var: &av.Variable, Type: elem},
 		Expr: nullRHS, AssignOp: AssignSimple,
 	}
 	body := &Block{
@@ -935,5 +934,43 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 			}
 		}
 		t.Fatalf("map_facts_in must gain may-null after back-edge merge; in=%v out=%v", inPts, outPts)
+	}
+}
+
+// FactMgr.cpp:629–639 — remove_loop_local_facts is full FactVec (ePointTo + eUnionWrite).
+// Soft invent was PT-only OOS on continue/break map_out: parent-block eUnionWrite
+// subjects (l_810) survived into map_union_out and polluted for-body back-edge merge.
+func TestRemoveLoopLocalUnionFactsDropsParentLocals(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	ut := &Type{isUnion: true, StructName: "U2", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	loop := &Block{Looping: true, StmID: 333, LocalVars: []*Variable{}}
+	parent := &Block{Parent: loop, Looping: false, StmID: 336}
+	l810 := CreateVariableScalars("l_810", ut, false, false)
+	parent.LocalVars = []*Variable{l810}
+	inner := &Block{Parent: parent, Looping: false, StmID: 367, LocalVars: []*Variable{}}
+	// continue lives in inner; walk collects inner + parent (l_810) + loop locals
+	fm := NewFactMgr(&Function{Name: "func_t", ReturnType: GetIntType()})
+	fm.UnionFacts = []*FactUnion{
+		MakeFactUnion(CreateVariableScalars("g_25", ut, true, false), 0),
+		MakeFactUnion(l810, 0),
+	}
+	cont := &Stmt{Kind: StmtContinue, StmID: 379}
+	fm.SetMapFactsOutForStmt(cont, []*FactPointTo{}, inner)
+	if HasError() {
+		t.Fatal("set_fact_out continue sticky", GetError())
+	}
+	outU := fm.GetMapUnionFactsOut(379)
+	if !UnionFactsComplete(outU) {
+		t.Fatal("map_union_out incomplete", outU)
+	}
+	if FindRelatedUnion(outU, l810) != nil {
+		t.Fatalf("continue map_out must OOS parent-block union l_810, got %v", outU)
+	}
+	// global union subject must remain
+	if FindRelatedUnion(outU, fm.UnionFacts[0].Var) == nil {
+		t.Fatal("must keep non-loop-local union subject", outU)
 	}
 }
