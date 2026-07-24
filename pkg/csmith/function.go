@@ -432,6 +432,10 @@ func MakeFirst(
 	if env != nil {
 		cg.Types = env
 	}
+	// Prefer the active run bag when MakeFirst runs under Session.Generate / g.Sess.
+	if cg.Sess == nil {
+		cg.Sess = currentSession()
+	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
 	// sticky error / null body / Unbuilt — do not invent success first function
 	if HasError() || f.Body == nil || f.BuildState != BuildBuilt {

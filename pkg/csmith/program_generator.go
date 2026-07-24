@@ -130,6 +130,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	InitSessionProbabilityTables(opts)
 	// share session Probabilities with VS
 	vs := NewVariableSelectorProbs(opts, probs)
+	vs.Sess = s
 	// Statement.cpp:133–139 — InitProbabilityTable from pStatementProb (session probs)
 	stmtTab := probs.StatementThresholdTable()
 	s.StmtTab = stmtTab
@@ -262,7 +263,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		if f.IsBuilt || f.BuildState == BuildBuilt {
 			continue
 		}
-		cg := EmptyCGContext().WithFuncList(&g.Funcs)
+		cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
 		cg.CurrentFunc = f
 		cg.Types = &g.Types
 		if fm := g.FactMgrs.ForFunc(f); fm != nil {
@@ -844,7 +845,7 @@ func (g *ProgramGenerator) OutputMain() string {
 		f0 = g.Funcs.Funcs[0]
 		// skip builtin first (unlikely); still need live invoke for user first
 		if !f0.IsBuiltin {
-			cg := EmptyCGContext().WithFuncList(&g.Funcs)
+			cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
 			cg.Types = &g.Types
 			inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
 			// no soft invent name()+"()" or main without call when build/output fails

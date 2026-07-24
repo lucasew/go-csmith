@@ -5,6 +5,8 @@ package csmith
 
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
+	// Sess is the pure-run bag when set (generation); nil in minimal unit tests.
+	Sess                   *Session
 	AllVars                []*Variable
 	GlobalList             []*Variable
 	GlobalNonvolatilesList []*Variable

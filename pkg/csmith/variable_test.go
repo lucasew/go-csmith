@@ -141,15 +141,20 @@ func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
 
 func TestNewProgramGeneratorSetsProcessProbs(t *testing.T) {
 	opts := Defaults()
-	g := NewProgramGenerator(NewSession(opts))
-	if ProcessProbabilities() != g.Probs {
-		t.Fatal("process probs must be session table")
+	s := NewSession(opts)
+	g := NewProgramGenerator(s)
+	// Tables live on the session bag (ambient Process* only while activated).
+	if s.Probs != g.Probs {
+		t.Fatal("session probs must be generator table")
 	}
 	if g.VS.Probs != g.Probs {
 		t.Fatal("VS share")
 	}
-	if ProcessRng() != g.Rng {
-		t.Fatal("process RNG must be session DefaultRndNumGenerator")
+	if s.Rng != g.Rng {
+		t.Fatal("session RNG must be generator DefaultRndNumGenerator")
+	}
+	if g.Sess != s || g.VS.Sess != s {
+		t.Fatal("Sess wiring")
 	}
 }
 

@@ -183,6 +183,7 @@ func TestOutputGlobalVariables(t *testing.T) {
 }
 
 func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	// smoke: func_1 with FM does not panic on if generation
 	opts := Defaults()
 	opts.MaxBlockSize = 1
@@ -215,3 +216,4 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 		t.Fatal(st)
 	}
 }
+

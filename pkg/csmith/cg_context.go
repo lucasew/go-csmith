@@ -64,6 +64,12 @@ func EmptyCGContext() CGContext {
 	return CGContext{effectContext: EmptyEffect()}
 }
 
+// WithSession attaches the pure-run bag (copied by later With* value receivers).
+func (c CGContext) WithSession(s *Session) CGContext {
+	c.Sess = s
+	return c
+}
+
 // EffectContext mirrors CGContext::get_effect_context.
 // CGContext.h:118 — ambient restriction context (not the accum).
 func (c CGContext) EffectContext() Effect {

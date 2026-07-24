@@ -6,6 +6,7 @@ import (
 )
 
 func TestMakeRandomBinaryFloatPath(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	opts.EnableFloat = true
 	ft := GetSimpleType(EFloat)
@@ -25,10 +26,14 @@ func TestMakeRandomBinaryFloatPath(t *testing.T) {
 }
 
 func TestMakeRandomBinaryAssignKind(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	// assign kind: op2 == op1
 	for seed := uint64(1); seed < 20; seed++ {
 		f := MakeRandomBinaryKind(NewRng(seed), opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpAssign, BinAdd)
+		if f == nil {
+			t.Fatalf("seed %d: nil", seed)
+		}
 		if f.Op1Signed != f.Op2Signed {
 			t.Fatalf("seed %d: assign op2 should match op1", seed)
 		}

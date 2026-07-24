@@ -83,6 +83,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 }
 
 func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	// StatementReturn.cpp:54–72 — make_random does not visit_facts; append_return does
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true

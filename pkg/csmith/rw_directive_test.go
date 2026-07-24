@@ -66,6 +66,7 @@ func TestIsEligibleNonReadable(t *testing.T) {
 }
 
 func TestStepHashEmittedInBlock(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	opts.StepHashByStmt = true
 	opts.ComputeHash = true
