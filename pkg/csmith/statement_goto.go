@@ -895,8 +895,32 @@ func MakeRandomGoto(
 			// C++ leaves global_facts alone until StatementGoto.cpp:204; restore
 			// union half to pre-visit live (StmVisitFacts already restored PT).
 			fm.UnionFacts = liveSavedU
-			// StatementGoto.cpp:178–181 — if dest contains other, recompute goto_out
+			// StatementGoto.cpp:178–181 — if dest contains other, recompute goto_out.
+			// C++ goto_in is a live reference to map_facts_in/out[other_stm]; visit may
+			// have updated those maps (StatementGoto.cpp:179–180). Soft invent froze
+			// gotoIn at pre-visit clone so recompute used stale lattice (seed 114667:
+			// goto map_out kept g_124={g_106} while live other map_out had l_2181 range
+			// → contains_unfixed_goto false → pure-shortcut need_revisit LCA →
+			// Func.Blocks n=37 vs UP n=3 at FindGoodJumpBlock).
 			if ContainsStmt(dest, other) {
+				if IsCtrlStmt(other) {
+					gotoIn = CloneFactSlice(fm.GetMapFactsIn(other.StmID))
+					gotoInU = CloneUnionFactSliceDeep(fm.GetMapUnionFactsIn(other.StmID))
+				} else {
+					gotoIn = CloneFactSlice(fm.GetMapFactsOut(other.StmID))
+					gotoInU = CloneUnionFactSliceDeep(fm.GetMapUnionFactsOut(other.StmID))
+				}
+				if HasError() || !FactsComplete(gotoIn) || !UnionFactsComplete(gotoInU) {
+					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
+					cg.ResetEffectAccum(preEffect)
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
+					return makeGotoFailed()
+				}
+				if gotoInU == nil {
+					gotoInU = []*FactUnion{}
+				}
 				gotoOut = nil
 				gotoOutU = nil
 				UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
