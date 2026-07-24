@@ -29,24 +29,23 @@ type ProgramGenerator struct {
 	OutputKind OutputMgrKind
 }
 
-// processProgramGen mirrors AbsProgramGenerator::current_generator_.
-var processProgramGen *ProgramGenerator
-
-// SetProcessProgramGenerator installs AbsProgramGenerator::current_generator_.
-func SetProcessProgramGenerator(g *ProgramGenerator) { processProgramGen = g }
+// SetProcessProgramGenerator installs AbsProgramGenerator::current_generator_
+// on the active session.
+func SetProcessProgramGenerator(g *ProgramGenerator) { currentSession().ProgramGen = g }
 
 // ProcessProgramGenerator mirrors AbsProgramGenerator::GetInstance.
 // Nil sticky fail-closed (C++ asserts).
 func ProcessProgramGenerator() *ProgramGenerator {
-	if processProgramGen == nil {
+	g := currentSession().ProgramGen
+	if g == nil {
 		SetError(ErrGeneric)
 		return nil
 	}
-	return processProgramGen
+	return g
 }
 
 // ClearProcessProgramGenerator drops current_generator_ (finalization / tests).
-func ClearProcessProgramGenerator() { processProgramGen = nil }
+func ClearProcessProgramGenerator() { currentSession().ProgramGen = nil }
 
 // GetOutputMgrKind mirrors AbsProgramGenerator::getOutputMgr kind (Go: no ostream).
 func (g *ProgramGenerator) GetOutputMgrKind() OutputMgrKind {

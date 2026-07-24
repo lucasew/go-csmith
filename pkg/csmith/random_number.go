@@ -2,7 +2,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// RandomNumber mirrors RandomNumber — process singleton bridge to AbsRndNumGenerator.
+// RandomNumber mirrors RandomNumber — session singleton bridge to AbsRndNumGenerator.
 // RandomNumber.cpp:39–152.
 type RandomNumber struct {
 	seed       uint64
@@ -11,18 +11,13 @@ type RandomNumber struct {
 	currKind   RngKind
 }
 
-// processRN is RandomNumber::instance_.
-// Guarded by processOptsMu (same lifetime as ProcessRng).
-var processRN *RandomNumber
-
 // MakeRndNumGenerator mirrors AbsRndNumGenerator::make_rndnum_generator.
 // AbsRndNumGenerator.cpp:66–84 — seedrand then Default or DFS factory.
-// Reads process Options for DFS max depth / debug sequence (not under processOptsMu).
 func MakeRndNumGenerator(kind RngKind, seed uint64) *Rng {
 	return makeRndNumGeneratorWithOpts(kind, seed, ProcessOptions())
 }
 
-// makeRndNumGeneratorWithOpts is the lock-free factory used while processOptsMu is held.
+// makeRndNumGeneratorWithOpts is the factory used under session ownership.
 func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
 	switch kind {
 	case RngKindDefault:
@@ -36,89 +31,81 @@ func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
 }
 
 // CreateRandomNumberInstance mirrors RandomNumber::CreateInstance.
-// RandomNumber.cpp:63–78.
+// RandomNumber.cpp:63–78. Session-specific (no process mutex).
 func CreateRandomNumberInstance(kind RngKind, seed uint64) {
-	processOptsMu.Lock()
-	defer processOptsMu.Unlock()
-	if processRN == nil {
-		processRN = &RandomNumber{
+	s := currentSession()
+	if s.RandomNumber == nil {
+		s.RandomNumber = &RandomNumber{
 			seed:       seed,
 			generators: make(map[RngKind]*Rng),
 		}
-		// under lock: use processOpts directly (no ProcessOptions RLock)
-		g := makeRndNumGeneratorWithOpts(kind, seed, processOpts)
+		g := makeRndNumGeneratorWithOpts(kind, seed, s.Opts)
 		if g == nil {
-			// sticky already set; leave instance with nil curr (fail closed)
 			return
 		}
-		processRN.generators[kind] = g
-		processRN.curr = g
-		processRN.currKind = kind
-		processRng = g
+		s.RandomNumber.generators[kind] = g
+		s.RandomNumber.curr = g
+		s.RandomNumber.currKind = kind
+		s.Rng = g
 		return
 	}
-	// Existing instance: switch to requested generator; create if missing
-	// (parity with SwitchRndNumGenerator / library multi-CreateInstance).
-	g := processRN.generators[kind]
+	rn := s.RandomNumber
+	g := rn.generators[kind]
 	if g == nil {
-		g = makeRndNumGeneratorWithOpts(kind, processRN.seed, processOpts)
+		g = makeRndNumGeneratorWithOpts(kind, rn.seed, s.Opts)
 		if g == nil {
-			// sticky already set (e.g. DFS max_depth<=0)
 			return
 		}
-		processRN.generators[kind] = g
+		rn.generators[kind] = g
 	}
-	processRN.curr = g
-	processRN.currKind = kind
-	processRng = g
+	rn.curr = g
+	rn.currKind = kind
+	s.Rng = g
 }
 
 // GetRandomNumber mirrors RandomNumber::GetInstance.
 // RandomNumber.cpp:80–83 — C++ asserts; nil is library fail-closed.
 func GetRandomNumber() *RandomNumber {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	if processRN == nil {
+	rn := currentSession().RandomNumber
+	if rn == nil {
 		SetError(ErrGeneric)
 		return nil
 	}
-	return processRN
+	return rn
 }
 
 // GetRndNumGenerator mirrors RandomNumber::GetRndNumGenerator.
 // RandomNumber.cpp:85–88.
 func GetRndNumGenerator() *Rng {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	if processRN == nil || processRN.curr == nil {
+	rn := currentSession().RandomNumber
+	if rn == nil || rn.curr == nil {
 		SetError(ErrGeneric)
 		return nil
 	}
-	return processRN.curr
+	return rn.curr
 }
 
 // SwitchRndNumGenerator mirrors RandomNumber::SwitchRndNumGenerator.
 // RandomNumber.cpp:95–110 — create missing generator from seed; return previous kind.
 func SwitchRndNumGenerator(kind RngKind) RngKind {
-	processOptsMu.Lock()
-	defer processOptsMu.Unlock()
-	if processRN == nil || processRN.curr == nil {
+	s := currentSession()
+	rn := s.RandomNumber
+	if rn == nil || rn.curr == nil {
 		SetError(ErrGeneric)
 		return RngKindDefault
 	}
-	old := processRN.currKind
-	g := processRN.generators[kind]
+	old := rn.currKind
+	g := rn.generators[kind]
 	if g == nil {
-		// under lock: processOpts direct (no ProcessOptions RLock deadlock)
-		g = makeRndNumGeneratorWithOpts(kind, processRN.seed, processOpts)
+		g = makeRndNumGeneratorWithOpts(kind, rn.seed, s.Opts)
 		if g == nil {
 			return old
 		}
-		processRN.generators[kind] = g
+		rn.generators[kind] = g
 	}
-	processRN.curr = g
-	processRN.currKind = kind
-	processRng = g
+	rn.curr = g
+	rn.currKind = kind
+	s.Rng = g
 	return old
 }
 
@@ -126,10 +113,9 @@ func SwitchRndNumGenerator(kind RngKind) RngKind {
 // RandomNumber.cpp:142–152 — drop generators and instance.
 // Also clears DFSRndNumGenerator::impl_ + SequenceFactory sequences.
 func RandomNumberDoFinalization() {
-	processOptsMu.Lock()
-	defer processOptsMu.Unlock()
-	processRN = nil
-	processRng = nil
+	s := currentSession()
+	s.RandomNumber = nil
+	s.Rng = nil
 	clearDFSImpl()
 }
 

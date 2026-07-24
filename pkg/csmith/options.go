@@ -10,125 +10,73 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"unsafe"
 )
 
-// processOpts mirrors C++ CGOptions process-wide static configuration.
-// Constant::make_random, FactPointTo::is_valid_ptr, choose_var bookkeeping,
-// and Block emission read CGOptions; library-first Go keeps an explicit
-// process Options set for each generation run (see SetProcessOptions).
-//
-// processProbs mirrors C++ Probabilities process singleton (same lifetime as
-// CGOptions for a generation). CreateVariable / create_field_vars read it;
-// nil means not initialized — fail closed, no invent NewProbabilities(opts).
-//
-// processRng mirrors DefaultRndNumGenerator process instance. CreateVariable
-// Constant::make_random burns the same stream as the rest of generation; nil
-// means library/test path without NewProgramGenerator (not NewRng(1) invent).
-//
-// processStmtTab mirrors Statement static ProbabilityTable (pStatementProb).
-// Block::make_random / nested GenerateBody share one session table; nil means
-// fail closed (no invent NewStatementThresholdTable mid-invocation).
-//
-// processScopeTab mirrors VariableSelector::scopeTable_ (InitScopeTable once).
-// VariableSelectionProbability shares one session table; nil means fail closed
-// (no invent NewScopeThresholdTable per draw).
-//
-// processAssignOpsTab mirrors StatementAssign::assignOpsTable_ (InitProbabilityTable).
-// processExprTables mirrors Expression::exprTable_/paramTable_ (InitProbabilityTables).
-// Both are set once from Probabilities::initialize_group_probs; nil = fail closed.
-var (
-	processOptsMu       sync.RWMutex
-	processOpts         = Defaults()
-	processProbs        *Probabilities
-	processRng          *Rng
-	processStmtTab      *ThresholdTable
-	processScopeTab     *ThresholdTable
-	processAssignOpsTab *DistributionTable
-	processExprTables   *ExprTables
-)
+// Process* accessors read/write the active Session (see session.go).
+// Mutable generation config lives on the session; concurrent Generate in one
+// process is unsupported (same as upstream one-process csmith).
 
-// SetProcessOptions installs the active process Options (CGOptions mirror).
+// SetProcessOptions installs the active session Options (CGOptions mirror).
 // NewProgramGenerator calls this so CreateVariable / ChooseVarFull / Block.Output
 // use session options instead of inventing Defaults().
 func SetProcessOptions(o Options) {
-	processOptsMu.Lock()
-	processOpts = o
-	processOptsMu.Unlock()
+	currentSession().Opts = o
 }
 
-// ProcessOptions returns the active process Options (CGOptions mirror).
-// Safe default is Defaults() until SetProcessOptions is called.
+// ProcessOptions returns the active session Options (CGOptions mirror).
+// Safe default is Defaults() on defaultSession until SetProcessOptions is called.
 func ProcessOptions() Options {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processOpts
+	return currentSession().Opts
 }
 
 // SetProcessProbabilities installs the session Probabilities singleton.
 // NewProgramGenerator sets this to the same table shared with VS / generator.
 func SetProcessProbabilities(p *Probabilities) {
-	processOptsMu.Lock()
-	processProbs = p
-	processOptsMu.Unlock()
+	currentSession().Probs = p
 }
 
-// ProcessProbabilities returns the active process Probabilities (may be nil).
+// ProcessProbabilities returns the active session Probabilities (may be nil).
 // C++ Probabilities::GetInstance() is always live after init; nil here is
 // fail-closed for library paths that ran without NewProgramGenerator.
 func ProcessProbabilities() *Probabilities {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processProbs
+	return currentSession().Probs
 }
 
 // SetProcessRng installs the session DefaultRndNumGenerator (shared with generator).
 // NewProgramGenerator sets this to the same *Rng used for generation draws.
 func SetProcessRng(r *Rng) {
-	processOptsMu.Lock()
-	processRng = r
-	processOptsMu.Unlock()
+	currentSession().Rng = r
 }
 
-// ProcessRng returns the active process Rng (may be nil outside a generation run).
+// ProcessRng returns the active session Rng (may be nil outside a generation run).
 func ProcessRng() *Rng {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processRng
+	return currentSession().Rng
 }
 
 // SetProcessStmtTab installs the session statement probability table.
 // NewProgramGenerator sets this to the same StmtTab used for generation.
 func SetProcessStmtTab(t *ThresholdTable) {
-	processOptsMu.Lock()
-	processStmtTab = t
-	processOptsMu.Unlock()
+	currentSession().StmtTab = t
 }
 
 // ProcessStmtTab returns the active statement ThresholdTable (may be nil).
 // C++ Statement probability table is always live after init; nil is fail-closed
 // for library paths without NewProgramGenerator.
 func ProcessStmtTab() *ThresholdTable {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processStmtTab
+	return currentSession().StmtTab
 }
 
 // SetProcessScopeTab installs the session VariableSelector::scopeTable_.
 // NewProgramGenerator / InitScopeTable set this once per generation.
 func SetProcessScopeTab(t *ThresholdTable) {
-	processOptsMu.Lock()
-	processScopeTab = t
-	processOptsMu.Unlock()
+	currentSession().ScopeTab = t
 }
 
 // ProcessScopeTab returns the active scope ThresholdTable (may be nil).
 // C++ scopeTable_ is always live after InitScopeTable; nil is fail-closed.
 func ProcessScopeTab() *ThresholdTable {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processScopeTab
+	return currentSession().ScopeTab
 }
 
 // InitScopeTable mirrors VariableSelector::InitScopeTable.
@@ -139,30 +87,22 @@ func InitScopeTable(opts Options) {
 
 // SetProcessAssignOpsTable installs StatementAssign::assignOpsTable_.
 func SetProcessAssignOpsTable(t *DistributionTable) {
-	processOptsMu.Lock()
-	processAssignOpsTab = t
-	processOptsMu.Unlock()
+	currentSession().AssignOpsTab = t
 }
 
 // ProcessAssignOpsTable returns the session assign-ops table (may be nil).
 func ProcessAssignOpsTable() *DistributionTable {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processAssignOpsTab
+	return currentSession().AssignOpsTab
 }
 
 // SetProcessExprTables installs Expression::exprTable_/paramTable_ session pair.
 func SetProcessExprTables(t *ExprTables) {
-	processOptsMu.Lock()
-	processExprTables = t
-	processOptsMu.Unlock()
+	currentSession().ExprTables = t
 }
 
 // ProcessExprTables returns the session Expression term tables (may be nil).
 func ProcessExprTables() *ExprTables {
-	processOptsMu.RLock()
-	defer processOptsMu.RUnlock()
-	return processExprTables
+	return currentSession().ExprTables
 }
 
 // InitSessionProbabilityTables mirrors Probabilities::initialize_group_probs
