@@ -141,9 +141,9 @@ func MakeRandomAssignQfer(
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
 	// after Statement::make_random (Statement.cpp:309)
 	// StatementAssign::assignOpsTable_ from InitProbabilityTable sticky (no invent per assign)
-	assignTab := ProcessAssignOpsTable()
+	assignTab := sessAssignOpsTab(cgSess(cg))
 	if assignTab == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// StatementAssign.cpp:115–123 — AssignOpsProbability(type) once; if type null
@@ -364,16 +364,29 @@ func MakeRandomAssignQfer(
 	// process-wide for CVQualifiers::match / choose_var; restore after Lhs.
 	// Must restore on every early return (no invent sticky process MatchExactQualifiers
 	// that over-restricts later choose_var qfer match — seed-2 OK-list shrink).
+	// Write both ambient ProcessOptions and cg.Sess.Opts when set so ChooseVarFull
+	// (sessOpts(cg.Sess)) and process MatchExact OR see the force without relying
+	// solely on activateSession identity.
 	prevExact := opts.MatchExactQualifiers
-	prevProc := ProcessOptions()
+	prevProc := sessOpts(cgSess(cg))
+	var prevSessExact bool
+	if cg.Sess != nil {
+		prevSessExact = cg.Sess.Opts.MatchExactQualifiers
+	}
 	if callerQf {
 		opts.MatchExactQualifiers = true
 		po := prevProc
 		po.MatchExactQualifiers = true
 		SetProcessOptions(po)
+		if cg.Sess != nil {
+			cg.Sess.Opts.MatchExactQualifiers = true
+		}
 		defer func() {
 			opts.MatchExactQualifiers = prevExact
 			SetProcessOptions(prevProc)
+			if cg.Sess != nil {
+				cg.Sess.Opts.MatchExactQualifiers = prevSessExact
+			}
 		}()
 	}
 	// StatementAssign.cpp:195–200 — strict_float uses RHS type for Lhs

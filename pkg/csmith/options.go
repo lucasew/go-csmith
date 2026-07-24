@@ -16,6 +16,10 @@ import (
 // Process* accessors read/write the active Session (see session.go).
 // Mutable generation config lives on the session; concurrent Generate in one
 // process is unsupported (same as upstream one-process csmith).
+//
+// Prefer sessOpts/sessProbs/… when a *Session is already in hand (cg.Sess /
+// vs.Sess / g.Sess). Process* remains the ambient bridge for package helpers
+// that still lack an explicit bag.
 
 // SetProcessOptions installs the active session Options (CGOptions mirror).
 // NewProgramGenerator calls this so CreateVariable / ChooseVarFull / Block.Output
@@ -28,6 +32,14 @@ func SetProcessOptions(o Options) {
 // Safe default is Defaults() on defaultSession until SetProcessOptions is called.
 func ProcessOptions() Options {
 	return currentSession().Opts
+}
+
+// sessOpts returns s.Opts when s is non-nil, else ambient ProcessOptions.
+func sessOpts(s *Session) Options {
+	if s != nil {
+		return s.Opts
+	}
+	return ProcessOptions()
 }
 
 // SetProcessProbabilities installs the session Probabilities singleton.
@@ -43,6 +55,14 @@ func ProcessProbabilities() *Probabilities {
 	return currentSession().Probs
 }
 
+// sessProbs returns s.Probs when s is non-nil, else ambient ProcessProbabilities.
+func sessProbs(s *Session) *Probabilities {
+	if s != nil {
+		return s.Probs
+	}
+	return ProcessProbabilities()
+}
+
 // SetProcessRng installs the session DefaultRndNumGenerator (shared with generator).
 // NewProgramGenerator sets this to the same *Rng used for generation draws.
 func SetProcessRng(r *Rng) {
@@ -52,6 +72,14 @@ func SetProcessRng(r *Rng) {
 // ProcessRng returns the active session Rng (may be nil outside a generation run).
 func ProcessRng() *Rng {
 	return currentSession().Rng
+}
+
+// sessRng returns s.Rng when s is non-nil, else ambient ProcessRng.
+func sessRng(s *Session) *Rng {
+	if s != nil {
+		return s.Rng
+	}
+	return ProcessRng()
 }
 
 // SetProcessStmtTab installs the session statement probability table.
@@ -67,6 +95,14 @@ func ProcessStmtTab() *ThresholdTable {
 	return currentSession().StmtTab
 }
 
+// sessStmtTab returns s.StmtTab when s is non-nil, else ambient ProcessStmtTab.
+func sessStmtTab(s *Session) *ThresholdTable {
+	if s != nil {
+		return s.StmtTab
+	}
+	return ProcessStmtTab()
+}
+
 // SetProcessScopeTab installs the session VariableSelector::scopeTable_.
 // NewProgramGenerator / InitScopeTable set this once per generation.
 func SetProcessScopeTab(t *ThresholdTable) {
@@ -77,6 +113,14 @@ func SetProcessScopeTab(t *ThresholdTable) {
 // C++ scopeTable_ is always live after InitScopeTable; nil is fail-closed.
 func ProcessScopeTab() *ThresholdTable {
 	return currentSession().ScopeTab
+}
+
+// sessScopeTab returns s.ScopeTab when s is non-nil, else ambient ProcessScopeTab.
+func sessScopeTab(s *Session) *ThresholdTable {
+	if s != nil {
+		return s.ScopeTab
+	}
+	return ProcessScopeTab()
 }
 
 // InitScopeTable mirrors VariableSelector::InitScopeTable.
@@ -95,6 +139,14 @@ func ProcessAssignOpsTable() *DistributionTable {
 	return currentSession().AssignOpsTab
 }
 
+// sessAssignOpsTab returns s.AssignOpsTab when s is non-nil, else ambient ProcessAssignOpsTable.
+func sessAssignOpsTab(s *Session) *DistributionTable {
+	if s != nil {
+		return s.AssignOpsTab
+	}
+	return ProcessAssignOpsTable()
+}
+
 // SetProcessExprTables installs Expression::exprTable_/paramTable_ session pair.
 func SetProcessExprTables(t *ExprTables) {
 	currentSession().ExprTables = t
@@ -103,6 +155,14 @@ func SetProcessExprTables(t *ExprTables) {
 // ProcessExprTables returns the session Expression term tables (may be nil).
 func ProcessExprTables() *ExprTables {
 	return currentSession().ExprTables
+}
+
+// sessExprTables returns s.ExprTables when s is non-nil, else ambient ProcessExprTables.
+func sessExprTables(s *Session) *ExprTables {
+	if s != nil {
+		return s.ExprTables
+	}
+	return ProcessExprTables()
 }
 
 // InitSessionProbabilityTables mirrors Probabilities::initialize_group_probs

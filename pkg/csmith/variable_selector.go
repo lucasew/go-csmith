@@ -36,7 +36,7 @@ func vsSess(vs *VariableSelector) *Session {
 // (C++ Probabilities singleton). No invent second NewProbabilities(opts) when
 // process unset — Probs may be nil (fail closed on draws that need tables).
 func NewVariableSelector(opts Options) *VariableSelector {
-	return NewVariableSelectorProbs(opts, ProcessProbabilities())
+	return NewVariableSelectorProbs(opts, sessProbs(nil))
 }
 
 // NewVariableSelectorProbs constructs a selector sharing session Probabilities
@@ -1744,8 +1744,8 @@ func ChooseVarFull(
 		return nil
 	}
 	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
-	// FactPointTo::is_valid_ptr reads process CGOptions null/dead deref probs
-	opts := ProcessOptions()
+	// FactPointTo::is_valid_ptr reads session CGOptions null/dead deref probs
+	opts := sessOpts(cg.Sess)
 	if HasDereferenceableVar(cands, want, cg, opts) {
 		RecordPointerAvailForDeref()
 	}
@@ -3364,9 +3364,9 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return MaxVarScope
 	}
-	// VariableSelector.cpp:1050 — InitScopeTable(); use process scopeTable_ only
+	// VariableSelector.cpp:1050 — InitScopeTable(); use session scopeTable_ only
 	// (no invent NewScopeThresholdTable per draw)
-	tab := ProcessScopeTab()
+	tab := sessScopeTab(cgSess(cg))
 	if tab == nil {
 		// library path without InitScopeTable — sticky ERROR_GUARD MAX
 		_ = opts
