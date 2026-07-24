@@ -21,7 +21,7 @@ func NewCVQualifiers(consts, vols []bool) CVQualifiers {
 	// C++ vectors always equal length at construction; mismatch is broken IR sticky
 	// (no invent truncate-to-min complete success past unpaired const/vol depths)
 	if len(consts) != len(vols) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	return CVQualifiers{
@@ -197,7 +197,7 @@ func (q CVQualifiers) Clone() CVQualifiers {
 func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
 	// CVQualifiers.cpp:96 — assert own vectors same size sticky
 	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(q.IsConsts) != len(other.IsConsts) || len(q.IsVolatiles) != len(other.IsVolatiles) {
@@ -242,7 +242,7 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 	// CVQualifiers.cpp:148 — assert is_consts.size() == is_volatiles.size() sticky
 	// (no invent match/not-match soft-skip past unpaired depth shells)
 	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// CVQualifiers.cpp:141–143 — if (CGOptions::match_exact_qualifiers())
@@ -256,14 +256,14 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 	if !q.AcceptStricter {
 		ok := q.StricterThan(other)
 		// residual ERROR sticky — no invent match true past StricterThan residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
 	}
 	ok := other.StricterThan(q)
 	// residual ERROR sticky — no invent match true past other StricterThan residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return ok
@@ -274,7 +274,7 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 // CVQualifiers always live; sticky (no invent soft-skip add past hole).
 func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
 	if q == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	q.IsConsts = append(q.IsConsts, isConst)
@@ -287,7 +287,7 @@ func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
 // length<=0 is complete no-op. Over-pop sticky (no invent partial truncate success).
 func (q *CVQualifiers) RemoveQualifiers(length int) {
 	if q == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if length <= 0 {
@@ -297,7 +297,7 @@ func (q *CVQualifiers) RemoveQualifiers(length int) {
 		// C++ pop_back both vectors; empty vector is assert/UB — sticky incomplete
 		// (no invent soft-break partial pop as complete qfer after over-deref)
 		if len(q.IsConsts) == 0 || len(q.IsVolatiles) == 0 {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		q.IsConsts = q.IsConsts[:len(q.IsConsts)-1]
@@ -318,13 +318,13 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 	if level < 0 {
 		// CVQualifiers.cpp:510 — assert(level == -1); multi-level & sticky fail closed as empty
 		if level != -1 {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return CVQualifiers{}
 		}
 		// address-of: add one false,false level (push_back)
 		// unpaired base sticky empty (no invent add-level past broken qfer)
 		if len(q.IsConsts) != len(q.IsVolatiles) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return CVQualifiers{}
 		}
 		out := q.Clone()
@@ -334,7 +334,7 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 	}
 	// dereference: pop_back `level` times; unpaired / over-pop sticky empty
 	if len(q.IsConsts) != len(q.IsVolatiles) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	out := NewCVQualifiers(
@@ -342,12 +342,12 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 		append([]bool(nil), q.IsVolatiles...),
 	)
 	// NewCVQualifiers may sticky on mismatch; length-equal path is fine
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	out.AcceptStricter = q.AcceptStricter
 	out.RemoveQualifiers(level)
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	return out
@@ -358,7 +358,7 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 func (q CVQualifiers) SanityCheck(t *Type) bool {
 	// CVQualifiers.cpp:527 assert(t) sticky
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if q.Wildcard {
@@ -366,12 +366,12 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 	}
 	level := t.IndirectLevel()
 	// residual ERROR sticky — no invent sanity true past IndirectLevel residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// CVQualifiers.cpp:529 assert(level >= 0) sticky
 	if level < 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return len(q.IsConsts) == len(q.IsVolatiles) &&
@@ -400,7 +400,7 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent identity without draw
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// nil probs → 0% (no invent NewProbabilities / hard-coded 50)
@@ -441,7 +441,7 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	p := 0
@@ -483,7 +483,7 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 		return append([]bool(nil), q.IsConsts...)
 	}
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	p := 0
@@ -518,7 +518,7 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	p := 0
@@ -561,12 +561,12 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent empty shells when missing
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent looser/stricter qfer past holes)
 	if !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	var vols []bool
@@ -578,13 +578,13 @@ func (q CVQualifiers) RandomQualifiersFrom(
 		vols = q.RandomStricterVolatiles(r, opts, probs)
 	}
 	// CVQualifiers.cpp:209 — ERROR_GUARD after random_*_volatiles
-	if HasError() {
+	if sessHasError(nil) {
 		return NewCVQualifiers(nil, vols)
 	}
 	if !noVolatile {
 		seFree := cg.EffectContext().IsSideEffectFree()
 		// residual ERROR sticky — no invent soft-clear/keep vol past IsSideEffectFree residual
-		if HasError() {
+		if sessHasError(nil) {
 			return CVQualifiers{}
 		}
 		if !seFree && len(vols) > 0 {
@@ -593,7 +593,7 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	}
 	MakeScalarVolatiles(opts, vols)
 	// CVQualifiers.cpp:215 — ERROR_GUARD
-	if HasError() {
+	if sessHasError(nil) {
 		return NewCVQualifiers(nil, vols)
 	}
 
@@ -605,7 +605,7 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	}
 	MakeScalarConsts(opts, consts)
 	// CVQualifiers.cpp:219 — ERROR_GUARD after random_*_consts
-	if HasError() {
+	if sessHasError(nil) {
 		return NewCVQualifiers(consts, vols)
 	}
 	if access == AccessWrite && len(consts) > 0 {
@@ -629,12 +629,12 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent fixed looser shells
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent looser qfer past holes)
 	if !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	var vols []bool
@@ -643,16 +643,16 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	} else {
 		vols = q.RandomLooserVolatiles(r, opts, probs)
 		// residual ERROR sticky — no invent soft-continue looser past RandomLooserVolatiles residual
-		if HasError() {
+		if sessHasError(nil) {
 			return CVQualifiers{}
 		}
 		if !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
 			// residual ERROR sticky — no invent soft-clear vol past IsSideEffectFree residual
-			if HasError() {
+			if sessHasError(nil) {
 				return CVQualifiers{}
 			}
 			vols[len(vols)-1] = false
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue past IsSideEffectFree residual true
 			return CVQualifiers{}
 		}
@@ -660,7 +660,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	MakeScalarVolatiles(opts, vols)
 	consts := q.RandomLooserConsts(r, opts, probs)
 	// residual ERROR sticky — no invent soft-continue looser past RandomLooserConsts residual
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	MakeScalarConsts(opts, consts)
@@ -669,7 +669,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	}
 	out := NewCVQualifiers(consts, vols)
 	// residual ERROR sticky — no invent soft-qfer past NewCVQualifiers residual (mismatch)
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	return out
@@ -695,14 +695,14 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent fixed non-const non-vol level
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return q
 	}
 	isConst := false
 	if opts.ConstPointers && probs != nil {
 		p := probs.Single(PRegularConstProb)
 		// residual ERROR sticky — no invent soft-const past Single residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return q
 		}
 		isConst = r.RndFlipcoin(uint32(p))
@@ -711,14 +711,14 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	if !noVolatile && opts.VolatilePointers && probs != nil {
 		p := probs.Single(PRegularVolatileProb)
 		// residual ERROR sticky — no invent soft-vol past Single residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return q
 		}
 		isVol = r.RndFlipcoin(uint32(p))
 	}
 	out.AddQualifiers(isConst, isVol)
 	// residual ERROR sticky — no invent soft-add level past AddQualifiers residual
-	if HasError() {
+	if sessHasError(nil) {
 		return q
 	}
 	return out
@@ -733,7 +733,7 @@ func (q CVQualifiers) OutputFirstQuals() string {
 	if len(q.IsConsts) > 0 && q.IsConsts[0] {
 		// CVQualifiers.cpp:641–642 — assert(consts()) sticky when bit set but option off
 		if !opts.Consts {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString("const ")
@@ -741,7 +741,7 @@ func (q CVQualifiers) OutputFirstQuals() string {
 	if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
 		// CVQualifiers.cpp:647–648 — assert(volatiles()) sticky when bit set but option off
 		if !opts.Volatiles {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString("volatile ")
@@ -778,13 +778,13 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 	}
 	// both sides paired depths; unpaired sticky (Match also stickies)
 	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(q.IsConsts) == len(other.IsConsts) {
 		ok := q.Match(other, matchExact)
 		// residual ERROR sticky — no invent soft-match past Match residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
@@ -796,12 +796,12 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 	}
 	ind := other.IndirectQualifiers(deref)
 	// residual ERROR sticky — no invent soft-match past IndirectQualifiers residual
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	ok := q.Match(ind, matchExact)
 	// residual ERROR sticky — no invent soft-match past Match residual after peel
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return ok
@@ -813,7 +813,7 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 // CVQualifiers always live; sticky (no invent soft-skip set past hole).
 func (q *CVQualifiers) SetConst(isConst bool, pos int) {
 	if q == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	n := len(q.IsConsts)
@@ -835,7 +835,7 @@ func (q *CVQualifiers) SetConst(isConst bool, pos int) {
 // CVQualifiers always live; sticky (no invent soft-skip set past hole).
 func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
 	if q == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	n := len(q.IsVolatiles)
@@ -859,7 +859,7 @@ func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
 // Wildcard is complete no-op (not incomplete IR).
 func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	if q == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if q.Wildcard {
@@ -867,7 +867,7 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	}
 	// incomplete ambient fails closed sticky (no invent clear-vol via IncompleteEffect SE-false)
 	if !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if access == AccessWrite {
@@ -875,7 +875,7 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	}
 	seFree := cg.EffectContext().IsSideEffectFree()
 	// residual ERROR sticky — no invent soft-restrict past IsSideEffectFree residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	if !seFree {
@@ -889,19 +889,19 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void" for nil type
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// CVQualifiers.cpp:533 — assert(sanity_check(t)); sticky no invent bare CName for bad layout
 	if !q.Wildcard && len(q.IsConsts) > 0 {
 		if !q.SanityCheck(t) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue bare type past SanityCheck residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -914,39 +914,39 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		// CVQualifiers.cpp:541–544 — assert(0) sticky if const bit without Consts option
 		if q.IsConst() {
 			// residual ERROR sticky — no invent soft-const past IsConst residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if !emitConst() {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString("const ")
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue past IsConst residual false
 			return ""
 		}
 		if q.IsVolatile() {
 			// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if !emitVol() {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString("volatile ")
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
 			return ""
 		}
 		cn := t.CName()
 		// residual ERROR sticky — no invent soft-empty type past CName residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if cn == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// CVQualifiers.cpp:557–559 — base Output then trailing space before name/site
@@ -956,7 +956,7 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	}
 	base := t.BaseType()
 	// residual ERROR sticky — no invent soft-continue bare base past BaseType residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if base == nil {
@@ -966,31 +966,31 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	// CVQualifiers.cpp:534–561 — single-level loop: quals then base + " "
 	if t.IsSimple() || t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-qual emit past IsSimple/IsAggregate residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		var b strings.Builder
 		if len(q.IsConsts) > 0 && q.IsConsts[0] {
 			if !emitConst() {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString("const ")
 		}
 		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
 			if !emitVol() {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString("volatile ")
 		}
 		cn := t.CName()
 		// residual ERROR sticky — no invent soft-empty type past CName residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if cn == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString(cn)
@@ -998,7 +998,7 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		return b.String()
 	}
 	// residual ERROR sticky — no invent soft-pointer qual emit past IsSimple/IsAggregate residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// pointer: const volatile base * const * ... (CVQualifiers.cpp:534–561)
@@ -1011,7 +1011,7 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		// CVQualifiers.cpp:540–544 / 545–552 — assert sticky when bit set but option off
 		if q.IsConsts[i] {
 			if !emitConst() {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			if i > 0 {
@@ -1021,7 +1021,7 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		}
 		if i < len(q.IsVolatiles) && q.IsVolatiles[i] {
 			if !emitVol() {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// CVQualifiers.cpp:548–552 — if (i > 0) out << " " before volatile
@@ -1034,11 +1034,11 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		if i == 0 {
 			cn := base.CName()
 			// residual ERROR sticky — no invent soft-empty pointer base past CName residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if cn == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString(cn)
@@ -1057,18 +1057,18 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	}
 	// Type always live on ptr chain; sticky not-OK (no invent volatile-OK past hole)
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !t.IsStruct() && !t.IsUnion() {
 		// residual ERROR sticky — no invent soft volatile-OK past IsStruct/IsUnion residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past IsStruct/IsUnion residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if !t.HasAssignOps {
@@ -1076,13 +1076,13 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	}
 	if t.IsStruct() {
 		// residual ERROR sticky — no invent soft volatile-OK past IsStruct residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue union walk past IsStruct residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// Union: nested struct field blocks volatile; nested unions recurse.
@@ -1090,36 +1090,36 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	// (no invent volatile-OK / soft re-pick past holes).
 	for _, f := range t.Fields {
 		if f.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if f.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft not-OK past nested IsStruct residual true
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue past nested IsStruct residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if f.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-continue past nested IsUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			if !isVolatileOKOnOneLevel(opts, f.Type) {
 				// residual ERROR sticky — no invent soft not-OK past recurse residual
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return false
 			}
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			return false
 		}
 	}
@@ -1142,18 +1142,18 @@ func RandomQualifiersForType(
 ) CVQualifiers {
 	// Type always live; sticky empty (no invent soft-skip qfer past hole)
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// CVQualifiers.cpp:295+ — always has RNG sticky; no invent empty shells without draw
 	// (align RandomQualifiersFrom / RandomLooseQualifiers)
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent non-vol qfer / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return CVQualifiers{}
 	}
 
@@ -1164,7 +1164,7 @@ func RandomQualifiersForType(
 	level := 0
 	tmp := t.PtrType()
 	// residual ERROR sticky — no invent soft-qual levels past PtrType residual
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	for tmp != nil {
@@ -1173,18 +1173,18 @@ func RandomQualifiersForType(
 		isVolatiles = append(isVolatiles, false)
 		tmp = tmp.PtrType()
 		// residual ERROR sticky — no invent soft-qual levels past nested PtrType residual
-		if HasError() {
+		if sessHasError(nil) {
 			return CVQualifiers{}
 		}
 	}
 	tmp = t.PtrType()
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	for tmp != nil {
 		volatileOK := isVolatileOKOnOneLevel(opts, tmp)
 		// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
-		if HasError() {
+		if sessHasError(nil) {
 			return CVQualifiers{}
 		}
 		isVolatile := false
@@ -1203,7 +1203,7 @@ func RandomQualifiersForType(
 		isVolatiles[level-1] = isVolatile
 		level--
 		tmp = tmp.PtrType()
-		if HasError() {
+		if sessHasError(nil) {
 			return CVQualifiers{}
 		}
 	}
@@ -1211,12 +1211,12 @@ func RandomQualifiersForType(
 	// CVQualifiers.cpp:332–343 — variable itself.
 	seFree := effectCtx.IsSideEffectFree()
 	// residual ERROR sticky — no invent soft-qual past IsSideEffectFree residual
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	volOK1 := isVolatileOKOnOneLevel(opts, t)
 	// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
-	if HasError() {
+	if sessHasError(nil) {
 		return CVQualifiers{}
 	}
 	volatileOK := seFree && volOK1
