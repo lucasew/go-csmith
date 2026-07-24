@@ -77,12 +77,26 @@ func (vs *VariableSelector) atMaxGlobals() bool {
 // ChooseVisibleReadVar mirrors VariableSelector::choose_visible_read_var.
 // VariableSelector.cpp:361–377 — expand structs; match convert; on stack or global; not vol.
 // Variable* always live; expand/list holes fail closed (nil pick).
+// Ambient ProcessOptions bridge for unit tests; generation uses ChooseVisibleReadVarOpts.
 func ChooseVisibleReadVar(
 	r *Rng,
 	b *Block,
 	readVars []*Variable,
 	typ *Type,
 	unionFacts []*FactUnion,
+) *Variable {
+	return ChooseVisibleReadVarOpts(r, b, readVars, typ, unionFacts, ProcessOptions())
+}
+
+// ChooseVisibleReadVarOpts is ChooseVisibleReadVar with explicit session Options
+// (MatchConvert / is_convertable strict_float / lang_cpp).
+func ChooseVisibleReadVarOpts(
+	r *Rng,
+	b *Block,
+	readVars []*Variable,
+	typ *Type,
+	unionFacts []*FactUnion,
+	opts Options,
 ) *Variable {
 	// VariableSelector.cpp:363 — type from caller (goto uses get_int_type); sticky no invent
 	if typ == nil {
@@ -132,7 +146,7 @@ func ChooseVisibleReadVar(
 		if sessHasError(nil) {
 			return nil
 		}
-		if !typ.MatchOpts(v.Type, MatchConvert, ProcessOptions()) {
+		if !typ.MatchOpts(v.Type, MatchConvert, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(nil) {
 				return nil
@@ -1555,7 +1569,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		if !typ.Match(v.Type, mt) {
+		if !typ.MatchOpts(v.Type, mt, sessOpts(firstSess(vsSess(vs), cg.Sess))) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -1779,7 +1793,7 @@ func ChooseVarFull(
 			}
 			continue
 		}
-		if !want.Match(x.Type, mt) {
+		if !want.MatchOpts(x.Type, mt, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(cg.Sess) {
 				return nil
@@ -1958,7 +1972,13 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 
 // ChooseOKVarMatch mirrors choose_var type filter + choose_ok_var.
 // VariableSelector.cpp choose_var — expand_struct_union_vars; Type::match(mt); optional skip const.
+// Ambient ProcessOptions bridge; generation prefers ChooseOKVarMatchOpts.
 func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
+	return ChooseOKVarMatchOpts(r, vars, want, mt, skipConst, ProcessOptions())
+}
+
+// ChooseOKVarMatchOpts is ChooseOKVarMatch with explicit session Options.
+func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
 	if want == nil {
 		return ChooseOKVar(r, vars)
 	}
@@ -1996,7 +2016,7 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 			}
 			continue
 		}
-		matched := want.Match(x.Type, mt)
+		matched := want.MatchOpts(x.Type, mt, opts)
 		// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 		if sessHasError(nil) {
 			return nil
@@ -2010,10 +2030,11 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 
 func typesMatchExact(a, b *Type) bool {
 	// Type::match eExact is pointer identity (cached simple/pointer types).
+	// MatchExact does not read Options; Defaults avoids ambient ProcessOptions.
 	if a == nil || b == nil {
 		return a == b
 	}
-	ok := a.Match(b, MatchExact)
+	ok := a.MatchOpts(b, MatchExact, Defaults())
 	// residual ERROR sticky — no invent soft-match past Match residual
 	if sessHasError(nil) {
 		return false

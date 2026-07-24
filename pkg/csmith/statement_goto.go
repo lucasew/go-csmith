@@ -597,7 +597,7 @@ func MakeRandomGoto(
 	}
 	var cond *Expression
 	if len(readVars) > 0 {
-		if v := ChooseVisibleReadVar(r, condBlk, readVars, GetIntType(), uf); v != nil {
+		if v := ChooseVisibleReadVarOpts(r, condBlk, readVars, GetIntType(), uf, sessOpts(cgSess(cg))); v != nil {
 			// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only.
 			// C++ does not call read_var here; visit_facts later uses check_read_var.
 			// Soft invent was NoteRead/ReadVar during make_random, which pushed the

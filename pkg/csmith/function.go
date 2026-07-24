@@ -185,29 +185,30 @@ func MakeRandomSignature(
 	qfer *CVQualifiers,
 	list *FunctionList,
 ) *Function {
+	// Prefer VS/run bag on the context (MakeRandom under generation has vs.Sess).
+	if cg.Sess == nil {
+		cg.Sess = vsSess(vs)
+	}
+	s := cg.Sess
 	// Function.cpp:401+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 	if probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
-	}
-	// Prefer VS/run bag on the context (MakeRandom under generation has vs.Sess).
-	if cg.Sess == nil {
-		cg.Sess = vsSess(vs)
 	}
 	// incomplete ambient fails closed sticky (no invent RV/qfer under hole shells)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var env *TypeEnv
@@ -220,7 +221,7 @@ func MakeRandomSignature(
 	if retType == nil {
 		retType = RandomReturnType(r, probs, env, opts)
 		// Function.cpp:404–408 — ERROR_GUARD after RandomReturnType / DEPTH_GUARD
-		if retType == nil || sessHasError(nil) {
+		if retType == nil || sessHasError(s) {
 			return nil
 		}
 	}
@@ -229,13 +230,13 @@ func MakeRandomSignature(
 		return nil
 	}
 	// Function.cpp:408 ERROR_GUARD after DEPTH_GUARD
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
-	name := RandomFunctionNameSess(firstSess(vsSess(vs), cg.Sess), sym)
+	name := RandomFunctionNameSess(firstSess(vsSess(vs), s), sym)
 	// gensym always live; sticky no invent empty-name signature / "_alias" shell
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
@@ -248,33 +249,33 @@ func MakeRandomSignature(
 		retQ = qfer.RandomQualifiersFrom(true, AccessRead, cg, opts, probs, r)
 	}
 	// Function.cpp:419 ERROR_GUARD after random_qualifiers
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	f.RV = CreateVariableQfer(name+"_rv", retType, retQ)
 	// Function.cpp:419–420 — CreateVariable + ERROR_GUARD path; no soft invent signature without rv
-	if f.RV == nil || sessHasError(nil) {
+	if f.RV == nil || sessHasError(s) {
 		return nil
 	}
 	// GenerateParameterList: for i=0; i<=max; i++
 	max := ParamListProbability(r, opts)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	for i := uint32(0); i <= max; i++ {
 		vs.GenerateParameterVariable(f, r)
 		// ERROR_RETURN style from GenerateParameterVariable
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 	}
 	// Function.cpp:422 — FMList.push_back(new FactMgr(f)); always at signature
-	f.ensurePairedFactMgr()
+	f.ensurePairedFactMgrSess(s)
 	// inline flip if enabled
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if list != nil {
@@ -298,31 +299,35 @@ func MakeRandomFunction(
 	qfer *CVQualifiers,
 	list *FunctionList,
 ) *Function {
+	if cg.Sess == nil {
+		cg.Sess = vsSess(vs)
+	}
+	s := cg.Sess
 	f := MakeRandomSignature(r, opts, probs, vs, sym, cg, retType, qfer, list)
 	// Function.cpp:434 ERROR_GUARD after signature
-	if f == nil || sessHasError(nil) {
+	if f == nil || sessHasError(s) {
 		return nil
 	}
 	// Function.cpp:422 FMList entry from signature — get_fact_mgr_for_func (no invent second)
 	// sticky no invent GenerateBody without live FactMgr
 	fm := f.PairedFactMgr()
 	if fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Variable* always live on GlobalList; nil hole fails closed sticky
 	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 			// incomplete PT/union abstract sticky or wipe must abort (no invent body past holes)
-			if sessHasError(nil) || !FactsComplete(fm.GlobalFacts) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(s) || !FactsComplete(fm.GlobalFacts) {
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return nil
 			}
@@ -333,17 +338,18 @@ func MakeRandomFunction(
 	// caller's current block (see BuildInvocationAndFunction / seed-7 call_chain note).
 	bodyCG := cg
 	bodyCG.FM = fm
+	bodyCG.Sess = firstSess(bodyCG.Sess, s)
 	if list != nil {
 		bodyCG = bodyCG.WithFuncList(list)
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
 	// Function.cpp:436 ERROR_GUARD after GenerateBody
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	// sticky no invent unbuilt/null-body success pointer (C++ would crash on body->)
 	if f.Body == nil || f.BuildState != BuildBuilt {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return f
@@ -363,14 +369,19 @@ func MakeFirst(
 	list *FunctionList,
 	fmMap *FactMgrMap,
 ) *Function {
+	// Function.cpp:457–458 bag — prefer VS / FMList session before any sticky write.
+	runSess := firstSess(vsSess(vs), nil)
+	if fmMap != nil && fmMap.Sess != nil {
+		runSess = firstSess(runSess, fmMap.Sess)
+	}
 	// Function.cpp:443+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(runSess, ErrGeneric)
 		return nil
 	}
 	// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 	if probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(runSess, ErrGeneric)
 		return nil
 	}
 	// Type::AllTypes is process-global in C++; session Types on list or vs
@@ -383,32 +394,28 @@ func MakeFirst(
 	}
 	// Function.cpp:444–445 — RandomReturnType; ERROR_GUARD
 	ty := RandomReturnType(r, probs, env, opts)
-	if ty == nil || sessHasError(nil) {
+	if ty == nil || sessHasError(runSess) {
 		return nil
 	}
-	name := RandomFunctionNameSess(vsSess(vs), sym)
+	name := RandomFunctionNameSess(runSess, sym)
 	// gensym always live; sticky no invent empty-name function / "_alias" shell
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(runSess, ErrGeneric)
 		return nil
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
 	// Function.cpp:452–453 — CVQualifiers::random_qualifiers(ty); ERROR_GUARD
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
-	if sessHasError(nil) {
+	if sessHasError(runSess) {
 		return nil
 	}
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 	// Function.cpp:453 — CreateVariable + ERROR_GUARD; no soft invent first without rv
-	if f.RV == nil || sessHasError(nil) {
+	if f.RV == nil || sessHasError(runSess) {
 		return nil
 	}
 
 	// Function.cpp:457–458 — FactMgr with empty global facts (FMList.push_back)
-	runSess := firstSess(vsSess(vs), nil)
-	if fmMap != nil && fmMap.Sess != nil {
-		runSess = firstSess(runSess, fmMap.Sess)
-	}
 	fm := f.ensurePairedFactMgrSess(runSess)
 	if fmMap != nil {
 		if fmMap.Sess == nil {
@@ -422,15 +429,15 @@ func MakeFirst(
 	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(runSess, ErrGeneric)
 			return nil
 		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 			// incomplete PT/union abstract sticky or wipe must abort (no invent body past holes)
-			if sessHasError(nil) || !FactsComplete(fm.GlobalFacts) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(runSess) || !FactsComplete(fm.GlobalFacts) {
+				if !sessHasError(runSess) {
+					sessNoteError(runSess, ErrGeneric)
 				}
 				return nil
 			}
@@ -461,7 +468,7 @@ func MakeFirst(
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
 	// sticky error / null body / Unbuilt — do not invent success first function
-	if sessHasError(nil) || f.Body == nil || f.BuildState != BuildBuilt {
+	if sessHasError(runSess) || f.Body == nil || f.BuildState != BuildBuilt {
 		return nil
 	}
 
@@ -469,7 +476,7 @@ func MakeFirst(
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	if sessHasError(nil) {
+	if sessHasError(runSess) {
 		return nil
 	}
 
@@ -484,14 +491,14 @@ func MakeFirst(
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(runSess, ErrGeneric)
 			return nil
 		}
 		if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts, &fm.UnionFacts) ||
 			!FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(runSess, ErrGeneric)
 			return nil
 		}
 	}
@@ -504,7 +511,7 @@ func MakeFirst(
 	// Function.cpp:475 — InitializeAttributes (package generators already cover emission;
 	// ensure func attr generator is ready when function attributes enabled)
 	if opts.FunctionAttributes {
-		_ = EnsureFuncAttrGeneratorSess(vsSess(vs))
+		_ = EnsureFuncAttrGeneratorSess(runSess)
 	}
 
 	return f
