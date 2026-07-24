@@ -642,8 +642,13 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		outU = RemoveFunctionLocalUnionFactsAt(outU, fm.Func, blk)
 	case StmtGoto:
 		// FactMgr.cpp:263–266 — update_facts_for_dest(facts, facts_copy, sg->dest)
-		// ePointTo half only here; eUnionWrite dest filter is UpdateUnionFactsForDest
-		// when that unit is linked (PT-only dest path kept until then).
+		// Full FactVec: ePointTo + eUnionWrite both OOS-drop subjects not visible
+		// at dest (FactMgr.cpp:450–482). Soft invent filtered only PT then stored
+		// raw live outU → map_facts_out[goto] kept then-arm local eUnionWrite
+		// (e.g. l_1372 last=0) after jump to sibling else where local is OOS.
+		// choose_visible_read_var(map_facts_out[goto], …) then treated the field
+		// as readable and inflated ok pool (seed 10613516242873274820:
+		// nOk 36 vs UP 35; if (l_1156) vs if (l_670.f0)).
 		dp := destParent
 		if dp == nil {
 			dp = st.GotoDestParent
@@ -656,11 +661,16 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		// IncompleteFactSlice sticky — bare nil + SetMapFactsOut invents complete empty.
 		if fm.Func == nil {
 			cp = IncompleteFactSlice()
+			outU = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
 		} else {
 			out := []*FactPointTo{}
 			UpdateFactsForDest(cp, &out, fm.Func, dp)
 			cp = out
+			// FactMgr.cpp:450–482 — same OOS filter on eUnionWrite partition
+			var outUnions []*FactUnion
+			UpdateUnionFactsForDest(outU, &outUnions, fm.Func, dp)
+			outU = outUnions
 		}
 	default:
 		// FactMgr.cpp:268 — eReturn || s->parent == nullptr → remove function locals

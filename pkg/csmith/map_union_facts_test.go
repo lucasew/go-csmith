@@ -198,6 +198,62 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	ClearError()
 }
 
+// TestSetMapFactsOutGotoDropsOOSUnionWrite — FactMgr.cpp:263–266.
+// set_fact_out(goto) runs update_facts_for_dest on the full FactVec so
+// eUnionWrite subjects OOS at dest are dropped. Soft invent filtered only
+// ePointTo then stored raw live UnionFacts → map_facts_out[goto] kept
+// then-arm local union last-write after jump to sibling else (seed
+// 10613516242873274820: choose_visible nOk 36 vs UP 35; if (l_1156) vs
+// if (l_670.f0) because OOS l_1372.f0 stayed readable).
+func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
+	ClearError()
+	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	g := CreateVariableScalars("g_keep", ut, false, false)
+	g.CreateFieldVars()
+	loc := CreateVariableScalars("l_arm", ut, false, false)
+	loc.CreateFieldVars()
+	fn := &Function{Name: "f_goto_u", ReturnType: GetIntType()}
+	// then-arm holds local; dest is body (sibling path) where local is OOS
+	body := &Block{Func: fn, StmID: AllocStmID()}
+	thenArm := &Block{Func: fn, Parent: body, StmID: AllocStmID(), LocalVars: []*Variable{loc}}
+	fn.Body = body
+	fn.Blocks = []*Block{body, thenArm}
+	// Live unions include both global and then-local
+	fm := NewFactMgr(fn)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(g, 0), MakeFactUnion(loc, 0)}
+	fm.GlobalFacts = []*FactPointTo{}
+	// Goto in then-arm jumping to a dest in body (local OOS at dest)
+	sg := &Stmt{
+		Kind: StmtGoto, StmID: AllocStmID(),
+		GotoDestStmID: AllocStmID(), GotoDestParent: body,
+	}
+	// parent of goto is thenArm for stack/OOS
+	fm.SetMapFactsOutForStmtDest(sg, []*FactPointTo{}, thenArm, body)
+	if HasError() {
+		t.Fatalf("set_fact_out goto: %v", GetError())
+	}
+	outU := fm.GetMapUnionFactsOut(sg.StmID)
+	if !UnionFactsComplete(outU) {
+		t.Fatal("map_union_out must be complete")
+	}
+	if FindRelatedUnion(outU, loc) != nil {
+		t.Fatal("then-arm local eUnionWrite must be OOS-dropped at dest outside arm")
+	}
+	if FindRelatedUnion(outU, g) == nil {
+		t.Fatal("global eUnionWrite must remain at dest")
+	}
+	// Field of OOS local must be nonreadable without fact
+	if len(loc.FieldVars) == 0 {
+		t.Fatal("need field")
+	}
+	if !IsNonreadableField(loc.FieldVars[0], outU) {
+		t.Fatal("OOS local field must be nonreadable after goto map_out filter")
+	}
+	ClearError()
+}
+
 // SetMapFactsOut pairs live UnionFacts (FactMgr.cpp set_fact_out full FactVec).
 func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	ClearError()
