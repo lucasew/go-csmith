@@ -73,7 +73,7 @@ type Function struct {
 func (f *Function) PairedFactMgr() *FactMgr {
 	// Function always live; sticky incomplete no invent nil FM soft-skip
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return f.factMgr
@@ -84,7 +84,7 @@ func (f *Function) PairedFactMgr() *FactMgr {
 func (f *Function) ensurePairedFactMgr() *FactMgr {
 	// Function always live; sticky incomplete no invent FM without function
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if f.factMgr == nil {
@@ -99,7 +99,7 @@ func (f *Function) ensurePairedFactMgr() *FactMgr {
 func (f *Function) IsEffectKnown() bool {
 	// Function always live; sticky incomplete no invent effect-known soft-skip
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return f.BuildState == BuildBuilt
@@ -109,7 +109,7 @@ func (f *Function) IsEffectKnown() bool {
 // Function always live; sticky (no invent soft-skip Built past hole).
 func (f *Function) markBuilt() {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	f.BuildState = BuildBuilt
@@ -137,7 +137,7 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 	// Type::choose_random requires AllTypes + RNG; ERROR_GUARD path → nil
 	// sticky no invent default int when r nil; empty env stays non-sticky soft nil
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if env == nil || len(env.AllTypes) == 0 {
@@ -150,7 +150,7 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 func ParamListProbability(r *Rng, opts Options) uint32 {
 	// C++ always has RNG; sticky no invent param count 0 without draw
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	n := opts.MaxParams
@@ -175,23 +175,23 @@ func MakeRandomSignature(
 ) *Function {
 	// Function.cpp:401+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 	if probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent RV/qfer under hole shells)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var env *TypeEnv
@@ -204,7 +204,7 @@ func MakeRandomSignature(
 	if retType == nil {
 		retType = RandomReturnType(r, probs, env, opts)
 		// Function.cpp:404–408 — ERROR_GUARD after RandomReturnType / DEPTH_GUARD
-		if retType == nil || HasError() {
+		if retType == nil || sessHasError(nil) {
 			return nil
 		}
 	}
@@ -213,13 +213,13 @@ func MakeRandomSignature(
 		return nil
 	}
 	// Function.cpp:408 ERROR_GUARD after DEPTH_GUARD
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	name := RandomFunctionName(sym)
 	// gensym always live; sticky no invent empty-name signature / "_alias" shell
 	if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
@@ -232,23 +232,23 @@ func MakeRandomSignature(
 		retQ = qfer.RandomQualifiersFrom(true, AccessRead, cg, opts, probs, r)
 	}
 	// Function.cpp:419 ERROR_GUARD after random_qualifiers
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	f.RV = CreateVariableQfer(name+"_rv", retType, retQ)
 	// Function.cpp:419–420 — CreateVariable + ERROR_GUARD path; no soft invent signature without rv
-	if f.RV == nil || HasError() {
+	if f.RV == nil || sessHasError(nil) {
 		return nil
 	}
 	// GenerateParameterList: for i=0; i<=max; i++
 	max := ParamListProbability(r, opts)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	for i := uint32(0); i <= max; i++ {
 		vs.GenerateParameterVariable(f, r)
 		// ERROR_RETURN style from GenerateParameterVariable
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
@@ -258,7 +258,7 @@ func MakeRandomSignature(
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	if list != nil {
@@ -284,29 +284,29 @@ func MakeRandomFunction(
 ) *Function {
 	f := MakeRandomSignature(r, opts, probs, vs, sym, cg, retType, qfer, list)
 	// Function.cpp:434 ERROR_GUARD after signature
-	if f == nil || HasError() {
+	if f == nil || sessHasError(nil) {
 		return nil
 	}
 	// Function.cpp:422 FMList entry from signature — get_fact_mgr_for_func (no invent second)
 	// sticky no invent GenerateBody without live FactMgr
 	fm := f.PairedFactMgr()
 	if fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Variable* always live on GlobalList; nil hole fails closed sticky
 	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 			// incomplete PT/union abstract sticky or wipe must abort (no invent body past holes)
-			if HasError() || !FactsComplete(fm.GlobalFacts) {
-				if !HasError() {
-					SetError(ErrGeneric)
+			if sessHasError(nil) || !FactsComplete(fm.GlobalFacts) {
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return nil
 			}
@@ -322,12 +322,12 @@ func MakeRandomFunction(
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
 	// Function.cpp:436 ERROR_GUARD after GenerateBody
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// sticky no invent unbuilt/null-body success pointer (C++ would crash on body->)
 	if f.Body == nil || f.BuildState != BuildBuilt {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return f
@@ -349,12 +349,12 @@ func MakeFirst(
 ) *Function {
 	// Function.cpp:443+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 	if probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Type::AllTypes is process-global in C++; session Types on list or vs
@@ -367,24 +367,24 @@ func MakeFirst(
 	}
 	// Function.cpp:444–445 — RandomReturnType; ERROR_GUARD
 	ty := RandomReturnType(r, probs, env, opts)
-	if ty == nil || HasError() {
+	if ty == nil || sessHasError(nil) {
 		return nil
 	}
 	name := RandomFunctionName(sym)
 	// gensym always live; sticky no invent empty-name function / "_alias" shell
 	if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
 	// Function.cpp:452–453 — CVQualifiers::random_qualifiers(ty); ERROR_GUARD
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 	// Function.cpp:453 — CreateVariable + ERROR_GUARD; no soft invent first without rv
-	if f.RV == nil || HasError() {
+	if f.RV == nil || sessHasError(nil) {
 		return nil
 	}
 
@@ -399,15 +399,15 @@ func MakeFirst(
 	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 			// incomplete PT/union abstract sticky or wipe must abort (no invent body past holes)
-			if HasError() || !FactsComplete(fm.GlobalFacts) {
-				if !HasError() {
-					SetError(ErrGeneric)
+			if sessHasError(nil) || !FactsComplete(fm.GlobalFacts) {
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return nil
 			}
@@ -438,7 +438,7 @@ func MakeFirst(
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
 	// sticky error / null body / Unbuilt — do not invent success first function
-	if HasError() || f.Body == nil || f.BuildState != BuildBuilt {
+	if sessHasError(nil) || f.Body == nil || f.BuildState != BuildBuilt {
 		return nil
 	}
 
@@ -446,7 +446,7 @@ func MakeFirst(
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 
@@ -461,14 +461,14 @@ func MakeFirst(
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts, &fm.UnionFacts) ||
 			!FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 	}
@@ -530,7 +530,7 @@ func (f *Function) generateBodyCore(
 	knownParams bool,
 ) {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// Function.cpp:626–629 / 668–671 — ignore regenerate
@@ -540,7 +540,7 @@ func (f *Function) generateBodyCore(
 	// Function.cpp:643–648 — non-builtin make_random body always has process RNG
 	// sticky no invent Building/Built shell without RNG
 	if !f.IsBuiltin && r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// incomplete ambient fails closed sticky before BuildBuilding
@@ -548,11 +548,11 @@ func (f *Function) generateBodyCore(
 	if !EffectComplete(prev.EffectContext()) ||
 		(prev.EffectAccum != nil && !EffectComplete(*prev.EffectAccum)) ||
 		!EffectComplete(prev.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if prev.FM != nil && !FactsComplete(prev.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	f.BuildState = BuildBuilding
@@ -595,7 +595,7 @@ func (f *Function) generateBodyCore(
 	// empty and the caller frame is omitted from call_chain.
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual
-	if HasError() {
+	if sessHasError(nil) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -607,7 +607,7 @@ func (f *Function) generateBodyCore(
 	if cg.FM == nil {
 		cg.FM = f.PairedFactMgr()
 		// residual ERROR sticky — no invent soft-continue body past PairedFactMgr residual
-		if HasError() {
+		if sessHasError(nil) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -615,7 +615,7 @@ func (f *Function) generateBodyCore(
 	}
 	if cg.FM == nil {
 		// get_fact_mgr_for_func returned null — sticky fail closed (no soft invent FM)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -627,13 +627,13 @@ func (f *Function) generateBodyCore(
 	if knownParams {
 		if rwd := prev.BuildCalleeRWDirective(cg.FM.GlobalFacts); rwd != nil {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual
-			if HasError() {
+			if sessHasError(nil) {
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			cg.RW = rwd
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual nil
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
@@ -649,42 +649,42 @@ func (f *Function) generateBodyCore(
 	if !knownParams {
 		for _, p := range f.Param {
 			if p == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			if p.Type == nil && !IsSpecialPtr(p) {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			if p.IsPointer() {
 				// residual ERROR sticky — no invent soft-skip param seed past IsPointer hole
-				if HasError() {
+				if sessHasError(nil) {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
 				// incomplete GlobalFacts sticky before soft FindRelated miss invent
 				if !FactsComplete(cg.FM.GlobalFacts) {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
 				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
 					// residual ERROR sticky — no invent soft-continue later params past FindRelated hole
-					if HasError() {
+					if sessHasError(nil) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
 					nf := MakeFactPointTo(p, TBDPtr)
-					if nf == nil || HasError() {
-						if !HasError() {
-							SetError(ErrGeneric)
+					if nf == nil || sessHasError(nil) {
+						if !sessHasError(nil) {
+							sessNoteError(nil, ErrGeneric)
 						}
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
@@ -692,17 +692,17 @@ func (f *Function) generateBodyCore(
 					}
 					cg.FM.SetGlobalFacts(append(cg.FM.GlobalFacts, nf), "auto_function_666")
 					// residual ERROR sticky — no invent soft-continue later params past append residual
-					if HasError() {
+					if sessHasError(nil) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
-				} else if HasError() {
+				} else if sessHasError(nil) {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue non-pointer past IsPointer hole
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
@@ -716,7 +716,7 @@ func (f *Function) generateBodyCore(
 	if f.IsBuiltin {
 		f.Body = MakeDummyBlockCG(&cg, opts)
 		// residual ERROR sticky — no invent soft-Built past MakeDummyBlock residual
-		if HasError() {
+		if sessHasError(nil) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -724,7 +724,7 @@ func (f *Function) generateBodyCore(
 	} else {
 		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
 		// residual ERROR sticky — no invent soft-Built past MakeRandomBlock residual
-		if HasError() {
+		if sessHasError(nil) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -732,7 +732,7 @@ func (f *Function) generateBodyCore(
 	}
 	// Function.cpp:647 / 689 — ERROR_RETURN(); body->set_depth_protect
 	// sticky error aborts; null body without error would crash C++ on body->
-	if HasError() {
+	if sessHasError(nil) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -752,7 +752,7 @@ func (f *Function) generateBodyCore(
 	// Block*/Variable*/Fact* always live; nil holes fail closed (abort cleanup invent)
 	// Early SetError must leave Unbuilt (no invent stuck Building / later markBuilt success)
 	abortUnbuilt := func() {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 	}
@@ -779,7 +779,7 @@ func (f *Function) generateBodyCore(
 			// nil without error = no lattice change; nil with sticky = incomplete fail closed
 			if nf := fact.MarkFuncEndLocals(locals); nf != nil {
 				cg.FM.GlobalFacts[i] = nf
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				abortUnbuilt()
 				return
 			}
@@ -805,7 +805,7 @@ func (f *Function) generateBodyCore(
 		}
 	}
 	f.ComputeSummary(summaryEff)
-	if HasError() {
+	if sessHasError(nil) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -813,7 +813,7 @@ func (f *Function) generateBodyCore(
 
 	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
 	f.MakeReturnConst(opts, probs, r)
-	if HasError() {
+	if sessHasError(nil) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -855,7 +855,7 @@ func (f *Function) generateBodyCore(
 // DepthProtect off / no return needed is complete no-op.
 func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if !opts.DepthProtect || !f.NeedReturnStmt() {
@@ -864,12 +864,12 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	// Function.cpp:610–612 — assert(return_type); assert simple != eVoid
 	if f.ReturnType == nil {
 		// assert(return_type) — sticky error for GenerateBody ERROR_RETURN
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	simple := f.ReturnType.IsSimple()
 	// residual ERROR sticky — no invent soft-ret past IsSimple residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	if simple && f.ReturnType.Simple() == EVoid {
@@ -879,17 +879,17 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	// Function.cpp:612 — Constant::make_random; no invent "0" on nil RNG/fail
 	if r == nil {
 		// C++ always has process RNG; fail closed with ERROR_RETURN semantics
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// session probs; aggregate ret_c needs live tables (nil → fail closed, no invent)
 	f.RetConst = MakeRandom(f.ReturnType, opts, probs, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
 	// sticky error so GenerateBody does not invent Built without ret_c
-	if HasError() || f.RetConst == nil {
+	if sessHasError(nil) || f.RetConst == nil {
 		f.RetConst = nil
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return
 	}
@@ -902,22 +902,22 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 func (f *Function) returnTypeC() string {
 	// Function always live at emit; sticky no invent "void" without it
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if f.RV != nil {
 		// RV Type* always live when rv is present; Type-nil sticky incomplete
 		if f.RV.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		out := f.RV.Qfer.OutputQualifiedType(f.RV.Type)
 		// residual ERROR sticky — no invent soft-empty return past OutputQualifiedType residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if out == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		return out
@@ -925,17 +925,17 @@ func (f *Function) returnTypeC() string {
 	if f.ReturnType != nil {
 		cn := f.ReturnType.CName()
 		// residual ERROR sticky — no invent soft-empty return past CName residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if cn == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		return cn
 	}
 	// incomplete IR sticky — no invent void
-	SetError(ErrGeneric)
+	sessNoteError(nil, ErrGeneric)
 	return ""
 }
 
@@ -951,7 +951,7 @@ func (f *Function) paramListC() string {
 // past missing Function IR). Empty Param is complete "void".
 func (f *Function) paramListCOpts(opts Options) string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if len(f.Param) == 0 {
@@ -962,42 +962,42 @@ func (f *Function) paramListCOpts(opts Options) string {
 	for i, p := range f.Param {
 		if p == nil || p.Type == nil {
 			// incomplete param IR sticky — fail closed (no invent type name)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions) sticky
 		if !opts.ArgStructs && p.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft-empty param past IsStruct residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue param past IsStruct residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if !opts.ArgUnions && p.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-empty param past IsUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue param past IsUnion residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		// Variable always has live name + qualified type; sticky no invent "int " / " p"
 		ty := p.Qfer.OutputQualifiedType(p.Type)
 		// residual ERROR sticky — no invent soft-continue later params past OutputQualifiedType residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if ty == "" || p.Name == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -1020,7 +1020,7 @@ func (f *Function) OutputHeader(forceStatic bool) string {
 func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	// Function always live at emit; sticky no invent "int (void)" without it
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Function.cpp:517–520 — assert no return struct/union when options off
@@ -1029,7 +1029,7 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	rt := f.ReturnType
 	if f.RV != nil {
 		if f.RV.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		rt = f.RV.Type
@@ -1037,52 +1037,52 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	if rt != nil {
 		if !opts.ReturnStructs && rt.IsStruct() {
 			// residual ERROR sticky — no invent soft-empty header past IsStruct residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue header past IsStruct residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if !opts.ReturnUnions && rt.IsUnion() {
 			// residual ERROR sticky — no invent soft-empty header past IsUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue header past IsUnion residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
 	// Function always has a live name; sticky no invent "int (void)" without name
 	if f.Name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	params := f.paramListCOpts(opts)
 	// residual ERROR sticky — no invent soft-empty header past paramList residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if params == "" {
 		// assert-path sticky fail closed on forbidden/incomplete params
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	rtName := f.returnTypeC()
 	// residual ERROR sticky — no invent soft-empty header past returnTypeC residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if rtName == "" {
 		// incomplete return type IR sticky — no invent void header
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1116,7 +1116,7 @@ func (f *Function) OutputForwardDecl() string {
 // Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if f.IsBuiltin {
@@ -1124,18 +1124,18 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 	}
 	s := f.OutputHeader(forceStatic)
 	// residual ERROR sticky — no invent bare ";" past OutputHeader residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// incomplete header IR sticky — no invent bare ";"
 	if s == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
 		// residual ERROR sticky — no invent soft-continue ";" past attr residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -1149,25 +1149,25 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 	// Function always live at emit; sticky incomplete no invent empty alias shell
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Function::alias_name set at create (name + "_alias"); sticky no invent when missing
 	if f.AliasName == "" || f.Name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	rtName := f.returnTypeC()
 	if rtName == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	params := f.paramListC()
 	if params == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
@@ -1192,7 +1192,7 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 // Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if f.IsBuiltin {
@@ -1201,8 +1201,8 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 	s := f.OutputHeaderAlias(forceStatic)
 	// incomplete alias header sticky — no invent bare ";"
 	if s == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
@@ -1219,7 +1219,7 @@ func (f *Function) Output() string {
 func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	// Function always live at def emit; sticky no invent empty def without it
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// builtins emit nothing (Function.cpp) — soft empty, not incomplete IR
@@ -1229,11 +1229,11 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell
 	hdr := f.OutputHeader(forceStatic)
 	// residual ERROR sticky — no invent soft-continue body past OutputHeader residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if hdr == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	s := ""
@@ -1243,7 +1243,7 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()
 		// residual ERROR sticky — no invent soft-continue past CommentOutput residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -1251,7 +1251,7 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
 		// residual ERROR sticky — no invent soft-continue body past attr residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -1259,17 +1259,17 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	// Function.cpp:575–598 — depth_protect + body + else ret_c always live together
 	// sticky no invent header-only / empty-body shells (C++ would dereference body)
 	if f.Body == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 	bodyOut := f.Body.Output(0)
 	// residual ERROR sticky — no invent soft-continue past Body.Output residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if bodyOut == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if f.DepthProtect && f.RetConst != nil {
@@ -1278,7 +1278,7 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		retVal := f.RetConst.Value
 		if retVal == "" {
 			// incomplete ret_c sticky — body only, no invent depth if/else
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		s += "if (DEPTH < MAX_DEPTH) \n"
