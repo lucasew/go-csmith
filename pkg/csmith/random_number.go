@@ -111,7 +111,7 @@ func SwitchRndNumGeneratorSess(s *Session, kind RngKind) RngKind {
 	s = sessOrAmbient(s)
 	rn := s.RandomNumber
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return RngKindDefault
 	}
 	old := rn.currKind

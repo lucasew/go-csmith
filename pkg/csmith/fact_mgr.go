@@ -114,10 +114,14 @@ func fmSess(fm *FactMgr) *Session {
 }
 
 func NewFactMgr(f *Function) *FactMgr {
+	return NewFactMgrSess(nil, f)
+}
+
+// NewFactMgrSess constructs a FactMgr on an explicit session bag (nil → ambient).
+func NewFactMgrSess(s *Session, f *Function) *FactMgr {
 	return &FactMgr{
-		// Capture active run bag when constructed under Session.Generate / activateSession.
-		// Unit tests without an active session get defaultSession (same bag SetError used).
-		Sess:             sessOrAmbient(nil),
+		// Prefer explicit s; else active run bag under Generate; unit tests → defaultSession.
+		Sess:             sessOrAmbient(s),
 		Func:             f,
 		MapStmEffect:     make(map[int]Effect),
 		MapFactsIn:       make(map[int][]*FactPointTo),
@@ -2253,12 +2257,19 @@ func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
 
 // FactMgrMap is Function::FMList session map (func → FactMgr).
 type FactMgrMap struct {
+	// Sess is the pure-run bag when set (ProgramGenerator); nil in minimal unit tests.
+	Sess   *Session
 	byFunc map[*Function]*FactMgr
 }
 
 // NewFactMgrMap creates an empty FMList.
 func NewFactMgrMap() *FactMgrMap {
-	return &FactMgrMap{byFunc: make(map[*Function]*FactMgr)}
+	return NewFactMgrMapSess(nil)
+}
+
+// NewFactMgrMapSess creates an FMList bound to an explicit session bag.
+func NewFactMgrMapSess(s *Session) *FactMgrMap {
+	return &FactMgrMap{Sess: s, byFunc: make(map[*Function]*FactMgr)}
 }
 
 // ForFunc returns the FactMgr for f (session FMList).
@@ -2279,14 +2290,20 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 		if f.factMgr == nil {
 			f.factMgr = fm
 		}
+		if m.Sess != nil {
+			fm.Sess = m.Sess
+		}
 		return fm
 	}
 	// reuse paired FactMgr from signature create (no invent second manager)
 	if f.factMgr != nil {
+		if m.Sess != nil {
+			f.factMgr.Sess = m.Sess
+		}
 		m.byFunc[f] = f.factMgr
 		return f.factMgr
 	}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(m.Sess, f)
 	f.factMgr = fm
 	m.byFunc[f] = fm
 	return fm

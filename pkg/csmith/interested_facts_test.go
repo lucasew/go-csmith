@@ -59,7 +59,8 @@ func TestGenerateFunctionsCallsAddInterested(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	g.GenerateFunctions()
-	if !MetaFactPointToEnabled() || !MetaFactUnionEnabled() {
+	// GenerateFunctions writes meta flags on g.Sess (not ambient Process* bag).
+	if !MetaFactPointToEnabledSess(g.Sess) || !MetaFactUnionEnabledSess(g.Sess) {
 		t.Fatal("GenerateFunctions should re-enable default interests")
 	}
 	if len(g.Funcs.Funcs) < 1 {

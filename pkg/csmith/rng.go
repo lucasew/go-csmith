@@ -338,87 +338,167 @@ func RejectEQ(bad uint32) Filter {
 // ProcessRndUpto mirrors random.cpp::rnd_upto → process DefaultRndNumGenerator.
 // random.cpp:67–71. Nil process RNG sticky 0.
 func ProcessRndUpto(n uint32, f Filter) uint32 {
-	return ProcessRng().RndUptoFilter(n, f)
+	return ProcessRndUptoSess(nil, n, f)
+}
+
+// ProcessRndUptoSess is ProcessRndUpto on an explicit session bag.
+func ProcessRndUptoSess(s *Session, n uint32, f Filter) uint32 {
+	r := ProcessRngSess(s)
+	if r == nil {
+		sessNoteError(s, ErrGeneric)
+		return 0
+	}
+	return r.RndUptoFilter(n, f)
 }
 
 // ProcessRndFlipcoin mirrors random.cpp::rnd_flipcoin.
 // random.cpp:73–77.
 func ProcessRndFlipcoin(p uint32, f Filter) bool {
-	return ProcessRng().RndFlipcoinFilter(p, f)
+	return ProcessRndFlipcoinSess(nil, p, f)
+}
+
+// ProcessRndFlipcoinSess is ProcessRndFlipcoin on an explicit session bag.
+func ProcessRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
+	r := ProcessRngSess(s)
+	if r == nil {
+		sessNoteError(s, ErrGeneric)
+		return false
+	}
+	return r.RndFlipcoinFilter(p, f)
 }
 
 // ProcessRandomHexDigits mirrors random.cpp::RandomHexDigits.
 // random.cpp:57–60.
 func ProcessRandomHexDigits(num int) string {
-	return ProcessRng().RandomHexDigits(num)
+	return ProcessRandomHexDigitsSess(nil, num)
+}
+
+// ProcessRandomHexDigitsSess is ProcessRandomHexDigits on an explicit session bag.
+func ProcessRandomHexDigitsSess(s *Session, num int) string {
+	r := ProcessRngSess(s)
+	if r == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	return r.RandomHexDigits(num)
 }
 
 // ProcessRandomDigits mirrors random.cpp::RandomDigits.
 // random.cpp:62–65.
 func ProcessRandomDigits(num int) string {
-	return ProcessRng().RandomDigits(num)
+	return ProcessRandomDigitsSess(nil, num)
+}
+
+// ProcessRandomDigitsSess is ProcessRandomDigits on an explicit session bag.
+func ProcessRandomDigitsSess(s *Session, num int) string {
+	r := ProcessRngSess(s)
+	if r == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	return r.RandomDigits(num)
 }
 
 // ProcessTraceDepth mirrors random.cpp::trace_depth.
 // random.cpp:132–135.
 func ProcessTraceDepth() string {
-	return ProcessRng().TraceDepth()
+	return ProcessTraceDepthSess(nil)
+}
+
+// ProcessTraceDepthSess is ProcessTraceDepth on an explicit session bag.
+func ProcessTraceDepthSess(s *Session) string {
+	r := ProcessRngSess(s)
+	if r == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	return r.TraceDepth()
 }
 
 // ProcessGetSequence mirrors random.cpp::get_sequence.
 // random.cpp:137–140.
 func ProcessGetSequence() string {
-	return ProcessRng().GetSequence()
+	return ProcessGetSequenceSess(nil)
+}
+
+// ProcessGetSequenceSess is ProcessGetSequence on an explicit session bag.
+func ProcessGetSequenceSess(s *Session) string {
+	r := ProcessRngSess(s)
+	if r == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	return r.GetSequence()
 }
 
 // PureRndUpto mirrors pure_rnd_upto.
 // random.cpp:104–117 — n==0 → 0; !is_random switches to Default generator temporarily.
 func PureRndUpto(n uint32, f Filter) uint32 {
+	return PureRndUptoSess(nil, n, f)
+}
+
+// PureRndUptoSess is PureRndUpto on an explicit session bag.
+func PureRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 	if n == 0 {
 		return 0
 	}
-	if sessOpts(nil).IsRandom() {
-		return ProcessRndUpto(n, f)
+	if sessOpts(s).IsRandom() {
+		return ProcessRndUptoSess(s, n, f)
 	}
-	old := SwitchRndNumGenerator(RngKindDefault)
-	rv := ProcessRndUpto(n, f)
-	_ = SwitchRndNumGenerator(old)
+	old := SwitchRndNumGeneratorSess(s, RngKindDefault)
+	rv := ProcessRndUptoSess(s, n, f)
+	_ = SwitchRndNumGeneratorSess(s, old)
 	return rv
 }
 
 // PureRndFlipcoin mirrors pure_rnd_flipcoin.
 // random.cpp:119–130.
 func PureRndFlipcoin(p uint32, f Filter) bool {
-	if sessOpts(nil).IsRandom() {
-		return ProcessRndFlipcoin(p, f)
+	return PureRndFlipcoinSess(nil, p, f)
+}
+
+// PureRndFlipcoinSess is PureRndFlipcoin on an explicit session bag.
+func PureRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
+	if sessOpts(s).IsRandom() {
+		return ProcessRndFlipcoinSess(s, p, f)
 	}
-	old := SwitchRndNumGenerator(RngKindDefault)
-	rv := ProcessRndFlipcoin(p, f)
-	_ = SwitchRndNumGenerator(old)
+	old := SwitchRndNumGeneratorSess(s, RngKindDefault)
+	rv := ProcessRndFlipcoinSess(s, p, f)
+	_ = SwitchRndNumGeneratorSess(s, old)
 	return rv
 }
 
 // PureRandomHexDigits mirrors PureRandomHexDigits.
 // random.cpp:79–89.
 func PureRandomHexDigits(num int) string {
-	if sessOpts(nil).IsRandom() {
-		return ProcessRandomHexDigits(num)
+	return PureRandomHexDigitsSess(nil, num)
+}
+
+// PureRandomHexDigitsSess is PureRandomHexDigits on an explicit session bag.
+func PureRandomHexDigitsSess(s *Session, num int) string {
+	if sessOpts(s).IsRandom() {
+		return ProcessRandomHexDigitsSess(s, num)
 	}
-	old := SwitchRndNumGenerator(RngKindDefault)
-	rv := ProcessRandomHexDigits(num)
-	_ = SwitchRndNumGenerator(old)
+	old := SwitchRndNumGeneratorSess(s, RngKindDefault)
+	rv := ProcessRandomHexDigitsSess(s, num)
+	_ = SwitchRndNumGeneratorSess(s, old)
 	return rv
 }
 
 // PureRandomDigits mirrors PureRandomDigits.
 // random.cpp:91–102.
 func PureRandomDigits(num int) string {
-	if sessOpts(nil).IsRandom() {
-		return ProcessRandomDigits(num)
+	return PureRandomDigitsSess(nil, num)
+}
+
+// PureRandomDigitsSess is PureRandomDigits on an explicit session bag.
+func PureRandomDigitsSess(s *Session, num int) string {
+	if sessOpts(s).IsRandom() {
+		return ProcessRandomDigitsSess(s, num)
 	}
-	old := SwitchRndNumGenerator(RngKindDefault)
-	rv := ProcessRandomDigits(num)
-	_ = SwitchRndNumGenerator(old)
+	old := SwitchRndNumGeneratorSess(s, RngKindDefault)
+	rv := ProcessRandomDigitsSess(s, num)
+	_ = SwitchRndNumGeneratorSess(s, old)
 	return rv
 }
 

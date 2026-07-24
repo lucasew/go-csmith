@@ -197,7 +197,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 		VS:         vs,
 		Tables:     exprTables,
 		StmtTab:    stmtTab,
-		FactMgrs:   NewFactMgrMap(),
+		FactMgrs:   NewFactMgrMapSess(s),
 		OutputKind: outKind,
 	}
 	s.ProgramGen = g
@@ -228,19 +228,14 @@ func (g *ProgramGenerator) Initialize() {
 		s = sessOrAmbient(nil)
 		g.Sess = s
 	}
-	// Activate g.Sess for Finalization + reinstall so we clear/rebuild the
-	// generator bag — not the ambient unit-test defaultSession when g.Sess is a
-	// pure NewSession. (CreateRandomNumberInstanceSess writes s only; wiping
-	// ambient without reinstall left ProcessRng nil for later unit tests.)
-	restore := activateSession(s)
-	defer restore()
-
+	// DoFinalizationSess(s) clears only the generator bag — ambient unit-test
+	// ProcessRng/defaultSession is preserved without activateSession.
 	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
 	// Finalization::doFinalization subset for a fresh generation
 	// (includes RandomNumber::doFinalization).
 	DoFinalizationSess(s)
-	// re-install from g after Finalization cleared s while active
+	// re-install from g after Finalization cleared s
 	s.Opts = g.Opts
 	s.ProgramGen = g
 	s.Probs = g.Probs
@@ -294,7 +289,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	if interests == 0 {
 		interests = DefaultInterestedFacts
 	}
-	AddInterestedFacts(interests)
+	AddInterestedFactsSess(g.Sess, interests)
 	// Function.cpp:792–793 — initialize_builtin_functions when builtins on
 	if g.Opts.Builtins {
 		InitializeBuiltinFunctions(g.Opts, g.Probs, g.Rng, &g.Funcs, g.FactMgrs)
@@ -494,8 +489,8 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	}
 	var structAttr, unionAttr *AttributeGenerator
 	if g.Opts.TypeAttributes {
-		structAttr = EnsureStructTypeAttrGenerator()
-		unionAttr = EnsureUnionTypeAttrGenerator()
+		structAttr = EnsureStructTypeAttrGeneratorSess(g.Sess)
+		unionAttr = EnsureUnionTypeAttrGeneratorSess(g.Sess)
 	}
 	// Type.cpp:1895 — output_comment_line always (empty section when no used aggregates)
 	var b strings.Builder
@@ -818,10 +813,7 @@ func (g *ProgramGenerator) hashGlobals() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	if g.Sess != nil {
-		restore := activateSession(g.Sess)
-		defer restore()
-	}
+	// Ctrl vars / errors use vs.Sess — no Process* activate required.
 	return HashGlobalVariablesWithUnionFacts(g.VS, g.unionWriteFactsForHash())
 }
 
@@ -1615,7 +1607,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		g.clearErr()
 		// fresh function list for this program
 		g.Funcs = FunctionList{}
-		g.FactMgrs = NewFactMgrMap()
+		g.FactMgrs = NewFactMgrMapSess(g.Sess)
 		g.GenerateFunctions()
 		if g.errCode() == ErrSuccess {
 			hdr := DFSOutputHeader(g.OutputHeader(), g.Opts.CompactOutput)
@@ -1635,7 +1627,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		g.Rng.DFSResetState()
 		// Function::doFinalization — drop built funcs
 		g.Funcs = FunctionList{}
-		g.FactMgrs = NewFactMgrMap()
+		g.FactMgrs = NewFactMgrMapSess(g.Sess)
 		// VariableSelector::doFinalization — clear session globals/locals
 		if g.VS != nil {
 			g.VS.DoFinalization()
