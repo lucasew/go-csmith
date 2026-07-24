@@ -137,7 +137,7 @@ func MinimalDepth(dType string, flag int) int {
 		return 1
 	default:
 		// DepthSpec.cpp:381–382 assert(0) for unknown dType — sticky no invent depth 1
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 }
@@ -147,7 +147,7 @@ func knownDepthType(dType string) bool {
 	d := MinimalDepth(dType, 0)
 	// residual ERROR sticky — no invent known-true past MinimalDepth residual hole
 	// (unknown dType SetError + -1; residual must not invent known via soft >=0)
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return d >= 0
@@ -163,7 +163,7 @@ func DepthGuardByDepth(opts Options, depthNeeded int) int {
 	r := ProcessRng()
 	if r == nil || r.kind != RngKindDFS {
 		// DFS exhaustive without live DFS generator: sticky incomplete
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return BadDepth
 	}
 	if r.EagerBacktracking(depthNeeded) {
@@ -187,8 +187,8 @@ func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
 	d := MinimalDepth(dType, flag)
 	if d < 0 {
 		// MinimalDepth already SetError on unknown; ensure sticky if that path skipped
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return BadDepth
 	}

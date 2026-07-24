@@ -34,35 +34,35 @@ func ReturnFloatTypeBinary(opts Options, rv, op1, op2 *Type, bop BinaryOp) bool 
 	}
 	if rv != nil && rv.IsFloat() {
 		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past rv IsFloat residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if op1 != nil && op1.IsFloat() {
 		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past op1 IsFloat residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if op2 != nil && op2.IsFloat() {
 		// residual ERROR sticky — no invent float-true past op2 IsFloat residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past op2 IsFloat residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if !BinaryOpWorksForFloat(bop) {
@@ -79,24 +79,24 @@ func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
 	}
 	if rv != nil && rv.IsFloat() {
 		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past rv IsFloat residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if op1 != nil && op1.IsFloat() {
 		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past op1 IsFloat residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if !UnaryOpWorksForFloat(uop) {
@@ -110,7 +110,7 @@ func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
 // SafeOpFlags* always live at clone; sticky nil (no invent soft-skip past hole).
 func (f *SafeOpFlags) Clone() *SafeOpFlags {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	cp := *f
@@ -174,7 +174,7 @@ func MakeDummyFlags() *SafeOpFlags {
 // Op1Sign mirrors SafeOpFlags::get_op1_sign.
 func (f *SafeOpFlags) Op1Sign() bool {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return f.Op1Signed
@@ -183,7 +183,7 @@ func (f *SafeOpFlags) Op1Sign() bool {
 // Op2Sign mirrors SafeOpFlags::get_op2_sign.
 func (f *SafeOpFlags) Op2Sign() bool {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return f.Op2Signed
@@ -192,7 +192,7 @@ func (f *SafeOpFlags) Op2Sign() bool {
 // OpSize mirrors SafeOpFlags::get_op_size.
 func (f *SafeOpFlags) OpSize() SafeOpSize {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return SafeInt8
 	}
 	return f.Size
@@ -224,13 +224,13 @@ func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *Sa
 func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
 	// SafeOpFlags.cpp:139–167 — always uses rnd_* sticky; no soft invent fixed flags
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true}
 	rvFloat := ReturnFloatTypeUnary(opts, rvType, op1Type, uop)
 	// residual ERROR sticky — no invent soft-flags past ReturnFloatTypeUnary residual
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
@@ -252,7 +252,7 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 	} else {
 		sz, ok := pickSafeOpSize(r, probs)
 		// residual ERROR sticky — no invent soft-flags past pickSafeOpSize residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if !ok {
@@ -279,13 +279,13 @@ func MakeRandomBinaryKind(
 	}
 	// SafeOpFlags.cpp:176+ — always uses rnd_* sticky; no soft invent fixed flags
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true} // ISSUE upstream: always true
 	rvFloat := ReturnFloatTypeBinary(opts, rvType, op1Type, op2Type, bop)
 	// residual ERROR sticky — no invent soft-flags past ReturnFloatTypeBinary residual
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 
@@ -320,7 +320,7 @@ func MakeRandomBinaryKind(
 	} else {
 		sz, ok := pickSafeOpSize(r, probs)
 		// residual ERROR sticky — no invent soft-flags past pickSafeOpSize residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if !ok {
@@ -336,7 +336,7 @@ func MakeRandomBinaryKind(
 // No invent opts-only weight table when probs missing.
 func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0, false
 	}
 	if probs == nil {
@@ -344,11 +344,11 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 	}
 	if probs == nil {
 		// Probabilities singleton always live in C++; sticky fail closed
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0, false
 	}
 	v := r.RndUptoFilter(uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())
-	if HasError() {
+	if sessHasError(nil) {
 		return 0, false
 	}
 	sz := SafeOpSize(v)
@@ -362,7 +362,7 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 // SafeOpFlags.cpp:245–247 — "func_" or "macro_".
 func (f *SafeOpFlags) OutputFuncOrMacro() string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if f.IsFunc {
@@ -375,7 +375,7 @@ func (f *SafeOpFlags) OutputFuncOrMacro() string {
 // SafeOpFlags.cpp:249–251 — "_s" or "_u".
 func (f *SafeOpFlags) OutputSign(signed bool) string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if signed {
@@ -388,7 +388,7 @@ func (f *SafeOpFlags) OutputSign(signed bool) string {
 // SafeOpFlags.cpp:253.
 func (f *SafeOpFlags) OutputOp1() string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return f.OutputSign(f.Op1Signed)
@@ -398,7 +398,7 @@ func (f *SafeOpFlags) OutputOp1() string {
 // SafeOpFlags.cpp:255.
 func (f *SafeOpFlags) OutputOp2() string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return f.OutputSign(f.Op2Signed)
@@ -415,7 +415,7 @@ func (f *SafeOpFlags) OutputSize() string {
 func (f *SafeOpFlags) SizeToken() string {
 	if f == nil {
 		// sticky no soft invent int32_t for nil flags
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:236–238 — float has no u prefix path
@@ -437,7 +437,7 @@ func (f *SafeOpFlags) SizeToken() string {
 		b.WriteString("int64_t")
 	default:
 		// SafeOpFlags.cpp:239 — assert(!"invalid size!"); sticky no soft invent int32_t
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return b.String()
@@ -461,7 +461,7 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 			return GetSimpleType(EFloat)
 		default:
 			// assert(0) path sticky — no soft invent GetIntType for unknown size
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 	}
@@ -476,7 +476,7 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 		return GetSimpleType(EULongLong)
 	default:
 		// assert(0) path sticky — no soft invent EUInt for unknown size
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 }
@@ -486,7 +486,7 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 func (f *SafeOpFlags) LHSType() *Type {
 	// SafeOpFlags methods are const on live flags; sticky no invent type for nil
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return FlagsToType(f.Op1Signed, f.Size)
@@ -496,7 +496,7 @@ func (f *SafeOpFlags) LHSType() *Type {
 // SafeOpFlags.cpp:104–108 — flags_to_type(op2_, op_size_); nil flags → nil.
 func (f *SafeOpFlags) RHSType() *Type {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return FlagsToType(f.Op2Signed, f.Size)
@@ -507,7 +507,7 @@ func (f *SafeOpFlags) RHSType() *Type {
 func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	// live flags required; sticky no invent safe_* name for nil
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:286–287 — float size short-circuit
@@ -535,14 +535,14 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 		shift = true
 	default:
 		// invalid binary op sticky (no invent empty wrapper name)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:314–319 — OutputFuncOrMacro + OutputSize + OutputOp1 + Op1/Op2
 	sz := f.OutputSize()
 	if sz == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
@@ -586,7 +586,7 @@ func safeFloatFuncString(op string) string {
 func (f *SafeOpFlags) UnaryMinusFuncName() string {
 	// live flags required; sticky no invent int32 name for nil
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:325 — assert(op_size_ != sFloat); non-sticky empty
@@ -598,8 +598,8 @@ func (f *SafeOpFlags) UnaryMinusFuncName() string {
 	sz := f.OutputSize()
 	if sz == "" {
 		// invalid size assert path sticky
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}

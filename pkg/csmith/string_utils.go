@@ -299,7 +299,7 @@ func BreakupAssigns(assigns string) (vars, values []string) {
 		pair := SplitString(st, '=')
 		if len(pair) != 2 {
 			// sticky fail closed — no soft invent skip of broken assignment
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil, nil
 		}
 		vars = append(vars, Chop(pair[0]))

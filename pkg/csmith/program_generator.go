@@ -40,7 +40,7 @@ func SetProcessProgramGenerator(g *ProgramGenerator) { currentSession().ProgramG
 func ProcessProgramGenerator() *ProgramGenerator {
 	g := currentSession().ProgramGen
 	if g == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return g
@@ -762,22 +762,11 @@ func HashGlobalVariables(vs *VariableSelector) string {
 func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactUnion) string {
 	// VariableSelector always live for global hash; sticky no invent empty hash without it
 	if vs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
-	note := func(code int) {
-		if vs.Sess != nil {
-			vs.Sess.GenError = code
-			return
-		}
-		SetError(code)
-	}
-	has := func() bool {
-		if vs.Sess != nil {
-			return vs.Sess.GenError != ErrSuccess
-		}
-		return HasError()
-	}
+	note := func(code int) { sessNoteError(vs.Sess, code) }
+	has := func() bool { return sessHasError(vs.Sess) }
 	// incomplete GlobalList fails closed sticky (no invent empty hash past nil hole)
 	if !VariablesComplete(vs.GlobalList) {
 		note(ErrGeneric)
@@ -1051,7 +1040,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	// incomplete ptr list fails closed sticky (no invent empty-reset success past holes)
 	if !VariablesComplete(ptrs) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if len(ptrs) == 0 {
@@ -1068,7 +1057,7 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent synthetic shell from ArraySizes / soft re-pick partial resets)
 		if v.IsArray && v.AsArray == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		av := v.AsArray
@@ -1080,8 +1069,8 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			if len(names) == 0 {
 				// C++ assumes get_last_ctrl_vars() non-empty after OutputArrayInitializers
 				// incomplete ctrl IR sticky — fail closed whole resets
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return ""
 			}
@@ -1093,12 +1082,12 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			initOut := outputArrayInitForced(av, "    ", names, opts.PostIncrOperator)
 			av.Init, av.InitExpr = savedInit, savedExpr
 			// residual ERROR sticky — no invent soft-continue later resets past init residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			// incomplete array init IR sticky — fail closed whole resets
 			if initOut == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString(initOut)
@@ -1107,11 +1096,11 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		// OutputMgr.cpp:337 — Variable::Output always live sticky; no invent " = 0;" without name
 		out := v.OutputC()
 		// residual ERROR sticky — no invent soft-continue later resets past OutputC residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if out == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString("    " + out + " = 0;\n")
@@ -1125,7 +1114,7 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {
 	// ArrayVariable always live for forced init; sticky incomplete no invent empty reset
 	if av == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:622–623 — collective itemized members skip (policy empty)
@@ -1134,12 +1123,12 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	}
 	// undersized / empty ctrl sticky — no invent letter names
 	if len(ctrl) < len(av.Sizes) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 	}
@@ -1148,14 +1137,14 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	if av.InitExpr != nil {
 		initVal = av.InitExpr.Output()
 		// residual ERROR sticky — no invent forced loop-init past Output residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	} else if av.Init != nil {
 		initVal = av.Init.Value
 	}
 	if initVal == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1175,11 +1164,11 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	// ArrayVariable::output_with_indices always live access sticky; no invent " = init;" without LHS
 	access := av.OutputWithIndices(ctrl)
 	// residual ERROR sticky — no invent forced loop-init past OutputWithIndices residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if access == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")

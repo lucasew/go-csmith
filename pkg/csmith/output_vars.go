@@ -16,7 +16,7 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 	}
 	// incomplete list fails closed sticky (no invent skip holes / partial section)
 	if !VariablesComplete(vars) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:858–860 — iterate vars in given order (not name-sorted)
@@ -26,7 +26,7 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 		// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
 		// sticky (no invent scalar OutputDef for IsArray shell / soft re-pick partial list)
 		if v.IsArray && v.AsArray == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		var def string
@@ -40,11 +40,11 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 			def = v.OutputDef(forceStatic)
 		}
 		// residual ERROR sticky — no invent soft-continue later vars past OutputDef residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if def == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString(indent)
@@ -58,16 +58,16 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 	// even if every array uses brace init (no_loop_initializer true).
 	if !vars[0].IsGlobal() {
 		// residual ERROR sticky — no invent soft-skip initializers past IsGlobal residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		inits := OutputArrayInitializers(vars, ProcessOptions(), indent)
 		// residual ERROR sticky — no invent soft-return defs-only past OutputArrayInitializers residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		b.WriteString(inits)
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-success past IsGlobal residual true
 		return ""
 	}
@@ -80,7 +80,7 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 func OutputGlobalVariables(vars []*Variable) string {
 	body := OutputVariableList(vars, "", true)
 	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if body == "" {
@@ -89,7 +89,7 @@ func OutputGlobalVariables(vars []*Variable) string {
 	var b strings.Builder
 	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
 	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString(hdr)
@@ -103,7 +103,7 @@ func OutputGlobalVariables(vars []*Variable) string {
 func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
 	body := OutputVariableList(vars, "", false)
 	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if body == "" {
@@ -112,7 +112,7 @@ func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
 	var b strings.Builder
 	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
 	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString(hdr)

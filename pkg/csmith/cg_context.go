@@ -564,7 +564,7 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 	add := func(v *Variable) bool {
 		if v == nil {
 			// incomplete must-use list sticky (no invent soft-skip hole as absent)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if !v.IsArray || seen[v] {
@@ -574,7 +574,7 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent soft-skip shell as absent then empty complete pool)
 		if v.AsArray == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		out = append(out, v.AsArray)

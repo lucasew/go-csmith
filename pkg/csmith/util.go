@@ -39,7 +39,7 @@ func (g *GenSym) Next(basename string) string {
 		return Gensym(basename)
 	}
 	if basename == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	g.count++
@@ -91,7 +91,7 @@ func OutputCloseEncloser(symbol string, indent int, noNewline bool) (out string,
 	newIndent = indent - 1
 	if newIndent < 0 {
 		// incomplete indent sticky — fail closed clamp (no invent negative indent)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		newIndent = 0
 	}
 	var b strings.Builder

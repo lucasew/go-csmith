@@ -22,7 +22,7 @@ func KleeOutputHeader() string {
 // KleeOutputSymbolics mirrors KleeExtension::output_symbolics.
 func KleeOutputSymbolics(values []*ExtensionValue) string {
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -44,7 +44,7 @@ func KleeOutputInit(values []*ExtensionValue) string {
 	var b strings.Builder
 	b.WriteString("int main(void)\n{\n")
 	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString(KleeOutputSymbolics(values))
@@ -65,7 +65,7 @@ const CrestInputBaseName = "CREST_"
 // CrestExtension.cpp:52–78 — simple types only; sticky "" on non-simple.
 func CrestTypeToString(t *Type) string {
 	if t == nil || !t.IsSimple() {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	switch t.Simple() {
@@ -86,7 +86,7 @@ func CrestTypeToString(t *Type) string {
 	case EULong:
 		return "unsigned_int"
 	default:
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -94,13 +94,13 @@ func CrestTypeToString(t *Type) string {
 // CrestOutputSymbolics mirrors CrestExtension::output_symbolics.
 func CrestOutputSymbolics(values []*ExtensionValue) string {
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	for _, value := range values {
 		ts := CrestTypeToString(value.Type)
-		if HasError() || ts == "" {
+		if sessHasError(nil) || ts == "" {
 			return ""
 		}
 		b.WriteString(AbsExtensionTab)
@@ -118,7 +118,7 @@ func CrestOutputInit(values []*ExtensionValue) string {
 	var b strings.Builder
 	b.WriteString("int main(void)\n{\n")
 	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString(CrestOutputSymbolics(values))
@@ -147,18 +147,18 @@ const (
 // CoverageTestExtension.cpp:52–61 — make_random per value × inputs_size.
 func CoverageGenerateValues(values []*ExtensionValue, inputsSize int, r *Rng, opts Options, probs *Probabilities) []*Constant {
 	if inputsSize <= 0 || r == nil || probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var out []*Constant
 	for _, value := range values {
 		for j := 0; j < inputsSize; j++ {
 			c := MakeRandom(value.Type, opts, probs, r)
-			if c == nil || HasError() {
+			if c == nil || sessHasError(nil) {
 				return nil
 			}
 			out = append(out, c)
@@ -171,12 +171,12 @@ func CoverageGenerateValues(values []*ExtensionValue, inputsSize int, r *Rng, op
 // count is the value index; tests layout is [v0_t0, v0_t1, ..., v1_t0, ...].
 func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 	if inputsSize <= 0 || count < 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	base := count * inputsSize
 	if base+inputsSize > len(tests) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if inputsSize == 1 {
@@ -192,7 +192,7 @@ func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 			b.WriteString(AbsExtensionTab)
 		}
 		o := tests[i].Output()
-		if HasError() || o == "" {
+		if sessHasError(nil) || o == "" {
 			return ""
 		}
 		b.WriteString(o)
@@ -205,7 +205,7 @@ func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 		b.WriteString(AbsExtensionTab)
 	}
 	o := tests[last].Output()
-	if HasError() || o == "" {
+	if sessHasError(nil) || o == "" {
 		return ""
 	}
 	b.WriteString(o)
@@ -215,20 +215,20 @@ func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 // CoverageOutputDecls mirrors CoverageTestExtension::output_decls.
 func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize int) string {
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	for count, value := range values {
 		b.WriteString(AbsExtensionTab)
 		cn := value.Type.CName()
-		if HasError() || cn == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || cn == "" {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
@@ -237,7 +237,7 @@ func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize
 		b.WriteString(fmt.Sprintf("%s%d", CoverageArrayBaseName, count))
 		b.WriteString(fmt.Sprintf("[%d] = {", inputsSize))
 		init := CoverageOutputArrayInit(tests, count, inputsSize)
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		b.WriteString(init)
@@ -253,7 +253,7 @@ func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize
 // CoverageOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 func CoverageOutputFirstFunInvocation(values []*ExtensionValue, invokeOut string, inputsSize int) string {
 	if !extensionValuesComplete(values) || invokeOut == "" || inputsSize <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -318,7 +318,7 @@ func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
 		currentSession().ExtKind = "coverage"
 		currentSession().CoverageSize = opts.CoverageTestSize
 		if currentSession().CoverageSize <= 0 {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 	} else {
@@ -327,16 +327,16 @@ func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
 
 	// AbsExtension::Initialize(func1_max_params, values)
 	currentSession().ExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
-	if currentSession().ExtValues == nil || HasError() {
-		if !HasError() {
-			SetError(ErrGeneric)
+	if currentSession().ExtValues == nil || sessHasError(nil) {
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		currentSession().ExtKind = ""
 		return
 	}
 	if currentSession().ExtKind == "coverage" {
 		currentSession().CoverageTests = CoverageGenerateValues(currentSession().ExtValues, currentSession().CoverageSize, r, opts, probs)
-		if currentSession().CoverageTests == nil || HasError() {
+		if currentSession().CoverageTests == nil || sessHasError(nil) {
 			currentSession().ExtKind = ""
 			currentSession().ExtValues = nil
 			return

@@ -90,20 +90,20 @@ func NewProbabilityFilter(pname ProbName) *ProbabilityFilter {
 // Probabilities.cpp:59–81.
 func (f *ProbabilityFilter) Filter(v uint32) bool {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	p := ProcessProbabilities()
 	if p == nil {
 		// C++ GetInstance always live after init; nil is library fail-closed.
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if p.CheckExtraFilter(f.pname, int(v)) {
 		return true
 	}
 	w := p.equalGroupWeight(f.pname, int(v))
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return w == 0
@@ -135,7 +135,7 @@ func NewProbabilities(opts Options) *Probabilities {
 // ProbabilityFilter walks GroupProbElem; Go weight slices are pre-indexed.
 func (p *Probabilities) equalGroupWeight(pname ProbName, v int) int {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	switch pname {
@@ -149,7 +149,7 @@ func (p *Probabilities) equalGroupWeight(pname ProbName, v int) int {
 		return p.SafeOpsSizeWeight(v)
 	default:
 		// Not an equal-group filter root; C++ would assert on dynamic_cast.
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 }
@@ -158,7 +158,7 @@ func (p *Probabilities) equalGroupWeight(pname ProbName, v int) int {
 // Probabilities.cpp:787–789.
 func (p *Probabilities) setProbFilter(pname ProbName) {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	p.probFilters[pname] = NewProbabilityFilter(pname)
@@ -169,7 +169,7 @@ func (p *Probabilities) setProbFilter(pname ProbName) {
 func GetProbFilter(pname ProbName) Filter {
 	p := ProcessProbabilities()
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
 	if f, ok := p.probFilters[pname]; ok && f != nil {
@@ -179,7 +179,7 @@ func GetProbFilter(pname ProbName) Filter {
 		return f
 	}
 	// C++ asserts filter non-null; fail closed reject-all.
-	SetError(ErrGeneric)
+	sessNoteError(nil, ErrGeneric)
 	return filterFunc(func(uint32) bool { return true })
 }
 
@@ -188,7 +188,7 @@ func GetProbFilter(pname ProbName) Filter {
 func RegisterExtraFilter(pname ProbName, filter Filter) {
 	p := ProcessProbabilities()
 	if p == nil || filter == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	p.extraFilters[pname] = filter
@@ -200,12 +200,12 @@ func RegisterExtraFilter(pname ProbName, filter Filter) {
 func UnregisterExtraFilter(pname ProbName, filter Filter) {
 	p := ProcessProbabilities()
 	if p == nil || filter == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	cur, ok := p.extraFilters[pname]
 	if !ok || cur == nil || !filterPtrEqual(cur, filter) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	p.extraFilters[pname] = nil
@@ -225,7 +225,7 @@ func filterPtrEqual(a, b Filter) (eq bool) {
 // Probabilities.cpp:806–813 — true when extra filter rejects v.
 func (p *Probabilities) CheckExtraFilter(pname ProbName, v int) bool {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if v < 0 {
@@ -241,7 +241,7 @@ func (p *Probabilities) CheckExtraFilter(pname ProbName, v int) bool {
 // ClearFilters mirrors Probabilities::clear_filter on both maps (destructor path).
 func (p *Probabilities) ClearFilters() {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	p.probFilters = make(map[ProbName]*ProbabilityFilter)
@@ -253,7 +253,7 @@ func (p *Probabilities) ClearFilters() {
 func (p *Probabilities) StatementThresholdTable() *ThresholdTable {
 	// Probabilities always live in C++ singleton; sticky incomplete no invent nil table
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return p.statementTable
@@ -265,7 +265,7 @@ func (p *Probabilities) StatementThresholdTable() *ThresholdTable {
 func (p *Probabilities) Single(name ProbName) int {
 	// Probabilities always live; sticky incomplete no invent 0% without table
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return p.single[name]
@@ -276,7 +276,7 @@ func (p *Probabilities) Single(name ProbName) int {
 func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
 	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	if simpleIdx < 0 || simpleIdx >= len(p.simpleTypeWeight) {
@@ -291,7 +291,7 @@ func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
 // bound filter against this *Probabilities (library/test paths without SetProcess).
 func (p *Probabilities) SimpleTypesFilter() Filter {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
 	if ProcessProbabilities() == p {
@@ -301,7 +301,7 @@ func (p *Probabilities) SimpleTypesFilter() Filter {
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.SimpleTypeWeight(int(v))
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return w == 0
@@ -313,7 +313,7 @@ func (p *Probabilities) SimpleTypesFilter() Filter {
 func (p *Probabilities) BinaryOpWeight(opIdx int) int {
 	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	if opIdx < 0 || opIdx >= len(p.binaryOpWeight) {
@@ -326,7 +326,7 @@ func (p *Probabilities) BinaryOpWeight(opIdx int) int {
 // Probabilities.cpp set_default_binary_ops_prob + set_prob_filter.
 func (p *Probabilities) BinaryOpsFilter() Filter {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
 	if ProcessProbabilities() == p {
@@ -336,7 +336,7 @@ func (p *Probabilities) BinaryOpsFilter() Filter {
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.BinaryOpWeight(int(v))
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return w == 0
@@ -348,7 +348,7 @@ func (p *Probabilities) BinaryOpsFilter() Filter {
 func (p *Probabilities) UnaryOpWeight(opIdx int) int {
 	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	if opIdx < 0 || opIdx >= len(p.unaryOpWeight) {
@@ -361,7 +361,7 @@ func (p *Probabilities) UnaryOpWeight(opIdx int) int {
 // Probabilities.cpp set_default_unary_ops_prob + set_prob_filter.
 func (p *Probabilities) UnaryOpsFilter() Filter {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
 	if ProcessProbabilities() == p {
@@ -371,7 +371,7 @@ func (p *Probabilities) UnaryOpsFilter() Filter {
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.UnaryOpWeight(int(v))
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return w == 0
@@ -538,7 +538,7 @@ func (p *Probabilities) initStatementProbs(opts Options) {
 // OOB sizeIdx is complete miss weight 0 (not incomplete IR).
 func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	if sizeIdx < 0 || sizeIdx >= len(p.safeOpsSizeWeight) {
@@ -551,7 +551,7 @@ func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
 // Probabilities.cpp set_default_safe_ops_size_prob + set_prob_filter.
 func (p *Probabilities) SafeOpsSizeFilter() Filter {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
 	if ProcessProbabilities() == p {
@@ -561,7 +561,7 @@ func (p *Probabilities) SafeOpsSizeFilter() Filter {
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.SafeOpsSizeWeight(int(v))
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return w == 0

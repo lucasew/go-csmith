@@ -92,7 +92,7 @@ func (op BinaryOp) BinaryOpC() string {
 		return "<<"
 	default:
 		// invalid op sticky; no soft invent "+"
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -104,7 +104,7 @@ func (op BinaryOp) CmpOpC() string {
 		return op.BinaryOpC()
 	default:
 		// invalid cmp sticky; no soft invent "<"
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -125,7 +125,7 @@ func BinaryOpsFilter(opts Options) Filter {
 func PickBinaryOp(r *Rng, opts Options) BinaryOp {
 	// FunctionInvocation.cpp:179–183 — always rnd_upto; sticky no invent eAdd without draw
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return BinaryOp(MaxBinaryOp)
 	}
 	// BINARY_OPS_PROB_FILTER uses process Probabilities group (no invent opts-only
@@ -193,7 +193,7 @@ func (op UnaryOp) UnaryOpC() string {
 		return "~"
 	default:
 		// invalid unary sticky; no soft invent "-"
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -213,7 +213,7 @@ func UnaryOpsFilter(opts Options) Filter {
 func PickUnaryOp(r *Rng, opts Options) UnaryOp {
 	// FunctionInvocation.cpp:146–148 — always rnd_upto; sticky no invent eMinus without draw
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return UnaryOp(MaxUnaryOp)
 	}
 	probs := ProcessProbabilities()
@@ -266,11 +266,11 @@ func (op AssignOp) CompoundToBinaryOps() (BinaryOp, bool) {
 // sticky no invent " = x" / "++" / "g = " empty-side shells
 func (op AssignOp) AssignOpC(name, rhs string) string {
 	if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if !op.NeedNoRHS() && rhs == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	switch op {
@@ -306,7 +306,7 @@ func (op AssignOp) AssignOpC(name, rhs string) string {
 		return name + "--"
 	default:
 		// invalid assign op sticky; no soft invent simple assign
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }

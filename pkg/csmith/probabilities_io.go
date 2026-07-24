@@ -78,7 +78,7 @@ func init() {
 func GetSName(pname ProbName) string {
 	s, ok := probSName[pname]
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return s
@@ -89,7 +89,7 @@ func GetSName(pname ProbName) string {
 func GetPName(sname string) (ProbName, bool) {
 	p, ok := snameToPname[sname]
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0, false
 	}
 	return p, true
@@ -116,7 +116,7 @@ func DumpSingleVal(sname string, val int) string {
 // Empty fname sticky (no invent stdout dump as success file write).
 func (p *Probabilities) DumpDefaultProbabilities() string {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Defaults from a fresh Defaults() table for "default" dump semantics
@@ -127,7 +127,7 @@ func (p *Probabilities) DumpDefaultProbabilities() string {
 // DumpActualProbabilities mirrors dump_actual_probabilities content (with seed header).
 func (p *Probabilities) DumpActualProbabilities(seed uint64) string {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -172,7 +172,7 @@ func (p *Probabilities) dumpSingles(actual bool) string {
 // WriteDumpDefaultProbabilities writes dump to file (C++ ofstream path).
 func WriteDumpDefaultProbabilities(fname string) error {
 	if fname == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return fmt.Errorf("empty dump path")
 	}
 	p := ProcessProbabilities()
@@ -185,12 +185,12 @@ func WriteDumpDefaultProbabilities(fname string) error {
 // WriteDumpActualProbabilities writes actual vals + seed header.
 func WriteDumpActualProbabilities(fname string, seed uint64) error {
 	if fname == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return fmt.Errorf("empty dump path")
 	}
 	p := ProcessProbabilities()
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return fmt.Errorf("probabilities not initialized")
 	}
 	return os.WriteFile(fname, []byte(p.DumpActualProbabilities(seed)), 0o644)
@@ -201,7 +201,7 @@ func WriteDumpActualProbabilities(fname string, seed uint64) error {
 // Group lines for equal/unequal groups fail closed with error_msg (no invent skip).
 func (p *Probabilities) ParseConfiguration(fname string) (errMsg string, ok bool) {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return "nil probabilities", false
 	}
 	if fname == "" {
@@ -231,7 +231,7 @@ func (p *Probabilities) ParseConfiguration(fname string) (errMsg string, ok bool
 // ParseLine mirrors Probabilities::parse_line.
 func (p *Probabilities) ParseLine(line string) (errMsg string, ok bool) {
 	if p == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return "nil probabilities", false
 	}
 	trim := strings.TrimSpace(line)

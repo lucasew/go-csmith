@@ -21,12 +21,12 @@ type ExtensionValue struct {
 func NewExtensionValue(typ *Type, name string) *ExtensionValue {
 	// Type always live; sticky nil (no invent void/default type shell)
 	if typ == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// empty name sticky (no invent base_name_only)
 	if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return &ExtensionValue{
@@ -50,7 +50,7 @@ const AbsExtensionBaseName = "x"
 // Incomplete num or RNG/probs sticky nil (no invent empty values as success).
 func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionValue {
 	if num < 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if num == 0 {
@@ -58,22 +58,22 @@ func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionV
 	}
 	// Rng + Probabilities always live for choose_random_simple
 	if r == nil || probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	values := make([]*ExtensionValue, 0, num)
 	for i := 0; i < num; i++ {
 		st := ChooseRandomNonvoidSimple(r, probs)
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		typ := GetSimpleType(st)
 		if typ == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		ev := NewExtensionValue(typ, fmt.Sprintf("%s%d", AbsExtensionBaseName, i))
-		if ev == nil || HasError() {
+		if ev == nil || sessHasError(nil) {
 			return nil
 		}
 		values = append(values, ev)
@@ -86,7 +86,7 @@ func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionV
 // Incomplete values sticky "" (no invent partial definitions section).
 func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag bool) string {
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if len(values) == 0 {
@@ -97,9 +97,9 @@ func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag boo
 		b.WriteString(AbsExtensionTab)
 		// Type::Output
 		cn := v.Type.CName()
-		if HasError() || cn == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || cn == "" {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
@@ -120,7 +120,7 @@ func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag boo
 // Incomplete invoke string sticky "" (no invent bare ";" call).
 func AbsExtensionOutputFirstFunInvocation(invokeOut string) string {
 	if invokeOut == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return AbsExtensionTab + invokeOut + ";\n"
@@ -131,19 +131,19 @@ func AbsExtensionOutputFirstFunInvocation(invokeOut string) string {
 // Incomplete func/values/VS sticky false.
 func AbsExtensionGenerateFirstParameterList(f *Function, values []*ExtensionValue, vs *VariableSelector) bool {
 	if f == nil || vs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	for _, ev := range values {
 		q := ev.Qfer
 		v := vs.GenerateParameterVariableTyped(ev.Type, q)
-		if v == nil || HasError() {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if v == nil || sessHasError(nil) {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
@@ -157,11 +157,11 @@ func AbsExtensionGenerateFirstParameterList(f *Function, values []*ExtensionValu
 // Incomplete sticky nil.
 func AbsExtensionMakeFuncInvocation(f *Function, values []*ExtensionValue) *Invocation {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !extensionValuesComplete(values) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Build a FunctionInvocationUser with fixed ExpressionVariable params.
@@ -170,7 +170,7 @@ func AbsExtensionMakeFuncInvocation(f *Function, values []*ExtensionValue) *Invo
 		// VariableSelector::new_variable(name, type, null init, qfer)
 		v := CreateVariableScalars(ev.Name, ev.Type, false, false)
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		v.Qfer = ev.Qfer
@@ -213,7 +213,7 @@ func CreateExtension(opts Options) {
 	probs := ProcessProbabilities()
 	if r == nil || probs == nil {
 		// CreateInstance may not have run yet — library paths pass via CreateExtensionFull
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	CreateExtensionFull(opts, r, probs)
@@ -248,8 +248,8 @@ func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
 		return
 	}
 	if !AbsExtensionGenerateFirstParameterList(f, currentSession().ExtValues, vs) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 	}
 }
@@ -268,7 +268,7 @@ func ExtensionMgrOutputHeader() string {
 	case "coverage":
 		return "" // CoverageTestExtension::OutputHeader empty
 	default:
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -287,7 +287,7 @@ func ExtensionMgrOutputTail() string {
 	case "coverage":
 		return CoverageOutputTail()
 	default:
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -304,7 +304,7 @@ func ExtensionMgrOutputInit(acceptArgc bool) string {
 		case "coverage":
 			return CoverageOutputInit(currentSession().ExtValues, currentSession().CoverageTests, currentSession().CoverageSize)
 		default:
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 	}
@@ -328,7 +328,7 @@ func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
 		case "coverage":
 			return CoverageOutputFirstFunInvocation(currentSession().ExtValues, invokeOut, currentSession().CoverageSize)
 		default:
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 	}

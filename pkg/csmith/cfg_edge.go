@@ -23,7 +23,7 @@ type CFGEdge struct {
 // Non-looping chain end (Parent nil) is complete miss (not incomplete IR).
 func ClosestLoopingBlock(b *Block) *Block {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	for cur := b; cur != nil; cur = cur.Parent {

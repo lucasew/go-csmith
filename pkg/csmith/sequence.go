@@ -41,7 +41,7 @@ func (s *LinearSequence) InitSequence() {}
 func (s *LinearSequence) AddNumber(v, bound, k int) {
 	_ = bound
 	if s == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if s.seqMap == nil {
@@ -55,7 +55,7 @@ func (s *LinearSequence) AddNumber(v, bound, k int) {
 func (s *LinearSequence) GetNumber(bound int) int {
 	_ = bound
 	if s == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	return -1
@@ -66,17 +66,17 @@ func (s *LinearSequence) GetNumber(bound int) int {
 // Missing key sticky -1 (no invent 0 for unset pos).
 func (s *LinearSequence) GetNumberByPos(pos int) int {
 	if s == nil || s.seqMap == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	rv, ok := s.seqMap[pos]
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	// C++ assert(rv >= 0); negative stored value sticky
 	if rv < 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	return rv
@@ -86,7 +86,7 @@ func (s *LinearSequence) GetNumberByPos(pos int) int {
 // LinearSequence.cpp:70.
 func (s *LinearSequence) Clear() {
 	if s == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	s.seqMap = make(map[int]int)
@@ -97,12 +97,12 @@ func (s *LinearSequence) Clear() {
 // Empty sticky "" (no invent bare sep shell).
 func (s *LinearSequence) GetSequence() string {
 	if s == nil || s.seqMap == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	n := len(s.seqMap)
 	if n == 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// require dense 0..n-1 keys (C++ iterates size()-1 via map.size())
@@ -110,7 +110,7 @@ func (s *LinearSequence) GetSequence() string {
 	for i := 0; i < n; i++ {
 		v, ok := s.seqMap[i]
 		if !ok {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -125,7 +125,7 @@ func (s *LinearSequence) GetSequence() string {
 // LinearSequence.cpp:81.
 func (s *LinearSequence) SequenceLength() int {
 	if s == nil || s.seqMap == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return len(s.seqMap)
@@ -134,7 +134,7 @@ func (s *LinearSequence) SequenceLength() int {
 // SepChar mirrors LinearSequence::get_sep_char.
 func (s *LinearSequence) SepChar() byte {
 	if s == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return LinearSequenceDefaultSep
 	}
 	return s.sep

@@ -98,7 +98,7 @@ func NewRng(seed uint64) *Rng {
 func (r *Rng) Genrand() uint32 {
 	// Rng always live for genrand; sticky incomplete no invent zero stream
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	r.state = (lcgA*r.state + lcgC) & lcgMask
@@ -110,7 +110,7 @@ func (r *Rng) Genrand() uint32 {
 func (r *Rng) RandDepth() uint64 {
 	// Rng always live; sticky incomplete no invent depth 0
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return r.randDepth
@@ -130,7 +130,7 @@ func (r *Rng) RndUpto(n uint32) uint32 {
 func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 	// Rng always live for rnd_upto; sticky incomplete no invent fixed 0 draw
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	// n==0 non-sticky soft empty domain (no invent %0 / poison factories)
@@ -150,7 +150,7 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 		for f.Filter(v) {
 			// residual ERROR sticky — no invent soft-retry filter past hard IR residual hole
 			// (e.g. IsVolatileStructUnion field-Type residual soft-rejects then hangs forever)
-			if HasError() {
+			if sessHasError(nil) {
 				return 0
 			}
 			// DefaultRndNumGenerator.cpp: roll back rand_depth_ to local_depth+1
@@ -160,7 +160,7 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 			tries++
 		}
 		// residual ERROR sticky — no invent accept candidate past residual filter true path
-		if HasError() {
+		if sessHasError(nil) {
 			return 0
 		}
 	}
@@ -192,7 +192,7 @@ func (r *Rng) RndFlipcoin(p uint32) bool {
 func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 	// Rng always live for flipcoin; sticky incomplete no invent fixed false
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if p > 100 {
@@ -236,7 +236,7 @@ func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 func (r *Rng) RandomHexDigits(num int) string {
 	// AbsRndNumGenerator always has live RNG; sticky no invent empty hex without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if num <= 0 {
@@ -259,7 +259,7 @@ func (r *Rng) RandomHexDigits(num int) string {
 func (r *Rng) RandomDigits(num int) string {
 	// AbsRndNumGenerator always has live RNG; sticky no invent empty digits without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if num <= 0 {
@@ -279,7 +279,7 @@ func (r *Rng) RandomDigits(num int) string {
 // Kind is AbsRndNumGenerator::kind — Default or DFS.
 func (r *Rng) Kind() RngKind {
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return RngKindDefault
 	}
 	return r.kind
@@ -294,7 +294,7 @@ func GetPrefixedNameDefault(name string) string { return name }
 // Go Rng keeps an empty string unless extended.
 func (r *Rng) TraceDepth() string {
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return r.traceString
@@ -305,7 +305,7 @@ func (r *Rng) TraceDepth() string {
 // DFS: LinearSequence map joined by sep (empty sticky "").
 func (r *Rng) GetSequence() string {
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if r.kind == RngKindDFS {
@@ -317,7 +317,7 @@ func (r *Rng) GetSequence() string {
 // SetRandDepth is DefaultRndNumGenerator::set_rand_depth.
 func (r *Rng) SetRandDepth(depth uint64) {
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	r.randDepth = depth

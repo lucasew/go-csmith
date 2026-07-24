@@ -63,7 +63,7 @@ func NewVectorFilterItems(items []int, mode FilterMode) *VectorFilter {
 // Enable mirrors Filter::enable.
 func (f *VectorFilter) Enable(kind FilterKind) {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if kind < 0 || kind >= FilterKindMax {
@@ -75,7 +75,7 @@ func (f *VectorFilter) Enable(kind FilterKind) {
 // Disable mirrors Filter::disable.
 func (f *VectorFilter) Disable(kind FilterKind) {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if kind < 0 || kind >= FilterKindMax {
@@ -101,7 +101,7 @@ func (f *VectorFilter) CurrentKind() FilterKind {
 // Filter.cpp:74–79 — kinds_.test(current_kind); false if kind is MAX or disabled.
 func (f *VectorFilter) ValidFilter() bool {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	k := f.CurrentKind()
@@ -114,7 +114,7 @@ func (f *VectorFilter) ValidFilter() bool {
 // Add mirrors VectorFilter::add — push item if not already present.
 func (f *VectorFilter) Add(item int) *VectorFilter {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return f
 	}
 	for _, x := range f.items {
@@ -131,7 +131,7 @@ func (f *VectorFilter) Add(item int) *VectorFilter {
 // Nil receiver is a Go hole (C++ would not call through null); fail closed 0.
 func (f *VectorFilter) MaxProb() int {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	if f.table == nil {
@@ -145,7 +145,7 @@ func (f *VectorFilter) MaxProb() int {
 // else ptable->rnd_num_to_key(v).
 func (f *VectorFilter) Lookup(v int) int {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	if !f.ValidFilter() || f.table == nil {
@@ -159,7 +159,7 @@ func (f *VectorFilter) Lookup(v int) int {
 // Nil receiver: Go hole fail-closed reject (C++ null would crash).
 func (f *VectorFilter) Filter(v uint32) bool {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	// VectorFilter.cpp:59–60 — invalid filter never rejects

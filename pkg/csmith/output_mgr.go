@@ -132,7 +132,7 @@ func OutputStepHashFuncInvocation(indent, stmtID int) string {
 	}
 	// incomplete stmt id sticky (no invent step_hash(0) shell)
 	if stmtID <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return OutputTab(indent) + StepHashFuncName + "(" + Int2Str(stmtID) + ");\n"
@@ -147,7 +147,7 @@ func IsSplit(opts Options) bool { return opts.MaxSplitFiles > 0 }
 // Empty dir sticky false (no invent cwd as success).
 func CreateOutputDir(dir string) bool {
 	if dir == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return CreateDir(dir)
@@ -159,12 +159,12 @@ func CreateOutputDir(dir string) bool {
 func SplitOutputFilePath(opts Options, num int) string {
 	dir := strings.TrimSpace(opts.SplitFilesDir)
 	if dir == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// incomplete negative index sticky (no invent rnd_output-1.c)
 	if num < 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	name := fmt.Sprintf("%s%d.c", SplitFilenamePrefix, num)
@@ -176,7 +176,7 @@ func SplitOutputFilePath(opts Options, num int) string {
 func SplitGlobalsHeaderPath(opts Options) string {
 	dir := strings.TrimSpace(opts.SplitFilesDir)
 	if dir == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return filepath.Join(dir, SplitGlobalHeader+".h")
@@ -279,9 +279,9 @@ func CreateDefaultOutputMgr(opts Options) bool {
 	paths := make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		p := SplitOutputFilePath(opts, i)
-		if p == "" || HasError() {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if p == "" || sessHasError(nil) {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			currentSession().SplitPaths = nil
 			return false
@@ -338,7 +338,7 @@ func GetMainOutPath(opts Options) string {
 	if IsSplit(opts) {
 		if len(currentSession().SplitPaths) == 0 {
 			// not initialized sticky
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		return currentSession().SplitPaths[0]
@@ -351,7 +351,7 @@ func GetMainOutPath(opts Options) string {
 // nFiles==0 sticky -1 (no invent index 0 into empty outs).
 func PureRndUptoIndex(nFiles int) int {
 	if nFiles <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	return int(PureRndUpto(uint32(nFiles), nil))
@@ -362,31 +362,31 @@ func PureRndUptoIndex(nFiles int) int {
 // Returns nFiles content strings (defs only, no headers). Incomplete globals sticky nil.
 func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []string {
 	if nFiles <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !VariablesComplete(globals) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	out := make([]string, nFiles)
 	for _, v := range globals {
 		idx := PureRndUptoIndex(nFiles)
-		if idx < 0 || HasError() {
+		if idx < 0 || sessHasError(nil) {
 			return nil
 		}
 		var def string
 		if v.IsArray && v.AsArray != nil {
 			def = v.AsArray.OutputDef()
 		} else if v.IsArray {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		} else {
 			def = v.OutputDef(forceStatic)
 		}
-		if HasError() || def == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || def == "" {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return nil
 		}
@@ -403,11 +403,11 @@ func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []st
 // Returns nFiles body strings. Incomplete funcs sticky nil.
 func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
 	if nFiles <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !FunctionsComplete(funcs) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	out := make([]string, nFiles)
@@ -416,13 +416,13 @@ func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr b
 			continue
 		}
 		idx := PureRndUptoIndex(nFiles)
-		if idx < 0 || HasError() {
+		if idx < 0 || sessHasError(nil) {
 			return nil
 		}
 		body := f.OutputOpts(forceStatic, funcAttr, rng)
-		if HasError() || body == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || body == "" {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return nil
 		}
@@ -438,11 +438,11 @@ func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr b
 // DefaultOutputMgr.cpp:165–168 — var defs then func defs into same nFiles buckets.
 func RandomOutputDefs(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
 	vars := RandomOutputVarDefs(globals, nFiles, forceStatic)
-	if vars == nil || HasError() {
+	if vars == nil || sessHasError(nil) {
 		return nil
 	}
 	fn := RandomOutputFuncDefs(funcs, nFiles, forceStatic, funcAttr, rng)
-	if fn == nil || HasError() {
+	if fn == nil || sessHasError(nil) {
 		return nil
 	}
 	out := make([]string, nFiles)
@@ -457,7 +457,7 @@ func RandomOutputDefs(globals []*Variable, funcs []*Function, nFiles int, forceS
 // forwards is OutputForwardDeclarations text (same into every file).
 func SplitAllHeadersContent(nFiles int, paranoid bool, forwards string) []string {
 	if nFiles <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	out := make([]string, nFiles)

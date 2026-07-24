@@ -33,10 +33,10 @@ func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
 	// Fail closed: reject assignment rather than invent exp.compatible(v).
 	// incomplete IR rejects sticky (no invent "compatible OK" / soft re-pick)
 	if v == nil || exp == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
-	// complete path always reject (C++ assert(0)); callers SetError(ErrCompatibleCheck)
+	// complete path always reject (C++ assert(0)); callers sessNoteError(nil, ErrCompatibleCheck)
 	return true
 }
 
@@ -49,29 +49,29 @@ func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
 	}
 	// incomplete Expression* fails closed sticky as reject (no invent non-error)
 	if a == nil || b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if a.CompatibleWithExpr(b, opts.ExpandStruct) {
 		// residual ERROR sticky — no invent reject-true past CompatibleWithExpr residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue reverse check past residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	if b.CompatibleWithExpr(a, opts.ExpandStruct) {
 		// residual ERROR sticky — no invent reject-true past reverse CompatibleWithExpr residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue no-reject past reverse residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return false

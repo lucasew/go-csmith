@@ -25,7 +25,7 @@ func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
 	case RngKindDFS:
 		return makeDFSRndNumGeneratorOpts(seed, opts)
 	default:
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 }
@@ -68,7 +68,7 @@ func CreateRandomNumberInstance(kind RngKind, seed uint64) {
 func GetRandomNumber() *RandomNumber {
 	rn := currentSession().RandomNumber
 	if rn == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return rn
@@ -79,7 +79,7 @@ func GetRandomNumber() *RandomNumber {
 func GetRndNumGenerator() *Rng {
 	rn := currentSession().RandomNumber
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return rn.curr
@@ -91,7 +91,7 @@ func SwitchRndNumGenerator(kind RngKind) RngKind {
 	s := currentSession()
 	rn := s.RandomNumber
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return RngKindDefault
 	}
 	old := rn.currKind
@@ -124,7 +124,7 @@ func RandomNumberDoFinalization() {
 // GetPrefixedName mirrors RandomNumber::get_prefixed_name → curr_generator_.
 func (rn *RandomNumber) GetPrefixedName(name string) string {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return name
 	}
 	if rn.curr.kind == RngKindDFS {
@@ -136,7 +136,7 @@ func (rn *RandomNumber) GetPrefixedName(name string) string {
 // TraceDepth mirrors RandomNumber::trace_depth.
 func (rn *RandomNumber) TraceDepth() string {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return rn.curr.TraceDepth()
@@ -145,7 +145,7 @@ func (rn *RandomNumber) TraceDepth() string {
 // GetSequence mirrors RandomNumber::get_sequence.
 func (rn *RandomNumber) GetSequence() string {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return rn.curr.GetSequence()
@@ -154,7 +154,7 @@ func (rn *RandomNumber) GetSequence() string {
 // RndUpto mirrors RandomNumber::rnd_upto.
 func (rn *RandomNumber) RndUpto(n uint32, f Filter) uint32 {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return rn.curr.RndUptoFilter(n, f)
@@ -163,7 +163,7 @@ func (rn *RandomNumber) RndUpto(n uint32, f Filter) uint32 {
 // RndFlipcoin mirrors RandomNumber::rnd_flipcoin.
 func (rn *RandomNumber) RndFlipcoin(p uint32, f Filter) bool {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return rn.curr.RndFlipcoinFilter(p, f)
@@ -172,7 +172,7 @@ func (rn *RandomNumber) RndFlipcoin(p uint32, f Filter) bool {
 // RandomHexDigits mirrors RandomNumber::RandomHexDigits.
 func (rn *RandomNumber) RandomHexDigits(num int) string {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return rn.curr.RandomHexDigits(num)
@@ -181,7 +181,7 @@ func (rn *RandomNumber) RandomHexDigits(num int) string {
 // RandomDigits mirrors RandomNumber::RandomDigits.
 func (rn *RandomNumber) RandomDigits(num int) string {
 	if rn == nil || rn.curr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return rn.curr.RandomDigits(num)
@@ -190,7 +190,7 @@ func (rn *RandomNumber) RandomDigits(num int) string {
 // Kind returns the active generator kind (Go helper for tests / Switch).
 func (rn *RandomNumber) Kind() RngKind {
 	if rn == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return RngKindDefault
 	}
 	return rn.currKind

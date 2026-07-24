@@ -461,7 +461,7 @@ func (o Options) VolTestsMachValue() string { return o.VolTestsMach }
 // Incomplete/unknown mach fails closed false (no invent silent store of invalid host string).
 func (o *Options) SetVolTests(s string) bool {
 	if o == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if s == "x86" || s == "x86_64" {

@@ -65,7 +65,7 @@ func TypeFromString(s string) *Type {
 		return GetSimpleType(EUInt128)
 	default:
 		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 }
@@ -125,7 +125,7 @@ func EnabledBuiltin(opts Options, kinds string) bool {
 func MakeDummyBlock(f *Function) *Block {
 	// Block always has live Function; sticky no invent dummy body without it
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Library path without CGContext: still register block (no soft invent body stmts)
@@ -142,13 +142,13 @@ func MakeDummyBlock(f *Function) *Block {
 func GenerateParameterListFromString(f *Function, params string) bool {
 	// Function always live; sticky no invent param list without it
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	vs := SplitString(params, ',')
 	fail := func() {
 		f.Param = IncompleteVariables()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 	}
 	// Function.cpp:350 — assert(params_cnt > 0) sticky (no invent empty-complete Param)
 	if len(vs) == 0 {
@@ -203,24 +203,24 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 		}
 	} else {
 		// Function.cpp:744 — assert(0 && "Invalid builtin function format!") sticky
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	ty := TypeFromString(parts[0])
 	if ty == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	name := parts[1]
 	// Function.cpp always has live name token; sticky (no invent empty-name builtin shell)
 	if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Function.cpp:752 — CVQualifiers::random_qualifiers always has process RNG
 	// sticky — no invent fixed non-const RV / NewProbabilities when session missing
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	f := &Function{
@@ -233,15 +233,15 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 	if f.RV == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// params from ( ... )
 	paramStr := GetSubstring(parts[2], '(', ')')
 	// Function.cpp:345+ — assert-path on bad param list; sticky no soft invent empty params
 	if !GenerateParameterListFromString(f, paramStr) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}

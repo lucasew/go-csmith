@@ -15,7 +15,7 @@ type DistributionTable struct {
 func (d *DistributionTable) AddEntry(key, prob int) {
 	// DistributionTable always live when building filters; sticky incomplete no invent
 	if d == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	d.keys = append(d.keys, key)
@@ -28,7 +28,7 @@ func (d *DistributionTable) AddEntry(key, prob int) {
 func (d *DistributionTable) Max() int {
 	// DistributionTable always live; sticky incomplete no invent max 0 soft-skip
 	if d == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return d.maxProb
@@ -38,7 +38,7 @@ func (d *DistributionTable) Max() int {
 // Probabilities.cpp:1031–1038 — first matching key's weight; 0 if missing.
 func (d *DistributionTable) KeyToProb(key int) int {
 	if d == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	for i, k := range d.keys {
@@ -55,7 +55,7 @@ func (d *DistributionTable) KeyToProb(key int) int {
 func (d *DistributionTable) RndNumToKey(rnd int) int {
 	// DistributionTable always live for lookup; sticky incomplete no invent -1 soft-skip
 	if d == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	if rnd < 0 || rnd >= d.maxProb {
@@ -84,7 +84,7 @@ type ThresholdTable struct {
 func (t *ThresholdTable) Add(key, value int) {
 	// ThresholdTable always live when building stmt tables; sticky incomplete no invent
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if key <= 0 {
@@ -108,7 +108,7 @@ func (t *ThresholdTable) Add(key, value int) {
 func (t *ThresholdTable) GetValue(k int) int {
 	// ThresholdTable always live for draws; sticky incomplete no invent -1 soft-skip
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	for i, key := range t.keys {

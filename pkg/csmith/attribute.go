@@ -38,17 +38,17 @@ type BooleanAttribute struct {
 func (a *BooleanAttribute) MakeRandom(r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent empty __attribute__ token
 	if a.Name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -69,17 +69,17 @@ type MultiChoiceAttribute struct {
 func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG + non-empty choices; sticky no invent without them
 	if r == nil || len(a.Choices) == 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent ("choice") without name
 	if a.Name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -89,7 +89,7 @@ func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 	// Attribute.cpp:66 — name + "(\"" + choice + "\")"; choice always live string
 	// sticky no invent name("") for empty choice slot
 	if a.Choices[i] == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return a.Name + "(\"" + a.Choices[i] + "\")"
@@ -107,17 +107,17 @@ type AlignedAttribute struct {
 func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent bare "(N)" without name
 	if a.Name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -127,7 +127,7 @@ func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	n := a.Alignment
 	if n < 1 {
 		// broken Attribute IR sticky — emit nothing (no soft invent alignment=1)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	exp := int(r.RndUpto(uint32(n)))
@@ -151,12 +151,12 @@ type SectionAttribute struct {
 func (a *SectionAttribute) MakeRandom(r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -164,7 +164,7 @@ func (a *SectionAttribute) MakeRandom(r *Rng) string {
 	}
 	// Attribute.cpp:97–99 — rnd_upto(10); name from ctor sticky (no invent "section")
 	if a.Name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	n := int(r.RndUpto(10))
@@ -183,7 +183,7 @@ type AttributeGenerator struct {
 // Empty Attributes is complete empty (not incomplete IR).
 func (g *AttributeGenerator) Output(r *Rng) string {
 	if g == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if len(g.Attributes) == 0 {
@@ -191,19 +191,19 @@ func (g *AttributeGenerator) Output(r *Rng) string {
 	}
 	// AttributeGenerator always has process RNG when attributes exist; sticky no invent skip
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var parts []string
 	for _, a := range g.Attributes {
 		// Attribute* always live in C++; sticky no invent skip nil holes
 		if a == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		s := a.MakeRandom(r)
 		// residual ERROR sticky — no invent soft-continue later attrs past MakeRandom residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if s != "" {
