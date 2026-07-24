@@ -5,7 +5,16 @@ package csmith
 import (
 	"context"
 	"fmt"
+	"sync"
 )
+
+// generateMu serializes full-program Generate against process-wide state.
+// Upstream csmith is one process / one generation (Type::derived_types,
+// Error, Bookkeeper, stm_labels, pointerCache, Fact finalization, etc.).
+// Concurrent Generate (go test -fuzz multi-worker) races those maps and aborts
+// with "concurrent map read and map write" — hang/exit 2 false bodyparity fails.
+// Not a seed-literal; mirrors single-process C++ entry.
+var generateMu sync.Mutex
 
 // Generate emits a full C program (upstream stdout role).
 // Wires DefaultProgramGenerator initialize → goGenerator.
@@ -18,6 +27,9 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	// Hold for the whole generation: package globals are process-wide (C++ statics).
+	generateMu.Lock()
+	defer generateMu.Unlock()
 	// Platform resolve when sizes needed later
 	if opts.PlatformInfoPath != "" {
 		if resolved, err := opts.resolvePlatformInfo(); err == nil {
