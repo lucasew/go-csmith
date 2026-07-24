@@ -49,10 +49,43 @@ func ProcessProgramGenerator() *ProgramGenerator {
 // ClearProcessProgramGenerator drops current_generator_ (finalization / tests).
 func ClearProcessProgramGenerator() { currentSession().ProgramGen = nil }
 
+// noteErr records ERROR on g.Sess when set, and keeps ambient GenError in sync
+// while lower layers still call SetError/HasError (bridge until fully pure).
+func (g *ProgramGenerator) noteErr(code int) {
+	if g != nil && g.Sess != nil {
+		g.Sess.GenError = code
+	}
+	SetError(code)
+}
+
+// hasErr reports ERROR on g.Sess when set, else ambient (bridge).
+func (g *ProgramGenerator) hasErr() bool {
+	if g != nil && g.Sess != nil && g.Sess.GenError != ErrSuccess {
+		return true
+	}
+	return HasError()
+}
+
+// clearErr clears ERROR on g.Sess when set, and ambient (bridge).
+func (g *ProgramGenerator) clearErr() {
+	if g != nil && g.Sess != nil {
+		g.Sess.GenError = ErrSuccess
+	}
+	ClearError()
+}
+
+// errCode returns sticky code preferring g.Sess, else ambient (bridge).
+func (g *ProgramGenerator) errCode() int {
+	if g != nil && g.Sess != nil && g.Sess.GenError != ErrSuccess {
+		return g.Sess.GenError
+	}
+	return GetError()
+}
+
 // GetOutputMgrKind mirrors AbsProgramGenerator::getOutputMgr kind (Go: no ostream).
 func (g *ProgramGenerator) GetOutputMgrKind() OutputMgrKind {
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return OutputMgrKindDefault
 	}
 	return g.OutputKind
@@ -63,17 +96,17 @@ func (g *ProgramGenerator) GetOutputMgrKind() OutputMgrKind {
 // DFSProgramGenerator.cpp:67–71 — "p_" + good_count_ + "_" + name.
 func (g *ProgramGenerator) GetCountPrefix(name string) string {
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	if g.OutputKind != OutputMgrKindDFS {
 		// Default assert(0); library fail-closed empty (no invent DFS-style prefix)
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// incomplete empty name sticky (no invent "p_0_")
 	if name == "" {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("p_%d_%s", g.GoodCount, name)
@@ -227,12 +260,12 @@ func (g *ProgramGenerator) GenerateAllTypes() {
 func (g *ProgramGenerator) GenerateFunctions() {
 	// ProgramGenerator always live for GenerateFunctions; sticky incomplete no invent no-op
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return
 	}
 	// Function::FMList is session state from NewProgramGenerator; sticky no invent mid-run miss
 	if g.FactMgrs == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return
 	}
 	g.Funcs.Types = &g.Types
@@ -248,7 +281,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	}
 	// Function.cpp:796–797 — make_first; ERROR_RETURN
 	first := MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)
-	if first == nil || HasError() {
+	if first == nil || g.hasErr() {
 		// sticky error / failed first function — stop generation (no soft invent continue)
 		return
 	}
@@ -257,7 +290,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		f := g.Funcs.Funcs[i]
 		// Function* always live on Funcs; nil hole fails closed sticky (no invent skip mid generation)
 		if f == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return
 		}
 		if f.IsBuilt || f.BuildState == BuildBuilt {
@@ -272,15 +305,15 @@ func (g *ProgramGenerator) GenerateFunctions() {
 			// fails closed sticky (no invent soft-continue GenerateBody past holes)
 			if g.VS != nil {
 				if !VariablesComplete(g.VS.GlobalList) {
-					SetError(ErrGeneric)
+					g.noteErr(ErrGeneric)
 					return
 				}
 				for _, gv := range g.VS.GlobalList {
 					fm.AddNewVarFact(gv)
 					// incomplete PT/union abstract sticky or wipe must abort (no invent body past holes)
-					if HasError() || !FactsComplete(fm.GlobalFacts) {
-						if !HasError() {
-							SetError(ErrGeneric)
+					if g.hasErr() || !FactsComplete(fm.GlobalFacts) {
+						if !g.hasErr() {
+							g.noteErr(ErrGeneric)
 						}
 						return
 					}
@@ -290,7 +323,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		}
 		f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 		// Function.cpp:805 ERROR_RETURN after each GenerateBody
-		if HasError() {
+		if g.hasErr() {
 			return
 		}
 		// no invent continue past unbuilt/null-body (C++ would crash on body->)
@@ -309,7 +342,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 func (g *ProgramGenerator) OutputHeader() string {
 	// ProgramGenerator always live at emit; sticky incomplete no invent empty header
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -403,14 +436,14 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 	// incomplete GlobalList sticky not-ready (GetMaxArrayDimension -1 must not
 	// invent ready via dimen<=0 / soft re-pick hash-func shell past holes)
 	if g.VS == nil || !VariablesComplete(g.VS.GlobalList) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return false
 	}
 	dimen := GetMaxArrayDimension(g.VS.GlobalList)
 	if dimen < 0 {
 		// incomplete array sizes sticky
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !g.hasErr() {
+			g.noteErr(ErrGeneric)
 		}
 		return false
 	}
@@ -427,16 +460,16 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 func (g *ProgramGenerator) OutputStructTypes() string {
 	// ProgramGenerator always live at emit; sticky incomplete no invent empty types section
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// incomplete type pools fail closed sticky (no invent partial section / empty shell)
 	if !typesComplete(g.Types.StructTypes) || !typesComplete(g.Types.UnionTypes) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	if !typesComplete(g.Types.AllTypes) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	var structAttr, unionAttr *AttributeGenerator
@@ -456,7 +489,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	// Type.cpp:1896–1900 — AllTypes order; only used struct/union start points
 	for _, t := range g.Types.AllTypes {
 		if t == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		if !t.Used || !t.IsAggregate() {
@@ -473,7 +506,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 // Emits nested aggregate field types first; skips when already Printed.
 func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, structAttr, unionAttr *AttributeGenerator) bool {
 	if t == nil || !t.IsAggregate() {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return false
 	}
 	// Type.cpp:1815 — if (!type->printed)
@@ -489,7 +522,7 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 			if !g.outputStructUnion(f.Type, b, structAttr, unionAttr) {
 				return false
 			}
-		} else if HasError() {
+		} else if g.hasErr() {
 			return false
 		}
 	}
@@ -507,11 +540,11 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 			decl = t.OutputUnionDecl()
 		}
 	}
-	if HasError() {
+	if g.hasErr() {
 		return false
 	}
 	if decl == "" {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return false
 	}
 	b.WriteString(decl)
@@ -527,7 +560,7 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 func (g *ProgramGenerator) OutputGlobals() string {
 	// ProgramGenerator always live at emit; sticky incomplete no invent empty globals section
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// VariableSelector.cpp:1552 — header always; empty GlobalList still emits section
@@ -536,14 +569,14 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	}
 	// incomplete GlobalList fails closed sticky (no invent partial section / empty shell)
 	if !VariablesComplete(g.VS.GlobalList) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	arrayByName := map[string]*ArrayVariable{}
 	// ArrayVariable* always live on Arrays; nil hole fails closed sticky
 	for _, av := range g.VS.Arrays {
 		if av == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		arrayByName[av.Name] = av
@@ -554,13 +587,13 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	for _, v := range g.VS.GlobalList {
 		// pre-validated VariablesComplete; Type always live for OutputDef
 		if v.Type == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent scalar OutputDef for IsArray shell not in Arrays map)
 		if v.IsArray && v.AsArray == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		if av := arrayByName[v.Name]; av != nil {
@@ -572,11 +605,11 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			// ArrayVariable::OutputDef always live; sticky no invent "static \n" for empty
 			def := av.OutputDef()
 			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
-			if HasError() {
+			if g.hasErr() {
 				return ""
 			}
 			if def == "" {
-				SetError(ErrGeneric)
+				g.noteErr(ErrGeneric)
 				return ""
 			}
 			if g.Opts.ForceGlobalsStatic {
@@ -591,11 +624,11 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		if v.IsArray && v.AsArray != nil {
 			def := v.AsArray.OutputDef()
 			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
-			if HasError() {
+			if g.hasErr() {
 				return ""
 			}
 			if def == "" {
-				SetError(ErrGeneric)
+				g.noteErr(ErrGeneric)
 				return ""
 			}
 			if g.Opts.ForceGlobalsStatic {
@@ -609,11 +642,11 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		// sticky no invent blank global line for incomplete IR
 		def := v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
 		// residual ERROR sticky — no invent soft-continue later globals past OutputDefFull residual
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		if def == "" {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		body.WriteString(def)
@@ -636,12 +669,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 func (g *ProgramGenerator) OutputFunctions() string {
 	// ProgramGenerator always live at emit; sticky incomplete no invent empty functions section
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// incomplete Funcs list fails closed sticky (no invent partial section past hole)
 	if !FunctionsComplete(g.Funcs.Funcs) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	var forwards, aliases, bodies strings.Builder
@@ -653,12 +686,12 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		// incomplete header IR — fail closed whole functions section
 		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
 		// residual ERROR sticky — no invent soft-continue later funcs past forward residual
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		if d == "" {
 			// incomplete header IR sticky — no invent partial functions section
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		forwards.WriteString(d)
@@ -667,12 +700,12 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		if g.Opts.FunctionAttributes {
 			a := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
 			// residual ERROR sticky — no invent soft-continue later funcs past alias residual
-			if HasError() {
+			if g.hasErr() {
 				return ""
 			}
 			if a == "" {
 				// alias expected when FunctionAttributes; incomplete AliasName sticky
-				SetError(ErrGeneric)
+				g.noteErr(ErrGeneric)
 				return ""
 			}
 			aliases.WriteString(a)
@@ -680,12 +713,12 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		}
 		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
 		// residual ERROR sticky — no invent soft-continue later funcs past body residual
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		if body == "" {
 			// incomplete body IR sticky — no invent forward-only section
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		// Function::Output already ends with two outputln (Function.cpp:594–595);
@@ -729,14 +762,27 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 		SetError(ErrGeneric)
 		return ""
 	}
+	note := func(code int) {
+		if vs.Sess != nil {
+			vs.Sess.GenError = code
+			return
+		}
+		SetError(code)
+	}
+	has := func() bool {
+		if vs.Sess != nil {
+			return vs.Sess.GenError != ErrSuccess
+		}
+		return HasError()
+	}
 	// incomplete GlobalList fails closed sticky (no invent empty hash past nil hole)
 	if !VariablesComplete(vs.GlobalList) {
-		SetError(ErrGeneric)
+		note(ErrGeneric)
 		return ""
 	}
 	// incomplete union map fails closed sticky (no invent all-fields-unreadable past hole)
 	if unionFacts != nil && !UnionFactsComplete(unionFacts) {
-		SetError(ErrGeneric)
+		note(ErrGeneric)
 		return ""
 	}
 	ctrl := GetLastCtrlVars()
@@ -746,7 +792,7 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
 		part := v.hashOutput(ctrl, unionFacts)
 		// residual ERROR sticky — no invent soft-continue later globals past hash residual hole
-		if HasError() {
+		if has() {
 			return ""
 		}
 		b.WriteString(part)
@@ -760,7 +806,7 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 func (g *ProgramGenerator) hashGlobals() string {
 	// ProgramGenerator always live at hash emit; sticky incomplete no invent empty hash
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	if g.Sess != nil {
@@ -781,7 +827,7 @@ func (g *ProgramGenerator) hashGlobals() string {
 // Seed 999: live g_605/g_467 last=0 matches upstream f0 hashes.
 func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
 	if g == nil || g.FactMgrs == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	first := GetFirstFunction(&g.Funcs)
@@ -791,11 +837,11 @@ func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
 	}
 	fm := g.FactMgrs.ForFunc(first)
 	if fm == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if !UnionFactsComplete(fm.UnionFacts) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	// shallow copy so hash path cannot mutate FM lattice
@@ -813,7 +859,7 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 	// ProgramGenerator + VS always live for main emit; sticky no invent main shell without them
 	if g == nil || g.VS == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -828,7 +874,7 @@ func (g *ProgramGenerator) OutputMain() string {
 	// OutputMgr.cpp:104 — OutputArrayInitializers for global arrays (ctrl vars + loop inits)
 	b.WriteString(OutputArrayInitializers(g.VS.GlobalList, g.Opts, "    "))
 	// residual ERROR sticky — no invent main body past array-init residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 
@@ -839,7 +885,7 @@ func (g *ProgramGenerator) OutputMain() string {
 	if len(g.Funcs.Funcs) > 0 {
 		// Function* always live; sticky no invent main without first call shell
 		if g.Funcs.Funcs[0] == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		f0 = g.Funcs.Funcs[0]
@@ -851,8 +897,8 @@ func (g *ProgramGenerator) OutputMain() string {
 			// no soft invent name()+"()" or main without call when build/output fails
 			// Failed soft re-pick; nil/empty output sticky incomplete IR
 			if inv == nil {
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !g.hasErr() {
+					g.noteErr(ErrGeneric)
 				}
 				return ""
 			}
@@ -861,11 +907,11 @@ func (g *ProgramGenerator) OutputMain() string {
 			}
 			firstInv = inv.Output()
 			// residual ERROR sticky — no invent main body past inv.Output residual hole
-			if HasError() {
+			if g.hasErr() {
 				return ""
 			}
 			if firstInv == "" {
-				SetError(ErrGeneric)
+				g.noteErr(ErrGeneric)
 				return ""
 			}
 		}
@@ -886,11 +932,11 @@ func (g *ProgramGenerator) OutputMain() string {
 		for _, v := range g.VS.GlobalList {
 			// Variable* always live; sticky no invent skip nil holes in dump list
 			if v == nil {
-				SetError(ErrGeneric)
+				g.noteErr(ErrGeneric)
 				return ""
 			}
 			dump := v.OutputValueDump("checksum ", 1, endUnion)
-			if dump == "" && HasError() {
+			if dump == "" && g.hasErr() {
 				return ""
 			}
 			b.WriteString(dump)
@@ -917,8 +963,8 @@ func (g *ProgramGenerator) OutputMain() string {
 			resets := OutputPtrResets(f0.DeadGlobals, g.Opts)
 			// incomplete dead_globals IR fails closed sticky whole main
 			if len(f0.DeadGlobals) > 0 && resets == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !g.hasErr() {
+					g.noteErr(ErrGeneric)
 				}
 				return ""
 			}
@@ -937,7 +983,7 @@ func (g *ProgramGenerator) OutputMain() string {
 			// also used when step-hash helpers fail closed incomplete ctrl IR
 			b.WriteString(g.hashGlobals())
 			// residual ERROR sticky — no invent main past hashGlobals residual hole
-			if HasError() {
+			if g.hasErr() {
 				return ""
 			}
 		}
@@ -957,7 +1003,7 @@ func (g *ProgramGenerator) OutputMain() string {
 func (g *ProgramGenerator) OutputHashFuncDef() string {
 	// ProgramGenerator always live at emit; sticky incomplete no invent empty hash def
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// no invent function shells when helpers disabled or ctrl IR incomplete
@@ -1146,11 +1192,11 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 // Incomplete Funcs sticky "" (no invent partial forward list).
 func (g *ProgramGenerator) OutputForwardDeclarations() string {
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	if !FunctionsComplete(g.Funcs.Funcs) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1159,11 +1205,11 @@ func (g *ProgramGenerator) OutputForwardDeclarations() string {
 			continue
 		}
 		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		if d == "" {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		b.WriteString(d)
@@ -1178,18 +1224,18 @@ func (g *ProgramGenerator) OutputForwardDeclarations() string {
 // Incomplete emit sticky "".
 func (g *ProgramGenerator) OutputDFS() string {
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	// OutputGlobalVariables
 	if g.VS != nil && len(g.VS.GlobalList) > 0 {
 		globalsOut := g.OutputGlobals()
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		if globalsOut == "" {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		b.WriteString(globalsOut)
@@ -1197,7 +1243,7 @@ func (g *ProgramGenerator) OutputDFS() string {
 	compact := g.Opts.CompactOutput
 	if !compact {
 		fwd := g.OutputForwardDeclarations()
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		b.WriteString(fwd)
@@ -1205,7 +1251,7 @@ func (g *ProgramGenerator) OutputDFS() string {
 	// OutputFunctions bodies (with banners via OutputFunctions for non-compact readability;
 	// C++ dumps Function::Output only — use function bodies without invent dual forwards)
 	if !FunctionsComplete(g.Funcs.Funcs) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	for _, f := range g.Funcs.Funcs {
@@ -1213,9 +1259,9 @@ func (g *ProgramGenerator) OutputDFS() string {
 			continue
 		}
 		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
-		if HasError() || body == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if g.hasErr() || body == "" {
+			if !g.hasErr() {
+				g.noteErr(ErrGeneric)
 			}
 			return ""
 		}
@@ -1223,16 +1269,16 @@ func (g *ProgramGenerator) OutputDFS() string {
 		b.WriteString("\n")
 	}
 	b.WriteString(g.OutputHashFuncDef())
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	if !compact && !g.Opts.NoMain {
 		mainOut := g.OutputMain()
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		if mainOut == "" {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		b.WriteString(mainOut)
@@ -1245,7 +1291,7 @@ func (g *ProgramGenerator) OutputDFS() string {
 // Returns path → content map (header + each rnd_outputN.c). Incomplete sticky nil.
 func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	if g == nil || !IsSplit(g.Opts) {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return nil
 	}
 	if !CreateDefaultOutputMgr(g.Opts) {
@@ -1254,7 +1300,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	n := g.Opts.MaxSplitFiles
 	paths := ProcessSplitPaths()
 	if len(paths) != n {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return nil
 	}
 	// OutputGlobals → rnd_globals.h
@@ -1263,15 +1309,15 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 		globals = g.VS.GlobalList
 	}
 	decls := OutputGlobalVariablesDecls(globals, "extern ")
-	if HasError() {
+	if g.hasErr() {
 		return nil
 	}
 	structs := g.OutputStructTypes()
-	if HasError() {
+	if g.hasErr() {
 		return nil
 	}
 	hdrPath := SplitGlobalsHeaderPath(g.Opts)
-	if hdrPath == "" || HasError() {
+	if hdrPath == "" || g.hasErr() {
 		return nil
 	}
 	files := map[string]string{
@@ -1279,36 +1325,36 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	}
 	// OutputAllHeaders
 	forwards := g.OutputForwardDeclarations()
-	if HasError() {
+	if g.hasErr() {
 		return nil
 	}
 	headers := SplitAllHeadersContent(n, g.Opts.Paranoid, forwards)
-	if headers == nil || HasError() {
+	if headers == nil || g.hasErr() {
 		return nil
 	}
 	// RandomOutputDefs into n buckets
 	defs := RandomOutputDefs(globals, g.Funcs.Funcs, n, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
-	if defs == nil || HasError() {
+	if defs == nil || g.hasErr() {
 		return nil
 	}
 	// hash + main + tail on main file (outs[0])
 	var mainExtra strings.Builder
 	mainExtra.WriteString(g.OutputHashFuncDef())
-	if HasError() {
+	if g.hasErr() {
 		return nil
 	}
 	if !g.Opts.NoMain {
 		m := g.OutputMain()
-		if HasError() || (m == "" && !g.Opts.NoMain) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if g.hasErr() || (m == "" && !g.Opts.NoMain) {
+			if !g.hasErr() {
+				g.noteErr(ErrGeneric)
 			}
 			return nil
 		}
 		mainExtra.WriteString(m)
 	}
 	mainExtra.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
-	if HasError() {
+	if g.hasErr() {
 		return nil
 	}
 	for i := 0; i < n; i++ {
@@ -1329,7 +1375,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 func (g *ProgramGenerator) GoGenerator() string {
 	// ProgramGenerator always live for goGenerator; sticky incomplete no invent empty program
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// Route Process* to g.Sess for this call (tests may call GoGenerator without outer Generate).
@@ -1341,18 +1387,18 @@ func (g *ProgramGenerator) GoGenerator() string {
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
 	// residual ERROR sticky — no invent program past OutputHeader residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	// DefaultProgramGenerator.cpp:70–72 — GenerateAllTypes; GenerateFunctions; then Output.
 	// OutputStructUnionDeclarations runs after generation so Type::used is set by choose paths.
 	g.GenerateAllTypes()
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	g.GenerateFunctions()
 	// Function.cpp:797/805 ERROR_RETURN — stop output when generation failed
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	// make_first always yields a built user function; no invent header-only program
@@ -1361,7 +1407,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	hasUser := false
 	for _, f := range g.Funcs.Funcs {
 		if f == nil {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		if !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
@@ -1377,7 +1423,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 		// DFSProgramGenerator.cpp:78 — OutputStructUnions to separate file first
 		// Library: prefix structs file content as labeled section
 		structsFile := g.OutputStructTypes()
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		var db strings.Builder
@@ -1390,14 +1436,14 @@ func (g *ProgramGenerator) GoGenerator() string {
 		}
 		// OutputHeader may be compact-skipped
 		hdr := DFSOutputHeader(g.OutputHeader(), g.Opts.CompactOutput)
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		db.WriteString(hdr)
 		body := g.OutputDFS()
-		if HasError() || body == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if g.hasErr() || body == "" {
+			if !g.hasErr() {
+				g.noteErr(ErrGeneric)
 			}
 			return ""
 		}
@@ -1408,7 +1454,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	// DefaultOutputMgr split path
 	if IsSplit(g.Opts) {
 		files := g.OutputSplitFiles()
-		if files == nil || HasError() {
+		if files == nil || g.hasErr() {
 			return ""
 		}
 		// stable join for library single-string return
@@ -1436,34 +1482,34 @@ func (g *ProgramGenerator) GoGenerator() string {
 	}
 	// DefaultOutputMgr.cpp:182–185 — OutputStructUnionDeclarations then globals/forwards/funcs
 	structsOut := g.OutputStructTypes()
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	// Type.cpp always emits at least the section comment; empty string is fail-closed residual
 	if structsOut == "" {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	b.WriteString(structsOut)
 	// GlobalList non-empty must emit live defs (no invent drop incomplete globals)
 	globalsOut := g.OutputGlobals()
 	// residual ERROR sticky — no invent program past OutputGlobals residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	if g.VS != nil && len(g.VS.GlobalList) > 0 && globalsOut == "" {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	b.WriteString(globalsOut)
 	// functions section always live after successful GenerateFunctions
 	funcsOut := g.OutputFunctions()
 	// residual ERROR sticky — no invent program past OutputFunctions residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	if funcsOut == "" {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	b.WriteString(funcsOut)
@@ -1471,24 +1517,24 @@ func (g *ProgramGenerator) GoGenerator() string {
 	// no invent partial helper shells — OutputHashFuncDef already fail-closed empty
 	b.WriteString(g.OutputHashFuncDef())
 	// residual ERROR sticky — no invent program past OutputHashFuncDef residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	// OutputMgr always emits main unless --nomain; incomplete main fails whole program sticky
 	mainOut := g.OutputMain()
 	// residual ERROR sticky — no invent program past OutputMain residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	if mainOut == "" && !g.Opts.NoMain {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	b.WriteString(mainOut)
 	// DefaultOutputMgr.cpp:194 — OutputTail after main (statistics comment)
 	b.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
 	// residual ERROR sticky — no invent program past OutputTail residual hole
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	// DefaultProgramGenerator.cpp:73–77 — identify_wrappers writes wrapper.h
@@ -1497,7 +1543,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 		b.WriteString("\n/* --- wrapper.h (identify_wrappers) ---\n")
 		b.WriteString(OutputWrapperH())
 		// residual ERROR sticky — no invent program past OutputWrapperH residual hole
-		if HasError() {
+		if g.hasErr() {
 			return ""
 		}
 		b.WriteString("--- end wrapper.h --- */\n")
@@ -1513,7 +1559,7 @@ const dfsLoopMaxPrograms = 10000
 
 func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	if g.Sess != nil {
@@ -1521,26 +1567,26 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		defer restore()
 	}
 	if g.OutputKind != OutputMgrKindDFS && !g.Opts.DFSExhaustive {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	g.Initialize()
 	// re-assert DFS after Initialize (re-creates RNG)
 	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	g.GenerateAllTypes()
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	var all strings.Builder
 	structsFile := g.OutputStructTypes()
-	if HasError() {
+	if g.hasErr() {
 		return ""
 	}
 	if structsFile != "" {
@@ -1553,22 +1599,22 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 	// DFSProgramGenerator.cpp:78 — OutputStructUnions once before loop
 	for iter := 0; !g.Rng.DFSGetAllDone(); iter++ {
 		if iter >= dfsLoopMaxPrograms {
-			SetError(ErrGeneric)
+			g.noteErr(ErrGeneric)
 			return ""
 		}
 		// Error::set_error(SUCCESS)
-		ClearError()
+		g.clearErr()
 		// fresh function list for this program
 		g.Funcs = FunctionList{}
 		g.FactMgrs = NewFactMgrMap()
 		g.GenerateFunctions()
-		if GetError() == ErrSuccess {
+		if g.errCode() == ErrSuccess {
 			hdr := DFSOutputHeader(g.OutputHeader(), g.Opts.CompactOutput)
-			if HasError() {
+			if g.hasErr() {
 				// treat as failed program; still reset state
 			} else {
 				body := g.OutputDFS()
-				if !HasError() && body != "" {
+				if !g.hasErr() && body != "" {
 					all.WriteString(hdr)
 					all.WriteString(body)
 					all.WriteString(ReallyOutputLn())
@@ -1596,7 +1642,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 func (g *ProgramGenerator) WrapperHeader() string {
 	// ProgramGenerator always live; sticky incomplete no invent empty wrapper header
 	if g == nil {
-		SetError(ErrGeneric)
+		g.noteErr(ErrGeneric)
 		return ""
 	}
 	// --identify-wrappers off: complete empty (soft option omit)

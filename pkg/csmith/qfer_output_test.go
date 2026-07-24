@@ -172,7 +172,6 @@ func TestOutputDeclNoInventEmptyName(t *testing.T) {
 
 func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	// incomplete OutputDef must not invent "static \n" / blank lines / section-only
-	ClearError()
 	opts := Defaults()
 	opts.ForceGlobalsStatic = true
 	g := NewProgramGenerator(NewSession(opts))
@@ -183,35 +182,34 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	if out != "" {
 		t.Fatal("all-empty globals must fail closed empty section", out)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("empty-def globals Output must SetError sticky")
 	}
 	// incomplete among live fails whole section (no invent skip holes)
-	ClearError()
+	g.clearErr()
 	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
 	g.VS.GlobalList = []*Variable{good, v}
 	if out2 := g.OutputGlobals(); out2 != "" {
 		t.Fatal("mixed incomplete globals must fail closed", out2)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("mixed incomplete globals must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 	// IsArray without AsArray soft invent was scalar OutputDef for array shell
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
 	g.VS.GlobalList = []*Variable{shell}
 	if out3 := g.OutputGlobals(); out3 != "" {
 		t.Fatal("IsArray without AsArray must fail closed globals", out3)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("IsArray without AsArray OutputGlobals must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 }
 
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	// Type.cpp:1894–1901 — empty used pool still emits section header; incomplete IR fails closed.
-	ClearError()
 	g := NewProgramGenerator(NewSession(Defaults()))
 	// complete empty: only section comment (no invent types past unused inventory)
 	g.Types.StructTypes = nil
@@ -221,11 +219,11 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	if out != "/* --- Struct/Union Declarations --- */\n" {
 		t.Fatalf("empty used pool must still emit section header, got %q", out)
 	}
-	if HasError() {
+	if g.hasErr() {
 		t.Fatal("complete empty OutputStructTypes must not SetError")
 	}
 	// used aggregate emits decl body
-	ClearError()
+	g.clearErr()
 	st := &Type{isStruct: true, StructName: "S0", Used: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
@@ -236,7 +234,7 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 		t.Fatal("used struct must emit under section", out2)
 	}
 	// unused inventory must not invent decl (only header)
-	ClearError()
+	g.clearErr()
 	stU := &Type{isStruct: true, StructName: "S1", Used: false, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
@@ -247,36 +245,36 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 		t.Fatal("unused struct must not invent decl", out3)
 	}
 	// incomplete unnamed used → fail closed
-	ClearError()
+	g.clearErr()
 	g.Types.StructTypes = []*Type{{isStruct: true, Used: true}} // unnamed → empty decl
 	g.Types.AllTypes = g.Types.StructTypes
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("empty struct decls must fail closed section", out)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("empty struct decl OutputStructTypes must SetError sticky")
 	}
 	// nil hole fails closed sticky
-	ClearError()
+	g.clearErr()
 	g.Types.StructTypes = []*Type{nil}
 	g.Types.AllTypes = nil
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("nil struct hole must fail closed", out)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("nil struct hole must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 	g.Types.StructTypes = nil
 	g.Types.UnionTypes = []*Type{nil}
 	g.Types.AllTypes = nil
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("nil union hole must fail closed", out)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("nil union hole must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 }
 
 func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
@@ -289,7 +287,7 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 		t.Fatal("empty function IR must fail closed sections", out)
 	}
 	// nil Funcs hole fails closed sticky (no invent skip holes)
-	ClearError()
+	g.clearErr()
 	good := &Function{
 		Name: "func_1", AliasName: "func_1_alias", ReturnType: GetIntType(),
 		RV:   CreateVariableQfer("func_1_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
@@ -299,17 +297,17 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 	if out := g.OutputFunctions(); out != "" {
 		t.Fatal("nil Funcs hole must fail closed", out)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("nil Funcs hole must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 	// empty-name incomplete among live fails whole (no invent skip)
-	ClearError()
+	g.clearErr()
 	g.Funcs.Funcs = []*Function{good, {Name: "", ReturnType: GetIntType()}}
 	if out := g.OutputFunctions(); out != "" {
 		t.Fatal("mixed incomplete must fail closed", out)
 	}
-	ClearError()
+	g.clearErr()
 }
 
 func TestBlockLocalNoInventEmptyDef(t *testing.T) {

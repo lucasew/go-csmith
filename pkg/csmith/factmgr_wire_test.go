@@ -459,14 +459,14 @@ func TestGenerateFunctionsWiresFactMgr(t *testing.T) {
 		t.Fatal("fm")
 	}
 	// Function::FMList is session state; sticky no invent mid-run miss
-	ClearError()
+	// noteErr dual-writes g2.Sess + ambient; clear both so suite mates stay clean.
 	g2 := NewProgramGenerator(NewSession(opts))
 	g2.FactMgrs = nil
 	g2.GenerateFunctions()
-	if !HasError() {
+	if !g2.hasErr() {
 		t.Fatal("nil FactMgrs GenerateFunctions must SetError sticky")
 	}
-	ClearError()
+	g2.clearErr()
 }
 
 func TestUpdateFactForReturnSetsFactOut(t *testing.T) {

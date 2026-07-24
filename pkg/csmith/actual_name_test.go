@@ -193,23 +193,23 @@ func TestOutputGlobalsIncompleteSticky(t *testing.T) {
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	v.Init = MakeInt(0)
 	g.VS.GlobalList = []*Variable{v, nil}
-	ClearError()
+	g.clearErr()
 	if g.OutputGlobals() != "" {
 		t.Fatal("nil GlobalList hole must fail closed empty")
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("nil GlobalList hole must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 	g.VS.GlobalList = []*Variable{v}
 	g.VS.Arrays = []*ArrayVariable{nil}
 	if g.OutputGlobals() != "" {
 		t.Fatal("nil Arrays hole must fail closed empty")
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("nil Arrays hole must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 }
 
 func TestOutputCNilSticky(t *testing.T) {

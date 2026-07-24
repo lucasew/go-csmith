@@ -166,20 +166,19 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	if hasUser {
 		t.Fatal("nil Funcs hole must not invent hasUser from later built func")
 	}
-	// OutputFunctions fails closed sticky on hole
-	ClearError()
+	// OutputFunctions fails closed sticky on hole (session GenError via noteErr)
+	g.clearErr()
 	if g.OutputFunctions() != "" {
 		t.Fatal("OutputFunctions must fail closed on nil Funcs hole")
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("nil Funcs hole OutputFunctions must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 }
 
 func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 	// body Output residual soft invent was soft-continue later funcs invent partial section.
-	ClearError()
 	// incomplete body: Type-nil RV → OutputOpts residual empty sticky
 	bad := &Function{
 		Name: "func_bad", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
@@ -198,10 +197,10 @@ func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 	if s := g.OutputFunctions(); s != "" {
 		t.Fatal("body residual must fail closed whole OutputFunctions, not invent later func", s)
 	}
-	if !HasError() {
+	if !g.hasErr() {
 		t.Fatal("body residual OutputFunctions must SetError sticky")
 	}
-	ClearError()
+	g.clearErr()
 }
 
 func TestOutputMainNilSticky(t *testing.T) {
