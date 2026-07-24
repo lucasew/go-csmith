@@ -699,6 +699,25 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
 	var lastPreOOS []*FactPointTo
 	var lastPreOOSUnions []*FactUnion
+	// Snapshot effect_accum at find_fixed_point entry (caller already
+	// reset_effect_accum(pre_effect) — Block.cpp:789 / PostCreationAnalysis).
+	// Each full statement re-walk must rebuild map_accum_effect progressively
+	// from this baseline. Without re-reset, a second pass (same_facts miss)
+	// leaves end-of-body accum and rewrites early stmts' map_accum with later
+	// reads — StatementGoto.cpp:125–128 choose_visible_read_var ok-pool grows
+	// (seed 1469030: nOk 49 vs UP 40; if (l_858) vs if (g_1065.f0)).
+	entryAccum := EmptyEffect()
+	if cg.EffectAccum != nil {
+		entryAccum = cg.EffectAccum.Clone()
+		// residual ERROR sticky — no invent soft-FP past entry accum Clone residual
+		if HasError() {
+			return inputs, nil, -1, false
+		}
+		if !EffectComplete(entryAccum) {
+			SetError(ErrGeneric)
+			return inputs, nil, -1, false
+		}
+	}
 	// Generation-time stack: make_random already has `b` on func.Stack during
 	// post_creation. Always-push here double-entered `b` (seed-2 e13830).
 	// VisitFactsBlock (off stack) still needs CurrentBlock() for some visit paths.
@@ -924,6 +943,19 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return outputs, nil, -1, false
 			}
 			fm.UnionFacts = workUnions
+		}
+		// Rebuild progressive map_accum from block-entry accum (see entryAccum).
+		// First pass: entryAccum is still pre_effect (caller reset). Later passes:
+		// effect_accum may hold end-of-body from prior walk — re-reset first.
+		if cg.EffectAccum != nil {
+			cp := entryAccum.Clone()
+			if HasError() || !EffectComplete(cp) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return outputs, nil, -1, false
+			}
+			*cg.EffectAccum = cp
 		}
 		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {
