@@ -21,18 +21,18 @@ func MakeExpressionComma(
 ) *Expression {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell without them
 	if r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent comma / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// ExpressionComma.cpp:58–61 — same CGContext&; make_random bumps expr_depth for siblings
@@ -41,14 +41,14 @@ func MakeExpressionComma(
 	// ExpressionComma.cpp:60–61 — rhs type/qfer, no_func=false, no_const=false
 	rhs := MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, false, MaxTermTypes, cg.ExprDepth)
 	// no soft TermVariable/TermConstant retries (C++ uses results directly)
-	if lhs == nil || rhs == nil || HasError() {
+	if lhs == nil || rhs == nil || sessHasError(nil) {
 		return nil
 	}
 	// ExpressionComma.cpp:62–64 — cast_if_needed when lang_cpp (optional for C null ptrs)
 	if opts.LangCPP {
 		castIfNeeded(rhs)
 		// residual ERROR sticky — no invent complete comma past cast/GetType residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
@@ -66,7 +66,7 @@ func MakeExpressionComma(
 // Non-constant / empty Con is complete no-op (nothing to cast).
 func castIfNeeded(exp *Expression) {
 	if exp == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if exp.Term != TermConstant || exp.Con == nil {
@@ -74,7 +74,7 @@ func castIfNeeded(exp *Expression) {
 	}
 	ty := exp.GetType()
 	// residual ERROR sticky — no invent soft-skip cast past GetType residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	if ty == nil {
@@ -82,19 +82,19 @@ func castIfNeeded(exp *Expression) {
 	}
 	isPtr := ty.IsPointerLike()
 	// residual ERROR sticky — no invent soft-continue cast past IsPointerLike residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	if isPtr && exp.EqualsInt(0) {
 		// residual ERROR sticky — no invent cast-true past EqualsInt residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		exp.CastType = ty
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue cast no-op past EqualsInt residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 }

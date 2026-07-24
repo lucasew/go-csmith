@@ -32,7 +32,7 @@ func StmtInBlock(stParent, b *Block) bool {
 func GetBlocksStmt(st *Stmt) []*Block {
 	// Statement always live; sticky incomplete IncompleteBlocks (no invent empty-complete)
 	if st == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteBlocks()
 	}
 	switch st.Kind {
@@ -41,7 +41,7 @@ func GetBlocksStmt(st *Stmt) []*Block {
 		// both arms always live in C++; nil arm sticky IncompleteBlocks
 		// (no invent []*Block{Then,nil} soft list for walkers to soft-continue past)
 		if st.Then == nil || st.Else == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteBlocks()
 		}
 		return []*Block{st.Then, st.Else}
@@ -49,7 +49,7 @@ func GetBlocksStmt(st *Stmt) []*Block {
 		// StatementFor.h — blks.push_back(&body); body always live
 		// sticky IncompleteBlocks (no invent []*Block{nil} soft for-body hole)
 		if st.Then == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteBlocks()
 		}
 		return []*Block{st.Then}
@@ -110,7 +110,7 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	if st == nil {
 		// incomplete Statement* — fail closed sticky hole marker
 		*stms = IncompleteStmtsSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	for _, k := range kinds {
@@ -121,7 +121,7 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	}
 	blks := GetBlocksStmt(st)
 	// residual ERROR sticky — no invent soft-walk past GetBlocksStmt residual
-	if HasError() {
+	if sessHasError(nil) {
 		*stms = IncompleteStmtsSlice()
 		return -1
 	}
@@ -129,13 +129,13 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 		// Block* always live from get_blocks; nil hole fails closed sticky
 		if b == nil {
 			*stms = IncompleteStmtsSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		for i := range b.Stmts {
 			if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
 				// residual ERROR sticky — no invent soft-continue walk past child residual
-				if HasError() {
+				if sessHasError(nil) {
 					if StmtsComplete(*stms) {
 						*stms = IncompleteStmtsSlice()
 					}
@@ -144,12 +144,12 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 				// child already set IncompleteStmtsSlice sticky when it failed closed
 				if StmtsComplete(*stms) {
 					*stms = IncompleteStmtsSlice()
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 				}
 				return -1
 			}
 			// residual ERROR sticky — no invent soft-continue later stmts past child residual true
-			if HasError() {
+			if sessHasError(nil) {
 				*stms = IncompleteStmtsSlice()
 				return -1
 			}
@@ -166,7 +166,7 @@ func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 	}
 	if b == nil {
 		*stms = IncompleteStmtsSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	for i := range b.Stmts {
@@ -186,7 +186,7 @@ func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 func Is1stStm(st *Stmt, parent *Block) bool {
 	// Statement + parent always live; sticky incomplete no invent is-first soft-skip
 	if st == nil || parent == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(parent.Stmts) == 0 {
@@ -207,7 +207,7 @@ func Is1stStm(st *Stmt, parent *Block) bool {
 // Incomplete parent get_blocks hole sticky nil (no invent soft-skip missing container).
 func FindContainerStm(b *Block) *Stmt {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// root is complete nil (not incomplete)
@@ -232,7 +232,7 @@ func FindContainerStm(b *Block) *Stmt {
 		}
 		if incomplete {
 			// get_blocks arms always live when Kind exposes them; nil hole sticky
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		if matched {
@@ -253,7 +253,7 @@ func FindContainerStm(b *Block) *Stmt {
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	// both Statement* always live; sticky incomplete no invent not-dominate soft-skip
 	if a == nil || s == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// s is nested inside a (get_blocks of a includes s's parent block)
@@ -272,7 +272,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 			}
 		}
 		if incomplete {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if matched {
@@ -295,7 +295,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 				return ia <= is
 			}
 			// incomplete StmID and not both in parent — sticky fail closed
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		return a.StmID <= s.StmID
@@ -307,7 +307,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 		if container != nil {
 			return Dominate(a, aParent, container, sParent.Parent)
 		}
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 	}
@@ -323,19 +323,19 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 // destStmID ≤0 fails closed sticky as jump-target (no invent "not target" on incomplete id).
 func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, srcParentOf map[int]*Block) bool {
 	if StmIDUnset(destStmID) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	// FactMgr always live for CFG jump sources; sticky fail closed jump-target
 	// (no invent "not target" without CFG / soft re-pick past hole)
 	if fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	srcs := fm.FindJumpSources(destStmID)
 	// incomplete CFG (nil sources) sticky fail closed as jump-target
 	if srcs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	for _, srcID := range srcs {
@@ -381,7 +381,7 @@ func IsPtrUsed(st *Stmt) bool {
 func ContainsStmtInBlock(b *Block, stParent *Block) bool {
 	// Block root always live; sticky incomplete no invent not-contain
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return StmtInBlock(stParent, b)
@@ -394,7 +394,7 @@ func ContainsStmtInBlock(b *Block, stParent *Block) bool {
 func ContainsStmtTree(root, s *Stmt) bool {
 	// both Statement* always live; sticky incomplete no invent not-contain soft-skip
 	if root == nil || s == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if root == s || (!StmIDUnset(root.StmID) && root.StmID == s.StmID) {
@@ -408,7 +408,7 @@ func ContainsStmtTree(root, s *Stmt) bool {
 	// nil hole sticky before invent membership from a partial arm scan
 	for _, b := range blks {
 		if b == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 	}
@@ -425,7 +425,7 @@ func ContainsStmtTree(root, s *Stmt) bool {
 // Incomplete arm sticky false (no invent membership via partial arm scan before hole).
 func blockHasStmtIDDeep(b *Block, id int) bool {
 	if b == nil || id <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if b.StmID == id {
@@ -439,7 +439,7 @@ func blockHasStmtIDDeep(b *Block, id int) bool {
 		blks := GetBlocksStmt(&b.Stmts[i])
 		for _, nb := range blks {
 			if nb == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return false
 			}
 		}

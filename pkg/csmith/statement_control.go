@@ -20,23 +20,23 @@ func (st Stmt) MustReturn() bool {
 		blks := GetBlocksStmt(&st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
 			// incomplete arms sticky not-must-return (no invent soft-skip missing arm)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if !blks[0].MustReturn() {
 			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue false-arm past Then residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		ok := blks[1].MustReturn()
 		// residual ERROR sticky — no invent must-return true past Else residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
@@ -53,13 +53,13 @@ func (st Stmt) MustReturn() bool {
 func (st Stmt) MustJump() bool {
 	if st.MustReturn() {
 		// residual ERROR sticky — no invent must-jump true past MustReturn residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue jump kinds past MustReturn residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	switch st.Kind {
@@ -67,12 +67,12 @@ func (st Stmt) MustJump() bool {
 		// Expression::not_equals(0) — Constant only; other terms false
 		// incomplete test Expr sticky not-must-jump (no invent always-jump)
 		if st.Expr == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		ok := st.Expr.NotEquals(0)
 		// residual ERROR sticky — no invent must-jump true past NotEquals residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
@@ -80,23 +80,23 @@ func (st Stmt) MustJump() bool {
 		blks := GetBlocksStmt(&st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
 			// StatementIf always both arms; incomplete sticky not-must-jump
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if !blks[0].MustJump() {
 			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue false-arm past Then residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		ok := blks[1].MustJump()
 		// residual ERROR sticky — no invent must-jump true past Else residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
@@ -112,7 +112,7 @@ func (st Stmt) MustJump() bool {
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturn() bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return b.MustReturnWithFM(b.EmitFM)
@@ -122,7 +122,7 @@ func (b *Block) MustReturn() bool {
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) == 0 {
@@ -135,19 +135,19 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	last := b.GetLastStm()
 	if last == nil || !last.MustReturn() {
 		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue escape check past MustReturn residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// Block.cpp:318–326 — back edges into block (continue) can skip end return
 	esc := b.hasEscapeBackEdge(fm)
 	// residual ERROR sticky — no invent must-return true past escape CFG residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return !esc
@@ -158,7 +158,7 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 // Block always live; sticky false (no invent not-must-jump soft-skip past hole).
 func (b *Block) MustJump() bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) == 0 {
@@ -173,7 +173,7 @@ func (b *Block) MustJump() bool {
 	}
 	ok := last.MustJump()
 	// residual ERROR sticky — no invent must-jump true past last MustJump residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return ok
@@ -193,7 +193,7 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	// Block::stm_id always live for CFG-indexed edges; StmID 0 is valid (fair sid).
 	// IncompleteStmID sticky possible escape (no invent "no back edge").
 	if StmIDUnset(b.StmID) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	// Statement.cpp:453–467 — e->dest == this only (DestStmID == block.StmID).
@@ -202,8 +202,8 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	back := fm.FindEdgesIn(b.StmID, false, true)
 	// incomplete CFG sticky possible escape
 	if back == nil {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return true
 	}
@@ -221,17 +221,17 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 func (f *Function) NeedReturnStmt() bool {
 	// Function always live; sticky incomplete need-return (restrictive)
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if f.ReturnType == nil {
 		// incomplete return type sticky need return (no invent void soft-skip)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	simple := f.ReturnType.IsSimple()
 	// residual ERROR sticky — no invent soft need-return past IsSimple residual
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return !(simple && f.ReturnType.Simple() == EVoid)

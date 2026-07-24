@@ -17,7 +17,7 @@ func MakeExpressionAssign(
 ) *Expression {
 	// ExpressionAssign.cpp always has RNG + CGContext; sticky no invent assign expr without them
 	if r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// ExpressionAssign.cpp:56–57 / 61–62 — get_fact_mgr always live in C++.
@@ -30,11 +30,11 @@ func MakeExpressionAssign(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// ExpressionAssign.cpp:49+ — type from Expression::make_random (may be non-null);
@@ -43,7 +43,7 @@ func MakeExpressionAssign(
 	if qfer == nil {
 		q := RandomQualifiersDefaultProbs(typ, AccessWrite, *cg, true, opts, probs, r)
 		// residual ERROR sticky — no invent soft-continue assign past RandomQualifiers residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		qfer = &q
@@ -52,7 +52,7 @@ func MakeExpressionAssign(
 	// forces match_exact_qualifiers while selecting LHS
 	st := MakeRandomAssignQfer(r, opts, probs, vs, tables, cg, typ, qfer)
 	// StatementAssign nullptr / ERROR_GUARD → no soft invent empty ExpressionAssign
-	if HasError() || !stmtOK(st) {
+	if sessHasError(nil) || !stmtOK(st) {
 		return nil
 	}
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
@@ -63,29 +63,29 @@ func MakeExpressionAssign(
 		if st.Lhs != nil {
 			indir = st.Lhs.IndirectLevel()
 			// residual ERROR sticky — no invent soft-continue UpdateFact past IndirectLevel residual
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 		}
 		rhs := st.GetAssignRhs()
 		// residual ERROR sticky — no invent soft-continue UpdateFact past GetAssignRhs residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		// FactUnion.cpp:133 — Lhs::get_type() for eUnionWrite abstract (not Variable.Type).
 		var lhsWant *Type
 		if st.Lhs != nil {
 			lhsWant = st.Lhs.GetType()
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 		}
 		_ = cg.FM.UpdateFactForAssignWant(st.LhsVar, indir, lhsWant, rhs)
 		// residual ERROR sticky — no invent ExpressionAssign shell past UpdateFact residual
 		// incomplete assign must not invent ExpressionAssign shell with wiped facts
-		if HasError() || !FactsComplete(cg.FM.GlobalFacts) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || !FactsComplete(cg.FM.GlobalFacts) {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return nil
 		}
@@ -95,11 +95,11 @@ func MakeExpressionAssign(
 	if st.Lhs != nil {
 		if t := st.Lhs.GetType(); t != nil {
 			// residual ERROR sticky — no invent ExpressionAssign shell past GetType residual
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 			exprType = t
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent ExpressionAssign shell past GetType residual nil
 			return nil
 		}

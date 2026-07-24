@@ -70,7 +70,7 @@ func NumberToType(table *ThresholdTable, value uint32) StatementType {
 	// Statement.cpp:141–147 — assert(stmtTable_); assert(value < 100)
 	// sticky fail closed MaxStatementType (invalid) — no invent eAssign / soft re-pick
 	if table == nil || value >= 100 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return MaxStatementType
 	}
 	v := table.GetValue(int(value))
@@ -87,7 +87,7 @@ func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
 	// Statement.cpp:233–234 — assert(value != -1); assert(0..99)
 	// ERROR_GUARD(MAX_STATEMENT_TYPE); sticky no soft invent eAssign
 	if r == nil || table == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return MaxStatementType
 	}
 	v := r.RndUpto(100)
@@ -99,7 +99,7 @@ func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
 func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) StatementType {
 	// Statement.cpp ERROR_GUARD(MAX_STATEMENT_TYPE); sticky no soft invent eAssign
 	if r == nil || table == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return MaxStatementType
 	}
 	v := r.RndUptoFilter(100, f)
@@ -128,7 +128,7 @@ func InitProbabilityTable(opts Options) *ThresholdTable {
 // Incomplete Stmt sticky MaxStatementType.
 func (st *Stmt) GetType() StatementType {
 	if st == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return MaxStatementType
 	}
 	return st.Kind

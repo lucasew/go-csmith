@@ -8,12 +8,12 @@ package csmith
 // policy rejects (pointing-to-locals) stay non-sticky false.
 func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtReturn {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// StatementReturn always has ExpressionVariable; nil expr sticky hard IR
 	if st.Expr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// no_return_dead_ptr: reject returning local-pointing ptrs
@@ -22,27 +22,27 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		// Prefer CurrBlk (set in stm_visit_facts) over stack-top CurrentBlock.
 		b := cg.AnalysisBlock()
 		if b == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		v := st.Expr.Var
 		// incomplete type IR sticky (no invent level-0 skip / soft re-pick)
 		ind, iok := st.Expr.IndirectLevelComplete()
 		if !iok {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		facts := cg.pointToFacts()
 		if IsPointingToLocals(v, b, ind, facts) {
 			// residual ERROR sticky — no invent policy soft-reject past residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			// policy reject — non-sticky
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past residual false path
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 	}
@@ -50,32 +50,32 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent visit success past VisitFactsExpression residual
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// FactMgr::update_fact_for_return — StatementReturn.cpp:91–94
 	// get_fact_mgr + curr_func + rv always live; sticky without them
 	if cg.FM == nil || cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// Statement::stm_id always live; StmID 0 sticky
 	if StmIDUnset(st.StmID) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	_ = cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 	// residual ERROR sticky — no invent visit success past UpdateFact/set_fact_out residual
 	// (soft invent was FactsComplete GlobalFacts true while residual ERROR soft-continued)
-	if HasError() || !FactsComplete(cg.FM.GlobalFacts) {
-		if !HasError() {
-			SetError(ErrGeneric)
+	if sessHasError(nil) || !FactsComplete(cg.FM.GlobalFacts) {
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
 	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if !EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm
@@ -94,14 +94,14 @@ func MakeRandomReturn(
 ) Stmt {
 	// StatementReturn.cpp nullptr sticky — empty Stmt (no invent Kind-only return shell)
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent return / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	// StatementReturn.cpp:55 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementReturn, nullptr)
@@ -116,7 +116,7 @@ func MakeRandomReturn(
 	}
 	// incomplete GlobalFacts fail closed sticky (no invent cleaned return expr under holes)
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	// StatementReturn.cpp:56–62 — curr_func->return_type; non-sticky soft re-pick
@@ -133,13 +133,13 @@ func MakeRandomReturn(
 	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true) — as_return
 	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
 	// StatementReturn.cpp:66 ERROR_GUARD after make_random + cast setup
-	if ev == nil || HasError() {
+	if ev == nil || sessHasError(nil) {
 		return Stmt{}
 	}
 	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
 	ev.CheckAndSetCastOpts(ret, opts)
 	// residual ERROR sticky — no invent Return stmt past CheckAndSetCast residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return Stmt{}
 	}
 	// ccomp + bitfield return cast (StatementAssign.cpp similar path)

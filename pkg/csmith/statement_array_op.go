@@ -7,7 +7,7 @@ package csmith
 func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
 	// StatementArrayOp.cpp:64–70 — pure_rnd_upto(size); sticky no invent incr=1 without RNG
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0, 0
 	}
 	if size < 1 {
@@ -33,12 +33,12 @@ func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
 func AddVariableToSet(set *[]*Variable, v *Variable) {
 	// set + Variable always live; sticky incomplete no invent soft no-op past hole
 	if set == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// incomplete *set sticky no-op (no invent append/dup past membership hole)
 	if !VariablesComplete(*set) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if !IsVariableInSet(*set, v) {
@@ -52,7 +52,7 @@ func AddVariableToSet(set *[]*Variable, v *Variable) {
 func CombineVariableSets(a, b []*Variable) []*Variable {
 	if !VariablesComplete(a) || !VariablesComplete(b) {
 		// incomplete lists fail closed sticky (no invent soft re-pick combined pool past holes)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := append([]*Variable(nil), a...)
@@ -76,23 +76,23 @@ func MakeRandomArrayOp(
 ) Stmt {
 	// StatementArrayOp always has VS + RNG + CG; sticky no invent array-op shell without them
 	if vs == nil || r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent array-op / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	// StatementArrayOp.cpp:77–80 — rnd_flipcoin(5); ERROR_GUARD
 	aryInit := r.RndFlipcoin(5)
-	if HasError() {
+	if sessHasError(nil) {
 		return Stmt{}
 	}
 	if aryInit {
@@ -100,7 +100,7 @@ func MakeRandomArrayOp(
 	}
 	// StatementFor::make_random_array_loop
 	st := MakeRandomArrayLoop(r, opts, probs, vs, tables, stmtTab, cg)
-	if st == nil || HasError() {
+	if st == nil || sessHasError(nil) {
 		return Stmt{}
 	}
 	return *st
@@ -120,18 +120,18 @@ func MakeRandomArrayLoop(
 ) *Stmt {
 	// StatementFor array-loop always has RNG + VS + CG; sticky no invent shell without them
 	if r == nil || vs == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent array loop / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:316–317 — rnd_upto(CGOptions::max_array_num_in_loop())
@@ -141,7 +141,7 @@ func MakeRandomArrayLoop(
 		maxN = 0
 	}
 	n := int(r.RndUpto(uint32(maxN)))
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	var mustReads, mustWrites []*Variable
@@ -150,13 +150,13 @@ func MakeRandomArrayLoop(
 		av := vs.SelectArray(r, *cg)
 		// StatementFor.cpp:319–328 — select_array then always use av; ERROR_GUARD sticky
 		// no soft invent fewer arrays by skipping nil (was continue + burn RndUpto)
-		if HasError() || av == nil {
+		if sessHasError(nil) || av == nil {
 			return nil
 		}
 		avs = append(avs, av)
 		// access: 0 = must read, 1 = must write, 2 = both
 		access := int(r.RndUpto(3))
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if access == 0 || access == 2 {
@@ -174,7 +174,7 @@ func MakeRandomArrayLoop(
 		// incomplete combine / existing No* lists fail closed sticky (no invent partial RW)
 		if !VariablesComplete(allMustReads) || !VariablesComplete(allMustWrites) ||
 			!VariablesComplete(cg.RW.NoReadVars) || !VariablesComplete(cg.RW.NoWriteVars) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		noReads = append([]*Variable(nil), cg.RW.NoReadVars...)
@@ -214,18 +214,18 @@ func MakeRandomArrayLoop(
 func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGContext) []*ArrayVariable {
 	// StatementFor array-loop setup always has RNG + VS; sticky no invent empty pool without them
 	if r == nil || vs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent array-loop setup past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	maxN := opts.MaxArrayNumInLoop
@@ -237,13 +237,13 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, cg)
 		// StatementFor.cpp:319–328 — no soft invent fewer arrays by skipping nil
-		if HasError() || av == nil {
+		if sessHasError(nil) || av == nil {
 			return nil
 		}
 		out = append(out, av)
 		// access choice 0/1/2 burns RNG (must_read / must_write / both)
 		_ = r.RndUpto(3)
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
@@ -267,23 +267,23 @@ func MakeRandomArrayInit(
 	_ = tables
 	// StatementArrayOp always has VS + RNG + CG; sticky no invent array-init shell without them
 	if vs == nil || r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky before EffectStm clear (no invent array init)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return Stmt{}
 	}
 	av := vs.SelectArray(r, *cg)
 	// StatementArrayOp.cpp:90–91 — ERROR_GUARD after select_array
-	if av == nil || HasError() {
+	if av == nil || sessHasError(nil) {
 		return Stmt{}
 	}
 	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1
@@ -303,11 +303,11 @@ func MakeRandomArrayInit(
 	volCount := 0
 	if av.IsVolatile() {
 		// residual ERROR sticky — no invent volCount past IsVolatile residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return Stmt{}
 		}
 		volCount++
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-continue non-vol past IsVolatile residual false
 		return Stmt{}
 	}
@@ -323,20 +323,20 @@ func MakeRandomArrayInit(
 		// C++ loops until break; SelectLoopCtrlVar creates on miss (no soft invent)
 		for tries := 0; tries < 256; tries++ {
 			iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
-			if iv == nil || HasError() {
+			if iv == nil || sessHasError(nil) {
 				// ERROR_GUARD path
 				break
 			}
 			// StatementArrayOp.cpp:112–115 — iv->type always live; float rejected
 			// Type-nil sticky fail whole array-op (no invent OK-IV soft pool past hole)
 			if iv.Type == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				iv = nil
 				break
 			}
 			if iv.Type.IsFloat() {
 				// residual ERROR sticky — no invent soft-continue then later IV past IsFloat hole
-				if HasError() {
+				if sessHasError(nil) {
 					iv = nil
 					break
 				}
@@ -344,18 +344,18 @@ func MakeRandomArrayInit(
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue non-float past IsFloat residual false path
-			if HasError() {
+			if sessHasError(nil) {
 				iv = nil
 				break
 			}
 			if iv.IsVolatile() {
 				// residual ERROR sticky — no invent soft-continue past IsVolatile hole
-				if HasError() {
+				if sessHasError(nil) {
 					iv = nil
 					break
 				}
 				volCount++
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue non-vol IV past IsVolatile residual false
 				iv = nil
 				break
@@ -363,7 +363,7 @@ func MakeRandomArrayInit(
 			// StatementArrayOp.cpp:118–123 — strict_volatile / ccomp packed / signed_char
 			packed := opts.CComp && iv.IsPackedAggregateFieldVar()
 			// residual ERROR sticky — no invent soft-continue past packed-field IR hole
-			if HasError() {
+			if sessHasError(nil) {
 				iv = nil
 				break
 			}
@@ -371,7 +371,7 @@ func MakeRandomArrayInit(
 				packed ||
 				(!opts.SignedCharIndex && iv.Type.IsSignedChar()) {
 				// residual from second IsVolatile sticky
-				if HasError() {
+				if sessHasError(nil) {
 					iv = nil
 					break
 				}
@@ -399,14 +399,14 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return Stmt{}
 		}
 		cg.WriteVar(iv)
 		// residual ERROR sticky — no invent soft-continue later dims past WriteVar residual
-		if HasError() {
+		if sessHasError(nil) {
 			for _, d := range dims {
 				if d != nil && d.IV != nil {
 					cg.RemoveIVBound(d.IV)
@@ -430,7 +430,7 @@ func MakeRandomArrayInit(
 	// StatementArrayOp.cpp:137 — write_var(av)
 	cg.WriteVar(&av.Variable)
 	// residual ERROR sticky — no invent soft-complete array-op past WriteVar residual
-	if HasError() {
+	if sessHasError(nil) {
 		for _, x := range dims {
 			if x != nil && x.IV != nil {
 				cg.RemoveIVBound(x.IV)
@@ -454,12 +454,12 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(x.IV)
 				}
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return Stmt{}
 		}
 		ivOut := d.IV.OutputC()
 		// residual ERROR sticky — no invent soft-continue access past OutputC residual
-		if HasError() {
+		if sessHasError(nil) {
 			for _, x := range dims {
 				if x != nil && x.IV != nil {
 					cg.RemoveIVBound(x.IV)
@@ -473,7 +473,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(x.IV)
 				}
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return Stmt{}
 		}
 		access += "[" + ivOut + "]"
@@ -494,7 +494,7 @@ func MakeRandomArrayInit(
 	}
 	parent := blk.RandomParentBlock(r, opts.GlobalVariables)
 	// nil parent is valid when allowGlobal (global init site). ERROR_GUARD only on RNG error.
-	if HasError() {
+	if sessHasError(nil) {
 		for _, d := range dims {
 			if d != nil && d.IV != nil {
 				cg.RemoveIVBound(d.IV)
@@ -521,7 +521,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return Stmt{}
 		}
 	}
@@ -538,7 +538,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return Stmt{}
 		}
 	}
@@ -610,12 +610,12 @@ func MakeRandomArrayInit(
 	// Incomplete EffectStm fails closed (no invent map record / create success)
 	if cg.FM != nil {
 		if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return Stmt{}
 		}
 		eff := cg.EffectStm.Clone()
 		// residual ERROR sticky — no invent soft-map effect past IncompleteEffect Clone residual
-		if HasError() {
+		if sessHasError(nil) {
 			return Stmt{}
 		}
 		cg.FM.SetMapStmEffect(st.StmID, eff)
