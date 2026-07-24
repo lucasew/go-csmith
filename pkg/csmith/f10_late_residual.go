@@ -294,7 +294,7 @@ func (p *residualPlayer) emitCreate() {
 		name: name, ctype: CType{Name: tname, Signed: true, Bits: 32}, isArray: true, arrayLen: 4,
 	})
 	// Pair each CreateArray with 2 parent-local style locals (UP density).
-	p.inventLocal(fmt.Sprintf("0"))
+	p.inventLocal("0")
 	if p.isPtrInits {
 		p.inventLocal("0")
 		// local pointer aliasing residual array
