@@ -1253,7 +1253,7 @@ func MakeRandomBinaryInvocation(
 			shiftNonConst := 0
 			if probs != nil {
 				shiftNonConst = probs.Single(PShiftByNonConstantProb)
-			} else if p := ProcessProbabilities(); p != nil {
+			} else if p := sessProbs(cgSess(cg)); p != nil {
 				shiftNonConst = p.Single(PShiftByNonConstantProb)
 			}
 			// not_constant = flip; constant path when !not_constant
@@ -1923,8 +1923,8 @@ func MakeRandomInvocation(
 					return &Invocation{Failed: true}
 				}
 			}
-			// Statement probability table is process/session singleton; sticky no invent second table
-			stmtTab := ProcessStmtTab()
+			// Statement probability table is session singleton; sticky no invent second table
+			stmtTab := sessStmtTab(cgSess(cg))
 			if stmtTab == nil {
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return &Invocation{Failed: true}

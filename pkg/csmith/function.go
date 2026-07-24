@@ -1217,6 +1217,11 @@ func (f *Function) Output() string {
 
 // OutputOpts adds force_static and optional function attributes on the header.
 func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
+	return f.OutputOptsWith(forceStatic, withAttrs, r, ProcessOptions())
+}
+
+// OutputOptsWith is OutputOpts with explicit session Options (header asserts + body emit).
+func (f *Function) OutputOptsWith(forceStatic, withAttrs bool, r *Rng, opts Options) string {
 	// Function always live at def emit; sticky no invent empty def without it
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1227,7 +1232,7 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		return ""
 	}
 	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell
-	hdr := f.OutputHeader(forceStatic)
+	hdr := f.OutputHeaderOpts(forceStatic, opts)
 	// residual ERROR sticky — no invent soft-continue body past OutputHeader residual
 	if sessHasError(nil) {
 		return ""
@@ -1263,7 +1268,7 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		return ""
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
-	bodyOut := f.Body.Output(0)
+	bodyOut := f.Body.OutputOpts(0, opts)
 	// residual ERROR sticky — no invent soft-continue past Body.Output residual
 	if sessHasError(nil) {
 		return ""

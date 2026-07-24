@@ -714,7 +714,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 			aliases.WriteString(a)
 			aliases.WriteString("\n")
 		}
-		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+		body := f.OutputOptsWith(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 		// residual ERROR sticky — no invent soft-continue later funcs past body residual
 		if g.hasErr() {
 			return ""
@@ -1250,7 +1250,7 @@ func (g *ProgramGenerator) OutputDFS() string {
 		if f.IsBuiltin {
 			continue
 		}
-		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+		body := f.OutputOptsWith(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 		if g.hasErr() || body == "" {
 			if !g.hasErr() {
 				g.noteErr(ErrGeneric)

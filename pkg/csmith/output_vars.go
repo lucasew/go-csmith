@@ -11,6 +11,11 @@ import (
 // then for non-global lists OutputArrayInitializers (ctrl decl even when all brace-init).
 // Incomplete Variable* list fails closed sticky empty (no invent skip holes / partial section).
 func OutputVariableList(vars []*Variable, indent string, forceStatic bool) string {
+	return OutputVariableListOpts(vars, indent, forceStatic, ProcessOptions())
+}
+
+// OutputVariableListOpts is OutputVariableList with explicit session Options.
+func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, opts Options) string {
 	if len(vars) == 0 {
 		return ""
 	}
@@ -61,7 +66,7 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 		if sessHasError(nil) {
 			return ""
 		}
-		inits := OutputArrayInitializers(vars, ProcessOptions(), indent)
+		inits := OutputArrayInitializers(vars, opts, indent)
 		// residual ERROR sticky — no invent soft-return defs-only past OutputArrayInitializers residual
 		if sessHasError(nil) {
 			return ""

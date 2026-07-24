@@ -209,11 +209,12 @@ func CreateExtension(opts Options) {
 		currentSession().CoverageTests = nil
 		return
 	}
-	r := ProcessRng()
-	probs := ProcessProbabilities()
+	s := currentSession()
+	r := sessRng(s)
+	probs := sessProbs(s)
 	if r == nil || probs == nil {
 		// CreateInstance may not have run yet — library paths pass via CreateExtensionFull
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	CreateExtensionFull(opts, r, probs)

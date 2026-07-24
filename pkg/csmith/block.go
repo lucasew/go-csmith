@@ -1384,7 +1384,7 @@ func makeRandomStmtForced(
 	}
 	// Statement static ProbabilityTable always live; sticky no invent NewStatementThresholdTable
 	if stmtTab == nil {
-		stmtTab = ProcessStmtTab()
+		stmtTab = sessStmtTab(cgSess(cg))
 	}
 	if stmtTab == nil {
 		sessNoteError(cgSess(cg), ErrGeneric)
@@ -1679,7 +1679,7 @@ func stmtOK(st Stmt) bool {
 // outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
 // indent is statement base indent (spaces/4); uses Emit* flags on b.
 func (b *Block) outputStmtsOnly(indent int) string {
-	return b.outputStmtsOnlyOpts(indent, false)
+	return b.outputStmtsOnlyOpts(indent, false, ProcessOptions())
 }
 
 // outputStmtsOnlyOpts is outputStmtsOnly with optional PreOutput skip.
@@ -1688,7 +1688,7 @@ func (b *Block) outputStmtsOnly(indent int) string {
 // Statement; re-running PreOutput on nested shells re-emits the same lbl_N
 // (seed 86: UP one lbl_1132 vs GO three inside nested fors). Nested shells
 // still emit for-headers/body; only pre_output is suppressed.
-func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
+func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) string {
 	if b == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
@@ -1741,7 +1741,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				return ""
 			}
 			// StatementReturn.cpp:127–129 — DEPTH-- when CGOptions::depth_protect()
-			if ProcessOptions().DepthProtect {
+			if opts.DepthProtect {
 				content.WriteString("DEPTH--;\n")
 				content.WriteString(inner)
 			}
@@ -1774,7 +1774,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// StatementAssign::OutputAsExpr — CGOptions::identify_wrappers process-wide
 			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
 			// no soft invent Defaults() / force IdentifyWrappers=false
-			asExpr := OutputAssignAsExprOpts(&st, wrap, ProcessOptions())
+			asExpr := OutputAssignAsExprOpts(&st, wrap, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past OutputAssign residual
 			if sessHasError(nil) {
 				return ""
@@ -1849,7 +1849,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				return ""
 			}
 			// body pad matches statement indent; outer sb prefixes first line with inner
-			bodyOut := st.Then.Output(indent)
+			bodyOut := st.Then.OutputOpts(indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
 			if sessHasError(nil) {
 				return ""
@@ -1872,12 +1872,12 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			if sessHasError(nil) {
 				return ""
 			}
-			thenOut := st.Then.Output(indent)
+			thenOut := st.Then.OutputOpts(indent, opts)
 			// residual ERROR sticky — no invent soft-continue else past Then residual
 			if sessHasError(nil) {
 				return ""
 			}
-			elseOut := st.Else.Output(indent)
+			elseOut := st.Else.OutputOpts(indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Else residual
 			if sessHasError(nil) {
 				return ""
@@ -1918,7 +1918,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
+			hdr := arrayOpHeaderOutput(st.Loop, opts)
 			// residual ERROR sticky — no invent soft-continue body past header residual
 			if sessHasError(nil) {
 				return ""
@@ -1980,7 +1980,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				nest := &Block{Stmts: []Stmt{child}, EmitFM: b.EmitFM, EmitStepHash: b.EmitStepHash,
 					EmitLabelAttrs: b.EmitLabelAttrs, LabelAttrRng: b.LabelAttrRng,
 					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise}
-				childOut := nest.outputStmtsOnlyOpts(indent+1, true)
+				childOut := nest.outputStmtsOnlyOpts(indent+1, true, opts)
 				if sessHasError(nil) {
 					return ""
 				}
@@ -1992,7 +1992,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				content.WriteString(pad + "}\n")
 				break
 			}
-			bodyOut := st.Then.Output(indent)
+			bodyOut := st.Then.OutputOpts(indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
 			if sessHasError(nil) {
 				return ""
@@ -2026,7 +2026,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			bodyOut := st.Then.Output(indent)
+			bodyOut := st.Then.OutputOpts(indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past nested residual
 			if sessHasError(nil) {
 				return ""
@@ -2062,6 +2062,11 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 
 // Output emits C for the block with indent levels.
 func (b *Block) Output(indent int) string {
+	return b.OutputOpts(indent, ProcessOptions())
+}
+
+// OutputOpts is Block.Output with explicit session Options (no ambient ProcessOptions).
+func (b *Block) OutputOpts(indent int, opts Options) string {
 	// Block.cpp:248+ — always live this; sticky no invent empty "{}" shell for nil
 	if b == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -2080,12 +2085,12 @@ func (b *Block) Output(indent int) string {
 	}
 	// Block.cpp:255–257 — CGOptions::depth_protect(), not Block::depth_protect flag.
 	// Function sets body->set_depth_protect(true) always; emit still gates on CGOptions.
-	if ProcessOptions().DepthProtect {
+	if opts.DepthProtect {
 		sb.WriteString(inner + "DEPTH++;\n")
 	}
 	// Block.cpp:261–262 — OutputTmpVariableList only when CGOptions::math_notmp().
 	// Tmps are still created during generation (gensym side-effect) either way.
-	if ProcessOptions().MathNoTmp && len(b.TmpVars) > 0 {
+	if opts.MathNoTmp && len(b.TmpVars) > 0 {
 		names := make([]string, 0, len(b.TmpVars))
 		for name := range b.TmpVars {
 			names = append(names, name)
@@ -2127,7 +2132,7 @@ func (b *Block) Output(indent int) string {
 	// for non-global lists (Variable.cpp:861–863). Do not invent a loopInits-only gate:
 	// C++ still emits "int i, j, k;" when every array is brace-init (seed-2 func_67).
 	if len(b.LocalVars) > 0 {
-		listOut := OutputVariableList(b.LocalVars, inner, false)
+		listOut := OutputVariableListOpts(b.LocalVars, inner, false, opts)
 		// residual ERROR sticky — no invent soft-continue stmts past OutputVariableList residual
 		if sessHasError(nil) {
 			return ""
@@ -2137,14 +2142,14 @@ func (b *Block) Output(indent int) string {
 	// Block.cpp:235–241 OutputStatementList
 	// Only fail closed on residuals raised during stmt emit (not pre-existing sticky).
 	hadErr := sessHasError(nil)
-	stmtsOut := b.outputStmtsOnly(indent + 1)
+	stmtsOut := b.outputStmtsOnlyOpts(indent+1, false, opts)
 	if stmtsOut == "" && sessHasError(nil) && !hadErr {
 		// residual during stmt list — no invent braces-only success past hole
 		return ""
 	}
 	sb.WriteString(stmtsOut)
 	// Block.cpp:266–267 — CGOptions::depth_protect() (not body depth_protect flag)
-	if ProcessOptions().DepthProtect {
+	if opts.DepthProtect {
 		sb.WriteString(inner + "DEPTH--;\n")
 	}
 	sb.WriteString(pad + "}\n")
