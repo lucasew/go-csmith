@@ -36,7 +36,7 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 	// pure_rnd_* == rnd_* in random mode (ERROR_RETURN still honors sticky Error)
 	// C++ always has RNG; sticky no invent fixed init/limit/incr when r nil
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if r.RndFlipcoin(50) {
@@ -52,13 +52,13 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 	tOps := []BinaryOp{BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe}
 	testOp = tOps[r.RndUpto(uint32(len(tOps)))]
 	// StatementFor.cpp:79 — ERROR_RETURN after test_op pick
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 
 	if r.RndFlipcoin(50) {
 		// StatementFor.cpp:82 — ERROR_RETURN after flip into +=/-= branch
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		incr = int(r.RndUpto(10))
@@ -86,7 +86,7 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 		}
 	} else {
 		// StatementFor.cpp:102 — ERROR_RETURN after flip into ++/-- branch
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		// ++/-- pre or post
@@ -123,7 +123,7 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 	// StatementFor.cpp:128+ — pure_rnd_*; bound is unsigned in C++ (0 allowed after --size)
 	// sticky no invent fixed array-loop control when RNG missing
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0, 0, 0, 0, 0, 0
 	}
 	if bound < 0 {
@@ -232,7 +232,7 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg *CGContext) *LoopControl {
 	// StatementFor always has RNG + VS + CG; sticky no invent iteration shell without them
 	if r == nil || vs == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:170–172 — assert(fm); assert(blk)
@@ -244,11 +244,11 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:176 — clear effect_stm before select
@@ -260,26 +260,26 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	var iv *Variable
 	for tries := 0; tries < 256; tries++ {
 		iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
-		if iv == nil || HasError() {
+		if iv == nil || sessHasError(nil) {
 			return nil
 		}
 		// reject volatile IVs (infinite-loop / SE issues)
 		if iv.IsVolatile() {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile hole
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 			invalid[iv] = true
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue non-vol IV past IsVolatile residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky on loop-ctrl pick
 		// (no invent IV shell past broken array IR)
 		if iv.IsArray && iv.AsArray == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		break
@@ -294,28 +294,28 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 	if !cg.ReadIndices(iv, facts) {
 		// assert(read); no soft invent continue after failed index visit
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}
 	cg.WriteVar(iv)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	cg.ReadVar(iv)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 
 	// StatementFor.cpp:222 — assert(var->type)
 	if iv.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	signed := iv.Type.IsSigned()
 	// residual ERROR sticky — no invent for bounds past IsSigned residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	var initN, limitN, incrN int
@@ -333,7 +333,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		if mustArr == nil {
 			// residual ERROR already sticky, or empty complete nil slice?
 			// FindMustUseArrays returns nil only on sticky hole; empty is non-nil empty
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 		}
@@ -343,7 +343,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			arrVars := make([]*Variable, 0, len(mustArr))
 			for _, av := range mustArr {
 				if av == nil {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return nil
 				}
 				arrVars = append(arrVars, &av.Variable)
@@ -351,8 +351,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			pick := ChooseOKVar(r, arrVars)
 			// StatementFor.cpp:210–211 — assert(av); library fail closed
 			if pick == nil || pick.AsArray == nil {
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return nil
 			}
@@ -389,7 +389,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		bound = InvalidIVBound
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
 		// StatementFor.cpp:79/82/102 ERROR_RETURN inside make_random_loop_control
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
@@ -398,7 +398,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	lhs := &Lhs{Var: iv, Type: iv.Type}
 	cInit := MakeInt(initN)
 	// StatementFor.cpp:229–230 — Constant::make_int; ERROR_GUARD(nullptr)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
@@ -406,7 +406,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	incrBop, _ := incrOp.CompoundToBinaryOps()
 	// when no compound map, incrBop is MaxBinaryOp (C++ MAX_BINARY_OP)
 	flags1 := MakeRandomBinaryKind(r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
-	if flags1 == nil || HasError() {
+	if flags1 == nil || sessHasError(nil) {
 		return nil
 	}
 	initSt := &Stmt{
@@ -421,8 +421,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited) sticky
 	if !VisitFactsStatementAssign(initSt, cg, opts) {
 		// C++ assert(visited); sticky make_iteration failure (no invent soft re-pick past fail)
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}
@@ -436,12 +436,12 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
 	cLimit := &Expression{Term: TermConstant, Con: MakeInt(limitN), ExprType: GetIntType()}
 	testFi := MakeBinary(r, opts, probs, *cg, testOp, vExpr, cLimit)
-	if testFi == nil || HasError() {
+	if testFi == nil || sessHasError(nil) {
 		return nil
 	}
 	testTy := testFi.GetType()
 	// residual ERROR sticky — no invent for-test ExprType past GetType residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testTy}
@@ -501,7 +501,7 @@ func MakeRandomFor(
 	// StatementFor.cpp nullptr factory sticky — nil (no invent Kind-only shell)
 	// always has RNG + CGContext sticky
 	if r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:288–289 — assert(fm); non-sticky soft re-pick without FactMgr
@@ -512,11 +512,11 @@ func MakeRandomFor(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:290 — clear per-statement effect before building for
@@ -524,7 +524,7 @@ func MakeRandomFor(
 
 	lc := MakeIteration(r, opts, probs, vs, cg)
 	// StatementFor.cpp:296 make_iteration null / ERROR paths → nullptr
-	if lc == nil || HasError() {
+	if lc == nil || sessHasError(nil) {
 		return nil
 	}
 	// when SafeMath and compound add/sub incr, attach dummy flags for emit
@@ -538,35 +538,35 @@ func MakeRandomFor(
 	// StatementFor.cpp:299–300 — record effect and facts before loop body
 	// incomplete GlobalFacts fail closed (no invent cleaned pre-loop snapshot)
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	preEffect := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-for past EffectStm Clone residual
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	if !EffectComplete(preEffect) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
 	// residual ERROR sticky — no invent soft-for past CloneFactSlice residual
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// FactMgr.cpp set_fact_in / StatementFor.cpp:299–300 — pre_facts is full FactVec
 	// including eUnionWrite; snapshot UnionFacts with point-to for post_loop restore.
 	if !UnionFactsComplete(cg.FM.UnionFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Deep: pre_facts eUnionWrite must not alias live FactUnion objects that
 	// body generation renews/joins (StatementFor.cpp:299–300 snapshot).
 	preUnion := CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-	if HasError() || !UnionFactsComplete(preUnion) {
-		if !HasError() {
-			SetError(ErrGeneric)
+	if sessHasError(nil) || !UnionFactsComplete(preUnion) {
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}
@@ -575,7 +575,7 @@ func MakeRandomFor(
 	// empty effect_stm, shared effect_accum, iv_bounds[iv]=bound.
 	// Incomplete parent accum fails closed (no invent body under incomplete shell)
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var iv *Variable
@@ -589,7 +589,7 @@ func MakeRandomFor(
 	// bodyCG.EffectAccum aliases cg.EffectAccum (CGContext.cpp:101)
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
-	if HasError() || body == nil {
+	if sessHasError(nil) || body == nil {
 		if lc.IV != nil {
 			bodyCG.RemoveIVBound(lc.IV)
 		}
@@ -605,7 +605,7 @@ func MakeRandomFor(
 	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
 	if !FactsComplete(cg.FM.GlobalFacts) ||
 		!EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// no MergeEffects: body writes already hit the shared parent EffectAccum
@@ -625,18 +625,18 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	if body == nil || StmIDUnset(body.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// Full FactVec: point-to + eUnionWrite (AssignGlobalFactsFromMapIn).
 	fm.AssignGlobalFactsFromMapIn(body.StmID)
 	// residual ERROR sticky — no invent soft-must-return path past map_in assign residual
-	if HasError() || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
+	if sessHasError(nil) || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return
 	}
@@ -650,8 +650,8 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return
 		}
@@ -666,7 +666,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// preUnion is still used by the must_return path below.
 	if body.MustReturn() {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
-		if HasError() {
+		if sessHasError(nil) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
@@ -675,11 +675,11 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		if !FactsComplete(preFacts) || !UnionFactsComplete(preUnion) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		fm.RestoreFactsPair(preFacts, preUnion)
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-continue break-merge past MustReturn residual false
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
@@ -698,21 +698,21 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 				!UnionFactsComplete(outU) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return
 			}
 			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return
 			}
 			// eUnionWrite half of merge_jump_facts on full FactVec
 			if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return
 			}
@@ -722,17 +722,17 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// for-stmt stm_id always live; incomplete body/pre effect fails closed sticky
 	if cg != nil && forSt != nil {
 		if StmIDUnset(forSt.StmID) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		bodyEff := fm.GetMapStmEffect(body.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(preEffect) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, preEffect)
 		if !EffectComplete(fm.GetMapStmEffect(forSt.StmID)) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 		}
 	}
 }
@@ -744,28 +744,28 @@ func forHeaderOutput(lc *LoopControl) string {
 	// StatementFor always has init/test/incr IR; incomplete sticky empty (no soft invent for(;;))
 	if lc == nil || lc.IV == nil {
 		if lc != nil && lc.IV == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	init := forInitOutput(lc)
 	// residual ERROR sticky — no invent soft-continue test/incr past init residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	test := forTestOutput(lc)
 	// residual ERROR sticky — no invent soft-continue incr past test residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	incr := forIncrOutput(lc)
 	// residual ERROR sticky — no invent soft-continue header past incr residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// StatementFor.cpp:408–414 — always live init/test/incr; sticky no invent empty segments
 	if init == "" || test == "" || incr == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
@@ -778,18 +778,18 @@ func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
 	// StatementArrayOp always has live LoopControl + IV sticky
 	if lc == nil || lc.IV == nil {
 		if lc != nil && lc.IV == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	// StatementArrayOp.cpp:194–220 — cv->Output always live; sticky no invent for ( = 0; …)
 	iv := lc.IV.OutputC()
 	// residual ERROR sticky — no invent soft-continue header past OutputC residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if iv == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -826,7 +826,7 @@ func forInitOutput(lc *LoopControl) string {
 	// StatementFor.cpp:408–410 — init->OutputAsExpr; always live StatementAssign
 	// sticky no invent "iv = InitN" when InitStmt missing
 	if lc == nil || lc.InitStmt == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	wrap := false
@@ -835,7 +835,7 @@ func forInitOutput(lc *LoopControl) string {
 	}
 	out := OutputAssignAsExpr(lc.InitStmt, wrap)
 	// residual ERROR sticky — no invent soft-empty init past OutputAssign residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	return out
@@ -844,12 +844,12 @@ func forInitOutput(lc *LoopControl) string {
 func forTestOutput(lc *LoopControl) string {
 	// StatementFor.cpp:412 — test.Output; sticky no invent "iv < LimitN" for missing test
 	if lc == nil || lc.TestExpr == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	out := lc.TestExpr.Output()
 	// residual ERROR sticky — no invent soft-empty test past Output residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	return out
@@ -860,7 +860,7 @@ func forTestOutput(lc *LoopControl) string {
 // sticky no invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
 func forIncrOutput(lc *LoopControl) string {
 	if lc == nil || lc.IncrStmt == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	wrap := false
@@ -869,7 +869,7 @@ func forIncrOutput(lc *LoopControl) string {
 	}
 	out := OutputAssignAsExpr(lc.IncrStmt, wrap)
 	// residual ERROR sticky — no invent soft-empty incr past OutputAssign residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	return out
