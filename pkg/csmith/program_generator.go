@@ -655,7 +655,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		}
 		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
 		// sticky no invent blank global line for incomplete IR
-		def := v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
+		def := v.OutputDefFullSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
 		// residual ERROR sticky — no invent soft-continue later globals past OutputDefFull residual
 		if g.hasErr() {
 			return ""
@@ -699,7 +699,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 			continue
 		}
 		// incomplete header IR — fail closed whole functions section
-		d := f.OutputForwardDeclWith(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes, g.Opts)
+		d := f.OutputForwardDeclWithSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes, g.Opts)
 		// residual ERROR sticky — no invent soft-continue later funcs past forward residual
 		if g.hasErr() {
 			return ""
@@ -726,7 +726,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 			aliases.WriteString(a)
 			aliases.WriteString("\n")
 		}
-		body := f.OutputOptsWith(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
+		body := f.OutputOptsWithSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 		// residual ERROR sticky — no invent soft-continue later funcs past body residual
 		if g.hasErr() {
 			return ""
@@ -1103,7 +1103,7 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			continue
 		}
 		// OutputMgr.cpp:337 — Variable::Output always live sticky; no invent " = 0;" without name
-		out := v.OutputC()
+		out := v.OutputCOptsWith(false, opts)
 		// residual ERROR sticky — no invent soft-continue later resets past OutputC residual
 		if sessHasError(nil) {
 			return ""
@@ -1205,7 +1205,7 @@ func (g *ProgramGenerator) OutputForwardDeclarations() string {
 		if f.IsBuiltin {
 			continue
 		}
-		d := f.OutputForwardDeclWith(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes, g.Opts)
+		d := f.OutputForwardDeclWithSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes, g.Opts)
 		if g.hasErr() {
 			return ""
 		}
@@ -1259,7 +1259,7 @@ func (g *ProgramGenerator) OutputDFS() string {
 		if f.IsBuiltin {
 			continue
 		}
-		body := f.OutputOptsWith(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
+		body := f.OutputOptsWithSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 		if g.hasErr() || body == "" {
 			if !g.hasErr() {
 				g.noteErr(ErrGeneric)

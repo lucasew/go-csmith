@@ -148,9 +148,14 @@ func (v *Variable) OutputDefOpts(forceStatic, prefixName bool) string {
 // Variable.cpp:640–665 — decl, attr_generator.Output, init, volatile comment.
 // IsArray without AsArray sticky empty (no invent scalar "int g_a = 0;" past array shell).
 func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng) string {
+	return v.OutputDefFullSess(nil, forceStatic, prefixName, withAttrs, r)
+}
+
+// OutputDefFullSess is OutputDefFull on an explicit session bag (var attrs).
+func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAttrs bool, r *Rng) string {
 	// Variable* always live at OutputDef; sticky no invent def shell without it
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky
@@ -190,7 +195,9 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	b.WriteString(decl)
 	// Variable.cpp:655 — var_attr_generator.Output when attributes enabled
 	if withAttrs && r != nil {
-		b.WriteString(EnsureVarAttrGenerator().Output(r))
+		if ag := EnsureVarAttrGeneratorSess(s); ag != nil {
+			b.WriteString(ag.Output(r))
+		}
 		// residual ERROR sticky — no invent soft-continue def past attr residual
 		if sessHasError(nil) {
 			return ""
@@ -230,10 +237,15 @@ func (v *Variable) OutputC() string {
 	return v.OutputCOpts(false)
 }
 
-// OutputCOpts is Output with prefix_name.
+// OutputCOpts is Output with prefix_name (ambient ProcessOptions for access_once).
+func (v *Variable) OutputCOpts(prefixName bool) string {
+	return v.OutputCOptsWith(prefixName, ProcessOptions())
+}
+
+// OutputCOptsWith is OutputCOpts with explicit session Options (access_once).
 // ArrayVariable::Output overrides Variable::Output for itemized members
 // (ArrayVariable.cpp:539–571) — name + indices, no VOL_RVAL wrap.
-func (v *Variable) OutputCOpts(prefixName bool) string {
+func (v *Variable) OutputCOptsWith(prefixName bool, opts Options) string {
 	// Variable* always live at Output; sticky no invent empty C name without it
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -292,7 +304,7 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 	// Variable.cpp:694–696 — CGOptions::access_once() && isAccessOnce && !isAddrTaken
 	// sticky when IsAccessOnce but option off (assert enabled; no invent silent skip wrap)
 	if v.IsAccessOnce && !v.IsAddrTaken {
-		if !sessOpts(nil).AccessOnce {
+		if !opts.AccessOnce {
 			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
@@ -2937,7 +2949,8 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	var b strings.Builder
 	indent := "    "
 	// ArrayVariable.cpp:758–762 — post_incr_operator → "i++" else "i = i + 1"
-	opts := sessOpts(nil)
+	// Prefer ambient during activate; HashGlobalVariables uses active bag.
+	opts := ProcessOptions()
 	incrSuffix := "++)"
 	if !opts.PostIncrOperator {
 		// rebuilt per dimension with name below

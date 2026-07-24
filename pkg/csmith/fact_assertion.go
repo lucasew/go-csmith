@@ -471,7 +471,9 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		b.WriteString(":")
 		attr := st.LabelAttr
 		if attr == "" && emitLabelAttrs && attrRng != nil {
-			attr = EnsureLabelAttrGenerator().Output(attrRng)
+			if ag := EnsureLabelAttrGeneratorSess(fmSess(fm)); ag != nil {
+				attr = ag.Output(attrRng)
+			}
 			// residual ERROR sticky — no invent soft-continue label past attr residual
 			if sessHasError(nil) {
 				return "", false

@@ -1125,8 +1125,13 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 
 // OutputForwardDeclWith is OutputForwardDeclOpts with explicit session Options.
 func (f *Function) OutputForwardDeclWith(forceStatic bool, r *Rng, withAttrs bool, opts Options) string {
+	return f.OutputForwardDeclWithSess(nil, forceStatic, r, withAttrs, opts)
+}
+
+// OutputForwardDeclWithSess is OutputForwardDeclWith on an explicit session bag.
+func (f *Function) OutputForwardDeclWithSess(sess *Session, forceStatic bool, r *Rng, withAttrs bool, opts Options) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	if f.IsBuiltin {
@@ -1143,9 +1148,11 @@ func (f *Function) OutputForwardDeclWith(forceStatic bool, r *Rng, withAttrs boo
 		return ""
 	}
 	if withAttrs && r != nil {
-		s += EnsureFuncAttrGenerator().Output(r)
+		if ag := EnsureFuncAttrGeneratorSess(sess); ag != nil {
+			s += ag.Output(r)
+		}
 		// residual ERROR sticky — no invent soft-continue ";" past attr residual
-		if sessHasError(nil) {
+		if sessHasError(sess) {
 			return ""
 		}
 	}
@@ -1242,9 +1249,14 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 
 // OutputOptsWith is OutputOpts with explicit session Options (header asserts + body emit).
 func (f *Function) OutputOptsWith(forceStatic, withAttrs bool, r *Rng, opts Options) string {
+	return f.OutputOptsWithSess(nil, forceStatic, withAttrs, r, opts)
+}
+
+// OutputOptsWithSess is OutputOptsWith on an explicit session bag.
+func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool, r *Rng, opts Options) string {
 	// Function always live at def emit; sticky no invent empty def without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	// builtins emit nothing (Function.cpp) — soft empty, not incomplete IR
@@ -1274,9 +1286,11 @@ func (f *Function) OutputOptsWith(forceStatic, withAttrs bool, r *Rng, opts Opti
 	}
 	s += hdr
 	if withAttrs && r != nil {
-		s += EnsureFuncAttrGenerator().Output(r)
+		if ag := EnsureFuncAttrGeneratorSess(sess); ag != nil {
+			s += ag.Output(r)
+		}
 		// residual ERROR sticky — no invent soft-continue body past attr residual
-		if sessHasError(nil) {
+		if sessHasError(sess) {
 			return ""
 		}
 	}
