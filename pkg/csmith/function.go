@@ -127,8 +127,13 @@ type FunctionList struct {
 // Function.cpp:249 — util.cpp gensym_count is process-wide; sym is ignored
 // (no invent private GenSym counter desynced from g_/t_).
 func RandomFunctionName(sym *GenSym) string {
+	return RandomFunctionNameSess(nil, sym)
+}
+
+// RandomFunctionNameSess is RandomFunctionName on an explicit session bag.
+func RandomFunctionNameSess(s *Session, sym *GenSym) string {
 	_ = sym
-	return GensymSess(nil, "func_")
+	return GensymSess(s, "func_")
 }
 
 // RandomReturnType mirrors Function.cpp RandomReturnType → Type::choose_random.
@@ -216,7 +221,7 @@ func MakeRandomSignature(
 	if sessHasError(nil) {
 		return nil
 	}
-	name := RandomFunctionName(sym)
+	name := RandomFunctionNameSess(firstSess(vsSess(vs), cg.Sess), sym)
 	// gensym always live; sticky no invent empty-name signature / "_alias" shell
 	if name == "" {
 		sessNoteError(nil, ErrGeneric)
@@ -370,7 +375,7 @@ func MakeFirst(
 	if ty == nil || sessHasError(nil) {
 		return nil
 	}
-	name := RandomFunctionName(sym)
+	name := RandomFunctionNameSess(vsSess(vs), sym)
 	// gensym always live; sticky no invent empty-name function / "_alias" shell
 	if name == "" {
 		sessNoteError(nil, ErrGeneric)

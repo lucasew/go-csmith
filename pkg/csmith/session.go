@@ -192,6 +192,14 @@ func sessOrAmbient(s *Session) *Session {
 	return currentSession()
 }
 
+// firstSess returns the first non-nil session among a, b (else nil for ambient).
+func firstSess(a, b *Session) *Session {
+	if a != nil {
+		return a
+	}
+	return b
+}
+
 // activateSession makes s the Process* target until restore.
 func activateSession(s *Session) (restore func()) {
 	prev := activeSession

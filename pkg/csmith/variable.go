@@ -821,7 +821,12 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 // Variable.cpp:395 Constant::make_random uses the process RNG stream.
 // Nil when session Rng unset — fail closed (no invent private advancing NewRng stream).
 func createVarRng() *Rng {
-	return sessRng(nil)
+	return createVarRngSess(nil)
+}
+
+// createVarRngSess is createVarRng on an explicit session bag.
+func createVarRngSess(s *Session) *Rng {
+	return sessRng(s)
 }
 
 // CreateVariableScalars mirrors
@@ -829,43 +834,48 @@ func createVarRng() *Rng {
 // Variable.cpp:368–402 — vectors of one bool each; init = Constant::make_random
 // unless outermost container is union (Variable.cpp:395).
 func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Variable {
+	return CreateVariableScalarsSess(nil, name, typ, isConst, isVolatile)
+}
+
+// CreateVariableScalarsSess is CreateVariableScalars on an explicit session bag.
+func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVolatile bool) *Variable {
 	// Variable.cpp:388–390 — assert(type); assert simple != eVoid sticky
 	// name always live; empty name non-sticky soft factory gate
 	if name == "" {
 		return nil
 	}
 	if typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	simple := typ.IsSimple()
 	// residual ERROR sticky — no invent soft-create past IsSimple residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if simple && typ.Simple() == EVoid {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
 	// Variable.cpp:392–395 — non-union top: Constant::make_random(type); union top: 0
-	// Constant::make_random reads process CGOptions + Probabilities singleton
+	// Constant::make_random reads session CGOptions + Probabilities
 	var init *Constant
 	isUn := typ.IsUnion()
 	// residual ERROR sticky — no invent soft-create past IsUnion residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if !isUn {
 		// session RNG + probs; nil probs → fail closed for aggregates
-		init = MakeRandom(typ, sessOpts(nil), sessProbs(nil), createVarRng())
+		init = MakeRandom(typ, sessOpts(s), sessProbs(s), createVarRngSess(s))
 		// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random fails / nullptr
-		if sessHasError(nil) || init == nil {
+		if sessHasError(s) || init == nil {
 			return nil
 		}
 	}
 	// Variable.cpp:397 — ERROR_GUARD_AND_DEL1(nullptr, var)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	v := &Variable{
@@ -878,7 +888,7 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 		v.CreateFieldVars()
 	}
 	// Variable.cpp:401 — ERROR_GUARD_AND_DEL1 after create_field_vars
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	return v

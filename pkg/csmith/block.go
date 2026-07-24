@@ -460,19 +460,22 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 // no invent VS.Sym private counter (that desynced t_ from g_/l_/func_).
 // sym is ignored; kept for call-site compatibility.
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
-	_ = sym
+	return b.CreateNewTmpVarSess(nil, st)
+}
+
+// CreateNewTmpVarSess is CreateNewTmpVar on an explicit session bag.
+func (b *Block) CreateNewTmpVarSess(s *Session, st ESimpleType) string {
 	// Block.cpp:216–219 — this always live; gensym + macro_tmp_vars insert together
 	// sticky no invent bare t_N without block registration (would emit undeclared use)
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Block.cpp:217 — const string var_name = gensym("t_"); sticky no invent bare ""
-	// Session bag (ambient during Generate activateSession; prefer Sess when threaded later).
-	name := GensymSess(nil, "t_")
+	name := GensymSess(s, "t_")
 	if name == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}

@@ -622,8 +622,8 @@ func makePossibleCompoundAssign(
 					}
 				}
 			}
-			st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
-			st.Tmp2 = blk.CreateNewTmpVar(sym, st2)
+			st.Tmp1 = blk.CreateNewTmpVarSess(cg.Sess, st1)
+			st.Tmp2 = blk.CreateNewTmpVarSess(cg.Sess, st2)
 			inv.Tmp1, inv.Tmp2 = st.Tmp1, st.Tmp2
 		}
 	}

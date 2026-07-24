@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-
 // Invocation is a minimal FunctionInvocation (user call or binary/unary op).
 type Invocation struct {
 	// User is non-nil for program-defined calls.
@@ -1763,11 +1762,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		return "", ""
 	}
 	st := ty1.Simple()
-	var sym *GenSym
-	if vs != nil {
-		sym = &vs.Sym
-	}
-	tmp1 = blk.CreateNewTmpVar(sym, st)
+	tmp1 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cg.Sess), st)
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
 	if sessHasError(cg.Sess) {
 		return "", ""
@@ -1793,7 +1788,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		}
 		st2 = ty.Simple()
 	}
-	tmp2 = blk.CreateNewTmpVar(sym, st2)
+	tmp2 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cg.Sess), st2)
 	return tmp1, tmp2
 }
 
@@ -1828,11 +1823,7 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 	if sessHasError(cg.Sess) {
 		return ""
 	}
-	var sym *GenSym
-	if vs != nil {
-		sym = &vs.Sym
-	}
-	tmp := blk.CreateNewTmpVar(sym, ty.Simple())
+	tmp := blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cg.Sess), ty.Simple())
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
 	if sessHasError(cg.Sess) {
 		return ""
