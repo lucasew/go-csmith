@@ -14,7 +14,12 @@ type RandomNumber struct {
 // MakeRndNumGenerator mirrors AbsRndNumGenerator::make_rndnum_generator.
 // AbsRndNumGenerator.cpp:66–84 — seedrand then Default or DFS factory.
 func MakeRndNumGenerator(kind RngKind, seed uint64) *Rng {
-	return makeRndNumGeneratorWithOpts(kind, seed, sessOpts(nil))
+	return MakeRndNumGeneratorSess(nil, kind, seed)
+}
+
+// MakeRndNumGeneratorSess is MakeRndNumGenerator using session Options (DFS).
+func MakeRndNumGeneratorSess(s *Session, kind RngKind, seed uint64) *Rng {
+	return makeRndNumGeneratorWithOpts(kind, seed, sessOpts(s))
 }
 
 // makeRndNumGeneratorWithOpts is the factory used under session ownership.

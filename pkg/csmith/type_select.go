@@ -220,6 +220,11 @@ func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 // ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
 // Type.cpp:570–586 — if type is struct return it; else random from env.
 func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
+	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, ProcessOptions())
+}
+
+// ChooseRandomStructFromTypeOpts is ChooseRandomStructFromType with explicit Options.
+func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile bool, opts Options) *Type {
 	if typ != nil && typ.IsStruct() {
 		// residual ERROR sticky — no invent soft-return typ past IsStruct residual hole
 		if sessHasError(nil) {
@@ -252,9 +257,9 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 		return nil
 	}
 	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
-	// process CGOptions (dfs_exhaustive / max_exhaustive_depth); no Defaults invent
+	// session CGOptions (dfs_exhaustive / max_exhaustive_depth); no Defaults invent
 	if len(ok) > 0 {
-		if DepthGuardByDepth(sessOpts(nil), 1) == BadDepth {
+		if DepthGuardByDepth(opts, 1) == BadDepth {
 			return nil
 		}
 	}

@@ -2710,15 +2710,20 @@ func (v *Variable) CollectExpandable() []*Variable {
 // mutating the package ctrl-var pool when no last set exists.
 // unionFacts nil → hash all union fields (no FactMgr); non-nil → IsFieldReadable.
 func (v *Variable) HashOutput() string {
-	return v.hashOutput(nil, nil)
+	return v.hashOutputOpts(nil, nil, ProcessOptions())
 }
 
 // HashOutputWithUnionFacts is HashOutput with FactUnion last-write filtering.
 func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
-	return v.hashOutput(nil, unionFacts)
+	return v.hashOutputOpts(nil, unionFacts, ProcessOptions())
 }
 
 func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
+	return v.hashOutputOpts(ctrl, unionFacts, ProcessOptions())
+}
+
+// hashOutputOpts is hashOutput with explicit Options (array post_incr etc.).
+func (v *Variable) hashOutputOpts(ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
 	// Variable + Type always live at hash emit; sticky incomplete no invent empty hash
 	if v == nil || v.Type == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -2731,7 +2736,7 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		return ""
 	}
 	if v.IsArray && len(v.ArraySizes) > 0 {
-		return hashArrayVariable(v, ctrl, unionFacts)
+		return hashArrayVariableOpts(v, ctrl, unionFacts, opts)
 	}
 	if v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
@@ -2766,7 +2771,7 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 				// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 				return ""
 			}
-			part := f.hashOutput(ctrl, unionFacts)
+			part := f.hashOutputOpts(ctrl, unionFacts, opts)
 			// residual ERROR sticky — no invent partial field hash past hard IR hole
 			if sessHasError(nil) {
 				return ""
@@ -2854,6 +2859,10 @@ func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
 // Variable always live; sticky empty (no invent soft-skip hash past hole).
 // Zero-rank / no payload is complete empty (not incomplete IR shell).
 func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
+	return hashArrayVariableOpts(v, ctrl, unionFacts, ProcessOptions())
+}
+
+func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
@@ -2949,8 +2958,6 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	var b strings.Builder
 	indent := "    "
 	// ArrayVariable.cpp:758–762 — post_incr_operator → "i++" else "i = i + 1"
-	// Prefer ambient during activate; HashGlobalVariables uses active bag.
-	opts := ProcessOptions()
 	incrSuffix := "++)"
 	if !opts.PostIncrOperator {
 		// rebuilt per dimension with name below

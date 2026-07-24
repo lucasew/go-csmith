@@ -82,13 +82,20 @@ func (f *Function) PairedFactMgr() *FactMgr {
 // ensurePairedFactMgr returns the paired FactMgr, creating once at signature-time
 // semantics (Function.cpp FMList.push_back(new FactMgr(f))).
 func (f *Function) ensurePairedFactMgr() *FactMgr {
+	return f.ensurePairedFactMgrSess(nil)
+}
+
+// ensurePairedFactMgrSess is ensurePairedFactMgr on an explicit session bag.
+func (f *Function) ensurePairedFactMgrSess(s *Session) *FactMgr {
 	// Function always live; sticky incomplete no invent FM without function
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if f.factMgr == nil {
-		f.factMgr = NewFactMgr(f)
+		f.factMgr = NewFactMgrSess(s, f)
+	} else if s != nil {
+		f.factMgr.Sess = s
 	}
 	return f.factMgr
 }
@@ -188,15 +195,19 @@ func MakeRandomSignature(
 		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
+	// Prefer VS/run bag on the context (MakeRandom under generation has vs.Sess).
+	if cg.Sess == nil {
+		cg.Sess = vsSess(vs)
+	}
 	// incomplete ambient fails closed sticky (no invent RV/qfer under hole shells)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	var env *TypeEnv
@@ -394,8 +405,15 @@ func MakeFirst(
 	}
 
 	// Function.cpp:457–458 — FactMgr with empty global facts (FMList.push_back)
-	fm := f.ensurePairedFactMgr()
+	runSess := firstSess(vsSess(vs), nil)
+	if fmMap != nil && fmMap.Sess != nil {
+		runSess = firstSess(runSess, fmMap.Sess)
+	}
+	fm := f.ensurePairedFactMgrSess(runSess)
 	if fmMap != nil {
+		if fmMap.Sess == nil {
+			fmMap.Sess = runSess
+		}
 		// register same instance into session FMList map
 		_ = fmMap.ForFunc(f)
 	}
@@ -430,14 +448,14 @@ func MakeFirst(
 	}
 
 	// Function.cpp:463 — GenerateBody(empty context)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm).WithSession(runSess)
 	if list != nil {
 		cg = cg.WithFuncList(list)
 	}
 	if env != nil {
 		cg.Types = env
 	}
-	// Prefer the active run bag when MakeFirst runs under Session.Generate / g.Sess.
+	// Bridge: ambient only when no VS/FMList session (unit tests).
 	if cg.Sess == nil {
 		cg.Sess = currentSession()
 	}

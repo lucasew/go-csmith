@@ -794,7 +794,7 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 	for _, v := range vs.GlobalList {
 		// pre-validated VariablesComplete
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
-		part := v.hashOutput(ctrl, unionFacts)
+		part := v.hashOutputOpts(ctrl, unionFacts, sessOpts(vs.Sess))
 		// residual ERROR sticky — no invent soft-continue later globals past hash residual hole
 		if has() {
 			return ""
