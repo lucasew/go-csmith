@@ -6074,8 +6074,6 @@ func burnCreateFieldVarsConstants(r *rng, t CType, ctx *genContext, opts Options
 			si >= 0 && si < len(ctx.info.structs) {
 			fields = ctx.info.structs[si].fields
 		}
-	} else if strings.HasPrefix(t.Name, "union") {
-		return
 	} else {
 		return
 	}
@@ -9511,7 +9509,7 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 						pool = uniq
 					}
 					for len(pool) < nChoose && len(pool) > 0 {
-						pool = append(pool, pool[len(pool)%len(pool)])
+						pool = append(pool, pool[0])
 					}
 					if len(pool) < 1 {
 						pool = []exprVarCandidate{{expr: "g_0", ctype: t, assignable: true}}
@@ -130878,7 +130876,6 @@ commaF80MultiDone:
 							ctx.state.postAggNestArrayOpPLPhase = 0
 							lhsFromDeref = true
 							lv = lvalueInfo{expr: "x", ctype: targetType}
-							break
 						}
 						continue
 					}
