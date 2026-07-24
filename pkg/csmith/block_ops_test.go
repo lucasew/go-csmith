@@ -1215,6 +1215,41 @@ func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 	}
 }
 
+func TestRemoveStmtScrubsParentChainOrphanBlocks(t *testing.T) {
+	// Statement.cpp:684–694 eBlock contains_stmt: candidate parent chain, not only
+	// Stmts-linked StmtBlock children. Failed/orphan nested blocks stay on
+	// Func.Blocks with Parent set (Block.cpp:142–174 abort leaves the entry);
+	// remove_stmt of the ancestor must still erase them (Block.cpp:655–663).
+	// Soft invent Stmts-only walk left them for StatementGoto find_good_jump_block
+	// (seed 11466719812903307384 first_div: Go n=37 vs UP n=3).
+	ClearError()
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	body := &Block{Func: f, StmID: 10}
+	// orphan: Parent=body but never a StmtBlock child of body
+	orphan := &Block{Func: f, StmID: 11, Parent: body}
+	forSt := Stmt{Kind: StmtFor, StmID: 4, Then: body}
+	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{forSt, {Kind: StmtAssign, StmID: 7}}}
+	body.Parent = outer
+	f.Blocks = []*Block{outer, body, orphan}
+	f.Body = outer
+	n := outer.RemoveStmt(4, fm)
+	if n != 1 {
+		t.Fatalf("RemoveStmt count=%d", n)
+	}
+	if HasError() {
+		t.Fatal("sticky ERROR after RemoveStmt")
+	}
+	for _, b := range f.Blocks {
+		if b == body || b == orphan {
+			t.Fatalf("must scrub body+orphan via parent chain, still have %v", b.StmID)
+		}
+	}
+	if len(f.Blocks) != 1 || f.Blocks[0] != outer {
+		t.Fatalf("Func.Blocks=%v", f.Blocks)
+	}
+}
+
 func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	// incomplete CFG scrub must wipe IncompleteCFGEdges sticky (not bare nil invent empty complete)
 	ClearError()

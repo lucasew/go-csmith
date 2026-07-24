@@ -253,6 +253,11 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	}
 
 	// Block.cpp:655–663 — delete blocks inside s from Function.Blocks
+	// via s->contains_stmt(b) (Statement.cpp:684–705). Block is-a Statement in
+	// C++; eBlock uses parent-chain of the candidate (not Stmts walk). Soft invent
+	// was get_blocks+Stmts-only (blockUnderStmt) which missed failed/orphan
+	// nested blocks that still have Parent set → Func.Blocks inflated for
+	// StatementGoto::find_good_jump_block (seed 114667… first_div n=37 vs UP n=3).
 	f := b.Func
 	if f == nil && fm != nil {
 		f = fm.Func
@@ -266,12 +271,24 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		} else {
 			nb := make([]*Block, 0, len(f.Blocks))
 			for _, blk := range f.Blocks {
-				if blockUnderStmt(removed, blk) {
+				if stmtContainsBlock(removed, blk) {
+					// residual ERROR sticky — no invent keep-block past contains residual
+					if HasError() {
+						f.Blocks = IncompleteBlocks()
+						break
+					}
 					continue
+				}
+				// residual ERROR sticky — no invent keep-block past contains residual false
+				if HasError() {
+					f.Blocks = IncompleteBlocks()
+					break
 				}
 				nb = append(nb, blk)
 			}
-			f.Blocks = nb
+			if BlocksComplete(f.Blocks) {
+				f.Blocks = nb
+			}
 		}
 	}
 
@@ -336,7 +353,8 @@ func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool 
 	return true
 }
 
-// blockUnderStmt reports whether blk is a get_blocks child of st or nested under them.
+// blockUnderStmt reports whether blk is under st via get_blocks+Stmts walk.
+// Prefer stmtContainsBlock for remove_stmt Func.Blocks scrub (C++ contains_stmt).
 // Incomplete get_blocks hole sticky true (no invent "not under" while soft-skipping
 // a nil if-arm — scrub aggressively / treat as contained for remove_stmt).
 func blockUnderStmt(st *Stmt, blk *Block) bool {
@@ -363,6 +381,71 @@ func blockUnderStmt(st *Stmt, blk *Block) bool {
 			if HasError() {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// stmtContainsBlock mirrors Statement::contains_stmt when the argument is a Block*
+// (C++ Block is-a Statement). Statement.cpp:684–705 + Block.cpp:655–663 remove_stmt.
+//
+//	if (this == s) return true;
+//	if (eType == eBlock) {
+//	  for (tmp = s->parent; tmp; tmp = tmp->parent)
+//	    if (tmp == this) return true;
+//	  return false;
+//	}
+//	get_blocks → each child Block::contains_stmt(s)  // parent-chain only
+//
+// Soft invent was Stmts-only walk (blockUnderStmt): missed orphan/failed nested
+// blocks that still have Parent pointing into the removed tree but were never
+// linked as StmtBlock children — left them on Func.Blocks for goto pool.
+func stmtContainsBlock(st *Stmt, blk *Block) bool {
+	// Statement + Block always live; sticky incomplete no invent not-contain soft-skip
+	if st == nil || blk == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	// C++ this == s: StmtBlock statement object is not the Block*; Then is.
+	if st.Kind == StmtBlock {
+		// Statement.cpp:689–694 — eBlock: identity or candidate parent chain
+		if st.Then == nil {
+			// incomplete nested block sticky (no invent not-contain past hole)
+			SetError(ErrGeneric)
+			return false
+		}
+		return blockIsSelfOrAncestor(st.Then, blk)
+	}
+	// Non-eBlock: get_blocks then each as eBlock contains_stmt
+	blks := GetBlocksStmt(st)
+	// pre-validate complete get_blocks (if always both arms; for body always live)
+	for _, b := range blks {
+		if b == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+	}
+	for _, b := range blks {
+		if blockIsSelfOrAncestor(b, blk) {
+			return true
+		}
+	}
+	return false
+}
+
+// blockIsSelfOrAncestor mirrors Block-as-eBlock Statement::contains_stmt(candidate).
+// Statement.cpp:684–694 — this==s or candidate's parent chain includes this.
+func blockIsSelfOrAncestor(ancestor, blk *Block) bool {
+	if ancestor == nil || blk == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if ancestor == blk {
+		return true
+	}
+	for tmp := blk.Parent; tmp != nil; tmp = tmp.Parent {
+		if tmp == ancestor {
+			return true
 		}
 	}
 	return false
