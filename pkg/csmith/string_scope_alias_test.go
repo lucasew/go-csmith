@@ -141,8 +141,8 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	fms := NewFactMgrMap()
 	fms.byFunc = map[*Function]*FactMgr{f: fm}
 	AggregateAllPointToSets([]*Function{f}, fms)
-	if len(AllPtrs) != 1 {
-		t.Fatal(AllPtrs)
+	if len(currentSession().AllPtrs) != 1 {
+		t.Fatal(currentSession().AllPtrs)
 	}
 	out := OutputStatistics(nil, Defaults())
 	if !strings.Contains(out, "total number of pointers: 1") {
@@ -151,16 +151,16 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	// nil Function hole / missing FM fails closed sticky (clears aggregates)
 	ClearError()
 	AggregateAllPointToSets([]*Function{f, nil}, fms)
-	if len(AllPtrs) != 0 {
-		t.Fatal("nil hole must clear aggregates", AllPtrs)
+	if len(currentSession().AllPtrs) != 0 {
+		t.Fatal("nil hole must clear aggregates", currentSession().AllPtrs)
 	}
 	if !HasError() {
 		t.Fatal("nil Function hole must SetError sticky")
 	}
 	ClearError()
 	AggregateAllPointToSets([]*Function{f}, nil)
-	if len(AllPtrs) != 0 {
-		t.Fatal("nil FactMgrMap must clear aggregates", AllPtrs)
+	if len(currentSession().AllPtrs) != 0 {
+		t.Fatal("nil FactMgrMap must clear aggregates", currentSession().AllPtrs)
 	}
 	if !HasError() {
 		t.Fatal("nil FactMgrMap must SetError sticky")
@@ -173,8 +173,8 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	fmsBad := NewFactMgrMap()
 	fmsBad.byFunc = map[*Function]*FactMgr{fBad: fmBad}
 	AggregateAllPointToSets([]*Function{fBad}, fmsBad)
-	if len(AllPtrs) != 0 {
-		t.Fatal("incomplete GlobalFacts must clear aggregates", AllPtrs)
+	if len(currentSession().AllPtrs) != 0 {
+		t.Fatal("incomplete GlobalFacts must clear aggregates", currentSession().AllPtrs)
 	}
 	if !HasError() {
 		t.Fatal("incomplete GlobalFacts AggregateAllPointToSets must SetError sticky")

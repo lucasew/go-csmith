@@ -8,26 +8,19 @@ import (
 )
 
 // GenSym is util.cpp gensym_count state. Session VariableSelector owns a GenSym;
-// package defaultGenSym mirrors the process-wide counter when no session is injected.
+// package currentSession().GenSym mirrors the process-wide counter when no session is injected.
 type GenSym struct {
 	count int
 }
 
-// defaultGenSym is util.cpp gensym_count for callers that do not pass a GenSym
-// (Block::create_new_tmp_var → gensym("t_") always hits the global counter).
-var defaultGenSym GenSym
-
-// analysisErrLog mirrors util.cpp errlog for log_analysis_fail.
-var analysisErrLog strings.Builder
-
-// Gensym mirrors util.cpp gensym(basename) on the package-wide counter.
+// Gensym mirrors util.cpp gensym(basename) on the session counter.
 func Gensym(basename string) string {
-	return defaultGenSym.Next(basename)
+	return currentSession().GenSym.Next(basename)
 }
 
-// ResetDefaultGensym mirrors reset_gensym on the package counter.
+// ResetDefaultGensym mirrors reset_gensym on the session counter.
 func ResetDefaultGensym() {
-	defaultGenSym.Reset()
+	currentSession().GenSym.Reset()
 }
 
 // Reset mirrors reset_gensym.
@@ -39,7 +32,7 @@ func (g *GenSym) Reset() {
 
 // Next mirrors gensym(basename): basename + (++count).
 // util.cpp: ss << basename; ss << ++gensym_count;
-// Nil receiver uses package defaultGenSym (not a one-shot local counter).
+// Nil receiver uses session GenSym (not a one-shot local counter).
 // empty basename is broken IR sticky — no invent bare "1"/"2" numeric names
 func (g *GenSym) Next(basename string) string {
 	if g == nil {
@@ -56,17 +49,18 @@ func (g *GenSym) Next(basename string) string {
 // LogAnalysisFail mirrors util.cpp log_analysis_fail.
 // util.cpp:76–79 — append to errlog; always returns false.
 func LogAnalysisFail(msg string) bool {
-	analysisErrLog.WriteString("Analysis failed at ")
-	analysisErrLog.WriteString(msg)
-	analysisErrLog.WriteString("\n")
+	b := &currentSession().AnalysisErrLog
+	b.WriteString("Analysis failed at ")
+	b.WriteString(msg)
+	b.WriteString("\n")
 	return false
 }
 
 // AnalysisErrLog returns the accumulated analysis-fail log (tests / debug).
-func AnalysisErrLog() string { return analysisErrLog.String() }
+func AnalysisErrLog() string { return currentSession().AnalysisErrLog.String() }
 
 // ClearAnalysisErrLog resets util errlog (finalization / tests).
-func ClearAnalysisErrLog() { analysisErrLog.Reset() }
+func ClearAnalysisErrLog() { currentSession().AnalysisErrLog.Reset() }
 
 // OutputPrintStr mirrors util.cpp output_print_str.
 // util.cpp:146–157 — indent + printf("str"[, value]);

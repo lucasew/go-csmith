@@ -754,13 +754,12 @@ func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 	av.Indices = append(av.Indices, s)
 }
 
-// arrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
+// currentSession().ArrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
 // inside build_init_recursive. Process-wide: advances across every array OutputDef
 // (do not reset per array).
-var arrayInitSeed uint32 = 0xABCDEF
 
 // ResetArrayInitSeed restores the C++ static seed (tests / Finalization).
-func ResetArrayInitSeed() { arrayInitSeed = 0xABCDEF }
+func ResetArrayInitSeed() { currentSession().ArrayInitSeed = 0xABCDEF }
 
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
 // ArrayVariable.cpp:426–446 — nested braces; process-static seed pick; "," (no space).
@@ -778,7 +777,7 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) str
 			//   size_t rnd_index = ((seed * seed + (i + 7) * (i + 13)) * 52369) % n;
 			// seed is unsigned: seed*seed wraps at 32 bits, then promotes to size_t
 			// for the rest of the expression (64-bit on LP64). All-uint32 Go mul was wrong.
-			s := arrayInitSeed
+			s := currentSession().ArrayInitSeed
 			ss := uint64(s * s) // uint32 mul wrap, then widen
 			prod := uint64(i+7) * uint64(i+13)
 			rnd := (ss + prod) * 52369
@@ -789,7 +788,7 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) str
 				return ""
 			}
 			b.WriteString(part)
-			arrayInitSeed = s + 1
+			currentSession().ArrayInitSeed = s + 1
 		} else {
 			part := av.buildInitRecursive(dimen+1, initStrings)
 			if part == "" {

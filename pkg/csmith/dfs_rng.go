@@ -25,8 +25,7 @@ type dfsEngine struct {
 	maxDepth         int
 }
 
-// processDFSImpl mirrors DFSRndNumGenerator::impl_ singleton.
-var processDFSImpl *Rng
+// currentSession().DFSImpl mirrors DFSRndNumGenerator::impl_ singleton.
 
 // NewDFSRng mirrors DFSRndNumGenerator ctor + make_rndnum_generator (with seed for Abs LCG).
 // AbsRndNumGenerator.cpp:70 seedrand then DFSRndNumGenerator::make_rndnum_generator.
@@ -72,23 +71,23 @@ func NewDFSRng(seed uint64, opts Options) *Rng {
 // DFSRndNumGenerator.cpp:137–158.
 // opts must be supplied by caller (avoids ProcessOptions RLock under processOptsMu).
 func makeDFSRndNumGeneratorOpts(seed uint64, opts Options) *Rng {
-	if processDFSImpl != nil {
-		return processDFSImpl
+	if currentSession().DFSImpl != nil {
+		return currentSession().DFSImpl
 	}
 	r := NewDFSRng(seed, opts)
 	if r == nil {
 		return nil
 	}
-	processDFSImpl = r
+	currentSession().DFSImpl = r
 	return r
 }
 
 // clearDFSImpl drops the process DFS singleton (RandomNumber::doFinalization path).
 func clearDFSImpl() {
-	if processDFSImpl != nil {
+	if currentSession().DFSImpl != nil {
 		// DFSRndNumGenerator dtor → SequenceFactory::destroy_sequences
 		DestroySequences()
-		processDFSImpl = nil
+		currentSession().DFSImpl = nil
 	}
 }
 

@@ -32,13 +32,13 @@ func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
 	if FindRelatedPointTo(facts, &item.Variable) != nil {
 		t.Fatal("itemized must not be dual-keyed on lattice")
 	}
-	inUserInvocationRevisit = false
+	currentSession().InUserInvocationRevisit = false
 	if IsValidPtr(&item.Variable, facts, 0, 0) {
 		t.Fatal("gen IsValidPtr(itemized) must miss without dual-reg")
 	}
 	ClearError()
-	inUserInvocationRevisit = true
-	defer func() { inUserInvocationRevisit = false }()
+	currentSession().InUserInvocationRevisit = true
+	defer func() { currentSession().InUserInvocationRevisit = false }()
 	if !IsValidPtr(&item.Variable, facts, 0, 0) {
 		t.Fatalf("revisit IsValidPtr(itemized) must fall back to collective err=%v", GetError())
 	}

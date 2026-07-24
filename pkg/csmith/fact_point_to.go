@@ -244,7 +244,7 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 	if HasError() {
 		return false
 	}
-	if fact == nil && inUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
+	if fact == nil && currentSession().InUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
 		fact = FindRelatedPointTo(facts, &p.AsArray.Collective.Variable)
 		if HasError() {
 			return false
@@ -2080,17 +2080,11 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 }
 
 // Package-level alias aggregates (FactPointTo.cpp:67–68).
-var (
-	// AllPtrs mirrors FactPointTo::all_ptrs.
-	AllPtrs []*Variable
-	// AllAliases mirrors FactPointTo::all_aliases (parallel to AllPtrs).
-	AllAliases [][]*Variable
-)
 
 // ClearPointToAggregates resets all_ptrs / all_aliases (generation start).
 func ClearPointToAggregates() {
-	AllPtrs = nil
-	AllAliases = nil
+	currentSession().AllPtrs = nil
+	currentSession().AllAliases = nil
 }
 
 // UpdatePtrAliases mirrors FactPointTo::update_ptr_aliases.
@@ -2171,7 +2165,7 @@ func IncompleteFunctions() []*Function {
 // AggregateAllPointToSets mirrors FactPointTo::aggregate_all_pointto_sets.
 // FactPointTo.cpp:792–804 — scan each non-builtin func FactMgr map_facts_out.
 // FactPointTo.cpp:803 — assert(all_ptrs.size() == all_aliases.size()); kept by UpdatePtrAliases.
-// Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial AllPtrs).
+// Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial currentSession().AllPtrs).
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 	ClearPointToAggregates()
 	// incomplete Funcs list fails closed sticky (no invent partial aggregate success)
@@ -2198,16 +2192,16 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		}
 		// prefer map_facts_out values; also include GlobalFacts
 		for _, facts := range fm.MapFactsOut {
-			if !UpdatePtrAliases(facts, &AllPtrs, &AllAliases) {
+			if !UpdatePtrAliases(facts, &currentSession().AllPtrs, &currentSession().AllAliases) {
 				ClearPointToAggregates()
-				// UpdatePtrAliases already sticky; keep cleared (no invent partial AllPtrs)
+				// UpdatePtrAliases already sticky; keep cleared (no invent partial currentSession().AllPtrs)
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return
 			}
 		}
-		if !UpdatePtrAliases(fm.GlobalFacts, &AllPtrs, &AllAliases) {
+		if !UpdatePtrAliases(fm.GlobalFacts, &currentSession().AllPtrs, &currentSession().AllAliases) {
 			ClearPointToAggregates()
 			if !HasError() {
 				SetError(ErrGeneric)
@@ -2216,7 +2210,7 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		}
 	}
 	// FactPointTo.cpp:803 — sizes must stay paired sticky (no invent desync success)
-	if len(AllPtrs) != len(AllAliases) {
+	if len(currentSession().AllPtrs) != len(currentSession().AllAliases) {
 		ClearPointToAggregates()
 		SetError(ErrGeneric)
 	}

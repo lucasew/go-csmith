@@ -87,7 +87,7 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	// incomplete last vector must IncompleteVariables sticky (not bare nil empty-complete)
 	ClearError()
 	_ = NewCtrlVars(2, false)
-	ctrlVarsVectors[len(ctrlVarsVectors)-1] = append(ctrlVarsVectors[len(ctrlVarsVectors)-1], nil)
+	currentSession().CtrlVarsVectors[len(currentSession().CtrlVarsVectors)-1] = append(currentSession().CtrlVarsVectors[len(currentSession().CtrlVarsVectors)-1], nil)
 	if VariablesComplete(GetLastCtrlVars()) {
 		t.Fatal("incomplete last ctrl must IncompleteVariables")
 	}

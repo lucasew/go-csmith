@@ -8,12 +8,6 @@ package csmith
 // return-fact registry (FunctionInvocationUser.cpp static invocations/return_facts).
 // C++ stores Fact* of any eCat; Go splits ePointTo / eUnionWrite into parallel registries
 // (same inv may appear once per category — FunctionInvocationUser.cpp:91–102).
-var (
-	returnFactInvocations []*Invocation
-	returnFactPoints      []*FactPointTo
-	returnUnionInvocations []*Invocation
-	returnUnionFacts       []*FactUnion
-)
 
 // AddReturnFactForInvocation mirrors add_return_fact_for_invocation for ePointTo.
 // FunctionInvocationUser.cpp:91–102 — assert(invocations.size() == return_facts.size()).
@@ -27,27 +21,27 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 		return
 	}
 	// keep parallel slices; desync is broken IR sticky — reset rather than invent
-	if len(returnFactInvocations) != len(returnFactPoints) {
-		returnFactInvocations = nil
-		returnFactPoints = nil
+	if len(currentSession().ReturnFactInvocations) != len(currentSession().ReturnFactPoints) {
+		currentSession().ReturnFactInvocations = nil
+		currentSession().ReturnFactPoints = nil
 		SetError(ErrGeneric)
 		return
 	}
-	for i, inv := range returnFactInvocations {
+	for i, inv := range currentSession().ReturnFactInvocations {
 		// nil registry slot sticky — clear, no invent re-seed
-		if inv == nil || returnFactPoints[i] == nil {
-			returnFactInvocations = nil
-			returnFactPoints = nil
+		if inv == nil || currentSession().ReturnFactPoints[i] == nil {
+			currentSession().ReturnFactInvocations = nil
+			currentSession().ReturnFactPoints = nil
 			SetError(ErrGeneric)
 			return
 		}
-		if inv == fi && returnFactPoints[i].Var == f.Var {
-			returnFactPoints[i] = f
+		if inv == fi && currentSession().ReturnFactPoints[i].Var == f.Var {
+			currentSession().ReturnFactPoints[i] = f
 			return
 		}
 	}
-	returnFactInvocations = append(returnFactInvocations, fi)
-	returnFactPoints = append(returnFactPoints, f)
+	currentSession().ReturnFactInvocations = append(currentSession().ReturnFactInvocations, fi)
+	currentSession().ReturnFactPoints = append(currentSession().ReturnFactPoints, f)
 }
 
 // AddReturnUnionFactForInvocation mirrors add_return_fact_for_invocation for eUnionWrite.
@@ -57,27 +51,27 @@ func AddReturnUnionFactForInvocation(fi *Invocation, f *FactUnion) {
 		SetError(ErrGeneric)
 		return
 	}
-	if len(returnUnionInvocations) != len(returnUnionFacts) {
-		returnUnionInvocations = nil
-		returnUnionFacts = nil
+	if len(currentSession().ReturnUnionInvocations) != len(currentSession().ReturnUnionFacts) {
+		currentSession().ReturnUnionInvocations = nil
+		currentSession().ReturnUnionFacts = nil
 		SetError(ErrGeneric)
 		return
 	}
-	for i, inv := range returnUnionInvocations {
-		if inv == nil || returnUnionFacts[i] == nil {
-			returnUnionInvocations = nil
-			returnUnionFacts = nil
+	for i, inv := range currentSession().ReturnUnionInvocations {
+		if inv == nil || currentSession().ReturnUnionFacts[i] == nil {
+			currentSession().ReturnUnionInvocations = nil
+			currentSession().ReturnUnionFacts = nil
 			SetError(ErrGeneric)
 			return
 		}
 		// FactUnion::is_related — eUnionWrite + var pointer identity
-		if inv == fi && returnUnionFacts[i].Var == f.Var {
-			returnUnionFacts[i] = f
+		if inv == fi && currentSession().ReturnUnionFacts[i].Var == f.Var {
+			currentSession().ReturnUnionFacts[i] = f
 			return
 		}
 	}
-	returnUnionInvocations = append(returnUnionInvocations, fi)
-	returnUnionFacts = append(returnUnionFacts, f)
+	currentSession().ReturnUnionInvocations = append(currentSession().ReturnUnionInvocations, fi)
+	currentSession().ReturnUnionFacts = append(currentSession().ReturnUnionFacts, f)
 }
 
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
@@ -89,21 +83,21 @@ func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 		SetError(ErrGeneric)
 		return nil
 	}
-	if len(returnFactInvocations) != len(returnFactPoints) {
+	if len(currentSession().ReturnFactInvocations) != len(currentSession().ReturnFactPoints) {
 		SetError(ErrGeneric)
 		return nil
 	}
-	for i, inv := range returnFactInvocations {
+	for i, inv := range currentSession().ReturnFactInvocations {
 		// Invocation* always live on registry; nil hole sticky
-		if inv == nil || returnFactPoints[i] == nil {
+		if inv == nil || currentSession().ReturnFactPoints[i] == nil {
 			SetError(ErrGeneric)
 			return nil
 		}
 		if inv != fi {
 			continue
 		}
-		if returnFactPoints[i].Var == v {
-			return returnFactPoints[i]
+		if currentSession().ReturnFactPoints[i].Var == v {
+			return currentSession().ReturnFactPoints[i]
 		}
 	}
 	return nil
@@ -116,20 +110,20 @@ func GetReturnUnionFactForInvocation(fi *Invocation, v *Variable) *FactUnion {
 		SetError(ErrGeneric)
 		return nil
 	}
-	if len(returnUnionInvocations) != len(returnUnionFacts) {
+	if len(currentSession().ReturnUnionInvocations) != len(currentSession().ReturnUnionFacts) {
 		SetError(ErrGeneric)
 		return nil
 	}
-	for i, inv := range returnUnionInvocations {
-		if inv == nil || returnUnionFacts[i] == nil {
+	for i, inv := range currentSession().ReturnUnionInvocations {
+		if inv == nil || currentSession().ReturnUnionFacts[i] == nil {
 			SetError(ErrGeneric)
 			return nil
 		}
 		if inv != fi {
 			continue
 		}
-		if returnUnionFacts[i].Var == v {
-			return returnUnionFacts[i]
+		if currentSession().ReturnUnionFacts[i].Var == v {
+			return currentSession().ReturnUnionFacts[i]
 		}
 	}
 	return nil
@@ -138,10 +132,10 @@ func GetReturnUnionFactForInvocation(fi *Invocation, v *Variable) *FactUnion {
 // InvocationReturnFactsDoFinalization mirrors FunctionInvocationUser::doFinalization.
 // FunctionInvocationUser.cpp:368–371.
 func InvocationReturnFactsDoFinalization() {
-	returnFactInvocations = nil
-	returnFactPoints = nil
-	returnUnionInvocations = nil
-	returnUnionFacts = nil
+	currentSession().ReturnFactInvocations = nil
+	currentSession().ReturnFactPoints = nil
+	currentSession().ReturnUnionInvocations = nil
+	currentSession().ReturnUnionFacts = nil
 }
 
 // SaveReturnFacts mirrors FunctionInvocationUser::save_return_fact for ePointTo.
@@ -601,9 +595,9 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		fm.SetupInOutMaps(true)
 	}
 	// IsValidPtr collective fallback for itemized arrays only while revisiting.
-	prevRevisit := inUserInvocationRevisit
-	inUserInvocationRevisit = true
-	defer func() { inUserInvocationRevisit = prevRevisit }()
+	prevRevisit := currentSession().InUserInvocationRevisit
+	currentSession().InUserInvocationRevisit = true
+	defer func() { currentSession().InUserInvocationRevisit = prevRevisit }()
 	// FunctionInvocationUser.cpp:206+324 — full FactVec handover includes eUnionWrite.
 	// Build path clones caller UnionFacts then FilterUnionFactsForHandover (function_invocation.go).
 	// Soft invent left stale callee UnionFacts across revisits → IsNonreadableField /

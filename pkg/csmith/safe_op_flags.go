@@ -117,28 +117,27 @@ func (f *SafeOpFlags) Clone() *SafeOpFlags {
 	return &cp
 }
 
-// wrapperNames is SafeOpFlags::wrapper_names for to_id.
-var wrapperNames []string
+// currentSession().WrapperNames is SafeOpFlags::wrapper_names for to_id.
 
 // SafeOpFlagsToID mirrors SafeOpFlags::to_id.
 // SafeOpFlags.cpp:343–352 — assign stable id to wrapper fname (1-based).
 func SafeOpFlagsToID(fname string) int {
-	for i, n := range wrapperNames {
+	for i, n := range currentSession().WrapperNames {
 		if n == fname {
 			return i + 1
 		}
 	}
-	wrapperNames = append(wrapperNames, fname)
-	return len(wrapperNames)
+	currentSession().WrapperNames = append(currentSession().WrapperNames, fname)
+	return len(currentSession().WrapperNames)
 }
 
 // ClearSafeOpWrapperNames resets to_id registry (finalization/tests).
 func ClearSafeOpWrapperNames() {
-	wrapperNames = nil
+	currentSession().WrapperNames = nil
 }
 
 // WrapperNamesCount mirrors SafeOpFlags::wrapper_names.size().
-func WrapperNamesCount() int { return len(wrapperNames) }
+func WrapperNamesCount() int { return len(currentSession().WrapperNames) }
 
 // OutputWrapperH mirrors DefaultProgramGenerator identify_wrappers wrapper.h body.
 // DefaultProgramGenerator.cpp:73–77 — #define N_WRAP <count>.

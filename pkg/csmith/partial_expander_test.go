@@ -46,7 +46,7 @@ func TestInitPartialExpanderForOnly(t *testing.T) {
 	}
 	// restore backup
 	RestorePartialExpanderInitValues()
-	if !partialExpands[MaxStatementType] {
+	if !currentSession().PartialExpands[MaxStatementType] {
 		t.Fatal("restored MAX")
 	}
 	if !DirectExpandCheck(StmtFor) || DirectExpandCheck(StmtAssign) {
@@ -103,7 +103,7 @@ func TestInitFromOptions(t *testing.T) {
 	if !InitPartialExpanderFromOptions(opts) {
 		t.Fatal("clear")
 	}
-	if partialExpands != nil {
+	if currentSession().PartialExpands != nil {
 		t.Fatal("cleared")
 	}
 }

@@ -197,17 +197,16 @@ func extensionValuesComplete(values []*ExtensionValue) bool {
 // --- ExtensionMgr process singleton ---
 
 // processExtension mirrors ExtensionMgr::extension_ (nil = default null extension).
-var processExtensionActive bool // true only when a non-null extension was created
 
 // CreateExtension mirrors ExtensionMgr::CreateExtension.
 // ExtensionMgr.cpp:48–64 — klee/crest/coverage_test construct; else leave null.
 // Uses process RNG/probs when live; incomplete → sticky fail closed.
 func CreateExtension(opts Options) {
 	if !opts.Klee && !opts.Crest && !opts.CoverageTest {
-		processExtensionActive = false
-		processExtKind = ""
-		processExtValues = nil
-		processCoverageTests = nil
+		currentSession().ExtensionActive = false
+		currentSession().ExtKind = ""
+		currentSession().ExtValues = nil
+		currentSession().CoverageTests = nil
 		return
 	}
 	r := ProcessRng()
@@ -223,20 +222,20 @@ func CreateExtension(opts Options) {
 // DestroyExtension mirrors ExtensionMgr::DestroyExtension.
 // ExtensionMgr.cpp:66–69.
 func DestroyExtension() {
-	processExtensionActive = false
-	processExtKind = ""
-	processExtValues = nil
-	processCoverageTests = nil
-	processCoverageSize = 0
+	currentSession().ExtensionActive = false
+	currentSession().ExtKind = ""
+	currentSession().ExtValues = nil
+	currentSession().CoverageTests = nil
+	currentSession().CoverageSize = 0
 }
 
 // ExtensionActive is true when a non-null AbsExtension is installed.
-func ExtensionActive() bool { return processExtensionActive }
+func ExtensionActive() bool { return currentSession().ExtensionActive }
 
 // ExtensionMgrGenerateValues mirrors ExtensionMgr::GenerateValues.
 // ExtensionMgr.cpp:84–88 — null → no-op; Klee/Crest empty; Coverage already built.
 func ExtensionMgrGenerateValues() {
-	if !processExtensionActive {
+	if !currentSession().ExtensionActive {
 		return
 	}
 	// Klee/Crest GenerateValues are empty; Coverage fills at Create
@@ -245,10 +244,10 @@ func ExtensionMgrGenerateValues() {
 // ExtensionMgrGenerateFirstParameterList mirrors GenerateFirstParameterList.
 // ExtensionMgr.cpp:77–82 — null → no-op.
 func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
-	if !processExtensionActive {
+	if !currentSession().ExtensionActive {
 		return
 	}
-	if !AbsExtensionGenerateFirstParameterList(f, processExtValues, vs) {
+	if !AbsExtensionGenerateFirstParameterList(f, currentSession().ExtValues, vs) {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -258,10 +257,10 @@ func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
 // ExtensionMgrOutputHeader mirrors OutputHeader — null → empty.
 // ExtensionMgr.cpp:101–107.
 func ExtensionMgrOutputHeader() string {
-	if !processExtensionActive {
+	if !currentSession().ExtensionActive {
 		return ""
 	}
-	switch processExtKind {
+	switch currentSession().ExtKind {
 	case "klee":
 		return KleeOutputHeader()
 	case "crest":
@@ -277,10 +276,10 @@ func ExtensionMgrOutputHeader() string {
 // ExtensionMgrOutputTail mirrors OutputTail.
 // ExtensionMgr.cpp:109–115 — null → "    return 0;\n".
 func ExtensionMgrOutputTail() string {
-	if !processExtensionActive {
+	if !currentSession().ExtensionActive {
 		return AbsExtensionTab + "return 0;\n"
 	}
-	switch processExtKind {
+	switch currentSession().ExtKind {
 	case "klee":
 		return KleeOutputTail()
 	case "crest":
@@ -296,14 +295,14 @@ func ExtensionMgrOutputTail() string {
 // ExtensionMgrOutputInit mirrors OutputInit.
 // ExtensionMgr.cpp:117–129 — null → main signature + "{".
 func ExtensionMgrOutputInit(acceptArgc bool) string {
-	if processExtensionActive {
-		switch processExtKind {
+	if currentSession().ExtensionActive {
+		switch currentSession().ExtKind {
 		case "klee":
-			return KleeOutputInit(processExtValues)
+			return KleeOutputInit(currentSession().ExtValues)
 		case "crest":
-			return CrestOutputInit(processExtValues)
+			return CrestOutputInit(currentSession().ExtValues)
 		case "coverage":
-			return CoverageOutputInit(processExtValues, processCoverageTests, processCoverageSize)
+			return CoverageOutputInit(currentSession().ExtValues, currentSession().CoverageTests, currentSession().CoverageSize)
 		default:
 			SetError(ErrGeneric)
 			return ""
@@ -322,12 +321,12 @@ func ExtensionMgrOutputInit(acceptArgc bool) string {
 // ExtensionMgrOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 // ExtensionMgr.cpp:131–141 — null path same as AbsExtension default.
 func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
-	if processExtensionActive {
-		switch processExtKind {
+	if currentSession().ExtensionActive {
+		switch currentSession().ExtKind {
 		case "klee", "crest":
 			return AbsExtensionOutputFirstFunInvocation(invokeOut)
 		case "coverage":
-			return CoverageOutputFirstFunInvocation(processExtValues, invokeOut, processCoverageSize)
+			return CoverageOutputFirstFunInvocation(currentSession().ExtValues, invokeOut, currentSession().CoverageSize)
 		default:
 			SetError(ErrGeneric)
 			return ""
@@ -337,7 +336,7 @@ func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
 }
 
 // ExtensionValues returns active extension values_ (may be nil).
-func ExtensionValues() []*ExtensionValue { return processExtValues }
+func ExtensionValues() []*ExtensionValue { return currentSession().ExtValues }
 
 // ExtensionKind returns "klee"|"crest"|"coverage"|"" .
-func ExtensionKind() string { return processExtKind }
+func ExtensionKind() string { return currentSession().ExtKind }

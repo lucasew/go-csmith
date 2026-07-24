@@ -38,8 +38,8 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// Count AllocStmID consumed by multi-dim array-init
-	nextStmID = 200
-	before := nextStmID
+	currentSession().NextStmID = 200
+	before := currentSession().NextStmID
 	st := MakeRandomArrayInit(NewRng(7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if HasError() {
 		t.Fatalf("MakeRandomArrayInit sticky: %v", GetError())
@@ -47,7 +47,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	if st.Kind != StmtArrayOp {
 		t.Fatalf("want StmtArrayOp got %v", st.Kind)
 	}
-	used := nextStmID - before
+	used := currentSession().NextStmID - before
 	if used != 1 {
 		t.Fatalf("multi-dim array-init must AllocStmID once (C++ one Statement), used=%d st.StmID=%d", used, st.StmID)
 	}

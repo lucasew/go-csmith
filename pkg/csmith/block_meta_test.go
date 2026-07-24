@@ -176,7 +176,7 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 
 func TestLabelAttrEmit(t *testing.T) {
 	ClearAttrGenerators()
-	labelAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
+	currentSession().LabelAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "hot", Prob: 100},
 	}}
 	b := &Block{
@@ -197,6 +197,7 @@ func TestLabelAttrEmit(t *testing.T) {
 }
 
 func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -221,6 +222,7 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 }
 
 func TestMustBreakOrReturn(t *testing.T) {
+	ClearError() // sticky GenError from earlier suite tests must not mask must_return
 	// Block.cpp:342–357 — last must_return (break alone is not enough)
 	b := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak,
@@ -239,6 +241,7 @@ func TestMustBreakOrReturn(t *testing.T) {
 }
 
 func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
+	ClearError()
 	// Block.cpp:313–331 — break_stms nonempty → not must_return
 	ret := Stmt{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
 	b := &Block{StmID: 1, Stmts: []Stmt{ret}, BreakStmIDs: []int{9}}
@@ -391,7 +394,7 @@ func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 // Statement.cpp:239,370–371 — sid starts 0; assign then increment.
 func TestAllocStmIDMatchesCppSid(t *testing.T) {
 	ClearError()
-	nextStmID = 0
+	currentSession().NextStmID = 0
 	if AllocStmID() != 0 {
 		t.Fatal("first stm_id must be 0")
 	}
@@ -409,7 +412,7 @@ func TestAllocStmIDMatchesCppSid(t *testing.T) {
 // Seed-2: func_1 body is block id 0; late id 577 (matches instrumented upstream).
 func TestSeed2BlockIDsMatchUpstream(t *testing.T) {
 	ClearError()
-	nextStmID = 0
+	currentSession().NextStmID = 0
 	opts := Defaults()
 	opts.Seed = 2
 	out, err := Generate(opts)

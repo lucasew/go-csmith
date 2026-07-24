@@ -135,7 +135,7 @@ func (st *Stmt) GetType() StatementType {
 }
 
 // GetCurrentSID mirrors Statement::get_current_sid process counter.
-// Statement uses nextStmID package counter (nextStmID).
+// Statement uses currentSession().NextStmID package counter (currentSession().NextStmID).
 func GetCurrentSID() int {
-	return nextStmID
+	return currentSession().NextStmID
 }

@@ -552,19 +552,14 @@ func (t *Type) ToUnsigned() *Type {
 	}
 }
 
-// platform sizes from Options / platform.info (set by Generate via SetPlatformSizes).
-var (
-	platformIntSize = 4
-	platformPtrSize = 8
-)
-
 // SetPlatformSizes mirrors host/platform.info integer and pointer sizes for SizeInBytes.
 func SetPlatformSizes(intSize, ptrSize int) {
+	s := currentSession()
 	if intSize > 0 {
-		platformIntSize = intSize
+		s.PlatformIntSize = intSize
 	}
 	if ptrSize > 0 {
-		platformPtrSize = ptrSize
+		s.PlatformPtrSize = ptrSize
 	}
 }
 
@@ -581,7 +576,7 @@ func (t *Type) SizeInBytes() int {
 	}
 	if t.ptrTo != nil {
 		// Type.cpp:1568–1572 — ePointer: pointer_size() side-effect then return 0
-		_ = platformPtrSize
+		_ = currentSession().PlatformPtrSize
 		return 0
 	}
 	// Type.cpp:1502–1531 — fixed simple sizes (independent of host LP64)
@@ -730,16 +725,13 @@ func (t *Type) IndirectLevel() int {
 	return n
 }
 
-// pointerCache keys by pointee pointer for stable eExact match on pointers.
+// currentSession().PointerCache keys by pointee pointer for stable eExact match on pointers.
 // Mirrors Type::derived_types pointer entries (Type.cpp find_pointer_type).
-var pointerCache = map[*Type]*Type{}
-
-// TypeDoFinalization mirrors Type::doFinalization for process-wide derived types.
-// Type.cpp:1962–1971 — clears derived_types (Go: pointerCache).
+// TypeDoFinalization mirrors Type::doFinalization for session derived types.
+// Type.cpp:1962–1971 — clears derived_types (Go: PointerCache).
 // simpleTypes stay: permanent eSimple cache (C++ simple_types[] is not reallocated each run).
-// Allocated struct/union *Type values are GC'd with their ProgramGenerator session.
 func TypeDoFinalization() {
-	pointerCache = map[*Type]*Type{}
+	currentSession().PointerCache = map[*Type]*Type{}
 }
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).
@@ -749,11 +741,11 @@ func PointerTo(pointee *Type) *Type {
 		SetError(ErrGeneric)
 		return nil
 	}
-	if p, ok := pointerCache[pointee]; ok {
+	if p, ok := currentSession().PointerCache[pointee]; ok {
 		return p
 	}
 	p := &Type{ptrTo: pointee}
-	pointerCache[pointee] = p
+	currentSession().PointerCache[pointee] = p
 	return p
 }
 

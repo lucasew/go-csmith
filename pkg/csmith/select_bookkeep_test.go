@@ -19,16 +19,16 @@ func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	reused := 0
 	created := 0
 	for seed := uint64(2); seed < 40; seed++ {
-		beforeOld := useOldVarCnt
-		beforeNew := useNewVarCnt
+		beforeOld := currentSession().BK.useOldVarCnt
+		beforeNew := currentSession().BK.useNewVarCnt
 		v := vs.Select(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(seed), MatchFlexible)
 		if v == nil {
 			continue
 		}
-		if useOldVarCnt > beforeOld {
+		if currentSession().BK.useOldVarCnt > beforeOld {
 			reused++
 		}
-		if useNewVarCnt > beforeNew {
+		if currentSession().BK.useNewVarCnt > beforeNew {
 			created++
 		}
 	}

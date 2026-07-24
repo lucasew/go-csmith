@@ -142,29 +142,27 @@ func (s *LinearSequence) SepChar() byte {
 
 // --- SequenceFactory ---
 
-// sequenceFactorySep mirrors SequenceFactory::current_sep_char_.
-var sequenceFactorySep byte = LinearSequenceDefaultSep
+// currentSession().SequenceFactorySep mirrors SequenceFactory::current_sep_char_.
 
-// sequenceFactoryLive tracks sequences created via MakeSequence (destroy_sequences).
-var sequenceFactoryLive []*LinearSequence
+// currentSession().SequenceFactoryLive tracks sequences created via MakeSequence (destroy_sequences).
 
 // MakeSequence mirrors SequenceFactory::make_sequence.
 // SequenceFactory.cpp:44–52 — always LinearSequence with default_sep_char.
 func MakeSequence() *LinearSequence {
 	seq := NewLinearSequence(LinearSequenceDefaultSep)
-	sequenceFactorySep = LinearSequenceDefaultSep
-	sequenceFactoryLive = append(sequenceFactoryLive, seq)
+	currentSession().SequenceFactorySep = LinearSequenceDefaultSep
+	currentSession().SequenceFactoryLive = append(currentSession().SequenceFactoryLive, seq)
 	return seq
 }
 
 // DestroySequences mirrors SequenceFactory::destroy_sequences.
 // SequenceFactory.cpp:54–59.
 func DestroySequences() {
-	sequenceFactoryLive = nil
+	currentSession().SequenceFactoryLive = nil
 }
 
 // CurrentSepChar mirrors SequenceFactory::current_sep_char.
-func CurrentSepChar() byte { return sequenceFactorySep }
+func CurrentSepChar() byte { return currentSession().SequenceFactorySep }
 
 // --- SequenceLineParser ---
 

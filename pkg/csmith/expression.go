@@ -1672,7 +1672,7 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
 		deref, _ := ev.IndirectLevelComplete()
 		if deref > 0 {
-			IncrCounter(&readDereferenceCnts, deref)
+			IncrCounter(&currentSession().BK.readDereferenceCnts, deref)
 		} else if deref < 0 {
 			RecordAddressTaken(v)
 		}

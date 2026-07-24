@@ -4,16 +4,15 @@ package csmith
 
 import "strings"
 
-// stmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
+// currentSession().StmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
 // StatementGoto.cpp:55, 224–229.
-var stmLabels = map[int]string{}
 
 // LabelForGotoDest returns existing or new gensym label for a jump destination.
 // StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present; else gensym("lbl_").
 // no invent fixed "lbl_1" when nextLabel is nil
 func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 	if !StmIDUnset(destStmID) {
-		if lab, ok := stmLabels[destStmID]; ok && lab != "" {
+		if lab, ok := currentSession().StmLabels[destStmID]; ok && lab != "" {
 			return lab
 		}
 	}
@@ -30,7 +29,7 @@ func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 		return ""
 	}
 	if !StmIDUnset(destStmID) {
-		stmLabels[destStmID] = lab
+		currentSession().StmLabels[destStmID] = lab
 	}
 	return lab
 }
@@ -38,7 +37,7 @@ func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 // GotoLabelsDoFinalization mirrors StatementGoto::doFinalization.
 // StatementGoto.cpp:404 — stm_labels.clear().
 func GotoLabelsDoFinalization() {
-	stmLabels = map[int]string{}
+	currentSession().StmLabels = map[int]string{}
 }
 
 // goodGotoTarget reports statements that may receive a label (not jump/return-ish).
@@ -590,7 +589,7 @@ func MakeRandomGoto(
 			label = LabelForGotoDest(other.StmID, nextLab)
 			other.SourceLabel = label
 		} else if !StmIDUnset(other.StmID) {
-			stmLabels[other.StmID] = label
+			currentSession().StmLabels[other.StmID] = label
 		}
 		// incomplete LocalVars on intermediate blocks fails closed sticky (Collect nil)
 		// no invent goto with empty InitSkippedVars when skip list is incomplete
@@ -974,7 +973,7 @@ func MakeRandomGoto(
 		}
 		dest.SourceLabel = label
 	} else {
-		stmLabels[destID] = label
+		currentSession().StmLabels[destID] = label
 	}
 	sg := Stmt{
 		Kind:            StmtGoto,

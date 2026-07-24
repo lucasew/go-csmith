@@ -30,7 +30,7 @@ func TestSizeInBytesUsesPlatform(t *testing.T) {
 		t.Fatal(GetSimpleType(EULong).CName())
 	}
 	SetPlatformSizes(4, 4)
-	// pointer still 0; platformPtrSize only for other uses
+	// pointer still 0; currentSession().PlatformPtrSize only for other uses
 	if PointerTo(GetIntType()).SizeInBytes() != 0 {
 		t.Fatal("ptr still 0 on ILP32")
 	}

@@ -76,7 +76,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect())
 	// reset sid for stable-ish ids
-	nextStmID = 0
+	currentSession().NextStmID = 0
 	b := MakeRandomBlock(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil block")

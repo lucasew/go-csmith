@@ -33,7 +33,7 @@ func DoFinalization() {
 	// StatementGoto::stm_labels
 	GotoLabelsDoFinalization()
 	// Statement sid
-	nextStmID = 0
+	currentSession().NextStmID = 0
 	// util.cpp reset_gensym — process gensym_count (DFSProgramGenerator.cpp:92)
 	// DefaultProgramGenerator process is one-shot; library multi-Generate needs reset
 	ResetDefaultGensym()

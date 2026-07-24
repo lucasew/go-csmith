@@ -22,33 +22,28 @@ const (
 // meta_facts enable flags (FactMgr.cpp:67 meta_facts vector).
 // When false, corresponding abstract_fact paths are skipped.
 //
-// inUserInvocationRevisit is true during FunctionInvocationUser::revisit
+// currentSession().InUserInvocationRevisit is true during FunctionInvocationUser::revisit
 // (nested body re-analysis). Used for IsValidPtr collective fallback on
 // only on revisit so gen-time ExpressionVariable select stream is unchanged.
-var (
-	metaFactPointToEnabled   = true
-	metaFactUnionEnabled     = true
-	inUserInvocationRevisit  bool
-)
 
 // AddInterestedFacts mirrors FactMgr::add_interested_facts.
 // FactMgr.cpp:475–486 — register meta fact kinds for DFA.
 func AddInterestedFacts(interests int) {
-	metaFactPointToEnabled = interests&FactCategoryPointTo != 0
-	metaFactUnionEnabled = interests&FactCategoryUnionWrite != 0
+	currentSession().MetaFactPointToEnabled = interests&FactCategoryPointTo != 0
+	currentSession().MetaFactUnionEnabled = interests&FactCategoryUnionWrite != 0
 }
 
 // MetaFactPointToEnabled reports whether point-to analysis is active.
-func MetaFactPointToEnabled() bool { return metaFactPointToEnabled }
+func MetaFactPointToEnabled() bool { return currentSession().MetaFactPointToEnabled }
 
 // MetaFactUnionEnabled reports whether union-write analysis is active.
-func MetaFactUnionEnabled() bool { return metaFactUnionEnabled }
+func MetaFactUnionEnabled() bool { return currentSession().MetaFactUnionEnabled }
 
 // ClearMetaFacts restores default interested facts (both on).
 // Called from DoFinalization between generations.
 func ClearMetaFacts() {
-	metaFactPointToEnabled = true
-	metaFactUnionEnabled = true
+	currentSession().MetaFactPointToEnabled = true
+	currentSession().MetaFactUnionEnabled = true
 }
 
 // FactMgr mirrors FactMgr for a function — global_facts + stm maps.
@@ -2444,8 +2439,8 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
-	wantPT := metaFactPointToEnabled && isPtr
-	wantUn := metaFactUnionEnabled && v.Type != nil && v.Type.IsUnion()
+	wantPT := currentSession().MetaFactPointToEnabled && isPtr
+	wantUn := currentSession().MetaFactUnionEnabled && v.Type != nil && v.Type.IsUnion()
 	// residual ERROR sticky — no invent soft-skip makeup past IsUnion residual
 	if HasError() {
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -3437,7 +3432,7 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered
-	if !metaFactPointToEnabled {
+	if !currentSession().MetaFactPointToEnabled {
 		return
 	}
 	// recurse into aggregate fields (pointer members) like AddNewVarFact

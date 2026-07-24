@@ -337,66 +337,57 @@ func NewUnionTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGen
 }
 
 // Package-level generators (Variable::var_attr_generator / Function::func_attr_generator).
-var (
-	varAttrGenerator    *AttributeGenerator
-	funcAttrGenerator   *AttributeGenerator
-	labelAttrGenerator  *AttributeGenerator
-	structTypeAttrGen   *AttributeGenerator
-	unionTypeAttrGen    *AttributeGenerator
-	attrGeneratorsOpts  Options
-	attrGeneratorsProbs *Probabilities
-)
 
 // InitAttrGenerators wires generators from options/probabilities (generation start).
 // Mirrors InitializeVariableAttributes / InitializeAttributes / InitializeLabelAttributes /
 // InitializeTypeAttributes when flags are on.
 func InitAttrGenerators(opts Options, probs *Probabilities) {
-	attrGeneratorsOpts = opts
-	attrGeneratorsProbs = probs
-	varAttrGenerator = NewVarAttrGenerator(opts, probs)
-	funcAttrGenerator = NewFuncAttrGenerator(opts, probs)
-	labelAttrGenerator = NewLabelAttrGenerator(opts, probs)
-	structTypeAttrGen = NewStructTypeAttrGenerator(opts, probs)
-	unionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
+	currentSession().Opts = opts
+	currentSession().Probs = probs
+	currentSession().VarAttrGenerator = NewVarAttrGenerator(opts, probs)
+	currentSession().FuncAttrGenerator = NewFuncAttrGenerator(opts, probs)
+	currentSession().LabelAttrGenerator = NewLabelAttrGenerator(opts, probs)
+	currentSession().StructTypeAttrGen = NewStructTypeAttrGenerator(opts, probs)
+	currentSession().UnionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
 }
 
 // EnsureVarAttrGenerator returns Variable::var_attr_generator after InitAttrGenerators.
 // No soft invent NewVarAttrGenerator with zero opts when init was skipped
 // (C++ InitializeVariableAttributes runs from CreateVariable / generation start).
 func EnsureVarAttrGenerator() *AttributeGenerator {
-	return varAttrGenerator
+	return currentSession().VarAttrGenerator
 }
 
 // EnsureFuncAttrGenerator returns function attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureFuncAttrGenerator() *AttributeGenerator {
-	return funcAttrGenerator
+	return currentSession().FuncAttrGenerator
 }
 
 // EnsureLabelAttrGenerator returns label attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureLabelAttrGenerator() *AttributeGenerator {
-	return labelAttrGenerator
+	return currentSession().LabelAttrGenerator
 }
 
 // EnsureStructTypeAttrGenerator returns struct type attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureStructTypeAttrGenerator() *AttributeGenerator {
-	return structTypeAttrGen
+	return currentSession().StructTypeAttrGen
 }
 
 // EnsureUnionTypeAttrGenerator returns union type attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureUnionTypeAttrGenerator() *AttributeGenerator {
-	return unionTypeAttrGen
+	return currentSession().UnionTypeAttrGen
 }
 
 // ClearAttrGenerators for Finalization between runs.
 func ClearAttrGenerators() {
-	varAttrGenerator = nil
-	funcAttrGenerator = nil
-	labelAttrGenerator = nil
-	structTypeAttrGen = nil
-	unionTypeAttrGen = nil
-	attrGeneratorsProbs = nil
+	currentSession().VarAttrGenerator = nil
+	currentSession().FuncAttrGenerator = nil
+	currentSession().LabelAttrGenerator = nil
+	currentSession().StructTypeAttrGen = nil
+	currentSession().UnionTypeAttrGen = nil
+	currentSession().Probs = nil
 }

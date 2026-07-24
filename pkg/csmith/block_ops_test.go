@@ -290,6 +290,7 @@ func TestEffectCloneIndependent(t *testing.T) {
 }
 
 func TestInArrayLoopFromIVBounds(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -303,6 +304,7 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 }
 
 func TestAppendReturnStmtRecordsMaps(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
@@ -598,7 +600,7 @@ func TestAddNewVarFactTo(t *testing.T) {
 	// no Init/InitExpr → C++ v->init nullptr → garbage via abstract; empty abstract
 	// when meta off fails closed without invent
 	ClearMetaFacts()
-	metaFactPointToEnabled = false
+	currentSession().MetaFactPointToEnabled = false
 	var empty []*FactPointTo
 	AddNewVarFactTo(p, &empty)
 	if len(empty) != 0 {
@@ -610,7 +612,7 @@ func TestAddNewVarFactTo(t *testing.T) {
 func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	// soft invent: skip nil FieldVars and still makeup later pointer fields
 	// fair: incomplete FieldVars clears *facts
-	metaFactPointToEnabled = true
+	currentSession().MetaFactPointToEnabled = true
 	defer ClearMetaFacts()
 	ClearError()
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
@@ -1008,7 +1010,7 @@ func TestFindJumpLabel(t *testing.T) {
 		t.Fatal(got)
 	}
 	// empty registry entry — no invent empty label token
-	stmLabels[100] = ""
+	currentSession().StmLabels[100] = ""
 	if got := FindJumpLabel(fm, 100); got != "" {
 		t.Fatal("empty registry label must fail closed", got)
 	}

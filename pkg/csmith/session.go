@@ -1,20 +1,23 @@
-// Session holds mutable generation state for one run (or the unit-test default).
+// Session owns all mutable generation state for one run (or the unit-test bag).
 //
-// Model (SPEC / library contract):
-//   - Read-only package data: opcode tables, probability name maps, simpleTypes
-//     templates, builtin string lists — never mutated per run.
-//   - Session-specific: Options, Rng, Probabilities, stmt/scope/expr tables,
-//     and everything DoFinalization clears (caches, labels, gensym, Error, …).
+// Rule: nothing writable is a package-level var of generation state.
+//   - Read-only package data only: const tables, name maps, builtin string lists.
+//   - All mutable run state lives on *Session.
 //
-// Concurrent Generate in one process is not supported (upstream csmith is one
-// process / one generation). Fuzz workers are separate OS processes and need
-// no shared-session lock. generateMu is therefore unnecessary.
+// Access bridge (temporary): currentSession() returns the active bag so existing
+// Process*/package helpers keep working without threading *Session through every
+// call yet. The bridge itself is the last global write; next step is to pass
+// *Session explicitly and delete activeSession.
+//
+// Concurrent Generate in one process is unsupported (upstream: one gen/process).
+// Fuzz workers are separate OS processes.
 //
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// Session is the CGOptions / Probabilities / RNG / table bag for one generation
-// (or the long-lived default bag used by unit tests via SetProcess*).
+import "strings"
+
+// Session is the full mutable generation bag (CGOptions + C++ statics mirror).
 type Session struct {
 	Opts         Options
 	Probs        *Probabilities
@@ -24,16 +27,151 @@ type Session struct {
 	AssignOpsTab *DistributionTable
 	ExprTables   *ExprTables
 	ProgramGen   *ProgramGenerator
-	// RandomNumber is RandomNumber::instance_ for this session.
 	RandomNumber *RandomNumber
+
+	// Error::r_error_
+	GenError int
+
+	// Statement::sid
+	NextStmID int
+	// StatementGoto::stm_labels
+	StmLabels map[int]string
+
+	// Type::derived_types pointer cache + platform sizes for SizeInBytes
+	PointerCache    map[*Type]*Type
+	PlatformIntSize int
+	PlatformPtrSize int
+
+	// Bookkeeper static counters (subset; full fields inlined via package funcs)
+	BK bookkeeperState
+
+	// OutputMgr statics
+	MonitoredFuncs []string
+	CurrFunc       string
+	OutputMgrKind  OutputMgrKind
+	StructOutput   string
+	SplitPaths     []string
+	OutputFile     string
+
+	// PartialExpander
+	PartialExpands       map[StatementType]bool
+	PartialExpandsBackup map[StatementType]bool
+
+	// ArrayVariable static seed
+	ArrayInitSeed uint32
+
+	// util gensym_count + analysis errlog
+	GenSym         GenSym
+	AnalysisErrLog strings.Builder
+
+	// CompatibleChecker process static
+	CompatibleCheck bool
+
+	// ExtensionMgr / AbsExtension process values
+	ExtensionActive bool
+	ExtValues       []*ExtensionValue
+	ExtKind         string
+	CoverageSize    int
+	CoverageTests   []*Constant
+
+	// Attribute generators
+	VarAttrGenerator   *AttributeGenerator
+	FuncAttrGenerator  *AttributeGenerator
+	LabelAttrGenerator *AttributeGenerator
+	StructTypeAttrGen  *AttributeGenerator
+	UnionTypeAttrGen   *AttributeGenerator
+
+	// FactMgr meta facts
+	MetaFactPointToEnabled  bool
+	MetaFactUnionEnabled    bool
+	InUserInvocationRevisit bool
+
+	// Variable::ctrl_vars
+	CtrlVarsVectors [][]*Variable
+	CtrlVarsCount   uint64
+
+	// FunctionInvocationUser return-fact registry
+	ReturnFactInvocations  []*Invocation
+	ReturnFactPoints       []*FactPointTo
+	ReturnUnionInvocations []*Invocation
+	ReturnUnionFacts       []*FactUnion
+
+	// FactPointTo aggregates
+	AllPtrs    []*Variable
+	AllAliases [][]*Variable
+
+	// Analysis / DFS helpers
+	FailedStm           *Stmt
+	DFSImpl             *Rng
+	SequenceFactorySep  byte
+	SequenceFactoryLive []*LinearSequence
+	WrapperNames        []string
 }
 
-// defaultSession is active when no Generate is running (unit tests, library
-// helpers that call SetProcessOptions without NewProgramGenerator).
-var defaultSession = &Session{Opts: Defaults()}
+// bookkeeperState is Bookkeeper.cpp static counters for one session.
+type bookkeeperState struct {
+	structDepthCnts                  []int
+	unionVarCnt                      int
+	exprDepthCnts                    []int
+	blkDepthCnts                     []int
+	dereferenceLevelCnts             []int
+	addressTakenCnt                  int
+	writeDereferenceCnts             []int
+	readDereferenceCnts              []int
+	cmpPtrToNull                     int
+	cmpPtrToPtr                      int
+	cmpPtrToAddr                     int
+	readVolatileCnt                  int
+	writeVolatileCnt                 int
+	readNonVolatileCnt               int
+	writeNonVolatileCnt              int
+	readVolatileThruPtrCnt           int
+	writeVolatileThruPtrCnt          int
+	pointerAvailForDeref             int
+	volatileAvail                    int
+	structsWithBitfields             int
+	varsWithBitfields                []int
+	varsWithFullBitfields            []int
+	varsWithBitfieldsAddressTakenCnt int
+	bitfieldsInTotal                 int
+	unamedBitfieldsInTotal           int
+	constBitfieldsInTotal            int
+	volatileBitfieldsInTotal         int
+	lhsBitfieldsStructsVarsCnt       int
+	rhsBitfieldsStructsVarsCnt       int
+	lhsBitfieldCnt                   int
+	rhsBitfieldCnt                   int
+	forwardJumpCnt                   int
+	backwardJumpCnt                  int
+	useNewVarCnt                     int
+	useOldVarCnt                     int
+	oobCnt                           int
+	relyOnIntSize                    bool
+	relyOnPtrSize                    bool
+}
 
-// activeSession is the Generate-scoped session; nil means use defaultSession.
+// defaultSession is the bag used by unit tests outside Generate.
+// It is still a heap object, not "generation state spilled into package vars".
+var defaultSession = newSession()
+
+// activeSession is the only remaining package-level write for the Process* bridge.
+// TODO: pass *Session explicitly and delete this.
 var activeSession *Session
+
+func newSession() *Session {
+	s := &Session{
+		Opts:                   Defaults(),
+		PlatformIntSize:        4,
+		PlatformPtrSize:        8,
+		ArrayInitSeed:          0xABCDEF,
+		MetaFactPointToEnabled: true,
+		MetaFactUnionEnabled:   true,
+		SequenceFactorySep:     LinearSequenceDefaultSep,
+		StmLabels:              map[int]string{},
+		PointerCache:           map[*Type]*Type{},
+	}
+	return s
+}
 
 func currentSession() *Session {
 	if activeSession != nil {
@@ -42,18 +180,17 @@ func currentSession() *Session {
 	return defaultSession
 }
 
-// activateSession makes s the Process* target until the returned restore runs.
-// Nested activate is supported for tests (restore previous).
+// activateSession makes s the Process* target until restore.
 func activateSession(s *Session) (restore func()) {
 	prev := activeSession
 	activeSession = s
 	return func() { activeSession = prev }
 }
 
-// BeginGenerateSession installs a fresh session for one full-program Generate
-// and returns restore that deactivates it. Caller should DoFinalization at the
-// end of generation (Initialize already runs a mid-setup finalization).
+// BeginGenerateSession installs a fresh session for one full-program Generate.
 func BeginGenerateSession() (restore func()) {
-	s := &Session{Opts: Defaults()}
-	return activateSession(s)
+	return activateSession(newSession())
 }
+
+// CurrentSession returns the active session bag (tests / migration helpers).
+func CurrentSession() *Session { return currentSession() }

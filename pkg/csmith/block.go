@@ -57,9 +57,7 @@ type Stmt struct {
 	Rhs *Expression
 }
 
-// nextStmID is Statement::sid (Statement.cpp:239, 370–371).
-// Starts at 0; AllocStmID assigns then increments so first live id is 0.
-var nextStmID int
+// Statement::sid lives on Session.NextStmID (see session.go).
 
 // IncompleteStmID is the unset/incomplete sentinel (not a C++ stm_id).
 // Valid C++ ids are 0,1,2,… — never use 0 as “missing”.
@@ -68,8 +66,9 @@ const IncompleteStmID = -1
 // AllocStmID mirrors Statement ctor: stm_id = sid; sid++.
 // Statement.cpp:370–371 — first statement gets 0.
 func AllocStmID() int {
-	id := nextStmID
-	nextStmID++
+	s := currentSession()
+	id := s.NextStmID
+	s.NextStmID++
 	return id
 }
 
@@ -1449,7 +1448,7 @@ func makeRandomStmtForced(
 			kind = StatementProbabilityFilter(r, stmtTab, f)
 		}
 		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
-		if opts.StopByStmt >= 0 && nextStmID >= opts.StopByStmt {
+		if opts.StopByStmt >= 0 && currentSession().NextStmID >= opts.StopByStmt {
 			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make

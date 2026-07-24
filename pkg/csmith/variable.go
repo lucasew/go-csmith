@@ -8,10 +8,6 @@ import (
 
 // ctrl_vars pool mirrors Variable::ctrl_vars_vectors / ctrl_vars_count.
 // Variable.cpp:73–74, 747–776.
-var (
-	ctrlVarsVectors [][]*Variable
-	ctrlVarsCount   uint64
-)
 
 // Variable mirrors Variable for non-array, non-field cases first.
 type Variable struct {
@@ -527,7 +523,7 @@ func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
 	if maxDim < 0 {
 		maxDim = 0
 	}
-	suffix := ctrlVarsCount
+	suffix := currentSession().CtrlVarsCount
 	ctrl := make([]*Variable, 0, maxDim)
 	name := byte('i')
 	for i := 0; i < maxDim; i++ {
@@ -542,8 +538,8 @@ func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
 		})
 		name++
 	}
-	ctrlVarsCount++
-	ctrlVarsVectors = append(ctrlVarsVectors, ctrl)
+	currentSession().CtrlVarsCount++
+	currentSession().CtrlVarsVectors = append(currentSession().CtrlVarsVectors, ctrl)
 	return ctrl
 }
 
@@ -557,10 +553,10 @@ func GetNewCtrlVars(opts Options) []*Variable {
 // Incomplete last vector fails closed sticky IncompleteVariables (not bare nil invent
 // empty-complete ctrl set / soft re-pick array inits past hole).
 func GetLastCtrlVars() []*Variable {
-	if len(ctrlVarsVectors) == 0 {
+	if len(currentSession().CtrlVarsVectors) == 0 {
 		return nil
 	}
-	last := ctrlVarsVectors[len(ctrlVarsVectors)-1]
+	last := currentSession().CtrlVarsVectors[len(currentSession().CtrlVarsVectors)-1]
 	if !VariablesComplete(last) {
 		SetError(ErrGeneric)
 		return IncompleteVariables()
@@ -571,8 +567,8 @@ func GetLastCtrlVars() []*Variable {
 // CtrlVarsDoFinalization mirrors Variable::doFinalization for ctrl var pool.
 // Variable.cpp:779–786.
 func CtrlVarsDoFinalization() {
-	ctrlVarsVectors = nil
-	ctrlVarsCount = 0
+	currentSession().CtrlVarsVectors = nil
+	currentSession().CtrlVarsCount = 0
 }
 
 // CtrlVarNames returns actual names of a ctrl-var slice.

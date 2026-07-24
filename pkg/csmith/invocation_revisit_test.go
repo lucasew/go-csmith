@@ -180,8 +180,8 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	ClearError()
 	InvocationReturnFactsDoFinalization()
 	fiOK := &Invocation{User: &Function{Name: "h", RV: rv}}
-	returnFactInvocations = []*Invocation{&Invocation{User: &Function{Name: "x"}}}
-	returnFactPoints = []*FactPointTo{} // desync sizes
+	currentSession().ReturnFactInvocations = []*Invocation{&Invocation{User: &Function{Name: "x"}}}
+	currentSession().ReturnFactPoints = []*FactPointTo{} // desync sizes
 	fiOK.SaveReturnFacts([]*FactPointTo{MakeFactPointTo(rv, NullPtr)})
 	if GetReturnFactForInvocation(fiOK, rv) != nil {
 		t.Fatal("desync Add residual must fail closed no invent registry")
@@ -194,8 +194,8 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	ClearError()
 	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}
 	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
-	returnFactInvocations = append([]*Invocation{nil}, returnFactInvocations...)
-	returnFactPoints = append([]*FactPointTo{MakeFactPointTo(rv, NullPtr)}, returnFactPoints...)
+	currentSession().ReturnFactInvocations = append([]*Invocation{nil}, currentSession().ReturnFactInvocations...)
+	currentSession().ReturnFactPoints = append([]*FactPointTo{MakeFactPointTo(rv, NullPtr)}, currentSession().ReturnFactPoints...)
 	if GetReturnFactForInvocation(fi2, rv) != nil {
 		t.Fatal("nil inv registry hole must fail closed, not invent later match")
 	}

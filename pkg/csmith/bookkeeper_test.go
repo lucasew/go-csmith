@@ -39,8 +39,8 @@ func TestRecordAddressTaken(t *testing.T) {
 	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	RecordAddressTaken(v)
-	if !v.IsAddrTaken || addressTakenCnt != 1 {
-		t.Fatal(addressTakenCnt, v.IsAddrTaken)
+	if !v.IsAddrTaken || currentSession().BK.addressTakenCnt != 1 {
+		t.Fatal(currentSession().BK.addressTakenCnt, v.IsAddrTaken)
 	}
 	// Bookkeeper.cpp:325–326 assert(var/type) sticky
 	RecordAddressTaken(nil)
@@ -58,12 +58,12 @@ func TestRecordAddressTaken(t *testing.T) {
 	BookkeeperDoFinalization()
 	holeTy := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
 	hv := &Variable{Name: "g_h", Type: holeTy}
-	before := varsWithBitfieldsAddressTakenCnt
+	before := currentSession().BK.varsWithBitfieldsAddressTakenCnt
 	RecordAddressTaken(hv)
 	if !HasError() {
 		t.Fatal("HasBitfields residual RecordAddressTaken must SetError sticky")
 	}
-	if varsWithBitfieldsAddressTakenCnt != before {
+	if currentSession().BK.varsWithBitfieldsAddressTakenCnt != before {
 		t.Fatal("HasBitfields residual must not invent bitfield address-taken count")
 	}
 	ClearError()
@@ -74,17 +74,17 @@ func TestRecordVolatileAccess(t *testing.T) {
 	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	RecordVolatileAccess(v, 0, false)
-	if readVolatileCnt != 1 {
-		t.Fatal(readVolatileCnt)
+	if currentSession().BK.readVolatileCnt != 1 {
+		t.Fatal(currentSession().BK.readVolatileCnt)
 	}
 	RecordVolatileAccess(v, 0, true)
-	if writeVolatileCnt != 1 {
-		t.Fatal(writeVolatileCnt)
+	if currentSession().BK.writeVolatileCnt != 1 {
+		t.Fatal(currentSession().BK.writeVolatileCnt)
 	}
 	nv := CreateVariableScalars("g_n", GetIntType(), false, false)
 	RecordVolatileAccess(nv, 0, false)
-	if readNonVolatileCnt != 1 {
-		t.Fatal(readNonVolatileCnt)
+	if currentSession().BK.readNonVolatileCnt != 1 {
+		t.Fatal(currentSession().BK.readNonVolatileCnt)
 	}
 	// Bookkeeper.cpp:388 assert(var) sticky
 	RecordVolatileAccess(nil, 0, false)
@@ -96,12 +96,12 @@ func TestRecordVolatileAccess(t *testing.T) {
 	// Fair: sticky stop (Type-nil peel residual).
 	BookkeeperDoFinalization()
 	hole := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	beforeR := readVolatileCnt + readNonVolatileCnt
+	beforeR := currentSession().BK.readVolatileCnt + currentSession().BK.readNonVolatileCnt
 	RecordVolatileAccess(hole, 0, false)
 	if !HasError() {
 		t.Fatal("IsVolatileAfterDeref residual RecordVolatileAccess must SetError sticky")
 	}
-	if readVolatileCnt+readNonVolatileCnt != beforeR {
+	if currentSession().BK.readVolatileCnt+currentSession().BK.readNonVolatileCnt != beforeR {
 		t.Fatal("IsVolatileAfterDeref residual must not invent peel access counts")
 	}
 	ClearError()
@@ -116,11 +116,11 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	RecordVarCreated(v)
 	RecordVarReused()
-	if forwardJumpCnt != 1 || backwardJumpCnt != 2 {
-		t.Fatal(forwardJumpCnt, backwardJumpCnt)
+	if currentSession().BK.forwardJumpCnt != 1 || currentSession().BK.backwardJumpCnt != 2 {
+		t.Fatal(currentSession().BK.forwardJumpCnt, currentSession().BK.backwardJumpCnt)
 	}
-	if useNewVarCnt != 1 || useOldVarCnt != 1 {
-		t.Fatal(useNewVarCnt, useOldVarCnt)
+	if currentSession().BK.useNewVarCnt != 1 || currentSession().BK.useOldVarCnt != 1 {
+		t.Fatal(currentSession().BK.useNewVarCnt, currentSession().BK.useOldVarCnt)
 	}
 	out := OutputStatistics(nil, Defaults())
 	if !strings.Contains(out, "forward jumps: 1") || !strings.Contains(out, "backward jumps: 2") {
@@ -178,13 +178,13 @@ func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
 	BookkeeperDoFinalization()
 	ClearError()
 	holeTy := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
-	beforeS := structsWithBitfields
+	beforeS := currentSession().BK.structsWithBitfields
 	RecordTypeWithBitfields(holeTy)
 	if !HasError() {
 		t.Fatal("HasBitfields residual RecordTypeWithBitfields must SetError sticky")
 	}
-	if structsWithBitfields != beforeS {
-		t.Fatal("HasBitfields residual must not invent structsWithBitfields count")
+	if currentSession().BK.structsWithBitfields != beforeS {
+		t.Fatal("HasBitfields residual must not invent currentSession().BK.structsWithBitfields count")
 	}
 	ClearError()
 	// Type always live; sticky — non-aggregate complete no-op
@@ -254,8 +254,8 @@ func TestRecordPointerComparisons(t *testing.T) {
 	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_p", pt, false, false), ExprType: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}, ExprType: pt}
 	RecordPointerComparisons(lhs, rhs)
-	if cmpPtrToNull != 1 {
-		t.Fatal(cmpPtrToNull)
+	if currentSession().BK.cmpPtrToNull != 1 {
+		t.Fatal(currentSession().BK.cmpPtrToNull)
 	}
 	// incomplete type IR sticky must not invent ptr-vs-ptr via level 0
 	BookkeeperDoFinalization()
@@ -263,8 +263,8 @@ func TestRecordPointerComparisons(t *testing.T) {
 	broken := &Expression{Term: TermVariable, Var: &Variable{Name: "x"}, ExprType: pt}
 	good := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", pt, false, false), ExprType: pt}
 	RecordPointerComparisons(broken, good)
-	if cmpPtrToPtr != 0 || cmpPtrToAddr != 0 {
-		t.Fatal("incomplete IndirectLevel must not invent compare counts", cmpPtrToPtr, cmpPtrToAddr)
+	if currentSession().BK.cmpPtrToPtr != 0 || currentSession().BK.cmpPtrToAddr != 0 {
+		t.Fatal("incomplete IndirectLevel must not invent compare counts", currentSession().BK.cmpPtrToPtr, currentSession().BK.cmpPtrToAddr)
 	}
 	if !HasError() {
 		t.Fatal("incomplete IndirectLevel RecordPointerComparisons must SetError sticky")
@@ -274,8 +274,8 @@ func TestRecordPointerComparisons(t *testing.T) {
 	BookkeeperDoFinalization()
 	typeHole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
 	RecordPointerComparisons(typeHole, good)
-	if cmpPtrToNull != 0 || cmpPtrToPtr != 0 || cmpPtrToAddr != 0 {
-		t.Fatal("GetType residual must not invent compare counts", cmpPtrToNull, cmpPtrToPtr, cmpPtrToAddr)
+	if currentSession().BK.cmpPtrToNull != 0 || currentSession().BK.cmpPtrToPtr != 0 || currentSession().BK.cmpPtrToAddr != 0 {
+		t.Fatal("GetType residual must not invent compare counts", currentSession().BK.cmpPtrToNull, currentSession().BK.cmpPtrToPtr, currentSession().BK.cmpPtrToAddr)
 	}
 	if !HasError() {
 		t.Fatal("GetType residual RecordPointerComparisons must SetError sticky")
@@ -304,44 +304,44 @@ func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
 	if n != 3 {
 		t.Fatalf("count %d", n)
 	}
-	if len(blkDepthCnts) < 2 || blkDepthCnts[0] < 2 {
+	if len(currentSession().BK.blkDepthCnts) < 2 || currentSession().BK.blkDepthCnts[0] < 2 {
 		// body-level: assign + if at bucket 0
-		t.Fatalf("depth0 %+v", blkDepthCnts)
+		t.Fatalf("depth0 %+v", currentSession().BK.blkDepthCnts)
 	}
-	if blkDepthCnts[1] < 1 {
-		t.Fatalf("depth1 %+v", blkDepthCnts)
+	if currentSession().BK.blkDepthCnts[1] < 1 {
+		t.Fatalf("depth1 %+v", currentSession().BK.blkDepthCnts)
 	}
 }
 
 func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	// incomplete IR sticky clear depths (no invent leaf 0 / soft re-pick)
 	ClearError()
-	exprDepthCnts = []int{99}
+	currentSession().BK.exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}}, // nil Invoke
 	}}}
 	StatExprDepths([]*Function{f})
-	if exprDepthCnts != nil {
-		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", exprDepthCnts)
+	if currentSession().BK.exprDepthCnts != nil {
+		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", currentSession().BK.exprDepthCnts)
 	}
 	if !HasError() {
 		t.Fatal("incomplete expr StatExprDepths must SetError sticky")
 	}
 	ClearError()
 	// incomplete Funcs list sticky
-	exprDepthCnts = []int{99}
+	currentSession().BK.exprDepthCnts = []int{99}
 	good := &Function{Name: "g", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
 	}}}
 	StatExprDepths([]*Function{nil, good})
-	if exprDepthCnts != nil {
-		t.Fatal("Funcs hole must clear depths, not invent count past hole", exprDepthCnts)
+	if currentSession().BK.exprDepthCnts != nil {
+		t.Fatal("Funcs hole must clear depths, not invent count past hole", currentSession().BK.exprDepthCnts)
 	}
 	if !HasError() {
 		t.Fatal("Funcs hole StatExprDepths must SetError sticky")
 	}
 	ClearError()
-	if StatBlkDepths([]*Function{nil, good}) != 0 || blkDepthCnts != nil {
+	if StatBlkDepths([]*Function{nil, good}) != 0 || currentSession().BK.blkDepthCnts != nil {
 		t.Fatal("Funcs hole must zero StatBlkDepths")
 	}
 	if !HasError() {
@@ -359,21 +359,21 @@ func TestStatExprDepthsForTestExpr(t *testing.T) {
 		{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}},
 	}}}
 	StatExprDepths([]*Function{f})
-	if len(exprDepthCnts) < 1 || exprDepthCnts[0] < 1 {
-		t.Fatalf("for-test must count: %+v", exprDepthCnts)
+	if len(currentSession().BK.exprDepthCnts) < 1 || currentSession().BK.exprDepthCnts[0] < 1 {
+		t.Fatalf("for-test must count: %+v", currentSession().BK.exprDepthCnts)
 	}
 }
 
 func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
 	// incomplete for Loop without TestExpr sticky clear
 	ClearError()
-	exprDepthCnts = []int{99}
+	currentSession().BK.exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{IV: CreateVariableScalars("i", GetIntType(), false, false)}, Then: &Block{}},
 	}}}
 	StatExprDepths([]*Function{f})
-	if exprDepthCnts != nil {
-		t.Fatal("for without TestExpr must fail closed clear, not invent skip", exprDepthCnts)
+	if currentSession().BK.exprDepthCnts != nil {
+		t.Fatal("for without TestExpr must fail closed clear, not invent skip", currentSession().BK.exprDepthCnts)
 	}
 	if !HasError() {
 		t.Fatal("for without TestExpr StatExprDepths must SetError sticky")
@@ -384,13 +384,13 @@ func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
 func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
 	// C++ get_exprs always live for assign; nil Expr sticky clear
 	ClearError()
-	exprDepthCnts = []int{99}
+	currentSession().BK.exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
 	}}}
 	StatExprDepths([]*Function{f})
-	if exprDepthCnts != nil {
-		t.Fatal("assign without Expr must fail closed clear depths", exprDepthCnts)
+	if currentSession().BK.exprDepthCnts != nil {
+		t.Fatal("assign without Expr must fail closed clear depths", currentSession().BK.exprDepthCnts)
 	}
 	if !HasError() {
 		t.Fatal("assign without Expr StatExprDepths must SetError sticky")
@@ -407,13 +407,13 @@ func TestRecordVarCreatedStructDepthResidualSticky(t *testing.T) {
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
 	v := &Variable{Name: "g_s", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	before := useNewVarCnt
+	before := currentSession().BK.useNewVarCnt
 	RecordVarCreated(v)
 	if !HasError() {
 		t.Fatal("StructDepth residual RecordVarCreated must SetError sticky")
 	}
-	// useNewVarCnt may increment before residual stop — fair fail-closed means no further invent
-	if useNewVarCnt < before {
+	// currentSession().BK.useNewVarCnt may increment before residual stop — fair fail-closed means no further invent
+	if currentSession().BK.useNewVarCnt < before {
 		t.Fatal("counter regression")
 	}
 	ClearError()
@@ -445,10 +445,10 @@ func TestRecordPointerComparisonsIsPointerLikeResidualSticky(t *testing.T) {
 	BookkeeperDoFinalization()
 	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
-	before := cmpPtrToNull + cmpPtrToPtr + cmpPtrToAddr
+	before := currentSession().BK.cmpPtrToNull + currentSession().BK.cmpPtrToPtr + currentSession().BK.cmpPtrToAddr
 	RecordPointerComparisons(a, b)
 	// non-pointer soft skip no count
-	if cmpPtrToNull+cmpPtrToPtr+cmpPtrToAddr != before {
+	if currentSession().BK.cmpPtrToNull+currentSession().BK.cmpPtrToPtr+currentSession().BK.cmpPtrToAddr != before {
 		t.Fatal("non-pointer must not invent cmp counts")
 	}
 	if HasError() {

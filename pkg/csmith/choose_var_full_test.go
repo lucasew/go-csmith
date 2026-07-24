@@ -128,10 +128,10 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 
 func TestRecordPointerAvailForDeref(t *testing.T) {
 	BookkeeperDoFinalization()
-	before := pointerAvailForDeref
+	before := currentSession().BK.pointerAvailForDeref
 	RecordPointerAvailForDeref()
-	if pointerAvailForDeref != before+1 {
-		t.Fatalf("got %d want %d", pointerAvailForDeref, before+1)
+	if currentSession().BK.pointerAvailForDeref != before+1 {
+		t.Fatalf("got %d want %d", currentSession().BK.pointerAvailForDeref, before+1)
 	}
 }
 

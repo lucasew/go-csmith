@@ -9,13 +9,7 @@ import (
 	"strings"
 )
 
-// Process OutputMgr statics (OutputMgr.cpp:72–86).
-var (
-	// monitoredFuncs mirrors OutputMgr::monitored_funcs_.
-	monitoredFuncs []string
-	// currFunc mirrors OutputMgr::curr_func_.
-	currFunc string
-)
+// OutputMgr statics live on Session (MonitoredFuncs, CurrFunc).
 
 // HashFuncName mirrors OutputMgr::hash_func_name.
 // OutputMgr.cpp:51.
@@ -64,40 +58,40 @@ func ParseStringOptions(vname string) []string {
 // SetMonitoredFuncs mirrors CGOptions::monitored_funcs.
 // CGOptions.cpp:558–560 — parse into OutputMgr::monitored_funcs_.
 func SetMonitoredFuncs(fnames string) {
-	monitoredFuncs = ParseStringOptions(fnames)
+	currentSession().MonitoredFuncs = ParseStringOptions(fnames)
 }
 
 // MonitoredFuncs returns a copy of OutputMgr::monitored_funcs_.
 func MonitoredFuncs() []string {
-	if len(monitoredFuncs) == 0 {
+	if len(currentSession().MonitoredFuncs) == 0 {
 		return nil
 	}
-	return append([]string(nil), monitoredFuncs...)
+	return append([]string(nil), currentSession().MonitoredFuncs...)
 }
 
 // ClearMonitoredFuncs resets process monitored list (tests / finalization).
 func ClearMonitoredFuncs() {
-	monitoredFuncs = nil
-	currFunc = ""
+	currentSession().MonitoredFuncs = nil
+	currentSession().CurrFunc = ""
 }
 
 // SetCurrFunc mirrors OutputMgr::set_curr_func.
 // OutputMgr.cpp:77–79.
 func SetCurrFunc(fname string) {
-	currFunc = fname
+	currentSession().CurrFunc = fname
 }
 
 // CurrFunc mirrors OutputMgr::curr_func_.
-func CurrFunc() string { return currFunc }
+func CurrFunc() string { return currentSession().CurrFunc }
 
 // IsMonitoredFunc mirrors OutputMgr::is_monitored_func.
 // OutputMgr.cpp:81–86 — empty list → all monitored; else curr must be in list.
 func IsMonitoredFunc() bool {
-	if len(monitoredFuncs) == 0 {
+	if len(currentSession().MonitoredFuncs) == 0 {
 		return true
 	}
-	for _, n := range monitoredFuncs {
-		if n == currFunc {
+	for _, n := range currentSession().MonitoredFuncs {
+		if n == currentSession().CurrFunc {
 			return true
 		}
 	}
@@ -265,21 +259,15 @@ const (
 	OutputMgrKindDFS
 )
 
-// processOutputMgrKind / processStructOutput mirror CreateInstance selection state.
-var (
-	processOutputMgrKind OutputMgrKind
-	processStructOutput  string
-	processSplitPaths    []string // DefaultOutputMgr outs_ paths after init
-	processOutputFile    string   // CGOptions::output_file when set
-)
+// currentSession().OutputMgrKind / currentSession().StructOutput mirror CreateInstance selection state.
 
 // CreateDefaultOutputMgr mirrors DefaultOutputMgr::CreateInstance + init.
 // DefaultOutputMgr.cpp:62–97 — record ofile path; if max_split_files>0 build split paths.
 // Does not open OS files (library returns paths/content); incomplete split dir sticky.
 func CreateDefaultOutputMgr(opts Options) bool {
-	processOutputMgrKind = OutputMgrKindDefault
-	processOutputFile = strings.TrimSpace(opts.OutputPath)
-	processSplitPaths = nil
+	currentSession().OutputMgrKind = OutputMgrKindDefault
+	currentSession().OutputFile = strings.TrimSpace(opts.OutputPath)
+	currentSession().SplitPaths = nil
 	if !IsSplit(opts) {
 		return true
 	}
@@ -295,67 +283,67 @@ func CreateDefaultOutputMgr(opts Options) bool {
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
-			processSplitPaths = nil
+			currentSession().SplitPaths = nil
 			return false
 		}
 		paths = append(paths, p)
 	}
-	processSplitPaths = paths
+	currentSession().SplitPaths = paths
 	return true
 }
 
 // CreateDFSOutputMgr mirrors DFSOutputMgr::CreateInstance.
 // DFSOutputMgr.cpp:49–61 — struct_output_ default or CGOptions::struct_output.
 func CreateDFSOutputMgr(opts Options) {
-	processOutputMgrKind = OutputMgrKindDFS
-	processSplitPaths = nil
-	processOutputFile = ""
+	currentSession().OutputMgrKind = OutputMgrKindDFS
+	currentSession().SplitPaths = nil
+	currentSession().OutputFile = ""
 	s := strings.TrimSpace(opts.StructOutput)
 	if s == "" {
-		processStructOutput = DefaultStructOutputName
+		currentSession().StructOutput = DefaultStructOutputName
 	} else {
-		processStructOutput = s
+		currentSession().StructOutput = s
 	}
 }
 
 // ClearOutputMgr resets process OutputMgr singleton state (finalization / tests).
 func ClearOutputMgr() {
-	processOutputMgrKind = OutputMgrKindDefault
-	processStructOutput = ""
-	processSplitPaths = nil
-	processOutputFile = ""
+	currentSession().OutputMgrKind = OutputMgrKindDefault
+	currentSession().StructOutput = ""
+	currentSession().SplitPaths = nil
+	currentSession().OutputFile = ""
 }
 
 // ProcessOutputMgrKind returns active OutputMgr kind.
-func ProcessOutputMgrKind() OutputMgrKind { return processOutputMgrKind }
+func ProcessOutputMgrKind() OutputMgrKind { return currentSession().OutputMgrKind }
 
 // ProcessStructOutput returns DFSOutputMgr::struct_output_.
-func ProcessStructOutput() string { return processStructOutput }
+func ProcessStructOutput() string { return currentSession().StructOutput }
 
 // ProcessSplitPaths returns a copy of DefaultOutputMgr split file paths.
 func ProcessSplitPaths() []string {
-	if len(processSplitPaths) == 0 {
+	if len(currentSession().SplitPaths) == 0 {
 		return nil
 	}
-	return append([]string(nil), processSplitPaths...)
+	return append([]string(nil), currentSession().SplitPaths...)
 }
 
 // ProcessOutputFile returns DefaultOutputMgr ofile path (empty → stdout).
-func ProcessOutputFile() string { return processOutputFile }
+func ProcessOutputFile() string { return currentSession().OutputFile }
 
 // GetMainOutPath mirrors DefaultOutputMgr::get_main_out target name.
 // DefaultOutputMgr.cpp:197–205 — split → outs[0]; ofile_; else "" (stdout).
 // Empty string means stdout (library has no ostream).
 func GetMainOutPath(opts Options) string {
 	if IsSplit(opts) {
-		if len(processSplitPaths) == 0 {
+		if len(currentSession().SplitPaths) == 0 {
 			// not initialized sticky
 			SetError(ErrGeneric)
 			return ""
 		}
-		return processSplitPaths[0]
+		return currentSession().SplitPaths[0]
 	}
-	return processOutputFile
+	return currentSession().OutputFile
 }
 
 // PureRndUptoIndex mirrors pure_rnd_upto for split file pick.
@@ -498,8 +486,8 @@ func DFSOutputHeader(header string, compact bool) string {
 
 // DFSStructOutputPath mirrors DFSOutputMgr::struct_output_ path for structs file.
 func DFSStructOutputPath() string {
-	if processStructOutput == "" {
+	if currentSession().StructOutput == "" {
 		return DefaultStructOutputName
 	}
-	return processStructOutput
+	return currentSession().StructOutput
 }

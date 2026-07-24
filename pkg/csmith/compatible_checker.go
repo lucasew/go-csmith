@@ -2,24 +2,23 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// compatibleCheckProcess mirrors CompatibleChecker::compatible_check_ static.
+// currentSession().CompatibleCheck mirrors CompatibleChecker::compatible_check_ static.
 // Enabled by EnableCompatibleCheck (DFS resolve path) or opts.CompatibleCheck.
-var compatibleCheckProcess bool
 
 // EnableCompatibleCheck mirrors CompatibleChecker::enable_compatible_check.
 // CompatibleChecker.cpp:68–70; CGOptions.cpp:416–417 (resolve_exhaustive_options).
 func EnableCompatibleCheck() {
-	compatibleCheckProcess = true
+	currentSession().CompatibleCheck = true
 }
 
 // ResetCompatibleCheck clears the process static (tests / finalization).
 func ResetCompatibleCheck() {
-	compatibleCheckProcess = false
+	currentSession().CompatibleCheck = false
 }
 
 // compatibleCheckOn is true when process static or option requests the checker.
 func compatibleCheckOn(opts Options) bool {
-	return compatibleCheckProcess || opts.CompatibleCheck
+	return currentSession().CompatibleCheck || opts.CompatibleCheck
 }
 
 // CompatibleCheckExprVar mirrors CompatibleChecker::compatible_check(Variable*, Expression*).

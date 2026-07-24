@@ -20,8 +20,8 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 	if s1 != "{A}" {
 		t.Fatalf("a1: got %q", s1)
 	}
-	if arrayInitSeed != 0xABCDEF+1 {
-		t.Fatalf("seed after 1 leaf: got %#x want %#x", arrayInitSeed, 0xABCDEF+1)
+	if currentSession().ArrayInitSeed != 0xABCDEF+1 {
+		t.Fatalf("seed after 1 leaf: got %#x want %#x", currentSession().ArrayInitSeed, 0xABCDEF+1)
 	}
 
 	// Second array: size 2, pool {"X","Y"} — first leaf uses seed 0xABCDEF+1 not reset
@@ -70,9 +70,9 @@ func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 		t.Fatalf("want 4 leaves: %q", out)
 	}
 	// second call continues seed
-	seedAfter := arrayInitSeed
+	seedAfter := currentSession().ArrayInitSeed
 	_ = av.buildInitializerStr([]string{"0", "1", "2"})
-	if arrayInitSeed <= seedAfter {
+	if currentSession().ArrayInitSeed <= seedAfter {
 		t.Fatal("static seed must advance across arrays")
 	}
 	ResetArrayInitSeed()

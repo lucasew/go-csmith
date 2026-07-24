@@ -681,9 +681,8 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	return ShortcutOK
 }
 
-// FailedStm mirrors Statement::failed_stm — last non-compound visit_facts failure.
+// currentSession().FailedStm mirrors Statement::failed_stm — last non-compound visit_facts failure.
 // Statement.cpp:88 / Statement.h:218 — set in stm_visit_facts when !ok && !is_compound.
-var FailedStm *Stmt
 
 // StmVisitFacts mirrors Statement::stm_visit_facts.
 // Statement.cpp:609–626 — clear effect_stm; visit_facts; remove_rv_facts;
@@ -737,7 +736,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	ok := VisitFactsStmt(st, cg, opts)
 	// Statement.cpp:615–617 — failed_stm = this when !ok && !is_compound
 	if !ok && !IsCompound(st.Kind) {
-		FailedStm = st
+		currentSession().FailedStm = st
 	}
 	if cg.FM != nil {
 		// Statement.cpp:621–624 — remove_rv on inputs; accum; visited always set

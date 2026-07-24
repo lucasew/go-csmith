@@ -290,7 +290,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 		ClearError()
 		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), false, false, nil)
 	}
-	if CalcTotal(writeDereferenceCnts) == 0 && writeVolatileCnt+writeNonVolatileCnt == 0 {
+	if CalcTotal(currentSession().BK.writeDereferenceCnts) == 0 && currentSession().BK.writeVolatileCnt+currentSession().BK.writeNonVolatileCnt == 0 {
 		t.Fatal("expected some write bookkeeping")
 	}
 }

@@ -47,7 +47,7 @@ func TestOutputDefWithAttrs(t *testing.T) {
 	v.Init = MakeInt(0)
 	// force attrs with 100% boolean
 	ClearAttrGenerators()
-	varAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
+	currentSession().VarAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 	}}
 	s := v.OutputDefFull(true, false, true, NewRng(1))
@@ -60,7 +60,7 @@ func TestOutputDefWithAttrs(t *testing.T) {
 func TestOutputFuncWithAttrs(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	ClearAttrGenerators()
-	funcAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
+	currentSession().FuncAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "noinline", Prob: 100},
 	}}
 	d := f.OutputForwardDeclOpts(true, NewRng(1), true)

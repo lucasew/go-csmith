@@ -5,12 +5,16 @@ import (
 	"testing"
 )
 
-// TestMain installs process singletons so CreateVariableScalars / pick paths match
+// TestMain installs a clean Session bag so CreateVariableScalars / pick paths match
 // C++ DefaultRndNumGenerator + Probabilities during unit tests — no invent private
-// nextCreateVarRng stream. Tests that need a clean slate save/restore Process*.
-// ReinstallTestProcessSingletons restores TestMain process handles after
-// DoFinalization / RandomNumberDoFinalization wiped them (library multi-run).
+// nextCreateVarRng stream. Tests that need a clean slate call ReinstallTestProcessSingletons.
+//
+// ReinstallTestProcessSingletons replaces defaultSession with a fresh bag (all
+// mutable state session-local) then re-seeds Options/Rng/Probabilities/tables.
 func ReinstallTestProcessSingletons() {
+	// Drop any Generate-scoped session; replace unit-test bag entirely.
+	activeSession = nil
+	defaultSession = newSession()
 	opts := Defaults()
 	SetProcessOptions(opts)
 	SetProcessRng(NewRng(1))

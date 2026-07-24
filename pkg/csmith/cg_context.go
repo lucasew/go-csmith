@@ -1200,7 +1200,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		}
 		accumCopy = &cp
 	}
-	IncrCounter(&dereferenceLevelCnts, indirect)
+	IncrCounter(&currentSession().BK.dereferenceLevelCnts, indirect)
 	allowNull := opts.NullPointerDerefProb > 0
 	allowDead := opts.DeadPointerDerefProb > 0
 	if !c.ReadIndices(v, facts) {
@@ -1303,7 +1303,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 		}
 		accumCopy = &cp
 	}
-	IncrCounter(&dereferenceLevelCnts, indirect)
+	IncrCounter(&currentSession().BK.dereferenceLevelCnts, indirect)
 	if !c.ReadIndices(lhs.Var, facts) {
 		return false
 	}

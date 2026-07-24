@@ -426,11 +426,11 @@ func TestDoFinalization(t *testing.T) {
 		SetProcessRng(prevR)
 		SetProcessProbabilities(prevP)
 	}()
-	IncrCounter(&structDepthCnts, 1)
-	nextStmID = 5
+	IncrCounter(&currentSession().BK.structDepthCnts, 1)
+	currentSession().NextStmID = 5
 	SetError(ErrGeneric)
 	DoFinalization()
-	if len(structDepthCnts) != 0 || nextStmID != 0 || HasError() {
+	if len(currentSession().BK.structDepthCnts) != 0 || currentSession().NextStmID != 0 || HasError() {
 		t.Fatal("not cleared")
 	}
 }

@@ -143,9 +143,9 @@ func TestSafeOpFlagsToIDStable(t *testing.T) {
 func TestStopByStmtForcesReturn(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 5
-	opts.StopByStmt = 0 // force return immediately (nextStmID >= 0 always)
+	opts.StopByStmt = 0 // force return immediately (currentSession().NextStmID >= 0 always)
 	// reset sid
-	nextStmID = 0
+	currentSession().NextStmID = 0
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	// make block — should tend to returns when stop is low

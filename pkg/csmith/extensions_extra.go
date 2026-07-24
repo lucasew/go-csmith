@@ -8,12 +8,6 @@ import (
 )
 
 // extensionValues holds AbsExtension values_ for the active non-null extension.
-var (
-	processExtValues     []*ExtensionValue
-	processExtKind       string // "klee"|"crest"|"coverage"|""
-	processCoverageSize  int
-	processCoverageTests []*Constant // CoverageTestExtension::test_values_
-)
 
 // --- KleeExtension ---
 
@@ -310,20 +304,20 @@ func CoverageOutputTail() string {
 // CreateExtensionFull installs Klee/Crest/Coverage when options request them.
 // Replaces sticky-only CreateExtension for those flags.
 func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
-	processExtensionActive = false
-	processExtValues = nil
-	processExtKind = ""
-	processCoverageTests = nil
-	processCoverageSize = 0
+	currentSession().ExtensionActive = false
+	currentSession().ExtValues = nil
+	currentSession().ExtKind = ""
+	currentSession().CoverageTests = nil
+	currentSession().CoverageSize = 0
 
 	if opts.Klee {
-		processExtKind = "klee"
+		currentSession().ExtKind = "klee"
 	} else if opts.Crest {
-		processExtKind = "crest"
+		currentSession().ExtKind = "crest"
 	} else if opts.CoverageTest {
-		processExtKind = "coverage"
-		processCoverageSize = opts.CoverageTestSize
-		if processCoverageSize <= 0 {
+		currentSession().ExtKind = "coverage"
+		currentSession().CoverageSize = opts.CoverageTestSize
+		if currentSession().CoverageSize <= 0 {
 			SetError(ErrGeneric)
 			return
 		}
@@ -332,21 +326,21 @@ func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
 	}
 
 	// AbsExtension::Initialize(func1_max_params, values)
-	processExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
-	if processExtValues == nil || HasError() {
+	currentSession().ExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
+	if currentSession().ExtValues == nil || HasError() {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
-		processExtKind = ""
+		currentSession().ExtKind = ""
 		return
 	}
-	if processExtKind == "coverage" {
-		processCoverageTests = CoverageGenerateValues(processExtValues, processCoverageSize, r, opts, probs)
-		if processCoverageTests == nil || HasError() {
-			processExtKind = ""
-			processExtValues = nil
+	if currentSession().ExtKind == "coverage" {
+		currentSession().CoverageTests = CoverageGenerateValues(currentSession().ExtValues, currentSession().CoverageSize, r, opts, probs)
+		if currentSession().CoverageTests == nil || HasError() {
+			currentSession().ExtKind = ""
+			currentSession().ExtValues = nil
 			return
 		}
 	}
-	processExtensionActive = true
+	currentSession().ExtensionActive = true
 }
