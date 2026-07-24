@@ -1,13 +1,16 @@
 // Session owns all mutable generation state for one run (or the unit-test bag).
 //
-// Rule: nothing writable is a package-level var of generation state.
-//   - Read-only package data only: const tables, name maps, builtin string lists.
-//   - All mutable run state lives on *Session.
+// Public pure API:
 //
-// Access bridge (temporary): currentSession() returns the active bag so existing
-// Process*/package helpers keep working without threading *Session through every
-// call yet. The bridge itself is the last global write; next step is to pass
-// *Session explicitly and delete activeSession.
+//	out, err := NewSession(opts).Generate(ctx)
+//
+// Rule: no package-level vars hold generation mutables (only on *Session).
+// Read-only package data: const tables, name maps, builtin lists, simpleTypes.
+//
+// Temporary bridge: while the call graph still uses Process*/SetError helpers,
+// Generate activates this Session for the duration of the call only (no residual
+// active session after return). Next layers pass *Session / g.Sess / cg.Sess
+// and delete activeSession.
 //
 // Concurrent Generate in one process is unsupported (upstream: one gen/process).
 // Fuzz workers are separate OS processes.
@@ -187,10 +190,19 @@ func activateSession(s *Session) (restore func()) {
 	return func() { activeSession = prev }
 }
 
-// BeginGenerateSession installs a fresh session for one full-program Generate.
+// BeginGenerateSession installs a fresh empty session (tests that need ambient
+// Process* without NewSession.Generate). Prefer NewSession(opts).Generate.
 func BeginGenerateSession() (restore func()) {
 	return activateSession(newSession())
 }
 
+// NewSession constructs a pure run bag with the given options (no globals written).
+func NewSession(opts Options) *Session {
+	s := newSession()
+	s.Opts = opts
+	return s
+}
+
 // CurrentSession returns the active session bag (tests / migration helpers).
+// Prefer holding *Session from NewSession rather than this ambient accessor.
 func CurrentSession() *Session { return currentSession() }

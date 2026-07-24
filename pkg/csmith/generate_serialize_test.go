@@ -1,6 +1,7 @@
 package csmith
 
 import (
+	"context"
 	"testing"
 )
 
@@ -37,5 +38,33 @@ func TestGenerateSequentialMultiSeedIsolated(t *testing.T) {
 	}
 	if same == len(bodies)-1 {
 		t.Fatal("all seeds produced identical body (RNG/session stuck)")
+	}
+}
+
+// NewSession.Generate is the pure entry: explicit bag, no residual ambient session.
+func TestNewSessionGeneratePureEntry(t *testing.T) {
+	opts := Defaults()
+	opts.Seed = 2
+	s := NewSession(opts)
+	if activeSession != nil {
+		t.Fatal("NewSession must not install ambient activeSession")
+	}
+	out, err := s.Generate(context.Background())
+	if err != nil || out == "" {
+		t.Fatalf("Generate: err=%v empty=%v", err, out == "")
+	}
+	if activeSession != nil {
+		t.Fatal("after Generate, ambient activeSession must be cleared")
+	}
+	if s.ProgramGen == nil || s.ProgramGen.Sess != s {
+		t.Fatal("ProgramGenerator.Sess must point at the run session")
+	}
+	// Same session object + same opts should re-run cleanly (fresh internal tables via Initialize).
+	out2, err := s.Generate(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out2 != out {
+		t.Fatal("second Generate on same Session+opts diverged")
 	}
 }

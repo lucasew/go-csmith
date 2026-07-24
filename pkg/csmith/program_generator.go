@@ -9,6 +9,8 @@ import (
 
 // ProgramGenerator mirrors DefaultProgramGenerator / DFSProgramGenerator state.
 type ProgramGenerator struct {
+	// Sess is the run bag for this generator (set by Session.Generate / NewProgramGenerator).
+	Sess    *Session
 	Opts    Options
 	Seed    uint64
 	Rng     *Rng
@@ -127,7 +129,9 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	InitScopeTable(opts)
 	// Expression session tables from InitSessionProbabilityTables (no invent mid-ctor)
 	exprTables := ProcessExprTables()
+	sess := currentSession()
 	g := &ProgramGenerator{
+		Sess:       sess,
 		Opts:       opts,
 		Seed:       seed,
 		Rng:        r,
@@ -137,6 +141,9 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 		StmtTab:    stmtTab,
 		FactMgrs:   NewFactMgrMap(),
 		OutputKind: outKind,
+	}
+	if sess != nil {
+		sess.ProgramGen = g
 	}
 	// Share gensym + derived_types across selector and generator.
 	vs.Types = &g.Types

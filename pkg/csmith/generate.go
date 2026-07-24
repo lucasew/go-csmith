@@ -8,57 +8,67 @@ import (
 )
 
 // Generate emits a full C program (upstream stdout role).
-// Wires DefaultProgramGenerator initialize → goGenerator.
+// Pure entry: builds a fresh Session and runs s.Generate — no residual ambient
+// session after return.
 //
 // Not safe for concurrent calls in one process (upstream is one generation per
-// process). Fuzz workers are separate processes. Mutable state is session-
-// specific (see session.go); no generateMu.
+// process). Fuzz workers are separate processes.
 func Generate(opts Options) (string, error) {
-	return GenerateContext(context.Background(), opts)
+	return NewSession(opts).Generate(context.Background())
 }
 
-// GenerateContext is the preferred entry (SPEC §2.2).
-// ctx cancel/deadline is checked at coarse boundaries (entry / after emit).
+// GenerateContext is the preferred package entry (SPEC §2.2).
 func GenerateContext(ctx context.Context, opts Options) (string, error) {
+	return NewSession(opts).Generate(ctx)
+}
+
+// Generate runs one generation using s as the only mutable bag for the run.
+// Activates s for Process* helpers for the duration of the call, then clears
+// the ambient pointer so nothing is left global.
+func (s *Session) Generate(ctx context.Context) (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("nil session")
+	}
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	// Fresh session for this run (unit-test defaultSession stays out of the way).
-	restore := BeginGenerateSession()
+
+	// Bridge: install this session for Process*/SetError for this call only.
+	restore := activateSession(s)
 	defer restore()
 
+	opts := s.Opts
 	// Platform resolve when sizes needed later
 	if opts.PlatformInfoPath != "" {
 		if resolved, err := opts.resolvePlatformInfo(); err == nil {
 			opts = resolved
+			s.Opts = opts
 		}
 	}
-	// RandomProgramGenerator.cpp — fix_options_for_cpp / resolve_exhaustive side effects
-	// then CGOptions::has_conflict() before generation.
+	// RandomProgramGenerator.cpp — fix_options_for_cpp / resolve_exhaustive
 	opts = opts.normalizeUpstreamFlow()
+	s.Opts = opts
 	if err := opts.Validate(); err != nil {
 		return "", err
 	}
-	// Error::set_error(SUCCESS) for a clean generation run
 	ClearError()
-	// Type::SizeInBytes uses platform integer/pointer sizes
 	SetPlatformSizes(opts.IntSize, opts.PointerSize)
-	// PartialExpander from CGOptions::partial_expand
 	if !InitPartialExpanderFromOptions(opts) {
 		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)
 	}
 	defer ClearPartialExpander()
-	// Session Probabilities + attr gens: NewProgramGenerator (C++ singleton); no invent
-	// a second NewProbabilities(opts) here for InitAttrGenerators alone.
+
 	g := NewProgramGenerator(opts)
+	g.Sess = s
+	s.ProgramGen = g
 	g.Argv = opts.Argv
 	defer ClearAttrGenerators()
-	// AbsProgramGenerator.cpp:64–86 — dump/parse probabilities then exit or continue
+
 	if opts.DumpDefaultProbabilities != "" {
 		if err := WriteDumpDefaultProbabilities(opts.DumpDefaultProbabilities); err != nil {
 			return "", err
 		}
-		return "", nil // upstream exits after dump
+		return "", nil
 	}
 	if opts.DumpRandomProbabilities != "" {
 		if err := WriteDumpActualProbabilities(opts.DumpRandomProbabilities, opts.Seed); err != nil {
@@ -76,7 +86,6 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 		}
 	}
 	out := g.GoGenerator()
-	// sticky ERROR_RETURN / failed make_first → empty out (no soft invent success)
 	if HasError() {
 		code := GetError()
 		ClearError()

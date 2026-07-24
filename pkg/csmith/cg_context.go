@@ -19,6 +19,8 @@ type RWDirective struct {
 // CGContext is a minimal CGContext for paths that only need effect_context.
 // Function/block/fact fields land with later ports.
 type CGContext struct {
+	// Sess is the pure-run bag when set by generation; nil in minimal unit tests.
+	Sess *Session
 	effectContext Effect
 	// CurrentFunc mirrors current_func_ (Function*).
 	CurrentFunc *Function
