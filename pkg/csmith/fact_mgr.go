@@ -3785,8 +3785,13 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	}
 }
 
-// UpdateFactForAssignInto is UpdateFactForAssign writing into a fact slice.
-// FactMgr.cpp:370–395 — same renew/merge rules as UpdateFactForAssign.
+// UpdateFactForAssignInto is the Lhs*/Expression* overload writing into a fact slice.
+// FactMgr.cpp:370–395 — renew/merge only; does NOT set Function::fact_changed.
+// StatementAssign overload (UpdateFactForAssign) alone sets fact_changed
+// (FactMgr.cpp:397–403). add_param_facts uses this path (FactMgr.cpp:108–114);
+// inventing FactChanged here forced NeedsRevisit on callees that only received
+// pointer params (seed 10482453124604569829: func_53 revisit dropped make_iteration
+// IV read g_283 from caller map_accum while FEffect still listed it).
 // Incomplete point-to apply or union merge fails closed like UpdateFactForAssign
 // (no invent continue union after wiped *facts).
 func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
@@ -3794,6 +3799,7 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 }
 
 // UpdateFactForAssignIntoWant is assign-into with Lhs desired type (see UpdateFactForAssignWant).
+// FactMgr.cpp:370–395 Lhs* path — no fact_changed (see UpdateFactForAssignInto).
 func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsWant *Type, rhs *Expression, facts *[]*FactPointTo) bool {
 	// FactMgr assign-into always has live lhs + facts accumulator; sticky no invent soft-skip
 	if facts == nil || lhs == nil {
@@ -3852,9 +3858,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 			fm.UnionFacts = merged
 			changed = true
 		}
-		if changed && fm.Func != nil {
-			fm.Func.FactChanged = true
-		}
+		// FactMgr.cpp:370–395 — Lhs* overload never touches func->fact_changed
 	}
 	return changed
 }
