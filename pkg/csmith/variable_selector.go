@@ -1144,7 +1144,7 @@ func (vs *VariableSelector) MakeInitValue(
 				if sessHasError(vsSess(vs)) {
 					return nil
 				}
-				RecordVolatileAccess(chosen, ci-ti, false)
+				RecordVolatileAccessSess(vsSess(vs), chosen, ci-ti, false)
 				// residual ERROR sticky — no invent soft-continue past RecordVolatileAccess residual
 				if sessHasError(vsSess(vs)) {
 					return nil
@@ -1161,7 +1161,7 @@ func (vs *VariableSelector) MakeInitValue(
 				return nil
 			}
 		}
-		RecordAddressTaken(chosen)
+		RecordAddressTakenSess(vsSess(vs), chosen)
 	} else if chosen.Type != nil {
 		// VariableSelector.cpp:905–909
 		if t == nil {
@@ -1180,7 +1180,7 @@ func (vs *VariableSelector) MakeInitValue(
 		}
 		derefLevel := lv - lw
 		if derefLevel < 0 {
-			RecordAddressTaken(chosen)
+			RecordAddressTakenSess(vsSess(vs), chosen)
 		}
 	}
 	// VariableSelector.cpp:910 assert(var); defensive after create paths (ERROR_GUARD earlier)
@@ -1410,7 +1410,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		}
 		if vol {
 			// VariableSelector.cpp:311 — Bookkeeper::volatile_avail++
-			RecordVolatileAvail()
+			RecordVolatileAvailSess(cg.Sess)
 			return true
 		}
 	}
@@ -1747,7 +1747,7 @@ func ChooseVarFull(
 	// FactPointTo::is_valid_ptr reads session CGOptions null/dead deref probs
 	opts := sessOpts(cg.Sess)
 	if HasDereferenceableVar(cands, want, cg, opts) {
-		RecordPointerAvailForDeref()
+		RecordPointerAvailForDerefSess(cg.Sess)
 	}
 	// residual ERROR sticky — no invent soft-continue choose past HasDereferenceable residual
 	if sessHasError(cg.Sess) {
@@ -2392,7 +2392,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	}
 	vs.VarCreated = true
 	// VariableSelector.cpp:1230–1236 — use_new_var stats
-	RecordVarCreated(v)
+	RecordVarCreatedSess(vsSess(vs), v)
 	return v
 }
 
@@ -3520,9 +3520,9 @@ func (vs *VariableSelector) SelectWithInvalid(
 	// VariableSelector.cpp:1229–1239 — record statistics
 	if v != nil {
 		if vs.VarCreated {
-			RecordVarCreated(v)
+			RecordVarCreatedSess(vsSess(vs), v)
 		} else {
-			RecordVarReused()
+			RecordVarReusedSess(vsSess(vs))
 		}
 	}
 	return v

@@ -428,8 +428,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 
 	// Bookkeeper::record_volatile_access read+write on IV (StatementFor.cpp:249–253)
-	RecordVolatileAccess(iv, 0, false)
-	RecordVolatileAccess(iv, 0, true)
+	RecordVolatileAccessSess(cgSess(cg), iv, 0, false)
+	RecordVolatileAccessSess(cgSess(cg), iv, 0, true)
 
 	// test: FunctionInvocation::make_binary(test_op, ExpressionVariable(iv), limit)
 	// StatementFor.cpp:255–263 — ERROR_GUARD on null (no soft bare Invocation)

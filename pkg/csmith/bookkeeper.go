@@ -9,6 +9,14 @@ import (
 
 // Bookkeeper counters live on Session.BK (session.go).
 
+// sessBK returns the bookkeeper counters for s, or the ambient session bag.
+func sessBK(s *Session) *bookkeeperState {
+	if s != nil {
+		return &s.BK
+	}
+	return &currentSession().BK
+}
+
 // IncrCounter mirrors incr_counter — grow vector and ++ at pos.
 // Bookkeeper.cpp:527–537.
 // Counters always live; sticky (no invent soft-skip stats past hole).
@@ -39,45 +47,49 @@ func CalcTotal(counters []int) int {
 
 // BookkeeperDoFinalization mirrors Bookkeeper::doFinalization.
 // Bookkeeper.cpp:116–126 (subset of cleared fields; full reset of all counters).
-func BookkeeperDoFinalization() {
-	currentSession().BK.structDepthCnts = nil
-	currentSession().BK.unionVarCnt = 0
-	currentSession().BK.exprDepthCnts = nil
-	currentSession().BK.blkDepthCnts = nil
-	currentSession().BK.dereferenceLevelCnts = nil
-	currentSession().BK.addressTakenCnt = 0
-	currentSession().BK.writeDereferenceCnts = nil
-	currentSession().BK.readDereferenceCnts = nil
-	currentSession().BK.cmpPtrToNull = 0
-	currentSession().BK.cmpPtrToPtr = 0
-	currentSession().BK.cmpPtrToAddr = 0
-	currentSession().BK.readVolatileCnt = 0
-	currentSession().BK.writeVolatileCnt = 0
-	currentSession().BK.readNonVolatileCnt = 0
-	currentSession().BK.writeNonVolatileCnt = 0
-	currentSession().BK.readVolatileThruPtrCnt = 0
-	currentSession().BK.writeVolatileThruPtrCnt = 0
-	currentSession().BK.pointerAvailForDeref = 0
-	currentSession().BK.volatileAvail = 0
-	currentSession().BK.structsWithBitfields = 0
-	currentSession().BK.varsWithBitfields = nil
-	currentSession().BK.varsWithFullBitfields = nil
-	currentSession().BK.varsWithBitfieldsAddressTakenCnt = 0
-	currentSession().BK.bitfieldsInTotal = 0
-	currentSession().BK.unamedBitfieldsInTotal = 0
-	currentSession().BK.constBitfieldsInTotal = 0
-	currentSession().BK.volatileBitfieldsInTotal = 0
-	currentSession().BK.lhsBitfieldsStructsVarsCnt = 0
-	currentSession().BK.rhsBitfieldsStructsVarsCnt = 0
-	currentSession().BK.lhsBitfieldCnt = 0
-	currentSession().BK.rhsBitfieldCnt = 0
-	currentSession().BK.forwardJumpCnt = 0
-	currentSession().BK.backwardJumpCnt = 0
-	currentSession().BK.useNewVarCnt = 0
-	currentSession().BK.useOldVarCnt = 0
-	currentSession().BK.oobCnt = 0
-	currentSession().BK.relyOnIntSize = false
-	currentSession().BK.relyOnPtrSize = false
+func BookkeeperDoFinalization() { BookkeeperDoFinalizationSess(nil) }
+
+// BookkeeperDoFinalizationSess clears bookkeeper counters on s (or ambient).
+func BookkeeperDoFinalizationSess(s *Session) {
+	bk := sessBK(s)
+	bk.structDepthCnts = nil
+	bk.unionVarCnt = 0
+	bk.exprDepthCnts = nil
+	bk.blkDepthCnts = nil
+	bk.dereferenceLevelCnts = nil
+	bk.addressTakenCnt = 0
+	bk.writeDereferenceCnts = nil
+	bk.readDereferenceCnts = nil
+	bk.cmpPtrToNull = 0
+	bk.cmpPtrToPtr = 0
+	bk.cmpPtrToAddr = 0
+	bk.readVolatileCnt = 0
+	bk.writeVolatileCnt = 0
+	bk.readNonVolatileCnt = 0
+	bk.writeNonVolatileCnt = 0
+	bk.readVolatileThruPtrCnt = 0
+	bk.writeVolatileThruPtrCnt = 0
+	bk.pointerAvailForDeref = 0
+	bk.volatileAvail = 0
+	bk.structsWithBitfields = 0
+	bk.varsWithBitfields = nil
+	bk.varsWithFullBitfields = nil
+	bk.varsWithBitfieldsAddressTakenCnt = 0
+	bk.bitfieldsInTotal = 0
+	bk.unamedBitfieldsInTotal = 0
+	bk.constBitfieldsInTotal = 0
+	bk.volatileBitfieldsInTotal = 0
+	bk.lhsBitfieldsStructsVarsCnt = 0
+	bk.rhsBitfieldsStructsVarsCnt = 0
+	bk.lhsBitfieldCnt = 0
+	bk.rhsBitfieldCnt = 0
+	bk.forwardJumpCnt = 0
+	bk.backwardJumpCnt = 0
+	bk.useNewVarCnt = 0
+	bk.useOldVarCnt = 0
+	bk.oobCnt = 0
+	bk.relyOnIntSize = false
+	bk.relyOnPtrSize = false
 }
 
 func formattedOutput(b *strings.Builder, msg string, num int) {
@@ -115,22 +127,25 @@ func formattedOutputf(b *strings.Builder, msg string, num float64) {
 
 // RecordAddressTaken mirrors Bookkeeper::record_address_taken.
 // Bookkeeper.cpp:324–334.
-func RecordAddressTaken(v *Variable) {
+func RecordAddressTaken(v *Variable) { RecordAddressTakenSess(nil, v) }
+
+// RecordAddressTakenSess is RecordAddressTaken on an explicit session bag.
+func RecordAddressTakenSess(s *Session, v *Variable) {
 	// Bookkeeper.cpp:325–326 — assert(var); assert(var->type) sticky
 	// (no invent skip broken IR as zero address-taken stats / soft re-pick)
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	v.IsAddrTaken = true
-	currentSession().BK.addressTakenCnt++
+	sessBK(s).addressTakenCnt++
 	if v.Type.HasBitfields() {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
-		currentSession().BK.varsWithBitfieldsAddressTakenCnt++
-	} else if sessHasError(nil) {
+		sessBK(s).varsWithBitfieldsAddressTakenCnt++
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
@@ -139,40 +154,46 @@ func RecordAddressTaken(v *Variable) {
 // RecordVolatileAccess mirrors Bookkeeper::record_volatile_access.
 // Bookkeeper.cpp:386–412.
 func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
+	RecordVolatileAccessSess(nil, v, derefLevel, write)
+}
+
+// RecordVolatileAccessSess is RecordVolatileAccess on an explicit session bag.
+func RecordVolatileAccessSess(s *Session, v *Variable, derefLevel int, write bool) {
 	// Bookkeeper.cpp:388 — assert(var) sticky
 	// (no invent skip nil as zero vol-access stats)
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if write {
-		RecordBitfieldsWrites(v)
+		RecordBitfieldsWritesSess(s, v)
 	} else {
-		RecordBitfieldsReads(v)
+		RecordBitfieldsReadsSess(s, v)
 	}
+	bk := sessBK(s)
 	for i := 0; i <= derefLevel; i++ {
 		vol := v.IsVolatileAfterDeref(i)
 		// residual ERROR sticky — no invent soft-continue peel stats past IsVolatileAfterDeref hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		if write {
 			if vol {
 				if i > 0 {
-					currentSession().BK.writeVolatileThruPtrCnt++
+					bk.writeVolatileThruPtrCnt++
 				}
-				currentSession().BK.writeVolatileCnt++
+				bk.writeVolatileCnt++
 			} else {
-				currentSession().BK.writeNonVolatileCnt++
+				bk.writeNonVolatileCnt++
 			}
 		} else {
 			if vol {
 				if i > 0 {
-					currentSession().BK.readVolatileThruPtrCnt++
+					bk.readVolatileThruPtrCnt++
 				}
-				currentSession().BK.readVolatileCnt++
+				bk.readVolatileCnt++
 			} else {
-				currentSession().BK.readNonVolatileCnt++
+				bk.readNonVolatileCnt++
 			}
 		}
 	}
@@ -182,23 +203,26 @@ func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
 // Bookkeeper.cpp:336–345.
 // RecordBitfieldsReads counts bitfield reads.
 // Variable + Type always live; sticky (no invent soft-skip bitfield read stats past hole).
-func RecordBitfieldsReads(v *Variable) {
+func RecordBitfieldsReads(v *Variable) { RecordBitfieldsReadsSess(nil, v) }
+
+// RecordBitfieldsReadsSess is RecordBitfieldsReads on an explicit session bag.
+func RecordBitfieldsReadsSess(s *Session, v *Variable) {
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if v.Type.HasBitfields() {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
-		currentSession().BK.rhsBitfieldsStructsVarsCnt++
-	} else if sessHasError(nil) {
+		sessBK(s).rhsBitfieldsStructsVarsCnt++
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
 	if v.IsBitfield {
-		currentSession().BK.rhsBitfieldCnt++
+		sessBK(s).rhsBitfieldCnt++
 	}
 }
 
@@ -206,23 +230,26 @@ func RecordBitfieldsReads(v *Variable) {
 // Bookkeeper.cpp:347–356.
 // RecordBitfieldsWrites counts bitfield writes.
 // Variable + Type always live; sticky (no invent soft-skip bitfield write stats past hole).
-func RecordBitfieldsWrites(v *Variable) {
+func RecordBitfieldsWrites(v *Variable) { RecordBitfieldsWritesSess(nil, v) }
+
+// RecordBitfieldsWritesSess is RecordBitfieldsWrites on an explicit session bag.
+func RecordBitfieldsWritesSess(s *Session, v *Variable) {
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if v.Type.HasBitfields() {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
-		currentSession().BK.lhsBitfieldsStructsVarsCnt++
-	} else if sessHasError(nil) {
+		sessBK(s).lhsBitfieldsStructsVarsCnt++
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
 	if v.IsBitfield {
-		currentSession().BK.lhsBitfieldCnt++
+		sessBK(s).lhsBitfieldCnt++
 	}
 }
 
@@ -231,8 +258,13 @@ func RecordBitfieldsWrites(v *Variable) {
 // RecordPointerComparisons counts pointer comparison kinds.
 // Expression operands always live; sticky (no invent soft-skip cmp stats past hole).
 func RecordPointerComparisons(lhs, rhs *Expression) {
+	RecordPointerComparisonsSess(nil, lhs, rhs)
+}
+
+// RecordPointerComparisonsSess is RecordPointerComparisons on an explicit session bag.
+func RecordPointerComparisonsSess(s *Session, lhs, rhs *Expression) {
 	if lhs == nil || rhs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// Bookkeeper.cpp:363 — both non-function
@@ -241,7 +273,7 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
 	// residual ERROR sticky — no invent soft-skip cmp stats past GetType residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	// Bookkeeper.cpp:364–365 — assert both pointer; fail closed non-sticky skip
@@ -251,12 +283,12 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 	}
 	lPtr := lt.IsPointerLike()
 	// residual ERROR sticky — no invent soft-skip cmp stats past IsPointerLike residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	rPtr := rt.IsPointerLike()
 	// residual ERROR sticky — no invent soft-skip cmp stats past RHS IsPointerLike residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	if !lPtr || !rPtr {
@@ -265,7 +297,7 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 	// var vs constant → null compare
 	if (lhs.Term == TermVariable && rhs.Term == TermConstant) ||
 		(rhs.Term == TermVariable && lhs.Term == TermConstant) {
-		currentSession().BK.cmpPtrToNull++
+		sessBK(s).cmpPtrToNull++
 		return
 	}
 	if lhs.Term == TermVariable && rhs.Term == TermVariable {
@@ -273,42 +305,46 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 		li, lok := lhs.IndirectLevelComplete()
 		ri, rok := rhs.IndirectLevelComplete()
 		if !lok || !rok {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		if li == ri {
-			currentSession().BK.cmpPtrToPtr++
+			sessBK(s).cmpPtrToPtr++
 		} else {
-			currentSession().BK.cmpPtrToAddr++
+			sessBK(s).cmpPtrToAddr++
 		}
 	}
 }
 
 // RecordVarsWithBitfields mirrors Bookkeeper::record_vars_with_bitfields.
 // Bookkeeper.cpp:464–474 — assert(type); base aggregate with bitfields.
-func RecordVarsWithBitfields(t *Type) {
+func RecordVarsWithBitfields(t *Type) { RecordVarsWithBitfieldsSess(nil, t) }
+
+// RecordVarsWithBitfieldsSess is RecordVarsWithBitfields on an explicit session bag.
+func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 	// Bookkeeper.cpp:465 assert(type) sticky on nil; !has_bitfields is normal no-op
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !t.HasBitfields() {
 		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-count past HasBitfields residual true path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	level := t.IndirectLevel()
 	// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
-	IncrCounter(&currentSession().BK.varsWithBitfields, level)
+	bk := sessBK(s)
+	IncrCounter(&bk.varsWithBitfields, level)
 }
 
 // RecordTypeWithBitfields mirrors Bookkeeper::record_type_with_bitfields.
@@ -346,7 +382,7 @@ func RecordTypeWithBitfields(t *Type) {
 	}
 	// Bookkeeper.cpp:482–483 — assert(len == fields.size()); Fields carry BitWidth
 	// incomplete field IR (nil Type) sticky stop — no invent zero counts past gaps
-	currentSession().BK.structsWithBitfields++
+	sessBK(nil).structsWithBitfields++
 	for _, f := range t.Fields {
 		// StructField Type always live for bitfield stats; nil hole sticky stop
 		if f.Type == nil {
@@ -358,9 +394,9 @@ func RecordTypeWithBitfields(t *Type) {
 			continue
 		}
 		// Bookkeeper.cpp:488–489 — bitfields_in_total++; zero width → unamed
-		currentSession().BK.bitfieldsInTotal++
+		sessBK(nil).bitfieldsInTotal++
 		if f.BitWidth == 0 {
-			currentSession().BK.unamedBitfieldsInTotal++
+			sessBK(nil).unamedBitfieldsInTotal++
 		}
 		// Bookkeeper.cpp:491–495 — qfers_[i] const/volatile
 		if f.Qfer.IsConst() {
@@ -368,7 +404,7 @@ func RecordTypeWithBitfields(t *Type) {
 			if sessHasError(nil) {
 				return
 			}
-			currentSession().BK.constBitfieldsInTotal++
+			sessBK(nil).constBitfieldsInTotal++
 		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue stats past IsConst residual false
 			return
@@ -378,7 +414,7 @@ func RecordTypeWithBitfields(t *Type) {
 			if sessHasError(nil) {
 				return
 			}
-			currentSession().BK.volatileBitfieldsInTotal++
+			sessBK(nil).volatileBitfieldsInTotal++
 		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue stats past IsVolatile residual false
 			return
@@ -390,30 +426,34 @@ func RecordTypeWithBitfields(t *Type) {
 // VariableSelector.cpp:1230–1236.
 // RecordVarCreated mirrors use_new_var bookkeeping on create.
 // Variable + Type always live; sticky (no invent soft-skip create stats past hole).
-func RecordVarCreated(v *Variable) {
+func RecordVarCreated(v *Variable) { RecordVarCreatedSess(nil, v) }
+
+// RecordVarCreatedSess is RecordVarCreated on an explicit session bag.
+func RecordVarCreatedSess(s *Session, v *Variable) {
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
-	currentSession().BK.useNewVarCnt++
-	RecordVarsWithBitfields(v.Type)
+	sessBK(s).useNewVarCnt++
+	RecordVarsWithBitfieldsSess(s, v.Type)
 	// residual ERROR sticky — no invent soft-continue create stats past bitfields residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	d := v.Type.StructDepth()
 	// residual ERROR sticky — no invent soft-count depth past StructDepth residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
-	IncrCounter(&currentSession().BK.structDepthCnts, d)
+	bk := sessBK(s)
+	IncrCounter(&bk.structDepthCnts, d)
 	if v.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-count union past IsUnion residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
-		currentSession().BK.unionVarCnt++
-	} else if sessHasError(nil) {
+		sessBK(s).unionVarCnt++
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 		return
 	}
@@ -421,33 +461,51 @@ func RecordVarCreated(v *Variable) {
 
 // RecordVarReused mirrors use_old_var_cnt++.
 // VariableSelector.cpp:1237–1238.
-func RecordVarReused() {
-	currentSession().BK.useOldVarCnt++
+func RecordVarReused() { RecordVarReusedSess(nil) }
+
+// RecordVarReusedSess records on an explicit session bag.
+func RecordVarReusedSess(s *Session) {
+	sessBK(s).useOldVarCnt++
 }
 
 // RecordForwardJump mirrors Bookkeeper::forward_jump_cnt++.
-func RecordForwardJump() { currentSession().BK.forwardJumpCnt++ }
+func RecordForwardJump() { RecordForwardJumpSess(nil) }
+
+// RecordForwardJumpSess records on an explicit session bag.
+func RecordForwardJumpSess(s *Session) { sessBK(s).forwardJumpCnt++ }
 
 // RecordBackwardJump mirrors Bookkeeper::backward_jump_cnt++.
-func RecordBackwardJump() { currentSession().BK.backwardJumpCnt++ }
+func RecordBackwardJump() { RecordBackwardJumpSess(nil) }
+
+// RecordBackwardJumpSess records on an explicit session bag.
+func RecordBackwardJumpSess(s *Session) { sessBK(s).backwardJumpCnt++ }
 
 // RecordPointerAvailForDeref mirrors Bookkeeper::pointer_avail_for_dereference++.
 // VariableSelector.cpp:416–419.
-func RecordPointerAvailForDeref() { currentSession().BK.pointerAvailForDeref++ }
+func RecordPointerAvailForDeref() { RecordPointerAvailForDerefSess(nil) }
+
+// RecordPointerAvailForDerefSess records on an explicit session bag.
+func RecordPointerAvailForDerefSess(s *Session) { sessBK(s).pointerAvailForDeref++ }
 
 // RecordVolatileAvail mirrors Bookkeeper::volatile_avail++.
 // VariableSelector.cpp:311 — has_eligible_volatile_var hit.
-func RecordVolatileAvail() { currentSession().BK.volatileAvail++ }
+func RecordVolatileAvail() { RecordVolatileAvailSess(nil) }
+
+// RecordVolatileAvailSess records on an explicit session bag.
+func RecordVolatileAvailSess(s *Session) { sessBK(s).volatileAvail++ }
 
 // VolatileAvailCount returns volatile_avail (tests / statistics).
-func VolatileAvailCount() int { return currentSession().BK.volatileAvail }
+func VolatileAvailCount() int { return sessBK(nil).volatileAvail }
 
 // RecordOOB mirrors Bookkeeper::oob_cnt++ when array_oob_prob fires.
 // StatementFor.cpp:157–158 — make_random_array_control.
-func RecordOOB() { currentSession().BK.oobCnt++ }
+func RecordOOB() { RecordOOBSess(nil) }
+
+// RecordOOBSess records on an explicit session bag.
+func RecordOOBSess(s *Session) { sessBK(s).oobCnt++ }
 
 // OOBCount returns oob_cnt (tests / statistics).
-func OOBCount() int { return currentSession().BK.oobCnt }
+func OOBCount() int { return sessBK(nil).oobCnt }
 
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
@@ -612,7 +670,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 // Builtins without body skip. Incomplete expressions / stmt IR sticky clear counts —
 // no invent counting broken IR as leaf depth 0 / soft re-pick past holes.
 func StatExprDepths(funcs []*Function) {
-	currentSession().BK.exprDepthCnts = nil
+	sessBK(nil).exprDepthCnts = nil
 	if !FunctionsComplete(funcs) {
 		sessNoteError(nil, ErrGeneric)
 		return
@@ -623,7 +681,7 @@ func StatExprDepths(funcs []*Function) {
 		}
 		// user func body always live after build; nil sticky clear
 		if f.Body == nil {
-			currentSession().BK.exprDepthCnts = nil
+			sessBK(nil).exprDepthCnts = nil
 			sessNoteError(nil, ErrGeneric)
 			return
 		}
@@ -631,7 +689,7 @@ func StatExprDepths(funcs []*Function) {
 			var exprs []*Expression
 			if !collectStmtExprs(&f.Body.Stmts[i], &exprs) {
 				// collectStmtExprs may already sticky
-				currentSession().BK.exprDepthCnts = nil
+				sessBK(nil).exprDepthCnts = nil
 				if !sessHasError(nil) {
 					sessNoteError(nil, ErrGeneric)
 				}
@@ -641,13 +699,14 @@ func StatExprDepths(funcs []*Function) {
 				c := ExpressionComplexity(e)
 				if c < 0 {
 					// ExpressionComplexity may already sticky
-					currentSession().BK.exprDepthCnts = nil
+					sessBK(nil).exprDepthCnts = nil
 					if !sessHasError(nil) {
 						sessNoteError(nil, ErrGeneric)
 					}
 					return
 				}
-				IncrCounter(&currentSession().BK.exprDepthCnts, c)
+				bk := sessBK(nil)
+	IncrCounter(&bk.exprDepthCnts, c)
 			}
 		}
 	}
@@ -657,7 +716,7 @@ func StatExprDepths(funcs []*Function) {
 // Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
 // Incomplete Funcs / Block* holes fail closed sticky zero counts (no invent partial depths).
 func StatBlkDepths(funcs []*Function) int {
-	currentSession().BK.blkDepthCnts = nil
+	sessBK(nil).blkDepthCnts = nil
 	cnt := 0
 	if !FunctionsComplete(funcs) {
 		sessNoteError(nil, ErrGeneric)
@@ -676,14 +735,15 @@ func StatBlkDepths(funcs []*Function) int {
 		if depth > 0 {
 			depth--
 		}
-		IncrCounter(&currentSession().BK.blkDepthCnts, depth)
+		bk := sessBK(nil)
+	IncrCounter(&bk.blkDepthCnts, depth)
 		cnt++
 		// get_blocks → recurse into Then/Else stmts with that block as parent
 		// Block* always live; nil hole sticky clear counts
 		for _, blk := range GetBlocksStmt(st) {
 			if blk == nil {
 				incomplete = true
-				currentSession().BK.blkDepthCnts = nil
+				sessBK(nil).blkDepthCnts = nil
 				cnt = 0
 				sessNoteError(nil, ErrGeneric)
 				return
@@ -700,7 +760,7 @@ func StatBlkDepths(funcs []*Function) int {
 		}
 		// user func body always live after build; nil sticky
 		if f.Body == nil {
-			currentSession().BK.blkDepthCnts = nil
+			sessBK(nil).blkDepthCnts = nil
 			sessNoteError(nil, ErrGeneric)
 			return 0
 		}
@@ -757,33 +817,33 @@ func OutputStatistics(funcs []*Function, opts Options) string {
 	if sessHasError(nil) {
 		return ""
 	}
-	if currentSession().BK.relyOnIntSize {
+	if sessBK(nil).relyOnIntSize {
 		b.WriteString("FYI: the random generator makes assumptions about the integer size. See platform.info for more details.\n")
 	}
-	if currentSession().BK.relyOnPtrSize {
+	if sessBK(nil).relyOnPtrSize {
 		b.WriteString("FYI: the random generator makes assumptions about the pointer size. See platform.info for more details.\n")
 	}
-	formattedOutput(&b, "total OOB instances added: ", currentSession().BK.oobCnt)
+	formattedOutput(&b, "total OOB instances added: ", sessBK(nil).oobCnt)
 	return b.String()
 }
 
 func outputStructUnionStatistics(b *strings.Builder, opts Options) {
-	maxD := len(currentSession().BK.structDepthCnts) - 1
+	maxD := len(sessBK(nil).structDepthCnts) - 1
 	if maxD < 0 {
 		maxD = 0
 	}
 	// empty vector → size()-1 wraps in C++; we emit 0
-	if len(currentSession().BK.structDepthCnts) == 0 {
+	if len(sessBK(nil).structDepthCnts) == 0 {
 		formattedOutput(b, "max struct depth: ", -1) // size_t(-1) style when empty? C++ size 0 → (0-1)=max
 		// upstream: (struct_depth_cnts.size() - 1) as int when empty is -1
 	} else {
 		formattedOutput(b, "max struct depth: ", maxD)
 	}
 	b.WriteString("breakdown:\n")
-	for i, c := range currentSession().BK.structDepthCnts {
+	for i, c := range sessBK(nil).structDepthCnts {
 		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, c))
 	}
-	formattedOutput(b, "total union variables: ", currentSession().BK.unionVarCnt)
+	formattedOutput(b, "total union variables: ", sessBK(nil).unionVarCnt)
 	outputBitfields(b, opts)
 }
 
@@ -792,32 +852,32 @@ func outputBitfields(b *strings.Builder, opts Options) {
 		return
 	}
 	b.WriteString("\n")
-	formattedOutput(b, "non-zero bitfields defined in structs: ", currentSession().BK.bitfieldsInTotal)
-	formattedOutput(b, "zero bitfields defined in structs: ", currentSession().BK.unamedBitfieldsInTotal)
-	formattedOutput(b, "const bitfields defined in structs: ", currentSession().BK.constBitfieldsInTotal)
-	formattedOutput(b, "volatile bitfields defined in structs: ", currentSession().BK.volatileBitfieldsInTotal)
-	formattedOutput(b, "structs with bitfields in the program: ", CalcTotal(currentSession().BK.varsWithBitfields))
+	formattedOutput(b, "non-zero bitfields defined in structs: ", sessBK(nil).bitfieldsInTotal)
+	formattedOutput(b, "zero bitfields defined in structs: ", sessBK(nil).unamedBitfieldsInTotal)
+	formattedOutput(b, "const bitfields defined in structs: ", sessBK(nil).constBitfieldsInTotal)
+	formattedOutput(b, "volatile bitfields defined in structs: ", sessBK(nil).volatileBitfieldsInTotal)
+	formattedOutput(b, "structs with bitfields in the program: ", CalcTotal(sessBK(nil).varsWithBitfields))
 	b.WriteString("breakdown:\n")
-	for i, c := range currentSession().BK.varsWithBitfields {
+	for i, c := range sessBK(nil).varsWithBitfields {
 		b.WriteString(fmt.Sprintf("   indirect level: %d, occurrence: %d\n", i, c))
 	}
-	formattedOutput(b, "times a bitfields struct's address is taken: ", currentSession().BK.varsWithBitfieldsAddressTakenCnt)
-	formattedOutput(b, "times a bitfields struct is read: ", currentSession().BK.rhsBitfieldsStructsVarsCnt)
-	formattedOutput(b, "times a bitfields struct is write: ", currentSession().BK.lhsBitfieldsStructsVarsCnt)
-	formattedOutput(b, "times a bitfield is read: ", currentSession().BK.rhsBitfieldCnt)
-	formattedOutput(b, "times a bitfield is write: ", currentSession().BK.lhsBitfieldCnt)
+	formattedOutput(b, "times a bitfields struct's address is taken: ", sessBK(nil).varsWithBitfieldsAddressTakenCnt)
+	formattedOutput(b, "times a bitfields struct is read: ", sessBK(nil).rhsBitfieldsStructsVarsCnt)
+	formattedOutput(b, "times a bitfields struct is write: ", sessBK(nil).lhsBitfieldsStructsVarsCnt)
+	formattedOutput(b, "times a bitfield is read: ", sessBK(nil).rhsBitfieldCnt)
+	formattedOutput(b, "times a bitfield is write: ", sessBK(nil).lhsBitfieldCnt)
 }
 
 func outputExprStatistics(b *strings.Builder, funcs []*Function) {
 	StatExprDepths(funcs)
-	maxD := len(currentSession().BK.exprDepthCnts) - 1
-	if len(currentSession().BK.exprDepthCnts) == 0 {
+	maxD := len(sessBK(nil).exprDepthCnts) - 1
+	if len(sessBK(nil).exprDepthCnts) == 0 {
 		formattedOutput(b, "max expression depth: ", -1)
 	} else {
 		formattedOutput(b, "max expression depth: ", maxD)
 	}
 	b.WriteString("breakdown:\n")
-	for i, c := range currentSession().BK.exprDepthCnts {
+	for i, c := range sessBK(nil).exprDepthCnts {
 		if c != 0 {
 			b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, c))
 		}
@@ -831,26 +891,26 @@ func outputPointerStatistics(b *strings.Builder) {
 	if len(ptrs) > 0 {
 		b.WriteString("\n")
 	}
-	formattedOutput(b, "times a variable address is taken: ", currentSession().BK.addressTakenCnt)
-	formattedOutput(b, "times a pointer is dereferenced on RHS: ", CalcTotal(currentSession().BK.readDereferenceCnts))
+	formattedOutput(b, "times a variable address is taken: ", sessBK(nil).addressTakenCnt)
+	formattedOutput(b, "times a pointer is dereferenced on RHS: ", CalcTotal(sessBK(nil).readDereferenceCnts))
 	b.WriteString("breakdown:\n")
-	for i := 1; i < len(currentSession().BK.readDereferenceCnts); i++ {
-		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, currentSession().BK.readDereferenceCnts[i]))
+	for i := 1; i < len(sessBK(nil).readDereferenceCnts); i++ {
+		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, sessBK(nil).readDereferenceCnts[i]))
 	}
-	formattedOutput(b, "times a pointer is dereferenced on LHS: ", CalcTotal(currentSession().BK.writeDereferenceCnts))
+	formattedOutput(b, "times a pointer is dereferenced on LHS: ", CalcTotal(sessBK(nil).writeDereferenceCnts))
 	b.WriteString("breakdown:\n")
-	for i := 1; i < len(currentSession().BK.writeDereferenceCnts); i++ {
-		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, currentSession().BK.writeDereferenceCnts[i]))
+	for i := 1; i < len(sessBK(nil).writeDereferenceCnts); i++ {
+		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, sessBK(nil).writeDereferenceCnts[i]))
 	}
-	formattedOutput(b, "times a pointer is compared with null: ", currentSession().BK.cmpPtrToNull)
-	formattedOutput(b, "times a pointer is compared with address of another variable: ", currentSession().BK.cmpPtrToAddr)
-	formattedOutput(b, "times a pointer is compared with another pointer: ", currentSession().BK.cmpPtrToPtr)
-	formattedOutput(b, "times a pointer is qualified to be dereferenced: ", currentSession().BK.pointerAvailForDeref)
-	if len(currentSession().BK.dereferenceLevelCnts) > 0 {
+	formattedOutput(b, "times a pointer is compared with null: ", sessBK(nil).cmpPtrToNull)
+	formattedOutput(b, "times a pointer is compared with address of another variable: ", sessBK(nil).cmpPtrToAddr)
+	formattedOutput(b, "times a pointer is compared with another pointer: ", sessBK(nil).cmpPtrToPtr)
+	formattedOutput(b, "times a pointer is qualified to be dereferenced: ", sessBK(nil).pointerAvailForDeref)
+	if len(sessBK(nil).dereferenceLevelCnts) > 0 {
 		b.WriteString("\n")
-		formattedOutput(b, "max dereference level: ", len(currentSession().BK.dereferenceLevelCnts)-1)
+		formattedOutput(b, "max dereference level: ", len(sessBK(nil).dereferenceLevelCnts)-1)
 		b.WriteString("breakdown:\n")
-		for i, c := range currentSession().BK.dereferenceLevelCnts {
+		for i, c := range sessBK(nil).dereferenceLevelCnts {
 			b.WriteString(fmt.Sprintf("   level: %d, occurrence: %d\n", i, c))
 		}
 	}
@@ -937,37 +997,37 @@ func outputPointerStatistics(b *strings.Builder) {
 }
 
 func outputVolatileAccessStatistics(b *strings.Builder) {
-	formattedOutput(b, "times a non-volatile is read: ", currentSession().BK.readNonVolatileCnt)
-	formattedOutput(b, "times a non-volatile is write: ", currentSession().BK.writeNonVolatileCnt)
-	formattedOutput(b, "times a volatile is read: ", currentSession().BK.readVolatileCnt)
-	formattedOutput(b, "   times read thru a pointer: ", currentSession().BK.readVolatileThruPtrCnt)
-	formattedOutput(b, "times a volatile is write: ", currentSession().BK.writeVolatileCnt)
-	formattedOutput(b, "   times written thru a pointer: ", currentSession().BK.writeVolatileThruPtrCnt)
-	total := currentSession().BK.readNonVolatileCnt + currentSession().BK.writeNonVolatileCnt + currentSession().BK.readVolatileCnt + currentSession().BK.writeVolatileCnt
+	formattedOutput(b, "times a non-volatile is read: ", sessBK(nil).readNonVolatileCnt)
+	formattedOutput(b, "times a non-volatile is write: ", sessBK(nil).writeNonVolatileCnt)
+	formattedOutput(b, "times a volatile is read: ", sessBK(nil).readVolatileCnt)
+	formattedOutput(b, "   times read thru a pointer: ", sessBK(nil).readVolatileThruPtrCnt)
+	formattedOutput(b, "times a volatile is write: ", sessBK(nil).writeVolatileCnt)
+	formattedOutput(b, "   times written thru a pointer: ", sessBK(nil).writeVolatileThruPtrCnt)
+	total := sessBK(nil).readNonVolatileCnt + sessBK(nil).writeNonVolatileCnt + sessBK(nil).readVolatileCnt + sessBK(nil).writeVolatileCnt
 	percentage := 0.0
 	if total > 0 {
-		percentage = float64(currentSession().BK.readNonVolatileCnt+currentSession().BK.writeNonVolatileCnt) * 100.0 / float64(total)
+		percentage = float64(sessBK(nil).readNonVolatileCnt+sessBK(nil).writeNonVolatileCnt) * 100.0 / float64(total)
 	}
-	formattedOutputf(b, "times a volatile is available for access: ", float64(currentSession().BK.volatileAvail))
+	formattedOutputf(b, "times a volatile is available for access: ", float64(sessBK(nil).volatileAvail))
 	formattedOutputf(b, "percentage of non-volatile access: ", percentage)
 }
 
 func outputJumpStatistics(b *strings.Builder) {
-	formattedOutput(b, "forward jumps: ", currentSession().BK.forwardJumpCnt)
-	formattedOutput(b, "backward jumps: ", currentSession().BK.backwardJumpCnt)
+	formattedOutput(b, "forward jumps: ", sessBK(nil).forwardJumpCnt)
+	formattedOutput(b, "backward jumps: ", sessBK(nil).backwardJumpCnt)
 }
 
 func outputStmtsStatistics(b *strings.Builder, funcs []*Function) {
 	stmtCnt := StatBlkDepths(funcs)
 	formattedOutput(b, "stmts: ", stmtCnt)
-	maxD := len(currentSession().BK.blkDepthCnts) - 1
-	if len(currentSession().BK.blkDepthCnts) == 0 {
+	maxD := len(sessBK(nil).blkDepthCnts) - 1
+	if len(sessBK(nil).blkDepthCnts) == 0 {
 		formattedOutput(b, "max block depth: ", -1)
 	} else {
 		formattedOutput(b, "max block depth: ", maxD)
 	}
 	b.WriteString("breakdown:\n")
-	for i, c := range currentSession().BK.blkDepthCnts {
+	for i, c := range sessBK(nil).blkDepthCnts {
 		if c != 0 {
 			b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, c))
 		}
@@ -975,11 +1035,11 @@ func outputStmtsStatistics(b *strings.Builder, funcs []*Function) {
 }
 
 func outputVarFreshness(b *strings.Builder) {
-	total := currentSession().BK.useNewVarCnt + currentSession().BK.useOldVarCnt
+	total := sessBK(nil).useNewVarCnt + sessBK(nil).useOldVarCnt
 	fresh, exist := 0.0, 0.0
 	if total > 0 {
-		fresh = float64(currentSession().BK.useNewVarCnt) * 100.0 / float64(total)
-		exist = float64(currentSession().BK.useOldVarCnt) * 100.0 / float64(total)
+		fresh = float64(sessBK(nil).useNewVarCnt) * 100.0 / float64(total)
+		exist = float64(sessBK(nil).useOldVarCnt) * 100.0 / float64(total)
 	}
 	formattedOutputf(b, "percentage a fresh-made variable is used: ", fresh)
 	formattedOutputf(b, "percentage an existing variable is used: ", exist)

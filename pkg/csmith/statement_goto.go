@@ -613,7 +613,7 @@ func MakeRandomGoto(
 		// okBlk is other_stm->parent (dest Statement::parent).
 		MarkNeedRevisitLCAParent(blk, other, okBlk)
 		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
-		RecordBackwardJump()
+		RecordBackwardJumpSess(cgSess(cg))
 		return st
 	}
 
@@ -1051,7 +1051,7 @@ func MakeRandomGoto(
 		}
 	}
 	// StatementGoto.cpp:211
-	RecordForwardJump()
+	RecordForwardJumpSess(fmSess(fm))
 	// StatementGoto.cpp:212 — return nullptr (goto already in other_blk)
 	return makeGotoFailed()
 }

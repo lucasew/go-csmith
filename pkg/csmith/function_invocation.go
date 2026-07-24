@@ -1549,7 +1549,7 @@ func MakeRandomBinaryPtrComparison(
 		return nil
 	}
 	// FunctionInvocation.cpp:358 — bookkeeping
-	RecordPointerComparisons(left, right)
+	RecordPointerComparisonsSess(cgSess(cg), left, right)
 	// residual ERROR sticky — no invent ptr-cmp past RecordPointerComparisons residual hole
 	if sessHasError(cgSess(cg)) {
 		return nil

@@ -1672,11 +1672,12 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
 		deref, _ := ev.IndirectLevelComplete()
 		if deref > 0 {
-			IncrCounter(&currentSession().BK.readDereferenceCnts, deref)
+			bk := sessBK(cgSess(cg))
+			IncrCounter(&bk.readDereferenceCnts, deref)
 		} else if deref < 0 {
-			RecordAddressTaken(v)
+			RecordAddressTakenSess(cgSess(cg), v)
 		}
-		RecordVolatileAccess(v, deref, false)
+		RecordVolatileAccessSess(cgSess(cg), v, deref, false)
 		return ev
 	}
 	return nil

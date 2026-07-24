@@ -773,9 +773,10 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 	// VisitFactsLhs already required complete Lhs; still use Complete for safety
 	deref, _ := lhs.IndirectLevelComplete()
 	if deref > 0 {
-		IncrCounter(&currentSession().BK.writeDereferenceCnts, deref)
+		bk := sessBK(cgSess(cg))
+		IncrCounter(&bk.writeDereferenceCnts, deref)
 	}
-	RecordVolatileAccess(v, deref, true)
+	RecordVolatileAccessSess(cgSess(cg), v, deref, true)
 	// wrap volatiles for OutputLhsC path on Variable
 	if opts.WrapVolatiles {
 		v.UseVolRVal = true
