@@ -93,7 +93,7 @@ func init() {
 // path — fail closed nil (no invent eInt for invalid eSimpleType).
 func GetSimpleType(st ESimpleType) *Type {
 	if st < 0 || int(st) >= MaxSimpleTypes {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return simpleTypes[st]
@@ -132,29 +132,29 @@ type IntSubfield struct {
 // Incomplete field Type sticky empty (no invent partial name list past hole).
 func (t *Type) GetIntSubfieldNames(prefix string, excluded []int) []IntSubfield {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if t.IsSimple() {
 		// residual ERROR sticky — no invent soft-leaf past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		return []IntSubfield{{Name: prefix, Type: t}}
 	}
 	// residual ERROR sticky — no invent soft-continue past IsSimple residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	if !t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-empty past IsAggregate residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-empty past IsAggregate residual true path
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	var out []IntSubfield
@@ -178,14 +178,14 @@ func (t *Type) GetIntSubfieldNames(prefix string, excluded []int) []IntSubfield 
 			continue
 		}
 		if f.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		// Type.cpp:1631–1634 — prefix+".f"+j; recurse with empty excluded
 		subPrefix := prefix + ".f" + itoa(j)
 		j++
 		nested := f.Type.GetIntSubfieldNames(subPrefix, nil)
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		out = append(out, nested...)
@@ -204,29 +204,29 @@ func (t *Type) IsConstStructUnion() bool {
 	for _, f := range t.Fields {
 		if f.Type == nil {
 			// incomplete field Type sticky const (restrictive — no invent non-const)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if f.Type.IsConstStructUnion() {
 			// residual ERROR sticky — no invent const-true past nested IsConstStructUnion hole
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		if f.Qfer.IsConst() {
 			// residual ERROR sticky — no invent const-true past field IsConst residual
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past IsConst residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 	}
@@ -244,29 +244,29 @@ func (t *Type) IsVolatileStructUnion() bool {
 	for _, f := range t.Fields {
 		if f.Type == nil {
 			// incomplete field Type sticky volatile (restrictive — no invent non-vol)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if f.Type.IsVolatileStructUnion() {
 			// residual ERROR sticky — no invent vol-true past nested IsVolatileStructUnion hole
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		if f.Qfer.IsVolatile() {
 			// residual ERROR sticky — no invent vol-true past field IsVolatile residual
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past IsVolatile residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 	}
@@ -291,12 +291,12 @@ func (t *Type) StructDepth() int {
 	for _, f := range t.Fields {
 		if f.Type == nil {
 			// incomplete field Type sticky deep (restrictive nesting filter)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return incompleteStructDepth
 		}
 		d := f.Type.StructDepth()
 		// residual ERROR sticky — no invent soft-continue later fields past nested StructDepth hole
-		if HasError() {
+		if sessHasError(nil) {
 			return incompleteStructDepth
 		}
 		if d > maxField {
@@ -310,7 +310,7 @@ func (t *Type) StructDepth() int {
 // Type* always live at Simple sites; sticky EVoid (no invent void soft-skip past hole).
 func (t *Type) Simple() ESimpleType {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return EVoid
 	}
 	return t.simple
@@ -338,35 +338,35 @@ func (t *Type) IsPointerLike() bool {
 // Type* always live on Fields; nil field hole fails closed as false (no invent has-int).
 func (t *Type) HasIntField() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if t.IsInt() {
 		// residual ERROR sticky — no invent has-int true past IsInt residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue field scan past IsInt residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	for _, f := range t.Fields {
 		if f.Type == nil {
 			// incomplete field Type sticky not-has-int (no invent int field past hole)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if f.Type.HasIntField() {
 			// residual ERROR sticky — no invent has-int true past nested HasIntField hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 	}
@@ -379,7 +379,7 @@ func (t *Type) HasIntField() bool {
 // Type* always live on Fields; nil field hole sticky true (no invent pointer-free).
 func (t *Type) ContainPointerField() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if t.ptrTo != nil {
@@ -387,28 +387,28 @@ func (t *Type) ContainPointerField() bool {
 	}
 	if t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-continue scan past IsAggregate residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		for _, f := range t.Fields {
 			if f.Type == nil {
 				// incomplete field Type sticky has-pointer (restrictive)
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return true
 			}
 			if f.Type.ContainPointerField() {
 				// residual ERROR sticky — no invent has-pointer true past nested hole
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 		}
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent pointer-free soft-skip past IsAggregate residual false
 		return true
 	}
@@ -419,18 +419,18 @@ func (t *Type) ContainPointerField() bool {
 // Type* always live; sticky false (no invent not-float soft-skip past hole).
 func (t *Type) IsFloat() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !t.IsSimple() {
 		// residual ERROR sticky — no invent not-float soft-skip past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue float check past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return t.simple == EFloat
@@ -441,18 +441,18 @@ func (t *Type) IsFloat() bool {
 // Type* always live; sticky false (no invent not-char soft-skip past hole).
 func (t *Type) IsSignedChar() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !t.IsSimple() {
 		// residual ERROR sticky — no invent not-char soft-skip past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue char check past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return t.simple == EChar
@@ -463,18 +463,18 @@ func (t *Type) IsSignedChar() bool {
 // Type* always live; sticky true (no invent not-full-bitfields soft-skip past hole).
 func (t *Type) IsFullBitfieldsStruct() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if !t.IsStruct() || len(t.Fields) == 0 {
 		// residual ERROR sticky — no invent not-full soft-skip past IsStruct residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue full check past IsStruct residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	for _, f := range t.Fields {
@@ -489,18 +489,18 @@ func (t *Type) IsFullBitfieldsStruct() bool {
 // Type* always live; sticky true (no invent unsigned soft-skip past hole).
 func (t *Type) IsSigned() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if !t.IsSimple() {
 		// residual ERROR sticky — no invent unsigned soft-skip past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue signed check past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	switch t.simple {
@@ -517,18 +517,18 @@ func (t *Type) IsSigned() bool {
 // Type* always live at to_unsigned; sticky nil (no invent soft-skip past hole).
 func (t *Type) ToUnsigned() *Type {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !t.IsSimple() {
 		// residual ERROR sticky — no invent soft-nil unsigned past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-continue unsigned past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	switch t.simple {
@@ -571,7 +571,7 @@ func SetPlatformSizes(intSize, ptrSize int) {
 // Type* always live at SizeInBytes sites; sticky 0 (no invent zero-size soft-skip).
 func (t *Type) SizeInBytes() int {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	if t.ptrTo != nil {
@@ -601,7 +601,7 @@ func (t *Type) SizeInBytes() int {
 		return 16
 	default:
 		// unknown simple — assert path sticky; no soft invent platform int size
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 }
@@ -611,15 +611,15 @@ func (t *Type) SizeInBytes() int {
 func (t *Type) CName() string {
 	// Type* always live at Output sites in C++; sticky no invent "void" for nil
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if t.ptrTo != nil {
 		inner := t.ptrTo.CName()
 		if inner == "" {
 			// incomplete pointee sticky — no invent bare "*"
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
@@ -628,7 +628,7 @@ func (t *Type) CName() string {
 	if t.isStruct {
 		// Type.cpp: eStruct → "struct S" + sid; sticky no invent bare "struct"
 		if t.StructName == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		return "struct " + t.StructName
@@ -636,7 +636,7 @@ func (t *Type) CName() string {
 	if t.isUnion {
 		// Type.cpp: eUnion → "union U" + sid; sticky no invent bare "union"
 		if t.StructName == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		return "union " + t.StructName
@@ -650,18 +650,18 @@ func (t *Type) CName() string {
 	case EInt128:
 		// Type.cpp:1685–1686 — __int{SizeInBytes*8}
 		sz := t.SizeInBytes()
-		if HasError() || sz <= 0 {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || sz <= 0 {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
 		return fmt.Sprintf("__int%d", sz*8)
 	case EUInt128:
 		sz := t.SizeInBytes()
-		if HasError() || sz <= 0 {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || sz <= 0 {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
@@ -670,7 +670,7 @@ func (t *Type) CName() string {
 		// Type.cpp:1689–1693 — (is_signed?"int":"uint") + bits + "_t"
 		if t.simple == 0 && !t.IsSimple() {
 			// unknown/non-simple fallthrough sticky
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// only integer simples reach here
@@ -678,18 +678,18 @@ func (t *Type) CName() string {
 		case EChar, EShort, EInt, ELong, ELongLong, EUChar, EUShort, EUInt, EULong, EULongLong:
 			// ok
 		default:
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		sz := t.SizeInBytes()
-		if HasError() || sz <= 0 {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || sz <= 0 {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return ""
 		}
 		signed := t.IsSigned()
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		bits := sz * 8
@@ -704,7 +704,7 @@ func (t *Type) CName() string {
 // Type* always live at ptr_type; sticky nil (no invent not-pointer soft-skip past hole).
 func (t *Type) PtrType() *Type {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return t.ptrTo
@@ -715,7 +715,7 @@ func (t *Type) PtrType() *Type {
 // soft-skip past missing Type shell / soft re-pick).
 func (t *Type) IndirectLevel() int {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	n := 0
@@ -738,7 +738,7 @@ func TypeDoFinalization() {
 // Type.cpp:423+ find_pointer_type — pointee Type* always live; sticky no invent int* for nil.
 func PointerTo(pointee *Type) *Type {
 	if pointee == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if p, ok := currentSession().PointerCache[pointee]; ok {
@@ -753,7 +753,7 @@ func PointerTo(pointee *Type) *Type {
 // Type* always live on both sides; sticky false (no invent equal/not-match soft-skip past hole).
 func (t *Type) Match(other *Type, mt MatchType) bool {
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	switch mt {
@@ -763,14 +763,14 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 		// Type::is_convertable reads CGOptions::strict_float / lang_cpp
 		ok := t.IsConvertableOpts(other, ProcessOptions())
 		// residual ERROR sticky — no invent match true past IsConvertableOpts residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
 	case MatchDereference:
 		ok := t.IsDereferencedFrom(other)
 		// residual ERROR sticky — no invent match true past IsDereferencedFrom residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
@@ -780,14 +780,14 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 		}
 		ok := t.IsDereferencedFrom(other)
 		// residual ERROR sticky — no invent match true past IsDereferencedFrom residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
 	case MatchFlexible:
 		ok := t.IsDerivable(other)
 		// residual ERROR sticky — no invent match true past IsDerivable residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return ok
@@ -801,18 +801,18 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 // Type* always live; sticky false (no invent not-promotable soft-skip past hole).
 func (t *Type) IsPromotable(other *Type) bool {
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !t.IsSimple() || !other.IsSimple() {
 		// residual ERROR sticky — no invent not-promotable soft-skip past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue promote past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	switch t.simple {
@@ -847,7 +847,7 @@ func (t *Type) IsConvertable(other *Type) bool {
 func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 	// both Type* always live; sticky incomplete no invent not-convertable soft-skip
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if t == other {
@@ -855,17 +855,17 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 	}
 	if t.IsSimple() && other.IsSimple() {
 		// residual ERROR sticky — no invent soft-continue convert past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		// forbidden conversion from float to int (Type.cpp:1428–1429)
 		of := other.IsFloat()
 		// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		tf := t.IsFloat()
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if of && !tf {
@@ -877,7 +877,7 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue pointer convert past IsSimple residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if t.ptrTo != nil && other.ptrTo != nil {
@@ -886,12 +886,12 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 		}
 		ts := t.ptrTo.IsSimple()
 		// residual ERROR sticky — no invent soft-convert past subject pointee IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		os := other.ptrTo.IsSimple()
 		// residual ERROR sticky — no invent soft-convert past other pointee IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if ts && os {
@@ -902,11 +902,11 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 			if opts.StrictFloat {
 				tf := t.ptrTo.IsFloat()
 				// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				of := other.ptrTo.IsFloat()
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				if (tf && !of) || (!tf && of) {
@@ -918,11 +918,11 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 			}
 			sb1 := t.ptrTo.SizeInBytes()
 			// residual ERROR sticky — no invent size-equal past SizeInBytes residual
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			sb2 := other.ptrTo.SizeInBytes()
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			return sb1 == sb2
@@ -935,7 +935,7 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 // Type* always live; sticky false (no invent not-deref soft-skip past hole).
 func (t *Type) IsDereferencedFrom(other *Type) bool {
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if other.ptrTo == nil {
@@ -953,7 +953,7 @@ func (t *Type) IsDereferencedFrom(other *Type) bool {
 // Type* always live; sticky false (no invent not-derivable / equal-nil soft-skip past hole).
 func (t *Type) IsDerivable(other *Type) bool {
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if t == other {
@@ -961,24 +961,24 @@ func (t *Type) IsDerivable(other *Type) bool {
 	}
 	if t.IsConvertable(other) {
 		// residual ERROR sticky — no invent derivable true past IsConvertable residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue derivable past IsConvertable residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if t.IsDereferencedFrom(other) {
 		// residual ERROR sticky — no invent derivable true past IsDereferencedFrom residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue derivable past IsDereferencedFrom residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return t.ptrTo == other
@@ -989,7 +989,7 @@ func (t *Type) IsDerivable(other *Type) bool {
 // Type* always live; sticky false (no invent equal-nil soft-skip past hole).
 func (t *Type) IsEquivalent(other *Type) bool {
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if t == other {
@@ -997,31 +997,31 @@ func (t *Type) IsEquivalent(other *Type) bool {
 	}
 	if t.IsSimple() && other.IsSimple() {
 		// residual ERROR sticky — no invent soft-equal past IsSimple residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		s1 := t.IsSigned()
 		// residual ERROR sticky — no invent soft-equal past IsSigned residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		s2 := other.IsSigned()
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		n1 := t.SizeInBytes()
 		// residual ERROR sticky — no invent soft-equal past SizeInBytes residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		n2 := other.SizeInBytes()
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return s1 == s2 && n1 == n2
 	}
 	// residual ERROR sticky — no invent soft-not-equal past IsSimple residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return false
@@ -1032,7 +1032,7 @@ func (t *Type) IsEquivalent(other *Type) bool {
 // past hole / soft re-pick).
 func (t *Type) BaseType() *Type {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	for t.ptrTo != nil {
@@ -1049,33 +1049,33 @@ func (t *Type) BaseType() *Type {
 func (t *Type) NeedsCast(other *Type) bool {
 	// both Type* always live; sticky incomplete no invent no-cast soft-skip
 	if t == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if t.PtrType() == nil {
 		// residual ERROR sticky — no invent no-cast soft-skip past PtrType residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue cast past PtrType residual true path
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	tb, ob := t.BaseType(), other.BaseType()
 	// residual ERROR sticky — no invent soft-continue no-cast past BaseType residual
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	if tb == nil || ob == nil {
 		// incomplete base type sticky needs cast (restrictive)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	eq := tb.IsEquivalent(ob)
 	// residual ERROR sticky — no invent soft-continue no-cast past IsEquivalent residual
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return !eq
@@ -1087,7 +1087,7 @@ func (t *Type) NeedsCast(other *Type) bool {
 // Type* always live on Fields; nil field hole sticky true (no invent bitfield-free).
 func (t *Type) HasBitfields() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	for _, f := range t.Fields {
@@ -1096,24 +1096,24 @@ func (t *Type) HasBitfields() bool {
 		}
 		if f.Type == nil {
 			// incomplete field Type sticky has-bitfields (restrictive)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		isStruct := f.Type.IsStruct()
 		// residual ERROR sticky — no invent soft-continue later fields past IsStruct residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		if isStruct {
 			if f.Type.HasBitfields() {
 				// residual ERROR sticky — no invent has-bitfields true past nested hole
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 		}
@@ -1126,12 +1126,12 @@ func (t *Type) HasBitfields() bool {
 func (t *Type) IsBitfieldIndex(index int) bool {
 	// Type* always live; sticky false (no invent non-bitfield soft-skip past hole)
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// OOB is assert path sticky — fail closed false (not invent non-bitfield / soft skip)
 	if index < 0 || index >= len(t.Fields) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return t.Fields[index].BitWidth >= 0
@@ -1142,12 +1142,12 @@ func (t *Type) IsBitfieldIndex(index int) bool {
 func (t *Type) IsUnamedPadding(index int) bool {
 	// Type* always live; sticky false (no invent not-padding soft success past hole)
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// assert OOB sticky — no invent "not padding" soft success past hole
 	if index < 0 || index >= len(t.Fields) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// only bitfield slots can be zero-width padding
@@ -1161,7 +1161,7 @@ func (t *Type) IsUnamedPadding(index int) bool {
 // soft-skip nested HasPadding past incomplete field Type).
 func (t *Type) HasPadding() bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if t.IsStruct() && !t.Packed {
@@ -1170,29 +1170,29 @@ func (t *Type) HasPadding() bool {
 	for i, f := range t.Fields {
 		if t.IsBitfieldIndex(i) {
 			// residual ERROR sticky — no invent has-padding true past IsBitfieldIndex hole
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past IsBitfieldIndex residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		if f.Type == nil {
 			// incomplete field Type sticky has-padding (restrictive)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if f.Type.HasPadding() {
 			// residual ERROR sticky — no invent has-padding true past nested hole
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 	}
@@ -1205,7 +1205,7 @@ func (t *Type) HasPadding() bool {
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 	// C++ always has RNG + probs; sticky no soft invent EInt when missing
 	if r == nil || probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return EVoid
 	}
 	v := r.RndUptoFilter(uint32(MaxSimpleTypes), probs.SimpleTypesFilter())
@@ -1221,29 +1221,29 @@ func GetIntType() *Type { return GetSimpleType(EInt) }
 // Type* always live; sticky true (no invent overflow-free soft-skip past hole).
 func (t *Type) SignedOverflowPossible(intSize int) bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if !t.IsSimple() {
 		// residual ERROR sticky — no invent overflow-free soft-skip past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	if !t.IsSigned() {
 		// residual ERROR sticky — no invent overflow-free soft-skip past IsSigned residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue past IsSigned residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	// CGOptions::int_size always positive; no invent platform size when arg is 0
@@ -1252,7 +1252,7 @@ func (t *Type) SignedOverflowPossible(intSize int) bool {
 	}
 	sz := t.SizeInBytes()
 	// residual ERROR sticky — no invent overflow-free soft-skip past SizeInBytes residual
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return sz >= intSize
@@ -1292,7 +1292,7 @@ func GetTypeFromString(typeString string) *Type {
 		return GetSimpleType(EUInt128)
 	default:
 		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 }
@@ -1303,7 +1303,7 @@ func GetTypeFromString(typeString string) *Type {
 // (no invent bare empty type-name token / soft re-pick past incomplete aggregate IR).
 func (t *Type) TypeNameString() string {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if t.ptrTo != nil {
@@ -1311,18 +1311,18 @@ func (t *Type) TypeNameString() string {
 	}
 	isSt := t.IsStruct()
 	// residual ERROR sticky — no invent soft-name past IsStruct residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	isUn := t.IsUnion()
 	// residual ERROR sticky — no invent soft-name past IsUnion residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if isSt || isUn {
 		// Type.cpp struct/union tag always live at name emit; sticky no invent ""
 		if t.StructName == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		return t.StructName
@@ -1358,7 +1358,7 @@ func (t *Type) TypeNameString() string {
 		return "UInt128"
 	default:
 		// unknown simple — assert path sticky; no soft invent empty type-name token
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 }
@@ -1368,7 +1368,7 @@ func (t *Type) TypeNameString() string {
 // Type* always live at printf emit; sticky empty (no invent empty directive past hole).
 func (t *Type) PrintfDirective() string {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if t.ptrTo != nil {
@@ -1376,7 +1376,7 @@ func (t *Type) PrintfDirective() string {
 	}
 	if t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-printf past IsAggregate residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		// Type.cpp:1945–1951 — fields[i]->printf_directive always live Type*
@@ -1385,16 +1385,16 @@ func (t *Type) PrintfDirective() string {
 		b.WriteString("{")
 		for i, f := range t.Fields {
 			if f.Type == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			part := f.Type.PrintfDirective()
 			// residual ERROR sticky — no invent soft-continue later fields past nested residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if part == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			if i > 0 {
@@ -1406,49 +1406,49 @@ func (t *Type) PrintfDirective() string {
 		return b.String()
 	}
 	// residual ERROR sticky — no invent soft-continue past IsAggregate residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if t.IsSimple() {
 		// residual ERROR sticky — no invent soft-printf past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		sz := t.SizeInBytes()
 		// residual ERROR sticky — no invent format past SizeInBytes residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if sz >= 8 {
 			if t.IsSigned() {
 				// residual ERROR sticky — no invent %lld past IsSigned residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				return "%lld"
 			}
 			// residual ERROR sticky — no invent %llu past IsSigned residual false path
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			return "%llu"
 		}
 		if t.IsSigned() {
 			// residual ERROR sticky — no invent %d past IsSigned residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			return "%d"
 		}
 		// residual ERROR sticky — no invent %u past IsSigned residual false path
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		return "%u"
 	}
 	// Type.cpp switch covers simple/pointer/struct/union only; other shape sticky
 	// empty (no invent empty directive soft-success past broken type shell)
-	SetError(ErrGeneric)
+	sessNoteError(nil, ErrGeneric)
 	return ""
 }
 
@@ -1457,14 +1457,14 @@ func (t *Type) PrintfDirective() string {
 func (t *Type) SizeofString() string {
 	// Type* always live; sticky no invent sizeof(void)/sizeof()
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	cn := t.CName()
 	if cn == "" {
 		// incomplete CName IR sticky (CName may already SetError)
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
@@ -1479,18 +1479,18 @@ func HasAggregateField(fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
 			// incomplete field Type sticky has-aggregate (restrictive)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if f.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft has-aggregate past IsAggregate residual true
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue past IsAggregate residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 	}
@@ -1504,33 +1504,33 @@ func HasLongLongField(fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
 			// incomplete field Type sticky has-longlong (restrictive)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if f.Type.IsSimple() {
 			// residual ERROR sticky — no invent soft has-longlong past IsSimple residual
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			if f.Type.simple == ELongLong || f.Type.simple == EULongLong {
 				return true
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			return true
 		}
 		if f.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft has-longlong past IsAggregate residual
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			if HasLongLongField(f.Type.Fields) {
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue past recursive residual
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			return true
 		}
 	}
@@ -1543,12 +1543,12 @@ func HasLongLongField(fields []StructField) bool {
 // Type* always live; sticky false (no invent not-padding soft success past hole).
 func (t *Type) IsUnnamedPadding(index int) bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// assert OOB sticky — no invent "not padding" soft success past hole
 	if index < 0 || index >= len(t.Fields) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	f := t.Fields[index]
@@ -1565,7 +1565,7 @@ func IfStructWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool 
 		return false
 	}
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
