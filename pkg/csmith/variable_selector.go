@@ -31,7 +31,6 @@ func vsSess(vs *VariableSelector) *Session {
 	return vs.Sess
 }
 
-
 // NewVariableSelector constructs an empty selector sharing process Probabilities
 // (C++ Probabilities singleton). No invent second NewProbabilities(opts) when
 // process unset — Probs may be nil (fail closed on draws that need tables).
@@ -346,7 +345,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			}
 			boundOf[iv] = bound
 		}
-			v := ChooseOKVar(r, ok)
+		v := ChooseOKVar(r, ok)
 		if v == nil {
 			return nil
 		}
@@ -425,7 +424,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		if sessHasError(vsSess(vs)) {
 			return nil
 		}
-		item.CreateFieldVars()
+		item.CreateFieldVarsSess(vsSess(vs))
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -483,7 +482,7 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	} else {
 		// VariableSelector.cpp:324 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
 		// random mode always GOOD; still call for fair wiring (process CGOptions)
-		if DepthGuardByDepth(sessOpts(nil), 1) == BadDepth {
+		if DepthGuardByDepthSess(nil, sessOpts(nil), 1) == BadDepth {
 			return nil
 		}
 		// VariableSelector.cpp:326–329 — rnd_upto(len); sticky no invent vars[0] without RNG

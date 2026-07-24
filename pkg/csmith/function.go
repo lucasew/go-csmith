@@ -486,7 +486,7 @@ func MakeFirst(
 	// Function.cpp:475 — InitializeAttributes (package generators already cover emission;
 	// ensure func attr generator is ready when function attributes enabled)
 	if opts.FunctionAttributes {
-		_ = EnsureFuncAttrGenerator()
+		_ = EnsureFuncAttrGeneratorSess(vsSess(vs))
 	}
 
 	return f

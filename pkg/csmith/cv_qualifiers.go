@@ -728,7 +728,11 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 // CVQualifiers.cpp:639–650 — leading const/volatile of level 0.
 // assert(0) if const/vol bit set when option disabled — emit nothing for that bit.
 func (q CVQualifiers) OutputFirstQuals() string {
-	opts := sessOpts(nil)
+	return q.OutputFirstQualsOpts(ProcessOptions())
+}
+
+// OutputFirstQualsOpts is OutputFirstQuals with explicit session Options.
+func (q CVQualifiers) OutputFirstQualsOpts(opts Options) string {
 	var b strings.Builder
 	if len(q.IsConsts) > 0 && q.IsConsts[0] {
 		// CVQualifiers.cpp:641–642 — assert(consts()) sticky when bit set but option off
@@ -887,6 +891,11 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 // CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
 // Uses ProcessOptions for CGOptions::consts/volatiles (assert when bit set but option off).
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
+	return q.OutputQualifiedTypeOpts(t, ProcessOptions())
+}
+
+// OutputQualifiedTypeOpts is OutputQualifiedType with explicit session Options.
+func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void" for nil type
 	if t == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -905,7 +914,6 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 			return ""
 		}
 	}
-	opts := sessOpts(nil)
 	emitConst := func() bool { return opts.Consts }
 	emitVol := func() bool { return opts.Volatiles }
 	if q.Wildcard || len(q.IsConsts) == 0 {

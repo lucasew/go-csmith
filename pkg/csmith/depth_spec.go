@@ -157,13 +157,18 @@ func knownDepthType(dType string) bool {
 // DepthSpec.cpp:330–335 — always GOOD_DEPTH when !dfs_exhaustive (random mode).
 // DFS: DFSRndNumGenerator::eager_backtracking → BAD_DEPTH when true.
 func DepthGuardByDepth(opts Options, depthNeeded int) int {
+	return DepthGuardByDepthSess(nil, opts, depthNeeded)
+}
+
+// DepthGuardByDepthSess is DepthGuardByDepth using an explicit session RNG bag.
+func DepthGuardByDepthSess(s *Session, opts Options, depthNeeded int) int {
 	if !opts.DFSExhaustive {
 		return GoodDepth
 	}
-	r := sessRng(nil)
+	r := sessRng(s)
 	if r == nil || r.kind != RngKindDFS {
 		// DFS exhaustive without live DFS generator: sticky incomplete
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return BadDepth
 	}
 	if r.EagerBacktracking(depthNeeded) {

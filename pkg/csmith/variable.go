@@ -885,7 +885,7 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 		Init: init,
 	}
 	if typ.IsAggregate() {
-		v.CreateFieldVars()
+		v.CreateFieldVarsSess(s)
 	}
 	// Variable.cpp:401 — ERROR_GUARD_AND_DEL1 after create_field_vars
 	if sessHasError(s) {
@@ -2150,26 +2150,31 @@ func (v *Variable) FindPointerFields() []*Variable {
 // (not bare nil — FieldVarsComplete(nil)==true invents empty-complete zero fields
 // when type still has Fields / half-built list was wiped).
 func (v *Variable) CreateFieldVars() {
+	v.CreateFieldVarsSess(nil)
+}
+
+// CreateFieldVarsSess is CreateFieldVars on an explicit session bag (opts/probs/rng).
+func (v *Variable) CreateFieldVarsSess(s *Session) {
 	// Variable.cpp:338 — assert(type->is_aggregate()) sticky for live non-aggregate
 	// Variable always live; sticky no invent soft-skip create past missing shell
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-skip create past IsAggregate residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue create past IsAggregate residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	if len(v.FieldVars) > 0 {
@@ -2181,20 +2186,20 @@ func (v *Variable) CreateFieldVars() {
 	// g_44.f1/f2/f4 wrongly vol → filtered under non-SE-free; UP n=11 vs Go n=8).
 	isVol := v.Qfer.IsVolatile()
 	// residual ERROR sticky — no invent soft-create fields past qfer IsVolatile residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		v.FieldVars = IncompleteVariables()
 		return
 	}
 	isConst := v.Qfer.IsConst()
 	// residual ERROR sticky — no invent soft-create fields past qfer IsConst residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		v.FieldVars = IncompleteVariables()
 		return
 	}
 	j := 0
 	fail := func() {
 		// sticky ERROR so soft re-pick cannot invent empty-complete zero fields past hole
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		v.FieldVars = IncompleteVariables()
 	}
 	for _, f := range v.Type.Fields {
@@ -2217,11 +2222,11 @@ func (v *Variable) CreateFieldVars() {
 				return
 			}
 			base = v.AsArray.OutputAccess()
-			if sessHasError(nil) || base == "" {
+			if sessHasError(s) || base == "" {
 				fail()
 				return
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-name past IsArray residual false
 			fail()
 			return
@@ -2233,7 +2238,7 @@ func (v *Variable) CreateFieldVars() {
 		// → IncompleteVariables soft shell without sticky ERROR_GUARD).
 		il := f.Type.IndirectLevel()
 		// residual ERROR sticky — no invent soft-create field past IndirectLevel residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			fail()
 			return
 		}
@@ -2278,7 +2283,7 @@ func (v *Variable) CreateFieldVars() {
 		var init *Constant
 		isUn := top.Type.IsUnion()
 		// residual ERROR sticky — no invent soft-init path past IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			fail()
 			return
 		}
@@ -2286,15 +2291,15 @@ func (v *Variable) CreateFieldVars() {
 			// Variable.cpp:395 — Constant::make_random via session CGOptions +
 			// Probabilities + DefaultRndNumGenerator; no invent NewProbabilities /
 			// separate NewRng stream
-			init = MakeRandom(f.Type, sessOpts(nil), sessProbs(nil), createVarRng())
+			init = MakeRandom(f.Type, sessOpts(s), sessProbs(s), createVarRngSess(s))
 			// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random nullptr
-			if sessHasError(nil) || init == nil {
+			if sessHasError(s) || init == nil {
 				fail()
 				return
 			}
 		}
 		// Variable.cpp:397 — ERROR_GUARD during field CreateVariable
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			fail()
 			return
 		}
@@ -2302,7 +2307,7 @@ func (v *Variable) CreateFieldVars() {
 		// Variable.cpp:363 — assert(var->qfer.sanity_check(var->type))
 		if !qfer.SanityCheck(f.Type) {
 			// residual ERROR sticky — no invent soft-field past SanityCheck residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				fail()
 				return
 			}
@@ -2311,7 +2316,7 @@ func (v *Variable) CreateFieldVars() {
 			return
 		}
 		// residual ERROR sticky — no invent soft-field past SanityCheck residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			fail()
 			return
 		}
@@ -2326,9 +2331,9 @@ func (v *Variable) CreateFieldVars() {
 		}
 		// recursive expand nested structs
 		if f.Type.IsAggregate() {
-			fv.CreateFieldVars()
+			fv.CreateFieldVarsSess(s)
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			fail()
 			return
 		}
