@@ -157,12 +157,14 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 		return true
 	}
 	// Function.cpp:217–220 — find_variable_in_set(blocks[i]->local_vars, var)
-	// is pointer identity only (Variable.cpp:138–145). Do not invent
-	// Variable::match for locals: match would treat aggregate fields as
-	// function-locals when only the parent is in local_vars → IsVarOOS true
-	// for field pointees still in scope → UpdateFactsForDest/OOS mark_dead
-	// garbage (seed 86: l_1226 pts=[garbage,l_1053.f3] while &l_1053[…].f3
-	// still live; IsValidPtr dead → strip func_19 if).
+	// uses Variable::match (Variable.cpp:103–111, 254–258):
+	//   if type && v->type && aggregate: (this==v) || has_field_var(v)
+	//   else: this==v
+	// Soft invent used pointer identity only so field pointees of later-sibling
+	// locals (l_298.f0) were not OOS at earlier for dest → map_facts_out[goto]
+	// kept live field instead of garbage (seed 17809409409875472624). Do not call
+	// Variable.Match here: it stickies Type-nil (C++ match falls through to ==).
+	// Fields still in scope return false above via IsVarOnStack Match.
 	for _, b := range f.Blocks {
 		if b == nil {
 			// incomplete Blocks sticky OOS
@@ -176,6 +178,24 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 			}
 			if loc == v {
 				return true
+			}
+			// Variable.cpp:254–258 — aggregate match includes fields when both typed
+			if loc.Type != nil && v.Type != nil {
+				agg := loc.Type.IsAggregate()
+				if HasError() {
+					return true
+				}
+				if agg {
+					if loc.HasFieldVar(v) {
+						if HasError() {
+							return true
+						}
+						return true
+					}
+					if HasError() {
+						return true
+					}
+				}
 			}
 		}
 	}
