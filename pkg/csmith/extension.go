@@ -242,12 +242,18 @@ func DestroyExtensionSess(s *Session) {
 }
 
 // ExtensionActive is true when a non-null AbsExtension is installed.
-func ExtensionActive() bool { return sessOrAmbient(nil).ExtensionActive }
+func ExtensionActive() bool { return ExtensionActiveSess(nil) }
+
+// ExtensionActiveSess reports ExtensionActive on an explicit session bag.
+func ExtensionActiveSess(s *Session) bool { return sessOrAmbient(s).ExtensionActive }
 
 // ExtensionMgrGenerateValues mirrors ExtensionMgr::GenerateValues.
 // ExtensionMgr.cpp:84–88 — null → no-op; Klee/Crest empty; Coverage already built.
-func ExtensionMgrGenerateValues() {
-	if !sessOrAmbient(nil).ExtensionActive {
+func ExtensionMgrGenerateValues() { ExtensionMgrGenerateValuesSess(nil) }
+
+// ExtensionMgrGenerateValuesSess is ExtensionMgrGenerateValues on an explicit bag.
+func ExtensionMgrGenerateValuesSess(s *Session) {
+	if !ExtensionActiveSess(s) {
 		return
 	}
 	// Klee/Crest GenerateValues are empty; Coverage fills at Create
@@ -256,23 +262,33 @@ func ExtensionMgrGenerateValues() {
 // ExtensionMgrGenerateFirstParameterList mirrors GenerateFirstParameterList.
 // ExtensionMgr.cpp:77–82 — null → no-op.
 func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
-	if !sessOrAmbient(nil).ExtensionActive {
+	ExtensionMgrGenerateFirstParameterListSess(nil, f, vs)
+}
+
+// ExtensionMgrGenerateFirstParameterListSess is GenerateFirstParameterList on bag s.
+func ExtensionMgrGenerateFirstParameterListSess(s *Session, f *Function, vs *VariableSelector) {
+	s = sessOrAmbient(s)
+	if !s.ExtensionActive {
 		return
 	}
-	if !AbsExtensionGenerateFirstParameterList(f, sessOrAmbient(nil).ExtValues, vs) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if !AbsExtensionGenerateFirstParameterList(f, s.ExtValues, vs) {
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 	}
 }
 
 // ExtensionMgrOutputHeader mirrors OutputHeader — null → empty.
 // ExtensionMgr.cpp:101–107.
-func ExtensionMgrOutputHeader() string {
-	if !sessOrAmbient(nil).ExtensionActive {
+func ExtensionMgrOutputHeader() string { return ExtensionMgrOutputHeaderSess(nil) }
+
+// ExtensionMgrOutputHeaderSess is ExtensionMgrOutputHeader on an explicit bag.
+func ExtensionMgrOutputHeaderSess(s *Session) string {
+	s = sessOrAmbient(s)
+	if !s.ExtensionActive {
 		return ""
 	}
-	switch sessOrAmbient(nil).ExtKind {
+	switch s.ExtKind {
 	case "klee":
 		return KleeOutputHeader()
 	case "crest":
@@ -280,18 +296,22 @@ func ExtensionMgrOutputHeader() string {
 	case "coverage":
 		return "" // CoverageTestExtension::OutputHeader empty
 	default:
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
 
 // ExtensionMgrOutputTail mirrors OutputTail.
 // ExtensionMgr.cpp:109–115 — null → "    return 0;\n".
-func ExtensionMgrOutputTail() string {
-	if !sessOrAmbient(nil).ExtensionActive {
+func ExtensionMgrOutputTail() string { return ExtensionMgrOutputTailSess(nil) }
+
+// ExtensionMgrOutputTailSess is ExtensionMgrOutputTail on an explicit bag.
+func ExtensionMgrOutputTailSess(s *Session) string {
+	s = sessOrAmbient(s)
+	if !s.ExtensionActive {
 		return AbsExtensionTab + "return 0;\n"
 	}
-	switch sessOrAmbient(nil).ExtKind {
+	switch s.ExtKind {
 	case "klee":
 		return KleeOutputTail()
 	case "crest":
@@ -299,7 +319,7 @@ func ExtensionMgrOutputTail() string {
 	case "coverage":
 		return CoverageOutputTail()
 	default:
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
@@ -307,16 +327,22 @@ func ExtensionMgrOutputTail() string {
 // ExtensionMgrOutputInit mirrors OutputInit.
 // ExtensionMgr.cpp:117–129 — null → main signature + "{".
 func ExtensionMgrOutputInit(acceptArgc bool) string {
-	if sessOrAmbient(nil).ExtensionActive {
-		switch sessOrAmbient(nil).ExtKind {
+	return ExtensionMgrOutputInitSess(nil, acceptArgc)
+}
+
+// ExtensionMgrOutputInitSess is ExtensionMgrOutputInit on an explicit bag.
+func ExtensionMgrOutputInitSess(s *Session, acceptArgc bool) string {
+	s = sessOrAmbient(s)
+	if s.ExtensionActive {
+		switch s.ExtKind {
 		case "klee":
-			return KleeOutputInit(sessOrAmbient(nil).ExtValues)
+			return KleeOutputInit(s.ExtValues)
 		case "crest":
-			return CrestOutputInit(sessOrAmbient(nil).ExtValues)
+			return CrestOutputInit(s.ExtValues)
 		case "coverage":
-			return CoverageOutputInit(sessOrAmbient(nil).ExtValues, sessOrAmbient(nil).CoverageTests, sessOrAmbient(nil).CoverageSize)
+			return CoverageOutputInit(s.ExtValues, s.CoverageTests, s.CoverageSize)
 		default:
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -333,14 +359,20 @@ func ExtensionMgrOutputInit(acceptArgc bool) string {
 // ExtensionMgrOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 // ExtensionMgr.cpp:131–141 — null path same as AbsExtension default.
 func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
-	if sessOrAmbient(nil).ExtensionActive {
-		switch sessOrAmbient(nil).ExtKind {
+	return ExtensionMgrOutputFirstFunInvocationSess(nil, invokeOut)
+}
+
+// ExtensionMgrOutputFirstFunInvocationSess is OutputFirstFunInvocation on bag s.
+func ExtensionMgrOutputFirstFunInvocationSess(s *Session, invokeOut string) string {
+	s = sessOrAmbient(s)
+	if s.ExtensionActive {
+		switch s.ExtKind {
 		case "klee", "crest":
 			return AbsExtensionOutputFirstFunInvocation(invokeOut)
 		case "coverage":
-			return CoverageOutputFirstFunInvocation(sessOrAmbient(nil).ExtValues, invokeOut, sessOrAmbient(nil).CoverageSize)
+			return CoverageOutputFirstFunInvocation(s.ExtValues, invokeOut, s.CoverageSize)
 		default:
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -348,7 +380,13 @@ func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
 }
 
 // ExtensionValues returns active extension values_ (may be nil).
-func ExtensionValues() []*ExtensionValue { return sessOrAmbient(nil).ExtValues }
+func ExtensionValues() []*ExtensionValue { return ExtensionValuesSess(nil) }
+
+// ExtensionValuesSess returns ExtValues on an explicit session bag.
+func ExtensionValuesSess(s *Session) []*ExtensionValue { return sessOrAmbient(s).ExtValues }
 
 // ExtensionKind returns "klee"|"crest"|"coverage"|"" .
-func ExtensionKind() string { return sessOrAmbient(nil).ExtKind }
+func ExtensionKind() string { return ExtensionKindSess(nil) }
+
+// ExtensionKindSess returns ExtKind on an explicit session bag.
+func ExtensionKindSess(s *Session) string { return sessOrAmbient(s).ExtKind }

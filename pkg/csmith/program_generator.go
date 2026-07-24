@@ -349,6 +349,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	// Function.cpp:808 — FactPointTo::aggregate_all_pointto_sets
 	AggregateAllPointToSetsSess(g.Sess, g.Funcs.Funcs, g.FactMgrs)
 	// Function.cpp:809 — ExtensionMgr::GenerateValues (null extension → no-op)
+	ExtensionMgrGenerateValuesSess(g.Sess)
 }
 
 // OutputHeader mirrors OutputMgr::OutputHeader (non-concise path).
@@ -618,7 +619,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			}
 			emittedArray[v.Name] = true
 			// ArrayVariable::OutputDef always live; sticky no invent "static \n" for empty
-			def := av.OutputDefOpts(g.Opts)
+			def := av.OutputDefSess(g.Sess, g.Opts)
 			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
 			if g.hasErr() {
 				return ""
@@ -637,7 +638,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		// IsArray with AsArray but missing from Arrays map still must use array OutputDef
 		// (no invent scalar OutputDefFull for live array not registered on VS.Arrays)
 		if v.IsArray && v.AsArray != nil {
-			def := v.AsArray.OutputDefOpts(g.Opts)
+			def := v.AsArray.OutputDefSess(g.Sess, g.Opts)
 			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
 			if g.hasErr() {
 				return ""

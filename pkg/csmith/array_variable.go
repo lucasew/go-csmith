@@ -763,14 +763,20 @@ func ResetArrayInitSeed() { ResetArrayInitSeedSess(nil) }
 // ResetArrayInitSeedSess restores ArrayInitSeed on an explicit session bag.
 func ResetArrayInitSeedSess(s *Session) { sessOrAmbient(s).ArrayInitSeed = 0xABCDEF }
 
-// buildInitRecursive mirrors ArrayVariable::build_init_recursive.
+// buildInitRecursive mirrors ArrayVariable::build_init_recursive (ambient seed bag).
 // ArrayVariable.cpp:426–446 — nested braces; process-static seed pick; "," (no space).
 func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) string {
+	return av.buildInitRecursiveSess(nil, dimen, initStrings)
+}
+
+// buildInitRecursiveSess is buildInitRecursive with ArrayInitSeed on bag s.
+func (av *ArrayVariable) buildInitRecursiveSess(s *Session, dimen int, initStrings []string) string {
 	// C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR sticky
 	if av == nil || dimen >= len(av.Sizes) || len(initStrings) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
+	sess := sessOrAmbient(s)
 	var b strings.Builder
 	b.WriteString("{")
 	for i := 0; i < av.Sizes[dimen]; i++ {
@@ -779,24 +785,23 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) str
 			//   size_t rnd_index = ((seed * seed + (i + 7) * (i + 13)) * 52369) % n;
 			// seed is unsigned: seed*seed wraps at 32 bits, then promotes to size_t
 			// for the rest of the expression (64-bit on LP64). All-uint32 Go mul was wrong.
-			sess := sessOrAmbient(nil)
-			s := sess.ArrayInitSeed
-			ss := uint64(s * s) // uint32 mul wrap, then widen
+			seed := sess.ArrayInitSeed
+			ss := uint64(seed * seed) // uint32 mul wrap, then widen
 			prod := uint64(i+7) * uint64(i+13)
 			rnd := (ss + prod) * 52369
 			idx := int(rnd % uint64(len(initStrings)))
 			part := initStrings[idx]
 			if part == "" {
-				sessNoteError(sess, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString(part)
-			sess.ArrayInitSeed = s + 1
+			sess.ArrayInitSeed = seed + 1
 		} else {
-			part := av.buildInitRecursive(dimen+1, initStrings)
+			part := av.buildInitRecursiveSess(s, dimen+1, initStrings)
 			if part == "" {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return ""
 			}
@@ -817,16 +822,21 @@ func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
 	return av.buildInitializerStrOpts(initStrings, ProcessOptions())
 }
 
-// buildInitializerStrOpts is buildInitializerStr with explicit session Options.
+// buildInitializerStrOpts is buildInitializerStr with explicit session Options (ambient seed).
 func (av *ArrayVariable) buildInitializerStrOpts(initStrings []string, opts Options) string {
+	return av.buildInitializerStrSess(nil, initStrings, opts)
+}
+
+// buildInitializerStrSess is buildInitializerStr with seed bag + Options.
+func (av *ArrayVariable) buildInitializerStrSess(s *Session, initStrings []string, opts Options) string {
 	if av == nil || len(initStrings) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// CGOptions::force_non_uniform_array_init (default true)
 	if opts.ForceNonUniformArrayInit {
 		// ArrayVariable.cpp:429 / 452–453 — static seed continues across calls
-		return av.buildInitRecursive(0, initStrings)
+		return av.buildInitRecursiveSess(s, 0, initStrings)
 	}
 	// ArrayVariable.cpp:456–473 — build from last dimension outward
 	str := ""
@@ -841,7 +851,7 @@ func (av *ArrayVariable) buildInitializerStrOpts(initStrings []string, opts Opti
 				idx := int(rnd % uint64(len(initStrings)))
 				part := initStrings[idx]
 				if part == "" {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return ""
 				}
 				dim.WriteString(part)
@@ -864,11 +874,16 @@ func (av *ArrayVariable) OutputDef() string {
 	return av.OutputDefOpts(ProcessOptions())
 }
 
-// OutputDefOpts is OutputDef with explicit session Options (force_non_uniform init).
+// OutputDefOpts is OutputDef with explicit session Options (ambient ArrayInitSeed bag).
 func (av *ArrayVariable) OutputDefOpts(opts Options) string {
+	return av.OutputDefSess(nil, opts)
+}
+
+// OutputDefSess is OutputDef with seed bag + Options (force_non_uniform init).
+func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 	// ArrayVariable always live at OutputDef; sticky no invent empty def shell
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:493 — only collective (parent) arrays emit def
@@ -878,17 +893,17 @@ func (av *ArrayVariable) OutputDefOpts(opts Options) string {
 	// ArrayVariable.cpp:494–507 — OutputDecl always live; sticky no invent bare ";" / " = …"
 	decl := av.CDeclType()
 	// residual ERROR sticky — no invent soft-empty def past CDeclType residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if decl == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	if !av.NoLoopInitializer() {
 		// residual ERROR sticky — no invent decl-only path past NoLoopInitializer residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// ArrayVariable.cpp:494–498 — OutputDecl + ";" (loop fills body)
@@ -897,43 +912,43 @@ func (av *ArrayVariable) OutputDefOpts(opts Options) string {
 		return b.String()
 	}
 	// residual ERROR sticky — no invent brace init past NoLoopInitializer residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// ArrayVariable.cpp:488–493 — init_strings from init->to_string() then each
 	// init_values[i]->to_string() (Expression::Output at emit time, not cached Value).
 	vals := make([]string, 0, 1+len(av.InitExprs))
 	if av.InitExpr != nil {
-		s := av.InitExpr.Output()
-		if sessHasError(nil) {
+		out := av.InitExpr.Output()
+		if sessHasError(s) {
 			return ""
 		}
-		if s != "" {
-			vals = append(vals, s)
+		if out != "" {
+			vals = append(vals, out)
 		}
 	} else if av.Init != nil {
-		s := av.Init.Output()
-		if sessHasError(nil) {
+		out := av.Init.Output()
+		if sessHasError(s) {
 			return ""
 		}
-		if s != "" {
-			vals = append(vals, s)
+		if out != "" {
+			vals = append(vals, out)
 		}
 	}
 	for _, e := range av.InitExprs {
 		if e == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		s := e.Output()
-		if sessHasError(nil) {
+		out := e.Output()
+		if sessHasError(s) {
 			return ""
 		}
-		if s == "" {
-			sessNoteError(nil, ErrGeneric)
+		if out == "" {
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		vals = append(vals, s)
+		vals = append(vals, out)
 	}
 	// Fallback: legacy InitValues if no Expression* pool (tests)
 	if len(vals) == 0 && len(av.InitValues) > 0 {
@@ -941,22 +956,22 @@ func (av *ArrayVariable) OutputDefOpts(opts Options) string {
 	}
 	// assert(init) — sticky no soft invent "0" brace list
 	if len(vals) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for _, v := range vals {
 		if v == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
 	b.WriteString(decl)
 	// ArrayVariable.cpp:506 — always build_initializer_str (full nested braces).
 	// Do not invent size caps (old tot>64 → emit 8 was not C++).
-	init := av.buildInitializerStrOpts(vals, opts)
+	init := av.buildInitializerStrSess(s, vals, opts)
 	if init == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
