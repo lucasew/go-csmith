@@ -33,32 +33,32 @@ func (f *Function) StackScanComplete(stParent *Block) bool {
 func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 	// Function + Variable always live; sticky incomplete no invent not-on-stack
 	if f == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !f.StackScanComplete(stParent) {
 		// incomplete Param/LocalVars sticky fail closed not-on-stack
 		// residual ERROR sticky — no invent soft not-on-stack past StackScan residual
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
 	for _, p := range f.Param {
 		// Param live after StackScanComplete; nil hole already sticky above
 		if p == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if p.Match(v) {
 			// residual ERROR sticky — no invent on-stack true past Match hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue then true later past Match hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 	}
@@ -72,18 +72,18 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 	for b := stParent; b != nil; b = b.Parent {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return false
 			}
 			if loc.Match(v) {
 				// residual ERROR sticky — no invent on-stack true past Match hole
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 		}
@@ -97,28 +97,28 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if v.IsGlobal() {
 		// residual ERROR sticky — no invent visible-true past IsGlobal hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent not-global soft-skip past IsGlobal hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// nil Function for non-global sticky not-visible (IsVarOnStack also stickies)
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	ok := f.IsVarOnStack(v, stParent)
 	// residual ERROR sticky — no invent visible/not-visible soft-skip past stack hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return ok
@@ -131,7 +131,7 @@ func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	// Function + Variable always live; sticky incomplete OOS fail closed
 	if f == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		// nil Function: cannot be OOS local of unknown func — fail closed false
 		// would invent not-OOS; true OOS is safer for dead marking, but C++ has
 		// live Function*. Sticky false for nil shell (assert path).
@@ -140,20 +140,20 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	if !f.StackScanComplete(stParent) {
 		// incomplete stack sticky OOS (no invent not-OOS when scan short-circuits)
 		// residual ERROR sticky — no invent soft-OOS past StackScan residual
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return true
 	}
 	if f.IsVarVisible(v, stParent) {
 		// residual ERROR sticky — no invent not-OOS past IsVarVisible hole
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue Blocks scan past IsVarVisible hole
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	// Function.cpp:217–220 — find_variable_in_set(blocks[i]->local_vars, var)
@@ -168,12 +168,12 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	for _, b := range f.Blocks {
 		if b == nil {
 			// incomplete Blocks sticky OOS
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		for _, loc := range b.LocalVars {
 			if loc == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return true
 			}
 			if loc == v {
@@ -182,17 +182,17 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 			// Variable.cpp:254–258 — aggregate match includes fields when both typed
 			if loc.Type != nil && v.Type != nil {
 				agg := loc.Type.IsAggregate()
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				if agg {
 					if loc.HasFieldVar(v) {
-						if HasError() {
+						if sessHasError(nil) {
 							return true
 						}
 						return true
 					}
-					if HasError() {
+					if sessHasError(nil) {
 						return true
 					}
 				}
@@ -221,7 +221,7 @@ func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo, unions *[]
 		if unions != nil {
 			*unions = IncompleteUnionFactSlice()
 		}
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return addBackReturnFactsBlock(b, fm, facts, unions)
@@ -236,7 +236,7 @@ func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo, union
 		if unions != nil {
 			*unions = IncompleteUnionFactSlice()
 		}
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {
@@ -256,7 +256,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 		if unions != nil {
 			*unions = IncompleteUnionFactSlice()
 		}
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if st.Kind == StmtReturn {
@@ -268,15 +268,15 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 			!UnionFactsComplete(outU) || !UnionFactsComplete(*unions) {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		_ = MergeFacts(facts, out)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
@@ -285,15 +285,15 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 			if nf == nil {
 				*facts = IncompleteFactSlice()
 				*unions = IncompleteUnionFactSlice()
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return false
 			}
 			*unions = MergeUnionFact(*unions, nf)
 			if !UnionFactsComplete(*unions) {
 				*facts = IncompleteFactSlice()
 				*unions = IncompleteUnionFactSlice()
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return false
 			}
@@ -306,7 +306,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 		if blk == nil {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		if !addBackReturnFactsBlock(blk, fm, facts, unions) {
@@ -340,13 +340,13 @@ func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPoint
 		return facts
 	}
 	if !FactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// incomplete vars list fail closed
 	for _, v := range vars {
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 	}
@@ -357,7 +357,7 @@ func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPoint
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
 		if f == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if f.Var != nil && drop[f.Var] {
@@ -374,12 +374,12 @@ func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion 
 		return facts
 	}
 	if !UnionFactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	for _, v := range vars {
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 	}
@@ -390,7 +390,7 @@ func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion 
 	out := make([]*FactUnion, 0, len(facts))
 	for _, f := range facts {
 		if f == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		if f.Var != nil && drop[f.Var] {
@@ -403,7 +403,7 @@ func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion 
 
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 	if facts == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if len(vars) == 0 {
@@ -412,13 +412,13 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 	if !FactsComplete(*facts) {
 		// incomplete map/vars fail closed sticky (no invent soft re-pick OOS cleanup)
 		*facts = IncompleteFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	for _, v := range vars {
 		if v == nil || !v.FieldVarsComplete() {
 			*facts = IncompleteFactSlice()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 	}
@@ -429,7 +429,7 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		for _, v := range vars {
 			if v.Match(f.Var) {
 				// residual ERROR sticky — no invent drop-true past Match hole
-				if HasError() {
+				if sessHasError(nil) {
 					*facts = IncompleteFactSlice()
 					return
 				}
@@ -438,7 +438,7 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 			}
 			// residual ERROR sticky — no invent soft-continue keep later past Match residual
 			// (Type-nil Match ERROR+false soft invents not-drop then keep fact)
-			if HasError() {
+			if sessHasError(nil) {
 				*facts = IncompleteFactSlice()
 				return
 			}
@@ -453,12 +453,12 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		for _, v := range vars {
 			if nf := cur.MarkDeadVar(v); nf != nil {
 				// residual ERROR sticky — no invent mark-dead success past MarkDeadVar hole
-				if HasError() {
+				if sessHasError(nil) {
 					*facts = IncompleteFactSlice()
 					return
 				}
 				cur = nf
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue later mark past MarkDead residual
 				*facts = IncompleteFactSlice()
 				return
@@ -478,7 +478,7 @@ func OutputCommentLine(comment string, quiet, concise bool) string {
 	}
 	// empty comment sticky (no invent "/*  */" / soft re-pick blank shell)
 	if comment == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return "/* " + comment + " */\n"
