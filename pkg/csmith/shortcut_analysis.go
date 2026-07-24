@@ -17,7 +17,7 @@ const (
 // Incomplete maps/PointTo fail closed sticky (no invent same-as-skip / soft re-pick past holes).
 func SameFacts(a, b []*FactPointTo) bool {
 	if !FactsComplete(a) || !FactsComplete(b) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -26,7 +26,7 @@ func SameFacts(a, b []*FactPointTo) bool {
 	for _, f := range a {
 		idx := FindFact(b, f)
 		// residual ERROR sticky — no invent soft-continue same past FindFact residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if idx < 0 {
@@ -42,7 +42,7 @@ func SameFacts(a, b []*FactPointTo) bool {
 // differed (IsNonreadableField over/under-filters choose_var).
 func SameUnionFacts(a, b []*FactUnion) bool {
 	if !UnionFactsComplete(a) || !UnionFactsComplete(b) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -50,7 +50,7 @@ func SameUnionFacts(a, b []*FactUnion) bool {
 	}
 	for _, f := range a {
 		idx := FindUnionFact(b, f)
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if idx < 0 {
@@ -66,21 +66,21 @@ func FindUnionFact(facts []*FactUnion, want *FactUnion) int {
 		return -1
 	}
 	if !UnionFactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	if !UnionFactsComplete([]*FactUnion{want}) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	for i, f := range facts {
 		if f.Equal(want) {
-			if HasError() {
+			if sessHasError(nil) {
 				return -1
 			}
 			return i
 		}
-		if HasError() {
+		if sessHasError(nil) {
 			return -1
 		}
 	}
@@ -91,7 +91,7 @@ func FindUnionFact(facts []*FactUnion, want *FactUnion) int {
 // Fact.cpp:237–246 — total size must match; each fact finds an equal in the other env.
 func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
 	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(ptA)+len(uA) != len(ptB)+len(uB) {
@@ -100,13 +100,13 @@ func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*
 	if !SameFacts(ptA, ptB) {
 		return false
 	}
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if !SameUnionFacts(uA, uB) {
 		return false
 	}
-	return !HasError()
+	return !sessHasError(nil)
 }
 
 // FindFact mirrors find_fact — equal fact in vector, or -1.
@@ -117,24 +117,24 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 		return -1
 	}
 	if !FactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	// want must be a complete fact for Equal to be meaningful sticky
 	if !FactsComplete([]*FactPointTo{want}) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	for i, f := range facts {
 		if f.Equal(want) {
 			// residual ERROR sticky — no invent match-index true past Equal hole
-			if HasError() {
+			if sessHasError(nil) {
 				return -1
 			}
 			return i
 		}
 		// residual ERROR sticky — no invent soft-continue later match past Equal residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return -1
 		}
 	}
@@ -146,7 +146,7 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 // Incomplete maps/PointTo fail closed sticky (no invent subset / soft re-pick past holes).
 func SubsetFacts(a, b []*FactPointTo) bool {
 	if !FactsComplete(a) || !FactsComplete(b) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -156,7 +156,7 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 	for _, f1 := range a {
 		f2 := FindRelatedPointTo(b, f1.Var)
 		// residual ERROR sticky — no invent soft-continue not-subset past FindRelated hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if f2 == nil {
@@ -164,7 +164,7 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 		}
 		ok := f2.Imply(f1)
 		// residual ERROR sticky — no invent soft-continue not-subset past Imply hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if !ok {
@@ -178,7 +178,7 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 // Fact.cpp:249–260 — same size; each f1 has related f2 that implies f1.
 func SubsetUnionFacts(a, b []*FactUnion) bool {
 	if !UnionFactsComplete(a) || !UnionFactsComplete(b) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -186,18 +186,18 @@ func SubsetUnionFacts(a, b []*FactUnion) bool {
 	}
 	for _, f1 := range a {
 		if f1 == nil || f1.Var == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		f2 := FindRelatedUnion(b, f1.Var)
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if f2 == nil {
 			return false
 		}
 		ok := f2.Imply(f1)
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if !ok {
@@ -211,7 +211,7 @@ func SubsetUnionFacts(a, b []*FactUnion) bool {
 // Fact.cpp:249–260 — total size match; each fact implied by related in other env.
 func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
 	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if len(ptA)+len(uA) != len(ptB)+len(uB) {
@@ -220,13 +220,13 @@ func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB [
 	if !SubsetFacts(ptA, ptB) {
 		return false
 	}
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if !SubsetUnionFacts(uA, uB) {
 		return false
 	}
-	return !HasError()
+	return !sessHasError(nil)
 }
 
 // IsCtrlStmt mirrors Statement::is_ctrl_stmt — break/continue/goto only.
@@ -234,7 +234,7 @@ func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB [
 // Statement always live; sticky false (no invent not-ctrl soft-skip past hole).
 func IsCtrlStmt(st *Stmt) bool {
 	if st == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	switch st.Kind {
@@ -249,7 +249,7 @@ func IsCtrlStmt(st *Stmt) bool {
 // Statement always live; sticky false (no invent not-contained soft-skip past hole).
 func ContainsStmt(root, target *Stmt) bool {
 	if root == nil || target == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return FindStmtInTree(root, target.StmID) != nil
@@ -261,7 +261,7 @@ func ContainsStmt(root, target *Stmt) bool {
 // Incomplete Block* hole fails closed sticky nil (no invent soft-skip arm / soft re-pick).
 func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 	if root == nil || StmIDUnset(stmID) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if root.StmID == stmID {
@@ -271,7 +271,7 @@ func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 	// pre-validate complete get_blocks before invent match past incomplete arm sticky
 	for _, b := range blks {
 		if b == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 	}
@@ -291,12 +291,12 @@ func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 // Statement + FactMgr always live; sticky (no invent soft-skip mark past hole).
 func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 	if root == nil || fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// incomplete CFG sticky (no invent partial mark-as-visited / soft re-pick past holes)
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if fm.MapVisited == nil {
@@ -317,7 +317,7 @@ func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 // Block + Statement always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmt(b *Block, target *Stmt) bool {
 	if b == nil || target == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {
@@ -336,24 +336,24 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 	// Statement.cpp:770–771 — get_fact_mgr_for_func; assert(fm)
 	// fail closed sticky: nil FM is unfixed (no invent "all gotos fixed" / soft re-pick)
 	if root == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	ids := map[int]bool{}
 	if !collectStmIDs(root, ids) {
 		// incomplete get_blocks tree sticky unfixed
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return true
 	}
 	ok := containsUnfixedGotoIDs(ids, fm)
 	// residual ERROR sticky — no invent fixed/unfixed soft-skip past CFG residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return ok
@@ -365,11 +365,11 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 // assert(fm) sticky unfixed without FactMgr.
 func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	ids := map[int]bool{}
@@ -378,15 +378,15 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 	}
 	for i := range b.Stmts {
 		if !collectStmIDs(&b.Stmts[i], ids) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return true
 		}
 	}
 	ok := containsUnfixedGotoIDs(ids, fm)
 	// residual ERROR sticky — no invent fixed/unfixed soft-skip past CFG residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	return ok
@@ -405,7 +405,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 	}
 	// incomplete CFG sticky unfixed (no invent skip holes as fixed / soft re-pick)
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	for _, e := range fm.CFGEdges {
@@ -417,7 +417,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			src := FindStmtByID(fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue fixed-scan past FindStmt hole
 			// (incomplete if-arm residual soft invents skip then later invents fixed tree)
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			if src == nil || src.Kind != StmtGoto {
@@ -452,8 +452,8 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			// incomplete maps sticky unfixed (GetMap may already SetError)
 			if !FactsComplete(srcOut) || !FactsComplete(destIn) ||
 				!UnionFactsComplete(srcOutU) || !UnionFactsComplete(destInU) {
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return true
 			}
@@ -465,30 +465,30 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			}
 			for _, f := range destIn {
 				if f.Var == nil {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return true
 				}
 				if f.Var.IsRV() {
 					// residual ERROR sticky — no invent soft-continue unfixed scan past IsRV hole
-					if HasError() {
+					if sessHasError(nil) {
 						return true
 					}
 					continue
 				}
 				// residual ERROR sticky — no invent soft-continue past IsRV residual false path
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				// Statement.cpp:797–800 — jump_src_f && !f->imply(*jump_src_f)
 				jumpSrc := FindRelatedPointTo(srcOut, f.Var)
 				// residual ERROR sticky — no invent soft-continue fixed past FindRelated hole
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				if jumpSrc != nil {
 					ok := f.Imply(jumpSrc)
 					// residual ERROR sticky — no invent soft-continue fixed past Imply hole
-					if HasError() {
+					if sessHasError(nil) {
 						return true
 					}
 					if !ok {
@@ -499,25 +499,25 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			// eUnionWrite half of full FactVec (same imply gate as ePointTo)
 			for _, fu := range destInU {
 				if fu == nil || fu.Var == nil {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return true
 				}
 				if fu.Var.IsRV() {
-					if HasError() {
+					if sessHasError(nil) {
 						return true
 					}
 					continue
 				}
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				jumpSrcU := FindRelatedUnion(srcOutU, fu.Var)
-				if HasError() {
+				if sessHasError(nil) {
 					return true
 				}
 				if jumpSrcU != nil {
 					ok := fu.Imply(jumpSrcU)
-					if HasError() {
+					if sessHasError(nil) {
 						return true
 					}
 					if !ok {
@@ -542,7 +542,7 @@ func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 	// get_blocks only — no invent collect via stray Then on assign/break
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		for i := range b.Stmts {
@@ -564,7 +564,7 @@ func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 // Nil FM / StmID≤0 is non-sticky ShortcutNone (intentional reuse miss / soft re-pick).
 func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) int {
 	if st == nil || facts == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ShortcutNone
 	}
 	if cg.FM == nil {
@@ -595,25 +595,25 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	if !SameFactVec(*facts, fm.UnionFacts, in, inU) || IsCtrlStmt(st) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts true path
-	if HasError() {
+	if sessHasError(nil) {
 		return ShortcutNone
 	}
 	// contains_unfixed_goto — conservative none if any unvisited goto in tree
 	if ContainsUnfixedGoto(st, fm) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return ShortcutNone
 	}
 	// Incomplete map_stm_effect / accum fails closed before AddEffect
@@ -630,13 +630,13 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	if cg.InConflict(eff) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return ShortcutConflict
 		}
 		return ShortcutConflict
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return ShortcutConflict
 	}
 	// Statement.cpp:559 — inputs = map_facts_out[this]; C++ map[] empty if missing.
@@ -659,7 +659,7 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	fm.UnionFacts = clU
 	cg.AddEffect(eff, false)
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past AddEffect residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ShortcutNone
 	}
 	if !EffectComplete(cg.EffectStm) {
@@ -671,7 +671,7 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	fm.SetMapAccumEffect(st.StmID, acc)
 	// residual ERROR sticky — no invent ShortcutOK past SetMapAccumEffect residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ShortcutNone
 	}
 	if fm.MapVisited == nil {
@@ -693,12 +693,12 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	// Statement.cpp:609+ — always live Statement* + inputs + cg_context
 	// incomplete call sticky (no soft invent true / soft re-pick past holes)
 	if st == nil || facts == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// Fact* always live; incomplete working set sticky before visit
 	if !FactsComplete(*facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
@@ -725,9 +725,9 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 		}
 		cl := CloneFactSlice(*facts)
-		if HasError() || !FactsComplete(cl) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || !FactsComplete(cl) {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
@@ -742,18 +742,18 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		// Statement.cpp:621–624 — remove_rv on inputs; accum; visited always set
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			*facts = IncompleteFactSlice()
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			ok = false
 		} else {
 			*facts = CloneFactSlice(cg.FM.GlobalFacts)
-			if HasError() || !FactsComplete(*facts) {
+			if sessHasError(nil) || !FactsComplete(*facts) {
 				// residual visit HasError with complete empty work: still harvest
 				if !FactsComplete(*facts) {
 					*facts = IncompleteFactSlice()
-					if !HasError() {
-						SetError(ErrGeneric)
+					if !sessHasError(nil) {
+						sessNoteError(nil, ErrGeneric)
 					}
 					ok = false
 				}
@@ -761,8 +761,8 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			if FactsComplete(*facts) {
 				cg.FM.RemoveRVFacts(facts)
 				if !FactsComplete(*facts) {
-					if !HasError() {
-						SetError(ErrGeneric)
+					if !sessHasError(nil) {
+						sessNoteError(nil, ErrGeneric)
 					}
 					ok = false
 				}
@@ -783,7 +783,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			if !haveLive {
 				cg.FM.GlobalFacts = IncompleteFactSlice()
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		// Incomplete accum fails closed sticky visit (record IncompleteEffect; no invent ok true)
@@ -791,7 +791,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		if !EffectComplete(acc) {
 			ok = false
 			acc = IncompleteEffect()
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 		}
 		cg.FM.SetMapAccumEffect(st.StmID, acc)
 		// residual ERROR sticky — visit already may be false; still record incomplete marker
@@ -810,17 +810,17 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	// Statement.cpp:574+ — always live this + inputs + cg_context
 	// incomplete call sticky (no soft invent true / soft re-pick past holes)
 	if st == nil || facts == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent
 	// validate success without set_fact_in/out)
 	if cg.FM != nil && StmIDUnset(st.StmID) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// Statement.cpp:574–606 — validate_and_update_facts does NOT assign
@@ -834,8 +834,8 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	case ShortcutOK:
 		// incomplete clone of out sticky (no invent shortcut success / soft re-pick)
 		if !FactsComplete(*facts) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
@@ -854,22 +854,22 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	inputsCopy := CloneFactSlice(*facts)
 	// incomplete pre-visit clone sticky (CloneFactSlice already sticks on holes)
 	if !FactsComplete(inputsCopy) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
 	var unionInCopy []*FactUnion
 	if cg.FM != nil {
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		// deep clone: visit may Join/SetBottom in place on live FactUnion objects
 		unionInCopy = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
 		if !UnionFactsComplete(unionInCopy) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
@@ -883,8 +883,8 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	}
 	// incomplete post-visit sticky (no invent set_fact_in/out success / soft re-pick past hole)
 	if !FactsComplete(*facts) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
