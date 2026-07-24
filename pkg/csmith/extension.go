@@ -202,14 +202,19 @@ func extensionValuesComplete(values []*ExtensionValue) bool {
 // ExtensionMgr.cpp:48–64 — klee/crest/coverage_test construct; else leave null.
 // Uses process RNG/probs when live; incomplete → sticky fail closed.
 func CreateExtension(opts Options) {
+	CreateExtensionSess(nil, opts)
+}
+
+// CreateExtensionSess is CreateExtension on an explicit session bag.
+func CreateExtensionSess(s *Session, opts Options) {
+	s = sessOrAmbient(s)
 	if !opts.Klee && !opts.Crest && !opts.CoverageTest {
-		currentSession().ExtensionActive = false
-		currentSession().ExtKind = ""
-		currentSession().ExtValues = nil
-		currentSession().CoverageTests = nil
+		s.ExtensionActive = false
+		s.ExtKind = ""
+		s.ExtValues = nil
+		s.CoverageTests = nil
 		return
 	}
-	s := currentSession()
 	r := sessRng(s)
 	probs := sessProbs(s)
 	if r == nil || probs == nil {
@@ -217,26 +222,32 @@ func CreateExtension(opts Options) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	CreateExtensionFull(opts, r, probs)
+	CreateExtensionFullSess(s, opts, r, probs)
 }
 
-// DestroyExtension mirrors ExtensionMgr::DestroyExtension.
+// DestroyExtension// DestroyExtension mirrors ExtensionMgr::DestroyExtension.
 // ExtensionMgr.cpp:66–69.
 func DestroyExtension() {
-	currentSession().ExtensionActive = false
-	currentSession().ExtKind = ""
-	currentSession().ExtValues = nil
-	currentSession().CoverageTests = nil
-	currentSession().CoverageSize = 0
+	DestroyExtensionSess(nil)
+}
+
+// DestroyExtensionSess clears ExtensionMgr state on an explicit session bag.
+func DestroyExtensionSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.ExtensionActive = false
+	s.ExtKind = ""
+	s.ExtValues = nil
+	s.CoverageTests = nil
+	s.CoverageSize = 0
 }
 
 // ExtensionActive is true when a non-null AbsExtension is installed.
-func ExtensionActive() bool { return currentSession().ExtensionActive }
+func ExtensionActive() bool { return sessOrAmbient(nil).ExtensionActive }
 
 // ExtensionMgrGenerateValues mirrors ExtensionMgr::GenerateValues.
 // ExtensionMgr.cpp:84–88 — null → no-op; Klee/Crest empty; Coverage already built.
 func ExtensionMgrGenerateValues() {
-	if !currentSession().ExtensionActive {
+	if !sessOrAmbient(nil).ExtensionActive {
 		return
 	}
 	// Klee/Crest GenerateValues are empty; Coverage fills at Create
@@ -245,10 +256,10 @@ func ExtensionMgrGenerateValues() {
 // ExtensionMgrGenerateFirstParameterList mirrors GenerateFirstParameterList.
 // ExtensionMgr.cpp:77–82 — null → no-op.
 func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
-	if !currentSession().ExtensionActive {
+	if !sessOrAmbient(nil).ExtensionActive {
 		return
 	}
-	if !AbsExtensionGenerateFirstParameterList(f, currentSession().ExtValues, vs) {
+	if !AbsExtensionGenerateFirstParameterList(f, sessOrAmbient(nil).ExtValues, vs) {
 		if !sessHasError(nil) {
 			sessNoteError(nil, ErrGeneric)
 		}
@@ -258,10 +269,10 @@ func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
 // ExtensionMgrOutputHeader mirrors OutputHeader — null → empty.
 // ExtensionMgr.cpp:101–107.
 func ExtensionMgrOutputHeader() string {
-	if !currentSession().ExtensionActive {
+	if !sessOrAmbient(nil).ExtensionActive {
 		return ""
 	}
-	switch currentSession().ExtKind {
+	switch sessOrAmbient(nil).ExtKind {
 	case "klee":
 		return KleeOutputHeader()
 	case "crest":
@@ -277,10 +288,10 @@ func ExtensionMgrOutputHeader() string {
 // ExtensionMgrOutputTail mirrors OutputTail.
 // ExtensionMgr.cpp:109–115 — null → "    return 0;\n".
 func ExtensionMgrOutputTail() string {
-	if !currentSession().ExtensionActive {
+	if !sessOrAmbient(nil).ExtensionActive {
 		return AbsExtensionTab + "return 0;\n"
 	}
-	switch currentSession().ExtKind {
+	switch sessOrAmbient(nil).ExtKind {
 	case "klee":
 		return KleeOutputTail()
 	case "crest":
@@ -296,14 +307,14 @@ func ExtensionMgrOutputTail() string {
 // ExtensionMgrOutputInit mirrors OutputInit.
 // ExtensionMgr.cpp:117–129 — null → main signature + "{".
 func ExtensionMgrOutputInit(acceptArgc bool) string {
-	if currentSession().ExtensionActive {
-		switch currentSession().ExtKind {
+	if sessOrAmbient(nil).ExtensionActive {
+		switch sessOrAmbient(nil).ExtKind {
 		case "klee":
-			return KleeOutputInit(currentSession().ExtValues)
+			return KleeOutputInit(sessOrAmbient(nil).ExtValues)
 		case "crest":
-			return CrestOutputInit(currentSession().ExtValues)
+			return CrestOutputInit(sessOrAmbient(nil).ExtValues)
 		case "coverage":
-			return CoverageOutputInit(currentSession().ExtValues, currentSession().CoverageTests, currentSession().CoverageSize)
+			return CoverageOutputInit(sessOrAmbient(nil).ExtValues, sessOrAmbient(nil).CoverageTests, sessOrAmbient(nil).CoverageSize)
 		default:
 			sessNoteError(nil, ErrGeneric)
 			return ""
@@ -322,12 +333,12 @@ func ExtensionMgrOutputInit(acceptArgc bool) string {
 // ExtensionMgrOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 // ExtensionMgr.cpp:131–141 — null path same as AbsExtension default.
 func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
-	if currentSession().ExtensionActive {
-		switch currentSession().ExtKind {
+	if sessOrAmbient(nil).ExtensionActive {
+		switch sessOrAmbient(nil).ExtKind {
 		case "klee", "crest":
 			return AbsExtensionOutputFirstFunInvocation(invokeOut)
 		case "coverage":
-			return CoverageOutputFirstFunInvocation(currentSession().ExtValues, invokeOut, currentSession().CoverageSize)
+			return CoverageOutputFirstFunInvocation(sessOrAmbient(nil).ExtValues, invokeOut, sessOrAmbient(nil).CoverageSize)
 		default:
 			sessNoteError(nil, ErrGeneric)
 			return ""
@@ -337,7 +348,7 @@ func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
 }
 
 // ExtensionValues returns active extension values_ (may be nil).
-func ExtensionValues() []*ExtensionValue { return currentSession().ExtValues }
+func ExtensionValues() []*ExtensionValue { return sessOrAmbient(nil).ExtValues }
 
 // ExtensionKind returns "klee"|"crest"|"coverage"|"" .
-func ExtensionKind() string { return currentSession().ExtKind }
+func ExtensionKind() string { return sessOrAmbient(nil).ExtKind }

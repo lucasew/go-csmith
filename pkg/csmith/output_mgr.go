@@ -265,9 +265,15 @@ const (
 // DefaultOutputMgr.cpp:62–97 — record ofile path; if max_split_files>0 build split paths.
 // Does not open OS files (library returns paths/content); incomplete split dir sticky.
 func CreateDefaultOutputMgr(opts Options) bool {
-	currentSession().OutputMgrKind = OutputMgrKindDefault
-	currentSession().OutputFile = strings.TrimSpace(opts.OutputPath)
-	currentSession().SplitPaths = nil
+	return CreateDefaultOutputMgrSess(nil, opts)
+}
+
+// CreateDefaultOutputMgrSess is CreateDefaultOutputMgr on an explicit session bag.
+func CreateDefaultOutputMgrSess(s *Session, opts Options) bool {
+	s = sessOrAmbient(s)
+	s.OutputMgrKind = OutputMgrKindDefault
+	s.OutputFile = strings.TrimSpace(opts.OutputPath)
+	s.SplitPaths = nil
 	if !IsSplit(opts) {
 		return true
 	}
@@ -279,39 +285,51 @@ func CreateDefaultOutputMgr(opts Options) bool {
 	paths := make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		p := SplitOutputFilePath(opts, i)
-		if p == "" || sessHasError(nil) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if p == "" || sessHasError(s) {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
-			currentSession().SplitPaths = nil
+			s.SplitPaths = nil
 			return false
 		}
 		paths = append(paths, p)
 	}
-	currentSession().SplitPaths = paths
+	s.SplitPaths = paths
 	return true
 }
 
 // CreateDFSOutputMgr mirrors DFSOutputMgr::CreateInstance.
 // DFSOutputMgr.cpp:49–61 — struct_output_ default or CGOptions::struct_output.
 func CreateDFSOutputMgr(opts Options) {
-	currentSession().OutputMgrKind = OutputMgrKindDFS
-	currentSession().SplitPaths = nil
-	currentSession().OutputFile = ""
-	s := strings.TrimSpace(opts.StructOutput)
-	if s == "" {
-		currentSession().StructOutput = DefaultStructOutputName
+	CreateDFSOutputMgrSess(nil, opts)
+}
+
+// CreateDFSOutputMgrSess is CreateDFSOutputMgr on an explicit session bag.
+func CreateDFSOutputMgrSess(s *Session, opts Options) {
+	s = sessOrAmbient(s)
+	s.OutputMgrKind = OutputMgrKindDFS
+	s.SplitPaths = nil
+	s.OutputFile = ""
+	so := strings.TrimSpace(opts.StructOutput)
+	if so == "" {
+		s.StructOutput = DefaultStructOutputName
 	} else {
-		currentSession().StructOutput = s
+		s.StructOutput = so
 	}
 }
 
 // ClearOutputMgr resets process OutputMgr singleton state (finalization / tests).
 func ClearOutputMgr() {
-	currentSession().OutputMgrKind = OutputMgrKindDefault
-	currentSession().StructOutput = ""
-	currentSession().SplitPaths = nil
-	currentSession().OutputFile = ""
+	ClearOutputMgrSess(nil)
+}
+
+// ClearOutputMgrSess clears OutputMgr selection state on an explicit session bag.
+func ClearOutputMgrSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.OutputMgrKind = OutputMgrKindDefault
+	s.StructOutput = ""
+	s.SplitPaths = nil
+	s.OutputFile = ""
 }
 
 // ProcessOutputMgrKind returns active OutputMgr kind.

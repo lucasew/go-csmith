@@ -5,19 +5,24 @@ package csmith
 // PartialExpander gates which statement kinds may be generated when --partial-expand is set.
 // When inactive (MAX key false), ExpandCheck always allows all kinds.
 
-
 // InitPartialExpander mirrors PartialExpander::init_partial_expander.
 // PartialExpander.cpp:59–67 — parse comma-separated kind names; enable MAX sentinel.
 // Empty options fail closed false (C++ parse_options("") → set_expand("") false).
 func InitPartialExpander(options string) bool {
-	currentSession().PartialExpands = initPartialMap(false)
-	if !parsePartialOptions(options, ',') {
-		// leave currentSession().PartialExpands half-init; callers treat false as fail
+	return InitPartialExpanderSess(nil, options)
+}
+
+// InitPartialExpanderSess is InitPartialExpander on an explicit session bag.
+func InitPartialExpanderSess(s *Session, options string) bool {
+	s = sessOrAmbient(s)
+	s.PartialExpands = initPartialMap(false)
+	if !parsePartialOptionsSess(s, options, ',') {
+		// leave PartialExpands half-init; callers treat false as fail
 		return false
 	}
 	// MAX_STATEMENT_TYPE sentinel means "partial mode active"
-	currentSession().PartialExpands[MaxStatementType] = true
-	currentSession().PartialExpandsBackup = copyPartialMap(currentSession().PartialExpands)
+	s.PartialExpands[MaxStatementType] = true
+	s.PartialExpandsBackup = copyPartialMap(s.PartialExpands)
 	return true
 }
 
@@ -46,6 +51,10 @@ func copyPartialMap(src map[StatementType]bool) map[StatementType]bool {
 }
 
 func parsePartialOptions(options string, sep byte) bool {
+	return parsePartialOptionsSess(nil, options, sep)
+}
+
+func parsePartialOptionsSess(s *Session, options string, sep byte) bool {
 	// PartialExpander.cpp:71–86 — empty string yields one empty token → set_expand fails
 	if options == "" {
 		return false
@@ -55,30 +64,35 @@ func parsePartialOptions(options string, sep byte) bool {
 		// single token without separator (SplitString emptied)
 		parts = []string{options}
 	}
-	for _, s := range parts {
-		if !setPartialExpand(s) {
+	for _, tok := range parts {
+		if !setPartialExpandSess(s, tok) {
 			return false
 		}
 	}
 	return true
 }
 
-func setPartialExpand(s string) bool {
-	switch s {
+func setPartialExpand(tok string) bool {
+	return setPartialExpandSess(nil, tok)
+}
+
+func setPartialExpandSess(s *Session, tok string) bool {
+	s = sessOrAmbient(s)
+	switch tok {
 	case "assignment":
-		currentSession().PartialExpands[StmtAssign] = true
+		s.PartialExpands[StmtAssign] = true
 	case "block":
-		currentSession().PartialExpands[StmtBlock] = true
+		s.PartialExpands[StmtBlock] = true
 	case "for":
-		currentSession().PartialExpands[StmtFor] = true
+		s.PartialExpands[StmtFor] = true
 	case "if-else":
-		currentSession().PartialExpands[StmtIfElse] = true
+		s.PartialExpands[StmtIfElse] = true
 	case "invoke":
-		currentSession().PartialExpands[StmtInvoke] = true
+		s.PartialExpands[StmtInvoke] = true
 	case "return":
-		currentSession().PartialExpands[StmtReturn] = true
+		s.PartialExpands[StmtReturn] = true
 	case "all":
-		currentSession().PartialExpands = initPartialMap(true)
+		s.PartialExpands = initPartialMap(true)
 	default:
 		return false
 	}
@@ -87,63 +101,98 @@ func setPartialExpand(s string) bool {
 
 // SetStmtExpand mirrors PartialExpander::set_stmt_expand.
 func SetStmtExpand(t StatementType, value bool) {
-	if currentSession().PartialExpands == nil {
-		currentSession().PartialExpands = initPartialMap(false)
+	SetStmtExpandSess(nil, t, value)
+}
+
+// SetStmtExpandSess is SetStmtExpand on an explicit session bag.
+func SetStmtExpandSess(s *Session, t StatementType, value bool) {
+	s = sessOrAmbient(s)
+	if s.PartialExpands == nil {
+		s.PartialExpands = initPartialMap(false)
 	}
-	currentSession().PartialExpands[t] = value
+	s.PartialExpands[t] = value
 }
 
 // RestorePartialExpanderInitValues mirrors restore_init_values.
 // PartialExpander.cpp:122–125.
 func RestorePartialExpanderInitValues() {
-	if currentSession().PartialExpandsBackup != nil {
-		currentSession().PartialExpands = copyPartialMap(currentSession().PartialExpandsBackup)
+	RestorePartialExpanderInitValuesSess(nil)
+}
+
+// RestorePartialExpanderInitValuesSess restores on an explicit session bag.
+func RestorePartialExpanderInitValuesSess(s *Session) {
+	s = sessOrAmbient(s)
+	if s.PartialExpandsBackup != nil {
+		s.PartialExpands = copyPartialMap(s.PartialExpandsBackup)
 	}
 }
 
 // DirectExpandCheck mirrors PartialExpander::direct_expand_check.
 // PartialExpander.cpp:127–130.
 func DirectExpandCheck(t StatementType) bool {
-	if currentSession().PartialExpands == nil {
+	return DirectExpandCheckSess(nil, t)
+}
+
+// DirectExpandCheckSess is DirectExpandCheck on an explicit session bag.
+func DirectExpandCheckSess(s *Session, t StatementType) bool {
+	s = sessOrAmbient(s)
+	if s.PartialExpands == nil {
 		return false
 	}
-	return currentSession().PartialExpands[t]
+	return s.PartialExpands[t]
 }
 
 // ExpandCheck mirrors PartialExpander::expand_check.
 // PartialExpander.cpp:132–151 — if partial mode off, allow all; else allow listed
 // kinds (Assign also ok if Invoke listed); first success clears MAX sentinel.
 func ExpandCheck(t StatementType) bool {
-	if currentSession().PartialExpands == nil || !currentSession().PartialExpands[MaxStatementType] {
+	return ExpandCheckSess(nil, t)
+}
+
+// ExpandCheckSess is ExpandCheck on an explicit session bag.
+func ExpandCheckSess(s *Session, t StatementType) bool {
+	s = sessOrAmbient(s)
+	if s.PartialExpands == nil || !s.PartialExpands[MaxStatementType] {
 		// not in partial mode → all valid
 		return true
 	}
 	// PartialExpander.cpp:137 — assert(expands_.find(t) != end)
 	// map only holds Assign/Block/For/IfElse/Invoke/Return/MAX; other kinds fail closed
 	// (filter rejects), not soft invent allow-all for unregistered types
-	rv := currentSession().PartialExpands[t]
+	rv := s.PartialExpands[t]
 	if t == StmtAssign {
 		// Assign also ok when Invoke is listed (PartialExpander.cpp:143–145)
-		rv = rv || currentSession().PartialExpands[StmtInvoke]
+		rv = rv || s.PartialExpands[StmtInvoke]
 	}
 	if rv {
 		// after first successful expand, disable further forcing
-		currentSession().PartialExpands[MaxStatementType] = false
+		s.PartialExpands[MaxStatementType] = false
 	}
 	return rv
 }
 
 // ClearPartialExpander resets package state (tests / finalization).
 func ClearPartialExpander() {
-	currentSession().PartialExpands = nil
-	currentSession().PartialExpandsBackup = nil
+	ClearPartialExpanderSess(nil)
+}
+
+// ClearPartialExpanderSess clears partial-expand state on an explicit session bag.
+func ClearPartialExpanderSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.PartialExpands = nil
+	s.PartialExpandsBackup = nil
 }
 
 // InitPartialExpanderFromOptions wires CGOptions::partial_expand string.
 func InitPartialExpanderFromOptions(opts Options) bool {
+	return InitPartialExpanderFromOptionsSess(nil, opts)
+}
+
+// InitPartialExpanderFromOptionsSess wires partial-expand on an explicit session bag.
+func InitPartialExpanderFromOptionsSess(s *Session, opts Options) bool {
 	if opts.PartialExpand == "" {
-		ClearPartialExpander()
+		ClearPartialExpanderSess(s)
 		return true
 	}
-	return InitPartialExpander(opts.PartialExpand)
+	return InitPartialExpanderSess(s, opts.PartialExpand)
 }

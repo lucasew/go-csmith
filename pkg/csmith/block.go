@@ -1394,7 +1394,7 @@ func makeRandomStmtForced(
 	f := filterFunc(func(v uint32) bool {
 		k := NumberToType(stmtTab, v)
 		// Statement.cpp:158–160 — PartialExpander::expand_check
-		if !ExpandCheck(k) {
+		if !ExpandCheckSess(cgSess(cg), k) {
 			return true
 		}
 		// Statement.cpp:164–166 — eBlock always filtered

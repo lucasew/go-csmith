@@ -53,17 +53,17 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 	}
 	ClearError()
 	SetPlatformSizes(opts.IntSize, opts.PointerSize)
-	if !InitPartialExpanderFromOptions(opts) {
+	if !InitPartialExpanderFromOptionsSess(s, opts) {
 		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)
 	}
-	defer ClearPartialExpander()
+	defer ClearPartialExpanderSess(s)
 
 	g := NewProgramGenerator(s)
 	if g == nil {
 		return "", fmt.Errorf("nil program generator")
 	}
 	g.Argv = opts.Argv
-	defer ClearAttrGenerators()
+	defer ClearAttrGeneratorsSess(s)
 
 	if opts.DumpDefaultProbabilities != "" {
 		if err := WriteDumpDefaultProbabilities(opts.DumpDefaultProbabilities); err != nil {

@@ -140,11 +140,11 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	if opts.DFSExhaustive {
 		kind = RngKindDFS
 		outKind = OutputMgrKindDFS
-		CreateDFSOutputMgr(opts)
+		CreateDFSOutputMgrSess(s, opts)
 	} else {
 		kind = RngKindDefault
 		outKind = OutputMgrKindDefault
-		if !CreateDefaultOutputMgr(opts) {
+		if !CreateDefaultOutputMgrSess(s, opts) {
 			// sticky already set on split path fail
 		}
 	}
@@ -190,12 +190,12 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	// Share gensym + derived_types across selector and generator.
 	vs.Types = &g.Types
 	// Attribute generators for this generation (Initialize*Attributes)
-	InitAttrGenerators(opts, probs)
+	InitAttrGeneratorsSess(s, opts, probs)
 	// ExtensionMgr::CreateExtension — null default; sticky if klee/crest/coverage
-	CreateExtension(opts)
+	CreateExtensionSess(s, opts)
 	// PartialExpander::init_partial_expander when --partial-expand set
 	if opts.PartialExpand != "" {
-		if !InitPartialExpanderFromOptions(opts) {
+		if !InitPartialExpanderFromOptionsSess(s, opts) {
 			s.GenError = ErrGeneric
 		}
 	}
@@ -234,9 +234,9 @@ func (g *ProgramGenerator) Initialize() {
 	kind := RngKindDefault
 	if g.OutputKind == OutputMgrKindDFS || g.Opts.DFSExhaustive {
 		kind = RngKindDFS
-		CreateDFSOutputMgr(g.Opts)
+		CreateDFSOutputMgrSess(g.Sess, g.Opts)
 	} else {
-		_ = CreateDefaultOutputMgr(g.Opts)
+		_ = CreateDefaultOutputMgrSess(g.Sess, g.Opts)
 	}
 	CreateRandomNumberInstance(kind, g.Seed)
 	if s != nil && s.Rng != nil {
@@ -1286,7 +1286,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 		g.noteErr(ErrGeneric)
 		return nil
 	}
-	if !CreateDefaultOutputMgr(g.Opts) {
+	if !CreateDefaultOutputMgrSess(g.Sess, g.Opts) {
 		return nil
 	}
 	n := g.Opts.MaxSplitFiles

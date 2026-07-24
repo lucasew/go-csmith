@@ -183,6 +183,15 @@ func currentSession() *Session {
 	return defaultSession
 }
 
+// sessOrAmbient returns s when non-nil, else the ambient Process* bag.
+// Prefer explicit *Session from Generate / cg.Sess / g.Sess; nil is the bridge.
+func sessOrAmbient(s *Session) *Session {
+	if s != nil {
+		return s
+	}
+	return currentSession()
+}
+
 // activateSession makes s the Process* target until restore.
 func activateSession(s *Session) (restore func()) {
 	prev := activeSession

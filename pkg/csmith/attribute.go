@@ -342,52 +342,89 @@ func NewUnionTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGen
 // Mirrors InitializeVariableAttributes / InitializeAttributes / InitializeLabelAttributes /
 // InitializeTypeAttributes when flags are on.
 func InitAttrGenerators(opts Options, probs *Probabilities) {
-	currentSession().Opts = opts
-	currentSession().Probs = probs
-	currentSession().VarAttrGenerator = NewVarAttrGenerator(opts, probs)
-	currentSession().FuncAttrGenerator = NewFuncAttrGenerator(opts, probs)
-	currentSession().LabelAttrGenerator = NewLabelAttrGenerator(opts, probs)
-	currentSession().StructTypeAttrGen = NewStructTypeAttrGenerator(opts, probs)
-	currentSession().UnionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
+	InitAttrGeneratorsSess(nil, opts, probs)
+}
+
+// InitAttrGeneratorsSess installs attribute generators on an explicit session bag.
+func InitAttrGeneratorsSess(s *Session, opts Options, probs *Probabilities) {
+	s = sessOrAmbient(s)
+	s.Opts = opts
+	s.Probs = probs
+	s.VarAttrGenerator = NewVarAttrGenerator(opts, probs)
+	s.FuncAttrGenerator = NewFuncAttrGenerator(opts, probs)
+	s.LabelAttrGenerator = NewLabelAttrGenerator(opts, probs)
+	s.StructTypeAttrGen = NewStructTypeAttrGenerator(opts, probs)
+	s.UnionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
 }
 
 // EnsureVarAttrGenerator returns Variable::var_attr_generator after InitAttrGenerators.
 // No soft invent NewVarAttrGenerator with zero opts when init was skipped
 // (C++ InitializeVariableAttributes runs from CreateVariable / generation start).
 func EnsureVarAttrGenerator() *AttributeGenerator {
-	return currentSession().VarAttrGenerator
+	return EnsureVarAttrGeneratorSess(nil)
+}
+
+// EnsureVarAttrGeneratorSess returns the generator on an explicit session bag.
+func EnsureVarAttrGeneratorSess(s *Session) *AttributeGenerator {
+	return sessOrAmbient(s).VarAttrGenerator
 }
 
 // EnsureFuncAttrGenerator returns function attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureFuncAttrGenerator() *AttributeGenerator {
-	return currentSession().FuncAttrGenerator
+	return EnsureFuncAttrGeneratorSess(nil)
+}
+
+// EnsureFuncAttrGeneratorSess returns the generator on an explicit session bag.
+func EnsureFuncAttrGeneratorSess(s *Session) *AttributeGenerator {
+	return sessOrAmbient(s).FuncAttrGenerator
 }
 
 // EnsureLabelAttrGenerator returns label attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureLabelAttrGenerator() *AttributeGenerator {
-	return currentSession().LabelAttrGenerator
+	return EnsureLabelAttrGeneratorSess(nil)
+}
+
+// EnsureLabelAttrGeneratorSess returns the generator on an explicit session bag.
+func EnsureLabelAttrGeneratorSess(s *Session) *AttributeGenerator {
+	return sessOrAmbient(s).LabelAttrGenerator
 }
 
 // EnsureStructTypeAttrGenerator returns struct type attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureStructTypeAttrGenerator() *AttributeGenerator {
-	return currentSession().StructTypeAttrGen
+	return EnsureStructTypeAttrGeneratorSess(nil)
+}
+
+// EnsureStructTypeAttrGeneratorSess returns the generator on an explicit session bag.
+func EnsureStructTypeAttrGeneratorSess(s *Session) *AttributeGenerator {
+	return sessOrAmbient(s).StructTypeAttrGen
 }
 
 // EnsureUnionTypeAttrGenerator returns union type attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureUnionTypeAttrGenerator() *AttributeGenerator {
-	return currentSession().UnionTypeAttrGen
+	return EnsureUnionTypeAttrGeneratorSess(nil)
+}
+
+// EnsureUnionTypeAttrGeneratorSess returns the generator on an explicit session bag.
+func EnsureUnionTypeAttrGeneratorSess(s *Session) *AttributeGenerator {
+	return sessOrAmbient(s).UnionTypeAttrGen
 }
 
 // ClearAttrGenerators for Finalization between runs.
 func ClearAttrGenerators() {
-	currentSession().VarAttrGenerator = nil
-	currentSession().FuncAttrGenerator = nil
-	currentSession().LabelAttrGenerator = nil
-	currentSession().StructTypeAttrGen = nil
-	currentSession().UnionTypeAttrGen = nil
-	currentSession().Probs = nil
+	ClearAttrGeneratorsSess(nil)
+}
+
+// ClearAttrGeneratorsSess clears attribute generators on an explicit session bag.
+func ClearAttrGeneratorsSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.VarAttrGenerator = nil
+	s.FuncAttrGenerator = nil
+	s.LabelAttrGenerator = nil
+	s.StructTypeAttrGen = nil
+	s.UnionTypeAttrGen = nil
+	s.Probs = nil
 }

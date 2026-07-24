@@ -304,20 +304,26 @@ func CoverageOutputTail() string {
 // CreateExtensionFull installs Klee/Crest/Coverage when options request them.
 // Replaces sticky-only CreateExtension for those flags.
 func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
-	currentSession().ExtensionActive = false
-	currentSession().ExtValues = nil
-	currentSession().ExtKind = ""
-	currentSession().CoverageTests = nil
-	currentSession().CoverageSize = 0
+	CreateExtensionFullSess(nil, opts, r, probs)
+}
+
+// CreateExtensionFullSess installs Klee/Crest/Coverage on an explicit session bag.
+func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilities) {
+	s = sessOrAmbient(s)
+	s.ExtensionActive = false
+	s.ExtValues = nil
+	s.ExtKind = ""
+	s.CoverageTests = nil
+	s.CoverageSize = 0
 
 	if opts.Klee {
-		currentSession().ExtKind = "klee"
+		s.ExtKind = "klee"
 	} else if opts.Crest {
-		currentSession().ExtKind = "crest"
+		s.ExtKind = "crest"
 	} else if opts.CoverageTest {
-		currentSession().ExtKind = "coverage"
-		currentSession().CoverageSize = opts.CoverageTestSize
-		if currentSession().CoverageSize <= 0 {
+		s.ExtKind = "coverage"
+		s.CoverageSize = opts.CoverageTestSize
+		if s.CoverageSize <= 0 {
 			sessNoteError(nil, ErrGeneric)
 			return
 		}
@@ -326,21 +332,21 @@ func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
 	}
 
 	// AbsExtension::Initialize(func1_max_params, values)
-	currentSession().ExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
-	if currentSession().ExtValues == nil || sessHasError(nil) {
+	s.ExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
+	if s.ExtValues == nil || sessHasError(nil) {
 		if !sessHasError(nil) {
 			sessNoteError(nil, ErrGeneric)
 		}
-		currentSession().ExtKind = ""
+		s.ExtKind = ""
 		return
 	}
-	if currentSession().ExtKind == "coverage" {
-		currentSession().CoverageTests = CoverageGenerateValues(currentSession().ExtValues, currentSession().CoverageSize, r, opts, probs)
-		if currentSession().CoverageTests == nil || sessHasError(nil) {
-			currentSession().ExtKind = ""
-			currentSession().ExtValues = nil
+	if s.ExtKind == "coverage" {
+		s.CoverageTests = CoverageGenerateValues(s.ExtValues, s.CoverageSize, r, opts, probs)
+		if s.CoverageTests == nil || sessHasError(nil) {
+			s.ExtKind = ""
+			s.ExtValues = nil
 			return
 		}
 	}
-	currentSession().ExtensionActive = true
+	s.ExtensionActive = true
 }
