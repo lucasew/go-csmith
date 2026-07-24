@@ -17,7 +17,7 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 	}
 	// C++ always has RNG; sticky no invent always-true past threshold when r nil
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
@@ -35,7 +35,7 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return StructField{}
 	}
 	// Type.cpp:658–666 make_one_struct_field — rnd_upto(AllTypes, filter for_field_var)
@@ -45,7 +45,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 		ft = env.chooseRandomForStructField(r, opts, probs)
 	}
 	// Type.cpp:661 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
-	if ft == nil || HasError() {
+	if ft == nil || sessHasError(nil) {
 		return StructField{}
 	}
 	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
@@ -53,7 +53,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
 	// Type.cpp:694 ERROR_RETURN after random_qualifiers
-	if HasError() {
+	if sessHasError(nil) {
 		return StructField{}
 	}
 	return StructField{
@@ -73,15 +73,15 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 	maxLen := opts.IntSize * 8
 	if maxLen < 1 {
 		// broken options IR sticky — empty field (no invent maxLen=32)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return fail
 	}
 	if r == nil || probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return fail
 	}
 	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
-	if HasError() {
+	if sessHasError(nil) {
 		return fail
 	}
 	var ft *Type
@@ -93,11 +93,11 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
-	if HasError() {
+	if sessHasError(nil) {
 		return fail
 	}
 	length := int(r.RndUpto(uint32(maxLen)))
-	if HasError() {
+	if sessHasError(nil) {
 		return fail
 	}
 	// force non-zero if first field or previous was zero-length
@@ -106,7 +106,7 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 			length = 1
 		} else {
 			length = int(r.RndUpto(uint32(maxLen-1))) + 1
-			if HasError() {
+			if sessHasError(nil) {
 				return fail
 			}
 		}
@@ -124,7 +124,7 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
 	// Type.cpp always has process RNG; sticky no invent struct type without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1077–1081 — max_struct_fields as-is; no soft invent maxCnt=1
@@ -139,17 +139,17 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	}
 	if fieldCnt < 1 {
 		// fixed + max 0 → empty type IR; sticky no invent zero-field struct shell
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1082 — ERROR_GUARD(nullptr) after field_cnt draw
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
 	// Type.cpp:1086–1088 — ERROR_GUARD after flip
 	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldsCreationProb)))
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)
@@ -159,13 +159,13 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		if fullBitfields {
 			// make_full_bitfields_struct_fields: ScalarFieldInFullBitFieldsProb → normal else bitfield
 			if r.RndFlipcoin(uint32(probs.Single(PScalarFieldInFullBitFieldsProb))) {
-				if HasError() {
+				if sessHasError(nil) {
 					return nil
 				}
 				f = MakeOneStructField(r, opts, probs, env, i)
 				prevZero = false
 			} else {
-				if HasError() {
+				if sessHasError(nil) {
 					return nil
 				}
 				f = MakeOneBitfield(r, opts, probs, i, prevZero)
@@ -173,20 +173,20 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			}
 		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
 			// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 			f = MakeOneBitfield(r, opts, probs, i, prevZero)
 			prevZero = f.Type != nil && f.BitWidth == 0
 		} else {
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 			f = MakeOneStructField(r, opts, probs, env, i)
 			prevZero = false
 		}
 		// Type.cpp:1090 ERROR_GUARD after make_*_struct_fields; no soft invent nil-type field
-		if f.Type == nil || HasError() {
+		if f.Type == nil || sessHasError(nil) {
 			return nil
 		}
 		fields = append(fields, f)
@@ -198,13 +198,13 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			// leave packed false
 		} else {
 			packed = r.RndFlipcoin(50)
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 		}
 	}
 	hasAssign := IfStructWillHaveAssignOps(r, opts, probs)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// Type.cpp:1088–1091 make_random_struct_type — does not set used or record_type_with_bitfields.
@@ -217,7 +217,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		env.AggregateSeq++
 		name = fmt.Sprintf("S%d", sid)
 	} else if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	st := &Type{
@@ -249,7 +249,7 @@ func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
 			// incomplete field Type sticky has-nontrivial (restrictive)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if f.Type.HasImplicitNontrivialAssignOps {
@@ -264,7 +264,7 @@ func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
 // TypeEnv always live; sticky (no invent soft-skip type gen past hole).
 func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEnv) {
 	if env == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// Type.cpp:1170–1176 GenerateSimpleTypes — push eChar..eUInt128 always.
@@ -280,7 +280,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if opts.Structs && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
 			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
-			if MakeRandomStructType(r, opts, probs, env, "") == nil || HasError() {
+			if MakeRandomStructType(r, opts, probs, env, "") == nil || sessHasError(nil) {
 				break
 			}
 			if len(env.StructTypes) > 20 {
@@ -290,7 +290,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	if opts.Unions && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
-			if MakeRandomUnionType(r, opts, probs, env, "") == nil || HasError() {
+			if MakeRandomUnionType(r, opts, probs, env, "") == nil || sessHasError(nil) {
 				break
 			}
 			if len(env.UnionTypes) > 20 {
@@ -310,7 +310,7 @@ func (t *Type) OutputStructDecl() string {
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	// Type* always live at struct emit; sticky no invent decl without it
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// non-struct: soft empty (callers use OutputUnionDecl for unions)
@@ -319,7 +319,7 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	}
 	// Type.cpp always has sid name (S#); sticky no invent "struct  {"
 	if t.StructName == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -336,7 +336,7 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if attrs != nil && r != nil {
 		b.WriteString(attrs.Output(r))
 		// residual ERROR sticky — no invent soft-continue fields past attr residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -347,25 +347,25 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		if f.BitWidth >= 0 {
 			if f.Type == nil {
 				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			if !f.Type.IsSimple() {
 				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual true
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			st := f.Type.Simple()
 			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			// Type.cpp:1868–1873 — eInt → signed; eUInt → unsigned; else assert(0) sticky
@@ -376,28 +376,28 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			case EUInt:
 				signedKW = "unsigned"
 			default:
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString("   ")
 			// Type.cpp:1867 — OutputFirstQuals
 			if f.Qfer.IsConst() {
 				// residual ERROR sticky — no invent soft-const past IsConst residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				b.WriteString("const ")
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
 				return ""
 			}
 			if f.Qfer.IsVolatile() {
 				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				b.WriteString("volatile ")
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue field past IsVolatile residual false
 				return ""
 			}
@@ -417,17 +417,17 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		// non-bitfield: qualified type + fN
 		if f.Type == nil {
 			// Type.cpp always has field type sticky; no soft invent "int"
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// Type.cpp:1879–1880 — output_qualified_type always live; sticky no invent " fN;"
 		ty := f.Qfer.OutputQualifiedType(f.Type)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if ty == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString("   ")
@@ -464,30 +464,30 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	// Constant.cpp:226–245 — only eInt / eUInt; else assert(0)
 	// sticky no invent empty/default constant past broken range IR
 	if r == nil || typ == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if !typ.IsSimple() {
 		// residual ERROR sticky — no invent soft-empty range past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-continue range past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	st := typ.Simple()
 	if st != EInt && st != EUInt {
 		// assert(0) for other simples — sticky no soft invent generic decimal
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if bound <= 0 {
 		// invalid bitfield width; sticky no invent "0" for broken range
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Constant.cpp:228 / 238 — int b = (int)pow(2, (double)bound / 2);
@@ -500,7 +500,7 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	}
 	if b < 1 {
 		// pure_rnd_upto domain; no invent b=1 soft-success past broken pow
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// pure_rnd_upto(b); C++ unsigned int domain (random mode == RndUpto)
@@ -532,7 +532,7 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 	// Constant.cpp:255 — assert(eStruct); always has RNG for field constants sticky
 	// no invent "{}" shell without live RNG / fields path
 	if r == nil || st == nil || !st.isStruct {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var b strings.Builder
@@ -546,7 +546,7 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 		// Type* always live on Fields; Type-nil sticky (no invent soft-empty val then
 		// ERROR_GUARD as complete field miss / soft re-pick past incomplete field Type)
 		if f.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		var val string
@@ -554,35 +554,35 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
 			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
 			// residual ERROR sticky — no invent soft-field past range residual
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 		} else if f.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft-field past IsStruct residual true
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 			if c := MakeStructConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue past IsStruct residual false
 			return nil
 		} else if f.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-field past IsUnion residual true
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 			if c := MakeUnionConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 			return nil
 		} else {
@@ -590,14 +590,14 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 			if c := MakeRandom(f.Type, opts, probs, r); c != nil {
 				val = c.Value
 			}
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
 		}
 		// Constant.cpp ERROR_GUARD("") on empty field — sticky fail whole struct, no invent hole
 		if val == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return nil
 		}
@@ -622,19 +622,19 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int, prevZero bool) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return StructField{}
 	}
 	// Type.cpp:677–680 — bitfield when bitfields && !ccomp && flipcoin(BitFieldInNormalStructProb)
 	// bitfield path uses traced rnd_flipcoin (not pure_rnd)
 	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
-		if HasError() {
+		if sessHasError(nil) {
 			return StructField{}
 		}
 		// Type.cpp:680 make_one_bitfield(fields, qfers, lens) — no_zero_len from lens
 		return MakeOneBitfield(r, opts, probs, fieldIdx, prevZero)
 	}
-	if HasError() {
+	if sessHasError(nil) {
 		return StructField{}
 	}
 	// Build ok_nonstruct_types and struct_types (Type.cpp:682–713)
@@ -646,22 +646,22 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		for _, t := range env.AllTypes {
 			// Type* always live on AllTypes; nil hole fails closed sticky (empty field shell)
 			if t == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return StructField{}
 			}
 			// Type.cpp:691–692 — contain_pointer_field rejected (pointers + aggregates with ptr fields)
 			if t.ContainPointerField() {
-				if HasError() {
+				if sessHasError(nil) {
 					return StructField{}
 				}
 				continue
 			}
 			isSt := t.IsStruct()
-			if HasError() {
+			if sessHasError(nil) {
 				return StructField{}
 			}
 			isUn := t.IsUnion()
-			if HasError() {
+			if sessHasError(nil) {
 				return StructField{}
 			}
 			if !isSt && !isUn {
@@ -671,7 +671,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			}
 			// Type.cpp:701–702 — no bitfields in union members for now
 			if t.HasBitfields() {
-				if HasError() {
+				if sessHasError(nil) {
 					return StructField{}
 				}
 				continue
@@ -694,54 +694,54 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	var ft *Type
 	for tries := 0; tries < 256; tries++ {
 		if len(structTypes) > 0 && r.RndFlipcoin(15) {
-			if HasError() {
+			if sessHasError(nil) {
 				return StructField{}
 			}
 			ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
-			if HasError() {
+			if sessHasError(nil) {
 				return StructField{}
 			}
 			break
 		}
-		if HasError() {
+		if sessHasError(nil) {
 			return StructField{}
 		}
 		if len(nonStruct) == 0 {
 			break
 		}
 		cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
-		if HasError() {
+		if sessHasError(nil) {
 			return StructField{}
 		}
 		// Type.cpp:723–727 — SIMPLE_TYPES_PROB_FILTER reject (weight 0), retry; pool stays full
 		if cand.IsSimple() {
-			if HasError() {
+			if sessHasError(nil) {
 				return StructField{}
 			}
 			if probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
-				if HasError() {
+				if sessHasError(nil) {
 					return StructField{}
 				}
 				continue
 			}
-			if HasError() {
+			if sessHasError(nil) {
 				return StructField{}
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			return StructField{}
 		}
 		ft = cand
 		break
 	}
 	// Type.cpp:730 — while (type == nullptr); no soft invent simple when pools empty
-	if ft == nil || HasError() {
+	if ft == nil || sessHasError(nil) {
 		return StructField{}
 	}
 	// Type.cpp:733–735 — FieldConstProb / FieldVolatileProb (traced random_qualifiers)
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
-	if HasError() {
+	if sessHasError(nil) {
 		return StructField{}
 	}
 	return StructField{Name: fmt.Sprintf("f%d", fieldIdx), Type: ft, Qfer: q, BitWidth: -1}
@@ -752,7 +752,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
 	// Type.cpp always has process RNG; sticky no invent union type without it
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1133–1135 — max_union_fields as-is; no soft invent maxCnt=1
@@ -762,12 +762,12 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	fieldCnt := int(r.RndUpto(uint32(maxCnt))) + 1
 	// Type.cpp:1136 — ERROR_GUARD after field_cnt
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	if fieldCnt < 1 {
 		// sticky no invent zero-field union shell
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)
@@ -778,14 +778,14 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		f := MakeOneUnionField(r, opts, probs, env, i, prevZero)
 		// Type.cpp:1140–1141 — make_one_union_field; assert no bitfields on last
 		// no soft invent nil-type union field
-		if f.Type == nil || HasError() {
+		if f.Type == nil || sessHasError(nil) {
 			return nil
 		}
 		if f.Type.HasBitfields() {
 			// residual ERROR sticky — no invent soft-skip assert fail past incomplete field Type
-			if !HasError() {
+			if !sessHasError(nil) {
 				// C++ assert(!fields.back()->has_bitfields()) — complete bitfields still fail closed
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 			}
 			return nil
 		}
@@ -795,7 +795,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		fields = append(fields, f)
 	}
 	hasAssign := IfUnionWillHaveAssignOps(r, opts, probs)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// Type.cpp:1110–1112 make_random_union_type — does not set used or record bitfields.
@@ -808,7 +808,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		env.AggregateSeq++
 		name = fmt.Sprintf("U%d", sid)
 	} else if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	ut := &Type{
@@ -838,7 +838,7 @@ func (t *Type) OutputUnionDecl() string {
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	// Type* always live at union emit; sticky no invent decl without it
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// non-union: soft empty
@@ -847,7 +847,7 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	}
 	// Type.cpp always has sid name (U#); sticky no invent "union  {"
 	if t.StructName == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -856,7 +856,7 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if attrs != nil && r != nil {
 		b.WriteString(attrs.Output(r))
 		// residual ERROR sticky — no invent soft-continue fields past attr residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -866,24 +866,24 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		if f.BitWidth >= 0 {
 			// unions rarely have bitfields; same assert rules as struct sticky
 			if f.Type == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			if !f.Type.IsSimple() {
 				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual true
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			st := f.Type.Simple()
 			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			var signedKW string
@@ -893,27 +893,27 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			case EUInt:
 				signedKW = "unsigned"
 			default:
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			b.WriteString("   ")
 			if f.Qfer.IsConst() {
 				// residual ERROR sticky — no invent soft-const past IsConst residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				b.WriteString("const ")
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
 				return ""
 			}
 			if f.Qfer.IsVolatile() {
 				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				b.WriteString("volatile ")
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue field past IsVolatile residual false
 				return ""
 			}
@@ -927,17 +927,17 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			continue
 		}
 		if f.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// output_qualified_type always live sticky; no invent " fN;" without type
 		ty := f.Qfer.OutputQualifiedType(f.Type)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if ty == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString("   ")
@@ -960,56 +960,56 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 	// Constant.cpp:289–291 — assert union with fields; always has RNG sticky
 	// no soft invent MakeInt(0) / "{}" without live RNG
 	if r == nil || ut == nil || !ut.isUnion || len(ut.Fields) == 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	f0 := ut.Fields[0]
 	// Type* always live on Fields; Type-nil sticky (no invent soft-empty val then
 	// ERROR_GUARD as complete first-field miss / soft re-pick past incomplete Type)
 	if f0.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var val string
 	if f0.Type.IsStruct() {
 		// residual ERROR sticky — no invent soft-union past IsStruct residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if c := MakeStructConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		return nil
 	} else if f0.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-union past IsUnion residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if c := MakeUnionConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		return nil
 	} else {
 		// Constant.cpp:292 — GenerateRandomConstant(fields[0]); no soft invent "0"
 		if c := MakeRandom(f0.Type, opts, probs, r); c != nil {
 			val = c.Value
 		}
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
 	// ERROR_GUARD on empty first field sticky — no invent "{}"
 	if val == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}
