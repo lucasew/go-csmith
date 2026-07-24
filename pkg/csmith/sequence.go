@@ -149,20 +149,34 @@ func (s *LinearSequence) SepChar() byte {
 // MakeSequence mirrors SequenceFactory::make_sequence.
 // SequenceFactory.cpp:44–52 — always LinearSequence with default_sep_char.
 func MakeSequence() *LinearSequence {
+	return MakeSequenceSess(nil)
+}
+
+// MakeSequenceSess is MakeSequence on an explicit session bag.
+func MakeSequenceSess(s *Session) *LinearSequence {
+	s = sessOrAmbient(s)
 	seq := NewLinearSequence(LinearSequenceDefaultSep)
-	currentSession().SequenceFactorySep = LinearSequenceDefaultSep
-	currentSession().SequenceFactoryLive = append(currentSession().SequenceFactoryLive, seq)
+	s.SequenceFactorySep = LinearSequenceDefaultSep
+	s.SequenceFactoryLive = append(s.SequenceFactoryLive, seq)
 	return seq
 }
 
 // DestroySequences mirrors SequenceFactory::destroy_sequences.
 // SequenceFactory.cpp:54–59.
 func DestroySequences() {
-	currentSession().SequenceFactoryLive = nil
+	DestroySequencesSess(nil)
+}
+
+// DestroySequencesSess clears live sequences on an explicit session bag.
+func DestroySequencesSess(s *Session) {
+	sessOrAmbient(s).SequenceFactoryLive = nil
 }
 
 // CurrentSepChar mirrors SequenceFactory::current_sep_char.
-func CurrentSepChar() byte { return currentSession().SequenceFactorySep }
+func CurrentSepChar() byte { return CurrentSepCharSess(nil) }
+
+// CurrentSepCharSess returns the separator on an explicit session bag.
+func CurrentSepCharSess(s *Session) byte { return sessOrAmbient(s).SequenceFactorySep }
 
 // --- SequenceLineParser ---
 

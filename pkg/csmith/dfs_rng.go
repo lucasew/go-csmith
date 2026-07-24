@@ -71,23 +71,35 @@ func NewDFSRng(seed uint64, opts Options) *Rng {
 // DFSRndNumGenerator.cpp:137–158.
 // opts must be supplied by caller (avoids ProcessOptions RLock under processOptsMu).
 func makeDFSRndNumGeneratorOpts(seed uint64, opts Options) *Rng {
-	if currentSession().DFSImpl != nil {
-		return currentSession().DFSImpl
+	return makeDFSRndNumGeneratorOptsSess(nil, seed, opts)
+}
+
+// makeDFSRndNumGeneratorOptsSess is the DFS factory on an explicit session bag.
+func makeDFSRndNumGeneratorOptsSess(s *Session, seed uint64, opts Options) *Rng {
+	s = sessOrAmbient(s)
+	if s.DFSImpl != nil {
+		return s.DFSImpl
 	}
 	r := NewDFSRng(seed, opts)
 	if r == nil {
 		return nil
 	}
-	currentSession().DFSImpl = r
+	s.DFSImpl = r
 	return r
 }
 
 // clearDFSImpl drops the process DFS singleton (RandomNumber::doFinalization path).
 func clearDFSImpl() {
-	if currentSession().DFSImpl != nil {
+	clearDFSImplSess(nil)
+}
+
+// clearDFSImplSess drops DFSImpl on an explicit session bag.
+func clearDFSImplSess(s *Session) {
+	s = sessOrAmbient(s)
+	if s.DFSImpl != nil {
 		// DFSRndNumGenerator dtor → SequenceFactory::destroy_sequences
-		DestroySequences()
-		currentSession().DFSImpl = nil
+		DestroySequencesSess(s)
+		s.DFSImpl = nil
 	}
 }
 

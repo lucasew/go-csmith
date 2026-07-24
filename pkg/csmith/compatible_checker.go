@@ -8,17 +8,27 @@ package csmith
 // EnableCompatibleCheck mirrors CompatibleChecker::enable_compatible_check.
 // CompatibleChecker.cpp:68–70; CGOptions.cpp:416–417 (resolve_exhaustive_options).
 func EnableCompatibleCheck() {
-	currentSession().CompatibleCheck = true
+	EnableCompatibleCheckSess(nil)
+}
+
+// EnableCompatibleCheckSess enables the checker on an explicit session bag.
+func EnableCompatibleCheckSess(s *Session) {
+	sessOrAmbient(s).CompatibleCheck = true
 }
 
 // ResetCompatibleCheck clears the process static (tests / finalization).
 func ResetCompatibleCheck() {
-	currentSession().CompatibleCheck = false
+	ResetCompatibleCheckSess(nil)
+}
+
+// ResetCompatibleCheckSess clears the checker flag on an explicit session bag.
+func ResetCompatibleCheckSess(s *Session) {
+	sessOrAmbient(s).CompatibleCheck = false
 }
 
 // compatibleCheckOn is true when process static or option requests the checker.
 func compatibleCheckOn(opts Options) bool {
-	return currentSession().CompatibleCheck || opts.CompatibleCheck
+	return sessOrAmbient(nil).CompatibleCheck || opts.CompatibleCheck
 }
 
 // CompatibleCheckExprVar mirrors CompatibleChecker::compatible_check(Variable*, Expression*).

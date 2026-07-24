@@ -52,7 +52,7 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		return "", err
 	}
 	ClearError()
-	SetPlatformSizes(opts.IntSize, opts.PointerSize)
+	SetPlatformSizesSess(s, opts.IntSize, opts.PointerSize)
 	if !InitPartialExpanderFromOptionsSess(s, opts) {
 		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)
 	}

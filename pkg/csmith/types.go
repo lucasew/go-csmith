@@ -554,7 +554,12 @@ func (t *Type) ToUnsigned() *Type {
 
 // SetPlatformSizes mirrors host/platform.info integer and pointer sizes for SizeInBytes.
 func SetPlatformSizes(intSize, ptrSize int) {
-	s := currentSession()
+	SetPlatformSizesSess(nil, intSize, ptrSize)
+}
+
+// SetPlatformSizesSess sets platform sizes on an explicit session bag.
+func SetPlatformSizesSess(s *Session, intSize, ptrSize int) {
+	s = sessOrAmbient(s)
 	if intSize > 0 {
 		s.PlatformIntSize = intSize
 	}
@@ -576,7 +581,7 @@ func (t *Type) SizeInBytes() int {
 	}
 	if t.ptrTo != nil {
 		// Type.cpp:1568–1572 — ePointer: pointer_size() side-effect then return 0
-		_ = currentSession().PlatformPtrSize
+		_ = sessOrAmbient(nil).PlatformPtrSize
 		return 0
 	}
 	// Type.cpp:1502–1531 — fixed simple sizes (independent of host LP64)
@@ -731,21 +736,32 @@ func (t *Type) IndirectLevel() int {
 // Type.cpp:1962–1971 — clears derived_types (Go: PointerCache).
 // simpleTypes stay: permanent eSimple cache (C++ simple_types[] is not reallocated each run).
 func TypeDoFinalization() {
-	currentSession().PointerCache = map[*Type]*Type{}
+	TypeDoFinalizationSess(nil)
+}
+
+// TypeDoFinalizationSess clears PointerCache on an explicit session bag.
+func TypeDoFinalizationSess(s *Session) {
+	sessOrAmbient(s).PointerCache = map[*Type]*Type{}
 }
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).
 // Type.cpp:423+ find_pointer_type — pointee Type* always live; sticky no invent int* for nil.
 func PointerTo(pointee *Type) *Type {
+	return PointerToSess(nil, pointee)
+}
+
+// PointerToSess is PointerTo on an explicit session bag.
+func PointerToSess(s *Session, pointee *Type) *Type {
 	if pointee == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	if p, ok := currentSession().PointerCache[pointee]; ok {
+	s = sessOrAmbient(s)
+	if p, ok := s.PointerCache[pointee]; ok {
 		return p
 	}
 	p := &Type{ptrTo: pointee}
-	currentSession().PointerCache[pointee] = p
+	s.PointerCache[pointee] = p
 	return p
 }
 

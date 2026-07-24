@@ -122,22 +122,36 @@ func (f *SafeOpFlags) Clone() *SafeOpFlags {
 // SafeOpFlagsToID mirrors SafeOpFlags::to_id.
 // SafeOpFlags.cpp:343–352 — assign stable id to wrapper fname (1-based).
 func SafeOpFlagsToID(fname string) int {
-	for i, n := range currentSession().WrapperNames {
+	return SafeOpFlagsToIDSess(nil, fname)
+}
+
+// SafeOpFlagsToIDSess is SafeOpFlagsToID on an explicit session bag.
+func SafeOpFlagsToIDSess(s *Session, fname string) int {
+	s = sessOrAmbient(s)
+	for i, n := range s.WrapperNames {
 		if n == fname {
 			return i + 1
 		}
 	}
-	currentSession().WrapperNames = append(currentSession().WrapperNames, fname)
-	return len(currentSession().WrapperNames)
+	s.WrapperNames = append(s.WrapperNames, fname)
+	return len(s.WrapperNames)
 }
 
 // ClearSafeOpWrapperNames resets to_id registry (finalization/tests).
 func ClearSafeOpWrapperNames() {
-	currentSession().WrapperNames = nil
+	ClearSafeOpWrapperNamesSess(nil)
+}
+
+// ClearSafeOpWrapperNamesSess clears wrapper names on an explicit session bag.
+func ClearSafeOpWrapperNamesSess(s *Session) {
+	sessOrAmbient(s).WrapperNames = nil
 }
 
 // WrapperNamesCount mirrors SafeOpFlags::wrapper_names.size().
-func WrapperNamesCount() int { return len(currentSession().WrapperNames) }
+func WrapperNamesCount() int { return WrapperNamesCountSess(nil) }
+
+// WrapperNamesCountSess returns wrapper count on an explicit session bag.
+func WrapperNamesCountSess(s *Session) int { return len(sessOrAmbient(s).WrapperNames) }
 
 // OutputWrapperH mirrors DefaultProgramGenerator identify_wrappers wrapper.h body.
 // DefaultProgramGenerator.cpp:73–77 — #define N_WRAP <count>.

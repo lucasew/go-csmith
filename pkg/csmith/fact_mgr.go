@@ -29,21 +29,43 @@ const (
 // AddInterestedFacts mirrors FactMgr::add_interested_facts.
 // FactMgr.cpp:475–486 — register meta fact kinds for DFA.
 func AddInterestedFacts(interests int) {
-	currentSession().MetaFactPointToEnabled = interests&FactCategoryPointTo != 0
-	currentSession().MetaFactUnionEnabled = interests&FactCategoryUnionWrite != 0
+	AddInterestedFactsSess(nil, interests)
+}
+
+// AddInterestedFactsSess sets meta-fact interest flags on an explicit session bag.
+func AddInterestedFactsSess(s *Session, interests int) {
+	s = sessOrAmbient(s)
+	s.MetaFactPointToEnabled = interests&FactCategoryPointTo != 0
+	s.MetaFactUnionEnabled = interests&FactCategoryUnionWrite != 0
 }
 
 // MetaFactPointToEnabled reports whether point-to analysis is active.
-func MetaFactPointToEnabled() bool { return currentSession().MetaFactPointToEnabled }
+func MetaFactPointToEnabled() bool { return MetaFactPointToEnabledSess(nil) }
+
+// MetaFactPointToEnabledSess reports point-to meta flag on an explicit session bag.
+func MetaFactPointToEnabledSess(s *Session) bool {
+	return sessOrAmbient(s).MetaFactPointToEnabled
+}
 
 // MetaFactUnionEnabled reports whether union-write analysis is active.
-func MetaFactUnionEnabled() bool { return currentSession().MetaFactUnionEnabled }
+func MetaFactUnionEnabled() bool { return MetaFactUnionEnabledSess(nil) }
+
+// MetaFactUnionEnabledSess reports union meta flag on an explicit session bag.
+func MetaFactUnionEnabledSess(s *Session) bool {
+	return sessOrAmbient(s).MetaFactUnionEnabled
+}
 
 // ClearMetaFacts restores default interested facts (both on).
 // Called from DoFinalization between generations.
 func ClearMetaFacts() {
-	currentSession().MetaFactPointToEnabled = true
-	currentSession().MetaFactUnionEnabled = true
+	ClearMetaFactsSess(nil)
+}
+
+// ClearMetaFactsSess restores default meta flags on an explicit session bag.
+func ClearMetaFactsSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.MetaFactPointToEnabled = true
+	s.MetaFactUnionEnabled = true
 }
 
 // FactMgr mirrors FactMgr for a function — global_facts + stm maps.
@@ -95,7 +117,7 @@ func NewFactMgr(f *Function) *FactMgr {
 	return &FactMgr{
 		// Capture active run bag when constructed under Session.Generate / activateSession.
 		// Unit tests without an active session get defaultSession (same bag SetError used).
-		Sess:             currentSession(),
+		Sess:             sessOrAmbient(nil),
 		Func:             f,
 		MapStmEffect:     make(map[int]Effect),
 		MapFactsIn:       make(map[int][]*FactPointTo),
@@ -2452,8 +2474,8 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
-	wantPT := currentSession().MetaFactPointToEnabled && isPtr
-	wantUn := currentSession().MetaFactUnionEnabled && v.Type != nil && v.Type.IsUnion()
+	wantPT := MetaFactPointToEnabledSess(fmSess(fm)) && isPtr
+	wantUn := MetaFactUnionEnabledSess(fmSess(fm)) && v.Type != nil && v.Type.IsUnion()
 	// residual ERROR sticky — no invent soft-skip makeup past IsUnion residual
 	if sessHasError(fmSess(fm)) {
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -3445,7 +3467,7 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered
-	if !currentSession().MetaFactPointToEnabled {
+	if !MetaFactPointToEnabledSess(nil) {
 		return
 	}
 	// recurse into aggregate fields (pointer members) like AddNewVarFact

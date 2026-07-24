@@ -33,7 +33,12 @@ func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
 // CreateRandomNumberInstance mirrors RandomNumber::CreateInstance.
 // RandomNumber.cpp:63–78. Session-specific (no process mutex).
 func CreateRandomNumberInstance(kind RngKind, seed uint64) {
-	s := currentSession()
+	CreateRandomNumberInstanceSess(nil, kind, seed)
+}
+
+// CreateRandomNumberInstanceSess is CreateInstance on an explicit session bag.
+func CreateRandomNumberInstanceSess(s *Session, kind RngKind, seed uint64) {
+	s = sessOrAmbient(s)
 	if s.RandomNumber == nil {
 		s.RandomNumber = &RandomNumber{
 			seed:       seed,
@@ -66,9 +71,14 @@ func CreateRandomNumberInstance(kind RngKind, seed uint64) {
 // GetRandomNumber mirrors RandomNumber::GetInstance.
 // RandomNumber.cpp:80–83 — C++ asserts; nil is library fail-closed.
 func GetRandomNumber() *RandomNumber {
-	rn := currentSession().RandomNumber
+	return GetRandomNumberSess(nil)
+}
+
+// GetRandomNumberSess returns RandomNumber on an explicit session bag.
+func GetRandomNumberSess(s *Session) *RandomNumber {
+	rn := sessOrAmbient(s).RandomNumber
 	if rn == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return rn
@@ -77,9 +87,14 @@ func GetRandomNumber() *RandomNumber {
 // GetRndNumGenerator mirrors RandomNumber::GetRndNumGenerator.
 // RandomNumber.cpp:85–88.
 func GetRndNumGenerator() *Rng {
-	rn := currentSession().RandomNumber
+	return GetRndNumGeneratorSess(nil)
+}
+
+// GetRndNumGeneratorSess returns the current AbsRng on an explicit session bag.
+func GetRndNumGeneratorSess(s *Session) *Rng {
+	rn := sessOrAmbient(s).RandomNumber
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return rn.curr
@@ -88,7 +103,12 @@ func GetRndNumGenerator() *Rng {
 // SwitchRndNumGenerator mirrors RandomNumber::SwitchRndNumGenerator.
 // RandomNumber.cpp:95–110 — create missing generator from seed; return previous kind.
 func SwitchRndNumGenerator(kind RngKind) RngKind {
-	s := currentSession()
+	return SwitchRndNumGeneratorSess(nil, kind)
+}
+
+// SwitchRndNumGeneratorSess switches generators on an explicit session bag.
+func SwitchRndNumGeneratorSess(s *Session, kind RngKind) RngKind {
+	s = sessOrAmbient(s)
 	rn := s.RandomNumber
 	if rn == nil || rn.curr == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -113,10 +133,15 @@ func SwitchRndNumGenerator(kind RngKind) RngKind {
 // RandomNumber.cpp:142–152 — drop generators and instance.
 // Also clears DFSRndNumGenerator::impl_ + SequenceFactory sequences.
 func RandomNumberDoFinalization() {
-	s := currentSession()
+	RandomNumberDoFinalizationSess(nil)
+}
+
+// RandomNumberDoFinalizationSess clears RandomNumber/DFS on an explicit session bag.
+func RandomNumberDoFinalizationSess(s *Session) {
+	s = sessOrAmbient(s)
 	s.RandomNumber = nil
 	s.Rng = nil
-	clearDFSImpl()
+	clearDFSImplSess(s)
 }
 
 // --- instance methods (RandomNumber.cpp:112–140) ---

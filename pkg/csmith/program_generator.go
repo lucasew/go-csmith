@@ -148,8 +148,8 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 			// sticky already set on split path fail
 		}
 	}
-	// RandomNumber::CreateInstance (writes s.Rng via active session)
-	CreateRandomNumberInstance(kind, seed)
+	// RandomNumber::CreateInstance (writes s.Rng on the run bag)
+	CreateRandomNumberInstanceSess(s, kind, seed)
 	r := s.Rng
 	if r == nil {
 		// Create failed; Default always works; DFS needs MaxExhaustiveDepth>0
@@ -206,12 +206,6 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 // C++ initialize only CreateInstance+OutputMgr; Go also runs Finalization subset
 // so library multi-Generate starts from a clean process pool (dtor-like).
 func (g *ProgramGenerator) Initialize() {
-	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
-	// ExtensionMgr::CreateExtension — null default, nothing to do.
-	// Finalization::doFinalization subset for a fresh generation
-	// (includes RandomNumber::doFinalization).
-	DoFinalization()
-	// DoFinalization clears session handles on the active bag; re-install from g.Sess.
 	if g == nil {
 		return
 	}
@@ -220,35 +214,44 @@ func (g *ProgramGenerator) Initialize() {
 		s = currentSession()
 		g.Sess = s
 	}
-	if s != nil {
-		s.Opts = g.Opts
-		s.ProgramGen = g
-		s.Probs = g.Probs
-		s.StmtTab = g.StmtTab
-		s.ExprTables = g.Tables
-		if g.Rng != nil {
-			s.Rng = g.Rng
-		}
+	// Activate g.Sess for Finalization + reinstall so we clear/rebuild the
+	// generator bag — not the ambient unit-test defaultSession when g.Sess is a
+	// pure NewSession. (CreateRandomNumberInstanceSess writes s only; wiping
+	// ambient without reinstall left ProcessRng nil for later unit tests.)
+	restore := activateSession(s)
+	defer restore()
+
+	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
+	// ExtensionMgr::CreateExtension — null default, nothing to do.
+	// Finalization::doFinalization subset for a fresh generation
+	// (includes RandomNumber::doFinalization).
+	DoFinalization()
+	// re-install from g after Finalization cleared s while active
+	s.Opts = g.Opts
+	s.ProgramGen = g
+	s.Probs = g.Probs
+	s.StmtTab = g.StmtTab
+	s.ExprTables = g.Tables
+	if g.Rng != nil {
+		s.Rng = g.Rng
 	}
 	// RandomNumber::CreateInstance after Finalization
 	kind := RngKindDefault
 	if g.OutputKind == OutputMgrKindDFS || g.Opts.DFSExhaustive {
 		kind = RngKindDFS
-		CreateDFSOutputMgrSess(g.Sess, g.Opts)
+		CreateDFSOutputMgrSess(s, g.Opts)
 	} else {
-		_ = CreateDefaultOutputMgrSess(g.Sess, g.Opts)
+		_ = CreateDefaultOutputMgrSess(s, g.Opts)
 	}
-	CreateRandomNumberInstance(kind, g.Seed)
-	if s != nil && s.Rng != nil {
+	CreateRandomNumberInstanceSess(s, kind, g.Seed)
+	if s.Rng != nil {
 		g.Rng = s.Rng
-	} else if g.Rng != nil && s != nil {
+	} else if g.Rng != nil {
 		s.Rng = g.Rng
 	}
 	// re-init scope + assign ops from session opts (once-per-run tables)
 	InitScopeTable(g.Opts)
-	if s != nil {
-		s.AssignOpsTab = NewAssignOpsTable(g.Opts)
-	}
+	s.AssignOpsTab = NewAssignOpsTable(g.Opts)
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).
