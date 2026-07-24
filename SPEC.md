@@ -133,7 +133,7 @@ This section is the **mandatory work method** for multi-seed drop-in. It does **
 |-------|------------|--------------------------------------|
 | **A** | Defaults + seed **2**: exact program body vs golden | **Met** (2026-07-21; re-verify after every gen/emit change) |
 | **B** | Defaults + every seed in the **§3.5a battery**: exact program body | **Met** (2026-07-22; re-verify after every gen/emit change) |
-| **C** | Broader seed range (e.g. 0…N or random sample) + optional checksum thermometer | **Open** (only after B) |
+| **C** | Broader seed range (e.g. 0…N or random sample) + optional checksum thermometer | **Met** (2026-07-24; `TestBodyParityLevelC` 10m CLEAN n=458 + battery green; re-verify after every gen/emit change) |
 
 **Done for multi-seed** means **level B**, not A alone. Seed 2 green is **not** permission to stop or to invent pads so other seeds “pass.”
 
@@ -142,9 +142,10 @@ This section is the **mandatory work method** for multi-seed drop-in. It does **
 | Command | Role |
 |---------|------|
 | `go test ./test/bodyparity -run TestBodyParityBattery -count=1` | Level **B** battery (`testing.T`) |
-| `go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s` | Level **C** continuous fuzz (`testing.F`) |
+| `BODYPARITY_LEVELC=10m go test ./test/bodyparity -run TestBodyParityLevelC -count=1 -timeout 15m` | Level **C** sequential random seeds (`testing.T`; no 10s fuzz-worker cap) |
+| `go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s` | Level **C** quick fuzz (`testing.F`; single inputs >~10s may false-hang) |
 
-Package **`./test/bodyparity`** only (not under `pkg/csmith`). Upstream path is `CSMITH_UPSTREAM` (hard fail if unset/invalid). Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Fuzzy seed corpus = level-B battery; crashers under `test/bodyparity/testdata/fuzz/` re-run until fixed or removed.
+Package **`./test/bodyparity`** only (not under `pkg/csmith`). Upstream path is `CSMITH_UPSTREAM` (hard fail if unset/invalid). Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Prefer **`TestBodyParityLevelC`** for substantial level-C time; `FuzzBodyParity` is fine for short smoke. Crashers under `test/bodyparity/testdata/fuzz/` re-run until fixed or removed (delete hang-only false positives that MATCH alone).
 
 #### Frozen battery (level B)
 
@@ -555,7 +556,7 @@ Superseding integrity text that banned residual while still logging residual cli
 | SPEC §3.5a multi-seed process lock | **Done** (2026-07-21) |
 | Whole-program level **A** (seed 2 exact body) | **Met** — re-verify after gen/emit changes |
 | Whole-program level **B** (battery exact body) | **Met** (2026-07-22) — frozen battery exact pre-stats body |
-| Whole-program level **C** (expanded range) | **Open** — only after B |
+| Whole-program level **C** (expanded range) | **Met** (2026-07-24) — `TestBodyParityLevelC` 10m CLEAN n=458 + battery green; re-verify after gen/emit changes |
 | Branch `fair-rewrite` + delete residual mass | **Done** (generator/residual/types godfiles removed) |
 | Layer 1: `Rng` | **Done** — `rng.go` + tests |
 | Layer 2: `CGOptions` defaults | **Done** — macros 1:1 tests; `MaxPointerDepth` fixed to 5 (`max_indirect_level`) |
