@@ -132,7 +132,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	// CGOptions on the session bag (field write; Process* bridge follows active s).
 	s.Opts = opts
 	// CGOptions::monitored_funcs → OutputMgr::monitored_funcs_
-	opts.ApplyMonitoredFuncs()
+	opts.ApplyMonitoredFuncsSess(s)
 	seed := opts.Seed
 	// AbsProgramGenerator.cpp:53–59 — dfs_exhaustive → DFS else Default
 	var kind RngKind
@@ -225,7 +225,7 @@ func (g *ProgramGenerator) Initialize() {
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
 	// Finalization::doFinalization subset for a fresh generation
 	// (includes RandomNumber::doFinalization).
-	DoFinalization()
+	DoFinalizationSess(s)
 	// re-install from g after Finalization cleared s while active
 	s.Opts = g.Opts
 	s.ProgramGen = g
@@ -338,7 +338,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		}
 	}
 	// Function.cpp:808 — FactPointTo::aggregate_all_pointto_sets
-	AggregateAllPointToSets(g.Funcs.Funcs, g.FactMgrs)
+	AggregateAllPointToSetsSess(g.Sess, g.Funcs.Funcs, g.FactMgrs)
 	// Function.cpp:809 — ExtensionMgr::GenerateValues (null extension → no-op)
 }
 
@@ -780,7 +780,7 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 		note(ErrGeneric)
 		return ""
 	}
-	ctrl := GetLastCtrlVars()
+	ctrl := GetLastCtrlVarsSess(vs.Sess)
 	var b strings.Builder
 	for _, v := range vs.GlobalList {
 		// pre-validated VariablesComplete
@@ -1010,7 +1010,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 	dimen := GetMaxArrayDimension(g.VS.GlobalList)
 	var ctrlDecl string
 	if dimen > 0 {
-		ctrl := GetNewCtrlVars(g.Opts)
+		ctrl := GetNewCtrlVarsSess(g.Sess, g.Opts)
 		ctrlDecl = OutputArrayCtrlVars(ctrl, dimen, "    ")
 		if ctrlDecl == "" {
 			// incomplete ctrl IR — fail closed empty (call sites use hashFuncDefReady;
@@ -1050,7 +1050,7 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		return ""
 	}
 	// OutputMgr.cpp:332 — Variable::get_last_ctrl_vars() (no GetNew soft-fallback)
-	ctrl := GetLastCtrlVars()
+	ctrl := GetLastCtrlVarsSess(nil)
 	names := CtrlVarNames(ctrl)
 	// OutputMgr.cpp:331 — Constant zero(get_int_type(), "0"); always live Expression*
 	zero := MakeInt(0)

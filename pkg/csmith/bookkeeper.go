@@ -706,7 +706,7 @@ func StatExprDepths(funcs []*Function) {
 					return
 				}
 				bk := sessBK(nil)
-	IncrCounter(&bk.exprDepthCnts, c)
+				IncrCounter(&bk.exprDepthCnts, c)
 			}
 		}
 	}
@@ -736,7 +736,7 @@ func StatBlkDepths(funcs []*Function) int {
 			depth--
 		}
 		bk := sessBK(nil)
-	IncrCounter(&bk.blkDepthCnts, depth)
+		IncrCounter(&bk.blkDepthCnts, depth)
 		cnt++
 		// get_blocks → recurse into Then/Else stmts with that block as parent
 		// Block* always live; nil hole sticky clear counts
@@ -886,7 +886,7 @@ func outputExprStatistics(b *strings.Builder, funcs []*Function) {
 
 func outputPointerStatistics(b *strings.Builder) {
 	// Bookkeeper.cpp:245–318 — all_ptrs / all_aliases when present
-	ptrs := currentSession().AllPtrs
+	ptrs := sessOrAmbient(nil).AllPtrs
 	formattedOutput(b, "total number of pointers: ", len(ptrs))
 	if len(ptrs) > 0 {
 		b.WriteString("\n")
@@ -936,9 +936,10 @@ func outputPointerStatistics(b *strings.Builder) {
 			if !ptrLike {
 				continue
 			}
-			if i < len(currentSession().AllAliases) {
-				totalAlias += len(currentSession().AllAliases[i])
-				if IsVariableInSet(currentSession().AllAliases[i], NullPtr) {
+			aliases := sessOrAmbient(nil).AllAliases
+			if i < len(aliases) {
+				totalAlias += len(aliases[i])
+				if IsVariableInSet(aliases[i], NullPtr) {
 					hasNull++
 				}
 			}

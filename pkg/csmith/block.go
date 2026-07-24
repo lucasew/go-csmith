@@ -1454,7 +1454,7 @@ func makeRandomStmtForced(
 			kind = StatementProbabilityFilter(r, stmtTab, f)
 		}
 		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
-		if opts.StopByStmt >= 0 && currentSession().NextStmID >= opts.StopByStmt {
+		if opts.StopByStmt >= 0 && GetCurrentSIDSess(cgSess(cg)) >= opts.StopByStmt {
 			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make

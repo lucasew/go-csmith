@@ -2,7 +2,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-
 import "strings"
 
 // Special points-to targets (FactPointTo.cpp:61–66).
@@ -2079,12 +2078,18 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	return false
 }
 
-// Package-level alias aggregates (FactPointTo.cpp:67–68).
+// Session AllPtrs / AllAliases mirror FactPointTo.cpp:67–68 aggregates.
 
 // ClearPointToAggregates resets all_ptrs / all_aliases (generation start).
 func ClearPointToAggregates() {
-	currentSession().AllPtrs = nil
-	currentSession().AllAliases = nil
+	ClearPointToAggregatesSess(nil)
+}
+
+// ClearPointToAggregatesSess clears pointer aggregates on an explicit session bag.
+func ClearPointToAggregatesSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.AllPtrs = nil
+	s.AllAliases = nil
 }
 
 // UpdatePtrAliases mirrors FactPointTo::update_ptr_aliases.
@@ -2165,12 +2170,18 @@ func IncompleteFunctions() []*Function {
 // AggregateAllPointToSets mirrors FactPointTo::aggregate_all_pointto_sets.
 // FactPointTo.cpp:792–804 — scan each non-builtin func FactMgr map_facts_out.
 // FactPointTo.cpp:803 — assert(all_ptrs.size() == all_aliases.size()); kept by UpdatePtrAliases.
-// Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial currentSession().AllPtrs).
+// Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial AllPtrs).
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
-	ClearPointToAggregates()
+	AggregateAllPointToSetsSess(nil, funcs, fms)
+}
+
+// AggregateAllPointToSetsSess is AggregateAllPointToSets on an explicit session bag.
+func AggregateAllPointToSetsSess(s *Session, funcs []*Function, fms *FactMgrMap) {
+	s = sessOrAmbient(s)
+	ClearPointToAggregatesSess(s)
 	// incomplete Funcs list fails closed sticky (no invent partial aggregate success)
 	if !FunctionsComplete(funcs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for _, f := range funcs {
@@ -2180,39 +2191,39 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		// FactMgr always paired for user funcs after make_random_signature / make_first
 		// no invent skip missing FM (partial aggregate)
 		if fms == nil {
-			ClearPointToAggregates()
-			sessNoteError(nil, ErrGeneric)
+			ClearPointToAggregatesSess(s)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		fm := fms.ForFunc(f)
 		if fm == nil {
-			ClearPointToAggregates()
-			sessNoteError(nil, ErrGeneric)
+			ClearPointToAggregatesSess(s)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		// prefer map_facts_out values; also include GlobalFacts
 		for _, facts := range fm.MapFactsOut {
-			if !UpdatePtrAliases(facts, &currentSession().AllPtrs, &currentSession().AllAliases) {
-				ClearPointToAggregates()
-				// UpdatePtrAliases already sticky; keep cleared (no invent partial currentSession().AllPtrs)
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if !UpdatePtrAliases(facts, &s.AllPtrs, &s.AllAliases) {
+				ClearPointToAggregatesSess(s)
+				// UpdatePtrAliases already sticky; keep cleared (no invent partial AllPtrs)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return
 			}
 		}
-		if !UpdatePtrAliases(fm.GlobalFacts, &currentSession().AllPtrs, &currentSession().AllAliases) {
-			ClearPointToAggregates()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if !UpdatePtrAliases(fm.GlobalFacts, &s.AllPtrs, &s.AllAliases) {
+			ClearPointToAggregatesSess(s)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return
 		}
 	}
 	// FactPointTo.cpp:803 — sizes must stay paired sticky (no invent desync success)
-	if len(currentSession().AllPtrs) != len(currentSession().AllAliases) {
-		ClearPointToAggregates()
-		sessNoteError(nil, ErrGeneric)
+	if len(s.AllPtrs) != len(s.AllAliases) {
+		ClearPointToAggregatesSess(s)
+		sessNoteError(s, ErrGeneric)
 	}
 }
 
@@ -2281,5 +2292,10 @@ func AbstractFactForReturn(facts []*FactPointTo, expr *Expression, fn *Function)
 // FactDoFinalization mirrors Fact::doFinalization.
 // Fact.cpp:110–115 — clear Fact::facts_ registry; Go uses ClearPointToAggregates.
 func FactDoFinalization() {
-	ClearPointToAggregates()
+	FactDoFinalizationSess(nil)
+}
+
+// FactDoFinalizationSess clears Fact aggregates on an explicit session bag.
+func FactDoFinalizationSess(s *Session) {
+	ClearPointToAggregatesSess(s)
 }

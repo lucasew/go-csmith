@@ -674,7 +674,7 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 	}
 	// stm_labels registry when edge/func incomplete
 	// no invent empty label token from registry
-	if lab, ok := currentSession().StmLabels[destStmID]; ok && lab != "" {
+	if lab := lookupStmLabelSess(nil, destStmID); lab != "" {
 		return lab
 	}
 	return ""

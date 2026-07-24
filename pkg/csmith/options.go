@@ -341,10 +341,10 @@ type Options struct {
 	SafeMathWrappers         string
 	MonitorFuncs             string
 	// Argv is CLI args for the Options: header line (excluding argv[0]).
-	Argv []string
-	EnableBuiltinKinds       string
-	DisableBuiltinKinds      string
-	NoDeltaReduction         bool
+	Argv                []string
+	EnableBuiltinKinds  string
+	DisableBuiltinKinds string
+	NoDeltaReduction    bool
 	// VolTestsMach mirrors CGOptions::vol_tests_mach_ (machine string for vol tests).
 	VolTestsMach string
 
@@ -534,7 +534,12 @@ func (o *Options) SetVolTests(s string) bool {
 // ApplyMonitoredFuncs installs Options.MonitorFuncs into OutputMgr process list.
 // Call from generation setup (CGOptions::monitored_funcs).
 func (o Options) ApplyMonitoredFuncs() {
-	SetMonitoredFuncs(o.MonitorFuncs)
+	o.ApplyMonitoredFuncsSess(nil)
+}
+
+// ApplyMonitoredFuncsSess installs MonitorFuncs on an explicit session bag.
+func (o Options) ApplyMonitoredFuncsSess(s *Session) {
+	SetMonitoredFuncsSess(s, o.MonitorFuncs)
 }
 
 // AllowInt64 mirrors CGOptions::allow_int64.

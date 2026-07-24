@@ -120,7 +120,7 @@ func CreateArrayVariable(
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name:       name,
-			Type:       elem, // element type
+			Type:       elem,         // element type
 			Qfer:       qfer.Clone(), // own vectors (C++ Variable value-copy)
 			IsArray:    true,
 			Init:       init,
@@ -754,12 +754,14 @@ func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 	av.Indices = append(av.Indices, s)
 }
 
-// currentSession().ArrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
-// inside build_init_recursive. Process-wide: advances across every array OutputDef
-// (do not reset per array).
+// Session.ArrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
+// inside build_init_recursive. Advances across every array OutputDef (do not reset per array).
 
 // ResetArrayInitSeed restores the C++ static seed (tests / Finalization).
-func ResetArrayInitSeed() { currentSession().ArrayInitSeed = 0xABCDEF }
+func ResetArrayInitSeed() { ResetArrayInitSeedSess(nil) }
+
+// ResetArrayInitSeedSess restores ArrayInitSeed on an explicit session bag.
+func ResetArrayInitSeedSess(s *Session) { sessOrAmbient(s).ArrayInitSeed = 0xABCDEF }
 
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
 // ArrayVariable.cpp:426–446 — nested braces; process-static seed pick; "," (no space).
@@ -777,18 +779,19 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) str
 			//   size_t rnd_index = ((seed * seed + (i + 7) * (i + 13)) * 52369) % n;
 			// seed is unsigned: seed*seed wraps at 32 bits, then promotes to size_t
 			// for the rest of the expression (64-bit on LP64). All-uint32 Go mul was wrong.
-			s := currentSession().ArrayInitSeed
+			sess := sessOrAmbient(nil)
+			s := sess.ArrayInitSeed
 			ss := uint64(s * s) // uint32 mul wrap, then widen
 			prod := uint64(i+7) * uint64(i+13)
 			rnd := (ss + prod) * 52369
 			idx := int(rnd % uint64(len(initStrings)))
 			part := initStrings[idx]
 			if part == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(sess, ErrGeneric)
 				return ""
 			}
 			b.WriteString(part)
-			currentSession().ArrayInitSeed = s + 1
+			sess.ArrayInitSeed = s + 1
 		} else {
 			part := av.buildInitRecursive(dimen+1, initStrings)
 			if part == "" {

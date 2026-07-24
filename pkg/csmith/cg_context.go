@@ -20,7 +20,7 @@ type RWDirective struct {
 // Function/block/fact fields land with later ports.
 type CGContext struct {
 	// Sess is the pure-run bag when set by generation; nil in minimal unit tests.
-	Sess *Session
+	Sess          *Session
 	effectContext Effect
 	// CurrentFunc mirrors current_func_ (Function*).
 	CurrentFunc *Function
@@ -77,7 +77,6 @@ func cgSess(c *CGContext) *Session {
 	}
 	return c.Sess
 }
-
 
 // EffectContext mirrors CGContext::get_effect_context.
 // CGContext.h:118 — ambient restriction context (not the accum).
@@ -1217,7 +1216,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		}
 		accumCopy = &cp
 	}
-	IncrCounter(&currentSession().BK.dereferenceLevelCnts, indirect)
+	IncrCounter(&sessBK(cgSess(c)).dereferenceLevelCnts, indirect)
 	allowNull := opts.NullPointerDerefProb > 0
 	allowDead := opts.DeadPointerDerefProb > 0
 	if !c.ReadIndices(v, facts) {
@@ -1320,7 +1319,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 		}
 		accumCopy = &cp
 	}
-	IncrCounter(&currentSession().BK.dereferenceLevelCnts, indirect)
+	IncrCounter(&sessBK(cgSess(c)).dereferenceLevelCnts, indirect)
 	if !c.ReadIndices(lhs.Var, facts) {
 		return false
 	}

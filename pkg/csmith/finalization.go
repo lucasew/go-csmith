@@ -3,56 +3,62 @@
 package csmith
 
 // DoFinalization mirrors Finalization::doFinalization.
-// Finalization.cpp:45–55 — clear package-level pools between runs.
+// Finalization.cpp:45–55 — clear session bag pools between runs (ambient when s==nil).
 func DoFinalization() {
+	DoFinalizationSess(nil)
+}
+
+// DoFinalizationSess clears generation pools on an explicit session bag.
+func DoFinalizationSess(s *Session) {
+	s = sessOrAmbient(s)
 	// ArrayVariable.cpp static seed in build_init_recursive — fresh generation
-	ResetArrayInitSeed()
+	ResetArrayInitSeedSess(s)
 	// Function::doFinalization — FuncList/FMList are session-scoped on ProgramGenerator;
 	// FactMgr::doFinalization (meta_facts) below.
 	// VariableSelector::doFinalization — session VS; AllVars cleared per NewVariableSelector.
 	// Variable::doFinalization — ctrl vars
-	CtrlVarsDoFinalization()
-	// Type::doFinalization — derived pointer cache (process-wide)
-	TypeDoFinalization()
+	CtrlVarsDoFinalizationSess(s)
+	// Type::doFinalization — derived pointer cache
+	TypeDoFinalizationSess(s)
 	// Bookkeeper::doFinalization
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(s)
 	// Fact::doFinalization + FactPointTo::all_ptrs / all_aliases
-	FactDoFinalization()
+	FactDoFinalizationSess(s)
 	// FactMgr::doFinalization / meta_facts
-	ClearMetaFacts()
+	ClearMetaFactsSess(s)
 	// Attribute generators
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(s)
 	// FunctionInvocationUser return-fact registry
-	InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(s)
 	// PartialExpander
-	ClearPartialExpander()
+	ClearPartialExpanderSess(s)
 	// ExtensionMgr::DestroyExtension
-	DestroyExtension()
+	DestroyExtensionSess(s)
 	// SafeOpFlags wrapper name registry
-	ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(s)
 	// StatementGoto::stm_labels
-	GotoLabelsDoFinalization()
+	GotoLabelsDoFinalizationSess(s)
 	// Statement sid
-	currentSession().NextStmID = 0
+	s.NextStmID = 0
 	// util.cpp reset_gensym — process gensym_count (DFSProgramGenerator.cpp:92)
 	// DefaultProgramGenerator process is one-shot; library multi-Generate needs reset
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(s)
 	// Probabilities / Rng / StmtTab process handles are re-installed by
 	// ProgramGenerator.Initialize after this call (same generation run).
 	// Clearing them here would soft-break nested make_random mid-run.
 	// CompatibleChecker process static (re-enable via resolve if needed)
-	ResetCompatibleCheck()
+	ResetCompatibleCheckSess(s)
 	// OutputMgr monitored_funcs_ / curr_func_
-	ClearMonitoredFuncs()
+	ClearMonitoredFuncsSess(s)
 	// DefaultOutputMgr / DFSOutputMgr process singleton
-	ClearOutputMgr()
+	ClearOutputMgrSess(s)
 	// AbsProgramGenerator::current_generator_
-	ClearProcessProgramGenerator()
+	s.ProgramGen = nil
 	// RandomNumber::doFinalization — Finalization.cpp:53
 	// Cleared here; ProgramGenerator re-CreateInstance / SetProcessRng after.
-	RandomNumberDoFinalization()
+	RandomNumberDoFinalizationSess(s)
 	// util.cpp errlog
-	ClearAnalysisErrLog()
+	ClearAnalysisErrLogSess(s)
 	// Error state
-	ClearError()
+	s.GenError = ErrSuccess
 }

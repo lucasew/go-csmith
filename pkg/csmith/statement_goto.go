@@ -4,15 +4,24 @@ package csmith
 
 import "strings"
 
-// currentSession().StmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
+// Session.StmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
 // StatementGoto.cpp:55, 224–229.
 
 // LabelForGotoDest returns existing or new gensym label for a jump destination.
 // StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present; else gensym("lbl_").
 // no invent fixed "lbl_1" when nextLabel is nil
 func LabelForGotoDest(destStmID int, nextLabel func() string) string {
+	return LabelForGotoDestSess(nil, destStmID, nextLabel)
+}
+
+// LabelForGotoDestSess is LabelForGotoDest on an explicit session bag.
+func LabelForGotoDestSess(s *Session, destStmID int, nextLabel func() string) string {
+	s = sessOrAmbient(s)
+	if s.StmLabels == nil {
+		s.StmLabels = map[int]string{}
+	}
 	if !StmIDUnset(destStmID) {
-		if lab, ok := currentSession().StmLabels[destStmID]; ok && lab != "" {
+		if lab, ok := s.StmLabels[destStmID]; ok && lab != "" {
 			return lab
 		}
 	}
@@ -21,15 +30,15 @@ func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 	if nextLabel != nil {
 		lab = nextLabel()
 	} else {
-		lab = Gensym("lbl_")
+		lab = GensymSess(s, "lbl_")
 	}
 	// incomplete empty label is broken IR sticky — fail closed (no invent "goto :")
 	if lab == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if !StmIDUnset(destStmID) {
-		currentSession().StmLabels[destStmID] = lab
+		s.StmLabels[destStmID] = lab
 	}
 	return lab
 }
@@ -37,7 +46,32 @@ func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 // GotoLabelsDoFinalization mirrors StatementGoto::doFinalization.
 // StatementGoto.cpp:404 — stm_labels.clear().
 func GotoLabelsDoFinalization() {
-	currentSession().StmLabels = map[int]string{}
+	GotoLabelsDoFinalizationSess(nil)
+}
+
+// GotoLabelsDoFinalizationSess clears stm_labels on an explicit session bag.
+func GotoLabelsDoFinalizationSess(s *Session) {
+	sessOrAmbient(s).StmLabels = map[int]string{}
+}
+
+// setStmLabelSess records a label for destStmID on the session bag.
+func setStmLabelSess(s *Session, destStmID int, label string) {
+	s = sessOrAmbient(s)
+	if s.StmLabels == nil {
+		s.StmLabels = map[int]string{}
+	}
+	if !StmIDUnset(destStmID) {
+		s.StmLabels[destStmID] = label
+	}
+}
+
+// lookupStmLabelSess returns a registered label for destStmID when present.
+func lookupStmLabelSess(s *Session, destStmID int) string {
+	s = sessOrAmbient(s)
+	if lab, ok := s.StmLabels[destStmID]; ok && lab != "" {
+		return lab
+	}
+	return ""
 }
 
 // goodGotoTarget reports statements that may receive a label (not jump/return-ish).
@@ -589,7 +623,7 @@ func MakeRandomGoto(
 			label = LabelForGotoDest(other.StmID, nextLab)
 			other.SourceLabel = label
 		} else if !StmIDUnset(other.StmID) {
-			currentSession().StmLabels[other.StmID] = label
+			setStmLabelSess(nil, other.StmID, label)
 		}
 		// incomplete LocalVars on intermediate blocks fails closed sticky (Collect nil)
 		// no invent goto with empty InitSkippedVars when skip list is incomplete
@@ -973,7 +1007,7 @@ func MakeRandomGoto(
 		}
 		dest.SourceLabel = label
 	} else {
-		currentSession().StmLabels[destID] = label
+		setStmLabelSess(nil, destID, label)
 	}
 	sg := Stmt{
 		Kind:            StmtGoto,

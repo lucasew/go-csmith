@@ -520,10 +520,16 @@ func (v *Variable) OutputLowerBound(prefixName bool) string {
 // Variable.cpp:747–767. maxDim is CGOptions::max_array_dimensions() as-is
 // (no soft invent maxDim=1 when option is 0 — empty loop / empty vector).
 func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
+	return NewCtrlVarsSess(nil, maxDim, freshNames)
+}
+
+// NewCtrlVarsSess is NewCtrlVars on an explicit session bag.
+func NewCtrlVarsSess(s *Session, maxDim int, freshNames bool) []*Variable {
+	s = sessOrAmbient(s)
 	if maxDim < 0 {
 		maxDim = 0
 	}
-	suffix := currentSession().CtrlVarsCount
+	suffix := s.CtrlVarsCount
 	ctrl := make([]*Variable, 0, maxDim)
 	name := byte('i')
 	for i := 0; i < maxDim; i++ {
@@ -538,14 +544,19 @@ func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
 		})
 		name++
 	}
-	currentSession().CtrlVarsCount++
-	currentSession().CtrlVarsVectors = append(currentSession().CtrlVarsVectors, ctrl)
+	s.CtrlVarsCount++
+	s.CtrlVarsVectors = append(s.CtrlVarsVectors, ctrl)
 	return ctrl
 }
 
 // GetNewCtrlVars mirrors Variable::get_new_ctrl_vars.
 func GetNewCtrlVars(opts Options) []*Variable {
-	return NewCtrlVars(opts.MaxArrayDim, opts.FreshArrayCtrlVarNames)
+	return GetNewCtrlVarsSess(nil, opts)
+}
+
+// GetNewCtrlVarsSess is GetNewCtrlVars on an explicit session bag.
+func GetNewCtrlVarsSess(s *Session, opts Options) []*Variable {
+	return NewCtrlVarsSess(s, opts.MaxArrayDim, opts.FreshArrayCtrlVarNames)
 }
 
 // GetLastCtrlVars mirrors Variable::get_last_ctrl_vars.
@@ -553,12 +564,18 @@ func GetNewCtrlVars(opts Options) []*Variable {
 // Incomplete last vector fails closed sticky IncompleteVariables (not bare nil invent
 // empty-complete ctrl set / soft re-pick array inits past hole).
 func GetLastCtrlVars() []*Variable {
-	if len(currentSession().CtrlVarsVectors) == 0 {
+	return GetLastCtrlVarsSess(nil)
+}
+
+// GetLastCtrlVarsSess is GetLastCtrlVars on an explicit session bag.
+func GetLastCtrlVarsSess(s *Session) []*Variable {
+	s = sessOrAmbient(s)
+	if len(s.CtrlVarsVectors) == 0 {
 		return nil
 	}
-	last := currentSession().CtrlVarsVectors[len(currentSession().CtrlVarsVectors)-1]
+	last := s.CtrlVarsVectors[len(s.CtrlVarsVectors)-1]
 	if !VariablesComplete(last) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	return last
@@ -567,8 +584,14 @@ func GetLastCtrlVars() []*Variable {
 // CtrlVarsDoFinalization mirrors Variable::doFinalization for ctrl var pool.
 // Variable.cpp:779–786.
 func CtrlVarsDoFinalization() {
-	currentSession().CtrlVarsVectors = nil
-	currentSession().CtrlVarsCount = 0
+	CtrlVarsDoFinalizationSess(nil)
+}
+
+// CtrlVarsDoFinalizationSess clears ctrl-var pool on an explicit session bag.
+func CtrlVarsDoFinalizationSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.CtrlVarsVectors = nil
+	s.CtrlVarsCount = 0
 }
 
 // CtrlVarNames returns actual names of a ctrl-var slice.

@@ -58,40 +58,71 @@ func ParseStringOptions(vname string) []string {
 // SetMonitoredFuncs mirrors CGOptions::monitored_funcs.
 // CGOptions.cpp:558–560 — parse into OutputMgr::monitored_funcs_.
 func SetMonitoredFuncs(fnames string) {
-	currentSession().MonitoredFuncs = ParseStringOptions(fnames)
+	SetMonitoredFuncsSess(nil, fnames)
+}
+
+// SetMonitoredFuncsSess installs monitored func names on an explicit session bag.
+func SetMonitoredFuncsSess(s *Session, fnames string) {
+	sessOrAmbient(s).MonitoredFuncs = ParseStringOptions(fnames)
 }
 
 // MonitoredFuncs returns a copy of OutputMgr::monitored_funcs_.
 func MonitoredFuncs() []string {
-	if len(currentSession().MonitoredFuncs) == 0 {
+	return MonitoredFuncsSess(nil)
+}
+
+// MonitoredFuncsSess returns monitored funcs on an explicit session bag.
+func MonitoredFuncsSess(s *Session) []string {
+	s = sessOrAmbient(s)
+	if len(s.MonitoredFuncs) == 0 {
 		return nil
 	}
-	return append([]string(nil), currentSession().MonitoredFuncs...)
+	return append([]string(nil), s.MonitoredFuncs...)
 }
 
 // ClearMonitoredFuncs resets process monitored list (tests / finalization).
 func ClearMonitoredFuncs() {
-	currentSession().MonitoredFuncs = nil
-	currentSession().CurrFunc = ""
+	ClearMonitoredFuncsSess(nil)
+}
+
+// ClearMonitoredFuncsSess clears monitored list / curr func on an explicit session bag.
+func ClearMonitoredFuncsSess(s *Session) {
+	s = sessOrAmbient(s)
+	s.MonitoredFuncs = nil
+	s.CurrFunc = ""
 }
 
 // SetCurrFunc mirrors OutputMgr::set_curr_func.
 // OutputMgr.cpp:77–79.
 func SetCurrFunc(fname string) {
-	currentSession().CurrFunc = fname
+	SetCurrFuncSess(nil, fname)
+}
+
+// SetCurrFuncSess sets curr_func_ on an explicit session bag.
+func SetCurrFuncSess(s *Session, fname string) {
+	sessOrAmbient(s).CurrFunc = fname
 }
 
 // CurrFunc mirrors OutputMgr::curr_func_.
-func CurrFunc() string { return currentSession().CurrFunc }
+func CurrFunc() string { return CurrFuncSess(nil) }
+
+// CurrFuncSess returns curr_func_ on an explicit session bag.
+func CurrFuncSess(s *Session) string { return sessOrAmbient(s).CurrFunc }
 
 // IsMonitoredFunc mirrors OutputMgr::is_monitored_func.
 // OutputMgr.cpp:81–86 — empty list → all monitored; else curr must be in list.
 func IsMonitoredFunc() bool {
-	if len(currentSession().MonitoredFuncs) == 0 {
+	return IsMonitoredFuncSess(nil)
+}
+
+// IsMonitoredFuncSess is IsMonitoredFunc on an explicit session bag.
+func IsMonitoredFuncSess(s *Session) bool {
+	s = sessOrAmbient(s)
+	if len(s.MonitoredFuncs) == 0 {
 		return true
 	}
-	for _, n := range currentSession().MonitoredFuncs {
-		if n == currentSession().CurrFunc {
+	for _, n := range s.MonitoredFuncs {
+		if n == s.CurrFunc {
 			return true
 		}
 	}
@@ -333,35 +364,42 @@ func ClearOutputMgrSess(s *Session) {
 }
 
 // ProcessOutputMgrKind returns active OutputMgr kind.
-func ProcessOutputMgrKind() OutputMgrKind { return currentSession().OutputMgrKind }
+func ProcessOutputMgrKind() OutputMgrKind { return sessOrAmbient(nil).OutputMgrKind }
 
 // ProcessStructOutput returns DFSOutputMgr::struct_output_.
-func ProcessStructOutput() string { return currentSession().StructOutput }
+func ProcessStructOutput() string { return sessOrAmbient(nil).StructOutput }
 
 // ProcessSplitPaths returns a copy of DefaultOutputMgr split file paths.
 func ProcessSplitPaths() []string {
-	if len(currentSession().SplitPaths) == 0 {
+	s := sessOrAmbient(nil)
+	if len(s.SplitPaths) == 0 {
 		return nil
 	}
-	return append([]string(nil), currentSession().SplitPaths...)
+	return append([]string(nil), s.SplitPaths...)
 }
 
 // ProcessOutputFile returns DefaultOutputMgr ofile path (empty → stdout).
-func ProcessOutputFile() string { return currentSession().OutputFile }
+func ProcessOutputFile() string { return sessOrAmbient(nil).OutputFile }
 
 // GetMainOutPath mirrors DefaultOutputMgr::get_main_out target name.
 // DefaultOutputMgr.cpp:197–205 — split → outs[0]; ofile_; else "" (stdout).
 // Empty string means stdout (library has no ostream).
 func GetMainOutPath(opts Options) string {
+	return GetMainOutPathSess(nil, opts)
+}
+
+// GetMainOutPathSess is GetMainOutPath on an explicit session bag.
+func GetMainOutPathSess(s *Session, opts Options) string {
+	s = sessOrAmbient(s)
 	if IsSplit(opts) {
-		if len(currentSession().SplitPaths) == 0 {
+		if len(s.SplitPaths) == 0 {
 			// not initialized sticky
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		return currentSession().SplitPaths[0]
+		return s.SplitPaths[0]
 	}
-	return currentSession().OutputFile
+	return s.OutputFile
 }
 
 // PureRndUptoIndex mirrors pure_rnd_upto for split file pick.
@@ -504,8 +542,8 @@ func DFSOutputHeader(header string, compact bool) string {
 
 // DFSStructOutputPath mirrors DFSOutputMgr::struct_output_ path for structs file.
 func DFSStructOutputPath() string {
-	if currentSession().StructOutput == "" {
+	if sessOrAmbient(nil).StructOutput == "" {
 		return DefaultStructOutputName
 	}
-	return currentSession().StructOutput
+	return sessOrAmbient(nil).StructOutput
 }
