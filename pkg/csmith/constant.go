@@ -22,39 +22,39 @@ func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant
 	// Type* always live at make_random (Expression choose_random / callers);
 	// sticky no invent Constant{Type:nil, Value:"0"} success shell past hole
 	if typ == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Constant.cpp:312 — assert(st != eVoid) before simple emit sticky
 	// (no invent soft re-pick past void as empty success / "/* void */")
 	if typ.IsSimple() {
 		// residual ERROR sticky — no invent soft-continue void check past IsSimple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		st := typ.Simple()
 		// residual ERROR sticky — no invent soft-continue void check past Simple residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if st == EVoid {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-continue const past IsSimple residual false
 		return nil
 	}
 	v := generateRandomConstant(typ, opts, probs, r)
 	// Constant.cpp:425 — ERROR_GUARD(nullptr)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	// assert / nil-probs / field fail paths yield ""; sticky no invent Constant{"", …}
 	// success: simple non-void non-empty, pointer "0", aggregate at least "{}"
 	if v == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}
@@ -65,12 +65,12 @@ func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant
 // Constant.cpp:429–433 — always has RNG; sticky no soft invent NewRng(0).
 func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	n := r.RndUpto(limit)
 	// Constant.cpp:432 — ERROR_GUARD(nullptr)
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	return &Constant{Type: GetSimpleType(EUInt), Value: strconv.FormatUint(uint64(n), 10)}
@@ -97,13 +97,13 @@ func MakeIntOpts(v int, opts Options) *Constant {
 // Incomplete type/rng sticky nil; bounded retries fail closed (no invent hang).
 func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
 	if typ == nil || r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// Cap retries — C++ loops unbounded; library fail closed if stuck on zero.
 	for tries := 0; tries < 64; tries++ {
 		c := MakeRandom(typ, opts, probs, r)
-		if c == nil || HasError() {
+		if c == nil || sessHasError(nil) {
 			return nil
 		}
 		// Constant.cpp:439 — StringUtils::str2int(v) == 0 → retry
@@ -111,11 +111,11 @@ func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *C
 			return c
 		}
 		// residual ERROR sticky — no invent soft-retry past NotEqualsZero residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
-	SetError(ErrGeneric)
+	sessNoteError(nil, ErrGeneric)
 	return nil
 }
 
@@ -124,7 +124,7 @@ func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *C
 // Incomplete Constant sticky nil (no invent zero Constant shell).
 func (c *Constant) Clone() *Constant {
 	if c == nil || c.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return &Constant{Type: c.Type, Value: c.Value}
@@ -134,7 +134,7 @@ func (c *Constant) Clone() *Constant {
 // Constant.cpp:527 — return *type.
 func (c *Constant) GetType() *Type {
 	if c == nil || c.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return c.Type
@@ -143,7 +143,7 @@ func (c *Constant) GetType() *Type {
 // GetValue mirrors Constant value string accessor.
 func (c *Constant) GetValue() string {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return c.Value
@@ -153,7 +153,7 @@ func (c *Constant) GetValue() string {
 // Constant.h:88.
 func (c *Constant) GetComplexity() int {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return 1
@@ -163,7 +163,7 @@ func (c *Constant) GetComplexity() int {
 // Constant has no pointers.
 func (c *Constant) GetReferencedPtrs() []*Variable {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return nil
@@ -173,12 +173,12 @@ func (c *Constant) GetReferencedPtrs() []*Variable {
 // Constant.cpp:488–493 — expand_struct → true; else false (not field soft-match).
 func (c *Constant) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// C++ assert(v)
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if expandStruct {
@@ -191,11 +191,11 @@ func (c *Constant) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 // Constant.cpp:496–498 — always false (assert exp non-null).
 func (c *Constant) CompatibleWithExpr(exp *Expression) bool {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if exp == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return false
@@ -206,12 +206,12 @@ func (c *Constant) CompatibleWithExpr(exp *Expression) bool {
 // Incomplete Constant sticky "" (no invent bare "0" for Type-nil shell).
 func (c *Constant) Output() string {
 	if c == nil || c.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// empty value sticky (no invent bare token)
 	if c.Value == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// negative numbers in parentheses
@@ -221,7 +221,7 @@ func (c *Constant) Output() string {
 	// pointer zero
 	if c.Type.PtrType() != nil {
 		// residual ERROR sticky — no invent soft-null past PtrType residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if c.Equals(0) {
@@ -231,7 +231,7 @@ func (c *Constant) Output() string {
 			}
 			return "(void*)" + c.Value
 		}
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		return ""
 	}
 	return c.Value
@@ -248,7 +248,7 @@ func (c *Constant) Equals(num int) bool {
 	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
 	// (no invent not-equal / fold success past Type-nil or empty-value shell)
 	if c == nil || c.Type == nil || c.Value == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return Str2Int(c.Value) == num
@@ -267,12 +267,12 @@ func (c *Constant) NotEquals(num int) bool {
 	// nil / Type-nil / empty Value → Equals stickies false; !false invents "not equals"
 	// — fail closed false sticky before complement
 	if c == nil || c.Type == nil || c.Value == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	eq := c.Equals(num)
 	// residual ERROR sticky — no invent not-equal true past Equals residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return !eq
@@ -285,7 +285,7 @@ func (c *Constant) LessThan(num int) bool {
 	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
 	// (no invent not-less soft-skip past Type-nil or empty-value shell)
 	if c == nil || c.Type == nil || c.Value == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return Str2Int(c.Value) < num
@@ -299,7 +299,7 @@ func (c *Constant) GetField(fid int) string {
 	// Type* + Value always live for aggregate field split; sticky empty
 	// (no invent empty field soft-skip past Type-nil / empty-value shell)
 	if c == nil || c.Type == nil || c.Value == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if fid < 0 {
@@ -346,94 +346,94 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 	// Type* always live at GenerateRandomConstant in generation; sticky no invent "0"
 	// success string that MakeRandom would wrap as Type-nil Constant shell
 	if typ == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if typ.IsStruct() {
 		// residual ERROR sticky — no invent soft-continue const past IsStruct residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 		if r == nil || probs == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if c := MakeStructConstant(r, opts, probs, typ); c != nil {
 			// residual ERROR sticky — no invent soft-empty value past MakeStruct residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			return c.Value
 		}
 		// incomplete struct const IR sticky (MakeStruct may already SetError)
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-continue union path past IsStruct residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if typ.IsUnion() {
 		// residual ERROR sticky — no invent soft-continue const past IsUnion residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if r == nil || probs == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if c := MakeUnionConstant(r, opts, probs, typ); c != nil {
 			// residual ERROR sticky — no invent soft-empty value past MakeUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			return c.Value
 		}
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-continue pointer path past IsUnion residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// Constant.cpp:308–310 — pointer constant is always "0" (no RNG draw)
 	if typ.PtrType() != nil {
 		// residual ERROR sticky — no invent "0" past PtrType residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		return "0"
 	}
 	// residual ERROR sticky — no invent soft-continue simple path past PtrType residual nil
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union sticky
 	if !typ.IsSimple() {
 		// residual ERROR sticky — no invent soft-continue past IsSimple residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-continue simple past IsSimple residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// Constant.cpp:312 — assert(st != eVoid); no soft invent comment literal sticky
 	if typ.Simple() == EVoid {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// simple non-void needs process RNG sticky (no invent NewRng for nil)
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	st := typ.Simple()
@@ -473,7 +473,7 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 			v = generateRandomFloatHexConstant(r)
 		default:
 			// Constant.cpp:407 — assert(0 && "Unsupported type!") sticky; no soft invent int
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 	}
@@ -490,7 +490,7 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 func generateSmallRandomFloatHexConstant(num int, r *Rng) string {
 	if r == nil {
 		// C++ always has RNG; sticky no invent fixed float literal
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	sign := ""
@@ -514,7 +514,7 @@ func formatSmallConstant(st ESimpleType, num int, opts Options) string {
 	if st == EFloat {
 		// broken call path sticky — float must not invent digit/sign from num alone
 		// or soft-empty success past wrong dispatch (use generateSmallRandomFloatHexConstant)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var body string
@@ -568,7 +568,7 @@ func HexToBinary(val string) string {
 			idx = int(c - 'a' + 10)
 		default:
 			// broken hex IR — sticky fail closed empty (C++ OOB ToBinary)
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		b.WriteString(toBin[idx*4 : idx*4+4])
@@ -596,7 +596,7 @@ func maybeBinaryConstant(opts Options, r *Rng, nHex int, suffix string) (string,
 		return "", false
 	}
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return "", false
 	}
 	if !r.RndFlipcoin(binaryConstProb()) {
@@ -681,7 +681,7 @@ func generateRandomInt128Constant(opts Options, r *Rng) string {
 func generateRandomFloatHexConstant(r *Rng) string {
 	if r == nil {
 		// C++ always has RNG; sticky no invent fixed literal
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	exp := int(r.RndUpto(100))
