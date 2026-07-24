@@ -49,37 +49,40 @@ func ProcessProgramGenerator() *ProgramGenerator {
 // ClearProcessProgramGenerator drops current_generator_ (finalization / tests).
 func ClearProcessProgramGenerator() { currentSession().ProgramGen = nil }
 
-// noteErr records ERROR on g.Sess when set, and keeps ambient GenError in sync
-// while lower layers still call SetError/HasError (bridge until fully pure).
+// noteErr records ERROR on g.Sess (and ambient bridge).
 func (g *ProgramGenerator) noteErr(code int) {
-	if g != nil && g.Sess != nil {
-		g.Sess.GenError = code
+	var s *Session
+	if g != nil {
+		s = g.Sess
 	}
-	SetError(code)
+	sessNoteError(s, code)
 }
 
 // hasErr reports ERROR on g.Sess when set, else ambient (bridge).
 func (g *ProgramGenerator) hasErr() bool {
-	if g != nil && g.Sess != nil && g.Sess.GenError != ErrSuccess {
-		return true
+	var s *Session
+	if g != nil {
+		s = g.Sess
 	}
-	return HasError()
+	return sessHasError(s)
 }
 
 // clearErr clears ERROR on g.Sess when set, and ambient (bridge).
 func (g *ProgramGenerator) clearErr() {
-	if g != nil && g.Sess != nil {
-		g.Sess.GenError = ErrSuccess
+	var s *Session
+	if g != nil {
+		s = g.Sess
 	}
-	ClearError()
+	sessClearError(s)
 }
 
 // errCode returns sticky code preferring g.Sess, else ambient (bridge).
 func (g *ProgramGenerator) errCode() int {
-	if g != nil && g.Sess != nil && g.Sess.GenError != ErrSuccess {
-		return g.Sess.GenError
+	var s *Session
+	if g != nil {
+		s = g.Sess
 	}
-	return GetError()
+	return sessErrorCode(s)
 }
 
 // GetOutputMgrKind mirrors AbsProgramGenerator::getOutputMgr kind (Go: no ostream).

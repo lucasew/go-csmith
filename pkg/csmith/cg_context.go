@@ -70,6 +70,15 @@ func (c CGContext) WithSession(s *Session) CGContext {
 	return c
 }
 
+// cgSess is nil-safe Sess for *CGContext (pointer methods may be called on nil).
+func cgSess(c *CGContext) *Session {
+	if c == nil {
+		return nil
+	}
+	return c.Sess
+}
+
+
 // EffectContext mirrors CGContext::get_effect_context.
 // CGContext.h:118 — ambient restriction context (not the accum).
 func (c CGContext) EffectContext() Effect {
@@ -167,43 +176,43 @@ const (
 func (c CGContext) FindVariableScope(v *Variable) int {
 	// Variable always live; sticky incomplete ScopeInactive (no invent soft re-pick)
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return ScopeInactive
 	}
 	if v.IsGlobal() {
 		// residual ERROR sticky — no invent global-scope past IsGlobal residual hole
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return ScopeInactive
 		}
 		return ScopeGlobalVar
 	}
 	// residual ERROR sticky — no invent soft-continue scope past IsGlobal residual false
-	if HasError() {
+	if sessHasError(c.Sess) {
 		return ScopeInactive
 	}
 	// non-global scope needs live curr_func (CGContext.cpp always has it for locals/params);
 	// sticky ScopeInactive (no invent "not found" soft re-pick past missing frame shell)
 	f := c.CurrentFunc
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return ScopeInactive
 	}
 	// params → 0
 	// Variable* always live on Param; nil hole sticky fail closed as inactive
 	for _, p := range f.Param {
 		if p == nil {
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return ScopeInactive
 		}
 		if p.Match(v) {
 			// residual ERROR sticky — no invent param-scope true past Match hole
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return ScopeInactive
 			}
 			return 0
 		}
 		// residual ERROR sticky — no invent soft-continue then later scope past Match residual
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return ScopeInactive
 		}
 	}
@@ -214,7 +223,7 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
 				// incomplete LocalVars sticky ScopeInactive
-				SetError(ErrGeneric)
+				sessNoteError(c.Sess, ErrGeneric)
 				return ScopeInactive
 			}
 			if loc == v {
@@ -229,13 +238,13 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		b = c.CallChain[i]
 		if b == nil {
 			// incomplete call_chain sticky ScopeInactive
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return ScopeInactive
 		}
 		for b != nil {
 			for _, loc := range b.LocalVars {
 				if loc == nil {
-					SetError(ErrGeneric)
+					sessNoteError(c.Sess, ErrGeneric)
 					return ScopeInactive
 				}
 				if loc == v {
@@ -308,7 +317,7 @@ func (c CGContext) WithRW(rw *RWDirective) CGContext {
 // CGContext always live; sticky (no invent soft-skip clear past hole).
 func (c *CGContext) ClearEffectStm() {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	c.EffectStm = EmptyEffect()
@@ -319,16 +328,16 @@ func (c *CGContext) ClearEffectStm() {
 // CGContext always live; sticky (no invent soft-skip reset past hole).
 func (c *CGContext) ResetEffectAccum(e Effect) {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	cp := e.Clone()
 	// residual ERROR sticky — no invent soft-reset past IncompleteEffect Clone residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	if !EffectComplete(cp) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
@@ -345,13 +354,13 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 func (c *CGContext) ExtendCallChain(from CGContext) {
 	// CGContext always live for extend; sticky incomplete shell no invent no-op
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	for _, b := range from.CallChain {
 		if b == nil {
 			// incomplete call_chain sticky wipe (no invent soft-skip hole frames)
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			c.CallChain = nil
 			return
 		}
@@ -377,7 +386,7 @@ func (c CGContext) OutputCallChain() string {
 		// CGContext.cpp:484 — call_chain[i] always live Block*; incomplete sticky
 		// (no invent "?" / blank " in " / skip holes that soft-rewrite the chain)
 		if blk == nil || blk.Func == nil || blk.Func.Name == "" {
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -399,24 +408,24 @@ func (c CGContext) OutputCallChain() string {
 // CGContext always live; sticky (no invent soft-skip merge past hole).
 func (c *CGContext) AddExternalEffect(e Effect) {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
 		(c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddExternalEffect(e)
 		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return
 		}
 	}
 	c.EffectStm = c.EffectStm.AddExternalEffect(e)
 	if !EffectComplete(c.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	// CGContext.cpp:399–404 — only accum + effect_stm (not Function::feffect)
@@ -436,28 +445,28 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 // CGContext always live; sticky (no invent soft-skip merge past hole).
 func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
 		(c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	for _, cb := range c.CallChain {
 		if cb == nil || !cb.StackScanComplete() {
 			// incomplete call_chain / stack lists — fail closed sticky (no invent skip merge)
 			// residual ERROR sticky — no invent soft-skip merge past StackScan residual
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(cgSess(c)) {
+				sessNoteError(cgSess(c), ErrGeneric)
 			}
 			return
 		}
 	}
 	if b != nil && !b.StackScanComplete() {
 		// residual ERROR sticky — no invent soft-skip merge past StackScan residual
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return
 	}
@@ -468,13 +477,13 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddExternalEffectWithCallers(e, callers)
 		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return
 		}
 	}
 	c.EffectStm = c.EffectStm.AddExternalEffectWithCallers(e, callers)
 	if !EffectComplete(c.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	// CGContext.cpp:411–417 — only accum + effect_stm (not Function::feffect)
@@ -487,33 +496,33 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 // CGContext always live; sticky (no invent soft-skip fold past hole).
 func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
 		(c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddEffectOpts(e, includeLHS)
 		// residual ERROR sticky — no invent soft-continue stm past accum AddEffect residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return
 		}
 		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return
 		}
 	}
 	// CGContext.cpp:386 — effect_stm.add_effect(e) always default include_lhs=false
 	c.EffectStm = c.EffectStm.AddEffectOpts(e, false)
 	// residual ERROR sticky — no invent soft-complete merge past stm AddEffect residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	if !EffectComplete(c.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 	}
 }
 
@@ -526,13 +535,13 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 // CGContext always live; sticky (no invent soft-skip merge past hole).
 func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 	if c == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if param.EffectAccum != nil {
 		// CGContext.cpp:392 — add_effect(*param.get_effect_accum(), include_lhs_effects)
 		c.AddEffect(*param.EffectAccum, includeLHS)
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return
 		}
 	}
@@ -596,18 +605,18 @@ func (c CGContext) IsNonReadable(v *Variable) bool {
 	for _, nr := range c.RW.NoReadVars {
 		if nr == nil {
 			// incomplete NoReadVars sticky nonreadable (restrictive)
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return true
 		}
 		if nr.Match(v) {
 			// residual ERROR sticky — no invent nonreadable true past Match hole
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue readable past Match residual false path
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 	}
@@ -627,18 +636,18 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 		for _, nw := range c.RW.NoWriteVars {
 			if nw == nil {
 				// incomplete NoWriteVars sticky nonwritable (restrictive)
-				SetError(ErrGeneric)
+				sessNoteError(c.Sess, ErrGeneric)
 				return true
 			}
 			if nw.LooseMatch(v) || v.LooseMatch(nw) {
 				// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
-				if HasError() {
+				if sessHasError(c.Sess) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue writable past LooseMatch residual
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 		}
@@ -647,18 +656,18 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 	for iv := range c.IVBounds {
 		if iv == nil {
 			// incomplete IVBounds sticky nonwritable
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return true
 		}
 		if v.LooseMatch(iv) {
 			// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue writable past LooseMatch residual
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 	}
@@ -669,7 +678,7 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 // CGContext + IV always live; sticky (no invent soft-skip IV bound past hole).
 func (c *CGContext) AddIVBound(iv *Variable, bound int) {
 	if c == nil || iv == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.IVBounds == nil {
@@ -683,7 +692,7 @@ func (c *CGContext) AddIVBound(iv *Variable, bound int) {
 // Nil IVBounds is complete no-op (no bounds to clear).
 func (c *CGContext) RemoveIVBound(iv *Variable) {
 	if c == nil || iv == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.IVBounds == nil {
@@ -741,14 +750,14 @@ func IsVariableInSet(set []*Variable, v *Variable) bool {
 func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 	// CGContext.cpp:352+ — always live this + v; hard IR sticky (no soft invent true)
 	if c == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if v.IsArray || v.AsArray != nil {
 		av := v.AsArray
 		// C++ static_cast ArrayVariable* on isArray; missing AsArray is broken IR sticky
 		if av == nil {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		// Expression::visit_facts reads process CGOptions; no Defaults invent
@@ -756,7 +765,7 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		// CGContext.cpp:356–363 — visit each index expression (live Expression*)
 		// incomplete IndexExprs fails closed sticky (no invent soft-skip nil index)
 		if !ExpressionsComplete(av.IndexExprs) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		for _, e := range av.IndexExprs {
@@ -766,14 +775,14 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 				return false
 			}
 			// residual ERROR sticky — no invent soft-continue later indices past visit residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return false
 			}
 		}
 		if av.FieldVarOf != nil {
 			ok := c.ReadIndices(av.FieldVarOf, facts)
 			// residual ERROR sticky — no invent soft-skip parent indices past nested residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return false
 			}
 			return ok
@@ -782,7 +791,7 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 	}
 	if v.IsArrayField() {
 		// residual ERROR sticky — no invent soft-continue field-walk past IsArrayField hole
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		// CGContext.cpp:368–374 — walk to parent array; assert(v) found
@@ -792,18 +801,18 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		}
 		// CGContext.cpp:373 — assert(v); hard IR sticky when parent missing
 		if p == nil {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		ok := c.ReadIndices(p, facts)
 		// residual ERROR sticky — no invent soft-skip parent indices past nested residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return ok
 	}
 	// residual ERROR sticky — no invent complete true past IsArrayField residual false path
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	return true
@@ -817,52 +826,52 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 // CGContext + Variable always live; sticky (no invent soft-skip read past hole).
 func (c *CGContext) ReadVar(v *Variable) {
 	if c == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	v = v.GetCollective()
 	// residual ERROR sticky — no invent soft-continue read past GetCollective residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	if v == nil {
 		// incomplete field/array collective path — fail closed sticky error
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.IsNonReadable(v) {
 		// residual ERROR sticky — no invent soft-skip read past IsNonReadable residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return
 		}
 		// CGContext.cpp:178 — assert(!"attempted read from a nonreadable variable")
 		// no soft invent silent skip: set sticky error for ERROR_GUARD callers
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue read past IsNonReadable residual false
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.ReadVar(v)
 		// residual ERROR sticky — no invent soft-continue stm read past accum ReadVar residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return
 		}
 	}
 	c.EffectStm = c.EffectStm.ReadVar(v)
 	// residual ERROR sticky — no invent soft-continue past stm ReadVar residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	// CGContext.cpp:175–185 — not Function::feffect (only at GenerateBody end)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 	}
 }
 
@@ -874,51 +883,51 @@ func (c *CGContext) ReadVar(v *Variable) {
 // CGContext + Variable always live; sticky (no invent soft-skip write past hole).
 func (c *CGContext) WriteVar(v *Variable) {
 	if c == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	v = v.GetCollective()
 	// residual ERROR sticky — no invent soft-continue write past GetCollective residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	if c.IsNonWritable(v) {
 		// residual ERROR sticky — no invent soft-skip write past IsNonWritable residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return
 		}
 		// CGContext.cpp:310 — assert(!"attempted write to a nonwritable variable")
 		// no soft invent silent skip
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue write past IsNonWritable residual false
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.WriteVar(v)
 		// residual ERROR sticky — no invent soft-continue stm write past accum WriteVar residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return
 		}
 	}
 	c.EffectStm = c.EffectStm.WriteVar(v)
 	// residual ERROR sticky — no invent soft-continue past stm WriteVar residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return
 	}
 	// CGContext.cpp:307–317 — not Function::feffect (only at GenerateBody end)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 	}
 }
 
@@ -928,7 +937,7 @@ func (c *CGContext) WriteVar(v *Variable) {
 func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options) bool {
 	// CGContext.cpp:153 — assert(v && "nullptr Variable!"); hard IR sticky
 	if c == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if !opts.StrictVolatileRule {
@@ -936,31 +945,31 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 	}
 	// Incomplete ambient fails closed sticky (no invent OK / soft re-pick past hole)
 	if !EffectComplete(c.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if !c.EffectContext().IsSideEffectFree() {
 		// residual ERROR sticky — no invent OK past IsSideEffectFree residual false path
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		level := derefLevel
 		for level > 0 {
 			if v.IsVolatileAfterDeref(level) {
 				// residual ERROR sticky — no invent OK past IsVolatileAfterDeref residual
-				if HasError() {
+				if sessHasError(cgSess(c)) {
 					return false
 				}
 				// policy reject (volatile under impure) — not incomplete IR sticky
 				return false
 			}
 			// residual ERROR sticky — no invent soft-continue peel past residual false path
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return false
 			}
 			level--
 		}
-	} else if HasError() {
+	} else if sessHasError(cgSess(c)) {
 		// residual ERROR sticky — no invent SE-free true past residual hole
 		return false
 	}
@@ -968,22 +977,22 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AccessDerefVolatile(v, derefLevel, true)
 		// residual ERROR sticky — no invent soft-continue stm past accum AccessDeref residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !EffectComplete(*c.EffectAccum) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 	}
 	c.EffectStm = c.EffectStm.AccessDerefVolatile(v, derefLevel, true)
 	// residual ERROR sticky — no invent soft-OK past stm AccessDeref residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	if !EffectComplete(c.EffectStm) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
@@ -1014,11 +1023,11 @@ func (c CGContext) unionFacts() []*FactUnion {
 // Policy rejects (nonreadable, partial write, volatile, dangling) stay non-sticky false.
 func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if !c.ReadIndices(v, facts) {
@@ -1028,8 +1037,8 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	v = v.GetCollective()
 	if v == nil {
 		// GetCollective already SetError sticky
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
@@ -1038,63 +1047,63 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent read-ok past IsInsideUnionField residual false path
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	if c.IsNonReadable(v) {
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	if c.EffectContext().IsWrittenPartially(v) {
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	// Type* always live for non-special subjects; Type-nil sticky false
 	// (IsPointer residual ERROR+false skips dangling then invents ReadVar true)
 	if !IsSpecialPtr(v) && v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
 	// CGOptions::dead_pointer_dereference_prob only (no dual residual knob)
 	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
 		// residual ERROR sticky — no invent read-ok past IsPointer/dangling hole
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	c.ReadVar(v)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
 	// never invent read-complete success with residual ERROR set
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	return true
@@ -1108,11 +1117,11 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 // Policy rejects (const, nonwritable, partial, volatile, dangling) stay non-sticky false.
 func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if !c.ReadIndices(v, facts) {
@@ -1120,65 +1129,65 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	v = v.GetCollective()
 	if v == nil {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
 	if c.IsNonWritable(v) || v.IsConst() {
 		// residual ERROR sticky — no invent write-ok past nonwritable/const hole
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	eff := c.EffectContext()
 	if eff.IsWrittenPartially(v) || eff.IsReadPartially(v) {
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	if v.IsVolatile() && !eff.IsSideEffectFree() {
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	// Type* always live for non-special subjects; Type-nil sticky false
 	// (IsPointer residual ERROR+false skips dangling then invents WriteVar true)
 	if !IsSpecialPtr(v) && v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob
 	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return false
 	}
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	c.WriteVar(v)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
 	// never invent write-complete success with residual ERROR set
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	return true
@@ -1190,7 +1199,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 // empty/null/dead policy rejects and incomplete MergePointees stay non-sticky.
 func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo, opts Options) bool {
 	if c == nil || v == nil || indirect <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	// CGContext.cpp:218 — Effect effect_accum_copy = *effect_accum (deep vector copy).
@@ -1199,11 +1208,11 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	if c.EffectAccum != nil {
 		cp := c.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-read_pointed past Effect Clone residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !EffectComplete(cp) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		accumCopy = &cp
@@ -1215,7 +1224,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue pointees past ReadIndices residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	// incomplete collective sticky via GetCollective
@@ -1224,8 +1233,8 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		if accumCopy != nil && c.EffectAccum != nil {
 			*c.EffectAccum = *accumCopy
 		}
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
@@ -1242,7 +1251,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue pointees past MergePointees residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			if accumCopy != nil && c.EffectAccum != nil {
 				*c.EffectAccum = *accumCopy
 			}
@@ -1268,7 +1277,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 				return false
 			}
 			// residual ERROR sticky — no invent soft-continue later pointees past CheckReadVar residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				if accumCopy != nil && c.EffectAccum != nil {
 					*c.EffectAccum = *accumCopy
 				}
@@ -1284,13 +1293,13 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 // Hard IR (nil lhs, incomplete collective) sticky; MergePointees incomplete non-sticky.
 func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	// incomplete Lhs type IR sticky (no invent non-deref write-pointed)
 	indirect, ok := lhs.IndirectLevelComplete()
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	if indirect <= 0 {
@@ -1302,11 +1311,11 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	if c.EffectAccum != nil {
 		cp := c.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-write_pointed past Effect Clone residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !EffectComplete(cp) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		accumCopy = &cp
@@ -1321,8 +1330,8 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 		if accumCopy != nil && c.EffectAccum != nil {
 			*c.EffectAccum = *accumCopy
 		}
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}
@@ -1365,7 +1374,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 				return false
 			}
 			// residual ERROR sticky — no invent soft-continue later pointees past Check residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				if accumCopy != nil && c.EffectAccum != nil {
 					*c.EffectAccum = *accumCopy
 				}
@@ -1381,14 +1390,14 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bool {
 	// incomplete ExpressionVariable shell sticky
 	if c == nil || e == nil || e.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	facts := c.pointToFacts()
 	// incomplete type IR sticky (no invent non-deref level-0 visit success)
 	deref, ok := e.IndirectLevelComplete()
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	v := e.Var
@@ -1396,32 +1405,32 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			// invalid ptr policy / incomplete maps (IsValidPtr may sticky)
 			// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual true path
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !c.CheckReadVar(v, facts) {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past CheckReadVar residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !c.ReadPointed(v, deref, facts, opts) {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past ReadPointed residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		volOK := c.CheckDerefVolatile(v, deref, opts)
 		// residual ERROR sticky — no invent visit success past CheckDerefVolatile residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		return volOK
@@ -1435,7 +1444,7 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 	}
 	readOK := c.CheckReadVar(v, facts)
 	// residual ERROR sticky — no invent visit success past CheckReadVar residual
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	return readOK
@@ -1446,12 +1455,12 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 // Incomplete ambient sticky false (no invent allow-vol under IncompleteEffect).
 func (c CGContext) AllowVolatile() bool {
 	if !EffectComplete(c.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return false
 	}
 	ok := c.EffectContext().IsSideEffectFree()
 	// residual ERROR sticky — no invent allow-vol true past IsSideEffectFree residual hole
-	if HasError() {
+	if sessHasError(c.Sess) {
 		return false
 	}
 	return ok
@@ -1468,27 +1477,27 @@ func (c CGContext) AllowConst(access Access) bool {
 // Nil type sticky; incomplete ambient sticky (no invent accept under IncompleteEffect).
 func (c CGContext) AcceptType(t *Type) bool {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return false
 	}
 	if c.EffectContext().IsSideEffectFree() {
 		// residual ERROR sticky — no invent accept past IsSideEffectFree hole
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue vol check past IsSideEffectFree residual
-	if HasError() {
+	if sessHasError(c.Sess) {
 		return false
 	}
 	vol := t.IsVolatileStructUnion()
 	// residual ERROR sticky — no invent accept true past IsVolatileStructUnion residual
-	if HasError() {
+	if sessHasError(c.Sess) {
 		return false
 	}
 	return !vol
@@ -1501,12 +1510,12 @@ func (c CGContext) AcceptType(t *Type) bool {
 // Incomplete eff or effect_context sticky as conflict.
 func (c CGContext) InConflict(eff Effect) bool {
 	if !EffectComplete(eff) || !EffectComplete(c.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return true
 	}
 	for _, v := range eff.ReadVars() {
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return true
 		}
 		if c.IsNonReadable(v) {
@@ -1514,67 +1523,67 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsNonReadable residual
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 		if c.EffectContext().IsWrittenPartially(v) {
 			// residual ERROR sticky — no invent conflict true past IsWrittenPartially residual hole
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsWrittenPartially residual false
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 		if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
 			// residual ERROR sticky — no invent conflict past IsVolatile/SE residual
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsVolatile residual false
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 	}
 	for _, v := range eff.WrittenVars() {
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return true
 		}
 		if c.IsNonWritable(v) || v.IsConst() {
 			// residual ERROR sticky — no invent conflict true past IsNonWritable/IsConst hole
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsNonWritable residual false
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 		ctx := c.EffectContext()
 		if ctx.IsWrittenPartially(v) || ctx.IsReadPartially(v) {
 			// residual ERROR sticky — no invent conflict true past partial residual hole
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past partial residual false
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 		if v.IsVolatile() && !ctx.IsSideEffectFree() {
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return true
 			}
 			return true
 		}
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return true
 		}
 	}
@@ -1589,7 +1598,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 func (c CGContext) IsFrameVar(v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-frame soft-skip
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return false
 	}
 	// CGContext.cpp:493–494 — get_current_block(); assert(b)
@@ -1602,20 +1611,20 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	if !b.StackScanComplete() {
 		// incomplete stack sticky (no invent not-frame / soft re-pick past hole)
 		// residual ERROR sticky — no invent soft not-frame past StackScan residual
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(c.Sess) {
+			sessNoteError(c.Sess, ErrGeneric)
 		}
 		return false
 	}
 	if v.IsVisibleLocal(b) {
 		// residual ERROR sticky — no invent frame-true past IsVisibleLocal hole
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent not-frame soft-skip past IsVisibleLocal hole
-	if HasError() {
+	if sessHasError(c.Sess) {
 		return false
 	}
 	for _, cb := range c.CallChain {
@@ -1623,18 +1632,18 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		// (no invent skip hole and still match a later frame)
 		if cb == nil || !cb.StackScanComplete() {
 			// residual ERROR sticky — no invent soft not-frame past StackScan residual
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(c.Sess) {
+				sessNoteError(c.Sess, ErrGeneric)
 			}
 			return false
 		}
 		if v.IsVisibleLocal(cb) {
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return false
 			}
 			return true
 		}
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return false
 		}
 	}
@@ -1651,14 +1660,14 @@ func (c CGContext) frameStacksComplete() bool {
 	}
 	if !b.StackScanComplete() {
 		// residual ERROR sticky — no invent soft-complete frames past StackScan residual
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return false
 		}
 		return false
 	}
 	for _, cb := range c.CallChain {
 		if cb == nil || !cb.StackScanComplete() {
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return false
 			}
 			return false
@@ -1674,11 +1683,11 @@ func (c CGContext) frameStacksComplete() bool {
 // Complete empty returns non-nil empty slice.
 func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 	if !FactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return IncompleteVariables()
 	}
 	if !c.frameStacksComplete() {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
@@ -1687,7 +1696,7 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 		for _, p := range f.PointTo {
 			// pointee Variable* always live in point-to sets (specials are non-nil)
 			if p == nil {
-				SetError(ErrGeneric)
+				sessNoteError(c.Sess, ErrGeneric)
 				return IncompleteVariables()
 			}
 			if IsSpecialPtr(p) || seen[p] {
@@ -1695,12 +1704,12 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 			}
 			if c.IsFrameVar(p) {
 				// residual ERROR sticky — no invent soft-continue frame scan past hole
-				if HasError() {
+				if sessHasError(c.Sess) {
 					return IncompleteVariables()
 				}
 				seen[p] = true
 				out = append(out, p)
-			} else if HasError() {
+			} else if sessHasError(c.Sess) {
 				// residual ERROR sticky — no invent soft-skip not-frame past hard IR hole
 				return IncompleteVariables()
 			}
@@ -1720,7 +1729,7 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		}
 		isG := v.IsGlobal()
 		// residual ERROR sticky — no invent soft-frame past IsGlobal residual
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return false
 		}
 		if isG {
@@ -1728,44 +1737,44 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		}
 		ok := IsVariableInSet(frameVars, v)
 		// residual ERROR sticky — no invent soft-frame past IsVariableInSet residual
-		if HasError() {
+		if sessHasError(c.Sess) {
 			return false
 		}
 		return ok
 	}
 	// incomplete frame list must not invent membership past holes
 	if frameVars != nil && !VariablesComplete(frameVars) {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return IncompleteVariables(), IncompleteVariables()
 	}
 	if c.RW != nil {
 		for _, v := range c.RW.NoReadVars {
 			if v == nil {
-				SetError(ErrGeneric)
+				sessNoteError(c.Sess, ErrGeneric)
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
 				// residual ERROR sticky — no invent soft-continue later no-reads past residual
-				if HasError() {
+				if sessHasError(c.Sess) {
 					return IncompleteVariables(), IncompleteVariables()
 				}
 				noReads = append(noReads, v)
-			} else if HasError() {
+			} else if sessHasError(c.Sess) {
 				// residual ERROR sticky — no invent soft-skip no-read past residual false
 				return IncompleteVariables(), IncompleteVariables()
 			}
 		}
 		for _, v := range c.RW.NoWriteVars {
 			if v == nil {
-				SetError(ErrGeneric)
+				sessNoteError(c.Sess, ErrGeneric)
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
-				if HasError() {
+				if sessHasError(c.Sess) {
 					return IncompleteVariables(), IncompleteVariables()
 				}
 				noWrites = append(noWrites, v)
-			} else if HasError() {
+			} else if sessHasError(c.Sess) {
 				return IncompleteVariables(), IncompleteVariables()
 			}
 		}
@@ -1773,15 +1782,15 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 	// convert global / frame IVs into non-writables
 	for iv := range c.IVBounds {
 		if iv == nil {
-			SetError(ErrGeneric)
+			sessNoteError(c.Sess, ErrGeneric)
 			return IncompleteVariables(), IncompleteVariables()
 		}
 		if inFrame(iv) {
-			if HasError() {
+			if sessHasError(c.Sess) {
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			noWrites = append(noWrites, iv)
-		} else if HasError() {
+		} else if sessHasError(c.Sess) {
 			return IncompleteVariables(), IncompleteVariables()
 		}
 	}
@@ -1796,11 +1805,11 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	frame := c.FindReachableFrameVars(facts)
 	// residual ERROR sticky / incomplete frame — no invent unrestricted nil RW;
 	// inherit full external NoRead/NoWrite (restrictive) and keep sticky ERROR
-	if HasError() || !VariablesComplete(frame) {
+	if sessHasError(c.Sess) || !VariablesComplete(frame) {
 		// incomplete facts — fail closed sticky full external lists (no invent empty RW
 		// or soft re-pick unrestricted nil past holes)
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(c.Sess) {
+			sessNoteError(c.Sess, ErrGeneric)
 		}
 		if c.RW == nil {
 			return &RWDirective{}
@@ -1826,7 +1835,7 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	nr, nw := c.GetExternalNoReadsWrites(frame)
 	// incomplete RW/IV lists — fail closed sticky empty RW directive (no invent unrestricted)
 	if !VariablesComplete(nr) || !VariablesComplete(nw) {
-		SetError(ErrGeneric)
+		sessNoteError(c.Sess, ErrGeneric)
 		return &RWDirective{}
 	}
 	if len(nr) == 0 && len(nw) == 0 {
@@ -1843,13 +1852,13 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 // MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
 func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	// incomplete Lhs type IR sticky as modified (no invent non-deref path)
 	indirect, ok := lhs.IndirectLevelComplete()
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return true
 	}
 	// Lhs.cpp:243 — assert(indirect > 0); non-deref LHS is not this path
@@ -1859,20 +1868,20 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	// if the pointer variable itself was written by RHS
 	if c.EffectStm.IsWritten(lhs.Var) {
 		// residual ERROR sticky — no invent modified true past IsWritten hole
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue unmodified past IsWritten residual false
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return true
 	}
 	// incomplete collective sticky as modified (GetCollective already SetError)
 	coll := lhs.Var.GetCollective()
 	if coll == nil {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return true
 	}
@@ -1888,13 +1897,13 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 		for _, v := range tmp {
 			if c.EffectStm.IsWritten(v) {
 				// residual ERROR sticky — no invent modified true past IsWritten hole
-				if HasError() {
+				if sessHasError(cgSess(c)) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later pointees past IsWritten residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return true
 			}
 		}
@@ -1908,7 +1917,7 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 // Lhs.cpp:301–356 — compound read-first; curr_rhs overlap; write/write_pointed.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	facts := c.pointToFacts()
@@ -1917,7 +1926,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	if lhs.CompoundAssign {
 		ty := lhs.GetType()
 		// residual ERROR sticky — no invent soft-continue visit past GetType residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		ev := &Expression{Term: TermVariable, Var: v, ExprType: ty}
@@ -1925,7 +1934,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past compound read residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 	}
@@ -1934,7 +1943,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue visit past VisitIndices residual true
-	if HasError() {
+	if sessHasError(cgSess(c)) {
 		return false
 	}
 	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
@@ -1942,18 +1951,18 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		lhsExpr := LhsAsExpression(lhs)
 		// Lhs always live for this check; incomplete shell sticky
 		if lhsExpr == nil {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		// complete get_eval_to_subexps always ≥1 entry; incomplete sticky via GetEvalToSubexps
 		// (IncompleteExpressions — no invent skip overlap as success past incomplete RHS)
 		subs := GetEvalToSubexps(c.CurrRHS)
 		// residual ERROR sticky — no invent soft-skip overlap past GetEvalToSubexps residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !ExpressionsComplete(subs) || len(subs) == 0 {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(c), ErrGeneric)
 			return false
 		}
 		for _, sub := range subs {
@@ -1968,32 +1977,32 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	// incomplete Lhs type IR sticky (no invent non-deref level-0 visit success)
 	deref, ok := lhs.IndirectLevelComplete()
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
 	valid := false
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual true path
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		// Lhs.cpp:337–339 — pointer modified in RHS
 		if c.PtrModifiedInRhs(lhs, facts) {
 			// residual ERROR sticky — no invent soft-continue visit past PtrModified residual true
-			if HasError() {
+			if sessHasError(cgSess(c)) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past PtrModified residual false
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		// read the pointer itself then write pointees
@@ -2001,28 +2010,28 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past CheckReadVar residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !c.WritePointed(lhs, facts, opts) {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past WritePointed residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		if !c.CheckDerefVolatile(v, deref, opts) {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue visit past CheckDerefVolatile residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 		valid = true
 	} else {
 		valid = c.CheckWriteVar(v, facts)
 		// residual ERROR sticky — no invent soft-continue visit past CheckWriteVar residual
-		if HasError() {
+		if sessHasError(cgSess(c)) {
 			return false
 		}
 	}
@@ -2031,15 +2040,15 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	if valid && c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.SetLhsWriteVarsFromWritten()
 		if !EffectComplete(*c.EffectAccum) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(cgSess(c)) {
+				sessNoteError(cgSess(c), ErrGeneric)
 			}
 			return false
 		}
 	}
 	if valid && (!EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum))) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(c)) {
+			sessNoteError(cgSess(c), ErrGeneric)
 		}
 		return false
 	}

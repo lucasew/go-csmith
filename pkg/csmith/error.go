@@ -24,3 +24,36 @@ func ClearError() { currentSession().GenError = ErrSuccess }
 
 // HasError is true when get_error() != SUCCESS.
 func HasError() bool { return currentSession().GenError != ErrSuccess }
+
+// sessNoteError writes GenError on s when non-nil and dual-syncs ambient GenError
+// while call sites still use SetError/HasError (pure-session bridge).
+func sessNoteError(s *Session, code int) {
+	if s != nil {
+		s.GenError = code
+	}
+	SetError(code)
+}
+
+// sessHasError reports sticky error on s when non-nil, else ambient.
+func sessHasError(s *Session) bool {
+	if s != nil && s.GenError != ErrSuccess {
+		return true
+	}
+	return HasError()
+}
+
+// sessClearError clears sticky error on s when non-nil and ambient.
+func sessClearError(s *Session) {
+	if s != nil {
+		s.GenError = ErrSuccess
+	}
+	ClearError()
+}
+
+// sessErrorCode returns sticky code preferring s, else ambient.
+func sessErrorCode(s *Session) int {
+	if s != nil && s.GenError != ErrSuccess {
+		return s.GenError
+	}
+	return GetError()
+}
