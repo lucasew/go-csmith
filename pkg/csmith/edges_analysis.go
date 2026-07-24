@@ -699,25 +699,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
 	var lastPreOOS []*FactPointTo
 	var lastPreOOSUnions []*FactUnion
-	// Snapshot effect_accum at find_fixed_point entry (caller already
-	// reset_effect_accum(pre_effect) — Block.cpp:789 / PostCreationAnalysis).
-	// Each full statement re-walk must rebuild map_accum_effect progressively
-	// from this baseline. Without re-reset, a second pass (same_facts miss)
-	// leaves end-of-body accum and rewrites early stmts' map_accum with later
-	// reads — StatementGoto.cpp:125–128 choose_visible_read_var ok-pool grows
-	// (seed 1469030: nOk 49 vs UP 40; if (l_858) vs if (g_1065.f0)).
-	entryAccum := EmptyEffect()
-	if cg.EffectAccum != nil {
-		entryAccum = cg.EffectAccum.Clone()
-		// residual ERROR sticky — no invent soft-FP past entry accum Clone residual
-		if HasError() {
-			return inputs, nil, -1, false
-		}
-		if !EffectComplete(entryAccum) {
-			SetError(ErrGeneric)
-			return inputs, nil, -1, false
-		}
-	}
+	// Note: C++ Block::find_fixed_point does NOT reset effect_accum between
+	// do-while iterations (only the caller resets pre_effect once at
+	// Block.cpp:789). Progressive re-reset fixed 1469030 pollution but broke
+	// 715573 under-read vs UP re-walk. Match C++; fix same_facts convergence.
 	// Generation-time stack: make_random already has `b` on func.Stack during
 	// post_creation. Always-push here double-entered `b` (seed-2 e13830).
 	// VisitFactsBlock (off stack) still needs CurrentBlock() for some visit paths.
@@ -809,6 +794,30 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 						return currentInputs, nil, -1, false
 					}
 				}
+			}
+		}
+		// Drop this block's LocalVars from current_inputs before same_facts / set_fact_in.
+		// map_facts_in is stored after DropFactSubjectsByVars (below); back-edge merge
+		// can reintroduce body locals from goto/break outs. Comparing pre-drop current
+		// to post-drop map_in never converges (seed 1469030 blk 548: nFact 76 vs nIn 72
+		// ×50 iterations → map_accum pollution → goto cond l_858 vs g_1065.f0).
+		// C++ set_fact_in stores current_inputs as-is; map_facts_out of loop edges
+		// already OOS-drops locals (FactMgr.cpp:601–611 / block post-OOS). Go's Drop
+		// at set_fact_in must be paired with Drop before shortcut for a stable lattice.
+		if len(b.LocalVars) > 0 {
+			currentInputs = DropFactSubjectsByVars(currentInputs, b.LocalVars)
+			if !FactsComplete(currentInputs) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, nil, -1, false
+			}
+			currentUnions = DropUnionSubjectsByVars(currentUnions, b.LocalVars)
+			if !UnionFactsComplete(currentUnions) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return currentInputs, nil, -1, false
 			}
 		}
 		// Install entry eUnionWrite as live before shortcut / sequential (C++ one FactVec).
@@ -943,19 +952,6 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return outputs, nil, -1, false
 			}
 			fm.UnionFacts = workUnions
-		}
-		// Rebuild progressive map_accum from block-entry accum (see entryAccum).
-		// First pass: entryAccum is still pre_effect (caller reset). Later passes:
-		// effect_accum may hold end-of-body from prior walk — re-reset first.
-		if cg.EffectAccum != nil {
-			cp := entryAccum.Clone()
-			if HasError() || !EffectComplete(cp) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				return outputs, nil, -1, false
-			}
-			*cg.EffectAccum = cp
 		}
 		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {
