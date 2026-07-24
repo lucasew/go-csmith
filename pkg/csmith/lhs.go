@@ -863,7 +863,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 				}
 				continue
 			}
-			if !typ.Match(x.Type, MatchFlexible) {
+			if !typ.MatchOpts(x.Type, MatchFlexible, sessOpts(cg.Sess)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 				if sessHasError(nil) {
 					incomplete = true

@@ -79,11 +79,18 @@ type Probabilities struct {
 // Probabilities.cpp:55–82 — extra filter first, then weight==0 rejects.
 type ProbabilityFilter struct {
 	pname ProbName
+	// owner is the Probabilities bag that installed this filter (avoids Process* lookup).
+	owner *Probabilities
 }
 
 // NewProbabilityFilter mirrors ProbabilityFilter(ProbName).
 func NewProbabilityFilter(pname ProbName) *ProbabilityFilter {
 	return &ProbabilityFilter{pname: pname}
+}
+
+// newProbabilityFilterOwned installs a filter bound to an explicit Probabilities bag.
+func newProbabilityFilterOwned(p *Probabilities, pname ProbName) *ProbabilityFilter {
+	return &ProbabilityFilter{pname: pname, owner: p}
 }
 
 // Filter implements Filter — true means reject candidate v.
@@ -93,7 +100,10 @@ func (f *ProbabilityFilter) Filter(v uint32) bool {
 		sessNoteError(nil, ErrGeneric)
 		return true
 	}
-	p := sessProbs(nil)
+	p := f.owner
+	if p == nil {
+		p = sessProbs(nil)
+	}
 	if p == nil {
 		// C++ GetInstance always live after init; nil is library fail-closed.
 		sessNoteError(nil, ErrGeneric)
@@ -161,15 +171,20 @@ func (p *Probabilities) setProbFilter(pname ProbName) {
 		sessNoteError(nil, ErrGeneric)
 		return
 	}
-	p.probFilters[pname] = NewProbabilityFilter(pname)
+	p.probFilters[pname] = newProbabilityFilterOwned(p, pname)
 }
 
 // GetProbFilter mirrors Probabilities::get_prob_filter (static via process).
 // Probabilities.cpp:777–785 — prob_filters_ then extra_filters_; missing → sticky nil.
 func GetProbFilter(pname ProbName) Filter {
-	p := sessProbs(nil)
+	return GetProbFilterSess(nil, pname)
+}
+
+// GetProbFilterSess is GetProbFilter on an explicit session bag.
+func GetProbFilterSess(s *Session, pname ProbName) Filter {
+	p := sessProbs(s)
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
 	if f, ok := p.probFilters[pname]; ok && f != nil {
@@ -179,16 +194,21 @@ func GetProbFilter(pname ProbName) Filter {
 		return f
 	}
 	// C++ asserts filter non-null; fail closed reject-all.
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return filterFunc(func(uint32) bool { return true })
 }
 
 // RegisterExtraFilter mirrors Probabilities::register_extra_filter.
 // Probabilities.cpp:791–796.
 func RegisterExtraFilter(pname ProbName, filter Filter) {
-	p := sessProbs(nil)
+	RegisterExtraFilterSess(nil, pname, filter)
+}
+
+// RegisterExtraFilterSess is RegisterExtraFilter on an explicit session bag.
+func RegisterExtraFilterSess(s *Session, pname ProbName, filter Filter) {
+	p := sessProbs(s)
 	if p == nil || filter == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	p.extraFilters[pname] = filter
@@ -198,9 +218,14 @@ func RegisterExtraFilter(pname ProbName, filter Filter) {
 // Probabilities.cpp:798–804 — pointer identity; Go requires comparable Filter
 // values (pointer/struct receivers). Function-typed Filters are not comparable.
 func UnregisterExtraFilter(pname ProbName, filter Filter) {
-	p := sessProbs(nil)
+	UnregisterExtraFilterSess(nil, pname, filter)
+}
+
+// UnregisterExtraFilterSess is UnregisterExtraFilter on an explicit session bag.
+func UnregisterExtraFilterSess(s *Session, pname ProbName, filter Filter) {
+	p := sessProbs(s)
 	if p == nil || filter == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	cur, ok := p.extraFilters[pname]

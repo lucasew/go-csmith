@@ -79,7 +79,12 @@ func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 // MakeInt mirrors Constant::make_int.
 // Constant.cpp:449–481 — optional mark_mutable_const wraps "(v)".
 func MakeInt(v int) *Constant {
-	return MakeIntOpts(v, sessOpts(nil))
+	return MakeIntOpts(v, ProcessOptions())
+}
+
+// MakeIntSess is MakeInt with Options from an explicit session bag.
+func MakeIntSess(s *Session, v int) *Constant {
+	return MakeIntOpts(v, sessOpts(s))
 }
 
 // MakeIntOpts is make_int with explicit Options (library tests).
@@ -205,6 +210,11 @@ func (c *Constant) CompatibleWithExpr(exp *Expression) bool {
 // Constant.cpp:532–553 — paren negatives; pointer-0 → (void*)0 / nullptr; else cast+value.
 // Incomplete Constant sticky "" (no invent bare "0" for Type-nil shell).
 func (c *Constant) Output() string {
+	return c.OutputOpts(ProcessOptions())
+}
+
+// OutputOpts is Output with explicit session Options (lang_cpp nullptr).
+func (c *Constant) OutputOpts(opts Options) string {
 	if c == nil || c.Type == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
@@ -225,7 +235,6 @@ func (c *Constant) Output() string {
 			return ""
 		}
 		if c.Equals(0) {
-			opts := sessOpts(nil)
 			if opts.LangCPP {
 				return "nullptr"
 			}
@@ -578,7 +587,12 @@ func HexToBinary(val string) string {
 
 // binaryConstProb mirrors BinaryConstProb() (Probabilities singleton; default 3).
 func binaryConstProb() uint32 {
-	if p := sessProbs(nil); p != nil {
+	return binaryConstProbSess(nil)
+}
+
+// binaryConstProbSess is binaryConstProb on an explicit session bag.
+func binaryConstProbSess(s *Session) uint32 {
+	if p := sessProbs(s); p != nil {
 		if v := p.Single(PBinaryConstProb); v >= 0 {
 			return uint32(v)
 		}

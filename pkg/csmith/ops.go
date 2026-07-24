@@ -112,7 +112,12 @@ func (op BinaryOp) CmpOpC() string {
 // BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER via process Probabilities.
 // No invent NewProbabilities(opts) one-off table when process unset — reject-all.
 func BinaryOpsFilter(opts Options) Filter {
-	return BinaryOpsFilterProbs(opts, sessProbs(nil))
+	return BinaryOpsFilterSess(nil, opts)
+}
+
+// BinaryOpsFilterSess is BinaryOpsFilter using session Probabilities.
+func BinaryOpsFilterSess(s *Session, opts Options) Filter {
+	return BinaryOpsFilterProbs(opts, sessProbs(s))
 }
 
 // BinaryOpsFilterProbs uses an explicit Probabilities bag (session path).
@@ -128,7 +133,12 @@ func BinaryOpsFilterProbs(opts Options, probs *Probabilities) Filter {
 // PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:179–183 — filter from Probabilities pBinaryOpsProb.
 func PickBinaryOp(r *Rng, opts Options) BinaryOp {
-	return PickBinaryOpProbs(r, opts, sessProbs(nil))
+	return PickBinaryOpSess(nil, r, opts)
+}
+
+// PickBinaryOpSess is PickBinaryOp using session Probabilities.
+func PickBinaryOpSess(s *Session, r *Rng, opts Options) BinaryOp {
+	return PickBinaryOpProbs(r, opts, sessProbs(s))
 }
 
 // PickBinaryOpProbs is PickBinaryOp with an explicit Probabilities bag.
@@ -210,7 +220,12 @@ func (op UnaryOp) UnaryOpC() string {
 // UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER via process Probabilities.
 // No invent NewProbabilities(opts) when process unset — reject-all.
 func UnaryOpsFilter(opts Options) Filter {
-	return UnaryOpsFilterProbs(opts, sessProbs(nil))
+	return UnaryOpsFilterSess(nil, opts)
+}
+
+// UnaryOpsFilterSess is UnaryOpsFilter using session Probabilities.
+func UnaryOpsFilterSess(s *Session, opts Options) Filter {
+	return UnaryOpsFilterProbs(opts, sessProbs(s))
 }
 
 // UnaryOpsFilterProbs uses an explicit Probabilities bag (session path).
@@ -225,7 +240,12 @@ func UnaryOpsFilterProbs(opts Options, probs *Probabilities) Filter {
 // PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:146–148 — filter from Probabilities pUnaryOpsProb.
 func PickUnaryOp(r *Rng, opts Options) UnaryOp {
-	return PickUnaryOpProbs(r, opts, sessProbs(nil))
+	return PickUnaryOpSess(nil, r, opts)
+}
+
+// PickUnaryOpSess is PickUnaryOp using session Probabilities.
+func PickUnaryOpSess(s *Session, r *Rng, opts Options) UnaryOp {
+	return PickUnaryOpProbs(r, opts, sessProbs(s))
 }
 
 // PickUnaryOpProbs is PickUnaryOp with an explicit Probabilities bag.

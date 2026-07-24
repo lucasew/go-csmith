@@ -740,7 +740,7 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 // Uses process CGOptions (identify_wrappers); no soft invent Defaults().
 // Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).
 func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
-	return OutputAssignAsExprOpts(st, wrapVol, sessOpts(nil))
+	return OutputAssignAsExprOpts(st, wrapVol, ProcessOptions())
 }
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.

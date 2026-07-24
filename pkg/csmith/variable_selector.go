@@ -132,7 +132,7 @@ func ChooseVisibleReadVar(
 		if sessHasError(nil) {
 			return nil
 		}
-		if !typ.Match(v.Type, MatchConvert) {
+		if !typ.MatchOpts(v.Type, MatchConvert, ProcessOptions()) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(nil) {
 				return nil
@@ -1356,7 +1356,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 			sessNoteError(cg.Sess, ErrGeneric)
 			return false
 		}
-		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
+		if typ != nil && !typ.MatchOpts(v.Type, MatchFlexible, sessOpts(cg.Sess)) {
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
 			if sessHasError(cg.Sess) {
 				return false
