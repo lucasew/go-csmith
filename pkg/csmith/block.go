@@ -115,7 +115,7 @@ type Block struct {
 // Block.h:85 — CGOptions::max_block_size captured at construction.
 func (b *Block) BlockSize() int {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	return b.blockSize
@@ -125,7 +125,7 @@ func (b *Block) BlockSize() int {
 // Block.h:76.
 func (b *Block) GetDepthProtect() bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return b.EmitDepthProtect
@@ -135,7 +135,7 @@ func (b *Block) GetDepthProtect() bool {
 // Block.h:72–74.
 func (b *Block) SetDepthProtect(v bool) bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	b.EmitDepthProtect = v
@@ -146,7 +146,7 @@ func (b *Block) SetDepthProtect(v bool) bool {
 // Incomplete Stmt Kind sticky (no invent append hole).
 func (b *Block) PushStmt(st Stmt) {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	b.Stmts = append(b.Stmts, st)
@@ -157,12 +157,12 @@ func (b *Block) PushStmt(st Stmt) {
 // Incomplete funcs sticky nil.
 func FindBlockByID(funcs []*Function, blkID int) *Block {
 	if !FunctionsComplete(funcs) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// incomplete id sticky (no invent match-first soft-pick)
 	if blkID <= 0 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	for _, f := range funcs {
@@ -171,7 +171,7 @@ func FindBlockByID(funcs []*Function, blkID int) *Block {
 		}
 		for _, b := range f.Blocks {
 			if b == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return nil
 			}
 			if b.StmID == blkID {
@@ -213,7 +213,7 @@ func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
 func (b *Block) GetLastStm() *Stmt {
 	// Block always live; sticky incomplete no invent nil last soft-skip
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if len(b.Stmts) == 0 {
@@ -235,7 +235,7 @@ func (b *Block) GetLastStm() *Stmt {
 func (b *Block) FromTailToHead() bool {
 	// Block always live; sticky incomplete no invent fall-through soft-skip
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !b.Looping || len(b.Stmts) == 0 {
@@ -244,22 +244,22 @@ func (b *Block) FromTailToHead() bool {
 	s := b.GetLastStm()
 	if s == nil {
 		// incomplete last stmt sticky no fall-through
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue fall-through past GetLastStm residual
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if s.MustJump() {
 		// residual ERROR sticky — no invent no-fall-through true past MustJump residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent fall-through true past MustJump residual false path
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return true
@@ -272,13 +272,13 @@ func (b *Block) FromTailToHead() bool {
 // IsEmpty/pure invent empty-complete block accum past StmID 0 soft-skip).
 func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 	if b == nil || fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return IncompleteEffect()
 	}
 	// Block::stm_id always live; StmID 0 fails closed sticky incomplete (no invent
 	// empty-complete accum return without map_stm_effect[block] recorded)
 	if StmIDUnset(b.StmID) {
-		SetError(ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return IncompleteEffect()
 	}
 	eff := EmptyEffect()
@@ -287,7 +287,7 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 		if StmIDUnset(st.StmID) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
-			SetError(ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return inc
 		}
 		// map_stm_effect[] defaults empty Effect in C++; incomplete map keys fail closed sticky
@@ -295,15 +295,15 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 		if !EffectComplete(se) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
-			SetError(ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return inc
 		}
 		eff = eff.AddEffect(se)
 		if !EffectComplete(eff) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return inc
 		}
@@ -323,7 +323,7 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 		return nil
 	}
 	if r == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var blks []*Block
@@ -339,7 +339,7 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 	}
 	idx := r.RndUpto(uint32(len(blks)))
 	// Block.cpp:306 ERROR_GUARD
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	return blks[idx]
@@ -358,7 +358,7 @@ func (b *Block) MustBreakOrReturn() bool {
 // soft-miss without ERROR so soft re-pick cannot treat hole as clean incomplete).
 func (b *Block) StackScanComplete() bool {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	f := b.Func
@@ -390,14 +390,14 @@ func (b *Block) StackScanComplete() bool {
 func (b *Block) IsVarOnStack(v *Variable) bool {
 	// Block + Variable always live; sticky incomplete no invent not-on-stack
 	if b == nil || v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !b.StackScanComplete() {
 		// incomplete Param/LocalVars sticky fail closed not-on-stack
 		// residual ERROR sticky — no invent soft not-on-stack past StackScan residual
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
@@ -409,18 +409,18 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 		for _, p := range f.Param {
 			// Param live after StackScanComplete; nil hole already sticky above
 			if p == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return false
 			}
 			if p.Match(v) {
 				// residual ERROR sticky — no invent on-stack true past Match hole
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 		}
@@ -428,7 +428,7 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 	for bb := b; bb != nil; bb = bb.Parent {
 		for _, loc := range bb.LocalVars {
 			if loc == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return false
 			}
 			if loc == v {
@@ -436,13 +436,13 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 			}
 			if loc.Match(v) {
 				// residual ERROR sticky — no invent on-stack true past Match hole
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 		}
@@ -459,14 +459,14 @@ func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	// Block.cpp:216–219 — this always live; gensym + macro_tmp_vars insert together
 	// sticky no invent bare t_N without block registration (would emit undeclared use)
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Block.cpp:217 — const string var_name = gensym("t_"); sticky no invent bare ""
 	name := Gensym("t_")
 	if name == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
@@ -487,7 +487,7 @@ func BlockProbability(blockSize int, r *Rng) int {
 	}
 	if r == nil {
 		// C++ always has RNG; sticky fail-closed → 0
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	// Block.cpp:88–92 — Keep {block_size-1}, disable fDefault, rnd_upto
@@ -512,24 +512,24 @@ func MakeRandomBlock(
 ) *Block {
 	// Block::make_random always has RNG + CGContext sticky
 	if r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// Block.cpp:120 — assert(curr_func) sticky; no soft invent parentless block
 	f := cg.CurrentFunc
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky before stack push (no invent block past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	parent := (*Block)(nil)
@@ -564,7 +564,7 @@ func MakeRandomBlock(
 	}
 	max := BlockProbability(b.blockSize, r)
 	// Block.cpp:136–140 — ERROR after BlockProbability → delete block
-	if HasError() {
+	if sessHasError(cgSess(cg)) {
 		abortBlockMake(f, b)
 		return nil
 	}
@@ -581,26 +581,26 @@ func MakeRandomBlock(
 	if cg.EffectAccum != nil {
 		if !EffectComplete(*cg.EffectAccum) {
 			abortBlockMake(f, b)
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		preEffect = cg.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-block past Effect Clone residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			abortBlockMake(f, b)
 			return nil
 		}
 	}
 	if !EffectComplete(preEffect) {
 		abortBlockMake(f, b)
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StmID always allocated at make; FM path always records map_facts_in
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			abortBlockMake(f, b)
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
@@ -636,7 +636,7 @@ func MakeRandomBlock(
 		// Block.cpp:152 — stop when statement must_return
 		must := st.MustReturn()
 		// residual ERROR sticky — no invent soft-continue more stmts past MustReturn residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			break
 		}
 		if must {
@@ -647,7 +647,7 @@ func MakeRandomBlock(
 		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()})
 	}
 	// Block.cpp:157–161 — ERROR after stmt loop → delete block
-	if HasError() {
+	if sessHasError(cgSess(cg)) {
 		abortBlockMake(f, b)
 		return nil
 	}
@@ -655,7 +655,7 @@ func MakeRandomBlock(
 	if b.NeedNestedLoop(*cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
 		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
 		// append_nested_loop ERROR_GUARD(nullptr) on for make fail
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			abortBlockMake(f, b)
 			return nil
 		}
@@ -666,7 +666,7 @@ func MakeRandomBlock(
 	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() {
 		must := b.MustReturn()
 		// residual ERROR sticky — no invent soft-append return past MustReturn residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			abortBlockMake(f, b)
 			return nil
 		}
@@ -687,10 +687,10 @@ func MakeRandomBlock(
 	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
 	// incomplete post-creation GlobalFacts fail closed even without sticky ERROR
 	// (no invent return live block past IncompleteFactSlice wipe)
-	if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
+	if sessHasError(cgSess(cg)) || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
 		// Block.cpp:170–174 — ERROR after post_creation → delete
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		abortBlockMake(f, b)
 		return nil
@@ -702,7 +702,7 @@ func MakeRandomBlock(
 		f.Stack = f.Stack[:len(f.Stack)-1]
 	}
 	// Block.cpp:187 — Error::set_error(SUCCESS)
-	ClearError()
+	sessClearError(cgSess(cg))
 	return b
 }
 
@@ -718,7 +718,7 @@ func MakeRandomBlock(
 // Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
 func abortBlockMake(f *Function, b *Block) {
 	if f == nil || b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {
@@ -766,7 +766,7 @@ func tombstoneStmt(st *Stmt) {
 // Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effect, r *Rng, vs *VariableSelector) {
 	if b == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return
 	}
 	fm := cg.FM
@@ -775,12 +775,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	}
 	if StmIDUnset(b.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return
 	}
 	if !EffectComplete(preEffect) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return
 	}
 	if fm.MapVisited == nil {
@@ -797,7 +797,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	// incomplete block map_stm_effect fails closed (no invent continue post-analysis)
 	if !EffectComplete(fm.GetMapStmEffect(b.StmID)) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return
 	}
 	// incomplete GlobalFacts fail closed sticky (no invent cleaned postFacts / OOS from holes)
@@ -813,7 +813,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		postFacts = IncompleteFactSlice()
 		postUnion = IncompleteUnionFactSlice()
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return
 	} else {
 		// Block.cpp:690–693 — post_facts snapshot; OOS for map_out.
@@ -824,7 +824,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		// GlobalFacts pre-OOS during FP; install map_out / OOS at end.
 		postFacts = CloneFactSlice(fm.GlobalFacts)
 		// residual ERROR sticky — no invent soft-post past CloneFactSlice residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
 			postUnion = IncompleteUnionFactSlice()
@@ -838,13 +838,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			postFacts = IncompleteFactSlice()
 			postUnion = IncompleteUnionFactSlice()
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return
 		}
 		postUnion = CloneUnionFactSliceDeep(fm.UnionFacts)
-		if HasError() || !UnionFactsComplete(postUnion) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(postUnion) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -857,9 +857,9 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			postUnion = []*FactUnion{}
 		}
 		outPost := CloneFactSlice(fm.GlobalFacts)
-		if HasError() || !FactsComplete(outPost) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(cgSess(cg)) || !FactsComplete(outPost) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
@@ -869,8 +869,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		if len(b.LocalVars) > 0 {
 			UpdateFactsForOOSVars(b.LocalVars, &outPost)
 			if !FactsComplete(outPost) {
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
@@ -880,8 +880,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		}
 		fm.RemoveRVFacts(&outPost)
 		if !FactsComplete(outPost) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
@@ -890,7 +890,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		}
 		// FactMgr.cpp:268–270 — set_fact_out(Block*): parent==nullptr → remove_function_local_facts
 		fm.SetMapFactsOutForBlock(b, outPost)
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
 			return
@@ -904,7 +904,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		// wipe via auto_block_959 after unnecessary FP; e12688 over-strip).
 		mustBR := b.MustBreakOrReturnFull(fm)
 		// residual ERROR sticky — no invent soft-fixed-point past MustBreakOrReturn residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -913,7 +913,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		isLoopBody := !mustBR && b.Looping
 		hasBack := fm.HasEdgeIn(b.StmID, false, true)
 		// residual ERROR sticky — HasEdgeIn sets sticky on incomplete CFG
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -924,7 +924,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			if isLoopBody {
 				fromTail := b.FromTailToHead()
 				// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
-				if HasError() {
+				if sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -942,12 +942,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-				SetError(ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			} else {
 				factsCopy := CloneFactSlice(in0)
 				// residual ERROR sticky — no invent soft-fixed-point past CloneFactSlice residual
-				if HasError() {
+				if sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -971,17 +971,17 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-					SetError(ErrGeneric)
+					sessNoteError(cgSess(cg), ErrGeneric)
 					return
 				}
 				entryUnionsSnap := CloneUnionFactSliceDeep(inU0)
-				if HasError() || !UnionFactsComplete(entryUnionsSnap) {
+				if sessHasError(cgSess(cg)) || !UnionFactsComplete(entryUnionsSnap) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-					if !HasError() {
-						SetError(ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					return
 				}
@@ -992,7 +992,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preEffect.Clone()
 					// residual ERROR sticky — no invent soft-reset past Effect Clone residual
-					if HasError() {
+					if sessHasError(cgSess(cg)) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						postFacts = IncompleteFactSlice()
 						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -1003,13 +1003,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					// Re-install entry eUnionWrite each attempt (reset_stm_fact_maps
 					// / prior FP may have left live at mid-body last-writes).
 					entryU := CloneUnionFactSliceDeep(entryUnionsSnap)
-					if HasError() || !UnionFactsComplete(entryU) {
+					if sessHasError(cgSess(cg)) || !UnionFactsComplete(entryU) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						fm.UnionFacts = IncompleteUnionFactSlice()
 						postFacts = IncompleteFactSlice()
 						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-						if !HasError() {
-							SetError(ErrGeneric)
+						if !sessHasError(cgSess(cg)) {
+							sessNoteError(cgSess(cg), ErrGeneric)
 						}
 						return
 					}
@@ -1035,7 +1035,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 								postFacts = IncompleteFactSlice()
 								postUnion = IncompleteUnionFactSlice()
 								fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-								SetError(ErrGeneric)
+								sessNoteError(cgSess(cg), ErrGeneric)
 								return
 							}
 							postUnion = fpUnions
@@ -1066,7 +1066,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					if !selfBack {
 						fromTail := b.FromTailToHead()
 						// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
-						if HasError() {
+						if sessHasError(cgSess(cg)) {
 							fm.GlobalFacts = IncompleteFactSlice()
 							postFacts = IncompleteFactSlice()
 							fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -1080,7 +1080,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preEffect.Clone()
 						// residual ERROR sticky — no invent soft-reset past Effect Clone residual
-						if HasError() {
+						if sessHasError(cgSess(cg)) {
 							fm.GlobalFacts = IncompleteFactSlice()
 							postFacts = IncompleteFactSlice()
 							fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -1093,13 +1093,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					// postLoop/global_facts (seed-2 e2308: EV rejects ** with nfacts=0).
 					if len(b.Stmts) == 0 {
 						entryUEmpty := CloneUnionFactSliceDeep(entryUnionsSnap)
-						if HasError() || !UnionFactsComplete(entryUEmpty) {
+						if sessHasError(cgSess(cg)) || !UnionFactsComplete(entryUEmpty) {
 							fm.GlobalFacts = IncompleteFactSlice()
 							fm.UnionFacts = IncompleteUnionFactSlice()
 							postFacts = IncompleteFactSlice()
 							fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-							if !HasError() {
-								SetError(ErrGeneric)
+							if !sessHasError(cgSess(cg)) {
+								sessNoteError(cgSess(cg), ErrGeneric)
 							}
 							return
 						}
@@ -1118,7 +1118,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									postFacts = IncompleteFactSlice()
 									postUnion = IncompleteUnionFactSlice()
 									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-									SetError(ErrGeneric)
+									sessNoteError(cgSess(cg), ErrGeneric)
 									return
 								}
 								postUnion = fpEmptyU
@@ -1132,7 +1132,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 								fm.GlobalFacts = IncompleteFactSlice()
 								postFacts = IncompleteFactSlice()
 								fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-								SetError(ErrGeneric)
+								sessNoteError(cgSess(cg), ErrGeneric)
 								return
 							}
 							fm.SetMapFactsIn(b.StmID, factsCopy)
@@ -1143,7 +1143,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()
 									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-									SetError(ErrGeneric)
+									sessNoteError(cgSess(cg), ErrGeneric)
 									return
 								}
 								AddNewVarFactTo(v, &preOOS)
@@ -1151,7 +1151,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()
 									fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-									SetError(ErrGeneric)
+									sessNoteError(cgSess(cg), ErrGeneric)
 									return
 								}
 							}
@@ -1163,8 +1163,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							if len(b.LocalVars) > 0 {
 								UpdateFactsForOOSVars(b.LocalVars, &outCopy)
 								if !FactsComplete(outCopy) {
-									if !HasError() {
-										SetError(ErrGeneric)
+									if !sessHasError(cgSess(cg)) {
+										sessNoteError(cgSess(cg), ErrGeneric)
 									}
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()
@@ -1173,7 +1173,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 								}
 							}
 							fm.SetMapFactsOutForBlock(b, outCopy)
-							if HasError() {
+							if sessHasError(cgSess(cg)) {
 								fm.GlobalFacts = IncompleteFactSlice()
 								postFacts = IncompleteFactSlice()
 								return
@@ -1193,12 +1193,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-					SetError(ErrGeneric)
+					sessNoteError(cgSess(cg), ErrGeneric)
 					return
 				}
 				fm.AssignGlobalFactsFromMapOut(b.StmID)
 				// residual ERROR sticky — no invent soft-out past full FactVec assign residual
-				if HasError() {
+				if sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
@@ -1219,11 +1219,11 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-				SetError(ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
 			fm.SetGlobalFacts(CloneFactSlice(outPost), "auto_block_oos_no_fp")
-			if HasError() {
+			if sessHasError(cgSess(cg)) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
@@ -1235,18 +1235,18 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				postFacts = IncompleteFactSlice()
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-				SetError(ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
 			if len(b.LocalVars) > 0 {
 				UpdateUnionFactsForOOSVars(b.LocalVars, &fm.UnionFacts)
-				if !UnionFactsComplete(fm.UnionFacts) || HasError() {
+				if !UnionFactsComplete(fm.UnionFacts) || sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-					if !HasError() {
-						SetError(ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					return
 				}
@@ -1265,7 +1265,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() {
 		must := b.MustReturn()
 		// residual ERROR sticky — no invent soft-append return past MustReturn residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			if !FactsComplete(postFacts) {
 				postFacts = IncompleteFactSlice()
@@ -1279,7 +1279,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			if !FactsComplete(postFacts) || !UnionFactsComplete(postUnion) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				SetError(ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
 			fm.SetGlobalFacts(postFacts, "auto_block_1002")
@@ -1289,9 +1289,9 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			// pre-OOS body-local unions after the no-FP OOS path.
 			if r != nil {
 				restU := CloneUnionFactSliceDeep(postUnion)
-				if HasError() || !UnionFactsComplete(restU) {
-					if !HasError() {
-						SetError(ErrGeneric)
+				if sessHasError(cgSess(cg)) || !UnionFactsComplete(restU) {
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
@@ -1316,13 +1316,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				out := fm.GetMapFactsOut(sr.StmID)
 				if FactsComplete(out) {
 					fm.SetMapFactsOutForBlock(b, out)
-					if HasError() {
+					if sessHasError(cgSess(cg)) {
 						return
 					}
 				} else {
 					// incomplete sr out — fail closed sticky hole marker (not empty complete)
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-					SetError(ErrGeneric)
+					sessNoteError(cgSess(cg), ErrGeneric)
 					return
 				}
 			}
@@ -1364,13 +1364,13 @@ func makeRandomStmtForced(
 ) Stmt {
 	// Statement.cpp always has RNG + CGContext; sticky no invent MAX-kind shell without them
 	if r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient EffectContext fails closed sticky before re-pick loop
 	// (no invent stmt under incomplete context shells; EffectStm is cleared per try)
 	if !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// Statement.cpp:243–244 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtStatement, t, nullptr)
@@ -1387,7 +1387,7 @@ func makeRandomStmtForced(
 		stmtTab = ProcessStmtTab()
 	}
 	if stmtTab == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// StatementFilter (Statement.cpp:150–182)
@@ -1405,13 +1405,13 @@ func makeRandomStmtForced(
 		if k == StmtReturn && cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil {
 			isSimple := cg.CurrentFunc.ReturnType.IsSimple()
 			// residual ERROR sticky — no invent filter keep/reject past IsSimple residual
-			if HasError() {
+			if sessHasError(cgSess(cg)) {
 				return true
 			}
 			if isSimple {
 				st := cg.CurrentFunc.ReturnType.Simple()
 				// residual ERROR sticky — no invent filter keep/reject past Simple residual
-				if HasError() {
+				if sessHasError(cgSess(cg)) {
 					return true
 				}
 				if st == EVoid {
@@ -1462,7 +1462,7 @@ func makeRandomStmtForced(
 		var preUnion []*FactUnion
 		if cg.FM != nil {
 			if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-				SetError(ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return Stmt{}
 			}
 			preFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
@@ -1471,17 +1471,17 @@ func makeRandomStmtForced(
 		preEffect := EmptyEffect()
 		if cg.EffectAccum != nil {
 			if !EffectComplete(*cg.EffectAccum) {
-				SetError(ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return Stmt{}
 			}
 			preEffect = cg.EffectAccum.Clone()
 			// residual ERROR sticky — no invent soft-stmt past Effect Clone residual
-			if HasError() {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 		}
 		if !EffectComplete(preEffect) {
-			SetError(ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return Stmt{}
 		}
 		// Statement.cpp:267–269 / 306–308 — compound stmts bump blk_depth around factory
@@ -1493,16 +1493,16 @@ func makeRandomStmtForced(
 			cg.BlkDepth--
 		}
 		// Statement.cpp:309 — ERROR_GUARD(nullptr): sticky error aborts without re-pick
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if stmtOK(st) {
 			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
 			// incomplete post-creation must not invent stmt success past wiped facts
 			PostCreationAnalysis(&st, preFacts, preUnion, preEffect, cg, opts)
-			if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
-				if !HasError() {
-					SetError(ErrGeneric)
+			if sessHasError(cgSess(cg)) || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return Stmt{}
 			}
@@ -1527,7 +1527,7 @@ func makeRandomStmtKind(
 ) Stmt {
 	// Statement.cpp always has live RNG + CGContext; sticky fail closed (no invent shell)
 	if r == nil || cg == nil {
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	switch kind {
@@ -1538,34 +1538,34 @@ func makeRandomStmtKind(
 		// No NoteWrite(LhsVar) — that wrongly marks pointers on *p=… (see StatementAssign).
 		st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
 		// residual ERROR sticky — no invent soft-return assign past MakeRandomAssign residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return st
 	case StmtBreak:
 		st := MakeRandomBreak(r, opts, vs, tables, cg)
 		// residual ERROR sticky — no invent soft-return break past MakeRandomBreak residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return st
 	case StmtContinue:
 		st := MakeRandomContinue(r, opts, vs, tables, cg, b)
 		// residual ERROR sticky — no invent soft-return continue past MakeRandomContinue residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return st
 	case StmtIfElse:
 		if st := MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
 			// residual ERROR sticky — no invent soft-return if past MakeRandomIf residual
-			if HasError() {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			return *st
 		}
 		// residual ERROR sticky — no invent soft re-pick past MakeRandomIf residual nil
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		// null factory → re-pick (Statement.cpp:314); incomplete shell fails stmtOK
@@ -1573,34 +1573,34 @@ func makeRandomStmtKind(
 	case StmtFor:
 		if st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
 			// residual ERROR sticky — no invent soft-return for past MakeRandomFor residual
-			if HasError() {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			return *st
 		}
 		// residual ERROR sticky — no invent soft re-pick past MakeRandomFor residual nil
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return Stmt{}
 	case StmtArrayOp:
 		st := MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
 		// residual ERROR sticky — no invent soft-return array-op past MakeRandomArrayOp residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return st
 	case StmtGoto:
 		st := MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
 		// residual ERROR sticky — no invent soft-return goto past MakeRandomGoto residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return st
 	case StmtInvoke:
 		st := MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
 		// residual ERROR sticky — no invent soft-return invoke past MakeRandomExprStmt residual
-		if HasError() {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		return st
@@ -1612,7 +1612,7 @@ func makeRandomStmtKind(
 		return Stmt{}
 	default:
 		// Statement.cpp:275–277 — assert(!"unknown Statement type"); fail closed
-		SetError(ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 }
@@ -1690,7 +1690,7 @@ func (b *Block) outputStmtsOnly(indent int) string {
 // still emit for-headers/body; only pre_output is suppressed.
 func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	inner := strings.Repeat("    ", indent)
@@ -1703,7 +1703,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 		if !skipPre {
 			pre, isGotoTarget = PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
 			// residual ERROR sticky — no invent soft-continue stmt emit past PreOutput hole
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 		}
@@ -1728,16 +1728,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// StatementReturn.cpp:125–134 — always ExpressionVariable var (no invent bare return;)
 			// incomplete sticky fails whole block (no invent soft-skip stmt and still emit later)
 			if st.Expr == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			exprOut := st.Expr.Output()
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if exprOut == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// StatementReturn.cpp:127–129 — DEPTH-- when CGOptions::depth_protect()
@@ -1755,16 +1755,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 				ty := st.LhsVar.Type.CName()
 				// residual ERROR sticky — no invent soft-continue past CName residual
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				rhs := st.Expr.Output()
 				// residual ERROR sticky — no invent soft-continue past Output residual
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				if ty == "" || rhs == "" {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return ""
 				}
 				content.WriteString(ty + " tmp = " + rhs + ";\n")
@@ -1776,7 +1776,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// no soft invent Defaults() / force IdentifyWrappers=false
 			asExpr := OutputAssignAsExprOpts(&st, wrap, ProcessOptions())
 			// residual ERROR sticky — no invent soft-continue stmt past OutputAssign residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if asExpr != "" {
@@ -1785,32 +1785,32 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				// array_init simple: a[i] = expr
 				rhs := st.Expr.Output()
 				// residual ERROR sticky — no invent soft-continue stmt past Output residual
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				if rhs == "" {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return ""
 				}
 				content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
 			} else {
 				// incomplete assign IR sticky — fail whole block (no invent soft-skip)
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 		case StmtBreak:
 			// StatementBreak.cpp:117–118 — test.Output always live; sticky no invent if () break
 			if st.Expr == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if test == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1820,16 +1820,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 		case StmtContinue:
 			// StatementContinue.cpp — test.Output always live; sticky no invent if () continue
 			if st.Expr == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if test == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1840,22 +1840,22 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// StatementFor.cpp:422–424 — output_header(indent); body.Output(indent)
 			// same indent as for (not indent+1). sticky no invent for(;;) / missing body
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			hdr := forHeaderOutput(st.Loop)
 			// residual ERROR sticky — no invent soft-continue body past header residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			// body pad matches statement indent; outer sb prefixes first line with inner
 			bodyOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if hdr == "" || bodyOut == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
@@ -1864,26 +1864,26 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// StatementIf.cpp:139–159 — if_true/if_false.Output(indent) same as condition
 			// sticky no invent if () / missing branches / empty test or branch Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			// residual ERROR sticky — no invent soft-continue arms past test residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			thenOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue else past Then residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			elseOut := st.Else.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past Else residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if test == "" || thenOut == "" || elseOut == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1895,16 +1895,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 		case StmtGoto:
 			// StatementGoto.cpp:252–253 — test.Output always live; sticky no invent if () goto
 			if st.Label == "" || st.Expr == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if test == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1915,16 +1915,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// StatementArrayOp.cpp:225–267 — header; body Block OR bare-brace init_value
 			// sticky no invent header without body/init
 			if st.Loop == nil || st.Loop.IV == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
 			// residual ERROR sticky — no invent soft-continue body past header residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if hdr == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
@@ -1939,22 +1939,22 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 				if st.Expr.Term == TermConstant && st.LhsVar != nil && st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 					ty := st.LhsVar.Type.CName()
 					rhs := st.Expr.Output()
-					if HasError() {
+					if sessHasError(nil) {
 						return ""
 					}
 					if ty == "" || rhs == "" {
-						SetError(ErrGeneric)
+						sessNoteError(nil, ErrGeneric)
 						return ""
 					}
 					content.WriteString(assignPad + ty + " tmp = " + rhs + ";\n")
 					content.WriteString(assignPad + st.ArrayAccess + " = tmp;\n")
 				} else {
 					rhs := st.Expr.Output()
-					if HasError() {
+					if sessHasError(nil) {
 						return ""
 					}
 					if rhs == "" {
-						SetError(ErrGeneric)
+						sessNoteError(nil, ErrGeneric)
 						return ""
 					}
 					content.WriteString(assignPad + st.ArrayAccess + " = " + rhs + ";\n")
@@ -1964,7 +1964,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			}
 			// StatementArrayOp.cpp:229–230 — body->Output(indent) when body non-null
 			if st.Then == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// Nested multi-dim may wrap child StmtArrayOp in a synthetic Block.
@@ -1981,11 +1981,11 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 					EmitLabelAttrs: b.EmitLabelAttrs, LabelAttrRng: b.LabelAttrRng,
 					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise}
 				childOut := nest.outputStmtsOnlyOpts(indent+1, true)
-				if HasError() {
+				if sessHasError(nil) {
 					return ""
 				}
 				if childOut == "" {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return ""
 				}
 				content.WriteString(childOut)
@@ -1994,11 +1994,11 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			}
 			bodyOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if bodyOut == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString(bodyOut)
@@ -2006,16 +2006,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// StatementExpr::Output — expr.Output(); ";"
 			// incomplete sticky fails whole block (no invent soft-skip empty invoke)
 			if st.Expr == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			out := st.Expr.Output()
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if out == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString(out + ";\n")
@@ -2023,16 +2023,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// Block is Statement; OutputStatementList calls Block::Output at same indent
 			// sticky no invent empty nested shell
 			if st.Then == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			bodyOut := st.Then.Output(indent)
 			// residual ERROR sticky — no invent soft-continue stmt past nested residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if bodyOut == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			content.WriteString(bodyOut)
@@ -2040,7 +2040,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 			// unknown/zero Kind in live body is incomplete IR sticky — fail whole block
 			// (no invent soft-skip hole and still emit later stmts)
 			// StmtLabel handled earlier via continue
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if content.Len() > 0 {
@@ -2051,7 +2051,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 		if b.EmitParanoid && b.EmitFM != nil {
 			post := PostOutput(&st, b, b.EmitFM, true, b.EmitConcise, inner)
 			// residual ERROR sticky — no invent soft-continue stmt emit past PostOutput hole
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			sb.WriteString(post)
@@ -2064,7 +2064,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool) string {
 func (b *Block) Output(indent int) string {
 	// Block.cpp:248+ — always live this; sticky no invent empty "{}" shell for nil
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	pad := strings.Repeat("    ", indent)
@@ -2094,23 +2094,23 @@ func (b *Block) Output(indent int) string {
 		for _, name := range names {
 			// macro_tmp_vars name + type always live; sticky no invent "int  = 0;" / skip holes
 			if name == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// eSimpleType always valid in macro_tmp_vars; OOB/invalid sticky fail closed
 			// (GetSimpleType nil — no invent "int" for broken tmp type)
 			ty := GetSimpleType(b.TmpVars[name])
 			if ty == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			cn := ty.CName()
 			// residual ERROR sticky — no invent soft-continue tmp decl past CName residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if cn == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			sb.WriteString(inner)
@@ -2120,7 +2120,7 @@ func (b *Block) Output(indent int) string {
 	// OutputVariableList(local_vars) — Variable.cpp:855–864
 	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
 	if !VariablesComplete(b.LocalVars) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Block.cpp:268 — OutputVariableList(local_vars): defs then OutputArrayInitializers
@@ -2129,16 +2129,16 @@ func (b *Block) Output(indent int) string {
 	if len(b.LocalVars) > 0 {
 		listOut := OutputVariableList(b.LocalVars, inner, false)
 		// residual ERROR sticky — no invent soft-continue stmts past OutputVariableList residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		sb.WriteString(listOut)
 	}
 	// Block.cpp:235–241 OutputStatementList
 	// Only fail closed on residuals raised during stmt emit (not pre-existing sticky).
-	hadErr := HasError()
+	hadErr := sessHasError(nil)
 	stmtsOut := b.outputStmtsOnly(indent + 1)
-	if stmtsOut == "" && HasError() && !hadErr {
+	if stmtsOut == "" && sessHasError(nil) && !hadErr {
 		// residual during stmt list — no invent braces-only success past hole
 		return ""
 	}
