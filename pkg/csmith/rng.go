@@ -377,7 +377,7 @@ func PureRndUpto(n uint32, f Filter) uint32 {
 	if n == 0 {
 		return 0
 	}
-	if ProcessOptions().IsRandom() {
+	if sessOpts(nil).IsRandom() {
 		return ProcessRndUpto(n, f)
 	}
 	old := SwitchRndNumGenerator(RngKindDefault)
@@ -389,7 +389,7 @@ func PureRndUpto(n uint32, f Filter) uint32 {
 // PureRndFlipcoin mirrors pure_rnd_flipcoin.
 // random.cpp:119–130.
 func PureRndFlipcoin(p uint32, f Filter) bool {
-	if ProcessOptions().IsRandom() {
+	if sessOpts(nil).IsRandom() {
 		return ProcessRndFlipcoin(p, f)
 	}
 	old := SwitchRndNumGenerator(RngKindDefault)
@@ -401,7 +401,7 @@ func PureRndFlipcoin(p uint32, f Filter) bool {
 // PureRandomHexDigits mirrors PureRandomHexDigits.
 // random.cpp:79–89.
 func PureRandomHexDigits(num int) string {
-	if ProcessOptions().IsRandom() {
+	if sessOpts(nil).IsRandom() {
 		return ProcessRandomHexDigits(num)
 	}
 	old := SwitchRndNumGenerator(RngKindDefault)
@@ -413,7 +413,7 @@ func PureRandomHexDigits(num int) string {
 // PureRandomDigits mirrors PureRandomDigits.
 // random.cpp:91–102.
 func PureRandomDigits(num int) string {
-	if ProcessOptions().IsRandom() {
+	if sessOpts(nil).IsRandom() {
 		return ProcessRandomDigits(num)
 	}
 	old := SwitchRndNumGenerator(RngKindDefault)

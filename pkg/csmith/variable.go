@@ -292,7 +292,7 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 	// Variable.cpp:694–696 — CGOptions::access_once() && isAccessOnce && !isAddrTaken
 	// sticky when IsAccessOnce but option off (assert enabled; no invent silent skip wrap)
 	if v.IsAccessOnce && !v.IsAddrTaken {
-		if !ProcessOptions().AccessOnce {
+		if !sessOpts(nil).AccessOnce {
 			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
@@ -796,9 +796,9 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 
 // createVarRng mirrors process DefaultRndNumGenerator for CreateVariable init.
 // Variable.cpp:395 Constant::make_random uses the process RNG stream.
-// Nil when ProcessRng unset — fail closed (no invent private advancing NewRng stream).
+// Nil when session Rng unset — fail closed (no invent private advancing NewRng stream).
 func createVarRng() *Rng {
-	return ProcessRng()
+	return sessRng(nil)
 }
 
 // CreateVariableScalars mirrors
@@ -834,8 +834,8 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 		return nil
 	}
 	if !isUn {
-		// process RNG + probs; nil probs → fail closed for aggregates
-		init = MakeRandom(typ, ProcessOptions(), ProcessProbabilities(), createVarRng())
+		// session RNG + probs; nil probs → fail closed for aggregates
+		init = MakeRandom(typ, sessOpts(nil), sessProbs(nil), createVarRng())
 		// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random fails / nullptr
 		if sessHasError(nil) || init == nil {
 			return nil
@@ -2250,10 +2250,10 @@ func (v *Variable) CreateFieldVars() {
 			return
 		}
 		if !isUn {
-			// Variable.cpp:395 — Constant::make_random via process CGOptions +
+			// Variable.cpp:395 — Constant::make_random via session CGOptions +
 			// Probabilities + DefaultRndNumGenerator; no invent NewProbabilities /
 			// separate NewRng stream
-			init = MakeRandom(f.Type, ProcessOptions(), ProcessProbabilities(), createVarRng())
+			init = MakeRandom(f.Type, sessOpts(nil), sessProbs(nil), createVarRng())
 			// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random nullptr
 			if sessHasError(nil) || init == nil {
 				fail()
@@ -2899,7 +2899,7 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	var b strings.Builder
 	indent := "    "
 	// ArrayVariable.cpp:758–762 — post_incr_operator → "i++" else "i = i + 1"
-	opts := ProcessOptions()
+	opts := sessOpts(nil)
 	incrSuffix := "++)"
 	if !opts.PostIncrOperator {
 		// rebuilt per dimension with name below

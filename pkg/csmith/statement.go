@@ -55,7 +55,7 @@ func buildStatementThresholdTable(opts Options) *ThresholdTable {
 // builds a library one-off from opts (tests that pass an explicit table).
 // Generation should prefer ProcessStmtTab / probs.StatementThresholdTable().
 func NewStatementThresholdTable(opts Options) *ThresholdTable {
-	if p := ProcessProbabilities(); p != nil {
+	if p := sessProbs(nil); p != nil {
 		if t := p.StatementThresholdTable(); t != nil {
 			return t
 		}

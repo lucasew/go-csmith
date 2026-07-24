@@ -93,7 +93,7 @@ func (f *ProbabilityFilter) Filter(v uint32) bool {
 		sessNoteError(nil, ErrGeneric)
 		return true
 	}
-	p := ProcessProbabilities()
+	p := sessProbs(nil)
 	if p == nil {
 		// C++ GetInstance always live after init; nil is library fail-closed.
 		sessNoteError(nil, ErrGeneric)
@@ -167,7 +167,7 @@ func (p *Probabilities) setProbFilter(pname ProbName) {
 // GetProbFilter mirrors Probabilities::get_prob_filter (static via process).
 // Probabilities.cpp:777–785 — prob_filters_ then extra_filters_; missing → sticky nil.
 func GetProbFilter(pname ProbName) Filter {
-	p := ProcessProbabilities()
+	p := sessProbs(nil)
 	if p == nil {
 		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
@@ -186,7 +186,7 @@ func GetProbFilter(pname ProbName) Filter {
 // RegisterExtraFilter mirrors Probabilities::register_extra_filter.
 // Probabilities.cpp:791–796.
 func RegisterExtraFilter(pname ProbName, filter Filter) {
-	p := ProcessProbabilities()
+	p := sessProbs(nil)
 	if p == nil || filter == nil {
 		sessNoteError(nil, ErrGeneric)
 		return
@@ -198,7 +198,7 @@ func RegisterExtraFilter(pname ProbName, filter Filter) {
 // Probabilities.cpp:798–804 — pointer identity; Go requires comparable Filter
 // values (pointer/struct receivers). Function-typed Filters are not comparable.
 func UnregisterExtraFilter(pname ProbName, filter Filter) {
-	p := ProcessProbabilities()
+	p := sessProbs(nil)
 	if p == nil || filter == nil {
 		sessNoteError(nil, ErrGeneric)
 		return

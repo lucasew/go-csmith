@@ -340,7 +340,7 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 		return 0, false
 	}
 	if probs == nil {
-		probs = ProcessProbabilities()
+		probs = sessProbs(nil)
 	}
 	if probs == nil {
 		// Probabilities singleton always live in C++; sticky fail closed

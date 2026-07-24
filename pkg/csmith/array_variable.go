@@ -146,9 +146,9 @@ func CreateArrayVariable(
 	// pure_rnd_upto(0)==0 with no draw; use PureRndUpto so ProcessRng matches C++
 	// RandomNumber singleton when r is the session process RNG.
 	half := uint32(total / 2)
-	// Prefer process pure path when r is the live process generator (C++ pure_rnd_*)
+	// Prefer process pure path when r is the live session generator (C++ pure_rnd_*)
 	var initNum int
-	if pr := ProcessRng(); pr != nil && pr == r {
+	if pr := sessRng(cgSess(cg)); pr != nil && pr == r {
 		initNum = int(PureRndUpto(half, nil))
 	} else {
 		initNum = int(r.RndUpto(half))
@@ -811,12 +811,17 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) str
 // buildInitializerStr mirrors ArrayVariable::build_initializer_str.
 // ArrayVariable.cpp:450–474 — force_non_uniform → recursive seed path; else nested dims.
 func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
+	return av.buildInitializerStrOpts(initStrings, ProcessOptions())
+}
+
+// buildInitializerStrOpts is buildInitializerStr with explicit session Options.
+func (av *ArrayVariable) buildInitializerStrOpts(initStrings []string, opts Options) string {
 	if av == nil || len(initStrings) == 0 {
 		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
-	// Process options match CGOptions::force_non_uniform_array_init (default true)
-	if ProcessOptions().ForceNonUniformArrayInit {
+	// CGOptions::force_non_uniform_array_init (default true)
+	if opts.ForceNonUniformArrayInit {
 		// ArrayVariable.cpp:429 / 452–453 — static seed continues across calls
 		return av.buildInitRecursive(0, initStrings)
 	}
@@ -853,6 +858,11 @@ func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
 // ArrayVariable.cpp:491–520 — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
+	return av.OutputDefOpts(ProcessOptions())
+}
+
+// OutputDefOpts is OutputDef with explicit session Options (force_non_uniform init).
+func (av *ArrayVariable) OutputDefOpts(opts Options) string {
 	// ArrayVariable always live at OutputDef; sticky no invent empty def shell
 	if av == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -940,7 +950,7 @@ func (av *ArrayVariable) OutputDef() string {
 	b.WriteString(decl)
 	// ArrayVariable.cpp:506 — always build_initializer_str (full nested braces).
 	// Do not invent size caps (old tot>64 → emit 8 was not C++).
-	init := av.buildInitializerStr(vals)
+	init := av.buildInitializerStrOpts(vals, opts)
 	if init == "" {
 		if !sessHasError(nil) {
 			sessNoteError(nil, ErrGeneric)

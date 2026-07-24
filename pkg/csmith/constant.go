@@ -79,7 +79,7 @@ func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 // MakeInt mirrors Constant::make_int.
 // Constant.cpp:449–481 — optional mark_mutable_const wraps "(v)".
 func MakeInt(v int) *Constant {
-	return MakeIntOpts(v, ProcessOptions())
+	return MakeIntOpts(v, sessOpts(nil))
 }
 
 // MakeIntOpts is make_int with explicit Options (library tests).
@@ -225,7 +225,7 @@ func (c *Constant) Output() string {
 			return ""
 		}
 		if c.Equals(0) {
-			opts := ProcessOptions()
+			opts := sessOpts(nil)
 			if opts.LangCPP {
 				return "nullptr"
 			}
@@ -578,7 +578,7 @@ func HexToBinary(val string) string {
 
 // binaryConstProb mirrors BinaryConstProb() (Probabilities singleton; default 3).
 func binaryConstProb() uint32 {
-	if p := ProcessProbabilities(); p != nil {
+	if p := sessProbs(nil); p != nil {
 		if v := p.Single(PBinaryConstProb); v >= 0 {
 			return uint32(v)
 		}

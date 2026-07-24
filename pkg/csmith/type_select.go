@@ -254,7 +254,7 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
 	// process CGOptions (dfs_exhaustive / max_exhaustive_depth); no Defaults invent
 	if len(ok) > 0 {
-		if DepthGuardByDepth(ProcessOptions(), 1) == BadDepth {
+		if DepthGuardByDepth(sessOpts(nil), 1) == BadDepth {
 			return nil
 		}
 	}

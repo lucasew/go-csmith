@@ -1119,7 +1119,12 @@ func MakeRandomBinaryInvocation(
 	}
 	// FunctionInvocation.cpp:179–183 — do { pick } while (type->is_float() && !works)
 	// FunctionInvocation.cpp:185 — assert(type); nil type allowed only for non-float paths (library)
-	op := PickBinaryOp(r, opts)
+	// Prefer caller probs; fall back to session bag (not ambient-only Process*).
+	binProbs := probs
+	if binProbs == nil {
+		binProbs = sessProbs(cgSess(cg))
+	}
+	op := PickBinaryOpProbs(r, opts, binProbs)
 	if typ != nil {
 		isF := typ.IsFloat()
 		// residual ERROR sticky — no invent soft-continue pick past IsFloat residual
@@ -1134,7 +1139,7 @@ func MakeRandomBinaryInvocation(
 					validB = true
 					break
 				}
-				op = PickBinaryOp(r, opts)
+				op = PickBinaryOpProbs(r, opts, binProbs)
 			}
 			if !validB {
 				return nil
@@ -1665,9 +1670,11 @@ func MakeRandomUnaryInvocation(
 	// FunctionInvocation.cpp:146–149 — do { pick } while (float && !works); no soft invent invalid
 	var uop UnaryOp
 	validU := false
+	// Unary make_random has no Probabilities arg; use session bag (cg.Sess under Generate).
+	unProbs := sessProbs(cgSess(cg))
 	// C++ unbounded do-while; cap high (no soft invent invalid float op)
 	for tries := 0; tries < 256; tries++ {
-		uop = PickUnaryOp(r, opts)
+		uop = PickUnaryOpProbs(r, opts, unProbs)
 		isF := typ.IsFloat()
 		// residual ERROR sticky — no invent soft-continue unary pick past IsFloat residual
 		if sessHasError(cgSess(cg)) {

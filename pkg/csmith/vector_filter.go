@@ -87,7 +87,11 @@ func (f *VectorFilter) Disable(kind FilterKind) {
 // CurrentKind mirrors Filter::current_kind.
 // Filter.cpp:63–68 — random_based → fDefault; dfs_exhaustive → fDFS; else MAX.
 func (f *VectorFilter) CurrentKind() FilterKind {
-	o := ProcessOptions()
+	return f.CurrentKindOpts(sessOpts(nil))
+}
+
+// CurrentKindOpts is CurrentKind with explicit session Options.
+func (f *VectorFilter) CurrentKindOpts(o Options) FilterKind {
 	if o.RandomBased {
 		return FilterKindDefault
 	}

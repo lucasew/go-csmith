@@ -302,12 +302,17 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputStructDecl emits a C struct definition.
 func (t *Type) OutputStructDecl() string {
-	return t.OutputStructDeclOpts(nil, nil)
+	return t.OutputStructDeclWith(nil, nil, ProcessOptions())
 }
 
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
+	return t.OutputStructDeclWith(r, attrs, ProcessOptions())
+}
+
+// OutputStructDeclWith is OutputStructDeclOpts with explicit session Options (ccomp pack).
+func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
 	// Type* always live at struct emit; sticky no invent decl without it
 	if t == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -326,7 +331,7 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t.Packed {
 		// Type.cpp:1823–1829 OutputStructUnion — non-ccomp: pack(push) then pack(1).
 		// ccomp: only pack(1). Defaults CComp=false (CGOptions::ccomp).
-		if !ProcessOptions().CComp {
+		if !opts.CComp {
 			b.WriteString("#pragma pack(push)\n")
 		}
 		b.WriteString("#pragma pack(1)\n")
@@ -445,7 +450,7 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	b.WriteString("\n")
 	if t.Packed {
 		// Type.cpp:1879–1883 — ccomp → pack(); else pack(pop)
-		if ProcessOptions().CComp {
+		if opts.CComp {
 			b.WriteString("#pragma pack()\n")
 		} else {
 			b.WriteString("#pragma pack(pop)\n")

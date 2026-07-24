@@ -761,7 +761,7 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 		return t == other
 	case MatchConvert:
 		// Type::is_convertable reads CGOptions::strict_float / lang_cpp
-		ok := t.IsConvertableOpts(other, ProcessOptions())
+		ok := t.IsConvertableOpts(other, sessOpts(nil))
 		// residual ERROR sticky — no invent match true past IsConvertableOpts residual hole
 		if sessHasError(nil) {
 			return false
@@ -837,9 +837,9 @@ func (t *Type) IsPromotable(other *Type) bool {
 
 // IsConvertable mirrors Type::is_convertable (simple + pointer size rules).
 // Type.cpp:1423–1455 — float→int forbidden; pointer same size unless strict_float/lang_cpp.
-// Uses process CGOptions; no soft invent Defaults().
+// Uses session CGOptions; no soft invent Defaults().
 func (t *Type) IsConvertable(other *Type) bool {
-	return t.IsConvertableOpts(other, ProcessOptions())
+	return t.IsConvertableOpts(other, sessOpts(nil))
 }
 
 // IsConvertableOpts applies CGOptions::strict_float / lang_cpp pointer rules.

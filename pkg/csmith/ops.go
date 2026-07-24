@@ -112,9 +112,14 @@ func (op BinaryOp) CmpOpC() string {
 // BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER via process Probabilities.
 // No invent NewProbabilities(opts) one-off table when process unset — reject-all.
 func BinaryOpsFilter(opts Options) Filter {
+	return BinaryOpsFilterProbs(opts, sessProbs(nil))
+}
+
+// BinaryOpsFilterProbs uses an explicit Probabilities bag (session path).
+func BinaryOpsFilterProbs(opts Options, probs *Probabilities) Filter {
 	_ = opts
-	if p := ProcessProbabilities(); p != nil {
-		return p.BinaryOpsFilter()
+	if probs != nil {
+		return probs.BinaryOpsFilter()
 	}
 	// C++ GetInstance always live; fail closed reject every op
 	return filterFunc(func(v uint32) bool { return true })
@@ -123,14 +128,18 @@ func BinaryOpsFilter(opts Options) Filter {
 // PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:179–183 — filter from Probabilities pBinaryOpsProb.
 func PickBinaryOp(r *Rng, opts Options) BinaryOp {
+	return PickBinaryOpProbs(r, opts, sessProbs(nil))
+}
+
+// PickBinaryOpProbs is PickBinaryOp with an explicit Probabilities bag.
+func PickBinaryOpProbs(r *Rng, opts Options, probs *Probabilities) BinaryOp {
 	// FunctionInvocation.cpp:179–183 — always rnd_upto; sticky no invent eAdd without draw
 	if r == nil {
 		sessNoteError(nil, ErrGeneric)
 		return BinaryOp(MaxBinaryOp)
 	}
-	// BINARY_OPS_PROB_FILTER uses process Probabilities group (no invent opts-only
+	// BINARY_OPS_PROB_FILTER uses session Probabilities group (no invent opts-only
 	// filter when session singleton is live).
-	probs := ProcessProbabilities()
 	if probs == nil {
 		// library path without NewProgramGenerator — fail closed MAX (non-sticky:
 		// sticky poisons unit paths that omit process Probabilities singleton)
@@ -201,9 +210,14 @@ func (op UnaryOp) UnaryOpC() string {
 // UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER via process Probabilities.
 // No invent NewProbabilities(opts) when process unset — reject-all.
 func UnaryOpsFilter(opts Options) Filter {
+	return UnaryOpsFilterProbs(opts, sessProbs(nil))
+}
+
+// UnaryOpsFilterProbs uses an explicit Probabilities bag (session path).
+func UnaryOpsFilterProbs(opts Options, probs *Probabilities) Filter {
 	_ = opts
-	if p := ProcessProbabilities(); p != nil {
-		return p.UnaryOpsFilter()
+	if probs != nil {
+		return probs.UnaryOpsFilter()
 	}
 	return filterFunc(func(v uint32) bool { return true })
 }
@@ -211,12 +225,16 @@ func UnaryOpsFilter(opts Options) Filter {
 // PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:146–148 — filter from Probabilities pUnaryOpsProb.
 func PickUnaryOp(r *Rng, opts Options) UnaryOp {
+	return PickUnaryOpProbs(r, opts, sessProbs(nil))
+}
+
+// PickUnaryOpProbs is PickUnaryOp with an explicit Probabilities bag.
+func PickUnaryOpProbs(r *Rng, opts Options, probs *Probabilities) UnaryOp {
 	// FunctionInvocation.cpp:146–148 — always rnd_upto; sticky no invent eMinus without draw
 	if r == nil {
 		sessNoteError(nil, ErrGeneric)
 		return UnaryOp(MaxUnaryOp)
 	}
-	probs := ProcessProbabilities()
 	if probs == nil {
 		// library path without session probs — fail closed MAX (non-sticky soft
 		// re-pick for unit paths without process Probabilities)

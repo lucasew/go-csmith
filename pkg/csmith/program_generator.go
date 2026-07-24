@@ -532,9 +532,9 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 	var decl string
 	if t.IsStruct() {
 		if structAttr != nil {
-			decl = t.OutputStructDeclOpts(g.Rng, structAttr)
+			decl = t.OutputStructDeclWith(g.Rng, structAttr, g.Opts)
 		} else {
-			decl = t.OutputStructDecl()
+			decl = t.OutputStructDeclWith(nil, nil, g.Opts)
 		}
 	} else {
 		if unionAttr != nil {

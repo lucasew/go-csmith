@@ -246,7 +246,7 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 		return false
 	}
 	// CVQualifiers.cpp:141–143 — if (CGOptions::match_exact_qualifiers())
-	if matchExact || ProcessOptions().MatchExactQualifiers {
+	if matchExact || sessOpts(nil).MatchExactQualifiers {
 		return boolsEqual(q.IsConsts, other.IsConsts) && boolsEqual(q.IsVolatiles, other.IsVolatiles)
 	}
 	// both non-pointer (one level) → true
@@ -386,7 +386,7 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 // these random_* helpers must too (seed-2 e9060: choose exact-miss then
 // RandomLooserConsts F50 while UP skipped flips under match_exact).
 func processMatchExactQualifiers(opts Options) bool {
-	return opts.MatchExactQualifiers || ProcessOptions().MatchExactQualifiers
+	return opts.MatchExactQualifiers || sessOpts(nil).MatchExactQualifiers
 }
 
 // RandomStricterConsts mirrors CVQualifiers::random_stricter_consts.
@@ -728,7 +728,7 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 // CVQualifiers.cpp:639–650 — leading const/volatile of level 0.
 // assert(0) if const/vol bit set when option disabled — emit nothing for that bit.
 func (q CVQualifiers) OutputFirstQuals() string {
-	opts := ProcessOptions()
+	opts := sessOpts(nil)
 	var b strings.Builder
 	if len(q.IsConsts) > 0 && q.IsConsts[0] {
 		// CVQualifiers.cpp:641–642 — assert(consts()) sticky when bit set but option off
@@ -905,7 +905,7 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 			return ""
 		}
 	}
-	opts := ProcessOptions()
+	opts := sessOpts(nil)
 	emitConst := func() bool { return opts.Consts }
 	emitVol := func() bool { return opts.Volatiles }
 	if q.Wildcard || len(q.IsConsts) == 0 {

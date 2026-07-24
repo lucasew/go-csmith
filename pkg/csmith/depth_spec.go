@@ -160,7 +160,7 @@ func DepthGuardByDepth(opts Options, depthNeeded int) int {
 	if !opts.DFSExhaustive {
 		return GoodDepth
 	}
-	r := ProcessRng()
+	r := sessRng(nil)
 	if r == nil || r.kind != RngKindDFS {
 		// DFS exhaustive without live DFS generator: sticky incomplete
 		sessNoteError(nil, ErrGeneric)

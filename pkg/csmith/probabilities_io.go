@@ -175,7 +175,7 @@ func WriteDumpDefaultProbabilities(fname string) error {
 		sessNoteError(nil, ErrGeneric)
 		return fmt.Errorf("empty dump path")
 	}
-	p := ProcessProbabilities()
+	p := sessProbs(nil)
 	if p == nil {
 		p = NewProbabilities(Defaults())
 	}
@@ -188,7 +188,7 @@ func WriteDumpActualProbabilities(fname string, seed uint64) error {
 		sessNoteError(nil, ErrGeneric)
 		return fmt.Errorf("empty dump path")
 	}
-	p := ProcessProbabilities()
+	p := sessProbs(nil)
 	if p == nil {
 		sessNoteError(nil, ErrGeneric)
 		return fmt.Errorf("probabilities not initialized")
