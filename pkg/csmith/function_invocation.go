@@ -60,7 +60,13 @@ func (fi *Invocation) wrapperOpts() Options {
 // Output C for the invocation.
 // FunctionInvocationUnary::Output / FunctionInvocationBinary::Output —
 // safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
+// Ambient ProcessOptions bridge; emit prefers OutputOpts.
 func (fi *Invocation) Output() string {
+	return fi.OutputOpts(ProcessOptions())
+}
+
+// OutputOpts is Output with explicit session Options (arg / wrapper emit).
+func (fi *Invocation) OutputOpts(opts Options) string {
 	// FunctionInvocation always live at Output; sticky no invent empty call without it
 	if fi == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -84,7 +90,7 @@ func (fi *Invocation) Output() string {
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			out := a.Output()
+			out := a.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue later args past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -123,7 +129,7 @@ func (fi *Invocation) Output() string {
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			a0 := fi.Args[0].Output()
+			a0 := fi.Args[0].OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-empty unary past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -149,12 +155,12 @@ func (fi *Invocation) Output() string {
 			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
-		a0 := fi.Args[0].Output()
+		a0 := fi.Args[0].OutputOpts(opts)
 		// residual ERROR sticky — no invent soft-continue a1 past a0 Output residual
 		if sessHasError(nil) {
 			return ""
 		}
-		a1 := fi.Args[1].Output()
+		a1 := fi.Args[1].OutputOpts(opts)
 		// residual ERROR sticky — no invent soft-empty binary past a1 Output residual
 		if sessHasError(nil) {
 			return ""

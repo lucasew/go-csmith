@@ -1685,13 +1685,19 @@ func makeExpressionVariableFlags(
 
 // Output is a minimal C fragment (Expression::Output + optional cast).
 // Expression.cpp:227–232 output_cast — "(type) " prefix when cast_type set.
+// Ambient ProcessOptions bridge; emit paths prefer OutputOpts.
 func (e *Expression) Output() string {
+	return e.OutputOpts(ProcessOptions())
+}
+
+// OutputOpts is Output with explicit session Options (const emit / access_once / lang_cpp).
+func (e *Expression) OutputOpts(opts Options) string {
 	// Expression* always live at Output; sticky no invent empty token without it
 	if e == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
-	body := e.outputBody()
+	body := e.outputBodyOpts(opts)
 	// residual ERROR sticky — no invent soft-empty body past outputBody residual hole
 	if sessHasError(nil) {
 		return ""
@@ -1718,7 +1724,12 @@ func (e *Expression) Output() string {
 // IndentedOutput mirrors Expression::indented_output.
 // Expression.cpp:133–136 — output_tab(indent) + Output.
 func (e *Expression) IndentedOutput(indent int) string {
-	out := e.Output()
+	return e.IndentedOutputOpts(indent, ProcessOptions())
+}
+
+// IndentedOutputOpts is IndentedOutput with explicit session Options.
+func (e *Expression) IndentedOutputOpts(indent int, opts Options) string {
+	out := e.OutputOpts(opts)
 	// residual ERROR sticky — no invent soft-indent emit past Output residual
 	if sessHasError(nil) {
 		return ""
@@ -1727,19 +1738,23 @@ func (e *Expression) IndentedOutput(indent int) string {
 }
 
 func (e *Expression) outputBody() string {
+	return e.outputBodyOpts(ProcessOptions())
+}
+
+func (e *Expression) outputBodyOpts(opts Options) string {
 	if e == nil {
 		return ""
 	}
 	switch e.Term {
 	case TermConstant:
 		// Expression::to_string → Output → Constant::Output (Constant.cpp:532–551).
-		// Must use Con.Output() so negatives become "(-6L)" for array init_strings
+		// Must use Con.OutputOpts so negatives become "(-6L)" for array init_strings
 		// (ArrayVariable.cpp:490–492 init_values[i]->to_string()), not bare Value.
 		if e.Con == nil {
 			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
-		return e.Con.Output()
+		return e.Con.OutputOpts(opts)
 	case TermVariable:
 		if e.Var == nil {
 			sessNoteError(nil, ErrGeneric)
@@ -1747,10 +1762,10 @@ func (e *Expression) outputBody() string {
 		}
 		// ExpressionVariable::Output — *…var or &var from indirect level.
 		// ExpressionVariable.cpp:202–219 — base is Variable::Output (VOL_RVAL/ACCESS_ONCE).
-		return outputExpressionVariable(e.Var, e.ExprType)
+		return outputExpressionVariableOpts(e.Var, e.ExprType, opts)
 	case TermFunction:
 		if e.Invoke != nil {
-			out := e.Invoke.Output()
+			out := e.Invoke.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-empty call past Invoke Output residual
 			if sessHasError(nil) {
 				return ""
@@ -1763,7 +1778,7 @@ func (e *Expression) outputBody() string {
 		if e.Assign != nil {
 			// ExpressionAssign::Output → (assign as expr)
 			wrap := e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal
-			as := OutputAssignAsExpr(e.Assign, wrap)
+			as := OutputAssignAsExprOpts(e.Assign, wrap, opts)
 			// residual ERROR sticky — no invent soft-empty assign expr past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -1783,12 +1798,12 @@ func (e *Expression) outputBody() string {
 			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
-		lhs := e.CommaLHS.Output()
+		lhs := e.CommaLHS.OutputOpts(opts)
 		// residual ERROR sticky — no invent soft-continue RHS past LHS Output residual
 		if sessHasError(nil) {
 			return ""
 		}
-		rhs := e.CommaRHS.Output()
+		rhs := e.CommaRHS.OutputOpts(opts)
 		// residual ERROR sticky — no invent soft-empty comma past RHS Output residual
 		if sessHasError(nil) {
 			return ""

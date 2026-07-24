@@ -319,10 +319,9 @@ func (p *Probabilities) SimpleTypesFilter() Filter {
 		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
-	if ProcessProbabilities() == p {
-		if f, ok := p.probFilters[PSimpleTypesProb]; ok && f != nil {
-			return f
-		}
+	// Prefer filters bound on this bag (setProbFilter owner); no Process* identity.
+	if f, ok := p.probFilters[PSimpleTypesProb]; ok && f != nil {
+		return f
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.SimpleTypeWeight(int(v))
@@ -354,10 +353,9 @@ func (p *Probabilities) BinaryOpsFilter() Filter {
 		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
-	if ProcessProbabilities() == p {
-		if f, ok := p.probFilters[PBinaryOpsProb]; ok && f != nil {
-			return f
-		}
+	// Prefer filters bound on this bag (setProbFilter owner); no Process* identity.
+	if f, ok := p.probFilters[PBinaryOpsProb]; ok && f != nil {
+		return f
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.BinaryOpWeight(int(v))
@@ -389,10 +387,9 @@ func (p *Probabilities) UnaryOpsFilter() Filter {
 		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
-	if ProcessProbabilities() == p {
-		if f, ok := p.probFilters[PUnaryOpsProb]; ok && f != nil {
-			return f
-		}
+	// Prefer filters bound on this bag (setProbFilter owner); no Process* identity.
+	if f, ok := p.probFilters[PUnaryOpsProb]; ok && f != nil {
+		return f
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.UnaryOpWeight(int(v))
@@ -579,10 +576,9 @@ func (p *Probabilities) SafeOpsSizeFilter() Filter {
 		sessNoteError(nil, ErrGeneric)
 		return filterFunc(func(uint32) bool { return true })
 	}
-	if ProcessProbabilities() == p {
-		if f, ok := p.probFilters[PSafeOpsSizeProb]; ok && f != nil {
-			return f
-		}
+	// Prefer filters bound on this bag (setProbFilter owner); no Process* identity.
+	if f, ok := p.probFilters[PSafeOpsSizeProb]; ok && f != nil {
+		return f
 	}
 	return filterFunc(func(v uint32) bool {
 		w := p.SafeOpsSizeWeight(int(v))

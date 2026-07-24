@@ -253,6 +253,11 @@ func (av *ArrayVariable) IsGlobal() bool {
 // ArrayVariable.cpp:512–521 OutputDecl — output_qualified_type + name + [sizes].
 // Do not invent bare Type.CName + storage IsVolatile (misplaces pointer vol).
 func (av *ArrayVariable) CDeclType() string {
+	return av.CDeclTypeOpts(ProcessOptions())
+}
+
+// CDeclTypeOpts is CDeclType with explicit session Options (const/volatile asserts).
+func (av *ArrayVariable) CDeclTypeOpts(opts Options) string {
 	// ArrayVariable / Variable decl always has live type; sticky (no invent "int")
 	if av == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -263,7 +268,7 @@ func (av *ArrayVariable) CDeclType() string {
 		return ""
 	}
 	// ArrayVariable.cpp:517 — output_qualified_type(out)
-	ty := av.Qfer.OutputQualifiedType(av.Type)
+	ty := av.Qfer.OutputQualifiedTypeOpts(av.Type, opts)
 	// residual ERROR sticky — no invent soft-empty decl past OutputQualifiedType residual
 	if sessHasError(nil) {
 		return ""
@@ -891,7 +896,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 		return ""
 	}
 	// ArrayVariable.cpp:494–507 — OutputDecl always live; sticky no invent bare ";" / " = …"
-	decl := av.CDeclType()
+	decl := av.CDeclTypeOpts(opts)
 	// residual ERROR sticky — no invent soft-empty def past CDeclType residual
 	if sessHasError(s) {
 		return ""

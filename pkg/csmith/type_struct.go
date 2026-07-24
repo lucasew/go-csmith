@@ -426,7 +426,7 @@ func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Opti
 			return ""
 		}
 		// Type.cpp:1879–1880 — output_qualified_type always live; sticky no invent " fN;"
-		ty := f.Qfer.OutputQualifiedType(f.Type)
+		ty := f.Qfer.OutputQualifiedTypeOpts(f.Type, opts)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
 		if sessHasError(nil) {
 			return ""
@@ -835,12 +835,17 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputUnionDecl emits a C union definition.
 func (t *Type) OutputUnionDecl() string {
-	return t.OutputUnionDeclOpts(nil, nil)
+	return t.OutputUnionDeclWith(nil, nil, ProcessOptions())
 }
 
 // OutputUnionDeclOpts optionally emits type attributes.
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
+	return t.OutputUnionDeclWith(r, attrs, ProcessOptions())
+}
+
+// OutputUnionDeclWith is OutputUnionDeclOpts with explicit session Options.
+func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
 	// Type* always live at union emit; sticky no invent decl without it
 	if t == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -936,7 +941,7 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			return ""
 		}
 		// output_qualified_type always live sticky; no invent " fN;" without type
-		ty := f.Qfer.OutputQualifiedType(f.Type)
+		ty := f.Qfer.OutputQualifiedTypeOpts(f.Type, opts)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
 		if sessHasError(nil) {
 			return ""

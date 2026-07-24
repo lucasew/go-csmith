@@ -1740,7 +1740,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			exprOut := st.Expr.Output()
+			exprOut := st.Expr.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -1767,7 +1767,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				if sessHasError(nil) {
 					return ""
 				}
-				rhs := st.Expr.Output()
+				rhs := st.Expr.OutputOpts(opts)
 				// residual ERROR sticky — no invent soft-continue past Output residual
 				if sessHasError(nil) {
 					return ""
@@ -1792,7 +1792,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				content.WriteString(asExpr + ";\n")
 			} else if st.ArrayAccess != "" && st.Expr != nil {
 				// array_init simple: a[i] = expr
-				rhs := st.Expr.Output()
+				rhs := st.Expr.OutputOpts(opts)
 				// residual ERROR sticky — no invent soft-continue stmt past Output residual
 				if sessHasError(nil) {
 					return ""
@@ -1813,7 +1813,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.Output()
+			test := st.Expr.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -1832,7 +1832,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.Output()
+			test := st.Expr.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -1876,7 +1876,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.Output()
+			test := st.Expr.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue arms past test residual
 			if sessHasError(nil) {
 				return ""
@@ -1907,7 +1907,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.Output()
+			test := st.Expr.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
 			if sessHasError(nil) {
 				return ""
@@ -1947,7 +1947,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				assignPad := strings.Repeat("    ", indent+1)
 				if st.Expr.Term == TermConstant && st.LhsVar != nil && st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 					ty := st.LhsVar.Type.CName()
-					rhs := st.Expr.Output()
+					rhs := st.Expr.OutputOpts(opts)
 					if sessHasError(nil) {
 						return ""
 					}
@@ -1958,7 +1958,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 					content.WriteString(assignPad + ty + " tmp = " + rhs + ";\n")
 					content.WriteString(assignPad + st.ArrayAccess + " = tmp;\n")
 				} else {
-					rhs := st.Expr.Output()
+					rhs := st.Expr.OutputOpts(opts)
 					if sessHasError(nil) {
 						return ""
 					}
@@ -2018,7 +2018,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
-			out := st.Expr.Output()
+			out := st.Expr.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
 			if sessHasError(nil) {
 				return ""

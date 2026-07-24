@@ -407,7 +407,13 @@ func (l *Lhs) Output(wrapVolatiles bool) string {
 
 // outputExpressionVariable mirrors ExpressionVariable::Output without cast.
 // ExpressionVariable.cpp:202–219 — (*…)/& + Variable::Output.
+// Ambient ProcessOptions bridge; emit prefers outputExpressionVariableOpts.
 func outputExpressionVariable(v *Variable, want *Type) string {
+	return outputExpressionVariableOpts(v, want, ProcessOptions())
+}
+
+// outputExpressionVariableOpts is outputExpressionVariable with access_once Options.
+func outputExpressionVariableOpts(v *Variable, want *Type, opts Options) string {
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
@@ -430,7 +436,7 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		}
 		ind = vi - wi
 	}
-	base := v.OutputC()
+	base := v.OutputCOptsWith(false, opts)
 	// residual ERROR sticky — no invent soft-empty base past OutputC residual hole
 	if sessHasError(nil) {
 		return ""
