@@ -33,21 +33,37 @@ type ProgramGenerator struct {
 
 // SetProcessProgramGenerator installs AbsProgramGenerator::current_generator_
 // on the active session.
-func SetProcessProgramGenerator(g *ProgramGenerator) { currentSession().ProgramGen = g }
+func SetProcessProgramGenerator(g *ProgramGenerator) {
+	SetProcessProgramGeneratorSess(nil, g)
+}
+
+// SetProcessProgramGeneratorSess installs current_generator_ on an explicit session bag.
+func SetProcessProgramGeneratorSess(s *Session, g *ProgramGenerator) {
+	sessOrAmbient(s).ProgramGen = g
+}
 
 // ProcessProgramGenerator mirrors AbsProgramGenerator::GetInstance.
 // Nil sticky fail-closed (C++ asserts).
 func ProcessProgramGenerator() *ProgramGenerator {
-	g := currentSession().ProgramGen
+	return ProcessProgramGeneratorSess(nil)
+}
+
+// ProcessProgramGeneratorSess returns ProgramGen on an explicit session bag.
+func ProcessProgramGeneratorSess(s *Session) *ProgramGenerator {
+	s = sessOrAmbient(s)
+	g := s.ProgramGen
 	if g == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return g
 }
 
 // ClearProcessProgramGenerator drops current_generator_ (finalization / tests).
-func ClearProcessProgramGenerator() { currentSession().ProgramGen = nil }
+func ClearProcessProgramGenerator() { ClearProcessProgramGeneratorSess(nil) }
+
+// ClearProcessProgramGeneratorSess clears ProgramGen on an explicit session bag.
+func ClearProcessProgramGeneratorSess(s *Session) { sessOrAmbient(s).ProgramGen = nil }
 
 // noteErr records ERROR on g.Sess (and ambient bridge).
 func (g *ProgramGenerator) noteErr(code int) {
@@ -163,7 +179,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	probs := NewProbabilities(opts)
 	s.Probs = probs
 	// Probabilities.cpp:573–578 — assignOpsTable_ + expr/param tables once
-	InitSessionProbabilityTables(opts)
+	InitSessionProbabilityTablesSess(s, opts)
 	// share session Probabilities with VS
 	vs := NewVariableSelectorProbs(opts, probs)
 	vs.Sess = s
@@ -171,7 +187,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	stmtTab := probs.StatementThresholdTable()
 	s.StmtTab = stmtTab
 	// VariableSelector::InitScopeTable — scopeTable_ once per generation
-	InitScopeTable(opts)
+	InitScopeTableSess(s, opts)
 	// Expression session tables from InitSessionProbabilityTables
 	exprTables := s.ExprTables
 	g := &ProgramGenerator{
@@ -211,7 +227,7 @@ func (g *ProgramGenerator) Initialize() {
 	}
 	s := g.Sess
 	if s == nil {
-		s = currentSession()
+		s = sessOrAmbient(nil)
 		g.Sess = s
 	}
 	// Activate g.Sess for Finalization + reinstall so we clear/rebuild the
@@ -250,7 +266,7 @@ func (g *ProgramGenerator) Initialize() {
 		s.Rng = g.Rng
 	}
 	// re-init scope + assign ops from session opts (once-per-run tables)
-	InitScopeTable(g.Opts)
+	InitScopeTableSess(s, g.Opts)
 	s.AssignOpsTab = NewAssignOpsTable(g.Opts)
 }
 
