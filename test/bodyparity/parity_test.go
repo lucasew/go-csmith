@@ -13,6 +13,8 @@ package bodyparity_test
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"os/exec"
@@ -237,14 +239,29 @@ func TestBodyParityLevelC(t *testing.T) {
 		dur = d
 	}
 	_ = upstreamCsmith(t)
-	t.Logf("upstream=%s levelC duration=%s", os.Getenv("CSMITH_UPSTREAM"), dur)
+	// Stream start: BODYPARITY_LEVELC_SEED for reproducible re-run of a hit;
+	// else crypto/rand so each invocation explores a fresh seed region
+	// (fixed golden-ratio start re-tested the same ~450 seeds every 10m).
+	seed := uint64(0)
+	if s := strings.TrimSpace(os.Getenv("BODYPARITY_LEVELC_SEED")); s != "" {
+		v, err := strconv.ParseUint(s, 0, 64)
+		if err != nil {
+			t.Fatalf("BODYPARITY_LEVELC_SEED=%q: %v", s, err)
+		}
+		seed = v
+	} else {
+		var b [8]byte
+		if _, err := crand.Read(b[:]); err != nil {
+			t.Fatalf("crypto/rand: %v", err)
+		}
+		seed = binary.LittleEndian.Uint64(b[:])
+	}
+	t.Logf("upstream=%s levelC duration=%s stream_start=%d", os.Getenv("CSMITH_UPSTREAM"), dur, seed)
 	deadline := time.Now().Add(dur)
-	// Deterministic start; then walk a large stride so re-runs explore more.
-	seed := uint64(0x9e3779b97f4a7c15) // golden ratio step
 	n, start := 0, time.Now()
 	for time.Now().Before(deadline) {
 		n++
-		// SplitMix64-style step for non-repeating seed stream
+		// SplitMix64-style step for non-repeating seed stream within a run
 		seed += 0x9e3779b97f4a7c15
 		z := seed
 		z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
@@ -252,7 +269,8 @@ func TestBodyParityLevelC(t *testing.T) {
 		z = z ^ (z >> 31)
 		assertSeedBodyParity(t, z)
 		if t.Failed() {
-			t.Logf("levelC failed after n=%d elapsed=%s", n, time.Since(start).Round(time.Second))
+			t.Logf("levelC failed after n=%d elapsed=%s seed=%d stream_start logged above",
+				n, time.Since(start).Round(time.Second), z)
 			return
 		}
 		if n%25 == 0 {
