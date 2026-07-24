@@ -112,7 +112,7 @@ Event numbers (`eNNNN`) are **debug breadcrumbs**, not evidence and not test nam
 
 The fair spine **can** emit full default programs. Gates below are **active**.
 
-**Acceptance metric (only this):** bit-identical **program body** vs golden / instrumented upstream for the same default flags + seed.
+**Acceptance metric (only this):** bit-identical **program body** vs golden / instrumented upstream for the same **drop-in** config (defaults and/or golden-CLI-expressible flags + seed).
 
 | In the gate | Out of the gate |
 |-------------|-----------------|
@@ -133,19 +133,32 @@ This section is the **mandatory work method** for multi-seed drop-in. It does **
 |-------|------------|--------------------------------------|
 | **A** | Defaults + seed **2**: exact program body vs golden | **Met** (2026-07-21; re-verify after every gen/emit change) |
 | **B** | Defaults + every seed in the **§3.5a battery**: exact program body | **Met** (2026-07-22; re-verify after every gen/emit change) |
-| **C** | Broader seed range (e.g. 0…N or random sample) + optional checksum thermometer | **Met** (2026-07-24; `TestBodyParityLevelC` 10m CLEAN n=458 + battery green; re-verify after every gen/emit change) |
+| **C** | Broader seed range under **defaults** (e.g. random sample) | **Met** (2026-07-24; `TestBodyParityLevelC` 10m CLEAN n=458 + battery green; re-verify after every gen/emit change) |
+| **D** | **Drop-in flag surface:** random golden-CLI-expressible `Options` + seed → exact body; battery B stays green | **Open** — `FuzzBodyParity` / flag loops; see §3.5b |
 
-**Done for multi-seed** means **level B**, not A alone. Seed 2 green is **not** permission to stop or to invent pads so other seeds “pass.”
+**Done for multi-seed defaults** means **level B**, not A alone. Seed 2 green is **not** permission to stop or to invent pads so other seeds “pass.”  
+**Done for drop-in CLI** means **level D** (plus B still green).
+
+#### 3.5b Drop-in vs library (lock)
+
+| Contract | Surface | Gate |
+|----------|---------|------|
+| **Drop-in** (`csmith(1)`) | `Defaults()` + fields `CLIArgs()` can emit (`FieldCLI` in `options_cli.go`) | Exact pre-stats body vs golden for same argv + seed |
+| **Go library** | Full `Options` (CGOptions-shaped + Go extras) | Unit contracts; library callers may set non-CLI knobs — **not** compared to stock binary |
+
+- `Generate(opts)` is the library entry; CLI is a thin argv → `Options` mapper.
+- CGOptions without a golden flag (`max_params`, `wrap_volatiles`, …) stay on the struct for library/fair C++ fidelity; **drop-in / bodyparity force them to Defaults** via `ForDropInParity`.
+- Do **not** invent golden flags upstream does not have. Do **not** count library-only non-defaults as drop-in parity.
 
 **Body parity harness (integration, not unit marks):**
 
 | Command | Role |
 |---------|------|
 | `go test ./test/bodyparity -run TestBodyParityBattery -count=1` | Level **B** battery (`testing.T`) |
-| `BODYPARITY_LEVELC=10m go test ./test/bodyparity -run TestBodyParityLevelC -count=1 -timeout 15m` | Level **C** sequential random seeds (`testing.T`; no 10s fuzz-worker cap) |
-| `go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s` | Level **C** quick fuzz (`testing.F`; single inputs >~10s may false-hang) |
+| `BODYPARITY_LEVELC=10m go test ./test/bodyparity -run TestBodyParityLevelC -count=1 -timeout 15m` | Level **C** sequential random seeds under defaults |
+| `go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s` | Level **D** drop-in flags+seed fuzz (`OptionsFromFuzzBlob`) |
 
-Package **`./test/bodyparity`** only (not under `pkg/csmith`). Upstream path is `CSMITH_UPSTREAM` (hard fail if unset/invalid). Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Prefer **`TestBodyParityLevelC`** for substantial level-C time; `FuzzBodyParity` is fine for short smoke. Crashers under `test/bodyparity/testdata/fuzz/` re-run until fixed or removed (delete hang-only false positives that MATCH alone).
+Package **`./test/bodyparity`** only (not under `pkg/csmith`). Upstream path is `CSMITH_UPSTREAM` (hard fail if unset/invalid). Gate is **exact pre-stats program body** (§3.5); mismatches report a **go-cmp** line diff (`-upstream +go`). Prefer **`TestBodyParityLevelC`** for substantial default-seed time; `FuzzBodyParity` for flag surface. Crashers under `test/bodyparity/testdata/fuzz/` re-run until fixed or removed (delete hang-only false positives that MATCH alone).
 
 #### Frozen battery (level B)
 
@@ -557,6 +570,7 @@ Superseding integrity text that banned residual while still logging residual cli
 | Whole-program level **A** (seed 2 exact body) | **Met** — re-verify after gen/emit changes |
 | Whole-program level **B** (battery exact body) | **Met** (2026-07-22) — frozen battery exact pre-stats body |
 | Whole-program level **C** (expanded range) | **Met** (2026-07-24) — `TestBodyParityLevelC` 10m CLEAN n=458 + battery green; re-verify after gen/emit changes |
+| Drop-in flag surface level **D** | **Open** — `FuzzBodyParity` / `OptionsFromFuzzBlob` + `CLIArgs`; library-only via `ForDropInParity` |
 | Branch `fair-rewrite` + delete residual mass | **Done** (generator/residual/types godfiles removed) |
 | Layer 1: `Rng` | **Done** — `rng.go` + tests |
 | Layer 2: `CGOptions` defaults | **Done** — macros 1:1 tests; `MaxPointerDepth` fixed to 5 (`max_indirect_level`) |

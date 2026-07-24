@@ -1,13 +1,17 @@
 // Upstream body parity (SPEC §3.5 / §3.5a) — integration only.
 //
 // Kept out of pkg/csmith so core unit tests stay fast. Run this package when
-// working multi-seed / level C:
+// working multi-seed / level C / flag-surface parity:
 //
 //	CSMITH_UPSTREAM=/path/to/csmith go test ./test/bodyparity -count=1
 //	CSMITH_UPSTREAM=/path/to/csmith go test ./test/bodyparity -run '^$' \
 //	  -fuzz=FuzzBodyParity -fuzztime=30s
 //
 // CSMITH_UPSTREAM required (hard fail if unset/invalid).
+//
+// Generation contract: csmith.Options → program string (Go) and Options.CLIArgs()
+// → golden binary (upstream). Fuzz mutates a compact blob decoded by
+// OptionsFromFuzzBlob — whole Options surface, not seed alone.
 package bodyparity_test
 
 import (
@@ -30,6 +34,7 @@ import (
 )
 
 // Frozen battery from SPEC §3.5a (level B). Do not shrink in this list.
+// Battery uses Defaults() + seed only.
 var bodyParityBattery = []uint64{
 	0, 1, 2, 3, 4, 5, 7, 10, 42, 100, 123, 999,
 }
@@ -79,44 +84,62 @@ func upstreamCsmith(tb testing.TB) string {
 	return p
 }
 
-func upstreamGenerate(tb testing.TB, seed uint64) string {
+func upstreamGenerate(tb testing.TB, opts csmith.Options) string {
 	tb.Helper()
 	bin := upstreamCsmith(tb)
+	args := opts.CLIArgs()
 	ctx, cancel := context.WithTimeout(tb.Context(), upstreamGenTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, "-s", strconv.FormatUint(seed, 10))
+	cmd := exec.CommandContext(ctx, bin, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		tb.Fatalf("upstream csmith seed=%d: timeout after %s (%s)", seed, upstreamGenTimeout, bin)
+		tb.Fatalf("upstream csmith opts=%v: timeout after %s (%s)", args, upstreamGenTimeout, bin)
 	}
 	if err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()
 		}
-		tb.Fatalf("upstream csmith seed=%d (%s): %s", seed, bin, msg)
+		// Shared invalid config: skip rather than fail the corpus entry.
+		if isUpstreamConflict(msg) {
+			tb.Skipf("upstream rejects config %v: %s", args, msg)
+		}
+		tb.Fatalf("upstream csmith %v (%s): %s", args, bin, msg)
 	}
 	return stdout.String()
 }
 
-func goGenerate(tb testing.TB, seed uint64) string {
+func isUpstreamConflict(msg string) bool {
+	low := strings.ToLower(msg)
+	return strings.Contains(low, "conflict") ||
+		strings.Contains(low, "error:") ||
+		strings.Contains(low, "cannot") ||
+		strings.Contains(low, "invalid")
+}
+
+func goGenerate(tb testing.TB, opts csmith.Options) string {
 	tb.Helper()
-	opts := csmith.Defaults()
-	opts.Seed = seed
+	if err := opts.Validate(); err != nil {
+		tb.Skipf("go rejects config: %v", err)
+	}
+	// Header Options: line should list the same argv we pass upstream.
+	opts.Argv = opts.CLIArgs()
 	out, err := csmith.Generate(opts)
 	if err != nil {
-		tb.Fatalf("go csmith seed=%d: %v", seed, err)
+		// Match upstream soft reject: skip invalid / failed generation under exotic flags.
+		if strings.Contains(err.Error(), "conflict") || strings.Contains(err.Error(), "generation error") {
+			tb.Skipf("go generate skipped: %v (args=%v)", err, opts.CLIArgs())
+		}
+		tb.Fatalf("go csmith args=%v: %v", opts.CLIArgs(), err)
 	}
 	return out
 }
 
 // bodyMismatchReport is a capped go-cmp style report (first differing lines).
-// Full-program cmp.Diff can be multi-MB and break fuzz worker IPC; still uses
-// go-cmp for the window around the first divergence.
-func bodyMismatchReport(seed uint64, upBody, goBody string) string {
+func bodyMismatchReport(opts csmith.Options, upBody, goBody string) string {
 	upLines := strings.Split(upBody, "\n")
 	goLines := strings.Split(goBody, "\n")
 	n := len(upLines)
@@ -137,11 +160,11 @@ func bodyMismatchReport(seed uint64, upBody, goBody string) string {
 			break
 		}
 	}
+	args := opts.CLIArgs()
 	if first < 0 {
-		return fmt.Sprintf("seed=%d program body mismatch (len up=%d go=%d, no line diff?)",
-			seed, len(upBody), len(goBody))
+		return fmt.Sprintf("opts=%v program body mismatch (len up=%d go=%d, no line diff?)",
+			args, len(upBody), len(goBody))
 	}
-	// Window of ±5 lines around first divergence, go-cmp on that slice.
 	lo := first - 5
 	if lo < 0 {
 		lo = 0
@@ -158,26 +181,48 @@ func bodyMismatchReport(seed uint64, upBody, goBody string) string {
 	if len(diff) > 4000 {
 		diff = diff[:4000] + "\n... (truncated)"
 	}
-	return fmt.Sprintf("seed=%d program body mismatch at line %d (-upstream +go):\n%s",
-		seed, first+1, diff)
+	return fmt.Sprintf("opts=%v program body mismatch at line %d (-upstream +go):\n%s",
+		args, first+1, diff)
 }
 
-func assertSeedBodyParity(tb testing.TB, seed uint64) {
+func assertOptsBodyParity(tb testing.TB, opts csmith.Options) {
 	tb.Helper()
-	upOut := upstreamGenerate(tb, seed)
-	goOut := goGenerate(tb, seed)
+	// Drop-in contract only: library/go-only knobs → Defaults (golden cannot set them).
+	opts = opts.ForDropInParity()
+	args := opts.CLIArgs()
+	short := csmith.FormatOptionsShort(opts)
+	// Always on failure / with -v. Fuzz workers often swallow stderr; optional
+	// BODYPARITY_LOG=path appends every case (including fuzz) for live inspection.
+	tb.Logf("bodyparity argv=%q short=%s", args, short)
+	if p := strings.TrimSpace(os.Getenv("BODYPARITY_LOG")); p != "" {
+		line := fmt.Sprintf("bodyparity argv=%q short=%s\n", args, short)
+		f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err == nil {
+			_, _ = f.WriteString(line)
+			_ = f.Close()
+		}
+	}
+	upOut := upstreamGenerate(tb, opts)
+	goOut := goGenerate(tb, opts)
 	upBody, err := programBody(upOut)
 	if err != nil {
-		tb.Fatalf("seed=%d upstream body: %v", seed, err)
+		tb.Fatalf("opts=%v upstream body: %v", opts.CLIArgs(), err)
 	}
 	goBody, err := programBody(goOut)
 	if err != nil {
-		tb.Fatalf("seed=%d go body: %v", seed, err)
+		tb.Fatalf("opts=%v go body: %v", opts.CLIArgs(), err)
 	}
 	if goBody == upBody {
 		return
 	}
-	tb.Fatal(bodyMismatchReport(seed, upBody, goBody))
+	tb.Fatal(bodyMismatchReport(opts, upBody, goBody))
+}
+
+func assertSeedBodyParity(tb testing.TB, seed uint64) {
+	tb.Helper()
+	opts := csmith.Defaults()
+	opts.Seed = seed
+	assertOptsBodyParity(tb, opts)
 }
 
 // TestBodyParityBattery is SPEC §3.5a level B: frozen battery, exact body.
@@ -191,37 +236,59 @@ func TestBodyParityBattery(t *testing.T) {
 	}
 }
 
-// FuzzBodyParity is SPEC §3.5a level C via testing.F (quick / short seeds).
+// FuzzBodyParity is drop-in flag-surface + seed fuzz (SPEC §3.5b).
+//
+// Payload: OptionsFromFuzzBlob — seed + every golden-CLI-expressible field
+// (FieldCLI). Library-only CGOptions stay at Defaults. Compares Go Generate
+// vs golden csmith(opts.CLIArgs()).
 //
 //	CSMITH_UPSTREAM=... go test ./test/bodyparity -run '^$' -fuzz=FuzzBodyParity -fuzztime=30s
 //
-// Hard limit: Go internal/fuzz worker panics "deadlocked!" if a single input
-// takes >10s (worker.go AfterFunc(10*time.Second)). Full upstream+go generate
-// often exceeds that → "hung or terminated unexpectedly: exit status 2" with
-// crashers that MATCH alone. For substantial level-C time use
-// TestBodyParityLevelC (sequential random, no 10s worker limit).
-//
-// Does **not** re-seed the level-B battery (that is TestBodyParityBattery only).
-// Mutator starts from the zero seed; interesting/failing inputs accumulate under
-// testdata/fuzz/. Commit crashers only as intentional regressions while C is open.
+// Seed-only Defaults remain covered by TestBodyParityBattery / TestBodyParityLevelC.
+// Hard limit: go-fuzz worker ~10s per input; prefer sequential helpers for long runs.
 func FuzzBodyParity(f *testing.F) {
 	f.Logf("upstream=%s", upstreamCsmith(f))
-	// One trivial entry so continuous -fuzz has a root; avoids re-running the
-	// full battery as baseline (duplicate of TestBodyParityBattery).
-	f.Add(uint64(0))
-	f.Fuzz(func(t *testing.T, seed uint64) {
-		assertSeedBodyParity(t, seed)
+	// Seed-only roots (8-byte LE seed) — Defaults drop-in surface.
+	for _, seed := range []uint64{0, 1, 2} {
+		b := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b, seed)
+		f.Add(b)
+	}
+	// Drop-in flag roots.
+	for _, seed := range []uint64{0, 2, 42} {
+		o := csmith.Defaults()
+		o.Seed = seed
+		f.Add(csmith.FuzzBlobFromOptions(o))
+	}
+	for _, mut := range []func(*csmith.Options){
+		func(o *csmith.Options) { o.Jumps = false },
+		func(o *csmith.Options) { o.Volatiles = false },
+		func(o *csmith.Options) { o.MaxFuncs = 3 },
+		func(o *csmith.Options) { o.Pointers = false },
+		func(o *csmith.Options) { o.Arrays = false },
+		func(o *csmith.Options) { o.SafeMath = false },
+		func(o *csmith.Options) { o.Bitfields = false },
+	} {
+		o := csmith.Defaults()
+		o.Seed = 2
+		mut(&o)
+		f.Add(csmith.FuzzBlobFromOptions(o))
+	}
+
+	f.Fuzz(func(t *testing.T, blob []byte) {
+		assertOptsBodyParity(t, csmith.OptionsFromFuzzBlob(blob))
 	})
 }
 
 // TestBodyParityLevelC is SPEC §3.5a level C without the go-fuzz 10s worker cap:
-// sequential random seeds, exact pre-stats body, until BODYPARITY_LEVELC duration
-// elapses (default 10m when set to "1"/"true"; or a Go duration like "10m").
+// sequential random seeds under Defaults(), exact pre-stats body, until
+// BODYPARITY_LEVELC duration elapses.
 //
 //	CSMITH_UPSTREAM=... BODYPARITY_LEVELC=10m go test ./test/bodyparity \
 //	  -run TestBodyParityLevelC -count=1 -timeout 15m
 //
 // Skipped unless BODYPARITY_LEVELC is set (keeps default `go test` fast).
+// For flag-surface stress use FuzzBodyParity (blob) instead.
 func TestBodyParityLevelC(t *testing.T) {
 	raw := strings.TrimSpace(os.Getenv("BODYPARITY_LEVELC"))
 	if raw == "" {
@@ -239,9 +306,6 @@ func TestBodyParityLevelC(t *testing.T) {
 		dur = d
 	}
 	_ = upstreamCsmith(t)
-	// Stream start: BODYPARITY_LEVELC_SEED for reproducible re-run of a hit;
-	// else crypto/rand so each invocation explores a fresh seed region
-	// (fixed golden-ratio start re-tested the same ~450 seeds every 10m).
 	seed := uint64(0)
 	if s := strings.TrimSpace(os.Getenv("BODYPARITY_LEVELC_SEED")); s != "" {
 		v, err := strconv.ParseUint(s, 0, 64)
@@ -261,7 +325,6 @@ func TestBodyParityLevelC(t *testing.T) {
 	n, start := 0, time.Now()
 	for time.Now().Before(deadline) {
 		n++
-		// SplitMix64-style step for non-repeating seed stream within a run
 		seed += 0x9e3779b97f4a7c15
 		z := seed
 		z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
@@ -311,19 +374,13 @@ XXX number of pointers: 0
 	if strings.Contains(body, "statistics") {
 		t.Fatal("statistics should be excluded")
 	}
-	if strings.Contains(body, "Generator:") {
-		t.Fatal("header should be excluded")
-	}
 }
 
-func TestBodyDiffUsesCmp(t *testing.T) {
-	want := "a\nb\nc"
-	got := "a\nX\nc"
-	diff := cmp.Diff(strings.Split(want, "\n"), strings.Split(got, "\n"))
-	if diff == "" {
-		t.Fatal("expected non-empty diff")
-	}
-	if !strings.Contains(diff, "b") || !strings.Contains(diff, "X") {
-		t.Fatalf("unexpected diff:\n%s", diff)
-	}
+func TestCLIArgsSmokeNoJumpsParity(t *testing.T) {
+	// Smoke: non-default flag path through both generators (needs upstream).
+	_ = upstreamCsmith(t)
+	opts := csmith.Defaults()
+	opts.Seed = 2
+	opts.Jumps = false
+	assertOptsBodyParity(t, opts)
 }

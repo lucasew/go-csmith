@@ -180,8 +180,18 @@ func InitSessionProbabilityTables(opts Options) {
 
 const defaultPlatformInfoPath = "platform.info"
 
-// Options is the canonical API-level configuration contract for generation.
-// Defaults are aligned with Csmith's CGOptions::set_default_settings where possible.
+// Options is the full generation configuration (CGOptions-shaped + Go library extras).
+//
+// Two product contracts share this type:
+//
+//   - Drop-in vs golden csmith(1): Defaults() plus fields that CLIArgs() can
+//     express (FieldCLI in options_cli.go). Body parity and FuzzBodyParity use
+//     ForDropInParity / OptionsFromFuzzBlob — library-only knobs stay default.
+//   - Go library: any field may be set for in-process Generate; CGOptions
+//     fields without a golden flag are still honored by the generator but are
+//     not drop-in-comparable to the stock binary.
+//
+// Defaults align with CGOptions::set_default_settings where possible.
 type Options struct {
 	Seed uint64
 
