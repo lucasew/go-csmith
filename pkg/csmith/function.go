@@ -128,7 +128,7 @@ type FunctionList struct {
 // (no invent private GenSym counter desynced from g_/t_).
 func RandomFunctionName(sym *GenSym) string {
 	_ = sym
-	return Gensym("func_")
+	return GensymSess(nil, "func_")
 }
 
 // RandomReturnType mirrors Function.cpp RandomReturnType → Type::choose_random.

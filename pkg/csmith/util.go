@@ -15,12 +15,22 @@ type GenSym struct {
 
 // Gensym mirrors util.cpp gensym(basename) on the session counter.
 func Gensym(basename string) string {
-	return currentSession().GenSym.Next(basename)
+	return GensymSess(nil, basename)
+}
+
+// GensymSess is Gensym on an explicit session bag.
+func GensymSess(s *Session, basename string) string {
+	return sessOrAmbient(s).GenSym.Next(basename)
 }
 
 // ResetDefaultGensym mirrors reset_gensym on the session counter.
 func ResetDefaultGensym() {
-	currentSession().GenSym.Reset()
+	ResetDefaultGensymSess(nil)
+}
+
+// ResetDefaultGensymSess resets gensym on an explicit session bag.
+func ResetDefaultGensymSess(s *Session) {
+	sessOrAmbient(s).GenSym.Reset()
 }
 
 // Reset mirrors reset_gensym.
@@ -49,7 +59,12 @@ func (g *GenSym) Next(basename string) string {
 // LogAnalysisFail mirrors util.cpp log_analysis_fail.
 // util.cpp:76–79 — append to errlog; always returns false.
 func LogAnalysisFail(msg string) bool {
-	b := &currentSession().AnalysisErrLog
+	return LogAnalysisFailSess(nil, msg)
+}
+
+// LogAnalysisFailSess logs analysis failure on an explicit session bag.
+func LogAnalysisFailSess(s *Session, msg string) bool {
+	b := &sessOrAmbient(s).AnalysisErrLog
 	b.WriteString("Analysis failed at ")
 	b.WriteString(msg)
 	b.WriteString("\n")
@@ -57,10 +72,13 @@ func LogAnalysisFail(msg string) bool {
 }
 
 // AnalysisErrLog returns the accumulated analysis-fail log (tests / debug).
-func AnalysisErrLog() string { return currentSession().AnalysisErrLog.String() }
+func AnalysisErrLog() string { return sessOrAmbient(nil).AnalysisErrLog.String() }
 
 // ClearAnalysisErrLog resets util errlog (finalization / tests).
-func ClearAnalysisErrLog() { currentSession().AnalysisErrLog.Reset() }
+func ClearAnalysisErrLog() { ClearAnalysisErrLogSess(nil) }
+
+// ClearAnalysisErrLogSess clears errlog on an explicit session bag.
+func ClearAnalysisErrLogSess(s *Session) { sessOrAmbient(s).AnalysisErrLog.Reset() }
 
 // OutputPrintStr mirrors util.cpp output_print_str.
 // util.cpp:146–157 — indent + printf("str"[, value]);

@@ -244,7 +244,7 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 	if sessHasError(nil) {
 		return false
 	}
-	if fact == nil && currentSession().InUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
+	if fact == nil && sessOrAmbient(nil).InUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
 		fact = FindRelatedPointTo(facts, &p.AsArray.Collective.Variable)
 		if sessHasError(nil) {
 			return false

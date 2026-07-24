@@ -1623,7 +1623,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		if g.VS != nil {
 			g.VS.DoFinalization()
 		}
-		ResetDefaultGensym()
+		ResetDefaultGensymSess(g.Sess)
 		RestorePartialExpanderInitValues()
 	}
 	return all.String()

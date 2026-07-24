@@ -66,7 +66,12 @@ const IncompleteStmID = -1
 // AllocStmID mirrors Statement ctor: stm_id = sid; sid++.
 // Statement.cpp:370–371 — first statement gets 0.
 func AllocStmID() int {
-	s := currentSession()
+	return AllocStmIDSess(nil)
+}
+
+// AllocStmIDSess allocates a statement id on an explicit session bag.
+func AllocStmIDSess(s *Session) int {
+	s = sessOrAmbient(s)
 	id := s.NextStmID
 	s.NextStmID++
 	return id
@@ -463,7 +468,8 @@ func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 		return ""
 	}
 	// Block.cpp:217 — const string var_name = gensym("t_"); sticky no invent bare ""
-	name := Gensym("t_")
+	// Session bag (ambient during Generate activateSession; prefer Sess when threaded later).
+	name := GensymSess(nil, "t_")
 	if name == "" {
 		if !sessHasError(nil) {
 			sessNoteError(nil, ErrGeneric)

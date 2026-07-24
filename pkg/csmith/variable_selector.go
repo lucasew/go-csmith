@@ -49,20 +49,20 @@ func NewVariableSelectorProbs(opts Options, probs *Probabilities) *VariableSelec
 }
 
 // RandomGlobalName mirrors VariableSelector.cpp RandomGlobalName → gensym("g_").
-// util.cpp gensym_count is process-wide (shared with t_/func_/lbl_); no invent
+// util.cpp gensym_count is session-wide (shared with t_/func_/lbl_); no invent
 // private VS.Sym counter that desyncs from create_new_tmp_var.
 func (vs *VariableSelector) RandomGlobalName() string {
-	return Gensym("g_")
+	return GensymSess(vsSess(vs), "g_")
 }
 
 // RandomLocalName mirrors RandomLocalName → gensym("l_").
 func (vs *VariableSelector) RandomLocalName() string {
-	return Gensym("l_")
+	return GensymSess(vsSess(vs), "l_")
 }
 
 // RandomParamName mirrors RandomParamName → gensym("p_").
 func (vs *VariableSelector) RandomParamName() string {
-	return Gensym("p_")
+	return GensymSess(vsSess(vs), "p_")
 }
 
 // atMaxGlobals reports whether GlobalList has hit the library MaxGlobals cap.
