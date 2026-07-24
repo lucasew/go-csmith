@@ -79,7 +79,20 @@ func upstreamCsmith(tb testing.TB) string {
 	}
 	st, err := os.Stat(p)
 	if err != nil || st.IsDir() {
-		tb.Fatalf("CSMITH_UPSTREAM=%q not a file", p)
+		// Nix GC often deletes the store object; re-realize without changing the path.
+		hint := ""
+		if strings.Contains(p, "/nix/store/") {
+			// nix-store -r takes the store path (derivation output), not necessarily .../bin/csmith
+			store := p
+			if i := strings.Index(p, "/bin/"); i > 0 {
+				store = p[:i]
+			}
+			hint = fmt.Sprintf("\n\tNix path missing (often GC): nix-store -r %s\n\tthen re-run with the same CSMITH_UPSTREAM", store)
+		}
+		if err != nil {
+			tb.Fatalf("CSMITH_UPSTREAM=%q not a file: %v%s", p, err, hint)
+		}
+		tb.Fatalf("CSMITH_UPSTREAM=%q is a directory, need the csmith binary%s", p, hint)
 	}
 	return p
 }
