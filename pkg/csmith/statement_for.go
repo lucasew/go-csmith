@@ -416,7 +416,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		Expr:      &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntType()},
 		AssignOp:  AssignSimple,
 		SafeFlags: flags1,
-		StmID:     AllocStmID(),
+		StmID:     AllocStmIDSess(cgSess(cg)),
 	}
 	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited) sticky
 	if !VisitFactsStatementAssign(initSt, cg, opts) {
@@ -453,13 +453,13 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if arrayBound {
 		// plain compound assign (no make_possible_compound)
 		incrSt = Stmt{
-			Kind: StmtAssign, LhsVar: iv, Lhs: lhs1, Expr: cIncr, AssignOp: incrOp, StmID: AllocStmID(),
+			Kind: StmtAssign, LhsVar: iv, Lhs: lhs1, Expr: cIncr, AssignOp: incrOp, StmID: AllocStmIDSess(cgSess(cg)),
 		}
 	} else {
 		// StatementAssign::make_possible_compound_assign
 		incrSt = makePossibleCompoundAssign(*cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr, gensymFromVS(vs))
 		if StmIDUnset(incrSt.StmID) {
-			incrSt.StmID = AllocStmID()
+			incrSt.StmID = AllocStmIDSess(cgSess(cg))
 		}
 	}
 
@@ -600,7 +600,7 @@ func MakeRandomFor(
 		bodyCG.RemoveIVBound(lc.IV)
 	}
 	// post_loop_analysis (StatementFor.cpp:350–370)
-	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
+	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmIDSess(cgSess(cg))}
 	postLoopAnalysis(cg.FM, st, body, preFacts, preUnion, preEffect, cg)
 	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
 	if !FactsComplete(cg.FM.GlobalFacts) ||

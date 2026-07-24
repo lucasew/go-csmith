@@ -43,7 +43,7 @@ func MakeRandomBreak(
 	if expr == nil || sessHasError(nil) {
 		return Stmt{}
 	}
-	st := Stmt{Kind: StmtBreak, Expr: expr, StmID: AllocStmID()}
+	st := Stmt{Kind: StmtBreak, Expr: expr, StmID: AllocStmIDSess(cgSess(cg))}
 	// StatementBreak.cpp:81 — b->break_stms.push_back only
 	// CFG edges created in StatementFor::post_loop_analysis (for-stmt dest), not here
 	loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)

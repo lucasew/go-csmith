@@ -147,5 +147,5 @@ func MakeRandomReturn(
 		ev.CastType = ret
 	}
 	// StatementReturn.cpp make_random does not visit_facts — stm_visit / append_return does
-	return Stmt{Kind: StmtReturn, Expr: ev, StmID: AllocStmID()}
+	return Stmt{Kind: StmtReturn, Expr: ev, StmID: AllocStmIDSess(cgSess(cg))}
 }

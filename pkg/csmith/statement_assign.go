@@ -538,7 +538,7 @@ func makePossibleCompoundAssign(
 	sym *GenSym,
 ) Stmt {
 	// Statement base ctor always assigns stm_id (Statement.cpp:364–367)
-	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs, Rhs: rhs, StmID: AllocStmID()}
+	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs, Rhs: rhs, StmID: AllocStmIDSess(cg.Sess)}
 	if lhs != nil {
 		st.LhsVar = lhs.Var
 	}

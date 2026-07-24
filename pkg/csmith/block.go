@@ -553,7 +553,7 @@ func MakeRandomBlock(
 		EmitStepHash:   opts.StepHashByStmt && opts.ComputeHash,
 		EmitLabelAttrs: opts.LabelAttributes,
 		LabelAttrRng:   r,
-		StmID:          AllocStmID(),
+		StmID:          AllocStmIDSess(cgSess(cg)),
 		// Block.cpp:127 — in_array_loop when induction bounds non-empty
 		InArrayLoop:  len(cg.IVBounds) > 0,
 		EmitParanoid: opts.Paranoid,
@@ -622,7 +622,7 @@ func MakeRandomBlock(
 		// Factories always AllocStmID (C++ Statement ctor). Do not re-alloc on
 		// StmID==0 — 0 is a valid first id after fair sid.
 		if StmIDUnset(st.StmID) {
-			st.StmID = AllocStmID()
+			st.StmID = AllocStmIDSess(cgSess(cg))
 		}
 		if pendingFwd != "" {
 			if st.SourceLabel == "" {
@@ -630,7 +630,7 @@ func MakeRandomBlock(
 			} else {
 				// already labeled — keep pending as no-op marker after previous
 				// StmtLabel is Go emit-only; still needs a sid for map keys if visited.
-				lab := Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()}
+				lab := Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmIDSess(cgSess(cg))}
 				b.Stmts = append(b.Stmts, lab)
 			}
 			pendingFwd = ""
@@ -650,7 +650,7 @@ func MakeRandomBlock(
 		}
 	}
 	if pendingFwd != "" {
-		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()})
+		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmIDSess(cgSess(cg))})
 	}
 	// Block.cpp:157–161 — ERROR after stmt loop → delete block
 	if sessHasError(cgSess(cg)) {
@@ -680,7 +680,7 @@ func MakeRandomBlock(
 			ret := MakeRandomReturn(r, opts, vs, cg)
 			if stmtOK(ret) {
 				if StmIDUnset(ret.StmID) {
-					ret.StmID = AllocStmID()
+					ret.StmID = AllocStmIDSess(cgSess(cg))
 				}
 				b.Stmts = append(b.Stmts, ret)
 			}
@@ -688,7 +688,7 @@ func MakeRandomBlock(
 	}
 	// b.StmID allocated at make (line above); never re-alloc valid id 0
 	if StmIDUnset(b.StmID) {
-		b.StmID = AllocStmID()
+		b.StmID = AllocStmIDSess(cgSess(cg))
 	}
 	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
 	// incomplete post-creation GlobalFacts fail closed even without sticky ERROR

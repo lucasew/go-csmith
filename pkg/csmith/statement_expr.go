@@ -97,6 +97,6 @@ func MakeRandomExprStmt(
 	return Stmt{
 		Kind:  StmtInvoke,
 		Expr:  &Expression{Term: TermFunction, Invoke: fi},
-		StmID: AllocStmID(),
+		StmID: AllocStmIDSess(cgSess(cg)),
 	}
 }

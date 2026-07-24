@@ -47,7 +47,7 @@ func MakeRandomContinue(
 	if expr == nil || sessHasError(nil) {
 		return Stmt{}
 	}
-	st := Stmt{Kind: StmtContinue, Expr: expr, StmID: AllocStmID()}
+	st := Stmt{Kind: StmtContinue, Expr: expr, StmID: AllocStmIDSess(cgSess(cg))}
 	// FactMgr::create_cfg_edge(sc, b, false, true) — StatementContinue.cpp:83
 	if cg.FM != nil {
 		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)

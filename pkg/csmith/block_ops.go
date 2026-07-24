@@ -731,7 +731,7 @@ func (b *Block) AppendNestedLoop(
 	}
 	st := &made
 	if StmIDUnset(st.StmID) {
-		st.StmID = AllocStmID()
+		st.StmID = AllocStmIDSess(cgSess(cg))
 	}
 	b.Stmts = append(b.Stmts, *st)
 	if cg.FM != nil {
@@ -845,7 +845,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		return nil
 	}
 	if StmIDUnset(ret.StmID) {
-		ret.StmID = AllocStmID()
+		ret.StmID = AllocStmIDSess(cgSess(cg))
 	}
 	b.Stmts = append(b.Stmts, ret)
 	st := &b.Stmts[len(b.Stmts)-1]
@@ -1004,7 +1004,7 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 		Parent:    parent,
 		Func:      f,
 		blockSize: 0,
-		StmID:     AllocStmID(),
+		StmID:     AllocStmIDSess(cgSess(cg)),
 		// Block.cpp:101 — in_array_loop from iv_bounds
 		InArrayLoop: len(cg.IVBounds) > 0,
 		EmitFM:      cg.FM,

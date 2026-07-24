@@ -577,13 +577,13 @@ func MakeRandomArrayInit(
 		// StatementArrayOp is a Statement; always has stm_id
 		return Stmt{
 			Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, Expr: rhs,
-			LhsVar: &av.Variable, StmID: AllocStmID(),
+			LhsVar: &av.Variable, StmID: AllocStmIDSess(cgSess(cg)),
 		}
 	}
 	// Single stm_id for the whole multi-dim StatementArrayOp (C++ one ctor).
 	// Nested dim shells share that id for Output structure only — they are not
 	// separate C++ Statement objects (no second AllocStmID).
-	sid := AllocStmID()
+	sid := AllocStmIDSess(cgSess(cg))
 	// Innermost dim carries ArrayAccess + init_value + array_var (for is_aggregate).
 	st := Stmt{
 		Kind:        StmtArrayOp,

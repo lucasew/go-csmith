@@ -553,7 +553,7 @@ func MakeRandomGoto(
 	}
 	other := &okBlk.Stmts[ti]
 	if StmIDUnset(other.StmID) {
-		other.StmID = AllocStmID()
+		other.StmID = AllocStmIDSess(cgSess(cg))
 	}
 
 	// StatementGoto.cpp:112 — clear effect_stm after other_stm pick (not before)
@@ -613,7 +613,7 @@ func MakeRandomGoto(
 
 	// util.cpp gensym_count process-wide; no invent VS.Sym private or fixed "lbl_1"
 	nextLab := func() string {
-		return Gensym("lbl_")
+		return GensymSess(cgSess(cg), "lbl_")
 	}
 
 	if backEdge {
@@ -633,7 +633,7 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		st := Stmt{
-			Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID(),
+			Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmIDSess(cgSess(cg)),
 			GotoBack:        true,
 			GotoDestStmID:   other.StmID,
 			GotoDestParent:  okBlk,
@@ -659,7 +659,7 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 	if StmIDUnset(dest.StmID) {
-		dest.StmID = AllocStmID()
+		dest.StmID = AllocStmIDSess(cgSess(cg))
 	}
 	// StatementGoto.cpp:185 — StatementGoto ctor gensyms label only after DFA
 	// validation succeeds. Do not gensym here: failed visit_facts/merge must not
@@ -988,7 +988,7 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 	if StmIDUnset(dest.StmID) {
-		dest.StmID = AllocStmID()
+		dest.StmID = AllocStmIDSess(cgSess(cg))
 	}
 	destID := dest.StmID
 	destIsCtrl := IsCtrlStmt(dest) || dest.Kind == StmtReturn
@@ -1013,7 +1013,7 @@ func MakeRandomGoto(
 		Kind:            StmtGoto,
 		Expr:            cond,
 		Label:           label,
-		StmID:           AllocStmID(),
+		StmID:           AllocStmIDSess(cgSess(cg)),
 		GotoForward:     true,
 		GotoDestStmID:   destID,
 		GotoDestParent:  blk,

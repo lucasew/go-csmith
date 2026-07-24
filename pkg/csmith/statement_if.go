@@ -205,7 +205,7 @@ func MakeRandomIf(
 	// StatementIf.cpp:101–107 — construct StatementIf; do not merge branch facts here
 	// (combine_branch_facts runs in post_creation_analysis / visit_facts)
 
-	st := &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB, StmID: AllocStmID()}
+	st := &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB, StmID: AllocStmIDSess(cgSess(cg))}
 	// StatementIf.cpp:105–106 / Statement.cpp:515–520 —
 	// set_accumulated_effect_after_block(eff, block): eff += map_stm_effect[block];
 	// map_stm_effect[this] = eff. C++ mutates the same Effect& across both calls so
