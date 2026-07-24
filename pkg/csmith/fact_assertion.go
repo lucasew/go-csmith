@@ -13,7 +13,7 @@ import (
 func (f *FactPointTo) IsTop() bool {
 	// Fact always live; sticky incomplete no invent empty-complete TOP
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return len(f.PointTo) == 0
@@ -23,7 +23,7 @@ func (f *FactPointTo) IsTop() bool {
 // FactPointTo.h:94–96.
 func (f *FactPointTo) IsBottom() bool {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return false
@@ -33,7 +33,7 @@ func (f *FactPointTo) IsBottom() bool {
 // FactPointTo.h:97.
 func (f *FactPointTo) SetTop() {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	f.PointTo = nil
@@ -43,7 +43,7 @@ func (f *FactPointTo) SetTop() {
 // FactPointTo.h:98.
 func (f *FactPointTo) SetBottom() {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 }
@@ -52,7 +52,7 @@ func (f *FactPointTo) SetBottom() {
 // FactPointTo.h:64.
 func (f *FactPointTo) GetVar() *Variable {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return f.Var
@@ -62,11 +62,11 @@ func (f *FactPointTo) GetVar() *Variable {
 // FactPointTo.cpp Output — subject and pointees by name.
 func (f *FactPointTo) Output() string {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if f.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -74,7 +74,7 @@ func (f *FactPointTo) Output() string {
 	b.WriteString(" => {")
 	for i, p := range f.PointTo {
 		if p == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -92,28 +92,28 @@ func (f *FactPointTo) Output() string {
 // (no invent "all visible" / soft re-pick past holes).
 func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 	if f == nil || f.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if stParent != nil && !stParent.StackScanComplete() {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if !f.Var.IsVisible(stParent) {
 		// residual ERROR sticky — no invent invisible true past IsVisible hole
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue visible scan past IsVisible residual false path
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	for _, p := range f.PointTo {
 		// Variable* always live in PointTo; nil hole sticky as invisible
 		if p == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return true
 		}
 		if IsSpecialPtr(p) {
@@ -121,13 +121,13 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 		}
 		if !p.IsVisible(stParent) {
 			// residual ERROR sticky — no invent invisible true past pointee IsVisible hole
-			if HasError() {
+			if sessHasError(nil) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue visible past pointee residual false path
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 	}
@@ -140,18 +140,18 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 // / soft re-pick past hole via IsVariableInSet false membership).
 func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	if f == nil || f.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// incomplete fact sticky (no invent assertable via partial PointTo scan)
 	if !FactsComplete([]*FactPointTo{f}) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky not-assertable
 	// (no invent complete not-array assertable past broken shell)
 	if f.Var.IsArray && f.Var.AsArray == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// get_array != null → not assertable
@@ -163,7 +163,7 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	}
 	inv := f.HasInvisible(stParent)
 	// residual ERROR sticky — no invent assertable true past HasInvisible residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return !inv
@@ -174,47 +174,47 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 func (f *FactPointTo) OutputCondition() string {
 	// Fact subject always live; sticky no invent bare pointee compare without var
 	if f == nil || f.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	lhs := outputFactVar(f.Var)
 	// residual ERROR sticky — no invent soft-empty condition past outputFactVar residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// subject always live Output; sticky no invent " == 0" / " >= &" without lhs
 	if lhs == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var parts []string
 	for _, pointee := range f.PointTo {
 		// FactPointTo.cpp: point_to_vars[i] always live; sticky no invent skip nil holes
 		if pointee == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		if pointee.IsArray || (pointee.AsArray != nil) {
 			// C++ isArray always ArrayVariable*; missing AsArray sticky
 			// (no invent bare-name bounds range form past broken array shell)
 			if pointee.IsArray && pointee.AsArray == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			// range form: (p >= &lo && p <= &hi)
 			// OutputLower/UpperBound always live; sticky no invent "(p >= & && p <= &)"
 			lo := pointee.OutputLowerBound(false)
 			// residual ERROR sticky — no invent soft-continue hi past LowerBound residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			hi := pointee.OutputUpperBound(false)
 			// residual ERROR sticky — no invent soft-continue range past UpperBound residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if lo == "" || hi == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			parts = append(parts, "("+lhs+" >= &"+lo+" && "+lhs+" <= &"+hi+")")
@@ -232,11 +232,11 @@ func (f *FactPointTo) OutputCondition() string {
 			// pointee->Output always live name; sticky no invent bare "&"
 			nm := pointee.GetActualName(false)
 			// residual ERROR sticky — no invent soft-empty & past GetActualName residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if nm == "" {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return ""
 			}
 			rhs = "&" + nm
@@ -249,17 +249,17 @@ func (f *FactPointTo) OutputCondition() string {
 func outputFactVar(v *Variable) string {
 	// Variable always live at fact emit; sticky no invent empty lhs token
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	s := v.GetActualName(false)
 	// residual ERROR sticky — no invent soft-empty fact-var past GetActualName residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	// sticky no invent "[0]" indices without identifier
 	if s == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()
@@ -267,7 +267,7 @@ func outputFactVar(v *Variable) string {
 	// C++ isArray always ArrayVariable*; missing AsArray sticky empty
 	// (no invent [0] indices from ArraySizes alone past broken shell)
 	if v.IsArray && v.AsArray == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if v.IsArray || v.AsArray != nil {
@@ -287,13 +287,13 @@ func outputFactVar(v *Variable) string {
 func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 	// Fact* always live at assert emit; sticky no invent empty assert without it
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// TOP fact: no assert condition (complete empty success)
 	isTop := f.IsTop()
 	// residual ERROR sticky — no invent soft-empty assert past IsTop residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if isTop {
@@ -302,19 +302,19 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 	cond := f.OutputCondition()
 	if cond == "" {
 		// incomplete condition IR sticky (OutputCondition may already SetError)
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	prefix := ""
 	if !f.IsAssertable(stParent) {
 		// residual ERROR sticky — no invent assert line past IsAssertable residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		prefix = "//"
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent live assert past IsAssertable residual true
 		return ""
 	}
@@ -326,12 +326,12 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool) string {
 	// FactMgr + Statement always live for assertion emit; sticky no invent section without them
 	if fm == nil || st == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent empty assertion section)
 	if StmIDUnset(st.StmID) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	var facts []*FactPointTo
@@ -346,8 +346,8 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	}
 	// incomplete maps fail closed sticky (no invent empty assertion block / soft re-pick)
 	if !FactsComplete(facts) {
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
@@ -363,24 +363,24 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	for _, f := range facts {
 		// Fact* always live in fact maps; nil hole sticky (no invent skip holes)
 		if f == nil || f.Var == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
 		// skip globals neither read nor written in this function
 		isG := f.Var.IsGlobal()
 		// residual ERROR sticky — no invent soft-skip then partial assert emit past IsGlobal residual
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 		if isG {
 			rd := eff.IsRead(f.Var)
 			// residual ERROR sticky — no invent soft-skip assert past IsRead residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			wr := eff.IsWritten(f.Var)
 			// residual ERROR sticky — no invent soft-skip assert past IsWritten residual
-			if HasError() {
+			if sessHasError(nil) {
 				return ""
 			}
 			if !rd && !wr {
@@ -390,7 +390,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 		// IsTop / empty OutputAssertion intentionally silent; non-nil fact still live
 		body.WriteString(f.OutputAssertion(stParent, indent))
 		// residual ERROR sticky — no invent partial assertion section past hard IR hole
-		if HasError() {
+		if sessHasError(nil) {
 			return ""
 		}
 	}
@@ -420,7 +420,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
 	// Statement always live at pre_output; sticky incomplete no invent empty pre shell
 	if st == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return "", false
 	}
 	label := ""
@@ -429,7 +429,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		// Statement::stm_id always live under FM; StmID 0 sticky fail closed
 		// (no invent SourceLabel / step_hash soft-fallback for incomplete id)
 		if StmIDUnset(st.StmID) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return "", false
 		}
 		srcs := fm.FindJumpSources(st.StmID)
@@ -437,8 +437,8 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		// empty non-nil = no gotos (do not fall back to SourceLabel)
 		if srcs == nil {
 			// incomplete CFG sticky — no invent step_hash soft-fallback past hole
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return "", false
 		}
@@ -448,7 +448,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 			if label == "" && fm.Func != nil {
 				src := FindStmtByID(fm.Func, srcs[0])
 				// residual ERROR sticky — no invent soft-continue label/SourceLabel past FindStmt hole
-				if HasError() {
+				if sessHasError(nil) {
 					return "", false
 				}
 				if src != nil {
@@ -473,7 +473,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		if attr == "" && emitLabelAttrs && attrRng != nil {
 			attr = EnsureLabelAttrGenerator().Output(attrRng)
 			// residual ERROR sticky — no invent soft-continue label past attr residual
-			if HasError() {
+			if sessHasError(nil) {
 				return "", false
 			}
 		}
@@ -503,7 +503,7 @@ func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, 
 	}
 	// when paranoid, Statement + FactMgr always live sticky
 	if st == nil || fm == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	if st.Kind == StmtBlock {
@@ -511,7 +511,7 @@ func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, 
 	}
 	out := fm.OutputAssertions(st, stParent, indent, true)
 	// residual ERROR sticky — no invent soft-empty post past OutputAssertions residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	return out
