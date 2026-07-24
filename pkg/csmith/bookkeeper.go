@@ -15,7 +15,7 @@ import (
 // pos < 0 is complete no-op (out-of-range index, not hard IR).
 func IncrCounter(counters *[]int, pos int) {
 	if counters == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if pos < 0 {
@@ -84,11 +84,11 @@ func formattedOutput(b *strings.Builder, msg string, num int) {
 	// Bookkeeper.cpp always has live ostream + message; sticky no invent silent
 	// skip of stats lines (undercount) past missing builder shell
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if msg == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	b.WriteString("XXX ")
@@ -100,11 +100,11 @@ func formattedOutputf(b *strings.Builder, msg string, num float64) {
 	// Bookkeeper.cpp always has live ostream + message; sticky no invent silent
 	// skip of stats lines past missing builder shell
 	if b == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if msg == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	b.WriteString("XXX ")
@@ -119,18 +119,18 @@ func RecordAddressTaken(v *Variable) {
 	// Bookkeeper.cpp:325–326 — assert(var); assert(var->type) sticky
 	// (no invent skip broken IR as zero address-taken stats / soft re-pick)
 	if v == nil || v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	v.IsAddrTaken = true
 	currentSession().BK.addressTakenCnt++
 	if v.Type.HasBitfields() {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		currentSession().BK.varsWithBitfieldsAddressTakenCnt++
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
@@ -142,7 +142,7 @@ func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
 	// Bookkeeper.cpp:388 — assert(var) sticky
 	// (no invent skip nil as zero vol-access stats)
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if write {
@@ -153,7 +153,7 @@ func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
 	for i := 0; i <= derefLevel; i++ {
 		vol := v.IsVolatileAfterDeref(i)
 		// residual ERROR sticky — no invent soft-continue peel stats past IsVolatileAfterDeref hole
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		if write {
@@ -184,16 +184,16 @@ func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
 // Variable + Type always live; sticky (no invent soft-skip bitfield read stats past hole).
 func RecordBitfieldsReads(v *Variable) {
 	if v == nil || v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if v.Type.HasBitfields() {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		currentSession().BK.rhsBitfieldsStructsVarsCnt++
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
@@ -208,16 +208,16 @@ func RecordBitfieldsReads(v *Variable) {
 // Variable + Type always live; sticky (no invent soft-skip bitfield write stats past hole).
 func RecordBitfieldsWrites(v *Variable) {
 	if v == nil || v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if v.Type.HasBitfields() {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		currentSession().BK.lhsBitfieldsStructsVarsCnt++
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
@@ -232,7 +232,7 @@ func RecordBitfieldsWrites(v *Variable) {
 // Expression operands always live; sticky (no invent soft-skip cmp stats past hole).
 func RecordPointerComparisons(lhs, rhs *Expression) {
 	if lhs == nil || rhs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	// Bookkeeper.cpp:363 — both non-function
@@ -241,7 +241,7 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
 	// residual ERROR sticky — no invent soft-skip cmp stats past GetType residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	// Bookkeeper.cpp:364–365 — assert both pointer; fail closed non-sticky skip
@@ -251,12 +251,12 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 	}
 	lPtr := lt.IsPointerLike()
 	// residual ERROR sticky — no invent soft-skip cmp stats past IsPointerLike residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	rPtr := rt.IsPointerLike()
 	// residual ERROR sticky — no invent soft-skip cmp stats past RHS IsPointerLike residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	if !lPtr || !rPtr {
@@ -273,7 +273,7 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 		li, lok := lhs.IndirectLevelComplete()
 		ri, rok := rhs.IndirectLevelComplete()
 		if !lok || !rok {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		if li == ri {
@@ -289,23 +289,23 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 func RecordVarsWithBitfields(t *Type) {
 	// Bookkeeper.cpp:465 assert(type) sticky on nil; !has_bitfields is normal no-op
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if !t.HasBitfields() {
 		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-count past HasBitfields residual true path
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	level := t.IndirectLevel()
 	// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	IncrCounter(&currentSession().BK.varsWithBitfields, level)
@@ -318,30 +318,30 @@ func RecordVarsWithBitfields(t *Type) {
 // Non-aggregate is complete no-op.
 func RecordTypeWithBitfields(t *Type) {
 	if t == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if !t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-skip count past IsAggregate residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue count past IsAggregate residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
 	if !t.HasBitfields() {
 		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-count past HasBitfields residual true path
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	// Bookkeeper.cpp:482–483 — assert(len == fields.size()); Fields carry BitWidth
@@ -350,7 +350,7 @@ func RecordTypeWithBitfields(t *Type) {
 	for _, f := range t.Fields {
 		// StructField Type always live for bitfield stats; nil hole sticky stop
 		if f.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		// Bookkeeper.cpp:485 — if (!is_bitfield(i)) continue
@@ -365,21 +365,21 @@ func RecordTypeWithBitfields(t *Type) {
 		// Bookkeeper.cpp:491–495 — qfers_[i] const/volatile
 		if f.Qfer.IsConst() {
 			// residual ERROR sticky — no invent soft-count past IsConst residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return
 			}
 			currentSession().BK.constBitfieldsInTotal++
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue stats past IsConst residual false
 			return
 		}
 		if f.Qfer.IsVolatile() {
 			// residual ERROR sticky — no invent soft-count past IsVolatile residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return
 			}
 			currentSession().BK.volatileBitfieldsInTotal++
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue stats past IsVolatile residual false
 			return
 		}
@@ -392,28 +392,28 @@ func RecordTypeWithBitfields(t *Type) {
 // Variable + Type always live; sticky (no invent soft-skip create stats past hole).
 func RecordVarCreated(v *Variable) {
 	if v == nil || v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	currentSession().BK.useNewVarCnt++
 	RecordVarsWithBitfields(v.Type)
 	// residual ERROR sticky — no invent soft-continue create stats past bitfields residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	d := v.Type.StructDepth()
 	// residual ERROR sticky — no invent soft-count depth past StructDepth residual
-	if HasError() {
+	if sessHasError(nil) {
 		return
 	}
 	IncrCounter(&currentSession().BK.structDepthCnts, d)
 	if v.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-count union past IsUnion residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return
 		}
 		currentSession().BK.unionVarCnt++
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 		return
 	}
@@ -456,7 +456,7 @@ func OOBCount() int { return currentSession().BK.oobCnt }
 // stats past partial nest counts).
 func ExpressionComplexity(e *Expression) int {
 	if e == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 	switch e.Term {
@@ -464,7 +464,7 @@ func ExpressionComplexity(e *Expression) int {
 		// Constant always has live Type* + Value; incomplete shell sticky → -1
 		// (no invent leaf complexity 0 for Type-nil / empty-value shell)
 		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		return 0
@@ -472,11 +472,11 @@ func ExpressionComplexity(e *Expression) int {
 		// ExpressionVariable always has live Variable*; incomplete sticky → -1
 		// Type-nil non-special sticky (no invent leaf complexity 0 past type hole)
 		if e.Var == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		return 0
@@ -484,7 +484,7 @@ func ExpressionComplexity(e *Expression) int {
 		// ExpressionFuncall::get_complexity — live invoke only
 		// no soft invent complexity 0/1 for nil Invoke IR sticky
 		if e.Invoke == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		comp := 0
@@ -494,7 +494,7 @@ func ExpressionComplexity(e *Expression) int {
 			// user-defined path: Function* always live; incomplete sticky
 			// (no invent complexity 0 shell past missing User as non-call)
 			if e.Invoke.User == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return -1
 			}
 			comp++ // function call itself
@@ -502,13 +502,13 @@ func ExpressionComplexity(e *Expression) int {
 		for _, a := range e.Invoke.Args {
 			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed sticky
 			if a == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return -1
 			}
 			c := ExpressionComplexity(a)
 			if c < 0 {
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return -1
 			}
@@ -518,13 +518,13 @@ func ExpressionComplexity(e *Expression) int {
 	case TermAssignment:
 		// incomplete Assign IR sticky — no invent complexity 1 shell
 		if e.Assign == nil || e.Assign.Expr == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		c := ExpressionComplexity(e.Assign.Expr)
 		if c < 0 {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return -1
 		}
@@ -532,21 +532,21 @@ func ExpressionComplexity(e *Expression) int {
 	case TermCommaExpr:
 		// both sides always live; incomplete sticky → -1
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return -1
 		}
 		cl := ExpressionComplexity(e.CommaLHS)
 		cr := ExpressionComplexity(e.CommaRHS)
 		if cl < 0 || cr < 0 {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return -1
 		}
 		return 1 + cl + cr
 	default:
 		// unknown term kind — incomplete IR sticky
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return -1
 	}
 }
@@ -557,7 +557,7 @@ func ExpressionComplexity(e *Expression) int {
 func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
 		if out != nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
@@ -569,7 +569,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	switch st.Kind {
 	case StmtFor:
 		if st.Loop == nil || st.Loop.TestExpr == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		*out = append(*out, st.Loop.TestExpr)
@@ -582,7 +582,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 		// C++ get_exprs always yields live Expression* for these kinds
 		// incomplete nil Expr fails closed sticky (no invent empty get_exprs success)
 		if st.Expr == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		*out = append(*out, st.Expr)
@@ -594,7 +594,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	// get_blocks → recurse (Block* always live; nil hole fails closed sticky)
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		for i := range b.Stmts {
@@ -614,7 +614,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 func StatExprDepths(funcs []*Function) {
 	currentSession().BK.exprDepthCnts = nil
 	if !FunctionsComplete(funcs) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	for _, f := range funcs {
@@ -624,7 +624,7 @@ func StatExprDepths(funcs []*Function) {
 		// user func body always live after build; nil sticky clear
 		if f.Body == nil {
 			currentSession().BK.exprDepthCnts = nil
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return
 		}
 		for i := range f.Body.Stmts {
@@ -632,8 +632,8 @@ func StatExprDepths(funcs []*Function) {
 			if !collectStmtExprs(&f.Body.Stmts[i], &exprs) {
 				// collectStmtExprs may already sticky
 				currentSession().BK.exprDepthCnts = nil
-				if !HasError() {
-					SetError(ErrGeneric)
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return
 			}
@@ -642,8 +642,8 @@ func StatExprDepths(funcs []*Function) {
 				if c < 0 {
 					// ExpressionComplexity may already sticky
 					currentSession().BK.exprDepthCnts = nil
-					if !HasError() {
-						SetError(ErrGeneric)
+					if !sessHasError(nil) {
+						sessNoteError(nil, ErrGeneric)
 					}
 					return
 				}
@@ -660,7 +660,7 @@ func StatBlkDepths(funcs []*Function) int {
 	currentSession().BK.blkDepthCnts = nil
 	cnt := 0
 	if !FunctionsComplete(funcs) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return 0
 	}
 	incomplete := false
@@ -685,7 +685,7 @@ func StatBlkDepths(funcs []*Function) int {
 				incomplete = true
 				currentSession().BK.blkDepthCnts = nil
 				cnt = 0
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return
 			}
 			for i := range blk.Stmts {
@@ -701,7 +701,7 @@ func StatBlkDepths(funcs []*Function) int {
 		// user func body always live after build; nil sticky
 		if f.Body == nil {
 			currentSession().BK.blkDepthCnts = nil
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return 0
 		}
 		// body is a Block; count its statements with parent=body
@@ -721,40 +721,40 @@ func OutputStatistics(funcs []*Function, opts Options) string {
 	var b strings.Builder
 	outputStructUnionStatistics(&b, opts)
 	// residual ERROR sticky — no invent soft-continue later stats past residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString("\n")
 	outputExprStatistics(&b, funcs)
 	// residual ERROR sticky — no invent soft-continue later stats past StatExpr residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString("\n")
 	outputPointerStatistics(&b)
 	// residual ERROR sticky — no invent soft-continue later stats past pointer residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString("\n")
 	outputVolatileAccessStatistics(&b)
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString("\n")
 	outputJumpStatistics(&b)
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString("\n")
 	outputStmtsStatistics(&b, funcs)
 	// residual ERROR sticky — no invent soft-continue later stats past StatBlk residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString("\n")
 	outputVarFreshness(&b)
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if currentSession().BK.relyOnIntSize {
@@ -863,13 +863,13 @@ func outputPointerStatistics(b *strings.Builder) {
 			// (no invent skip partial alias/pointee stats)
 			if p == nil || p.Type == nil {
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				break
 			}
 			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates
 			ptrLike := p.Type.IsPointerLike()
 			// residual ERROR sticky — no invent soft-skip stats past IsPointerLike residual
-			if HasError() {
+			if sessHasError(nil) {
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break
 			}
@@ -884,45 +884,45 @@ func outputPointerStatistics(b *strings.Builder) {
 			}
 			if p.Type.IndirectLevel() > 1 {
 				// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
 				ptPtr++
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue stats past IndirectLevel residual false
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break
 			} else if pt := p.Type.PtrType(); pt != nil {
 				// residual ERROR sticky — no invent soft-count past PtrType residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
 				if pt.IsSimple() {
 					// residual ERROR sticky — no invent soft-count past IsSimple residual hole
-					if HasError() {
+					if sessHasError(nil) {
 						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 						break
 					}
 					ptScalar++
-				} else if HasError() {
+				} else if sessHasError(nil) {
 					// residual ERROR sticky — no invent soft-continue past IsSimple residual false
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				} else if pt.IsStruct() {
 					// residual ERROR sticky — no invent soft-count past IsStruct residual hole
-					if HasError() {
+					if sessHasError(nil) {
 						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 						break
 					}
 					ptStruct++
-				} else if HasError() {
+				} else if sessHasError(nil) {
 					// residual ERROR sticky — no invent soft-continue past IsStruct residual false
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-continue past PtrType residual nil
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break
@@ -995,7 +995,7 @@ func OutputTail(funcs []*Function, opts Options) string {
 	b.WriteString("\n/************************ statistics *************************\n")
 	stats := OutputStatistics(funcs, opts)
 	// residual ERROR sticky — no invent soft-continue stats shell past residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	b.WriteString(stats)
