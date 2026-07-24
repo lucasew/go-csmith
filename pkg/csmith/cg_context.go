@@ -1401,7 +1401,7 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 	}
 	v := e.Var
 	if deref > 0 {
-		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+		if !IsValidPtrSess(cgSess(c), v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			// invalid ptr policy / incomplete maps (IsValidPtr may sticky)
 			// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual
 			if sessHasError(cgSess(c)) {
@@ -1981,7 +1981,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	}
 	valid := false
 	if deref > 0 {
-		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+		if !IsValidPtrSess(cgSess(c), v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual
 			if sessHasError(cgSess(c)) {
 				return false

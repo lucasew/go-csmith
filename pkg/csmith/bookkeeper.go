@@ -791,7 +791,7 @@ func OutputStatistics(funcs []*Function, opts Options) string {
 		return ""
 	}
 	b.WriteString("\n")
-	outputPointerStatistics(&b)
+	outputPointerStatistics(&b, nil)
 	// residual ERROR sticky — no invent soft-continue later stats past pointer residual
 	if sessHasError(nil) {
 		return ""
@@ -884,33 +884,35 @@ func outputExprStatistics(b *strings.Builder, funcs []*Function) {
 	}
 }
 
-func outputPointerStatistics(b *strings.Builder) {
+func outputPointerStatistics(b *strings.Builder, s *Session) {
 	// Bookkeeper.cpp:245–318 — all_ptrs / all_aliases when present
-	ptrs := sessOrAmbient(nil).AllPtrs
+	sess := sessOrAmbient(s)
+	bk := sessBK(s)
+	ptrs := sess.AllPtrs
 	formattedOutput(b, "total number of pointers: ", len(ptrs))
 	if len(ptrs) > 0 {
 		b.WriteString("\n")
 	}
-	formattedOutput(b, "times a variable address is taken: ", sessBK(nil).addressTakenCnt)
-	formattedOutput(b, "times a pointer is dereferenced on RHS: ", CalcTotal(sessBK(nil).readDereferenceCnts))
+	formattedOutput(b, "times a variable address is taken: ", bk.addressTakenCnt)
+	formattedOutput(b, "times a pointer is dereferenced on RHS: ", CalcTotal(bk.readDereferenceCnts))
 	b.WriteString("breakdown:\n")
-	for i := 1; i < len(sessBK(nil).readDereferenceCnts); i++ {
-		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, sessBK(nil).readDereferenceCnts[i]))
+	for i := 1; i < len(bk.readDereferenceCnts); i++ {
+		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, bk.readDereferenceCnts[i]))
 	}
-	formattedOutput(b, "times a pointer is dereferenced on LHS: ", CalcTotal(sessBK(nil).writeDereferenceCnts))
+	formattedOutput(b, "times a pointer is dereferenced on LHS: ", CalcTotal(bk.writeDereferenceCnts))
 	b.WriteString("breakdown:\n")
-	for i := 1; i < len(sessBK(nil).writeDereferenceCnts); i++ {
-		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, sessBK(nil).writeDereferenceCnts[i]))
+	for i := 1; i < len(bk.writeDereferenceCnts); i++ {
+		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, bk.writeDereferenceCnts[i]))
 	}
-	formattedOutput(b, "times a pointer is compared with null: ", sessBK(nil).cmpPtrToNull)
-	formattedOutput(b, "times a pointer is compared with address of another variable: ", sessBK(nil).cmpPtrToAddr)
-	formattedOutput(b, "times a pointer is compared with another pointer: ", sessBK(nil).cmpPtrToPtr)
-	formattedOutput(b, "times a pointer is qualified to be dereferenced: ", sessBK(nil).pointerAvailForDeref)
-	if len(sessBK(nil).dereferenceLevelCnts) > 0 {
+	formattedOutput(b, "times a pointer is compared with null: ", bk.cmpPtrToNull)
+	formattedOutput(b, "times a pointer is compared with address of another variable: ", bk.cmpPtrToAddr)
+	formattedOutput(b, "times a pointer is compared with another pointer: ", bk.cmpPtrToPtr)
+	formattedOutput(b, "times a pointer is qualified to be dereferenced: ", bk.pointerAvailForDeref)
+	if len(bk.dereferenceLevelCnts) > 0 {
 		b.WriteString("\n")
-		formattedOutput(b, "max dereference level: ", len(sessBK(nil).dereferenceLevelCnts)-1)
+		formattedOutput(b, "max dereference level: ", len(bk.dereferenceLevelCnts)-1)
 		b.WriteString("breakdown:\n")
-		for i, c := range sessBK(nil).dereferenceLevelCnts {
+		for i, c := range bk.dereferenceLevelCnts {
 			b.WriteString(fmt.Sprintf("   level: %d, occurrence: %d\n", i, c))
 		}
 	}
@@ -923,20 +925,20 @@ func outputPointerStatistics(b *strings.Builder) {
 			// (no invent skip partial alias/pointee stats)
 			if p == nil || p.Type == nil {
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				break
 			}
 			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates
 			ptrLike := p.Type.IsPointerLike()
 			// residual ERROR sticky — no invent soft-skip stats past IsPointerLike residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break
 			}
 			if !ptrLike {
 				continue
 			}
-			aliases := sessOrAmbient(nil).AllAliases
+			aliases := sess.AllAliases
 			if i < len(aliases) {
 				totalAlias += len(aliases[i])
 				if IsVariableInSet(aliases[i], NullPtr) {
@@ -945,45 +947,45 @@ func outputPointerStatistics(b *strings.Builder) {
 			}
 			if p.Type.IndirectLevel() > 1 {
 				// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
 				ptPtr++
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue stats past IndirectLevel residual false
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break
 			} else if pt := p.Type.PtrType(); pt != nil {
 				// residual ERROR sticky — no invent soft-count past PtrType residual hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
 				if pt.IsSimple() {
 					// residual ERROR sticky — no invent soft-count past IsSimple residual hole
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 						break
 					}
 					ptScalar++
-				} else if sessHasError(nil) {
+				} else if sessHasError(s) {
 					// residual ERROR sticky — no invent soft-continue past IsSimple residual false
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				} else if pt.IsStruct() {
 					// residual ERROR sticky — no invent soft-count past IsStruct residual hole
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 						break
 					}
 					ptStruct++
-				} else if sessHasError(nil) {
+				} else if sessHasError(s) {
 					// residual ERROR sticky — no invent soft-continue past IsStruct residual false
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue past PtrType residual nil
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break

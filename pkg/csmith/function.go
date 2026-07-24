@@ -929,7 +929,13 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 // Function always has return_type in C++; no soft invent "void" when missing.
 // RV present with Type-nil sticky (no invent fall through to ReturnType / void past
 // incomplete return-variable type shell).
+// Ambient ProcessOptions bridge; emit paths prefer returnTypeCOpts.
 func (f *Function) returnTypeC() string {
+	return f.returnTypeCOpts(ProcessOptions())
+}
+
+// returnTypeCOpts is returnTypeC with explicit session Options (const/volatile asserts).
+func (f *Function) returnTypeCOpts(opts Options) string {
 	// Function always live at emit; sticky no invent "void" without it
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -941,7 +947,7 @@ func (f *Function) returnTypeC() string {
 			sessNoteError(nil, ErrGeneric)
 			return ""
 		}
-		out := f.RV.Qfer.OutputQualifiedType(f.RV.Type)
+		out := f.RV.Qfer.OutputQualifiedTypeOpts(f.RV.Type, opts)
 		// residual ERROR sticky — no invent soft-empty return past OutputQualifiedType residual
 		if sessHasError(nil) {
 			return ""
@@ -1021,7 +1027,7 @@ func (f *Function) paramListCOpts(opts Options) string {
 			return ""
 		}
 		// Variable always has live name + qualified type; sticky no invent "int " / " p"
-		ty := p.Qfer.OutputQualifiedType(p.Type)
+		ty := p.Qfer.OutputQualifiedTypeOpts(p.Type, opts)
 		// residual ERROR sticky — no invent soft-continue later params past OutputQualifiedType residual
 		if sessHasError(nil) {
 			return ""
@@ -1105,7 +1111,7 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
-	rtName := f.returnTypeC()
+	rtName := f.returnTypeCOpts(opts)
 	// residual ERROR sticky — no invent soft-empty header past returnTypeC residual
 	if sessHasError(nil) {
 		return ""
@@ -1204,7 +1210,7 @@ func (f *Function) OutputHeaderAliasOpts(forceStatic bool, opts Options) string 
 		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
-	rtName := f.returnTypeC()
+	rtName := f.returnTypeCOpts(opts)
 	if rtName == "" {
 		if !sessHasError(nil) {
 			sessNoteError(nil, ErrGeneric)

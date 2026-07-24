@@ -1468,7 +1468,7 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 			if sessHasError(cg.Sess) {
 				return false
 			}
-			if IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+			if IsValidPtrSess(cg.Sess, v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 				// residual ERROR sticky — no invent eligible-true past IsValidPtr hole
 				if sessHasError(cg.Sess) {
 					return false

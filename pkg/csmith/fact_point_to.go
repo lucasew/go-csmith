@@ -217,19 +217,25 @@ func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 // valid true via related-fact match past Type-nil pointer shell).
 // Incomplete fact maps fail closed sticky invalid (no invent valid / soft re-pick past holes).
 // Missing related fact / null/dead policy rejects stay non-sticky false.
+// Ambient InUserInvocationRevisit bridge; generation prefers IsValidPtrSess.
 func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
+	return IsValidPtrSess(nil, p, facts, nullProb, deadProb)
+}
+
+// IsValidPtrSess is IsValidPtr with InUserInvocationRevisit from bag s.
+func IsValidPtrSess(s *Session, p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// Type* always live for non-special subjects; Type-nil sticky invalid
 	// (no invent valid via fact lookup past Type-nil pointer shell)
 	if !IsSpecialPtr(p) && p.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// FactPointTo.cpp:415–426 — exact var* match. Array facts live on get_collective()
@@ -240,12 +246,12 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 	// seed-10054: nested revisit miss itemized while collective has live fact.
 	fact := FindRelatedPointTo(facts, p)
 	// residual ERROR sticky — no invent valid false/true soft-skip past FindRelated hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
-	if fact == nil && sessOrAmbient(nil).InUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
+	if fact == nil && sessOrAmbient(s).InUserInvocationRevisit && p.AsArray != nil && p.AsArray.Collective != nil {
 		fact = FindRelatedPointTo(facts, &p.AsArray.Collective.Variable)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 	}
@@ -255,24 +261,24 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 	}
 	if nullProb <= 0 && fact.IsNull() {
 		// residual ERROR sticky — no invent valid past IsNull residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue valid past IsNull residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if deadProb <= 0 && fact.IsDead() {
 		// residual ERROR sticky — no invent valid past IsDead residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent valid true past IsDead residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return true

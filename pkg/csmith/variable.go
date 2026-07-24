@@ -88,15 +88,20 @@ func (v *Variable) OutputDecl(forceStatic bool) string {
 	return v.OutputDeclOpts(forceStatic, false)
 }
 
-// OutputDeclOpts includes prefix_name option.
+// OutputDeclOpts includes prefix_name option (ambient ProcessOptions for CV asserts).
 func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
+	return v.OutputDeclWith(forceStatic, prefixName, ProcessOptions())
+}
+
+// OutputDeclWith is OutputDeclOpts with explicit session Options (const/volatile asserts).
+func (v *Variable) OutputDeclWith(forceStatic, prefixName bool, opts Options) string {
 	// Variable* always live at OutputDecl; sticky no invent decl shell without it
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:670–676 — output_qualified_type always live type; sticky no invent " name"
-	ty := v.Qfer.OutputQualifiedType(v.Type)
+	ty := v.Qfer.OutputQualifiedTypeOpts(v.Type, opts)
 	// residual ERROR sticky — no invent soft-continue decl past OutputQualifiedType residual
 	if sessHasError(nil) {
 		return ""
@@ -182,9 +187,9 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 		return ""
 	}
 	// Variable.cpp:640–660 — OutputDecl always live; sticky no invent " = init;" without decl
-	decl := v.OutputDeclOpts(forceStatic, prefixName)
+	decl := v.OutputDeclWith(forceStatic, prefixName, sessOpts(s))
 	// residual ERROR sticky — no invent soft-continue def past OutputDecl residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if decl == "" {
