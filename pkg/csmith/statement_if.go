@@ -149,7 +149,8 @@ func MakeRandomIf(
 		return nil
 	}
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
-	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
+	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true (deletes expr only;
+	// if_true already ~Block via make_random ERROR path when nil).
 	// live if_true Block* required sticky (no invent if with nil Then shell)
 	if thenB == nil {
 		if !HasError() {
@@ -158,6 +159,8 @@ func MakeRandomIf(
 		return nil
 	}
 	if HasError() {
+		// residual after successful then: drop live if_true (no StatementIf yet)
+		tombstoneBlock(thenB)
 		return nil
 	}
 
@@ -173,24 +176,30 @@ func MakeRandomIf(
 			cg.FM.GlobalFacts = IncompleteFactSlice()
 			cg.FM.UnionFacts = IncompleteUnionFactSlice()
 			SetError(ErrGeneric)
+			tombstoneBlock(thenB)
 			return nil
 		}
 		cg.FM.AssignGlobalFactsFromMapIn(thenB.StmID)
 		if HasError() {
+			tombstoneBlock(thenB)
 			return nil
 		}
 	}
 
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
-	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false
+	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 — delete expr + if_true
+	// (if_false already ~Block on make_random ERROR when nil).
 	// live if_false Block* required sticky (no invent if with nil Else shell)
 	if elseB == nil {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
+		tombstoneBlock(thenB)
 		return nil
 	}
 	if HasError() {
+		tombstoneBlock(thenB)
+		tombstoneBlock(elseB)
 		return nil
 	}
 	// StatementIf.cpp:101–107 — construct StatementIf; do not merge branch facts here

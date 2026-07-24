@@ -1250,6 +1250,44 @@ func TestRemoveStmtScrubsParentChainOrphanBlocks(t *testing.T) {
 	}
 }
 
+func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
+	// Block.cpp:632–646 — if (s->contains_stmt(edge->dest)) full contains_stmt.
+	// Soft invent was blockUnderStmt (Stmts walk) for DestBlock, missing orphan
+	// nested blocks with only Parent set → edge kept, goto cascade skipped.
+	ClearError()
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	body := &Block{Func: f, StmID: 10}
+	orphan := &Block{Func: f, StmID: 11, Parent: body}
+	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, Label: "lbl"}
+	forSt := Stmt{Kind: StmtFor, StmID: 4, Then: body}
+	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{forSt, gotoSt, {Kind: StmtAssign, StmID: 7}}}
+	body.Parent = outer
+	f.Blocks = []*Block{outer, body, orphan}
+	f.Body = outer
+	fm.CFGEdges = []*CFGEdge{
+		{SrcID: 20, DestStmID: 11, DestBlock: orphan},
+		{SrcID: 7, DestStmID: 99},
+	}
+	n := outer.RemoveStmt(4, fm)
+	if n < 1 {
+		t.Fatalf("RemoveStmt count=%d", n)
+	}
+	if HasError() {
+		t.Fatal("sticky ERROR after RemoveStmt")
+	}
+	for _, e := range fm.CFGEdges {
+		if e != nil && e.SrcID == 20 {
+			t.Fatalf("edge into orphan DestBlock must scrub, still have %+v", e)
+		}
+	}
+	for _, s := range outer.Stmts {
+		if s.StmID == 20 {
+			t.Fatal("goto into removed orphan dest must cascade-remove")
+		}
+	}
+}
+
 func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	// incomplete CFG scrub must wipe IncompleteCFGEdges sticky (not bare nil invent empty complete)
 	ClearError()
@@ -1653,18 +1691,32 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 // stack.pop_back(); delete b; return nullptr — no func->blocks.erase.
 // remove_stmt alone erases (Block.cpp:653–660). Invent erase shrinks
 // StatementGoto::make_random's func->blocks copy (seed-2 e12688 n=11 vs 14).
+// ~Block clears stms so find_good_jump filters empty (StatementGoto.cpp:333–336).
 func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 	ClearError()
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	b := &Block{StmID: AllocStmID(), Func: f}
+	nested := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
+	b := &Block{
+		StmID: AllocStmID(), Func: f,
+		Stmts: []Stmt{
+			{Kind: StmtReturn, StmID: AllocStmID()},
+			{Kind: StmtIfElse, StmID: AllocStmID(), Then: nested, Else: &Block{StmID: AllocStmID()}},
+		},
+	}
 	f.Stack = []*Block{b}
-	f.Blocks = []*Block{b}
+	f.Blocks = []*Block{b, nested}
 	abortBlockMake(f, b)
 	if len(f.Stack) != 0 {
 		t.Fatalf("abort must pop stack, got %d", len(f.Stack))
 	}
-	if len(f.Blocks) != 1 || f.Blocks[0] != b {
+	if len(f.Blocks) != 2 || f.Blocks[0] != b {
 		t.Fatalf("abort must leave block on Function.Blocks (C++ no erase), got %d", len(f.Blocks))
+	}
+	if len(b.Stmts) != 0 {
+		t.Fatalf("~Block must clear stms for empty find_good filter, got %d", len(b.Stmts))
+	}
+	if len(nested.Stmts) != 0 {
+		t.Fatal("nested then via if must be tombstoned (~StatementIf delete &if_true)")
 	}
 	// sticky on nil args still
 	ClearError()
@@ -1693,6 +1745,11 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 	}
 	if len(f.Stack) != 0 {
 		t.Fatalf("stack must be empty after aborts, got %d", len(f.Stack))
+	}
+	for i, b := range f.Blocks {
+		if len(b.Stmts) != 0 {
+			t.Fatalf("tombstoned block %d must have empty stms, got %d", i, len(b.Stmts))
+		}
 	}
 	if n := len(append([]*Block(nil), f.Blocks...)); n != 3 {
 		t.Fatalf("goto pool copy size %d want 3", n)

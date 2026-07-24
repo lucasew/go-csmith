@@ -712,6 +712,10 @@ func MakeRandomBlock(
 // C++ does NOT erase from func->blocks (only remove_stmt does Block.cpp:653–660).
 // Leaving the entry matches StatementGoto::make_random's vector copy of func->blocks
 // (seed-2 first_div e12688: invent erase → n=11 vs upstream n=14).
+// ~Block clears stms (nested Statement destructors delete nested Blocks) so
+// find_good_jump_block treats the dangling entry as empty (StatementGoto.cpp:333–336).
+// Soft invent left live Stmts on aborted blocks → usable goto pool inflation
+// (seed 11466719812903307384).
 // Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
 func abortBlockMake(f *Function, b *Block) {
 	if f == nil || b == nil {
@@ -722,6 +726,37 @@ func abortBlockMake(f *Function, b *Block) {
 		f.Stack = f.Stack[:n-1]
 	}
 	// no invent f.Blocks erase — C++ delete leaves the pointer in func->blocks
+	tombstoneBlock(b)
+}
+
+// tombstoneBlock mirrors C++ delete on a Block* that remains on func->blocks:
+// Block::~Block clears stms; nested StatementIf/For destructors delete branch/body
+// Blocks (also left empty on func->blocks). Does not erase Function.Blocks.
+func tombstoneBlock(b *Block) {
+	if b == nil {
+		return
+	}
+	for i := range b.Stmts {
+		tombstoneStmt(&b.Stmts[i])
+	}
+	b.Stmts = nil
+	b.LocalVars = nil
+	b.BreakStmIDs = nil
+}
+
+// tombstoneStmt mirrors delete on a Statement* owned by a tombstoned Block.
+func tombstoneStmt(st *Stmt) {
+	if st == nil {
+		return
+	}
+	if st.Then != nil {
+		tombstoneBlock(st.Then)
+		st.Then = nil
+	}
+	if st.Else != nil {
+		tombstoneBlock(st.Else)
+		st.Else = nil
+	}
 }
 
 // PostCreationAnalysis mirrors Block::post_creation_analysis.

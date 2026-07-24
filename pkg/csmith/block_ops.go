@@ -198,16 +198,37 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 			fm.CFGEdges = ne
 
 			// Block.cpp:632–652 — remove edges with dest inside s; cascade-delete gotos
+			// C++: if (s->contains_stmt(edge->dest)) — full Statement::contains_stmt
+			// (Statement.cpp:684–705). For Block* dest, eBlock uses parent chain, not
+			// Stmts-only walk. Soft invent was blockUnderStmt (get_blocks+Stmts) which
+			// missed orphan DestBlock → kept CFG edges / skipped goto cascade.
 			ne = make([]*CFGEdge, 0, len(fm.CFGEdges))
 			scrubIncomplete := false
 			for _, e := range fm.CFGEdges {
 				destIn := !StmIDUnset(e.DestStmID) && ids[e.DestStmID]
 				if !destIn && e.DestBlock != nil {
-					// dest block nested under removed stmt
-					destIn = blockUnderStmt(removed, e.DestBlock)
-					// residual ERROR sticky — no invent dest-in scan past blockUnder residual
+					// Block* dest: parent-chain contains_stmt (not Stmts walk)
+					destIn = stmtContainsBlock(removed, e.DestBlock)
+					// residual ERROR sticky — no invent dest-in scan past contains residual
 					if HasError() {
 						scrubIncomplete = true
+						break
+					}
+				}
+				if !destIn && !StmIDUnset(e.DestStmID) && fm.Func != nil &&
+					BlocksComplete(fm.Func.Blocks) {
+					// Dest may be a Block on Func.Blocks (Block is-a Statement) whose
+					// StmID was never in the Stmts tree (orphan after failed arm).
+					for _, blk := range fm.Func.Blocks {
+						if blk != nil && blk.StmID == e.DestStmID {
+							destIn = stmtContainsBlock(removed, blk)
+							if HasError() {
+								scrubIncomplete = true
+							}
+							break
+						}
+					}
+					if scrubIncomplete {
 						break
 					}
 				}
