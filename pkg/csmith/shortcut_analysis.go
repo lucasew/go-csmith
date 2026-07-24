@@ -174,6 +174,61 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 	return true
 }
 
+// SubsetUnionFacts mirrors subset_facts for the eUnionWrite partition.
+// Fact.cpp:249–260 — same size; each f1 has related f2 that implies f1.
+func SubsetUnionFacts(a, b []*FactUnion) bool {
+	if !UnionFactsComplete(a) || !UnionFactsComplete(b) {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(a) != len(b) {
+		return false
+	}
+	for _, f1 := range a {
+		if f1 == nil || f1.Var == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		f2 := FindRelatedUnion(b, f1.Var)
+		if HasError() {
+			return false
+		}
+		if f2 == nil {
+			return false
+		}
+		ok := f2.Imply(f1)
+		if HasError() {
+			return false
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// SubsetFactVec mirrors subset_facts on a full FactVec (ePointTo + eUnionWrite).
+// Fact.cpp:249–260 — total size match; each fact implied by related in other env.
+func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
+	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(ptA)+len(uA) != len(ptB)+len(uB) {
+		return false
+	}
+	if !SubsetFacts(ptA, ptB) {
+		return false
+	}
+	if HasError() {
+		return false
+	}
+	if !SubsetUnionFacts(uA, uB) {
+		return false
+	}
+	return !HasError()
+}
+
 // IsCtrlStmt mirrors Statement::is_ctrl_stmt — break/continue/goto only.
 // Statement.h:164–167 — eContinue | eBreak | eGoto (not eReturn; return may pure-shortcut).
 // Statement always live; sticky false (no invent not-ctrl soft-skip past hole).

@@ -120,23 +120,38 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 		// StatementGoto.cpp:390–398 — force dest re-analysis when current outs
 		// are proper subset of previous outs and neither visited this pass.
 		destID := st.GotoDestStmID
-		if destID > 0 {
+		// StatementGoto.cpp:390–398 — fair sid allows dest 0; clear full FactVec
+		// (ePointTo + eUnionWrite). Soft invent was destID>0 + PT-only delete.
+		if !StmIDUnset(destID) {
 			visitedThis := fm.MapVisited != nil && fm.MapVisited[st.StmID]
 			visitedDest := fm.MapVisited != nil && fm.MapVisited[destID]
 			prevOut := fm.GetMapFactsOut(st.StmID)
+			prevOutU := fm.GetMapUnionFactsOut(st.StmID)
 			cur := facts
-			// incomplete prev outs sticky (GetMapFactsOut may already SetError)
-			if !FactsComplete(prevOut) {
+			if !FactsComplete(prevOut) || !UnionFactsComplete(prevOutU) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
+			if !UnionFactsComplete(fm.UnionFacts) {
+				SetError(ErrGeneric)
+				return false
+			}
+			curU := fm.UnionFacts
 			if !visitedThis && !visitedDest &&
-				!SameFacts(cur, prevOut) &&
-				SubsetFacts(cur, prevOut) {
+				!SameFactVec(cur, curU, prevOut, prevOutU) &&
+				SubsetFactVec(cur, curU, prevOut, prevOutU) {
+				if HasError() {
+					return false
+				}
 				delete(fm.MapFactsIn, destID)
 				delete(fm.MapFactsOut, destID)
+				delete(fm.MapUnionFactsIn, destID)
+				delete(fm.MapUnionFactsOut, destID)
+			}
+			if HasError() {
+				return false
 			}
 		}
 		// Incomplete EffectStm sticky (no invent visit true with incomplete map)

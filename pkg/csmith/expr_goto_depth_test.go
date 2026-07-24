@@ -133,17 +133,29 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 }
 
 func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
+	// StatementGoto.cpp:390–398 — subset outs clear map_facts_in/out[dest] full FactVec
+	// (ePointTo + eUnionWrite). Soft invent was PT-only delete.
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
-	// previous out was wide {a,b}; current inputs subset {a}
 	wide := MakeFactPointToSet(p, []*Variable{a, b})
 	narrow := MakeFactPointTo(p, a)
 	fm.SetMapFactsOut(5, []*FactPointTo{wide})
 	fm.SetMapFactsIn(10, []*FactPointTo{wide})
 	fm.SetMapFactsOut(10, []*FactPointTo{wide})
-	fm.MapVisited = map[int]bool{} // neither visited
+	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu.Init = MakeInt(0)
+	u := MakeFactUnion(gu, 0)
+	// dest has union lattice; prev/cur outs empty union (size match via PT only)
+	fm.MapUnionFactsIn = map[int][]*FactUnion{10: {u}}
+	fm.MapUnionFactsOut = map[int][]*FactUnion{10: {u}}
+	fm.UnionFacts = []*FactUnion{} // live empty pairs with empty prevOutU
+	fm.MapVisited = map[int]bool{}
 	fm.GlobalFacts = []*FactPointTo{narrow}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -153,13 +165,49 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 	}
 	if !VisitFactsStatementGoto(st, &cg, Defaults()) {
-		t.Fatal("visit")
+		t.Fatal("visit", HasError())
 	}
 	if _, ok := fm.MapFactsIn[10]; ok {
-		t.Fatal("dest in cleared")
+		t.Fatal("dest PT in cleared")
 	}
 	if _, ok := fm.MapFactsOut[10]; ok {
-		t.Fatal("dest out cleared")
+		t.Fatal("dest PT out cleared")
+	}
+	if _, ok := fm.MapUnionFactsIn[10]; ok {
+		t.Fatal("dest union in cleared (full FactVec clear)")
+	}
+	if _, ok := fm.MapUnionFactsOut[10]; ok {
+		t.Fatal("dest union out cleared (full FactVec clear)")
+	}
+}
+
+func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
+	// fair sid: dest stm_id 0 is valid (StatementGoto.cpp no destID>0 invent)
+	ClearError()
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p0", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalars("g_a0", GetIntType(), true, false)
+	b := CreateVariableScalars("g_b0", GetIntType(), true, false)
+	wide := MakeFactPointToSet(p, []*Variable{a, b})
+	narrow := MakeFactPointTo(p, a)
+	fm.SetMapFactsOut(1, []*FactPointTo{wide})
+	fm.SetMapFactsIn(0, []*FactPointTo{wide})
+	fm.SetMapFactsOut(0, []*FactPointTo{wide})
+	fm.UnionFacts = []*FactUnion{}
+	fm.MapVisited = map[int]bool{}
+	fm.GlobalFacts = []*FactPointTo{narrow}
+	eff := EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	st := &Stmt{
+		Kind: StmtGoto, StmID: 1, GotoDestStmID: 0,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+	}
+	if !VisitFactsStatementGoto(st, &cg, Defaults()) {
+		t.Fatal("visit", HasError())
+	}
+	if _, ok := fm.MapFactsIn[0]; ok {
+		t.Fatal("dest id 0 in must clear")
 	}
 }
 
