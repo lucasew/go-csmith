@@ -225,7 +225,7 @@ func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// poison after types so make_first fails
 	g.Initialize()
 	g.GenerateAllTypes()
@@ -251,7 +251,7 @@ func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.Initialize()
 	g.GenerateAllTypes()
 	g.VS.GlobalList = []*Variable{CreateVariableScalars("g_x", GetIntType(), false, false), nil}
@@ -273,7 +273,7 @@ func TestGenerateFunctionsNoInventNilFuncHole(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 3
 	opts.MaxBlockSize = 1
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.Initialize()
 	g.GenerateAllTypes()
 	// pre-seed nil hole; make_first appends after it → [nil, first]

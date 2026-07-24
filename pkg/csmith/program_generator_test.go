@@ -75,7 +75,7 @@ func TestGenerateDifferentSeedsDiffer(t *testing.T) {
 func TestGoGeneratorHasForwardAndBody(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 7
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	out := g.GoGenerator()
 	if !strings.Contains(out, "FORWARD DECLARATIONS") {
 		t.Fatal("forwards")
@@ -109,13 +109,13 @@ func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 	ClearError()
 	opts2 := Defaults()
 	opts2.Seed = 12
-	g := NewProgramGenerator(opts2)
+	g := NewProgramGenerator(NewSession(opts2))
 	g.Initialize()
 	SetError(ErrGeneric)
 	// GenerateFunctions stops; without built user GoGenerator must empty
 	// (re-Initialize at start of GoGenerator clears error — call pipeline manually)
 	ClearError()
-	g2 := NewProgramGenerator(opts2)
+	g2 := NewProgramGenerator(NewSession(opts2))
 	g2.Initialize()
 	g2.GenerateAllTypes()
 	// empty types after GenerateAllTypes wiped
@@ -144,7 +144,7 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	// Function* hole on Funcs must not invent hasUser / functions section from later built
 	ClearError()
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	built := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
 		RV:   CreateVariableScalars("func_1_rv", GetIntType(), false, false),
@@ -193,7 +193,7 @@ func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
 		RV: CreateVariableScalars("func_ok_rv", GetIntType(), false, false),
 	}
-	g := NewProgramGenerator(Defaults())
+	g := NewProgramGenerator(NewSession(Defaults()))
 	g.Funcs.Funcs = []*Function{bad, good}
 	if s := g.OutputFunctions(); s != "" {
 		t.Fatal("body residual must fail closed whole OutputFunctions, not invent later func", s)
@@ -214,7 +214,7 @@ func TestOutputMainNilSticky(t *testing.T) {
 	}
 	ClearError()
 	// --nomain soft empty
-	g := NewProgramGenerator(Defaults())
+	g := NewProgramGenerator(NewSession(Defaults()))
 	g.Opts.NoMain = true
 	if g.OutputMain() != "" {
 		t.Fatal("--nomain OutputMain must soft empty")

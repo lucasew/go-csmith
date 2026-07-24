@@ -92,10 +92,14 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 }
 
 func TestNoteReadTracksGlobal(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	// NoteRead does not update feffect (Function.cpp:657 finalizes from body map).
 	// CommentOutput uses insertion-order read_vars via OutputForComment.
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	g := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	if g == nil {
+		t.Fatal("CreateVariableQfer nil", GetError())
+	}
 	f.FEffect = f.FEffect.ReadVar(g)
 	if !f.FEffect.IsRead(g) {
 		t.Fatal("read")

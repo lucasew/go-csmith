@@ -141,7 +141,7 @@ func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
 
 func TestNewProgramGeneratorSetsProcessProbs(t *testing.T) {
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	if ProcessProbabilities() != g.Probs {
 		t.Fatal("process probs must be session table")
 	}

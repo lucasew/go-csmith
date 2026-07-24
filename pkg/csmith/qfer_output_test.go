@@ -175,7 +175,7 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	opts.ForceGlobalsStatic = true
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// global without init → OutputDef empty sticky
 	v := &Variable{Name: "g_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	g.VS.GlobalList = []*Variable{v}
@@ -212,7 +212,7 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	// Type.cpp:1894–1901 — empty used pool still emits section header; incomplete IR fails closed.
 	ClearError()
-	g := NewProgramGenerator(Defaults())
+	g := NewProgramGenerator(NewSession(Defaults()))
 	// complete empty: only section comment (no invent types past unused inventory)
 	g.Types.StructTypes = nil
 	g.Types.UnionTypes = nil
@@ -281,7 +281,7 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 
 func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 	// incomplete funcs must not invent FORWARD/FUNCTIONS section-only shells
-	g := NewProgramGenerator(Defaults())
+	g := NewProgramGenerator(NewSession(Defaults()))
 	g.Funcs.Funcs = []*Function{
 		{Name: "", ReturnType: GetIntType()}, // empty name → empty header
 	}
@@ -717,7 +717,7 @@ func TestOutputQualifiedTypeBadSanityFailClosed(t *testing.T) {
 func TestOutputGlobalsUsesOutputDef(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 2
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	// force a global
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -800,7 +800,7 @@ func TestOutputGlobalsOutputDefResidualSticky(t *testing.T) {
 	// OutputDef residual soft invent was soft-continue later globals invent partial section.
 	ClearError()
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.VS = NewVariableSelector(opts)
 	// Type-nil InitExpr residual on OutputDefFull
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)

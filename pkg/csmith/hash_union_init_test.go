@@ -12,7 +12,7 @@ func TestUnionWriteFactsForHashUsesLiveFirstFunc(t *testing.T) {
 	// seed 999: upstream hashes g_605.f0 / g_467.f0 (live last_written=0)
 	opts := Defaults()
 	opts.Seed = 999
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	_ = g.GoGenerator()
 	if HasError() {
 		t.Log("gen err", GetError())
@@ -65,7 +65,7 @@ func TestUnionWriteFactsForHashSeed34(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	opts.Seed = 34
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	src := g.GoGenerator()
 	if src == "" {
 		t.Fatal("empty gen", GetError())

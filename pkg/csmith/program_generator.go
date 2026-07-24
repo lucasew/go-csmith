@@ -79,12 +79,22 @@ func (g *ProgramGenerator) GetCountPrefix(name string) string {
 	return fmt.Sprintf("p_%d_%s", g.GoodCount, name)
 }
 
-// NewProgramGenerator constructs a generator (Abs/Default/DFS ProgramGenerator).
+// NewProgramGenerator constructs a generator on s (Abs/Default/DFS ProgramGenerator).
 // AbsProgramGenerator::CreateInstance selects DFS vs Default from dfs_exhaustive.
-// initialize — CreateInstance RNG + OutputMgr; ExtensionMgr skipped (null).
-func NewProgramGenerator(opts Options) *ProgramGenerator {
-	// CGOptions process-wide state for Constant::make_random / choose_var / emit.
-	SetProcessOptions(opts)
+// s is required; mutables are written on s (and g.Sess == s). Helpers that still
+// use Process* see s only while s is the active session (nested activate here if needed).
+func NewProgramGenerator(s *Session) *ProgramGenerator {
+	if s == nil {
+		return nil
+	}
+	// Nested activate so tests calling NewProgramGenerator(NewSession(opts)) without
+	// an outer Generate still route Process* to this bag during construction.
+	restore := activateSession(s)
+	defer restore()
+
+	opts := s.Opts
+	// CGOptions on the session bag (field write; Process* bridge follows active s).
+	s.Opts = opts
 	// CGOptions::monitored_funcs → OutputMgr::monitored_funcs_
 	opts.ApplyMonitoredFuncs()
 	seed := opts.Seed
@@ -102,36 +112,33 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 			// sticky already set on split path fail
 		}
 	}
-	// RandomNumber::CreateInstance
+	// RandomNumber::CreateInstance (writes s.Rng via active session)
 	CreateRandomNumberInstance(kind, seed)
-	r := ProcessRng()
+	r := s.Rng
 	if r == nil {
 		// Create failed; Default always works; DFS needs MaxExhaustiveDepth>0
 		if kind == RngKindDefault {
 			r = NewRng(seed)
-			SetProcessRng(r)
+			s.Rng = r
 		}
 		// DFS fail closed with sticky error + nil rng handled below
 	}
 	// C++ Probabilities is a process singleton — one session table for generator + VS
-	// + CreateVariable/create_field_vars (no invent second NewProbabilities(opts))
 	probs := NewProbabilities(opts)
-	SetProcessProbabilities(probs)
+	s.Probs = probs
 	// Probabilities.cpp:573–578 — assignOpsTable_ + expr/param tables once
 	InitSessionProbabilityTables(opts)
-	// share session Probabilities with VS (no invent throwaway NewProbabilities then overwrite)
+	// share session Probabilities with VS
 	vs := NewVariableSelectorProbs(opts, probs)
 	// Statement.cpp:133–139 — InitProbabilityTable from pStatementProb (session probs)
-	// no invent second NewStatementThresholdTable independent of Probabilities
 	stmtTab := probs.StatementThresholdTable()
-	SetProcessStmtTab(stmtTab)
+	s.StmtTab = stmtTab
 	// VariableSelector::InitScopeTable — scopeTable_ once per generation
 	InitScopeTable(opts)
-	// Expression session tables from InitSessionProbabilityTables (no invent mid-ctor)
-	exprTables := ProcessExprTables()
-	sess := currentSession()
+	// Expression session tables from InitSessionProbabilityTables
+	exprTables := s.ExprTables
 	g := &ProgramGenerator{
-		Sess:       sess,
+		Sess:       s,
 		Opts:       opts,
 		Seed:       seed,
 		Rng:        r,
@@ -142,9 +149,7 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 		FactMgrs:   NewFactMgrMap(),
 		OutputKind: outKind,
 	}
-	if sess != nil {
-		sess.ProgramGen = g
-	}
+	s.ProgramGen = g
 	// Share gensym + derived_types across selector and generator.
 	vs.Types = &g.Types
 	// Attribute generators for this generation (Initialize*Attributes)
@@ -154,11 +159,9 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// PartialExpander::init_partial_expander when --partial-expand set
 	if opts.PartialExpand != "" {
 		if !InitPartialExpanderFromOptions(opts) {
-			SetError(ErrGeneric)
+			s.GenError = ErrGeneric
 		}
 	}
-	// AbsProgramGenerator::current_generator_
-	SetProcessProgramGenerator(g)
 	return g
 }
 
@@ -171,32 +174,43 @@ func (g *ProgramGenerator) Initialize() {
 	// Finalization::doFinalization subset for a fresh generation
 	// (includes RandomNumber::doFinalization).
 	DoFinalization()
-	// DoFinalization clears process-wide session handles; re-install the
-	// generator's live singletons (CGOptions / RNG / Probabilities / Statement table).
-	if g != nil {
-		SetProcessOptions(g.Opts)
-		SetProcessProgramGenerator(g)
-		// RandomNumber::CreateInstance after Finalization
-		kind := RngKindDefault
-		if g.OutputKind == OutputMgrKindDFS || g.Opts.DFSExhaustive {
-			kind = RngKindDFS
-			CreateDFSOutputMgr(g.Opts)
-		} else {
-			_ = CreateDefaultOutputMgr(g.Opts)
+	// DoFinalization clears session handles on the active bag; re-install from g.Sess.
+	if g == nil {
+		return
+	}
+	s := g.Sess
+	if s == nil {
+		s = currentSession()
+		g.Sess = s
+	}
+	if s != nil {
+		s.Opts = g.Opts
+		s.ProgramGen = g
+		s.Probs = g.Probs
+		s.StmtTab = g.StmtTab
+		s.ExprTables = g.Tables
+		if g.Rng != nil {
+			s.Rng = g.Rng
 		}
-		CreateRandomNumberInstance(kind, g.Seed)
-		if r := ProcessRng(); r != nil {
-			g.Rng = r
-		} else if g.Rng != nil {
-			SetProcessRng(g.Rng)
-		}
-		SetProcessProbabilities(g.Probs)
-		SetProcessStmtTab(g.StmtTab)
-		SetProcessExprTables(g.Tables)
-		// re-init scope + assign ops from session opts (once-per-run tables)
-		InitScopeTable(g.Opts)
-		// assignOpsTable_ depends on CGOptions incr/compound flags
-		SetProcessAssignOpsTable(NewAssignOpsTable(g.Opts))
+	}
+	// RandomNumber::CreateInstance after Finalization
+	kind := RngKindDefault
+	if g.OutputKind == OutputMgrKindDFS || g.Opts.DFSExhaustive {
+		kind = RngKindDFS
+		CreateDFSOutputMgr(g.Opts)
+	} else {
+		_ = CreateDefaultOutputMgr(g.Opts)
+	}
+	CreateRandomNumberInstance(kind, g.Seed)
+	if s != nil && s.Rng != nil {
+		g.Rng = s.Rng
+	} else if g.Rng != nil && s != nil {
+		s.Rng = g.Rng
+	}
+	// re-init scope + assign ops from session opts (once-per-run tables)
+	InitScopeTable(g.Opts)
+	if s != nil {
+		s.AssignOpsTab = NewAssignOpsTable(g.Opts)
 	}
 }
 
@@ -747,6 +761,10 @@ func (g *ProgramGenerator) hashGlobals() string {
 	if g == nil {
 		SetError(ErrGeneric)
 		return ""
+	}
+	if g.Sess != nil {
+		restore := activateSession(g.Sess)
+		defer restore()
 	}
 	return HashGlobalVariablesWithUnionFacts(g.VS, g.unionWriteFactsForHash())
 }
@@ -1313,6 +1331,11 @@ func (g *ProgramGenerator) GoGenerator() string {
 		SetError(ErrGeneric)
 		return ""
 	}
+	// Route Process* to g.Sess for this call (tests may call GoGenerator without outer Generate).
+	if g.Sess != nil {
+		restore := activateSession(g.Sess)
+		defer restore()
+	}
 	g.Initialize()
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
@@ -1491,6 +1514,10 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 	if g == nil {
 		SetError(ErrGeneric)
 		return ""
+	}
+	if g.Sess != nil {
+		restore := activateSession(g.Sess)
+		defer restore()
 	}
 	if g.OutputKind != OutputMgrKindDFS && !g.Opts.DFSExhaustive {
 		SetError(ErrGeneric)

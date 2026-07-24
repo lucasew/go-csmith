@@ -79,7 +79,7 @@ func TestStepHashNoInventDeclWithoutComputeHash(t *testing.T) {
 	opts := Defaults()
 	opts.StepHashByStmt = true
 	opts.ComputeHash = false
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	hdr := g.OutputHeader()
 	if strings.Contains(hdr, "csmith_compute_hash") || strings.Contains(hdr, "step_hash") {
 		t.Fatal("must not invent hash decls without ComputeHash", hdr)
@@ -96,7 +96,7 @@ func TestStepHashNoInventCallWithoutDef(t *testing.T) {
 	opts.StepHashByStmt = true
 	opts.ComputeHash = true
 	opts.MaxArrayDim = 0
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// one global array so dimen > MaxArrayDim
 	av := &Variable{
 		Name:       "g_a",

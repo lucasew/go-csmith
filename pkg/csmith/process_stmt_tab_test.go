@@ -186,12 +186,14 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 		SetProcessProbabilities(prevP)
 		SetProcessStmtTab(prevS)
 	}()
-	g := NewProgramGenerator(opts)
+	s := NewSession(opts)
+	g := NewProgramGenerator(s)
 	if g.StmtTab != g.Probs.StatementThresholdTable() {
 		t.Fatal("generator StmtTab must be probs statement table")
 	}
-	if ProcessStmtTab() != g.StmtTab {
-		t.Fatal("ProcessStmtTab must share generator table")
+	// Table lives on the session bag (ambient ProcessStmtTab is only live while activated).
+	if s.StmtTab != g.StmtTab {
+		t.Fatal("session StmtTab must share generator table")
 	}
 }
 

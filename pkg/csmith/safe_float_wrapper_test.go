@@ -390,7 +390,7 @@ func TestGoGeneratorIdentifyWrappers(t *testing.T) {
 	defer ClearSafeOpWrapperNames()
 	// pre-register so N_WRAP non-zero even if gen avoids safe ops
 	_ = SafeOpFlagsToID("func_add_int32_t")
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	out := g.GoGenerator()
 	if !strings.Contains(out, "wrapper.h") || !strings.Contains(out, "N_WRAP") {
 		t.Fatal(out[len(out)-200:])

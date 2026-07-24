@@ -144,9 +144,11 @@ func TestProcessProgramGenerator(t *testing.T) {
 	}
 	ClearError()
 	o := Defaults()
-	g := NewProgramGenerator(o)
-	if ProcessProgramGenerator() != g {
-		t.Fatal("current generator")
+	s := NewSession(o)
+	g := NewProgramGenerator(s)
+	// Generator is owned by the session bag (not ambient after nested activate returns).
+	if g == nil || g.Sess != s || s.ProgramGen != g {
+		t.Fatal("ProgramGenerator.Sess / s.ProgramGen must wire the run bag")
 	}
 	if g.GetOutputMgrKind() != OutputMgrKindDefault {
 		t.Fatal(g.GetOutputMgrKind())
@@ -172,14 +174,16 @@ func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
 	o.DFSExhaustive = true
 	o.RandomBased = false
 	o.MaxExhaustiveDepth = 6
-	g := NewProgramGenerator(o)
-	if g.OutputKind != OutputMgrKindDFS {
-		t.Fatal(g.OutputKind)
+	s := NewSession(o)
+	g := NewProgramGenerator(s)
+	if g == nil || g.OutputKind != OutputMgrKindDFS {
+		t.Fatal(g)
 	}
 	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
 		t.Fatal("DFS rng", g.Rng)
 	}
-	if ProcessOutputMgrKind() != OutputMgrKindDFS {
-		t.Fatal(ProcessOutputMgrKind())
+	// Output mgr kind is on the session bag (not ambient after construction).
+	if s.OutputMgrKind != OutputMgrKindDFS {
+		t.Fatal(s.OutputMgrKind)
 	}
 }

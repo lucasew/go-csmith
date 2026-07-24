@@ -9,7 +9,7 @@ func TestOutputHeaderAccessOnceMacro(t *testing.T) {
 	opts := Defaults()
 	opts.AccessOnce = true
 	opts.Seed = 2
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	h := g.OutputHeader()
 	if !strings.Contains(h, "ACCESS_ONCE") || !strings.Contains(h, "typeof") {
 		t.Fatal(h)
@@ -19,7 +19,7 @@ func TestOutputHeaderAccessOnceMacro(t *testing.T) {
 func TestOutputHeaderWrapVolatiles(t *testing.T) {
 	opts := Defaults()
 	opts.WrapVolatiles = true
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	h := g.OutputHeader()
 	if !strings.Contains(h, "volatile_runtime.h") {
 		t.Fatal(h)

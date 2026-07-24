@@ -46,7 +46,7 @@ func TestSeed1048Func53NoSpuriousFactChanged(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	opts.Seed = 10482453124604569829
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	out := g.GoGenerator()
 	if out == "" {
 		t.Fatal("empty program", HasError())

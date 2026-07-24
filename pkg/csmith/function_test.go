@@ -77,6 +77,7 @@ func TestMakeRandomSignatureParams(t *testing.T) {
 }
 
 func TestMakeFirstNoParamsHasBody(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -151,7 +152,10 @@ func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 		r := NewRng(seed)
 		seedTypesForTest(r, opts, probs, vs, nil)
 		f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
-		if f.Body != nil && len(f.Body.Stmts) < opts.MaxBlockSize {
+		if f == nil || f.Body == nil {
+			continue
+		}
+		if len(f.Body.Stmts) < opts.MaxBlockSize {
 			// last should be return if early
 			last := f.Body.Stmts[len(f.Body.Stmts)-1]
 			if last.Kind == StmtReturn {

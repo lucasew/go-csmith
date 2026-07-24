@@ -56,7 +56,7 @@ func TestGenerateFunctionsCallsAddInterested(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	opts.InterestedFacts = DefaultInterestedFacts
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	g.GenerateFunctions()
 	if !MetaFactPointToEnabled() || !MetaFactUnionEnabled() {

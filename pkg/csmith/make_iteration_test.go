@@ -153,6 +153,7 @@ func TestMakeIterationArrayBoundPath(t *testing.T) {
 }
 
 func TestMakeRandomForEmitsHeader(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1

@@ -185,7 +185,7 @@ func TestStepHashBody(t *testing.T) {
 	opts := Defaults()
 	opts.StepHashByStmt = true
 	opts.ComputeHash = true
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// minimal so OutputHashFuncDef runs
 	s := g.OutputHashFuncDef()
 	if !strings.Contains(s, "crc32_gentab") || !strings.Contains(s, "step_hash") {

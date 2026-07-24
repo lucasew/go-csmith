@@ -444,7 +444,7 @@ func TestUpdateFactForAssignUnionField(t *testing.T) {
 func TestGenerateFunctionsWiresFactMgr(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 7
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	g.GenerateFunctions()
 	if g.FactMgrs == nil {
@@ -460,7 +460,7 @@ func TestGenerateFunctionsWiresFactMgr(t *testing.T) {
 	}
 	// Function::FMList is session state; sticky no invent mid-run miss
 	ClearError()
-	g2 := NewProgramGenerator(opts)
+	g2 := NewProgramGenerator(NewSession(opts))
 	g2.FactMgrs = nil
 	g2.GenerateFunctions()
 	if !HasError() {

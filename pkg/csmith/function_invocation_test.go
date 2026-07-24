@@ -217,7 +217,7 @@ func TestExpressionFuncallCanCreateUserFunc(t *testing.T) {
 		opts := Defaults()
 		opts.Seed = seed
 		opts.MaxFuncs = 10
-		g := NewProgramGenerator(opts)
+		g := NewProgramGenerator(NewSession(opts))
 		_ = g.GoGenerator()
 		if len(g.Funcs.Funcs) > 1 {
 			foundMulti = true
@@ -275,6 +275,7 @@ func TestGenerateEmitsBinaryOrCall(t *testing.T) {
 }
 
 func TestGenerateNewParentLocal(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)

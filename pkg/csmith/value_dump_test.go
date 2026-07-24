@@ -215,7 +215,7 @@ func TestBlindCheckGlobalMain(t *testing.T) {
 	opts.MaxFuncs = 1
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	// seed simple global
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
@@ -239,7 +239,7 @@ func TestOutputMainNoInventWithoutFirstInvoke(t *testing.T) {
 	// OutputMgr.cpp:97 — MakeFuncInvocation always live; no invent main shell without call
 	opts := Defaults()
 	opts.NoMain = false
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// incomplete first func (no RV/body) — BuildUserInvocation may still run with empty params
 	g.Funcs.Funcs = []*Function{{
 		Name: "func_1", ReturnType: GetIntType(),

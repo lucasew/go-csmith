@@ -22,7 +22,7 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	o.MaxBlockSize = 1
 	o.MaxBlockDepth = 1
 	o.MaxExprComplexity = 1
-	g := NewProgramGenerator(o)
+	g := NewProgramGenerator(NewSession(o))
 	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
 		t.Fatal("need DFS rng")
 	}
@@ -40,7 +40,7 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	ClearError()
 	o.DFSDebugSequence = "0"
-	g = NewProgramGenerator(o)
+	g = NewProgramGenerator(NewSession(o))
 	// Manually set all_done path: after debug sequence exhausted
 	_ = g.Rng.RndUpto(3)
 	out := g.GoGeneratorDFSLoop()

@@ -31,7 +31,7 @@ func TestOutputForwardDeclAlias(t *testing.T) {
 func TestOutputFunctionsEmitsAliasDecls(t *testing.T) {
 	opts := Defaults()
 	opts.FunctionAttributes = true
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.Funcs.Funcs = []*Function{{
 		Name: "func_1", AliasName: "func_1_alias",
 		ReturnType: GetIntType(),

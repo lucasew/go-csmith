@@ -58,9 +58,10 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 	}
 	defer ClearPartialExpander()
 
-	g := NewProgramGenerator(opts)
-	g.Sess = s
-	s.ProgramGen = g
+	g := NewProgramGenerator(s)
+	if g == nil {
+		return "", fmt.Errorf("nil program generator")
+	}
 	g.Argv = opts.Argv
 	defer ClearAttrGenerators()
 
@@ -77,7 +78,7 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		return "", nil
 	}
 	if opts.ProbabilityConfiguration != "" {
-		p := ProcessProbabilities()
+		p := s.Probs
 		if p == nil {
 			return "", fmt.Errorf("probabilities not initialized")
 		}
@@ -86,9 +87,9 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		}
 	}
 	out := g.GoGenerator()
-	if HasError() {
-		code := GetError()
-		ClearError()
+	if s.GenError != ErrSuccess {
+		code := s.GenError
+		s.GenError = ErrSuccess
 		return "", fmt.Errorf("generation error (Error=%d)", code)
 	}
 	if out == "" {

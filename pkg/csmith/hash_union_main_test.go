@@ -6,6 +6,7 @@ import (
 )
 
 func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
+	ReinstallTestProcessSingletons()
 	ut := &Type{
 		isUnion:    true,
 		StructName: "U0",
@@ -87,7 +88,7 @@ func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
 	opts := Defaults()
 	opts.ComputeHash = true
 	opts.StepHashByStmt = true // hashHelpersEnabled requires both
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// complete empty globals: ready (no arrays)
 	g.VS.GlobalList = nil
 	if !g.hashFuncDefReady() {
@@ -105,7 +106,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	// seed a union global with live init (nil rhs union abstract fails closed sticky)
 	ut := &Type{

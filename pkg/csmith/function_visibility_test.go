@@ -9,7 +9,7 @@ import "testing"
 // was pointer-identity only (field never in local_vars) then wrong OOS/mark_dead.
 // 5b8ae90: IsVarOnStack uses Match like find_variable_in_set.
 func TestIsVarOOSLocalAggregateField(t *testing.T) {
-	ClearError()
+	ReinstallTestProcessSingletons()
 	st := &Type{
 		isStruct:   true,
 		StructName: "S0",
@@ -23,6 +23,9 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	f.Blocks = []*Block{body}
 	f.Stack = []*Block{body}
 	arr := CreateVariableScalars("l_1053", st, false, false)
+	if arr == nil {
+		t.Fatalf("CreateVariableScalars nil err=%v", GetError())
+	}
 	arr.CreateFieldVars()
 	if len(arr.FieldVars) < 2 {
 		t.Fatalf("fields %d err=%v", len(arr.FieldVars), GetError())

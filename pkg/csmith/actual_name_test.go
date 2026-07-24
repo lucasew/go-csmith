@@ -131,7 +131,7 @@ func TestBlockNoInventIndentOnlyIncompleteStmt(t *testing.T) {
 func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {
 	// C++ Probabilities singleton — generator and VS must share one table
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	if g.Probs == nil || g.VS == nil || g.VS.Probs == nil {
 		t.Fatal("missing probs")
 	}
@@ -151,7 +151,7 @@ func TestNewVariableSelectorProbsShares(t *testing.T) {
 
 func TestOutputGlobalsVolatileComment(t *testing.T) {
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	// Force a known scalar volatile global through OutputGlobals path.
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	v.Init = MakeInt(0)
@@ -165,7 +165,7 @@ func TestOutputGlobalsVolatileComment(t *testing.T) {
 func TestOutputGlobalsVolatileArrayNoComment(t *testing.T) {
 	// ArrayVariable.cpp:506–507 — array OutputDef emits ";\n" only; no VOLATILE GLOBAL invent.
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
@@ -189,7 +189,7 @@ func TestOutputGlobalsVolatileArrayNoComment(t *testing.T) {
 func TestOutputGlobalsIncompleteSticky(t *testing.T) {
 	// incomplete GlobalList / Arrays fail closed sticky (no invent empty section)
 	opts := Defaults()
-	g := NewProgramGenerator(opts)
+	g := NewProgramGenerator(NewSession(opts))
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	v.Init = MakeInt(0)
 	g.VS.GlobalList = []*Variable{v, nil}
