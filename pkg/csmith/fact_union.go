@@ -28,19 +28,19 @@ func MakeFactUnion(v *Variable, fid int) *FactUnion {
 	// no soft invent FactUnion on scalar/struct vars
 	if v != nil {
 		if v.Type == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		if !v.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-nil FactUnion past IsUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return nil
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		// residual ERROR sticky — no invent soft-FactUnion past IsUnion residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
@@ -53,8 +53,8 @@ func MakeFactUnionTop(v *Variable) *FactUnion {
 	f := MakeFactUnion(v, FactUnionTop)
 	if f == nil {
 		// MakeFactUnion may already sticky non-union/incomplete subject
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return nil
 	}
@@ -69,13 +69,13 @@ func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		f := MakeFactUnion(v, fid)
 		// non-union subject is assert path — fail closed sticky whole batch
 		if f == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		out = append(out, f)
@@ -88,13 +88,13 @@ func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
 	// subject always live; sticky no invent miss / soft-skip nil key
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	for _, f := range facts {
 		// FactUnion* always live; sticky no invent skip hole to later match
 		if f == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		if f.Var == v {
@@ -107,7 +107,7 @@ func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
 // GetVar mirrors FactUnion::get_var.
 func (f *FactUnion) GetVar() *Variable {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return f.Var
@@ -116,11 +116,11 @@ func (f *FactUnion) GetVar() *Variable {
 // SetVar mirrors FactUnion::set_var.
 func (f *FactUnion) SetVar(v *Variable) {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	f.Var = v
@@ -129,7 +129,7 @@ func (f *FactUnion) SetVar(v *Variable) {
 // GetLastWrittenFID mirrors FactUnion::get_last_written_fid.
 func (f *FactUnion) GetLastWrittenFID() int {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return FactUnionBottom
 	}
 	return f.LastWrittenFID
@@ -138,7 +138,7 @@ func (f *FactUnion) GetLastWrittenFID() int {
 // IsRelated mirrors Fact::is_related for Union — same subject var.
 func (f *FactUnion) IsRelated(other *FactUnion) bool {
 	if f == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return f.Var == other.Var
@@ -149,7 +149,7 @@ func (f *FactUnion) IsRelated(other *FactUnion) bool {
 func (f *FactUnion) IsTop() bool {
 	// FactUnion always live; sticky incomplete no invent TOP soft-skip
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return f.LastWrittenFID == FactUnionTop
@@ -160,7 +160,7 @@ func (f *FactUnion) IsTop() bool {
 func (f *FactUnion) IsBottom() bool {
 	// FactUnion always live; sticky incomplete no invent BOTTOM soft-skip
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	return f.LastWrittenFID == FactUnionBottom
@@ -170,7 +170,7 @@ func (f *FactUnion) IsBottom() bool {
 // Incomplete FactUnion sticky no-op (no invent soft-set TOP past missing shell).
 func (f *FactUnion) SetTop() {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	f.LastWrittenFID = FactUnionTop
@@ -180,7 +180,7 @@ func (f *FactUnion) SetTop() {
 // Incomplete FactUnion sticky no-op (no invent soft-set BOTTOM past missing shell).
 func (f *FactUnion) SetBottom() {
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return
 	}
 	f.LastWrittenFID = FactUnionBottom
@@ -191,7 +191,7 @@ func (f *FactUnion) SetBottom() {
 func (f *FactUnion) Clone() *FactUnion {
 	// FactUnion always live; sticky incomplete no invent nil clone soft-skip
 	if f == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return &FactUnion{Var: f.Var, LastWrittenFID: f.LastWrittenFID}
@@ -203,7 +203,7 @@ func (f *FactUnion) Clone() *FactUnion {
 func (f *FactUnion) Equal(other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent not-equal
 	if f == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -218,7 +218,7 @@ func (f *FactUnion) Equal(other *FactUnion) bool {
 func (f *FactUnion) Imply(other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent not-imply
 	if f == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -226,24 +226,24 @@ func (f *FactUnion) Imply(other *FactUnion) bool {
 	}
 	if f.IsBottom() {
 		// residual ERROR sticky — no invent soft-imply past IsBottom residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past IsBottom residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if other.IsBottom() {
 		// residual ERROR sticky — no invent soft-imply past other IsBottom residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue past other IsBottom residual false
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return f.LastWrittenFID == other.LastWrittenFID
@@ -255,7 +255,7 @@ func (f *FactUnion) Imply(other *FactUnion) bool {
 func (f *FactUnion) Join(other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent join no-op success
 	if f == nil || other == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -263,24 +263,24 @@ func (f *FactUnion) Join(other *FactUnion) bool {
 	}
 	if f.Imply(other) {
 		// residual ERROR sticky — no invent join no-op true past Imply hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue join past Imply residual false path
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if other.Imply(f) {
 		// residual ERROR sticky — no invent absorb past other.Imply hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		f.LastWrittenFID = other.LastWrittenFID
 	} else {
 		// residual ERROR sticky — no invent soft-set BOTTOM past other.Imply residual false
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		f.SetBottom()
@@ -294,17 +294,17 @@ func (f *FactUnion) Join(other *FactUnion) bool {
 // Top/bottom are complete no-type (not incomplete IR).
 func (f *FactUnion) GetLastWrittenType() *Type {
 	if f == nil || f.Var == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	isTop := f.IsTop()
 	// residual ERROR sticky — no invent soft-nil type past IsTop residual
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	isBot := f.IsBottom()
 	// residual ERROR sticky — no invent soft-nil type past IsBottom residual
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	if isTop || isBot {
@@ -312,31 +312,31 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 	}
 	// FactUnion.cpp:65 — assert(var->type && eUnion) sticky; fail closed nil if not union
 	if f.Var.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if !f.Var.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-nil type past IsUnion residual
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-type past IsUnion residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return nil
 	}
 	fid := f.LastWrittenFID
 	// FactUnion.cpp:68–69 — assert fid in [0, field_vars.size()) sticky
 	if fid < 0 || fid >= len(f.Var.FieldVars) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	fv := f.Var.FieldVars[fid]
 	// field Variable* always live; sticky no invent nil type via hole
 	if fv == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	return fv.Type
@@ -347,18 +347,18 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 func (f *FactUnion) Output() string {
 	if f == nil || f.Var == nil {
 		if f != nil && f.Var == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 		}
 		return ""
 	}
 	// var name always live; sticky no invent " last written field: N" without identifier
 	name := f.Var.GetActualName(false)
 	// residual ERROR sticky — no invent soft-empty union fact past GetActualName residual
-	if HasError() {
+	if sessHasError(nil) {
 		return ""
 	}
 	if name == "" {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return ""
 	}
 	return name + " last written field: " + strconv.Itoa(f.LastWrittenFID)
@@ -391,7 +391,7 @@ func CloneUnionFactSlice(facts []*FactUnion) []*FactUnion {
 		return nil
 	}
 	if !UnionFactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, len(facts))
@@ -408,15 +408,15 @@ func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
 		return nil
 	}
 	if !UnionFactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, len(facts))
 	for i, f := range facts {
 		cp := f.Clone()
-		if cp == nil || HasError() {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if cp == nil || sessHasError(nil) {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return IncompleteUnionFactSlice()
 		}
@@ -429,29 +429,29 @@ func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
 // Related subject replaced; else append. Incomplete maps fail closed sticky wipe.
 func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
 	if facts == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if nf == nil || nf.Var == nil {
 		*facts = IncompleteUnionFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !UnionFactsComplete(*facts) {
 		*facts = IncompleteUnionFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	for i, f := range *facts {
 		if f.Var == nf.Var {
 			if f.Equal(nf) {
-				if HasError() {
+				if sessHasError(nil) {
 					*facts = IncompleteUnionFactSlice()
 					return false
 				}
 				return false
 			}
-			if HasError() {
+			if sessHasError(nil) {
 				*facts = IncompleteUnionFactSlice()
 				return false
 			}
@@ -467,23 +467,23 @@ func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
 // FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts) includes eUnionWrite.
 func RenewUnionFacts(facts *[]*FactUnion, newFacts []*FactUnion) bool {
 	if facts == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !UnionFactsComplete(*facts) || !UnionFactsComplete(newFacts) {
 		*facts = IncompleteUnionFactSlice()
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	changed := false
 	for _, nf := range newFacts {
 		if RenewUnionFact(facts, nf) {
-			if HasError() {
+			if sessHasError(nil) {
 				*facts = IncompleteUnionFactSlice()
 				return false
 			}
 			changed = true
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			*facts = IncompleteUnionFactSlice()
 			return false
 		}
@@ -499,13 +499,13 @@ func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
 		return nil
 	}
 	if !UnionFactsComplete(facts) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, 0, len(facts))
 	for _, f := range facts {
 		isG := f.Var.IsGlobal()
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice()
 		}
 		if isG {
@@ -521,23 +521,23 @@ func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
 func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 	// subject always live union; incomplete subject sticky not-readable
 	if v == nil || v.Type == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !v.Type.IsUnion() || fid < 0 {
 		// residual ERROR sticky — no invent not-readable soft-skip past IsUnion residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue readable past IsUnion residual true
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if !UnionFactsComplete(facts) {
 		// incomplete map sticky (no invent readable / soft re-pick past hole)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if fid >= len(v.Type.Fields) && fid >= len(v.FieldVars) {
@@ -546,14 +546,14 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 	tmp := MakeFactUnion(v, fid)
 	if tmp == nil {
 		// MakeFactUnion may already sticky non-union; ensure sticky
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return false
 	}
 	fu := FindRelatedUnion(facts, v)
 	// residual ERROR sticky — no invent readable/not-readable soft-skip past FindRelated hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	if fu == nil {
@@ -561,7 +561,7 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 	}
 	ok := tmp.Imply(fu)
 	// residual ERROR sticky — no invent readable true past Imply hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return ok
@@ -576,23 +576,23 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 // FindRelatedUnion returns nil past a hole before a matching parent fact).
 func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	if v == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	if !v.IsInsideUnionField() {
 		// residual ERROR sticky — no invent not-nonreadable soft-skip past IsInsideUnionField hole
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue nonreadable past IsInsideUnion residual true path
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	if !UnionFactsComplete(facts) {
 		// incomplete union map sticky nonreadable (no invent readable past hole)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	// walk to the union field variable
@@ -600,19 +600,19 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	uf := v
 	for uf != nil && !uf.IsUnionField() {
 		// residual ERROR sticky — no invent soft-continue walk past IsUnionField residual
-		if HasError() {
+		if sessHasError(nil) {
 			return true
 		}
 		uf = uf.FieldVarOf
 	}
 	// residual ERROR sticky — no invent soft-continue past final IsUnionField residual
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	// broken IR (no union field in ancestry) — sticky fail closed nonreadable
 	// (no invent readable / soft re-pick past hole)
 	if uf == nil || uf.FieldVarOf == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return true
 	}
 	parent := uf.FieldVarOf
@@ -621,14 +621,14 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	tmp := MakeFactUnion(parent, fid)
 	if tmp == nil {
 		// parent not union type — sticky fail closed nonreadable
-		if !HasError() {
-			SetError(ErrGeneric)
+		if !sessHasError(nil) {
+			sessNoteError(nil, ErrGeneric)
 		}
 		return true
 	}
 	fu := FindRelatedUnion(facts, parent)
 	// residual ERROR sticky — no invent soft-continue readable past FindRelatedUnion hole
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	if fu == nil {
@@ -637,7 +637,7 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	}
 	ok := tmp.Imply(fu)
 	// residual ERROR sticky — no invent soft-continue readable past Imply hole
-	if HasError() {
+	if sessHasError(nil) {
 		return true
 	}
 	if !ok {
@@ -655,14 +655,14 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 	// incomplete union map / vars fails closed sticky (no invent soft nil join success path)
 	if !UnionFactsComplete(facts) || !VariablesComplete(vars) {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	var fu *FactUnion
 	for _, v := range vars {
 		exist := FindRelatedUnion(facts, v)
 		// residual ERROR sticky — no invent soft-continue join past FindRelated hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if exist == nil {
@@ -671,9 +671,9 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 		if fu == nil {
 			fu = exist.Clone()
 			// residual ERROR sticky — no invent soft-continue past Clone hole
-			if HasError() || fu == nil {
-				if !HasError() {
-					SetError(ErrGeneric)
+			if sessHasError(nil) || fu == nil {
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return nil
 			}
@@ -683,7 +683,7 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 		fu.Var = exist.Var
 		fu.Join(exist)
 		// residual ERROR sticky — no invent soft-continue partial join past Join hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 	}
@@ -729,19 +729,19 @@ func RhsToLhsTransferUnion(
 	for _, v := range lvars {
 		if v == nil || v.Type == nil {
 			// hard IR sticky — no soft invent transfer onto non-union
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		if !v.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-transfer past IsUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return IncompleteUnionFactSlice()
 			}
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		// residual ERROR sticky — no invent soft-continue later lvars past IsUnion residual true
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice()
 		}
 	}
@@ -750,13 +750,13 @@ func RhsToLhsTransferUnion(
 		return MakeFactUnions(lvars, 0)
 	case TermVariable:
 		if rhs.Var == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		// incomplete type IR sticky (no invent level-0 union transfer)
 		indirect, iok := rhs.IndirectLevelComplete()
 		if !iok {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		// FactUnion.cpp:89 assert(indirect >= 0) is NDEBUG-elided in Release.
@@ -764,12 +764,12 @@ func RhsToLhsTransferUnion(
 		// never runs). Fair: allow &expr (indirect==-1) as pointee set {coll}; only
 		// multi-level & (indirect < -1) is sticky broken IR.
 		if indirect < -1 {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		coll := rhs.Var.GetCollective()
 		// residual ERROR sticky — no invent soft-merge past GetCollective residual
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice()
 		}
 		// indirect<=0 → MergePointeesOfPointer no-ops to {coll}; pass 0 for that path
@@ -779,7 +779,7 @@ func RhsToLhsTransferUnion(
 		}
 		rvars := MergePointeesOfPointer(coll, mergeLevel, ptFacts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice()
 		}
 		// incomplete pointees — non-sticky abstract hole
@@ -788,7 +788,7 @@ func RhsToLhsTransferUnion(
 		}
 		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
 		// residual ERROR sticky — no invent soft-empty transfer past JoinVarFacts residual
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice()
 		}
 		if rhsFact == nil {
@@ -811,7 +811,7 @@ func RhsToLhsTransferUnion(
 		rv := rhs.Invoke.User.RV
 		uf := GetReturnUnionFactForInvocation(rhs.Invoke, rv)
 		// residual ERROR sticky — no invent soft-union transfer past registry residual
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice()
 		}
 		if uf != nil {
@@ -824,11 +824,11 @@ func RhsToLhsTransferUnion(
 		// incomplete Assign/Expr sticky — no invent empty/non-sticky via nil-rhs peel
 		// (generation AddParamFacts missing-arg path is bare rhs=nil, not compound shell)
 		if rhs.Assign == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		if rhs.Assign.Expr == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.Assign.Expr)
@@ -836,7 +836,7 @@ func RhsToLhsTransferUnion(
 		// FactUnion.cpp:113–115 — peel comma RHS
 		// incomplete CommaRHS sticky — no invent empty/non-sticky via nil-rhs peel
 		if rhs.CommaRHS == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.CommaRHS)
@@ -867,7 +867,7 @@ func AbstractFactUnionForAssign(
 	rhs *Expression,
 ) (out []*FactUnion, lvarCnt int) {
 	if lhs == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return IncompleteUnionFactSlice(), 0
 	}
 	// incomplete maps — non-sticky abstract hole
@@ -876,12 +876,12 @@ func AbstractFactUnionForAssign(
 	}
 	coll := lhs.GetCollective()
 	// residual ERROR sticky — no invent soft-abstract union past GetCollective residual
-	if HasError() {
+	if sessHasError(nil) {
 		return IncompleteUnionFactSlice(), 0
 	}
 	lvars := MergePointeesOfPointer(coll, lhsIndir, ptFacts)
 	// residual ERROR sticky — no invent soft-abstract union past MergePointees residual
-	if HasError() {
+	if sessHasError(nil) {
 		return IncompleteUnionFactSlice(), 0
 	}
 	// incomplete merge at indir>0 — non-sticky; indir 0 yields [lhs]
@@ -900,21 +900,21 @@ func AbstractFactUnionForAssign(
 	// Special null/garbage/tbd have Type nil by design — complete non-union path.
 	if want == nil {
 		if !IsSpecialPtr(lhs) {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 	} else if want.IsUnion() {
 		// residual ERROR sticky — no invent union transfer past IsUnion residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		out := RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs)
 		// residual ERROR sticky — no invent soft-continue transfer past union transfer residual
-		if HasError() {
+		if sessHasError(nil) {
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		return out, lvarCnt
-	} else if HasError() {
+	} else if sessHasError(nil) {
 		// residual ERROR sticky — no invent non-union transfer past IsUnion residual false
 		return IncompleteUnionFactSlice(), lvarCnt
 	}
@@ -925,37 +925,37 @@ func AbstractFactUnionForAssign(
 	for _, v := range lvars {
 		// pointees always live; nil hole sticky (no invent skip / soft re-pick)
 		if v == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		var fu *FactUnion
 		if v.IsUnionField() {
 			// residual ERROR sticky — no invent soft-continue transfer past IsUnionField hole
-			if HasError() {
+			if sessHasError(nil) {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 			// FactUnion.cpp:141–143
 			fid := v.GetFieldID()
 			// residual ERROR sticky — no invent soft-union fact past GetFieldID residual
-			if HasError() {
+			if sessHasError(nil) {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 			fu = MakeFactUnion(v.FieldVarOf, fid)
 			// residual ERROR sticky — no invent soft-continue past MakeFactUnion residual
-			if HasError() {
+			if sessHasError(nil) {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 			// FieldVarOf non-union → MakeFactUnion nil is broken IR sticky
 			if fu == nil && v.FieldVarOf != nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue IsInside path past IsUnionField residual false
 			return IncompleteUnionFactSlice(), lvarCnt
 		} else if v.IsInsideUnionField() {
 			// residual ERROR sticky — no invent soft-continue transfer past IsInsideUnionField hole
-			if HasError() {
+			if sessHasError(nil) {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 			// FactUnion.cpp:144–146 — v->type->has_padding() always live Type*
@@ -963,35 +963,35 @@ func AbstractFactUnionForAssign(
 			typ := v.Type
 			if typ == nil {
 				if !IsSpecialPtr(v) {
-					SetError(ErrGeneric)
+					sessNoteError(nil, ErrGeneric)
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
 			} else if typ.HasPadding() || v.IsPackedAfterBitfield() {
 				// residual ERROR sticky — no invent soft-continue padding path past IsPacked residual
-				if HasError() {
+				if sessHasError(nil) {
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
 				cu := v.GetContainerUnion()
 				// residual ERROR sticky — no invent soft-skip container past GetContainerUnion residual
-				if HasError() {
+				if sessHasError(nil) {
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
 				if cu != nil {
 					fu = MakeFactUnion(cu, FactUnionBottom)
 					// residual ERROR sticky — no invent soft-continue past MakeFactUnion residual
-					if HasError() {
+					if sessHasError(nil) {
 						return IncompleteUnionFactSlice(), lvarCnt
 					}
 					if fu == nil {
-						SetError(ErrGeneric)
+						sessNoteError(nil, ErrGeneric)
 						return IncompleteUnionFactSlice(), lvarCnt
 					}
 				}
-			} else if HasError() {
+			} else if sessHasError(nil) {
 				// residual ERROR sticky — no invent soft-skip no-padding past IsPacked residual false
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-skip not-inside past IsInside residual false
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
