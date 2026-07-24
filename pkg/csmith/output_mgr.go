@@ -417,6 +417,11 @@ func PureRndUptoIndex(nFiles int) int {
 // DefaultOutputMgr.cpp:144–151 — each global → pure_rnd_upto(nFiles) file bucket.
 // Returns nFiles content strings (defs only, no headers). Incomplete globals sticky nil.
 func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []string {
+	return RandomOutputVarDefsOpts(globals, nFiles, forceStatic, ProcessOptions())
+}
+
+// RandomOutputVarDefsOpts is RandomOutputVarDefs with explicit session Options.
+func RandomOutputVarDefsOpts(globals []*Variable, nFiles int, forceStatic bool, opts Options) []string {
 	if nFiles <= 0 {
 		sessNoteError(nil, ErrGeneric)
 		return nil
@@ -433,7 +438,7 @@ func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []st
 		}
 		var def string
 		if v.IsArray && v.AsArray != nil {
-			def = v.AsArray.OutputDef()
+			def = v.AsArray.OutputDefOpts(opts)
 		} else if v.IsArray {
 			sessNoteError(nil, ErrGeneric)
 			return nil
@@ -458,6 +463,11 @@ func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []st
 // DefaultOutputMgr.cpp:154–163 — skip builtin; pure_rnd_upto file; Function::Output.
 // Returns nFiles body strings. Incomplete funcs sticky nil.
 func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
+	return RandomOutputFuncDefsOpts(funcs, nFiles, forceStatic, funcAttr, rng, ProcessOptions())
+}
+
+// RandomOutputFuncDefsOpts is RandomOutputFuncDefs with explicit session Options.
+func RandomOutputFuncDefsOpts(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng, opts Options) []string {
 	if nFiles <= 0 {
 		sessNoteError(nil, ErrGeneric)
 		return nil
@@ -475,7 +485,7 @@ func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr b
 		if idx < 0 || sessHasError(nil) {
 			return nil
 		}
-		body := f.OutputOpts(forceStatic, funcAttr, rng)
+		body := f.OutputOptsWith(forceStatic, funcAttr, rng, opts)
 		if sessHasError(nil) || body == "" {
 			if !sessHasError(nil) {
 				sessNoteError(nil, ErrGeneric)
@@ -493,11 +503,16 @@ func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr b
 // RandomOutputDefs mirrors DefaultOutputMgr::RandomOutputDefs.
 // DefaultOutputMgr.cpp:165–168 — var defs then func defs into same nFiles buckets.
 func RandomOutputDefs(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
-	vars := RandomOutputVarDefs(globals, nFiles, forceStatic)
+	return RandomOutputDefsOpts(globals, funcs, nFiles, forceStatic, funcAttr, rng, ProcessOptions())
+}
+
+// RandomOutputDefsOpts is RandomOutputDefs with explicit session Options.
+func RandomOutputDefsOpts(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng, opts Options) []string {
+	vars := RandomOutputVarDefsOpts(globals, nFiles, forceStatic, opts)
 	if vars == nil || sessHasError(nil) {
 		return nil
 	}
-	fn := RandomOutputFuncDefs(funcs, nFiles, forceStatic, funcAttr, rng)
+	fn := RandomOutputFuncDefsOpts(funcs, nFiles, forceStatic, funcAttr, rng, opts)
 	if fn == nil || sessHasError(nil) {
 		return nil
 	}

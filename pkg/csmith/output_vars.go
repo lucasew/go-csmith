@@ -40,7 +40,7 @@ func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, o
 			if v.AsArray.Collective != nil {
 				continue
 			}
-			def = v.AsArray.OutputDef()
+			def = v.AsArray.OutputDefOpts(opts)
 		} else {
 			def = v.OutputDef(forceStatic)
 		}
@@ -83,7 +83,12 @@ func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, o
 // VariableSelector.cpp:1594–1601 — comment header + list (no access_once toggle).
 // no invent section header without any live global defs
 func OutputGlobalVariables(vars []*Variable) string {
-	body := OutputVariableList(vars, "", true)
+	return OutputGlobalVariablesOpts(vars, ProcessOptions())
+}
+
+// OutputGlobalVariablesOpts is OutputGlobalVariables with explicit session Options.
+func OutputGlobalVariablesOpts(vars []*Variable, opts Options) string {
+	body := OutputVariableListOpts(vars, "", true, opts)
 	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
 	if sessHasError(nil) {
 		return ""
@@ -106,7 +111,12 @@ func OutputGlobalVariables(vars []*Variable) string {
 // VariableSelector.cpp:1604–1612.
 // no invent section header without any live decls
 func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
-	body := OutputVariableList(vars, "", false)
+	return OutputGlobalVariablesDeclsOpts(vars, prefix, ProcessOptions())
+}
+
+// OutputGlobalVariablesDeclsOpts is OutputGlobalVariablesDecls with explicit Options.
+func OutputGlobalVariablesDeclsOpts(vars []*Variable, prefix string, opts Options) string {
+	body := OutputVariableListOpts(vars, "", false, opts)
 	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
 	if sessHasError(nil) {
 		return ""

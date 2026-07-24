@@ -1115,6 +1115,11 @@ func (f *Function) OutputForwardDecl() string {
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
 // Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
+	return f.OutputForwardDeclWith(forceStatic, r, withAttrs, ProcessOptions())
+}
+
+// OutputForwardDeclWith is OutputForwardDeclOpts with explicit session Options.
+func (f *Function) OutputForwardDeclWith(forceStatic bool, r *Rng, withAttrs bool, opts Options) string {
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
@@ -1122,7 +1127,7 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 	if f.IsBuiltin {
 		return ""
 	}
-	s := f.OutputHeader(forceStatic)
+	s := f.OutputHeaderOpts(forceStatic, opts)
 	// residual ERROR sticky — no invent bare ";" past OutputHeader residual
 	if sessHasError(nil) {
 		return ""
@@ -1147,6 +1152,11 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 // Function.cpp:533–541 — static? + type alias_name(params) __attribute__((alias("name"))).
 // Incomplete Function sticky empty (no invent alias shell without function).
 func (f *Function) OutputHeaderAlias(forceStatic bool) string {
+	return f.OutputHeaderAliasOpts(forceStatic, ProcessOptions())
+}
+
+// OutputHeaderAliasOpts is OutputHeaderAlias with explicit session Options.
+func (f *Function) OutputHeaderAliasOpts(forceStatic bool, opts Options) string {
 	// Function always live at emit; sticky incomplete no invent empty alias shell
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1164,7 +1174,7 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 		}
 		return ""
 	}
-	params := f.paramListC()
+	params := f.paramListCOpts(opts)
 	if params == "" {
 		if !sessHasError(nil) {
 			sessNoteError(nil, ErrGeneric)
@@ -1191,6 +1201,11 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
 // Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
+	return f.OutputForwardDeclAliasOpts(forceStatic, ProcessOptions())
+}
+
+// OutputForwardDeclAliasOpts is OutputForwardDeclAlias with explicit session Options.
+func (f *Function) OutputForwardDeclAliasOpts(forceStatic bool, opts Options) string {
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
 		return ""
@@ -1198,7 +1213,7 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 	if f.IsBuiltin {
 		return ""
 	}
-	s := f.OutputHeaderAlias(forceStatic)
+	s := f.OutputHeaderAliasOpts(forceStatic, opts)
 	// incomplete alias header sticky — no invent bare ";"
 	if s == "" {
 		if !sessHasError(nil) {

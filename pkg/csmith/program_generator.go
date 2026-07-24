@@ -139,11 +139,9 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	if s == nil {
 		return nil
 	}
-	// Nested activate so tests calling NewProgramGenerator(NewSession(opts)) without
-	// an outer Generate still route Process* to this bag during construction.
-	restore := activateSession(s)
-	defer restore()
-
+	// Construction writes only s via *Sess APIs (no activateSession). Tests that
+	// need Process* ambient for later package helpers still call Generate or
+	// activate via GoGenerator.
 	opts := s.Opts
 	// CGOptions on the session bag (field write; Process* bridge follows active s).
 	s.Opts = opts
@@ -625,7 +623,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			}
 			emittedArray[v.Name] = true
 			// ArrayVariable::OutputDef always live; sticky no invent "static \n" for empty
-			def := av.OutputDef()
+			def := av.OutputDefOpts(g.Opts)
 			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
 			if g.hasErr() {
 				return ""
@@ -644,7 +642,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		// IsArray with AsArray but missing from Arrays map still must use array OutputDef
 		// (no invent scalar OutputDefFull for live array not registered on VS.Arrays)
 		if v.IsArray && v.AsArray != nil {
-			def := v.AsArray.OutputDef()
+			def := v.AsArray.OutputDefOpts(g.Opts)
 			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
 			if g.hasErr() {
 				return ""
@@ -706,7 +704,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 			continue
 		}
 		// incomplete header IR — fail closed whole functions section
-		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
+		d := f.OutputForwardDeclWith(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes, g.Opts)
 		// residual ERROR sticky — no invent soft-continue later funcs past forward residual
 		if g.hasErr() {
 			return ""
@@ -720,7 +718,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		forwards.WriteString("\n")
 		// Function.cpp:820–826 — alias decls when FunctionAttributes
 		if g.Opts.FunctionAttributes {
-			a := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
+			a := f.OutputForwardDeclAliasOpts(g.Opts.ForceGlobalsStatic, g.Opts)
 			// residual ERROR sticky — no invent soft-continue later funcs past alias residual
 			if g.hasErr() {
 				return ""
@@ -1215,7 +1213,7 @@ func (g *ProgramGenerator) OutputForwardDeclarations() string {
 		if f.IsBuiltin {
 			continue
 		}
-		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
+		d := f.OutputForwardDeclWith(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes, g.Opts)
 		if g.hasErr() {
 			return ""
 		}
@@ -1319,7 +1317,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	if g.VS != nil {
 		globals = g.VS.GlobalList
 	}
-	decls := OutputGlobalVariablesDecls(globals, "extern ")
+	decls := OutputGlobalVariablesDeclsOpts(globals, "extern ", g.Opts)
 	if g.hasErr() {
 		return nil
 	}
@@ -1344,7 +1342,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 		return nil
 	}
 	// RandomOutputDefs into n buckets
-	defs := RandomOutputDefs(globals, g.Funcs.Funcs, n, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+	defs := RandomOutputDefsOpts(globals, g.Funcs.Funcs, n, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 	if defs == nil || g.hasErr() {
 		return nil
 	}
