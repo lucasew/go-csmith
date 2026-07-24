@@ -59,7 +59,7 @@ func GetBinopString(op BinaryOp) string {
 func (fi *Invocation) IsReturnTypeFloat() bool {
 	// nil inv sticky incomplete; missing Safe alone → complete false (not float)
 	if fi == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if fi.Safe == nil {
@@ -74,21 +74,21 @@ func (fi *Invocation) IsReturnTypeFloat() bool {
 func (fi *Invocation) GetType() *Type {
 	// C++ FunctionInvocation always non-null; sticky nil → no invent int type shell
 	if fi == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if fi.User != nil {
 		// FunctionInvocationUser.cpp:380 — return func->return_type
 		// nil ReturnType incomplete sticky
 		if fi.User.ReturnType == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		return fi.User.ReturnType
 	}
 	if !fi.IsStd {
 		// incomplete non-user non-std shell sticky
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	if fi.IsUnary {
@@ -107,18 +107,18 @@ func (fi *Invocation) getTypeUnary() *Type {
 	case "+", "-", "~":
 		// C++ param_value[0]->get_type(); missing operand → incomplete IR sticky
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		ty := fi.Args[0].GetType()
 		// residual ERROR sticky — no invent unary type past GetType residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		return ty
 	default:
 		// FunctionInvocationUnary.cpp:117 assert invalid operator sticky; no invent eInt
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 }
@@ -133,7 +133,7 @@ func (fi *Invocation) getTypeBinary() *Type {
 	op, ok := BinaryOpFromString(fi.Binary)
 	// FunctionInvocationBinary.cpp:196–199 — assert invalid operator sticky; no soft invent eInt
 	if !ok {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 	switch op {
@@ -141,21 +141,21 @@ func (fi *Invocation) getTypeBinary() *Type {
 		// FunctionInvocationBinary.cpp:208–224 — param_value[0/1]->get_type always live
 		// missing operands → incomplete IR sticky (no invent signed=true → eInt)
 		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		lt, rt := fi.Args[0].GetType(), fi.Args[1].GetType()
 		// residual ERROR sticky — no invent eInt/eUInt past GetType residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if lt == nil || rt == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		ls, rs := lt.IsSigned(), rt.IsSigned()
 		// residual ERROR sticky — no invent eInt/eUInt past IsSigned residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if ls && rs {
@@ -167,21 +167,21 @@ func (fi *Invocation) getTypeBinary() *Type {
 	case BinLShift, BinRShift:
 		// FunctionInvocationBinary.cpp:229–238 — param_value[0]->get_type always sticky
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		lt := fi.Args[0].GetType()
 		// residual ERROR sticky — no invent eInt/eUInt past GetType residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if lt == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return nil
 		}
 		ls := lt.IsSigned()
 		// residual ERROR sticky — no invent eInt/eUInt past IsSigned residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return nil
 		}
 		if ls {
@@ -190,7 +190,7 @@ func (fi *Invocation) getTypeBinary() *Type {
 		return GetSimpleType(EUInt)
 	default:
 		// FunctionInvocationBinary.cpp:240–241 — assert(0) sticky; no soft invent eInt
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return nil
 	}
 }
@@ -202,7 +202,7 @@ func (fi *Invocation) getTypeBinary() *Type {
 func (fi *Invocation) SafeInvocation() bool {
 	// Invocation always live; sticky incomplete no invent not-safe soft-skip
 	if fi == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if fi.User != nil {
@@ -221,12 +221,12 @@ func (fi *Invocation) SafeInvocation() bool {
 func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
 	// Invocation always live; non-unary-std complete false (C++ binary/user)
 	if fi == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if v == nil {
 		// FunctionInvocationUnary.cpp assert path via operand.compatible(v)
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !fi.IsStd || !fi.IsUnary {
@@ -234,12 +234,12 @@ func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
 	}
 	if len(fi.Args) == 0 || fi.Args[0] == nil {
 		// incomplete unary operand sticky — no invent not-compatible soft-skip
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	ok := fi.Args[0].CompatibleWithVar(v, expandStruct)
 	// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	return ok
@@ -252,7 +252,7 @@ func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
 func (fi *Invocation) Is0Or1() bool {
 	// Invocation always live for fold; sticky incomplete no invent not-0or1
 	if fi == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !fi.IsStd {
@@ -280,7 +280,7 @@ func (fi *Invocation) Is0Or1() bool {
 func (fi *Invocation) EqualsInt(num int) bool {
 	// Invocation always live for fold; sticky incomplete no invent not-equal
 	if fi == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if !fi.IsStd {
@@ -290,46 +290,46 @@ func (fi *Invocation) EqualsInt(num int) bool {
 	// FunctionInvocationBinary.cpp:155 — assert(param_value.size() == 2)
 	if fi.IsUnary {
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
-			SetError(ErrGeneric)
+			sessNoteError(nil, ErrGeneric)
 			return false
 		}
 		a0 := fi.Args[0]
 		if num == 0 && fi.Unary == "!" {
 			if a0.NotEquals(0) {
 				// residual ERROR sticky — no invent equal-true past NotEquals residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue fold past NotEquals residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 		}
 		if num == 1 && fi.Unary == "!" {
 			if a0.EqualsInt(0) {
 				// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue fold past EqualsInt residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 		}
 		if fi.Unary == "-" {
 			if a0.EqualsInt(-num) {
 				// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
-				if HasError() {
+				if sessHasError(nil) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue fold past EqualsInt residual false
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 		}
@@ -337,7 +337,7 @@ func (fi *Invocation) EqualsInt(num int) bool {
 	}
 	if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
 		// incomplete binary operands sticky — no invent not-equal fold
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	a0, a1 := fi.Args[0], fi.Args[1]
@@ -349,28 +349,28 @@ func (fi *Invocation) EqualsInt(num int) bool {
 		// 0 * x, 0 / x, 0 % x, 0 << x, 0 >> x, 0 && x, 0 & x
 		if a0 != nil && a0.EqualsInt(0) {
 			// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			switch op {
 			case BinMul, BinDiv, BinMod, BinLShift, BinRShift, BinAnd, BinBitAnd:
 				return true
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue fold past a0 EqualsInt residual false
 			return false
 		}
 		// x * 0, x && 0, x & 0
 		if a1 != nil && a1.EqualsInt(0) {
 			// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			switch op {
 			case BinMul, BinAnd, BinBitAnd:
 				return true
 			}
-		} else if HasError() {
+		} else if sessHasError(nil) {
 			// residual ERROR sticky — no invent soft-continue fold past a1 EqualsInt residual false
 			return false
 		}
@@ -385,11 +385,11 @@ func (fi *Invocation) EqualsInt(num int) bool {
 		if a1 != nil {
 			eq1 := a1.EqualsInt(1)
 			// residual ERROR sticky — no invent soft-continue fold past EqualsInt residual
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			eqM1 := a1.EqualsInt(-1)
-			if HasError() {
+			if sessHasError(nil) {
 				return false
 			}
 			if (eq1 || eqM1) && op == BinMod {
@@ -412,11 +412,11 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	// incomplete IR sticky (no soft invent visit success / soft re-pick)
 	// param_value[0/1] always live Expression* after ERROR_GUARD
 	if fi == nil || cg == nil || len(fi.Args) < 2 {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	if fi.Args[0] == nil || fi.Args[1] == nil {
-		SetError(ErrGeneric)
+		sessNoteError(nil, ErrGeneric)
 		return false
 	}
 	// left
@@ -424,7 +424,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue right/merge past left visit residual
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// FunctionInvocationBinary.cpp:494 — inputs_copy = inputs (full FactVec)
@@ -433,14 +433,14 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	var afterLeftUnion []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
 		afterLeftPT = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-continue past CloneFactSlice residual
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		// Shallow clone of union pointers: RenewUnionFact replaces live slice
@@ -448,9 +448,9 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		// Fact* vector copy). Deep clone would freeze post-left at post-left
 		// values but is not required for merge_facts semantics.
 		afterLeftUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
-		if HasError() || !UnionFactsComplete(afterLeftUnion) {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if sessHasError(nil) || !UnionFactsComplete(afterLeftUnion) {
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
@@ -460,7 +460,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue merge past right visit residual
-	if HasError() {
+	if sessHasError(nil) {
 		return false
 	}
 	// FunctionInvocationBinary.cpp:499 — merge_facts(inputs, inputs_copy)
@@ -468,32 +468,32 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeftPT) ||
 			!UnionFactsComplete(cg.FM.UnionFacts) || !UnionFactsComplete(afterLeftUnion) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
 		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeftPT)
 		// residual ERROR sticky — no invent visit success past MergeFacts residual hole
-		if HasError() {
+		if sessHasError(nil) {
 			return false
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			if !HasError() {
-				SetError(ErrGeneric)
+			if !sessHasError(nil) {
+				sessNoteError(nil, ErrGeneric)
 			}
 			return false
 		}
 		// eUnionWrite half of merge_facts (mirror make_random ordered path)
 		for _, f := range afterLeftUnion {
 			if f == nil {
-				SetError(ErrGeneric)
+				sessNoteError(nil, ErrGeneric)
 				return false
 			}
 			cg.FM.UnionFacts = MergeUnionFactInto(cg.FM.UnionFacts, f)
-			if HasError() || !UnionFactsComplete(cg.FM.UnionFacts) {
-				if !HasError() {
-					SetError(ErrGeneric)
+			if sessHasError(nil) || !UnionFactsComplete(cg.FM.UnionFacts) {
+				if !sessHasError(nil) {
+					sessNoteError(nil, ErrGeneric)
 				}
 				return false
 			}
