@@ -49,8 +49,9 @@ func sessNoteError(s *Session, code int) {
 }
 
 // sessHasError reports sticky error on s when non-nil, else ambient.
-// Prefer explicit s; ambient dual-read remains for residual Filter hang-prevention
-// when sessNoteError(nil) wrote Process* bag under activateSession.
+// Prefer explicit s for pure-session ERROR_GUARD; ambient dual-read remains for
+// residual Filter hang-prevention when sessNoteError(nil) wrote Process* bag
+// under activateSession, and for unit tests (SetError/HasError).
 func sessHasError(s *Session) bool {
 	if s != nil {
 		return s.GenError != ErrSuccess

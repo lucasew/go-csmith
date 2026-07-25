@@ -434,7 +434,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 		}
 	} else {
 		// MakeupNewVarFacts fails closed sticky (nils preFacts) on holes; pre already complete
-		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) {
+		if !MakeupNewVarFactsSess(cgSess(cg), &preFacts, fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !sessHasError(cgSess(cg)) {

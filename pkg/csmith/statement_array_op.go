@@ -472,7 +472,7 @@ func MakeRandomArrayInit(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return Stmt{}
 		}
-		ivOut := d.IV.OutputC()
+		ivOut := d.IV.OutputCSess(cgSess(cg), false)
 		// residual ERROR sticky — no invent soft-continue access past OutputC residual
 		if sessHasError(cgSess(cg)) {
 			for _, x := range dims {

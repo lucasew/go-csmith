@@ -653,7 +653,7 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 		s := fmt.Sprintf("%d", idx)
 		item.Indices = append(item.Indices, s)
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
+			Term: TermConstant, Con: MakeIntSess(vsSess(vs), idx), ExprType: GetIntType(),
 		})
 	}
 	// ArrayVariable.cpp:288–291 — type always live; type->is_aggregate()
@@ -1286,7 +1286,7 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 		item.Indices = append(item.Indices, idxStr)
 		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
+			Term: TermConstant, Con: MakeIntSess(s, idx), ExprType: GetIntType(),
 		})
 	}
 	// ArrayVariable.cpp:261–264 — type always live; only expand aggregate itemized

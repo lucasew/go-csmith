@@ -503,18 +503,18 @@ func MakeRandomAssignQfer(
 	}
 	lhsIndir := 0
 	if st.Lhs != nil {
-		lhsIndir = st.Lhs.IndirectLevel()
+		lhsIndir = st.Lhs.IndirectLevelSess(cgSess(cg))
 		// residual ERROR sticky — no invent ArrayAccess past IndirectLevel residual hole
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
-		isVol := opts.WrapVolatiles && st.Lhs.IsVolatile()
+		isVol := opts.WrapVolatiles && st.Lhs.IsVolatileSess(cgSess(cg))
 		// residual ERROR sticky — no invent ArrayAccess past IsVolatile residual hole
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if lhsIndir > 0 || isVol {
-			st.ArrayAccess = st.Lhs.Output(opts.WrapVolatiles)
+			st.ArrayAccess = st.Lhs.OutputSess(cgSess(cg), opts.WrapVolatiles)
 			// residual ERROR sticky — no invent soft-empty ArrayAccess past Output residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}

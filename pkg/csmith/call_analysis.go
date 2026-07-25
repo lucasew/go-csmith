@@ -597,7 +597,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	}
 	// makeup new vars from branch outs into pre snapshot (full FactVec)
 	// sequential: first failure must not invent second makeup from cleared empty
-	if !MakeupNewVarFacts(preFacts, thenOut) || !MakeupNewVarFacts(preFacts, elseOut) {
+	if !MakeupNewVarFactsSess(fmSess(fm), preFacts, thenOut) || !MakeupNewVarFactsSess(fmSess(fm), preFacts, elseOut) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		if !sessHasError(fmSess(fm)) {

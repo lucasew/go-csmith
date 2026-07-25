@@ -88,7 +88,12 @@ func (l *Lhs) PtrModifiedInRhs(cg *CGContext, facts []*FactPointTo) bool {
 // Incomplete Lhs IR (nil var/type) returns 0 for the bit; callers that must not
 // invent non-deref visit success use IndirectLevelComplete.
 func (l *Lhs) IndirectLevel() int {
-	n, ok := l.IndirectLevelComplete()
+	return l.IndirectLevelSess(nil)
+}
+
+// IndirectLevelSess is IndirectLevel with sticky errors on bag s.
+func (l *Lhs) IndirectLevelSess(s *Session) int {
+	n, ok := l.IndirectLevelCompleteSess(s)
 	if !ok {
 		return 0
 	}
@@ -943,7 +948,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 				}
 				continue
 			}
-			if !typ.MatchOpts(x.Type, MatchFlexible, sessOpts(cg.Sess)) {
+			if !typ.MatchOptsSess(cg.Sess, x.Type, MatchFlexible, sessOpts(cg.Sess)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 				if sessHasError(cg.Sess) {
 					incomplete = true

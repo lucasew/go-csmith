@@ -1007,18 +1007,18 @@ func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool
 	if t == other {
 		return true
 	}
-	if t.IsSimpleSess(s) && other.IsSimple() {
+	if t.IsSimpleSess(s) && other.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent soft-continue convert past IsSimple residual
 		if sessHasError(s) {
 			return false
 		}
 		// forbidden conversion from float to int (Type.cpp:1428–1429)
-		of := other.IsFloat()
+		of := other.IsFloatSess(s)
 		// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
 		if sessHasError(s) {
 			return false
 		}
-		tf := t.IsFloat()
+		tf := t.IsFloatSess(s)
 		if sessHasError(s) {
 			return false
 		}
@@ -1122,7 +1122,7 @@ func (t *Type) IsDerivableSess(s *Session, other *Type) bool {
 	if t == other {
 		return true
 	}
-	if t.IsConvertable(other) {
+	if t.IsConvertableSess(s, other) {
 		// residual ERROR sticky — no invent derivable true past IsConvertable residual hole
 		if sessHasError(s) {
 			return false

@@ -169,7 +169,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		if sessHasError(s) {
 			return nil
 		}
-		if !typ.MatchOpts(v.Type, MatchConvert, opts) {
+		if !typ.MatchOptsSess(s, v.Type, MatchConvert, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(s) {
 				return nil
@@ -546,7 +546,7 @@ func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		item := v.AsArray.Itemize(r)
+		item := v.AsArray.ItemizeIntoSess(s, r, nil)
 		if item == nil {
 			return nil
 		}
@@ -1424,7 +1424,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 			sessNoteError(cg.Sess, ErrGeneric)
 			return false
 		}
-		if typ != nil && !typ.MatchOpts(v.Type, MatchFlexible, sessOpts(cg.Sess)) {
+		if typ != nil && !typ.MatchOptsSess(cg.Sess, v.Type, MatchFlexible, sessOpts(cg.Sess)) {
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
 			if sessHasError(cg.Sess) {
 				return false
@@ -1433,7 +1433,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		}
 		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirectOpts(v.Qfer, false, sessOpts(cg.Sess)) {
+			if !qfer.MatchIndirectOptsSess(cg.Sess, v.Qfer, false, sessOpts(cg.Sess)) {
 				// residual ERROR sticky — no invent soft-continue past MatchIndirect hole
 				if sessHasError(cg.Sess) {
 					return false
@@ -1623,7 +1623,8 @@ func (vs *VariableSelector) SelectMustUseVar(
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		if !typ.MatchOpts(v.Type, mt, sessOpts(firstSess(vsSess(vs), cg.Sess))) {
+		sMatch := firstSess(vsSess(vs), cg.Sess)
+		if !typ.MatchOptsSess(sMatch, v.Type, mt, sessOpts(sMatch)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -1632,7 +1633,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 		}
 		if qfer != nil && !qfer.Wildcard {
 			// qfer->match(v->qfer) — ORs opts.MatchExactQualifiers (assign force)
-			if !qfer.MatchOpts(v.Qfer, false, sessOpts(firstSess(vsSess(vs), cg.Sess))) {
+			if !qfer.MatchOptsSess(sMatch, v.Qfer, false, sessOpts(sMatch)) {
 				// residual ERROR sticky — no invent soft-continue past Match hole
 				if sessHasError(vsSess(vs)) {
 					return nil
@@ -1847,7 +1848,7 @@ func ChooseVarFull(
 			}
 			continue
 		}
-		if !want.MatchOpts(x.Type, mt, opts) {
+		if !want.MatchOptsSess(cg.Sess, x.Type, mt, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(cg.Sess) {
 				return nil
@@ -1855,7 +1856,7 @@ func ChooseVarFull(
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirectOpts(x.Qfer, matchExact, opts) {
+			if !qfer.MatchIndirectOptsSess(cg.Sess, x.Qfer, matchExact, opts) {
 				// residual ERROR from MatchIndirect OOB/sticky — no invent soft-continue
 				if sessHasError(cg.Sess) {
 					return nil
@@ -1890,7 +1891,7 @@ func ChooseVarFull(
 		}
 		ok = append(ok, x)
 	}
-	return chooseVarFromOK(r, want, ok, opts)
+	return chooseVarFromOKSess(cg.Sess, r, want, ok, opts)
 }
 
 // chooseVarFromOK mirrors VariableSelector::choose_var post-filter bias.
@@ -2089,7 +2090,7 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 			}
 			continue
 		}
-		matched := want.MatchOpts(x.Type, mt, opts)
+		matched := want.MatchOptsSess(s, x.Type, mt, opts)
 		// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 		if sessHasError(s) {
 			return nil
@@ -2112,7 +2113,7 @@ func typesMatchExactSess(s *Session, a, b *Type) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	ok := a.MatchOpts(b, MatchExact, Defaults())
+	ok := a.MatchOptsSess(s, b, MatchExact, Defaults())
 	// residual ERROR sticky — no invent soft-match past Match residual
 	if sessHasError(s) {
 		return false
@@ -2226,7 +2227,7 @@ func (vs *VariableSelector) createAndInitialize(
 		vs.AllVars = append(vs.AllVars, &av.Variable)
 		vs.Arrays = append(vs.Arrays, av)
 		// ArrayVariable.cpp:249–275 — itemize() random indices; AllVars; field_vars
-		item := av.ItemizeInto(r, vs)
+		item := av.ItemizeIntoSess(vsSess(vs), r, vs)
 		if item == nil {
 			return nil
 		}

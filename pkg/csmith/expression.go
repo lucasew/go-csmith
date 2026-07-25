@@ -1571,7 +1571,7 @@ func makeExpressionVariableFlags(
 		}
 		// ExpressionVariable.cpp:93–94 — no float var for non-float want
 		// C++ continue without dummy.push_back (only validate/visit fail push dummy)
-		if !typ.IsFloat() && v.Type.IsFloat() {
+		if !typ.IsFloatSess(cgSess(cg)) && v.Type.IsFloatSess(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {

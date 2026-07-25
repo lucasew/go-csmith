@@ -2388,7 +2388,7 @@ func AbstractFactForVarInitSess(s *Session, v *Variable) (pt []*FactPointTo, un 
 		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
-	if !v.IsPointer() && !v.Type.IsUnion() {
+	if !v.IsPointerSess(s) && !v.Type.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-skip empty-init past IsPointer residual false
 		if sessHasError(s) {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
@@ -2416,7 +2416,7 @@ func AbstractFactForVarInitSess(s *Session, v *Variable) (pt []*FactPointTo, un 
 		rhs = v.AsArray.InitExprs[0]
 		moreStart = 1
 	}
-	if v.Type.IsUnion() {
+	if v.Type.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-continue union abstract past IsUnion residual
 		if sessHasError(s) {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
@@ -2521,7 +2521,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		return
 	}
 	// recurse into aggregate fields (pointer members)
-	if !v.IsPointer() && !v.Type.IsUnion() {
+	if !v.IsPointerSess(fmSess(fm)) && !v.Type.IsUnionSess(fmSess(fm)) {
 		// residual ERROR sticky — no invent soft-continue field recurse past IsPointer residual false
 		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -2553,14 +2553,14 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		return
 	}
 	// FactMgr.cpp:77–79 — only meta_facts that were registered
-	isPtr := v.IsPointer()
+	isPtr := v.IsPointerSess(fmSess(fm))
 	// residual ERROR sticky — no invent soft-skip makeup past IsPointer residual
 	if sessHasError(fmSess(fm)) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	wantPT := MetaFactPointToEnabledSess(fmSess(fm)) && isPtr
-	wantUn := MetaFactUnionEnabledSess(fmSess(fm)) && v.Type != nil && v.Type.IsUnion()
+	wantUn := MetaFactUnionEnabledSess(fmSess(fm)) && v.Type != nil && v.Type.IsUnionSess(fmSess(fm))
 	// residual ERROR sticky — no invent soft-skip makeup past IsUnion residual
 	if sessHasError(fmSess(fm)) {
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -3584,17 +3584,17 @@ func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered
-	if !MetaFactPointToEnabledSess(nil) {
+	if !MetaFactPointToEnabledSess(s) {
 		return
 	}
 	// recurse into aggregate fields (pointer members) like AddNewVarFact
-	isPtr := v.IsPointer()
+	isPtr := v.IsPointerSess(s)
 	// residual ERROR sticky — no invent soft-skip field walk past IsPointer residual
 	if sessHasError(s) {
 		*facts = IncompleteFactSlice()
 		return
 	}
-	isUn := v.Type.IsUnion()
+	isUn := v.Type.IsUnionSess(s)
 	// residual ERROR sticky — no invent soft-skip field walk past IsUnion residual
 	if sessHasError(s) {
 		*facts = IncompleteFactSlice()
