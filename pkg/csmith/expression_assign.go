@@ -67,7 +67,7 @@ func MakeExpressionAssign(
 				return nil
 			}
 		}
-		rhs := st.GetAssignRhs()
+		rhs := st.GetAssignRhsSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-continue UpdateFact past GetAssignRhs residual
 		if sessHasError(cgSess(cg)) {
 			return nil

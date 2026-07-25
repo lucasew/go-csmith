@@ -602,7 +602,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			}
 			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs() + lhs
 			// incomplete assign fails closed sticky — no invent mark visited with wiped facts
-			_ = fm.UpdateFactForAssignWant(lhs, indir, lhsWant, st.GetAssignRhs())
+			_ = fm.UpdateFactForAssignWant(lhs, indir, lhsWant, st.GetAssignRhsSess(cgSess(cg)))
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				if !sessHasError(cgSess(cg)) {

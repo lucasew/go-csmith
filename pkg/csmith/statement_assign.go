@@ -247,7 +247,7 @@ func MakeRandomAssignQfer(
 			return Stmt{}
 		}
 		if !callerQf {
-			if q := expressionQualifiers(rhs); q != nil {
+			if q := expressionQualifiersSess(cgSess(cg), rhs); q != nil {
 				// Clone: expressionQualifiers may alias Variable.qfer slice backing
 				qfer = q.Clone()
 				// StatementAssign.cpp:151–152 — accept_stricter only.
@@ -300,7 +300,7 @@ func MakeRandomAssignQfer(
 			return Stmt{}
 		}
 		if !callerQf {
-			if q := expressionQualifiers(rhs); q != nil {
+			if q := expressionQualifiersSess(cgSess(cg), rhs); q != nil {
 				// Clone: do not share Variable.qfer slices with later SetVolatile
 				qfer = q.Clone()
 				// StatementAssign.cpp:172–174 — accept_stricter only (no set_const).
@@ -661,9 +661,14 @@ func makePossibleCompoundAssign(
 // StatementAssign.h:109; FactMgr::update_fact_for_assign(sa) uses get_rhs().
 // Incomplete Statement sticky nil (no invent soft-skip assign without RHS past hole).
 func (st *Stmt) GetAssignRhs() *Expression {
+	return st.GetAssignRhsSess(nil)
+}
+
+// GetAssignRhsSess is GetAssignRhs with explicit session residual sticky.
+func (st *Stmt) GetAssignRhsSess(s *Session) *Expression {
 	// Statement always live for get_rhs; sticky incomplete no invent nil soft-skip
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if st.Rhs != nil {
@@ -920,14 +925,19 @@ func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 
 // expressionQualifiers mirrors Expression::get_qualifiers for qfer seed.
 // Uses Expression.GetQualifiers (ExpressionVariable/Assign/Funcall/Comma).
-// Expression always live at qfer seed; sticky nil (no invent empty seed past hole).}
+// Expression always live at qfer seed; sticky nil (no invent empty seed past hole).
 
 func expressionQualifiers(e *Expression) *CVQualifiers {
+	return expressionQualifiersSess(nil, e)
+}
+
+// expressionQualifiersSess is expressionQualifiers with explicit session residual sticky.
+func expressionQualifiersSess(s *Session, e *Expression) *CVQualifiers {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	q := e.GetQualifiers()
+	q := e.GetQualifiersSess(s)
 	// empty vectors → treat as no seed (match prior nil for bare constants)
 	if len(q.IsConsts) == 0 && len(q.IsVolatiles) == 0 && !q.Wildcard {
 		return nil
@@ -1312,7 +1322,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 				return false
 			}
 		}
-		_ = cg.FM.UpdateFactForAssignWant(lhsVar, indir, lhsWant, st.GetAssignRhs())
+		_ = cg.FM.UpdateFactForAssignWant(lhsVar, indir, lhsWant, st.GetAssignRhsSess(cgSess(cg)))
 		// incomplete assign sticky (no invent visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			if !sessHasError(cgSess(cg)) {
