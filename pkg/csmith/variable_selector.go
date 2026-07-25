@@ -3875,7 +3875,7 @@ func (vs *VariableSelector) GenerateNewVariable(
 		v = vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	case ScopeParentLocal:
 		// VariableSelector.cpp:1114–1115 — DEPTH_GUARD_BY_DEPTH for parent-local create
-		if DepthGuardByDepth(vs.Opts, MinimalDepth(DtGenerateNewParentLocal, 0)) == BadDepth {
+		if DepthGuardByDepthSess(vsSess(vs), vs.Opts, MinimalDepthSess(vsSess(vs), DtGenerateNewParentLocal, 0)) == BadDepth {
 			return nil
 		}
 		if r == nil {

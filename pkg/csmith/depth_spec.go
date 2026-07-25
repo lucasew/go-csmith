@@ -58,6 +58,11 @@ const (
 // DepthSpec.cpp atomic and composed depths (flag ignored except documented cases).
 // Used when dfs_exhaustive; random mode guards ignore the value.
 func MinimalDepth(dType string, flag int) int {
+	return MinimalDepthSess(nil, dType, flag)
+}
+
+// MinimalDepthSess is MinimalDepth with explicit session residual sticky.
+func MinimalDepthSess(s *Session, dType string, flag int) int {
 	switch dType {
 	case DtConstant:
 		return 0
@@ -94,17 +99,17 @@ func MinimalDepth(dType string, flag int) int {
 		}
 		return base
 	case DtBlock, DtFunctionGenerateBody:
-		return MinimalDepth(DtStatement, 0) + 1
+		return MinimalDepthSess(s, DtStatement, 0) + 1
 	case DtStatementAssign, DtStatementFor, DtStatementIf, DtStatementExpr:
-		return MinimalDepth(DtStatement, 0)
+		return MinimalDepthSess(s, DtStatement, 0)
 	case DtReturnType, "dtRandomTypeFromType":
 		return 1
 	case DtGenerateParamList:
 		return AtomicDepthIncr + 1
 	case DtFunction:
-		return MinimalDepth(DtGenerateParamList, 0) + MinimalDepth(DtFunctionGenerateBody, 0)
+		return MinimalDepthSess(s, DtGenerateParamList, 0) + MinimalDepthSess(s, DtFunctionGenerateBody, 0)
 	case DtFirstFunction:
-		return MinimalDepth(DtReturnType, 0) + MinimalDepth(DtFunctionGenerateBody, 0)
+		return MinimalDepthSess(s, DtReturnType, 0) + MinimalDepthSess(s, DtFunctionGenerateBody, 0)
 	case DtSafeOpFlags:
 		// DepthSpec.cpp — sOpBinary → 2; sOpUnary (and assign) → 3
 		// SafeOpKind: sOpUnary=0, sOpBinary=1, sOpAssign=2
@@ -125,8 +130,8 @@ func MinimalDepth(dType string, flag int) int {
 		return 2 + 1
 	case DtGenerateNewVariable:
 		// min(parentLocal, global) + 1
-		a := MinimalDepth(DtGenerateNewParentLocal, 0)
-		b := MinimalDepth(DtGenerateNewGlobal, 0)
+		a := MinimalDepthSess(s, DtGenerateNewParentLocal, 0)
+		b := MinimalDepthSess(s, DtGenerateNewGlobal, 0)
 		if a <= b {
 			return a + 1
 		}
@@ -137,17 +142,22 @@ func MinimalDepth(dType string, flag int) int {
 		return 1
 	default:
 		// DepthSpec.cpp:381–382 assert(0) for unknown dType — sticky no invent depth 1
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 }
 
 // knownDepthType reports whether dType is a handled DepthSpec case.
 func knownDepthType(dType string) bool {
-	d := MinimalDepth(dType, 0)
+	return knownDepthTypeSess(nil, dType)
+}
+
+// knownDepthTypeSess is knownDepthType with explicit session residual sticky.
+func knownDepthTypeSess(s *Session, dType string) bool {
+	d := MinimalDepthSess(s, dType, 0)
 	// residual ERROR sticky — no invent known-true past MinimalDepth residual hole
 	// (unknown dType SetError + -1; residual must not invent known via soft >=0)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return d >= 0
@@ -199,7 +209,7 @@ func DepthGuardByTypeFlagSess(s *Session, opts Options, dType string, flag int) 
 		return GoodDepth
 	}
 	// DepthSpec.cpp:381–382 — unknown dType assert(0) → BAD_DEPTH sticky fail closed
-	d := MinimalDepth(dType, flag)
+	d := MinimalDepthSess(s, dType, flag)
 	if d < 0 {
 		// MinimalDepth already SetError on unknown; ensure sticky if that path skipped
 		if !sessHasError(s) {
