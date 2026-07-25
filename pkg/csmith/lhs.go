@@ -360,6 +360,7 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 		return false
 	}
 	rhsCG := CGContext{
+		Sess:          cgSess(cg),
 		effectContext: eff,
 		CurrentFunc:   cg.CurrentFunc,
 		BlkDepth:      cg.BlkDepth,

@@ -410,7 +410,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 			return nil
 		}
 		if ret != nil && f.ReturnType != nil {
-			ok := ret.IsConvertableOpts(f.ReturnType, opts)
+			ok := ret.IsConvertableOptsSess(cgSess(cg), f.ReturnType, opts)
 			// residual ERROR sticky — no invent soft-continue then pick later past IsConvertable residual
 			if sessHasError(cgSess(cg)) {
 				return nil
@@ -426,7 +426,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return nil
 			}
-			if !qfer.Match(f.RV.Qfer, false) {
+			if !qfer.MatchSess(cgSess(cg), f.RV.Qfer, false) {
 				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 				if sessHasError(cgSess(cg)) {
 					return nil
