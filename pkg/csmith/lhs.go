@@ -1102,7 +1102,7 @@ func selectDerefPointerInv(
 		pq = RandomQualifiersDefaultProbs(ptrType, access, cg, true, opts, probs, r)
 	} else {
 		// random_add_qualifiers(!SE-free)
-		seFree := cg.EffectContext().IsSideEffectFree()
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-no-vol RandomAdd past IsSideEffectFree residual
 		if sessHasError(cg.Sess) {
 			return nil

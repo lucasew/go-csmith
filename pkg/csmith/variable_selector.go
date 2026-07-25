@@ -1128,7 +1128,7 @@ func (vs *VariableSelector) MakeInitValue(
 		}
 		noVolatile := false
 		if vs.Opts.StrictVolatileRule {
-			seFree := cg.EffectContext().IsSideEffectFree()
+			seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
 			// residual ERROR sticky — no invent soft-no-vol past IsSideEffectFree residual
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -1287,7 +1287,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 
 	// volatile + non-SE-free context → reject
-	seFree := eff.IsSideEffectFree()
+	seFree := eff.IsSideEffectFreeSess(cg.Sess)
 	// residual ERROR sticky — no invent soft-eligible past IsSideEffectFree residual
 	if sessHasError(cg.Sess) {
 		return false
@@ -3080,7 +3080,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			}
 			return true
 		}
-		seFree := cg.EffectContext().IsSideEffectFree()
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-continue keep past IsSideEffectFree residual
 		if sessHasError(vsSess(vs)) {
 			return false
@@ -3557,7 +3557,7 @@ func (vs *VariableSelector) SelectWithInvalid(
 	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
 	// non-sticky null soft re-pick (sticky poisons generation when vol slips through filter)
 	if v != nil {
-		seFree := cg.EffectContext().IsSideEffectFree()
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-skip vol assert past IsSideEffectFree residual
 		if sessHasError(vsSess(vs)) {
 			return nil

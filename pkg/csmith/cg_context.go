@@ -857,13 +857,13 @@ func (c *CGContext) ReadVar(v *Variable) {
 		return
 	}
 	if c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.ReadVar(v)
+		*c.EffectAccum = c.EffectAccum.ReadVarSess(cgSess(c), v)
 		// residual ERROR sticky — no invent soft-continue stm read past accum ReadVar residual
 		if sessHasError(cgSess(c)) {
 			return
 		}
 	}
-	c.EffectStm = c.EffectStm.ReadVar(v)
+	c.EffectStm = c.EffectStm.ReadVarSess(cgSess(c), v)
 	// residual ERROR sticky — no invent soft-continue past stm ReadVar residual
 	if sessHasError(cgSess(c)) {
 		return
@@ -913,13 +913,13 @@ func (c *CGContext) WriteVar(v *Variable) {
 		return
 	}
 	if c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+		*c.EffectAccum = c.EffectAccum.WriteVarSess(cgSess(c), v)
 		// residual ERROR sticky — no invent soft-continue stm write past accum WriteVar residual
 		if sessHasError(cgSess(c)) {
 			return
 		}
 	}
-	c.EffectStm = c.EffectStm.WriteVar(v)
+	c.EffectStm = c.EffectStm.WriteVarSess(cgSess(c), v)
 	// residual ERROR sticky — no invent soft-continue past stm WriteVar residual
 	if sessHasError(cgSess(c)) {
 		return
@@ -947,14 +947,14 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 		sessNoteError(cgSess(c), ErrGeneric)
 		return false
 	}
-	if !c.EffectContext().IsSideEffectFree() {
+	if !c.EffectContext().IsSideEffectFreeSess(cgSess(c)) {
 		// residual ERROR sticky — no invent OK past IsSideEffectFree residual false path
 		if sessHasError(cgSess(c)) {
 			return false
 		}
 		level := derefLevel
 		for level > 0 {
-			if v.IsVolatileAfterDeref(level) {
+			if v.IsVolatileAfterDerefSess(cgSess(c), level) {
 				// residual ERROR sticky — no invent OK past IsVolatileAfterDeref residual
 				if sessHasError(cgSess(c)) {
 					return false
@@ -974,7 +974,7 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 	}
 	// Incomplete accum/stm AccessDerefVolatile sticky (AccessDerefVolatile sets ERROR)
 	if c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.AccessDerefVolatile(v, derefLevel, true)
+		*c.EffectAccum = c.EffectAccum.AccessDerefVolatileSess(cgSess(c), v, derefLevel, true)
 		// residual ERROR sticky — no invent soft-continue stm past accum AccessDeref residual
 		if sessHasError(cgSess(c)) {
 			return false
@@ -984,7 +984,7 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 			return false
 		}
 	}
-	c.EffectStm = c.EffectStm.AccessDerefVolatile(v, derefLevel, true)
+	c.EffectStm = c.EffectStm.AccessDerefVolatileSess(cgSess(c), v, derefLevel, true)
 	// residual ERROR sticky — no invent soft-OK past stm AccessDeref residual
 	if sessHasError(cgSess(c)) {
 		return false
@@ -1058,7 +1058,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if sessHasError(cgSess(c)) {
 		return false
 	}
-	if c.EffectContext().IsWrittenPartially(v) {
+	if c.EffectContext().IsWrittenPartiallySess(cgSess(c), v) {
 		if sessHasError(cgSess(c)) {
 			return false
 		}
@@ -1067,7 +1067,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if sessHasError(cgSess(c)) {
 		return false
 	}
-	if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
+	if v.IsVolatileSess(cgSess(c)) && !c.EffectContext().IsSideEffectFreeSess(cgSess(c)) {
 		if sessHasError(cgSess(c)) {
 			return false
 		}
@@ -1133,7 +1133,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		}
 		return false
 	}
-	if c.IsNonWritable(v) || v.IsConst() {
+	if c.IsNonWritable(v) || v.IsConstSess(cgSess(c)) {
 		// residual ERROR sticky — no invent write-ok past nonwritable/const hole
 		if sessHasError(cgSess(c)) {
 			return false
@@ -1144,7 +1144,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	eff := c.EffectContext()
-	if eff.IsWrittenPartially(v) || eff.IsReadPartially(v) {
+	if eff.IsWrittenPartiallySess(cgSess(c), v) || eff.IsReadPartiallySess(cgSess(c), v) {
 		if sessHasError(cgSess(c)) {
 			return false
 		}
@@ -1153,7 +1153,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if sessHasError(cgSess(c)) {
 		return false
 	}
-	if v.IsVolatile() && !eff.IsSideEffectFree() {
+	if v.IsVolatileSess(cgSess(c)) && !eff.IsSideEffectFreeSess(cgSess(c)) {
 		if sessHasError(cgSess(c)) {
 			return false
 		}
@@ -1457,7 +1457,7 @@ func (c CGContext) AllowVolatile() bool {
 		sessNoteError(c.Sess, ErrGeneric)
 		return false
 	}
-	ok := c.EffectContext().IsSideEffectFree()
+	ok := c.EffectContext().IsSideEffectFreeSess(c.Sess)
 	// residual ERROR sticky — no invent allow-vol true past IsSideEffectFree residual hole
 	if sessHasError(c.Sess) {
 		return false
@@ -1483,7 +1483,7 @@ func (c CGContext) AcceptType(t *Type) bool {
 		sessNoteError(c.Sess, ErrGeneric)
 		return false
 	}
-	if c.EffectContext().IsSideEffectFree() {
+	if c.EffectContext().IsSideEffectFreeSess(c.Sess) {
 		// residual ERROR sticky — no invent accept past IsSideEffectFree hole
 		if sessHasError(c.Sess) {
 			return false
@@ -1512,7 +1512,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 		sessNoteError(c.Sess, ErrGeneric)
 		return true
 	}
-	for _, v := range eff.ReadVars() {
+	for _, v := range eff.ReadVarsSess(c.Sess) {
 		if v == nil {
 			sessNoteError(c.Sess, ErrGeneric)
 			return true
@@ -1525,7 +1525,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 		if sessHasError(c.Sess) {
 			return true
 		}
-		if c.EffectContext().IsWrittenPartially(v) {
+		if c.EffectContext().IsWrittenPartiallySess(c.Sess, v) {
 			// residual ERROR sticky — no invent conflict true past IsWrittenPartially residual hole
 			if sessHasError(c.Sess) {
 				return true
@@ -1536,7 +1536,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 		if sessHasError(c.Sess) {
 			return true
 		}
-		if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
+		if v.IsVolatileSess(c.Sess) && !c.EffectContext().IsSideEffectFreeSess(c.Sess) {
 			// residual ERROR sticky — no invent conflict past IsVolatile/SE residual
 			if sessHasError(c.Sess) {
 				return true
@@ -1548,12 +1548,12 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 	}
-	for _, v := range eff.WrittenVars() {
+	for _, v := range eff.WrittenVarsSess(c.Sess) {
 		if v == nil {
 			sessNoteError(c.Sess, ErrGeneric)
 			return true
 		}
-		if c.IsNonWritable(v) || v.IsConst() {
+		if c.IsNonWritable(v) || v.IsConstSess(c.Sess) {
 			// residual ERROR sticky — no invent conflict true past IsNonWritable/IsConst hole
 			if sessHasError(c.Sess) {
 				return true
@@ -1565,7 +1565,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 		ctx := c.EffectContext()
-		if ctx.IsWrittenPartially(v) || ctx.IsReadPartially(v) {
+		if ctx.IsWrittenPartiallySess(c.Sess, v) || ctx.IsReadPartiallySess(c.Sess, v) {
 			// residual ERROR sticky — no invent conflict true past partial residual hole
 			if sessHasError(c.Sess) {
 				return true
@@ -1576,7 +1576,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 		if sessHasError(c.Sess) {
 			return true
 		}
-		if v.IsVolatile() && !ctx.IsSideEffectFree() {
+		if v.IsVolatileSess(c.Sess) && !ctx.IsSideEffectFreeSess(c.Sess) {
 			if sessHasError(c.Sess) {
 				return true
 			}
@@ -2037,7 +2037,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	// Lhs.cpp:348–351 — set_lhs_write_vars from write_vars on accum
 	// Incomplete SetLhsWriteVars / stm sticky (no invent visit true after poison)
 	if valid && c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.SetLhsWriteVarsFromWritten()
+		*c.EffectAccum = c.EffectAccum.SetLhsWriteVarsFromWrittenSess(cgSess(c))
 		if !EffectComplete(*c.EffectAccum) {
 			if !sessHasError(cgSess(c)) {
 				sessNoteError(cgSess(c), ErrGeneric)

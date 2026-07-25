@@ -447,7 +447,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		}
 		// Function.cpp:307–313 — strict_volatile_rule
 		if opts.StrictVolatileRule && cg != nil {
-			if !f.FEffect.IsSideEffectFree() && !cg.EffectContext().IsSideEffectFree() {
+			if !f.FEffect.IsSideEffectFreeSess(cgSess(cg)) && !cg.EffectContext().IsSideEffectFreeSess(cgSess(cg)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past SE residual
 				if sessHasError(cgSess(cg)) {
 					return nil

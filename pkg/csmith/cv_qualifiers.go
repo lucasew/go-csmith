@@ -607,7 +607,7 @@ func (q CVQualifiers) RandomQualifiersFrom(
 		return NewCVQualifiers(nil, vols)
 	}
 	if !noVolatile {
-		seFree := cg.EffectContext().IsSideEffectFree()
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-clear/keep vol past IsSideEffectFree residual
 		if sessHasError(cg.Sess) {
 			return CVQualifiers{}
@@ -671,7 +671,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 		if sessHasError(cg.Sess) {
 			return CVQualifiers{}
 		}
-		if !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
+		if !cg.EffectContext().IsSideEffectFreeSess(cg.Sess) && len(vols) > 0 {
 			// residual ERROR sticky — no invent soft-clear vol past IsSideEffectFree residual
 			if sessHasError(cg.Sess) {
 				return CVQualifiers{}
@@ -917,7 +917,7 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	if access == AccessWrite {
 		q.SetConst(false, 0)
 	}
-	seFree := cg.EffectContext().IsSideEffectFree()
+	seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
 	// residual ERROR sticky — no invent soft-restrict past IsSideEffectFree residual
 	if sessHasError(cg.Sess) {
 		return
@@ -1267,7 +1267,7 @@ func RandomQualifiersForType(
 	}
 
 	// CVQualifiers.cpp:332–343 — variable itself.
-	seFree := effectCtx.IsSideEffectFree()
+	seFree := effectCtx.IsSideEffectFreeSess(nil)
 	// residual ERROR sticky — no invent soft-qual past IsSideEffectFree residual
 	if sessHasError(cg.Sess) {
 		return CVQualifiers{}

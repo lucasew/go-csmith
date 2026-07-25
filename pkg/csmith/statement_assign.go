@@ -161,7 +161,7 @@ func MakeRandomAssignQfer(
 	}
 	if typ == nil {
 		// Type::SelectLType(!SE-free, op)
-		seFree := cg.EffectContext().IsSideEffectFree()
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-no-vol SelectLType past IsSideEffectFree residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
@@ -337,12 +337,12 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:183 — write_var_set(rhs_accum.get_lhs_write_vars())
 	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge
 	// when LhsWriteVars used bare nil on incomplete rhs_accum).
-	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
+	if lw := rhsAccum.LhsWriteVarsSess(cgSess(cg)); !VariablesComplete(lw) || len(lw) > 0 {
 		// residual ERROR sticky — no invent soft-skip WriteVarSet past LhsWriteVars residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
-		runningEff = runningEff.WriteVarSet(lw)
+		runningEff = runningEff.WriteVarSetSess(cgSess(cg), lw)
 		// residual ERROR sticky — no invent soft-continue LHS past WriteVarSet residual
 		if sessHasError(cgSess(cg)) || !EffectComplete(runningEff) {
 			if !sessHasError(cgSess(cg)) {
@@ -1235,12 +1235,12 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementAssign.cpp:377 — write_var_set(rhs_accum.get_lhs_write_vars())
 	// IncompleteVariables → WriteVarSet IncompleteEffect sticky
-	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
+	if lw := rhsAccum.LhsWriteVarsSess(cgSess(cg)); !VariablesComplete(lw) || len(lw) > 0 {
 		// residual ERROR sticky — no invent soft-skip WriteVarSet past LhsWriteVars residual
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		runningEff = runningEff.WriteVarSet(lw)
+		runningEff = runningEff.WriteVarSetSess(cgSess(cg), lw)
 		// residual ERROR sticky — no invent soft-continue LHS past WriteVarSet residual
 		if sessHasError(cgSess(cg)) || !EffectComplete(runningEff) {
 			if !sessHasError(cgSess(cg)) {

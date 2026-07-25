@@ -1301,7 +1301,7 @@ func MakeRandomExpression(
 		if env == nil || len(env.AllTypes) == 0 {
 			return nil
 		}
-		seFree := cg.EffectContext().IsSideEffectFree()
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-choose type past IsSideEffectFree residual
 		if sessHasError(cgSess(cg)) {
 			return nil

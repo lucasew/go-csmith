@@ -597,7 +597,7 @@ func MakeRandomGoto(
 	if backEdge {
 		// StatementGoto.cpp:119–122 — accum read_vars + global_facts
 		if cg.EffectAccum != nil {
-			readVars = cg.EffectAccum.ReadVars()
+			readVars = cg.EffectAccum.ReadVarsSess(cgSess(cg))
 		}
 		if cg.FM != nil {
 			uf = cg.FM.UnionFacts
@@ -608,7 +608,7 @@ func MakeRandomGoto(
 		// C++ map[] always (missing live id → empty); StmID 0 IncompleteEffect
 		condBlk = okBlk
 		if cg.FM != nil {
-			readVars = cg.FM.GetMapAccumEffect(other.StmID).ReadVars()
+			readVars = cg.FM.GetMapAccumEffect(other.StmID).ReadVarsSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-empty read past GetMapAccum residual
 			if sessHasError(cgSess(cg)) {
 				return makeGotoFailed()
