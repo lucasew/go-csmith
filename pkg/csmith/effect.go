@@ -1599,7 +1599,7 @@ func (e Effect) CommentOutputSess(s *Session) string {
 	}
 	for _, v := range reads {
 		// Effect.cpp:518 — Variable::OutputForComment → get_actual_name()
-		name := v.OutputForComment(false)
+		name := v.OutputForCommentSess(s, false)
 		if sessHasError(s) {
 			return ""
 		}
@@ -1621,7 +1621,7 @@ func (e Effect) CommentOutputSess(s *Session) string {
 		return ""
 	}
 	for _, v := range writes {
-		name := v.OutputForComment(false)
+		name := v.OutputForCommentSess(s, false)
 		if sessHasError(s) {
 			return ""
 		}
