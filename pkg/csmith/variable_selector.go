@@ -3497,7 +3497,7 @@ func VariableCreationProbabilitySess(s *Session, r *Rng, opts Options) VariableS
 		sessNoteError(s, ErrGeneric)
 		return MaxVarScope
 	}
-	flag := opts.GlobalVariables && r.RndFlipcoin(10)
+	flag := opts.GlobalVariables && r.RndFlipcoinSess(s, 10)
 	// VariableSelector.cpp:1065 ERROR_GUARD after flipcoin
 	if sessHasError(s) {
 		return MaxVarScope

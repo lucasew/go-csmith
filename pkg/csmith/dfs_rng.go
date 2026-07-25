@@ -511,8 +511,13 @@ func (r *Rng) dfsRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 
 // Format helper for tests — sequence string via engine.
 func (r *Rng) dfsSequenceString() string {
+	return r.dfsSequenceStringSess(nil)
+}
+
+// dfsSequenceStringSess is dfsSequenceString with explicit session residual sticky.
+func (r *Rng) dfsSequenceStringSess(s *Session) string {
 	if r == nil || r.dfs == nil || r.dfs.seq == nil {
 		return ""
 	}
-	return r.dfs.seq.GetSequence()
+	return r.dfs.seq.GetSequenceSess(s)
 }

@@ -96,9 +96,14 @@ func NewRng(seed uint64) *Rng {
 // AbsRndNumGenerator::genrand → lrand48: (X >> 17) after LCG step.
 // Nil Rng sticky 0 (no invent fixed zero stream / soft re-pick without RNG).
 func (r *Rng) Genrand() uint32 {
+	return r.GenrandSess(nil)
+}
+
+// GenrandSess is Genrand with explicit session residual sticky.
+func (r *Rng) GenrandSess(s *Session) uint32 {
 	// Rng always live for genrand; sticky incomplete no invent zero stream
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	r.state = (lcgA*r.state + lcgC) & lcgMask
@@ -108,9 +113,14 @@ func (r *Rng) Genrand() uint32 {
 // RandDepth is DefaultRndNumGenerator::rand_depth_ (count of rnd_upto/rnd_flipcoin/hex digit steps).
 // Nil Rng sticky 0 (no invent depth 0 soft-success past missing stream).
 func (r *Rng) RandDepth() uint64 {
+	return r.RandDepthSess(nil)
+}
+
+// RandDepthSess is RandDepth with explicit session residual sticky.
+func (r *Rng) RandDepthSess(s *Session) uint64 {
 	// Rng always live; sticky incomplete no invent depth 0
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	return r.randDepth
@@ -119,7 +129,12 @@ func (r *Rng) RandDepth() uint64 {
 // RndUpto returns v in [0, n). n must be > 0.
 // DefaultRndNumGenerator::rnd_upto (no Filter* → no reject loop).
 func (r *Rng) RndUpto(n uint32) uint32 {
-	return r.RndUptoFilter(n, nil)
+	return r.RndUptoFilterSess(nil, n, nil)
+}
+
+// RndUptoSess is RndUpto with explicit session residual sticky.
+func (r *Rng) RndUptoSess(s *Session, n uint32) uint32 {
+	return r.RndUptoFilterSess(s, n, nil)
 }
 
 // RndUptoFilter is DefaultRndNumGenerator::rnd_upto with optional Filter.
@@ -128,9 +143,14 @@ func (r *Rng) RndUpto(n uint32) uint32 {
 // non-sticky return 0 without inventing domain (soft re-pick: empty half/list lengths
 // must not sticky-poison factories).
 func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
+	return r.RndUptoFilterSess(nil, n, f)
+}
+
+// RndUptoFilterSess is RndUptoFilter with explicit session residual sticky.
+func (r *Rng) RndUptoFilterSess(s *Session, n uint32, f Filter) uint32 {
 	// Rng always live for rnd_upto; sticky incomplete no invent fixed 0 draw
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	// n==0 non-sticky soft empty domain (no invent %0 / poison factories)
@@ -139,9 +159,9 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 	}
 	// DFSRndNumGenerator::rnd_upto → random_choice (not genrand %)
 	if r.kind == RngKindDFS {
-		return r.dfsRndUpto(n, f)
+		return r.dfsRndUptoSess(s, n, f)
 	}
-	raw := r.Genrand()
+	raw := r.GenrandSess(s)
 	v := raw % n
 	localDepth := r.randDepth
 	r.randDepth++
@@ -150,17 +170,17 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 		for f.Filter(v) {
 			// residual ERROR sticky — no invent soft-retry filter past hard IR residual hole
 			// (e.g. IsVolatileStructUnion field-Type residual soft-rejects then hangs forever)
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return 0
 			}
 			// DefaultRndNumGenerator.cpp: roll back rand_depth_ to local_depth+1
 			r.randDepth = localDepth + 1
-			raw = r.Genrand()
+			raw = r.GenrandSess(s)
 			v = raw % n
 			tries++
 		}
 		// residual ERROR sticky — no invent accept candidate past residual filter true path
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return 0
 		}
 	}
@@ -183,16 +203,26 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 // RndFlipcoin returns true with probability p% (p clamped to 100).
 // DefaultRndNumGenerator::rnd_flipcoin.
 func (r *Rng) RndFlipcoin(p uint32) bool {
-	return r.RndFlipcoinFilter(p, nil)
+	return r.RndFlipcoinFilterSess(nil, p, nil)
+}
+
+// RndFlipcoinSess is RndFlipcoin with explicit session residual sticky.
+func (r *Rng) RndFlipcoinSess(s *Session, p uint32) bool {
+	return r.RndFlipcoinFilterSess(s, p, nil)
 }
 
 // RndFlipcoinFilter is DefaultRndNumGenerator::rnd_flipcoin with optional Filter.
 // If filter rejects 0 → true without genrand; rejects 1 → false without genrand.
 // Nil Rng sticky false (no invent fixed tails / soft re-pick without RNG).
 func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
+	return r.RndFlipcoinFilterSess(nil, p, f)
+}
+
+// RndFlipcoinFilterSess is RndFlipcoinFilter with explicit session residual sticky.
+func (r *Rng) RndFlipcoinFilterSess(s *Session, p uint32, f Filter) bool {
 	// Rng always live for flipcoin; sticky incomplete no invent fixed false
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if p > 100 {
@@ -200,7 +230,7 @@ func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 	}
 	// DFSRndNumGenerator::rnd_flipcoin → random_choice(2) with invalid list
 	if r.kind == RngKindDFS {
-		return r.dfsRndFlipcoin(p, f)
+		return r.dfsRndFlipcoinSess(s, p, f)
 	}
 	localDepth := r.randDepth
 	r.randDepth++
@@ -218,7 +248,7 @@ func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 			return false
 		}
 	}
-	raw := r.Genrand()
+	raw := r.GenrandSess(s)
 	ok := (raw % 100) < p
 	if r.trace && r.traceTo != nil {
 		b := 0
@@ -234,9 +264,14 @@ func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 // Each digit: genrand()%16; increments rand_depth_ per digit.
 // AbsRndNumGenerator.cpp:50 — hex1 = "0123456789ABCDEF" (uppercase; no invent abcdef).
 func (r *Rng) RandomHexDigits(num int) string {
+	return r.RandomHexDigitsSess(nil, num)
+}
+
+// RandomHexDigitsSess is RandomHexDigits with explicit session residual sticky.
+func (r *Rng) RandomHexDigitsSess(s *Session, num int) string {
 	// AbsRndNumGenerator always has live RNG; sticky no invent empty hex without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if num <= 0 {
@@ -244,7 +279,7 @@ func (r *Rng) RandomHexDigits(num int) string {
 	}
 	b := make([]byte, 0, num)
 	for i := 0; i < num; i++ {
-		x := r.Genrand() % 16
+		x := r.GenrandSess(s) % 16
 		b = append(b, HexAlphabet[x])
 		// DefaultRndNumGenerator increments rand_depth_; Abs/DFS does not.
 		if r.kind != RngKindDFS {
@@ -257,9 +292,14 @@ func (r *Rng) RandomHexDigits(num int) string {
 // RandomDigits is DefaultRndNumGenerator::RandomDigits when CGOptions::is_random().
 // DFS uses AbsRndNumGenerator::RandomDigits (no rand_depth_ bump).
 func (r *Rng) RandomDigits(num int) string {
+	return r.RandomDigitsSess(nil, num)
+}
+
+// RandomDigitsSess is RandomDigits with explicit session residual sticky.
+func (r *Rng) RandomDigitsSess(s *Session, num int) string {
 	// AbsRndNumGenerator always has live RNG; sticky no invent empty digits without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if num <= 0 {
@@ -267,7 +307,7 @@ func (r *Rng) RandomDigits(num int) string {
 	}
 	b := make([]byte, 0, num)
 	for i := 0; i < num; i++ {
-		x := r.Genrand() % 10
+		x := r.GenrandSess(s) % 10
 		b = append(b, DecAlphabet[x])
 		if r.kind != RngKindDFS {
 			r.randDepth++
@@ -278,8 +318,13 @@ func (r *Rng) RandomDigits(num int) string {
 
 // Kind is AbsRndNumGenerator::kind — Default or DFS.
 func (r *Rng) Kind() RngKind {
+	return r.KindSess(nil)
+}
+
+// KindSess is Kind with explicit session residual sticky.
+func (r *Rng) KindSess(s *Session) RngKind {
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return RngKindDefault
 	}
 	return r.kind
@@ -293,8 +338,13 @@ func GetPrefixedNameDefault(name string) string { return name }
 // Random-mode default does not append where labels unless callers use where;
 // Go Rng keeps an empty string unless extended.
 func (r *Rng) TraceDepth() string {
+	return r.TraceDepthSess(nil)
+}
+
+// TraceDepthSess is TraceDepth with explicit session residual sticky.
+func (r *Rng) TraceDepthSess(s *Session) string {
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return r.traceString
@@ -304,20 +354,30 @@ func (r *Rng) TraceDepth() string {
 // Default: sequence bookkeeping no-op → "".
 // DFS: LinearSequence map joined by sep (empty sticky "").
 func (r *Rng) GetSequence() string {
+	return r.GetSequenceSess(nil)
+}
+
+// GetSequenceSess is GetSequence with explicit session residual sticky.
+func (r *Rng) GetSequenceSess(s *Session) string {
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if r.kind == RngKindDFS {
-		return r.dfsSequenceString()
+		return r.dfsSequenceStringSess(s)
 	}
 	return ""
 }
 
 // SetRandDepth is DefaultRndNumGenerator::set_rand_depth.
 func (r *Rng) SetRandDepth(depth uint64) {
+	r.SetRandDepthSess(nil, depth)
+}
+
+// SetRandDepthSess is SetRandDepth with explicit session residual sticky.
+func (r *Rng) SetRandDepthSess(s *Session, depth uint64) {
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	r.randDepth = depth
@@ -348,7 +408,7 @@ func ProcessRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 		sessNoteError(s, ErrGeneric)
 		return 0
 	}
-	return r.RndUptoFilter(n, f)
+	return r.RndUptoFilterSess(s, n, f)
 }
 
 // ProcessRndFlipcoin mirrors random.cpp::rnd_flipcoin.
@@ -364,7 +424,7 @@ func ProcessRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	return r.RndFlipcoinFilter(p, f)
+	return r.RndFlipcoinFilterSess(s, p, f)
 }
 
 // ProcessRandomHexDigits mirrors random.cpp::RandomHexDigits.
@@ -380,7 +440,7 @@ func ProcessRandomHexDigitsSess(s *Session, num int) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return r.RandomHexDigits(num)
+	return r.RandomHexDigitsSess(s, num)
 }
 
 // ProcessRandomDigits mirrors random.cpp::RandomDigits.
@@ -396,7 +456,7 @@ func ProcessRandomDigitsSess(s *Session, num int) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return r.RandomDigits(num)
+	return r.RandomDigitsSess(s, num)
 }
 
 // ProcessTraceDepth mirrors random.cpp::trace_depth.
@@ -412,7 +472,7 @@ func ProcessTraceDepthSess(s *Session) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return r.TraceDepth()
+	return r.TraceDepthSess(s)
 }
 
 // ProcessGetSequence mirrors random.cpp::get_sequence.
@@ -428,7 +488,7 @@ func ProcessGetSequenceSess(s *Session) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return r.GetSequence()
+	return r.GetSequenceSess(s)
 }
 
 // PureRndUpto mirrors pure_rnd_upto.
