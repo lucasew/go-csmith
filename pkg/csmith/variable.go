@@ -3027,25 +3027,25 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 	if v.IsArray && len(v.ArraySizes) > 0 {
 		return hashArrayVariableOptsSess(s, v, ctrl, unionFacts, opts)
 	}
-	if v.Type.IsAggregate() {
+	if v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if sessHasError(s) {
 			return ""
 		}
 		// incomplete FieldVars fails closed sticky whole hash (no invent soft-skip hole)
-		if !v.FieldVarsComplete() {
+		if !v.FieldVarsCompleteSess(s) {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		var b strings.Builder
 		for i, f := range v.FieldVars {
 			// Variable.cpp:893–898 — skip unreadable union fields
-			if v.Type.IsUnion() && unionFacts != nil {
+			if v.Type.IsUnionSess(s) && unionFacts != nil {
 				// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
 				if sessHasError(s) {
 					return ""
 				}
-				if !IsFieldReadable(v, i, unionFacts) {
+				if !IsFieldReadableSess(s, v, i, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial hash past hole
 					if sessHasError(s) {
 						return ""
@@ -3073,13 +3073,13 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 	if sessHasError(s) {
 		return ""
 	}
-	if v.Type.IsSimple() {
+	if v.Type.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent soft-hash past IsSimple residual
 		if sessHasError(s) {
 			return ""
 		}
 		// Variable.cpp:900–920 — name always live sticky; no invent empty transparent_crc
-		name := v.GetActualName(false)
+		name := v.GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
 		if sessHasError(s) {
 			return ""
@@ -3229,7 +3229,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		return ""
 	}
 	// array name always live sticky; no invent transparent_crc([i], …) / for ( = 0; …)
-	access := v.GetActualName(false)
+	access := v.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty hash past GetActualName residual
 	if sessHasError(s) {
 		return ""
@@ -3245,7 +3245,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		names[i] = ctrl[i].GetActualName(false)
+		names[i] = ctrl[i].GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent soft-continue later indices past GetActualName residual
 		if sessHasError(s) {
 			return ""

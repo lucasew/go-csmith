@@ -802,7 +802,7 @@ func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 		return ""
 	}
 	// StatementArrayOp.cpp:194–220 — cv->Output always live; sticky no invent for ( = 0; …)
-	iv := lc.IV.OutputC()
+	iv := lc.IV.OutputCOptsWithSess(s, false, opts)
 	// residual ERROR sticky — no invent soft-continue header past OutputC residual
 	if sessHasError(s) {
 		return ""

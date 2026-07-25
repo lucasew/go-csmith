@@ -699,7 +699,7 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	lhs := assignLhsText(st, wrapVol)
+	lhs := assignLhsTextSess(s, st, wrapVol)
 	if lhs == "" {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
@@ -741,7 +741,7 @@ func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 		return st.ArrayAccess
 	}
 	if st.Lhs != nil {
-		out := st.Lhs.Output(wrapVol)
+		out := st.Lhs.OutputSess(s, wrapVol)
 		// residual ERROR sticky — no invent soft-empty LHS past Lhs.Output residual
 		if sessHasError(s) {
 			return ""
@@ -749,7 +749,7 @@ func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 		return out
 	}
 	if st.LhsVar != nil {
-		out := st.LhsVar.OutputLhsC()
+		out := st.LhsVar.OutputLhsCOptsSess(s, false)
 		// residual ERROR sticky — no invent soft-empty LHS past OutputLhsC residual
 		if sessHasError(s) {
 			return ""
@@ -784,7 +784,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	lhs := assignLhsText(st, wrapVol)
+	lhs := assignLhsTextSess(s, st, wrapVol)
 	if lhs == "" {
 		// incomplete LHS IR sticky — no invent bare RHS / safe rewrite
 		if !sessHasError(s) {
@@ -817,7 +817,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 			// ccomp + volatile + real compound → "lhs = lhs binop rhs"
 			// no invent "lhs = lhs + " with empty rhs Output
 			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok && opts.CComp {
-				if assignLhsIsVolatile(st) {
+				if assignLhsIsVolatileSess(s, st) {
 					// residual ERROR sticky — no invent ccomp rewrite past IsVolatile residual
 					if sessHasError(s) {
 						return ""
@@ -829,7 +829,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 					return ""
 				}
 			}
-			return OutputAssignSimple(st, wrapVol)
+			return OutputAssignSimpleSess(s, st, wrapVol)
 		case AssignPreIncr:
 			return "++" + lhs
 		case AssignPreDecr:
@@ -856,7 +856,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 			id := SafeOpFlagsToIDSess(s, fname)
 			// don't use wrapper if filtered out by --safe-math-wrapper
 			if !SafeMathWrapperAllowed(opts, id) {
-				return OutputAssignSimple(st, wrapVol)
+				return OutputAssignSimpleSess(s, st, wrapVol)
 			}
 			// StatementAssign.cpp:595–598 — expr.Output always (live Expression*)
 			if rhs == "" && !st.AssignOp.NeedNoRHS() {
@@ -894,7 +894,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 			return ""
 		}
 	}
-	return OutputAssignSimple(st, wrapVol)
+	return OutputAssignSimpleSess(s, st, wrapVol)
 }
 
 // assignLhsIsVolatile reports LHS volatile for OutputAsExpr ccomp rewrite.
@@ -910,7 +910,7 @@ func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 		return true
 	}
 	if st.Lhs != nil {
-		vol := st.Lhs.IsVolatile()
+		vol := st.Lhs.IsVolatileSess(s)
 		// residual ERROR sticky — no invent non-vol soft-skip past Lhs IsVolatile residual
 		if sessHasError(s) {
 			return true
@@ -920,7 +920,7 @@ func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 	if st.LhsVar == nil {
 		return false
 	}
-	vol := st.LhsVar.IsVolatile()
+	vol := st.LhsVar.IsVolatileSess(s)
 	// residual ERROR sticky — no invent non-vol soft-skip past LhsVar IsVolatile residual
 	if sessHasError(s) {
 		return true

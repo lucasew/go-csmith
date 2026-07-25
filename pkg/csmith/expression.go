@@ -1824,7 +1824,7 @@ func (e *Expression) OutputOptsSess(s *Session, opts Options) string {
 	if e.CastType != nil {
 		// Expression.cpp:228–231 — cast_type->Output + body; both always live
 		// sticky no invent "() body" / "(type) " empty body
-		cn := e.CastType.CName()
+		cn := e.CastType.CNameSess(s)
 		// residual ERROR sticky — no invent cast emit past CName residual hole
 		if sessHasError(s) {
 			return ""

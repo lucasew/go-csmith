@@ -1917,7 +1917,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			hdr := forHeaderOutput(st.Loop)
+			hdr := forHeaderOutputSess(s, st.Loop)
 			// residual ERROR sticky — no invent soft-continue body past header residual
 			if sessHasError(s) {
 				return ""
@@ -1992,7 +1992,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			hdr := arrayOpHeaderOutput(st.Loop, opts)
+			hdr := arrayOpHeaderOutputSess(s, st.Loop, opts)
 			// residual ERROR sticky — no invent soft-continue body past header residual
 			if sessHasError(s) {
 				return ""
