@@ -178,16 +178,21 @@ func (b *Block) PushStmtSess(s *Session, st Stmt) {
 
 // FindBlockByID mirrors find_block_by_id.
 // Block.cpp:69–83 — scan non-builtin Function::blocks for stm_id.
-// Incomplete funcs sticky nil.}
+// Incomplete funcs sticky nil.
 
 func FindBlockByID(funcs []*Function, blkID int) *Block {
+	return FindBlockByIDSess(nil, funcs, blkID)
+}
+
+// FindBlockByIDSess is FindBlockByID with explicit session residual sticky.
+func FindBlockByIDSess(s *Session, funcs []*Function, blkID int) *Block {
 	if !FunctionsComplete(funcs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// incomplete id sticky (no invent match-first soft-pick)
 	if blkID <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	for _, f := range funcs {
@@ -196,7 +201,7 @@ func FindBlockByID(funcs []*Function, blkID int) *Block {
 		}
 		for _, b := range f.Blocks {
 			if b == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return nil
 			}
 			if b.StmID == blkID {
@@ -536,18 +541,23 @@ func (b *Block) CreateNewTmpVarSess(s *Session, st ESimpleType) string {
 // filter.disable(fDefault). In random mode valid_filter() is false so
 // filter() never rejects → uniform rnd_upto(block_size) in [0, block_size).
 func BlockProbability(blockSize int, r *Rng) int {
+	return BlockProbabilitySess(nil, blockSize, r)
+}
+
+// BlockProbabilitySess is BlockProbability with explicit session residual sticky.
+func BlockProbabilitySess(s *Session, blockSize int, r *Rng) int {
 	if blockSize < 1 {
 		return 0
 	}
 	if r == nil {
 		// C++ always has RNG; sticky fail-closed → 0
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	// Block.cpp:88–92 — Keep {block_size-1}, disable fDefault, rnd_upto
 	f := NewVectorFilterItems([]int{blockSize - 1}, FilterModeKeep)
-	f.Disable(FilterKindDefault)
-	return int(r.RndUptoFilter(uint32(blockSize), f))
+	f.DisableSess(s, FilterKindDefault)
+	return int(r.RndUptoFilterSess(s, uint32(blockSize), f))
 }
 
 // MakeRandomBlock mirrors Block::make_random.
@@ -613,13 +623,13 @@ func MakeRandomBlock(
 	f.Blocks = append(f.Blocks, b)
 	// DepthSpec::depth_guard_by_type(dtBlock) — random mode always GOOD
 	if DepthGuardByTypeSess(cgSess(cg), opts, "dtBlock") == BadDepth {
-		abortBlockMake(f, b)
+		abortBlockMakeSess(cgSess(cg), f, b)
 		return nil
 	}
-	max := BlockProbability(b.blockSize, r)
+	max := BlockProbabilitySess(cgSess(cg), b.blockSize, r)
 	// Block.cpp:136–140 — ERROR after BlockProbability → delete block
 	if sessHasError(cgSess(cg)) {
-		abortBlockMake(f, b)
+		abortBlockMakeSess(cgSess(cg), f, b)
 		return nil
 	}
 	// Note: blk_depth is bumped in Statement::make_random for compound stmts
@@ -634,26 +644,26 @@ func MakeRandomBlock(
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
 		if !EffectComplete(*cg.EffectAccum) {
-			abortBlockMake(f, b)
+			abortBlockMakeSess(cgSess(cg), f, b)
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		preEffect = cg.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-block past Effect Clone residual
 		if sessHasError(cgSess(cg)) {
-			abortBlockMake(f, b)
+			abortBlockMakeSess(cgSess(cg), f, b)
 			return nil
 		}
 	}
 	if !EffectComplete(preEffect) {
-		abortBlockMake(f, b)
+		abortBlockMakeSess(cgSess(cg), f, b)
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StmID always allocated at make; FM path always records map_facts_in
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			abortBlockMake(f, b)
+			abortBlockMakeSess(cgSess(cg), f, b)
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
@@ -702,7 +712,7 @@ func MakeRandomBlock(
 	}
 	// Block.cpp:157–161 — ERROR after stmt loop → delete block
 	if sessHasError(cgSess(cg)) {
-		abortBlockMake(f, b)
+		abortBlockMakeSess(cgSess(cg), f, b)
 		return nil
 	}
 	// Block.cpp:164–166 — nested loop for must-use multi-dim arrays
@@ -710,7 +720,7 @@ func MakeRandomBlock(
 		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
 		// append_nested_loop ERROR_GUARD(nullptr) on for make fail
 		if sessHasError(cgSess(cg)) {
-			abortBlockMake(f, b)
+			abortBlockMakeSess(cgSess(cg), f, b)
 			return nil
 		}
 	}
@@ -721,7 +731,7 @@ func MakeRandomBlock(
 		must := b.MustReturn()
 		// residual ERROR sticky — no invent soft-append return past MustReturn residual
 		if sessHasError(cgSess(cg)) {
-			abortBlockMake(f, b)
+			abortBlockMakeSess(cgSess(cg), f, b)
 			return nil
 		}
 		if !must {
@@ -746,7 +756,7 @@ func MakeRandomBlock(
 		if !sessHasError(cgSess(cg)) {
 			sessNoteError(cgSess(cg), ErrGeneric)
 		}
-		abortBlockMake(f, b)
+		abortBlockMakeSess(cgSess(cg), f, b)
 		return nil
 	}
 	// Block.cpp:178 — stack.pop_back() (always; C++ does not identity-check).
@@ -771,8 +781,13 @@ func MakeRandomBlock(
 // (seed 11466719812903307384).
 // Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
 func abortBlockMake(f *Function, b *Block) {
+	abortBlockMakeSess(nil, f, b)
+}
+
+// abortBlockMakeSess is abortBlockMake with explicit session residual sticky.
+func abortBlockMakeSess(s *Session, f *Function, b *Block) {
 	if f == nil || b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {
