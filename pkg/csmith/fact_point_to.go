@@ -869,7 +869,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 			}
 			var ret []*FactPointTo
 			for i := 0; i < len(lvars); i++ {
-				rvFact := GetReturnFactForInvocation(fi, ptrs[i])
+				rvFact := GetReturnFactForInvocationSess(s, fi, ptrs[i])
 				// missing return fact during generation — non-sticky hole (soft re-pick)
 				if rvFact == nil {
 					return IncompleteFactSlice()
@@ -893,7 +893,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 		}
 		// FactPointTo.cpp:250–252 — missing rv_fact during generation is non-sticky
 		// hole (soft re-pick AddParamFacts / call factories; no invent GarbagePtr)
-		rvFact := GetReturnFactForInvocation(fi, fn.RV)
+		rvFact := GetReturnFactForInvocationSess(s, fi, fn.RV)
 		if rvFact == nil {
 			return IncompleteFactSlice()
 		}
@@ -2030,7 +2030,7 @@ func MergePointeesOfPointersSess(s *Session, ptrs []*Variable, facts []*FactPoin
 		if IsSpecialPtr(p) {
 			continue
 		}
-		ft := FindRelatedPointTo(facts, p)
+		ft := FindRelatedPointToSess(s, facts, p)
 		// residual ERROR sticky — no invent soft-merge pointees past FindRelated residual
 		if sessHasError(s) {
 			return IncompleteVariables()
@@ -2160,7 +2160,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 	}
 	var pointees []*Variable
 	if indirection == 0 {
-		ft := FindRelatedPointTo(facts, v)
+		ft := FindRelatedPointToSess(s, facts, v)
 		// residual ERROR sticky — no invent not-pointing soft-skip past FindRelated hole
 		if sessHasError(s) {
 			return true
@@ -2170,7 +2170,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 		}
 		pointees = ft.PointTo
 	} else {
-		pointees = MergePointeesOfPointer(v, indirection, facts)
+		pointees = MergePointeesOfPointerSess(s, v, indirection, facts)
 		// incomplete merge non-sticky true (soft re-pick)
 		if !VariablesComplete(pointees) {
 			return true

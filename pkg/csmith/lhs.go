@@ -272,7 +272,7 @@ func (l *Lhs) GetLvarsSess(s *Session, facts []*FactPointTo) []*Variable {
 	if sessHasError(s) {
 		return IncompleteVariables()
 	}
-	vars := MergePointeesOfPointer(coll, n, facts)
+	vars := MergePointeesOfPointerSess(s, coll, n, facts)
 	// residual ERROR sticky — no invent soft-merge past MergePointees residual hole
 	if sessHasError(s) {
 		return IncompleteVariables()

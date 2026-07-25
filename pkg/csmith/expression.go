@@ -533,7 +533,7 @@ func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
-		q := e.CommaRHS.GetQualifiers()
+		q := e.CommaRHS.GetQualifiersSess(s)
 		// residual ERROR sticky — no invent comma quals past RHS residual hole
 		if sessHasError(s) {
 			return CVQualifiers{}

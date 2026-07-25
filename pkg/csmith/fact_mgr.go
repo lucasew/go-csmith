@@ -4191,7 +4191,7 @@ func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 		if f.Var.IsRV() {
 			// keep only this function's RV
 			if fm.Func != nil && fm.Func.RV != nil {
-				match := fm.Func.RV.Match(f.Var)
+				match := fm.Func.RV.MatchSess(fmSess(fm), f.Var)
 				// residual ERROR sticky — no invent soft-continue filter past Match hole
 				// (Type-nil RV Match residual ERROR+false soft invents drop then keep later non-RV)
 				if sessHasError(fmSess(fm)) {

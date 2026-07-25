@@ -899,7 +899,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 		if mergeLevel < 0 {
 			mergeLevel = 0
 		}
-		rvars := MergePointeesOfPointer(coll, mergeLevel, ptFacts)
+		rvars := MergePointeesOfPointerSess(s, coll, mergeLevel, ptFacts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
@@ -931,7 +931,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 			return IncompleteUnionFactSlice()
 		}
 		rv := rhs.Invoke.User.RV
-		uf := GetReturnUnionFactForInvocation(rhs.Invoke, rv)
+		uf := GetReturnUnionFactForInvocationSess(s, rhs.Invoke, rv)
 		// residual ERROR sticky — no invent soft-union transfer past registry residual
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
