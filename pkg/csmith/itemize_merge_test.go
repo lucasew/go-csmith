@@ -28,13 +28,13 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	// entry: primary pointer-0 → null only
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(&coll.Variable, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, &coll.Variable, NullPtr)}
 	// RHS: &g_127 — ExpressionVariable(g) with desired type int16_t** (indir -1)
 	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	if !fm.UpdateFactForAssign(&item.Variable, 0, rhs) {
 		t.Fatalf("update err=%v", HasErrorSess(testAmbientSession))
 	}
-	fp := FindRelatedPointTo(fm.GlobalFacts, &coll.Variable)
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &coll.Variable)
 	if fp == nil {
 		t.Fatal("missing coll fact")
 	}
@@ -44,7 +44,7 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 			pts = append(pts, p.Name)
 		}
 	}
-	if !fp.IsNull() {
+	if !fp.IsNullSess(testAmbientSession) {
 		t.Fatalf("itemized array assign must MERGE keep null, pts=%v factVarIsArray=%v",
 			pts, fp.Var != nil && fp.Var.IsArray)
 	}
@@ -81,11 +81,11 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	}
 	item.AsArray = item
 	// may-null on collective (post_loop / merge lattice)
-	facts := []*FactPointTo{MakeFactPointToSet(&coll.Variable, []*Variable{NullPtr, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)})}
+	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, &coll.Variable, []*Variable{NullPtr, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)})}
 	r := NewRngSess(testAmbientSession, 1)
 	d0 := r.RandDepth()
 	// need one more indir than var for validate to check null
-	got := OpportunisticValidate(r, &item.Variable, GetIntTypeSess(testAmbientSession), facts, 0, 0)
+	got := OpportunisticValidateSess(testAmbientSession, r, &item.Variable, GetIntTypeSess(testAmbientSession), facts, 0, 0)
 	if got != 0 {
 		t.Fatalf("may-null + null_prob=0 must reject, got %d", got)
 	}
@@ -93,10 +93,10 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 		t.Fatalf("must still flipcoin(null_prob=0): depth %d → %d", d0, r.RandDepth())
 	}
 	// pure non-null: no flipcoin
-	live := []*FactPointTo{MakeFactPointTo(&coll.Variable, CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false))}
+	live := []*FactPointTo{MakeFactPointToSess(testAmbientSession, &coll.Variable, CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false))}
 	r2 := NewRngSess(testAmbientSession, 1)
 	d1 := r2.RandDepth()
-	if OpportunisticValidate(r2, &item.Variable, GetIntTypeSess(testAmbientSession), live, 0, 0) != 1 {
+	if OpportunisticValidateSess(testAmbientSession, r2, &item.Variable, GetIntTypeSess(testAmbientSession), live, 0, 0) != 1 {
 		t.Fatal("pure live must accept without null flip")
 	}
 	if r2.RandDepth() != d1 {

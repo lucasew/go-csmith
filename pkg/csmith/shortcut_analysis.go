@@ -183,7 +183,7 @@ func SubsetFactsSess(s *Session, a, b []*FactPointTo) bool {
 		return false
 	}
 	for _, f1 := range a {
-		f2 := FindRelatedPointTo(b, f1.Var)
+		f2 := FindRelatedPointToSess(s, b, f1.Var)
 		// residual ERROR sticky — no invent soft-continue not-subset past FindRelated hole
 		if sessHasError(s) {
 			return false
@@ -191,7 +191,7 @@ func SubsetFactsSess(s *Session, a, b []*FactPointTo) bool {
 		if f2 == nil {
 			return false
 		}
-		ok := f2.Imply(f1)
+		ok := f2.ImplySess(s, f1)
 		// residual ERROR sticky — no invent soft-continue not-subset past Imply hole
 		if sessHasError(s) {
 			return false
@@ -925,7 +925,7 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	// Statement.cpp:574–606 — validate_and_update_facts does NOT assign
 	// fm->global_facts = inputs before shortcut/visit. Mid-gen ExpressionAssign
 	// updates live on global_facts; map_facts_in / fixed-point *facts can lag.
-	// Installing CloneFactSlice(*facts) here wiped l_233 may-null (seed-2 e10107:
+	// Installing CloneFactSliceSess(sessFromCG(cg), *facts) here wiped l_233 may-null (seed-2 e10107:
 	// WIPE at ValidateAndUpdateFacts before shortcut reuse returned without
 	// re-visit). C++ opportunistic_validate reads global_facts, not map_facts_in.
 	sc := ShortcutAnalysisSess(sessFromCG(cg), st, facts, cg, opts)

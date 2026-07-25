@@ -48,10 +48,10 @@ func TestPointerParamTBD(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	// manually run param fact path: Building adds tbd before body
 	f2.BuildState = BuildBuilding
-	if FindRelatedPointTo(fm2.GlobalFacts, p2) == nil {
-		fm2.GlobalFacts = append(fm2.GlobalFacts, MakeFactPointTo(p2, TBDPtr))
+	if FindRelatedPointToSess(testAmbientSession, fm2.GlobalFacts, p2) == nil {
+		fm2.GlobalFacts = append(fm2.GlobalFacts, MakeFactPointToSess(testAmbientSession, p2, TBDPtr))
 	}
-	if !FindRelatedPointTo(fm2.GlobalFacts, p2).IsTBDOnly() {
+	if !FindRelatedPointToSess(testAmbientSession, fm2.GlobalFacts, p2).IsTBDOnlySess(testAmbientSession) {
 		t.Fatal("tbd")
 	}
 }

@@ -25,25 +25,25 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("add %v", HasErrorSess(testAmbientSession))
 	}
-	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
-	if fp == nil || fp.IsNull() || fp.IsDead() {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &av.Variable)
+	if fp == nil || fp.IsNullSess(testAmbientSession) || fp.IsDeadSess(testAmbientSession) {
 		t.Fatalf("after InitExpr=&g want pure live: %+v", fp)
 	}
 	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	if !fm.UpdateFactForAssign(&av.Variable, 0, rhs) {
 		t.Fatal("arrayop")
 	}
-	fp2 := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
-	if fp2 == nil || fp2.IsNull() || fp2.IsDead() {
+	fp2 := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &av.Variable)
+	if fp2 == nil || fp2.IsNullSess(testAmbientSession) || fp2.IsDeadSess(testAmbientSession) {
 		t.Fatalf("after arrayop want pure live: %+v", fp2)
 	}
 	fm2 := NewFactMgrSess(testAmbientSession, &Function{Name: "f2"})
-	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(&av.Variable, NullPtr)}
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, &av.Variable, NullPtr)}
 	if !fm2.UpdateFactForAssign(&av.Variable, 0, rhs) {
 		t.Fatal("merge null")
 	}
-	fp3 := FindRelatedPointTo(fm2.GlobalFacts, &av.Variable)
-	if fp3 == nil || !fp3.IsNull() {
+	fp3 := FindRelatedPointToSess(testAmbientSession, fm2.GlobalFacts, &av.Variable)
+	if fp3 == nil || !fp3.IsNullSess(testAmbientSession) {
 		t.Fatalf("from null entry must keep may-null: %+v", fp3)
 	}
 	ClearErrorSess(testAmbientSession)

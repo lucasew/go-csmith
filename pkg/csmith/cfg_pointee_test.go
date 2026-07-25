@@ -5,14 +5,14 @@ import "testing"
 func TestMergePointeesOfPointer(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	// indirect 0 → just p itself? while(indirect-- > 0) so 0 means no steps → [p]
-	got0 := MergePointeesOfPointer(p, 0, facts)
+	got0 := MergePointeesOfPointerSess(testAmbientSession, p, 0, facts)
 	if len(got0) != 1 || got0[0] != p {
 		t.Fatalf("indir0 %+v", got0)
 	}
 	// indirect 1 → pointees of p
-	got1 := MergePointeesOfPointer(p, 1, facts)
+	got1 := MergePointeesOfPointerSess(testAmbientSession, p, 1, facts)
 	if len(got1) != 1 || got1[0] != tgt {
 		t.Fatalf("indir1 %+v", got1)
 	}
@@ -22,10 +22,10 @@ func TestRhsTransferUsesMergePointees(t *testing.T) {
 	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	in := []*FactPointTo{MakeFactPointTo(p2, tgt)}
+	in := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p2, tgt)}
 	// p2 as pointer expr: level 1 - 1 = 0, merge(indirect+1)=1
 	rhs := &Expression{Term: TermVariable, Var: p2, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	facts := RhsToLhsTransfer(in, []*Variable{p1}, rhs)
+	facts := RhsToLhsTransferSess(testAmbientSession, in, []*Variable{p1}, rhs)
 	if len(facts) != 1 || facts[0].PointTo[0] != tgt {
 		t.Fatalf("%+v", facts)
 	}
@@ -116,17 +116,17 @@ func TestMakeupNewVarFacts(t *testing.T) {
 		t.Fatal("pointer init")
 	}
 	// seed new_facts with a related fact entry so makeup sees the var
-	newF := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	newF := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	MakeupNewVarFacts(&old, newF)
-	got := FindRelatedPointTo(old, p)
+	got := FindRelatedPointToSess(testAmbientSession, old, p)
 	if got == nil {
 		t.Fatal("added")
 	}
 	// must use init abstract (null), not invent NewFactPointTo garbage default
-	if got.IsDead() {
+	if got.IsDeadSess(testAmbientSession) {
 		t.Fatal("makeup must not invent garbage for null-init pointer")
 	}
-	if !got.IsNull() {
+	if !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("want null from init, got %+v", got.PointTo)
 	}
 	// idempotent
@@ -146,16 +146,16 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	q := CreateVariableQferSess(testAmbientSession, "g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
 	q.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	old2 := []*FactPointTo{}
-	MakeupNewVarFacts(&old2, []*FactPointTo{MakeFactPointTo(q, GarbagePtr)})
-	fq := FindRelatedPointTo(old2, q)
-	if fq == nil || fq.IsDead() || len(fq.PointTo) != 1 || fq.PointTo[0] != tgt {
+	MakeupNewVarFacts(&old2, []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, GarbagePtr)})
+	fq := FindRelatedPointToSess(testAmbientSession, old2, q)
+	if fq == nil || fq.IsDeadSess(testAmbientSession) || len(fq.PointTo) != 1 || fq.PointTo[0] != tgt {
 		t.Fatalf("want &g_t fact, got %+v", fq)
 	}
 	// nil hole fails closed sticky — no invent skip past hole to makeup later vars
 	r := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	old3 := []*FactPointTo{}
-	MakeupNewVarFacts(&old3, []*FactPointTo{nil, MakeFactPointTo(r, NullPtr)})
-	if FindRelatedPointTo(old3, r) != nil {
+	MakeupNewVarFacts(&old3, []*FactPointTo{nil, MakeFactPointToSess(testAmbientSession, r, NullPtr)})
+	if FindRelatedPointToSess(testAmbientSession, old3, r) != nil {
 		t.Fatal("makeup must not invent past nil hole")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -173,10 +173,10 @@ func TestIsPointingToLocalsMultiLevel(t *testing.T) {
 	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))), false, false)
 	facts := []*FactPointTo{
-		MakeFactPointTo(p1, loc),
-		MakeFactPointTo(p2, p1),
+		MakeFactPointToSess(testAmbientSession, p1, loc),
+		MakeFactPointToSess(testAmbientSession, p2, p1),
 	}
-	if !IsPointingToLocals(p2, blk, 2, facts) {
+	if !IsPointingToLocalsSess(testAmbientSession, p2, blk, 2, facts) {
 		t.Fatal("2-level")
 	}
 }

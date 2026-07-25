@@ -152,11 +152,11 @@ func TestMakeRandomAssignUpdatesIndirectFacts(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ppT, false, false)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, q)}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fm.UpdateFactForAssign(p, 1, rhs)
-	got := FindRelatedPointTo(fm.GlobalFacts, q)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, q)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("%+v", got)
 	}
 }

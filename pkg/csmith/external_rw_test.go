@@ -42,8 +42,8 @@ func TestFindMustUseArraysNilHole(t *testing.T) {
 
 func TestFindRelatedPointToNilHole(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	facts := []*FactPointTo{nil, MakeFactPointTo(p, NullPtr)}
-	if FindRelatedPointTo(facts, p) != nil {
+	facts := []*FactPointTo{nil, MakeFactPointToSess(testAmbientSession, p, NullPtr)}
+	if FindRelatedPointToSess(testAmbientSession, facts, p) != nil {
 		t.Fatal("nil fact hole must fail closed (no invent skip to later)")
 	}
 	if FindRelatedUnionSess(testAmbientSession, []*FactUnion{nil}, p) != nil {
@@ -109,7 +109,7 @@ func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 	}
 	// incomplete fact map fails closed nil
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	if VariablesComplete(cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
+	if VariablesComplete(cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil})) {
 		t.Fatal("incomplete facts must fail closed incomplete")
 	}
 }
@@ -121,7 +121,7 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	rwd := cg.BuildCalleeRWDirective([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
+	rwd := cg.BuildCalleeRWDirective([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil})
 	if rwd == nil {
 		t.Fatal("incomplete must not invent nil unrestricted RW")
 	}
@@ -291,7 +291,7 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 		t.Fatal("empty")
 	}
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.SetMapFactsIn(1, facts)
 	fm.SetMapFactsOut(1, facts)
 	if len(fm.MapFactsIn[1]) != 1 || len(fm.MapFactsOut[1]) != 1 {

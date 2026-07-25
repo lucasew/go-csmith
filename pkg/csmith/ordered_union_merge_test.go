@@ -58,7 +58,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 // TestOrderedBinaryNilSnapshotStillMakeupMerge —
 // FunctionInvocation.cpp:275–279 — ordered &&/|| always makeup+merge, even when
 // the post-LHS snapshot is empty. NewFactMgr leaves GlobalFacts/UnionFacts nil;
-// CloneFactSlice(nil)/CloneUnionFactSliceSess(testAmbientSession, nil) return nil. Soft invent guarded
+// CloneFactSliceSess(testAmbientSession, nil)/CloneUnionFactSliceSess(testAmbientSession, nil) return nil. Soft invent guarded
 // the make_random path with `factsCopy != nil`, which skipped the merge entirely
 // for the first-program ordered binary (UP seed-199 seq=1: nCopy=0, live last=3
 // → JOIN 0⊕3 BOTTOM; Go kept last=3 and later ChooseOKVar pool differed).
@@ -98,7 +98,7 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	if got == nil || got.LastWrittenFID != 0 {
 		t.Fatalf("nil snapshot makeup must add init last=0, got %#v", got)
 	}
-	_ = MergeFacts(&fm.GlobalFacts, factsCopy)
+	_ = MergeFactsSess(testAmbientSession, &fm.GlobalFacts, factsCopy)
 	for _, f := range unionCopy {
 		fm.UnionFacts = MergeUnionFactIntoSess(testAmbientSession, fm.UnionFacts, f)
 	}

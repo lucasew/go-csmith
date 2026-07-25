@@ -23,17 +23,17 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	g99 := CreateVariableScalarsSess(testAmbientSession, "g_99", ppt, false, false)
 	f := &Function{Name: "f", ReturnType: i32}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.SetGlobalFacts([]*FactPointTo{MakeFactPointTo(g99, g77)}, "t")
+	fm.SetGlobalFacts([]*FactPointTo{MakeFactPointToSess(testAmbientSession, g99, g77)}, "t")
 	lhs := &Lhs{Var: g99, Type: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
 	if !fm.UpdateFactForAssignWant(g99, lhs.IndirectLevelSess(testAmbientSession), lhs.GetType(), rhs) {
 		t.Fatal("UpdateFactForAssignWant returned false")
 	}
-	fg := FindRelatedPointTo(fm.GlobalFacts, g77)
-	if fg == nil || !fg.IsNull() {
+	fg := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, g77)
+	if fg == nil || !fg.IsNullSess(testAmbientSession) {
 		t.Fatalf("g_77 must be null after *g_99=(void*)0, fact=%v", fg)
 	}
-	if IsValidPtr(g77, fm.GlobalFacts, 0, 0) {
+	if IsValidPtrSess(testAmbientSession, g77, fm.GlobalFacts, 0, 0) {
 		t.Fatal("IsValidPtr must fail for null g_77")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -51,24 +51,24 @@ func TestIfThenNullMergeMakesPointeeInvalid(t *testing.T) {
 	g99 := CreateVariableScalarsSess(testAmbientSession, "g_99", ppt, false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_18", i32, false, false)
 	pre := []*FactPointTo{
-		MakeFactPointTo(g99, g77),
-		MakeFactPointTo(g77, tgt),
+		MakeFactPointToSess(testAmbientSession, g99, g77),
+		MakeFactPointToSess(testAmbientSession, g77, tgt),
 	}
-	thenWork := CloneFactSlice(pre)
+	thenWork := CloneFactSliceSess(testAmbientSession, pre)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
-	nf, n := AbstractFactForAssign(thenWork, g99, 1, rhs)
+	nf, n := AbstractFactForAssignSess(testAmbientSession, thenWork, g99, 1, rhs)
 	if n != 1 || len(nf) != 1 {
 		t.Fatalf("then abstract n=%d len=%d", n, len(nf))
 	}
 	_ = RenewFact(&thenWork, nf[0])
-	elseWork := CloneFactSlice(pre)
-	merged := CloneFactSlice(thenWork)
-	_ = MergeFacts(&merged, elseWork)
-	fg := FindRelatedPointTo(merged, g77)
-	if fg == nil || !fg.IsNull() {
+	elseWork := CloneFactSliceSess(testAmbientSession, pre)
+	merged := CloneFactSliceSess(testAmbientSession, thenWork)
+	_ = MergeFactsSess(testAmbientSession, &merged, elseWork)
+	fg := FindRelatedPointToSess(testAmbientSession, merged, g77)
+	if fg == nil || !fg.IsNullSess(testAmbientSession) {
 		t.Fatalf("merged g_77 must IsNull (may-null), got %v", fg)
 	}
-	if IsValidPtr(g77, merged, 0, 0) {
+	if IsValidPtrSess(testAmbientSession, g77, merged, 0, 0) {
 		t.Fatal("IsValidPtr must fail for may-null g_77")
 	}
 	ClearErrorSess(testAmbientSession)

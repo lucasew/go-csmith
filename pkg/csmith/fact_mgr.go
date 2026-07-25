@@ -128,9 +128,9 @@ func NewFactMgrSess(s *Session, f *Function) *FactMgr {
 }
 
 // factHasL233MayNull reports whether facts contain may-null for variable l_233.
-func factHasL233MayNull(facts []*FactPointTo) bool {
+func factHasL233MayNull(s *Session, facts []*FactPointTo) bool {
 	for _, f := range facts {
-		if f != nil && f.Var != nil && f.Var.Name == "l_233" && f.IsNull() {
+		if f != nil && f.Var != nil && f.Var.Name == "l_233" && f.IsNullSess(s) {
 			return true
 		}
 	}
@@ -144,7 +144,7 @@ func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 		noteErrFM(fm, ErrGeneric)
 		return
 	}
-	if os.Getenv("CSMITH_DEBUG_FACTS") != "" && factHasL233MayNull(fm.GlobalFacts) && !factHasL233MayNull(facts) {
+	if os.Getenv("CSMITH_DEBUG_FACTS") != "" && factHasL233MayNull(sessFromFM(fm), fm.GlobalFacts) && !factHasL233MayNull(sessFromFM(fm), facts) {
 		depth := uint64(0)
 		if r := sessRng(sessFromFM(fm)); r != nil {
 			depth = r.RandDepth()
@@ -971,7 +971,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			}
 		}
 	}
-	cl := fact.Clone()
+	cl := fact.CloneSess(sessFromFM(fm))
 	// residual ERROR sticky — no invent soft-append past Clone residual
 	if hasErrFM(fm) {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
@@ -1805,7 +1805,7 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 		}
 		// FactMgr.cpp:659–662 — assert(prev_f); only changed when prev exists
 		// no soft invent "new out-only fact" as updated
-		prev := FindRelatedPointTo(in, f.Var)
+		prev := FindRelatedPointToSess(sessFromFM(fm), in, f.Var)
 		// residual ERROR sticky — no invent soft-continue then partial updated past hole
 		if hasErrFM(fm) {
 			return IncompleteFactSlice()
@@ -1813,7 +1813,7 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 		if prev == nil {
 			continue
 		}
-		if !f.Equal(prev) {
+		if !f.EqualSess(sessFromFM(fm), prev) {
 			// residual ERROR sticky — no invent soft-continue past Equal hole
 			if hasErrFM(fm) {
 				return IncompleteFactSlice()
@@ -1872,7 +1872,7 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 		if prev == nil {
 			continue
 		}
-		if !f.Equal(prev) {
+		if !f.EqualSess(sessFromFM(fm), prev) {
 			// residual ERROR sticky — no invent soft-continue past Equal hole
 			if hasErrFM(fm) {
 				return IncompleteFactSlice()
@@ -2576,7 +2576,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		return
 	}
 	if wantPT {
-		rel := FindRelatedPointTo(fm.GlobalFacts, v)
+		rel := FindRelatedPointToSess(sessFromFM(fm), fm.GlobalFacts, v)
 		// residual ERROR sticky — no invent soft-skip makeup past FindRelated residual
 		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -2733,7 +2733,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			noteErrFM(fm, ErrGeneric)
 			return
 		}
-		cl := f.Clone()
+		cl := f.CloneSess(sessFromFM(fm))
 		// residual ERROR sticky — no invent soft-push past Clone residual
 		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -2778,7 +2778,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					fm.MapFactsOut[id] = IncompleteFactSlice()
 					continue
 				}
-				c2 := f.Clone()
+				c2 := f.CloneSess(sessFromFM(fm))
 				// residual ERROR sticky — no invent soft-push past Clone residual
 				if hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
@@ -2834,7 +2834,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 						fm.MapFactsOut[id] = IncompleteFactSlice()
 						continue
 					}
-					c2 := f.Clone()
+					c2 := f.CloneSess(sessFromFM(fm))
 					if hasErrFM(fm) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						return
@@ -3528,7 +3528,7 @@ func MakeupNewVarFactsSess(s *Session, oldFacts *[]*FactPointTo, newFacts []*Fac
 			*oldFacts = IncompleteFactSlice()
 			return false
 		}
-		related := FindRelatedPointTo(*oldFacts, v)
+		related := FindRelatedPointToSess(s, *oldFacts, v)
 		// residual ERROR sticky — no invent soft-continue makeup later past FindRelated hole
 		if sessHasError(s) {
 			*oldFacts = IncompleteFactSlice()
@@ -3634,7 +3634,7 @@ func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 		*facts = IncompleteFactSlice()
 		return
 	}
-	if FindRelatedPointTo(*facts, v) != nil {
+	if FindRelatedPointToSess(s, *facts, v) != nil {
 		// residual ERROR sticky — no invent soft-skip found past FindRelated residual
 		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
@@ -3662,7 +3662,7 @@ func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 			sessNoteError(s, ErrGeneric)
 			return
 		}
-		cl := f.Clone()
+		cl := f.CloneSess(s)
 		// residual ERROR sticky — no invent soft-makeup past Clone residual
 		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
@@ -3673,7 +3673,7 @@ func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 			sessNoteError(s, ErrGeneric)
 			return
 		}
-		if FindRelatedPointTo(*facts, f.Var) == nil {
+		if FindRelatedPointToSess(s, *facts, f.Var) == nil {
 			// residual ERROR sticky — no invent soft-append past FindRelated residual
 			if sessHasError(s) {
 				*facts = IncompleteFactSlice()

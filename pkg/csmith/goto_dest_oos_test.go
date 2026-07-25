@@ -73,17 +73,17 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 
 	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	g67 := CreateVariableScalarsSess(testAmbientSession, "g_67", GetIntTypeSess(testAmbientSession), false, false)
-	factsIn := []*FactPointTo{MakeFactPointToSet(g77, []*Variable{g67, f0})}
+	factsIn := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, g77, []*Variable{g67, f0})}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("sticky: %v", GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(factsOut, g77)
+	got := FindRelatedPointToSess(testAmbientSession, factsOut, g77)
 	if got == nil {
 		t.Fatal("missing g77")
 	}
-	if !got.IsDead() {
+	if !got.IsDeadSess(testAmbientSession) {
 		names := []string{}
 		for _, p := range got.PointTo {
 			if p != nil {

@@ -174,7 +174,7 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	// Unit: plant missing MapFactsIn after then would have set it — contract of assign
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	prior := MakeFactPointTo(p, GarbagePtr)
+	prior := MakeFactPointToSess(testAmbientSession, p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	// missing MapFactsIn[5]
 	thenStmID := 5
@@ -182,10 +182,10 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	if !FactsComplete(in) {
 		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
-		fm.GlobalFacts = CloneFactSlice(in)
+		fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, in)
 	}
 	// missing MapFactsIn is complete empty (C++ map[]); must not keep prior
-	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) != nil {
 		t.Fatal("missing then MapFactsIn must clear prior, not invent pre-branch")
 	}
 	if !FactsComplete(fm.GlobalFacts) {
@@ -194,13 +194,13 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	// incomplete hole
 	fm.GlobalFacts = []*FactPointTo{prior}
 	fm.MapFactsIn = map[int][]*FactPointTo{
-		5: {MakeFactPointTo(p, NullPtr), nil},
+		5: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	in = fm.MapFactsIn[thenStmID]
 	if !FactsComplete(in) {
 		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
-		fm.GlobalFacts = CloneFactSlice(in)
+		fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, in)
 	}
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete then MapFactsIn must fail closed")

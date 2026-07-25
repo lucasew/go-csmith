@@ -455,20 +455,20 @@ func TestJoinVisits(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
 	// TBD-only base
-	f := MakeFactPointTo(p, TBDPtr)
-	if !f.IsTBDOnly() {
+	f := MakeFactPointToSess(testAmbientSession, p, TBDPtr)
+	if !f.IsTBDOnlySess(testAmbientSession) {
 		t.Fatal("tbd")
 	}
-	other := MakeFactPointTo(p, a)
-	if !f.JoinVisits(other) {
+	other := MakeFactPointToSess(testAmbientSession, p, a)
+	if !f.JoinVisitsSess(testAmbientSession, other) {
 		t.Fatal("join")
 	}
-	if f.IsTBDOnly() || !IsVariableInSet(f.PointTo, a) {
+	if f.IsTBDOnlySess(testAmbientSession) || !IsVariableInSet(f.PointTo, a) {
 		t.Fatal(f.PointTo)
 	}
 	// ignore TBD other
-	f2 := MakeFactPointTo(p, a)
-	if f2.JoinVisits(MakeFactPointTo(p, TBDPtr)) {
+	f2 := MakeFactPointToSess(testAmbientSession, p, a)
+	if f2.JoinVisitsSess(testAmbientSession, MakeFactPointToSess(testAmbientSession, p, TBDPtr)) {
 		t.Fatal("tbd other ignored")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -478,7 +478,7 @@ func TestJoinVisits(t *testing.T) {
 	// IsTBDOnly residual soft invent was soft-continue join invent change.
 	// Fair: sticky no-change false. PointTo nil hole IsTBDOnly residual.
 	fHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
-	if fHole.JoinVisits(MakeFactPointTo(p, a)) {
+	if fHole.JoinVisitsSess(testAmbientSession, MakeFactPointToSess(testAmbientSession, p, a)) {
 		t.Fatal("IsTBDOnly residual JoinVisits must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -486,9 +486,9 @@ func TestJoinVisits(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// JoinVisitsInto
-	facts := []*FactPointTo{MakeFactPointTo(p, a)}
-	JoinVisitsInto(&facts, []*FactPointTo{MakeFactPointTo(p, b)})
-	fp := FindRelatedPointTo(facts, p)
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	JoinVisitsIntoSess(testAmbientSession, &facts, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b)})
+	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if fp == nil || !IsVariableInSet(fp.PointTo, b) {
 		t.Fatal(fp)
 	}
@@ -498,8 +498,8 @@ func TestJoinVisits(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete maps fail closed sticky IncompleteFactSlice (not invent no-change complete)
 	ClearErrorSess(testAmbientSession)
-	factsHole := []*FactPointTo{MakeFactPointTo(p, a), nil}
-	if JoinVisitsInto(&factsHole, []*FactPointTo{MakeFactPointTo(p, b)}) {
+	factsHole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
+	if JoinVisitsIntoSess(testAmbientSession, &factsHole, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b)}) {
 		t.Fatal("incomplete subject must fail closed false")
 	}
 	if FactsComplete(factsHole) {
@@ -509,8 +509,8 @@ func TestJoinVisits(t *testing.T) {
 		t.Fatal("incomplete subject JoinVisitsInto must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
-	if JoinVisitsInto(&facts2, []*FactPointTo{MakeFactPointTo(p, b), nil}) {
+	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	if JoinVisitsIntoSess(testAmbientSession, &facts2, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b), nil}) {
 		t.Fatal("incomplete newFacts must fail closed false")
 	}
 	if FactsComplete(facts2) {
@@ -521,7 +521,7 @@ func TestJoinVisits(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip join-visits past hole)
-	if JoinVisitsInto(nil, []*FactPointTo{MakeFactPointTo(p, b)}) {
+	if JoinVisitsIntoSess(testAmbientSession, nil, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b)}) {
 		t.Fatal("nil facts JoinVisitsInto must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -591,7 +591,7 @@ func TestIsPureIsEmptyIncompleteSticky(t *testing.T) {
 
 func TestIsTBDOnlyIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactPointTo)(nil).IsTBDOnly() {
+	if (*FactPointTo)(nil).IsTBDOnlySess(testAmbientSession) {
 		t.Fatal("nil Fact IsTBDOnly must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -600,7 +600,7 @@ func TestIsTBDOnlyIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
-	if f.IsTBDOnly() {
+	if f.IsTBDOnlySess(testAmbientSession) {
 		t.Fatal("PointTo hole IsTBDOnly must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -9,16 +9,16 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	f := MakeFactPointTo(p, tgt)
+	f := MakeFactPointToSess(testAmbientSession, p, tgt)
 	cond := f.OutputCondition()
 	if !strings.Contains(cond, "g_p == &g_1") {
 		t.Fatal(cond)
 	}
-	fn := MakeFactPointTo(p, NullPtr)
+	fn := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	if fn.OutputCondition() != "g_p == 0" {
 		t.Fatal(fn.OutputCondition())
 	}
-	fd := MakeFactPointTo(p, GarbagePtr)
+	fd := MakeFactPointToSess(testAmbientSession, p, GarbagePtr)
 	if !strings.Contains(fd.OutputCondition(), "dangling") {
 		t.Fatal(fd.OutputCondition())
 	}
@@ -86,14 +86,14 @@ func TestFactPointToOutputCondition(t *testing.T) {
 
 func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	f := MakeFactPointTo(p, GarbagePtr)
+	f := MakeFactPointToSess(testAmbientSession, p, GarbagePtr)
 	out := f.OutputAssertion(nil, "    ")
 	if !strings.HasPrefix(strings.TrimSpace(out), "//assert") && !strings.Contains(out, "//assert") {
 		t.Fatal(out)
 	}
 	// assertable: global → global
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	ok := MakeFactPointTo(p, tgt)
+	ok := MakeFactPointToSess(testAmbientSession, p, tgt)
 	out2 := ok.OutputAssertion(nil, "    ")
 	if strings.Contains(out2, "//assert") {
 		t.Fatal(out2)
@@ -125,7 +125,7 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc, nil}}
-	fl := MakeFactPointTo(loc, NullPtr)
+	fl := MakeFactPointToSess(testAmbientSession, loc, NullPtr)
 	if !fl.HasInvisible(blk) {
 		t.Fatal("incomplete stack must HasInvisible true")
 	}
@@ -163,8 +163,8 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	// function reads/writes p so fact is printed
 	f.FEffect = EmptyEffect().ReadVarSess(testAmbientSession, p).WriteVarSess(testAmbientSession, p)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.SetMapFactsIn(5, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.SetMapFactsOut(5, []*FactPointTo{MakeFactPointTo(p, tgt)})
+	fm.SetMapFactsIn(5, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.SetMapFactsOut(5, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm.SetupInOutMaps(true)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
 	out := fm.OutputAssertions(st, nil, "    ", true)
@@ -178,8 +178,8 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	f2 := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// empty effect: skip globals
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
-	fm2.SetMapFactsIn(6, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm2.SetMapFactsOut(6, []*FactPointTo{MakeFactPointTo(p, tgt)})
+	fm2.SetMapFactsIn(6, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm2.SetMapFactsOut(6, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm2.SetupInOutMaps(true)
 	st2 := &Stmt{Kind: StmtAssign, StmID: 6}
 	if s := fm2.OutputAssertions(st2, nil, "    ", true); s != "" {
@@ -224,8 +224,8 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	f3.FEffect = EmptyEffect().ReadVarSess(testAmbientSession, shell).WriteVarSess(testAmbientSession, shell).ReadVarSess(testAmbientSession, p).WriteVarSess(testAmbientSession, p)
 	fm3 := NewFactMgrSess(testAmbientSession, f3)
 	// postCondition uses updated facts — in≠out so both appear; shell subject stickies emit
-	fm3.SetMapFactsIn(8, []*FactPointTo{MakeFactPointTo(shell, NullPtr), MakeFactPointTo(p, NullPtr)})
-	fm3.SetMapFactsOut(8, []*FactPointTo{MakeFactPointTo(shell, tgt), MakeFactPointTo(p, tgt)})
+	fm3.SetMapFactsIn(8, []*FactPointTo{MakeFactPointToSess(testAmbientSession, shell, NullPtr), MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm3.SetMapFactsOut(8, []*FactPointTo{MakeFactPointToSess(testAmbientSession, shell, tgt), MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm3.SetupInOutMaps(true)
 	st8 := &Stmt{Kind: StmtAssign, StmID: 8}
 	if s := fm3.OutputAssertions(st8, nil, "    ", true); s != "" {
@@ -243,8 +243,8 @@ func TestPostOutputInBlock(t *testing.T) {
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
 	f.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, p).ReadVarSess(testAmbientSession, p)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.SetMapFactsIn(7, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.SetMapFactsOut(7, []*FactPointTo{MakeFactPointTo(p, tgt)})
+	fm.SetMapFactsIn(7, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.SetMapFactsOut(7, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm.SetupInOutMaps(true)
 	b := &Block{
 		EmitParanoid: true,

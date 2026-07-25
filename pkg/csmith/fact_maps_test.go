@@ -16,7 +16,7 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// fact: g_p points to local l_1 which is OOS at dest with nil parent (outside func stack)
 	// destParent = nil means only globals visible → local is OOS
-	in := []*FactPointTo{MakeFactPointToSet(p, []*Variable{loc})}
+	in := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{loc})}
 	// also a fact about the local itself
 	// locals that are subjects get dropped as OOS
 	var out []*FactPointTo
@@ -26,14 +26,14 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 		t.Fatal("expected ptr fact kept")
 	}
 	// subject p is global → not OOS
-	fp := FindRelatedPointTo(out, p)
+	fp := FindRelatedPointToSess(testAmbientSession, out, p)
 	if fp == nil {
 		t.Fatal("p gone")
 	}
 	// nil fact hole fails closed sticky — hole marker (not bare nil / empty complete)
 	ClearErrorSess(testAmbientSession)
 	var out2 []*FactPointTo
-	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, &out2, f, nil)
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}, &out2, f, nil)
 	if FactsComplete(out2) {
 		t.Fatal("nil hole must fail closed incomplete dest facts", out2)
 	}
@@ -43,7 +43,7 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil PointTo hole on live fact fails closed sticky
 	var out3 []*FactPointTo
-	bad := MakeFactPointTo(p, NullPtr)
+	bad := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	bad.PointTo = []*Variable{nil, loc}
 	UpdateFactsForDest([]*FactPointTo{bad}, &out3, f, nil)
 	if FactsComplete(out3) {
@@ -55,7 +55,7 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// missing function fails closed sticky incomplete (no invent empty dest)
 	var out4 []*FactPointTo
-	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, &out4, nil, nil)
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, &out4, nil, nil)
 	if FactsComplete(out4) {
 		t.Fatal("nil func must fail closed incomplete dest facts", out4)
 	}
@@ -64,7 +64,7 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// factsOut always live; sticky (no invent soft-skip dest update past hole)
-	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil, f, nil)
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, nil, f, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil factsOut UpdateFactsForDest must SetError sticky")
 	}
@@ -75,7 +75,7 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	locH := &Variable{Name: "l_h", Type: GetIntTypeSess(testAmbientSession)}
 	fHole.Blocks = []*Block{nil, {Func: fHole, LocalVars: []*Variable{locH}}}
 	var outH []*FactPointTo
-	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, locH)}, &outH, fHole, nil)
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, locH)}, &outH, fHole, nil)
 	if FactsComplete(outH) {
 		t.Fatal("IsVarOOS residual must fail closed incomplete dest facts", outH)
 	}
@@ -101,7 +101,7 @@ func TestClearMapVisited(t *testing.T) {
 func TestSetupInOutMaps(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	f1 := MakeFactPointTo(p, NullPtr)
+	f1 := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	fm.SetMapFactsIn(1, []*FactPointTo{f1})
 	fm.SetMapFactsOut(1, []*FactPointTo{f1})
 	fm.SetupInOutMaps(true)
@@ -109,10 +109,10 @@ func TestSetupInOutMaps(t *testing.T) {
 		t.Fatal("first clone")
 	}
 	// second visit with wider fact
-	f2 := MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})
+	f2 := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})
 	fm.SetMapFactsIn(1, []*FactPointTo{f2})
 	fm.SetupInOutMaps(false)
-	final := FindRelatedPointTo(fm.MapFactsInFinal[1], p)
+	final := FindRelatedPointToSess(testAmbientSession, fm.MapFactsInFinal[1], p)
 	if final == nil || len(final.PointTo) < 2 {
 		t.Fatal("combine", final)
 	}
@@ -126,10 +126,10 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// plant holes bypassing SetMapFacts* (CloneFactSlice strips holes)
 	fm.MapFactsIn = map[int][]*FactPointTo{
-		1: {MakeFactPointTo(p, NullPtr), nil},
+		1: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		2: {MakeFactPointTo(p, GarbagePtr), nil},
+		2: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	fm.SetupInOutMaps(true)
 	if FactsComplete(fm.MapFactsInFinal[1]) {
@@ -147,7 +147,7 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	// incomplete Out only: still sticky
 	fmOut := NewFactMgrSess(testAmbientSession, nil)
 	fmOut.MapFactsOut = map[int][]*FactPointTo{
-		2: {MakeFactPointTo(p, GarbagePtr), nil},
+		2: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	fmOut.SetupInOutMaps(true)
 	if FactsComplete(fmOut.MapFactsOutFinal[2]) {
@@ -160,7 +160,7 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	// complete sibling still clones
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.MapFactsIn = map[int][]*FactPointTo{
-		3: {MakeFactPointTo(p, NullPtr)},
+		3: {MakeFactPointToSess(testAmbientSession, p, NullPtr)},
 	}
 	fm2.SetupInOutMaps(true)
 	if len(fm2.MapFactsInFinal[3]) != 1 {
@@ -174,7 +174,7 @@ func TestSetupInOutMapsSiblingResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	good := MakeFactPointTo(p, NullPtr)
+	good := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	fm.MapFactsIn = map[int][]*FactPointTo{
 		1: {good, nil}, // incomplete
 		2: {good},      // complete sibling
@@ -195,11 +195,11 @@ func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	f1 := MakeFactPointTo(p, NullPtr)
+	f1 := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	fm.SetMapFactsIn(1, []*FactPointTo{f1})
 	fm.SetupInOutMaps(true)
 	// plant incomplete current MapFactsIn
-	fm.MapFactsIn[1] = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr}), nil}
+	fm.MapFactsIn[1] = []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr}), nil}
 	fm.SetupInOutMaps(false)
 	if FactsComplete(fm.MapFactsInFinal[1]) {
 		t.Fatal("incomplete combine must fail closed incomplete final, not invent partial join")
@@ -216,8 +216,8 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	thenB := &Block{StmID: 20, Stmts: []Stmt{{StmID: 21}}}
 	// StatementIf always has both arms
 	st := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB, Else: &Block{}}
-	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
 	in := map[int][]*FactPointTo{}
 	out := map[int][]*FactPointTo{}
 	fm.BackupStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
@@ -225,10 +225,10 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	fm.SetMapFactsIn(10, nil)
 	fm.SetMapFactsOut(21, nil)
 	fm.RestoreStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
-	if FindRelatedPointTo(fm.MapFactsIn[10], p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.MapFactsIn[10], p) == nil {
 		t.Fatal("restored in")
 	}
-	if FindRelatedPointTo(fm.MapFactsOut[21], p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.MapFactsOut[21], p) == nil {
 		t.Fatal("restored out")
 	}
 	// incomplete if — whole backup fail closed sticky (no invent root-only complete tree)
@@ -236,8 +236,8 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	in2 := map[int][]*FactPointTo{}
 	out2 := map[int][]*FactPointTo{}
 	bad := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
-	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
 	fm.BackupStmFactMaps(bad, in2, out2, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if _, ok := out2[21]; ok {
 		t.Fatal("incomplete if must not invent nested backup past nil Else")
@@ -299,10 +299,10 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 15}
 	fm.MapFactsIn = map[int][]*FactPointTo{
-		15: {MakeFactPointTo(p, NullPtr), nil},
+		15: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		15: {MakeFactPointTo(p, GarbagePtr), nil},
+		15: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	in := map[int][]*FactPointTo{}
 	out := map[int][]*FactPointTo{}
@@ -314,10 +314,10 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 		t.Fatal("incomplete MapFactsOut must backup incomplete, not invent cleaned")
 	}
 	// restore incomplete backup → incomplete maps (not invent cleaned)
-	fm.MapFactsIn[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
-	fm.MapFactsOut[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
-	in[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	out[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.MapFactsIn[15] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
+	fm.MapFactsOut[15] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
+	in[15] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
+	out[15] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	fm.RestoreStmFactMaps(st, in, out, map[int][]*FactUnion{}, map[int][]*FactUnion{})
 	if FactsComplete(fm.MapFactsIn[15]) || FactsComplete(fm.MapFactsOut[15]) {
 		t.Fatal("restore incomplete backup must fail closed incomplete")
@@ -327,8 +327,8 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 func TestFindUpdatedFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
+	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
 	u := fm.FindUpdatedFacts(1)
 	if len(u) != 1 {
 		t.Fatal(u)
@@ -357,23 +357,23 @@ func TestFindUpdatedFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// equal → no update
-	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("no change")
 	}
 	// FactMgr.cpp:660 assert(prev_f) — out-only fact without in match is not updated
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(q, NullPtr)})
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, NullPtr)})
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("missing prev must fail closed, not invent as updated")
 	}
 	// Equal residual: PointTo nil hole soft invent was continue then partial updated list
 	ClearErrorSess(testAmbientSession)
-	goodIn := MakeFactPointTo(p, NullPtr)
+	goodIn := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	badOut := &FactPointTo{Var: p, PointTo: []*Variable{GarbagePtr, nil}} // hole for Equal
-	goodOutOther := MakeFactPointTo(q, GarbagePtr)
+	goodOutOther := MakeFactPointToSess(testAmbientSession, q, GarbagePtr)
 	// plant complete maps with Equal residual on p then later q would invent partial
-	fm.MapFactsIn[1] = []*FactPointTo{goodIn, MakeFactPointTo(q, NullPtr)}
+	fm.MapFactsIn[1] = []*FactPointTo{goodIn, MakeFactPointToSess(testAmbientSession, q, NullPtr)}
 	fm.MapFactsOut[1] = []*FactPointTo{badOut, goodOutOther}
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("Equal residual must fail closed incomplete, not invent partial updated")
@@ -384,8 +384,8 @@ func TestFindUpdatedFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil fact hole fails closed sticky at store and find_updated
 	ClearErrorSess(testAmbientSession)
-	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
+	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil})
 	// incomplete store is hole marker (FactsComplete false), not cleaned list
 	if FactsComplete(fm.MapFactsOut[1]) {
 		t.Fatal("SetMapFactsOut must not invent cleaned/complete list from nil hole")
@@ -398,7 +398,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// direct find with hole in out (bypass Set)
-	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil}
+	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil}
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("nil fact hole in out must fail closed incomplete")
 	}
@@ -407,8 +407,8 @@ func TestFindUpdatedFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// final maps: incomplete → sticky IncompleteFactSlice (not bare nil invent empty)
-	fm.MapFactsInFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, NullPtr)}}
-	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, GarbagePtr), nil}}
+	fm.MapFactsInFinal = map[int][]*FactPointTo{1: {MakeFactPointToSess(testAmbientSession, p, NullPtr)}}
+	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil}}
 	if FactsComplete(fm.FindUpdatedFinalFacts(1)) {
 		t.Fatal("incomplete final out must fail closed incomplete")
 	}
@@ -423,19 +423,19 @@ func TestRestoreFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	old := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), MakeFactPointTo(q, NullPtr)}
+	old := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr), MakeFactPointToSess(testAmbientSession, q, NullPtr)}
 	fm.RestoreFacts(old)
 	// p restored to old; q added via makeup
-	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 		t.Fatal("p")
 	}
-	if FindRelatedPointTo(fm.GlobalFacts, q) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, q) == nil {
 		t.Fatal("makeup q")
 	}
 	// incomplete oldFacts fails closed sticky (no invent soft re-pick past wipe)
-	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(q, NullPtr)}
+	hole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, NullPtr)}
 	fm.RestoreFacts(hole)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete oldFacts must wipe GlobalFacts incomplete")
@@ -461,17 +461,17 @@ func TestRestoreFactsDoesNotReinjectLiveMayNull(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "l_233", PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort))), false, false)
 	p.IsArray = true
-	snap := []*FactPointTo{MakeFactPointToSet(p, []*Variable{g})}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, g})}
+	snap := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{g})}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, g})}
 	fm.RestoreFacts(snap)
 	if !FactsComplete(fm.GlobalFacts) {
 		t.Fatal("restore incomplete", HasErrorSess(testAmbientSession))
 	}
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if fp == nil {
 		t.Fatal("missing fact after restore")
 	}
-	if fp.IsNull() {
+	if fp.IsNullSess(testAmbientSession) {
 		t.Fatalf("restore must not reinject live may-null, pts=%v", fp.PointTo)
 	}
 }
@@ -488,8 +488,8 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	old := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
+	old := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
+	newF := []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, NullPtr)}
 	if MakeupNewVarFacts(&old, newF) {
 		t.Fatal("incomplete oldFacts must fail closed false")
 	}
@@ -500,8 +500,8 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 		t.Fatal("incomplete oldFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	old2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	new2 := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
+	old2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
+	new2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, NullPtr), nil}
 	if MakeupNewVarFacts(&old2, new2) {
 		t.Fatal("incomplete newFacts must fail closed false")
 	}
@@ -530,8 +530,8 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	old := []*FactPointTo{}
 	// both appear as new_facts subjects so makeup tries AddNewVarFactInto for each
 	newF := []*FactPointTo{
-		MakeFactPointTo(agg, NullPtr),
-		MakeFactPointTo(later, NullPtr),
+		MakeFactPointToSess(testAmbientSession, agg, NullPtr),
+		MakeFactPointToSess(testAmbientSession, later, NullPtr),
 	}
 	if MakeupNewVarFacts(&old, newF) {
 		t.Fatal("FieldVars hole must fail closed false")
@@ -539,7 +539,7 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	if FactsComplete(old) {
 		t.Fatal("must not invent re-accumulate later pointer after hole", old)
 	}
-	if FindRelatedPointTo(old, later) != nil {
+	if FindRelatedPointToSess(testAmbientSession, old, later) != nil {
 		t.Fatal("later var must not be made up past field hole")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -551,10 +551,10 @@ func TestMakeupNewVarFactsAmbientResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	old := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	old := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
+	newF := []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, NullPtr)}
 	if MakeupNewVarFacts(&old, newF) {
 		t.Fatal("ambient residual must fail closed MakeupNewVarFacts")
 	}
@@ -592,8 +592,8 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// global points to inner local; after goto to body, pointee is OOS → garbage
 	facts := []*FactPointTo{
-		MakeFactPointTo(g, innerLoc),
-		MakeFactPointTo(innerLoc, NullPtr),
+		MakeFactPointToSess(testAmbientSession, g, innerLoc),
+		MakeFactPointToSess(testAmbientSession, innerLoc, NullPtr),
 	}
 	// SetMapFactsOutForStmt resolves GotoDestParent (no invent approx drop)
 	fm.SetMapFactsOutForStmt(st, facts, inner)
@@ -602,12 +602,12 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 		t.Fatal("out set")
 	}
 	// global kept; subject innerLoc OOS at body dest → dropped from subjects
-	if FindRelatedPointTo(out, g) == nil {
+	if FindRelatedPointToSess(testAmbientSession, out, g) == nil {
 		t.Fatal("global lost", out)
 	}
 	// pointee of g marked dead (OOS local)
-	gf := FindRelatedPointTo(out, g)
-	if gf == nil || !gf.IsDead() {
+	gf := FindRelatedPointToSess(testAmbientSession, out, g)
+	if gf == nil || !gf.IsDeadSess(testAmbientSession) {
 		t.Fatalf("want g→garbage after OOS pointee, got %+v", gf)
 	}
 	// return uses s->parent stack walk, not invent f.Body-only
@@ -615,7 +615,7 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 	fm.SetMapFactsOutForStmt(ret, facts, inner)
 	retOut := fm.MapFactsOut[4]
 	// innerLoc on stack at return → subject dropped
-	if FindRelatedPointTo(retOut, innerLoc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, retOut, innerLoc) != nil {
 		t.Fatal("return must drop stack local subject", retOut)
 	}
 }
@@ -625,11 +625,11 @@ func TestSetMapFactsIncompleteStoresNil(t *testing.T) {
 	// stored as hole marker (FactsComplete false), not bare nil (FactsComplete true)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
+	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil})
 	if FactsComplete(fm.MapFactsIn[1]) {
 		t.Fatal("SetMapFactsIn incomplete must not invent complete empty")
 	}
-	fm.SetMapFactsOut(2, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
+	fm.SetMapFactsOut(2, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil})
 	if FactsComplete(fm.MapFactsOut[2]) {
 		t.Fatal("SetMapFactsOut incomplete must not invent complete empty")
 	}
@@ -666,7 +666,7 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	// incomplete facts on RemoveLoopLocalFacts sticky
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	if FactsComplete(RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty)) {
+	if FactsComplete(RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}, empty)) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -675,7 +675,7 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil blk soft invent was complete passthrough keep-all-facts (including loop locals)
 	// fair: sticky IncompleteFactSlice so break/continue cannot invent cleaned out map
-	prior := MakeFactPointTo(p, NullPtr)
+	prior := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	gotNil := RemoveLoopLocalFacts([]*FactPointTo{prior}, nil)
 	if FactsComplete(gotNil) {
 		t.Fatal("nil blk RemoveLoopLocalFacts must fail closed, not keep-all passthrough", gotNil)
@@ -701,7 +701,7 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
-	fm.SetMapFactsOutForStmt(st, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, nil)
+	fm.SetMapFactsOutForStmt(st, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}, nil)
 	if FactsComplete(fm.MapFactsOut[5]) {
 		t.Fatal("incomplete set_fact_out must not invent complete empty")
 	}
@@ -711,7 +711,7 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// StmID 0 fails closed sticky (no invent silent set_fact_out)
 	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
-	fm.SetMapFactsOutForStmt(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil)
+	fm.SetMapFactsOutForStmt(st0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 set_fact_out must SetError sticky")
 	}
@@ -736,11 +736,11 @@ func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
 	av.Type = elem
 
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(&av.Variable, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, &av.Variable, NullPtr)}
 	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	_ = fm.UpdateFactForAssign(&av.Variable, 0, rhs)
-	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
-	if fp == nil || !fp.IsNull() {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &av.Variable)
+	if fp == nil || !fp.IsNullSess(testAmbientSession) {
 		t.Fatalf("merge keep null; fp=%v", fp)
 	}
 }
@@ -771,7 +771,7 @@ func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("abstract incomplete n=%d err=%v", len(pt), HasErrorSess(testAmbientSession))
 	}
-	if !pt[0].IsNull() {
+	if !pt[0].IsNullSess(testAmbientSession) {
 		names := []string{}
 		for _, p := range pt[0].PointTo {
 			if p != nil {
@@ -799,11 +799,11 @@ func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
 	av.Name = "p"
 	av.Type = elem
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
-	pt, _ := AbstractFactForAssign(nil, &av.Variable, 0, rhs)
+	pt, _ := AbstractFactForAssignSess(testAmbientSession, nil, &av.Variable, 0, rhs)
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("n=%d complete=%v err=%v", len(pt), FactsComplete(pt), HasErrorSess(testAmbientSession))
 	}
-	if !pt[0].IsNull() {
+	if !pt[0].IsNullSess(testAmbientSession) {
 		names := []string{}
 		for _, x := range pt[0].PointTo {
 			if x != nil {
@@ -836,17 +836,17 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	// seed may-null: null + g_127
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{NullPtr, g})}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, &av.Variable, []*Variable{NullPtr, g})}
 	// assign l_233 = &g_127 (address-of as ExpressionVariable with pointer type)
 	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	if !fm.UpdateFactForAssign(&av.Variable, 0, rhs) {
 		t.Fatalf("update failed err=%v", HasErrorSess(testAmbientSession))
 	}
-	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &av.Variable)
 	if fp == nil {
 		t.Fatal("missing fact")
 	}
-	if !fp.IsNull() {
+	if !fp.IsNullSess(testAmbientSession) {
 		names := []string{}
 		for _, p := range fp.PointTo {
 			if p != nil {
@@ -878,7 +878,7 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 	av.Name = "l_233"
 	av.Type = elem
 	// Entry: only g_127 (as if map_facts_in taken before body assign)
-	entry := []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{g})}
+	entry := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, &av.Variable, []*Variable{g})}
 	// Body statement: l_233 = null (Constant 0 pointer)
 	nullRHS := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
 	st := &Stmt{
@@ -903,20 +903,20 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 	cg.EffectAccum = &eff
 	opts2 := Defaults()
 
-	out, _, failIdx, ok := FindFixedPointBlock(body, CloneFactSlice(entry), &cg, opts2, true)
+	out, _, failIdx, ok := FindFixedPointBlock(body, CloneFactSliceSess(testAmbientSession, entry), &cg, opts2, true)
 	if !ok {
 		t.Fatalf("fixed-point failed idx=%d err=%v", failIdx, HasErrorSess(testAmbientSession))
 	}
 	// After fixed-point, map_facts_in should have absorbed may-null from out via
 	// back-edge merge on iteration 2+ (or out itself has may-null).
 	inAfter := fm.GetMapFactsIn(body.StmID)
-	fpIn := FindRelatedPointTo(inAfter, &av.Variable)
-	fpOut := FindRelatedPointTo(out, &av.Variable)
-	if fpOut == nil || !fpOut.IsNull() {
+	fpIn := FindRelatedPointToSess(testAmbientSession, inAfter, &av.Variable)
+	fpOut := FindRelatedPointToSess(testAmbientSession, out, &av.Variable)
+	if fpOut == nil || !fpOut.IsNullSess(testAmbientSession) {
 		t.Fatalf("map_facts_out/return must be may-null after null assign; out=%v", fpOut)
 	}
 	// post_loop uses map_facts_in — must eventually include null after ≥2 iters
-	if fpIn == nil || !fpIn.IsNull() {
+	if fpIn == nil || !fpIn.IsNullSess(testAmbientSession) {
 		// document actual state for diagnosis
 		inPts, outPts := []string{}, []string{}
 		if fpIn != nil {

@@ -14,18 +14,18 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	bodyLoc.InitExpr = &Expression{Term: TermVariable, Var: outer, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	in := []*FactPointTo{
-		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), outer),
-		MakeFactPointTo(bodyLoc, outer),
+		MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), outer),
+		MakeFactPointToSess(testAmbientSession, bodyLoc, outer),
 	}
 	locals := []*Variable{bodyLoc}
 	out := DropFactSubjectsByVars(in, locals)
 	if !FactsComplete(out) || HasErrorSess(testAmbientSession) {
 		t.Fatalf("drop must complete: out complete=%v err=%v", FactsComplete(out), HasErrorSess(testAmbientSession))
 	}
-	if FindRelatedPointTo(out, bodyLoc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, out, bodyLoc) != nil {
 		t.Fatal("body local subject must be dropped from entry env")
 	}
-	if FindRelatedPointTo(out, in[0].Var) == nil {
+	if FindRelatedPointToSess(testAmbientSession, out, in[0].Var) == nil {
 		t.Fatal("unrelated subjects must remain")
 	}
 	// empty vars no-op
@@ -52,15 +52,15 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 	// polluted map_facts_in[body] incorrectly includes body local (bug shape)
 	gPtr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.MapFactsIn[body.StmID] = []*FactPointTo{
-		MakeFactPointTo(gPtr, g),
-		MakeFactPointTo(lBody, g),
+		MakeFactPointToSess(testAmbientSession, gPtr, g),
+		MakeFactPointToSess(testAmbientSession, lBody, g),
 	}
 	fm.MapUnionFactsIn = map[int][]*FactUnion{body.StmID: {}}
 	// break out: remove_loop_local already dropped l_body (48 facts shape: only g_p)
-	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointTo(gPtr, g)}
+	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, gPtr, g)}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{20: {}}
 	// outer facts as post_loop starts (will AssignGlobalFactsFromMapIn)
-	fm.GlobalFacts = CloneFactSlice(fm.MapFactsIn[body.StmID])
+	fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, fm.MapFactsIn[body.StmID])
 	fm.UnionFacts = []*FactUnion{}
 	forSt := &Stmt{Kind: StmtFor, StmID: 30, Then: body}
 	// run post_loop strip + break merge path
@@ -76,23 +76,23 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 		t.Fatalf("merge must succeed: err=%v", HasErrorSess(testAmbientSession))
 	}
 	// l_body must not reappear as garbage invent
-	if f := FindRelatedPointTo(fm.GlobalFacts, lBody); f != nil {
+	if f := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, lBody); f != nil {
 		t.Fatalf("body local must not be re-invented after break merge, got pointees=%v", pointToNames(f))
 	}
 	// outer g_p remains
-	if FindRelatedPointTo(fm.GlobalFacts, gPtr) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, gPtr) == nil {
 		t.Fatal("outer pointer fact must remain after break merge")
 	}
 	// contrast: without drop, invent would create garbage subject
 	polluted := []*FactPointTo{
-		MakeFactPointTo(gPtr, g),
-		MakeFactPointTo(lBody, g),
+		MakeFactPointToSess(testAmbientSession, gPtr, g),
+		MakeFactPointToSess(testAmbientSession, lBody, g),
 	}
-	breakOut := []*FactPointTo{MakeFactPointTo(gPtr, g)}
+	breakOut := []*FactPointTo{MakeFactPointToSess(testAmbientSession, gPtr, g)}
 	if _, ok := tryMergeJumpFacts(&polluted, breakOut); !ok {
 		t.Fatal("raw invent path must complete")
 	}
-	if f := FindRelatedPointTo(polluted, lBody); f == nil || !f.IsDead() {
+	if f := FindRelatedPointToSess(testAmbientSession, polluted, lBody); f == nil || !f.IsDeadSess(testAmbientSession) {
 		t.Fatal("without drop, invent garbage is expected (documents FactMgr.cpp:575–579)")
 	}
 	_ = forSt

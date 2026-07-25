@@ -163,13 +163,13 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	// empty then/else blocks with entry last=1
 	thenB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
 	elseB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
-	fm.SetMapFactsInPair(thenB.StmID, CloneFactSlice(fm.GlobalFacts), CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts))
-	fm.SetMapFactsOutForBlock(thenB, CloneFactSlice(fm.GlobalFacts))
+	fm.SetMapFactsInPair(thenB.StmID, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts), CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts))
+	fm.SetMapFactsOutForBlock(thenB, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts))
 	// else starts from then map_in (StatementIf.cpp:97)
 	fm.AssignGlobalFactsFromMapIn(thenB.StmID)
-	fm.SetMapFactsOutForBlock(elseB, CloneFactSlice(fm.GlobalFacts))
+	fm.SetMapFactsOutForBlock(elseB, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts))
 	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmID(), Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
-	prePT := CloneFactSlice(fm.GlobalFacts)
+	prePT := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	preU := CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts)
 	CombineBranchFacts(ifSt, &prePT, &preU, fm)
 	if HasErrorSess(testAmbientSession) {

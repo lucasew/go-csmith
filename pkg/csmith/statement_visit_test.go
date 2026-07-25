@@ -19,7 +19,7 @@ func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// plant incomplete GlobalFacts before visit — fails early
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := Stmt{
 		Kind: StmtIfElse,
@@ -44,7 +44,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	// then writes p → b; else keeps a
 	thenAssign := Stmt{
 		Kind: StmtAssign,
@@ -91,8 +91,8 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	// VisitFactsBlock under incomplete arm may set sticky ERROR — clear for suite
 	ClearErrorSess(testAmbientSession)
 	// true must return → facts from else (pre) kept
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
-	if fp == nil || !fp.IsNull() && len(fp.PointTo) > 0 && fp.PointTo[0] != a {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if fp == nil || !fp.IsNullSess(testAmbientSession) && len(fp.PointTo) > 0 && fp.PointTo[0] != a {
 		// pre was p→a; true returns so else facts = pre
 		if fp == nil {
 			t.Fatal("nil fact")
@@ -108,7 +108,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	rv := CreateVariableScalarsSess(testAmbientSession, "g_rv", GetIntTypeSess(testAmbientSession), false, false)
 	ret := Stmt{
 		Kind: StmtReturn, StmID: 2,
@@ -405,7 +405,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 	// incomplete GlobalFacts fail closed
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
@@ -443,7 +443,7 @@ func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 	// rewrite it: VisitFactsBlock on empty may SetMapFactsIn from complete inputs.
 	// Pre-plant incomplete MapFactsIn; VisitFactsBlock for empty starts from GlobalFacts
 	// complete empty then overwrites MapFactsIn. So plant incomplete GlobalFacts:
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	if VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("incomplete GlobalFacts/body path must fail closed")
 	}
@@ -497,7 +497,7 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	// body entry facts (what fixed-point left in MapFactsIn)
-	bodyIn := []*FactPointTo{MakeFactPointTo(p, a)}
+	bodyIn := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	body := &Block{StmID: 20, Func: f, Looping: true, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 21, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false),
 			Lhs:  &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)},
@@ -507,7 +507,7 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	// Use empty body that succeeds fixed point; then override MapFactsIn
 	body.Stmts = nil // empty body converges easily
 	fm.SetMapFactsIn(20, bodyIn)
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, b)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b)})
 	st := &Stmt{
 		Kind: StmtFor, StmID: 10,
 		Loop: &LoopControl{
@@ -520,14 +520,14 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// start with different fact
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, b)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b)}
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("visit for")
 	}
 	// after visit, GlobalFacts should prefer body map_facts_in (a), not post-body b alone
 	// FindFixedPoint may overwrite MapFactsIn — re-apply expectation:
 	// If MapFactsIn still bodyIn or was rewritten, check we did not simply keep only post.
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if got == nil {
 		t.Fatal("missing p fact")
 	}
@@ -566,13 +566,13 @@ func TestVisitFactsStatementForMustReturnRestoresPostInit(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
 	// must_return → post-init facts (init may not change pointer fact)
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
-	if got == nil || !got.Equal(MakeFactPointTo(p, a)) {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if got == nil || !got.EqualSess(testAmbientSession, MakeFactPointToSess(testAmbientSession, p, a)) {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -595,20 +595,20 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 	}
 	// break edge into for (post_dest)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 12, PostDest: true}}
-	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointTo(p, c)})
+	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, c)})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if got == nil {
 		t.Fatal("nil")
 	}
 	// merge_jump_facts should union a and c (or garbage widen)
-	if !IsVariableInSet(got.PointTo, a) && !IsVariableInSet(got.PointTo, c) && !got.IsDead() {
+	if !IsVariableInSet(got.PointTo, a) && !IsVariableInSet(got.PointTo, c) && !got.IsDeadSess(testAmbientSession) {
 		// at least something from merge
 		t.Logf("merged set: %+v", got.PointTo)
 	}
@@ -777,15 +777,15 @@ func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
 		Then: body,
 	}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 88, DestStmID: 15, PostDest: true}}
-	fm.SetMapFactsOut(88, []*FactPointTo{MakeFactPointTo(p, c)})
+	fm.SetMapFactsOut(88, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, c)})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	if !VisitFactsStatementArrayOp(st, &cg, Defaults()) {
 		t.Fatal("visit arrayop")
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if got == nil || !IsVariableInSet(got.PointTo, c) {
 		t.Fatalf("break merge: %+v", got)
 	}
@@ -799,7 +799,7 @@ func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 5,
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
@@ -814,7 +814,7 @@ func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
 	if !VisitFactsStatementIf(st, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if got == nil || len(got.PointTo) != 1 || got.PointTo[0] != a {
 		t.Fatalf("both must_return should restore pre-cond p→a: %+v", got)
 	}
@@ -827,7 +827,7 @@ func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 10,
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
@@ -841,7 +841,7 @@ func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 	if !VisitFactsStatementIf(st, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if got == nil || len(got.PointTo) != 1 || got.PointTo[0] != a {
 		t.Fatalf("true must_return → else env p→a: %+v", got)
 	}
@@ -975,12 +975,12 @@ func TestVisitFactsBlockMergesBackEdgesWhenVisited(t *testing.T) {
 	ptr := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_loc", GetIntTypeSess(testAmbientSession), false, false)
 	// Back-edge out includes garbage may-null; merge must not invent strip.
-	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointToSet(ptr, []*Variable{loc, GarbagePtr})})
+	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, ptr, []*Variable{loc, GarbagePtr})})
 	fm.CreateCFGEdge(99, body, false, true)
 	// map_facts_in empty so pure shortcut on unmerged entry is not taken first;
 	// with map_visited, merge runs then full/shortcut path.
 	fm.SetMapFactsIn(50, []*FactPointTo{})
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(ptr, loc)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, loc)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()

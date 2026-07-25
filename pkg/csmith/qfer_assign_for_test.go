@@ -205,11 +205,11 @@ func TestAbstractFactAggregatePointerFields(t *testing.T) {
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	// address-of style: indirect -1 on tgt would need expr; use null const
 	rhs = &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
-	facts, _ := AbstractFactForAssign(nil, parent, 0, rhs)
+	facts, _ := AbstractFactForAssignSess(testAmbientSession, nil, parent, 0, rhs)
 	if len(facts) == 0 {
 		t.Fatal("no facts")
 	}
-	if !FindRelatedPointTo(facts, pf).IsNull() {
+	if !FindRelatedPointToSess(testAmbientSession, facts, pf).IsNullSess(testAmbientSession) {
 		t.Fatal("null field")
 	}
 }
@@ -220,19 +220,19 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	// no MapFactsIn[10]; not must_return — C++ map[] empty is complete empty
 	postLoopAnalysis(fm, forSt, body, nil, nil, EmptyEffect(), nil)
-	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) != nil {
 		t.Fatal("missing body MapFactsIn must clear prior, not invent keep prior")
 	}
 	if !FactsComplete(fm.GlobalFacts) {
 		t.Fatal("missing body in is complete empty, not incomplete marker")
 	}
 	// body StmID 0 — incomplete IR marker
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	postLoopAnalysis(fm, forSt, &Block{StmID: IncompleteStmID}, nil, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("body StmID 0 must fail closed incomplete GlobalFacts")
@@ -244,10 +244,10 @@ func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	body := &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign}}}
 	fm.MapFactsIn = map[int][]*FactPointTo{
-		11: {MakeFactPointTo(p, NullPtr), nil},
+		11: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	postLoopAnalysis(fm, forSt, body, nil, nil, EmptyEffect(), nil)
@@ -263,11 +263,11 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	body := &Block{StmID: 12, BreakStmIDs: []int{22}, Stmts: []Stmt{{Kind: StmtAssign}}}
 	fm.SetMapFactsIn(12, pre)
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		22: {MakeFactPointTo(p, NullPtr), nil},
+		22: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	postLoopAnalysis(fm, forSt, body, pre, nil, EmptyEffect(), nil)
@@ -281,8 +281,8 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.SetMapFactsIn(13, pre)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
-		30: {MakeFactPointTo(p, NullPtr), nil},
-		31: {MakeFactPointTo(p, c)},
+		30: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
+		31: {MakeFactPointToSess(testAmbientSession, p, c)},
 	}
 	postLoopAnalysis(fm2, &Stmt{Kind: StmtFor, StmID: 8, Then: body2}, body2, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm2.GlobalFacts) {
@@ -297,12 +297,12 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	body := &Block{StmID: 14, Stmts: []Stmt{{Kind: StmtReturn}}}
 	fm.MapFactsIn = map[int][]*FactPointTo{
-		14: {MakeFactPointTo(p, NullPtr), nil},
+		14: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 7, Then: body}, body, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body in must not invent must_return restore", fm.GlobalFacts)
@@ -315,13 +315,13 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	pre := []*FactPointTo{MakeFactPointTo(p, a)}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtReturn}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	postLoopAnalysis(fm, forSt, body, pre, nil, EmptyEffect(), nil)
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
-	if fp == nil || fp.IsNull() || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if fp == nil || fp.IsNullSess(testAmbientSession) || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
 		t.Fatalf("want pre fact → a, got %+v", fp)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -333,14 +333,14 @@ func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	// complete map_facts_in so we reach MustReturn
 	body := &Block{
 		StmID: 10,
 		Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{StmID: 30}}},
 	}
-	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 9, Then: body}, body, pre, nil, EmptyEffect(), nil)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("MustReturn residual must fail closed incomplete GlobalFacts", fm.GlobalFacts)
@@ -357,18 +357,18 @@ func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	body := &Block{
 		StmID:       10,
 		BreakStmIDs: []int{20},
 		Stmts:       []Stmt{{Kind: StmtAssign}},
 	}
 	fm.SetMapFactsIn(10, pre)
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, b)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, b)})
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	// body entry facts base; merge break outs
 	postLoopAnalysis(fm, forSt, body, pre, nil, EmptyEffect(), nil)
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
 	if fp == nil {
 		t.Fatal("nil")
 	}

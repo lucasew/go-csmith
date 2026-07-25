@@ -52,17 +52,17 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	}
 	// UpdateFactsForDest must not mark-dead pointers to the field
 	ptr := CreateVariableScalarsSess(testAmbientSession, "l_1226", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
-	factsIn := []*FactPointTo{MakeFactPointTo(ptr, field)}
+	factsIn := []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, field)}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(factsOut, ptr)
+	got := FindRelatedPointToSess(testAmbientSession, factsOut, ptr)
 	if got == nil {
 		t.Fatal("pointer fact missing after dest update")
 	}
-	if got.IsDead() {
+	if got.IsDeadSess(testAmbientSession) {
 		t.Fatalf("pointees to in-scope aggregate field must not be garbage: %+v", got.PointTo)
 	}
 	ClearErrorSess(testAmbientSession)

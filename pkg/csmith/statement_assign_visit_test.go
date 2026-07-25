@@ -176,7 +176,7 @@ func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ppT, false, false)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, q)}
 	rhs := &Expression{
 		Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"},
 		ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
@@ -185,12 +185,12 @@ func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
 	if !fm.UpdateFactForAssign(p, 1, rhs) {
 		t.Fatal("update *p")
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, q)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, q)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("q should be null after *p=0: %+v", got)
 	}
 	// visit path also passes indir from Lhs (Type = *int, Var = **int → indir 1)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, q)}
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 5,
 		Lhs:      &Lhs{Var: p, Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))},
@@ -349,7 +349,7 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	ptr := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(ptr, pointee))
+	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointToSess(testAmbientSession, ptr, pointee))
 	blk := &Block{Func: f, LocalVars: []*Variable{ptr}}
 	f.Stack = []*Block{blk}
 	eff := EmptyEffect()
@@ -388,11 +388,11 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	vs.AllVars = append(vs.AllVars, p)
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.AddNewVarFact(p)
-	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
+	if !FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p).IsNullSess(testAmbientSession) {
 		t.Fatal("want null init for p")
 	}
 	// force pointer assign facts path: assign p = &g_x would change null→g_x if update ran
-	before := CloneFactSlice(fm.GlobalFacts)
+	before := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.FM = fm
 	cg.CurrentFunc = fm.Func
@@ -403,12 +403,12 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	}
 	if stmtOK(st) {
 		// If make updated facts, pointer lattice would often change; require identical related p fact.
-		got := FindRelatedPointTo(fm.GlobalFacts, p)
-		want := FindRelatedPointTo(before, p)
+		got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+		want := FindRelatedPointToSess(testAmbientSession, before, p)
 		if got == nil || want == nil {
 			t.Fatalf("facts missing after make got=%v want=%v", got, want)
 		}
-		if !got.Equal(want) {
+		if !got.EqualSess(testAmbientSession, want) {
 			t.Fatalf("MakeRandomAssign must not update GlobalFacts; before=%v after=%v", want.PointTo, got.PointTo)
 		}
 	}
@@ -428,8 +428,8 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{
-		MakeFactPointTo(ptr, mid),
-		MakeFactPointTo(mid, pointee),
+		MakeFactPointToSess(testAmbientSession, ptr, mid),
+		MakeFactPointToSess(testAmbientSession, mid, pointee),
 	}
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

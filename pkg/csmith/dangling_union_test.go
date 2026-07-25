@@ -107,7 +107,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// dead global pointer
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(p)}
+	fm.GlobalFacts = []*FactPointTo{NewFactPointToSess(testAmbientSession, p)}
 	fm.FindDanglingGlobalPtrs(f)
 	if len(f.DeadGlobals) != 1 || f.DeadGlobals[0] != p {
 		t.Fatalf("%v", f.DeadGlobals)
@@ -115,7 +115,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	// const not listed
 	f.DeadGlobals = nil
 	cp := CreateVariableScalarsSess(testAmbientSession, "g_cp", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(cp)}
+	fm.GlobalFacts = []*FactPointTo{NewFactPointToSess(testAmbientSession, cp)}
 	fm.FindDanglingGlobalPtrs(f)
 	if len(f.DeadGlobals) != 0 {
 		t.Fatal("const")
@@ -138,7 +138,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	goodDead := CreateVariableScalarsSess(testAmbientSession, "g_p3", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{
 		{Var: p2, PointTo: []*Variable{nil}}, // residual IsDead
-		NewFactPointTo(goodDead),
+		NewFactPointToSess(testAmbientSession, goodDead),
 	}
 	f.DeadGlobals = nil
 	fm.FindDanglingGlobalPtrs(f)

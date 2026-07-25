@@ -5,7 +5,7 @@ import "testing"
 // Fact.cpp:89–111 — primary Variable::init first, then get_more_init_values.
 // CreateArrayVariable puts alts in InitExprs; createAndInitialize sets InitExpr primary.
 // Soft invent AbstractFactForVarInit with nil primary + InitExprs only:
-// first AbstractFactForAssign(nil rhs) → GarbagePtr, then merge alts still IsDead
+// first AbstractFactForAssignSess(testAmbientSession, nil rhs) → GarbagePtr, then merge alts still IsDead
 // (seed-10054 IsValidPtr fail on local pointer arrays during revisit).
 func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
@@ -42,9 +42,9 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("pt incomplete/len %v n=%d", FactsComplete(pt), len(pt))
 	}
-	if pt[0].IsDead() || pt[0].IsNull() {
+	if pt[0].IsDeadSess(testAmbientSession) || pt[0].IsNullSess(testAmbientSession) {
 		t.Fatalf("primary+alts must be pure live, dead=%v null=%v pts=%v",
-			pt[0].IsDead(), pt[0].IsNull(), pt[0].PointTo)
+			pt[0].IsDeadSess(testAmbientSession), pt[0].IsNullSess(testAmbientSession), pt[0].PointTo)
 	}
 	// must point at l_118 collective
 	found := false
@@ -82,8 +82,8 @@ func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("want complete fact, complete=%v n=%d", FactsComplete(pt), len(pt))
 	}
-	if pt[0].IsDead() || pt[0].IsNull() {
-		t.Fatalf("promoted primary must be pure live dead=%v null=%v", pt[0].IsDead(), pt[0].IsNull())
+	if pt[0].IsDeadSess(testAmbientSession) || pt[0].IsNullSess(testAmbientSession) {
+		t.Fatalf("promoted primary must be pure live dead=%v null=%v", pt[0].IsDeadSess(testAmbientSession), pt[0].IsNullSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)
 }

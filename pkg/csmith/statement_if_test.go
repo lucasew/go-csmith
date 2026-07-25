@@ -15,26 +15,26 @@ func TestFunc1PreFactsSnapshotIsShallow(t *testing.T) {
 		t.Fatal("vars")
 	}
 	// start: g → tgt only
-	facts := []*FactPointTo{MakeFactPointTo(g, tgt)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, g, tgt)}
 	// shallow snapshot like StatementIf.cpp:69
 	pre := append([]*FactPointTo(nil), facts...)
 	// mid-condition Join on the live fact object
-	live := FindRelatedPointTo(facts, g)
+	live := FindRelatedPointToSess(testAmbientSession, facts, g)
 	if live == nil {
 		t.Fatal("missing live fact")
 	}
-	if !live.Join(MakeFactPointTo(g, NullPtr)) {
+	if !live.JoinSess(testAmbientSession, MakeFactPointToSess(testAmbientSession, g, NullPtr)) {
 		t.Fatal("Join should add null", HasErrorSess(testAmbientSession))
 	}
 	// pre must observe may-null (shared Fact*)
-	preF := FindRelatedPointTo(pre, g)
-	if preF == nil || !preF.IsNull() {
+	preF := FindRelatedPointToSess(testAmbientSession, pre, g)
+	if preF == nil || !preF.IsNullSess(testAmbientSession) {
 		t.Fatalf("shallow pre must see mid-condition Join null")
 	}
 	// deep clone of the original lattice would freeze:
-	deep := CloneFactSlice([]*FactPointTo{MakeFactPointTo(g, tgt)})
-	deepF := FindRelatedPointTo(deep, g)
-	if deepF == nil || deepF.IsNull() {
+	deep := CloneFactSliceSess(testAmbientSession, []*FactPointTo{MakeFactPointToSess(testAmbientSession, g, tgt)})
+	deepF := FindRelatedPointToSess(testAmbientSession, deep, g)
+	if deepF == nil || deepF.IsNullSess(testAmbientSession) {
 		t.Fatal("control: deep clone of pre-Join lattice must stay non-null")
 	}
 	ClearErrorSess(testAmbientSession)

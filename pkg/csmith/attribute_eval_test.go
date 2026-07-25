@@ -383,7 +383,7 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 	f1 := &Variable{Name: "g_u.f1", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{f0, f1}
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{f0, f1})}
+	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{f0, f1})}
 	// indirection: Var type *int, ExprType int → level 1
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
@@ -403,7 +403,7 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
-	holeFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	holeFacts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	if !HaveOverlappingFields(e1, e2, holeFacts) {
 		t.Fatal("incomplete facts must fail closed as overlap")
 	}
@@ -432,7 +432,7 @@ func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	// Type-nil parent ancestry: GetContainerUnion stickies ERROR
 	parent := &Variable{Name: "g_hole"} // Type nil
 	fld := &Variable{Name: "g_hole.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
-	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld})}
+	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{fld})}
 	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	got := FindUnionPointees(facts, e)
 	if VariablesComplete(got) {
@@ -469,7 +469,7 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 	f.Stack = []*Block{blk}
 	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, loc)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, lp, loc)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := Stmt{
 		Kind: StmtReturn,

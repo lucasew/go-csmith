@@ -88,7 +88,7 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
 	// start with a
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -100,7 +100,7 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	if !VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 		t.Fatal("facts kept")
 	}
 	// through VisitFactsInvocation
@@ -144,7 +144,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	// post-left lattice: last written f0
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	// p points to f1
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, f1)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, f1)}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -502,7 +502,7 @@ func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},

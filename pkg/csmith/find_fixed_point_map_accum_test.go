@@ -71,7 +71,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 		t.Fatalf("precondition: live accum must be pre-only; late=%v", cg.EffectAccum.IsReadSess(testAmbientSession, late))
 	}
 
-	_, _, _, ok := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), true)
+	_, _, _, ok := FindFixedPointBlock(b, CloneFactSliceSess(testAmbientSession, entry), &cg, Defaults(), true)
 	_ = ok
 	ClearErrorSess(testAmbientSession)
 

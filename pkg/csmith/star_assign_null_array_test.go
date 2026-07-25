@@ -19,8 +19,8 @@ func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "l_236", PointerToSess(testAmbientSession, elem), false, false)
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.GlobalFacts = []*FactPointTo{
-		MakeFactPointTo(&arr.Variable, g),
-		MakeFactPointTo(p, &arr.Variable),
+		MakeFactPointToSess(testAmbientSession, &arr.Variable, g),
+		MakeFactPointToSess(testAmbientSession, p, &arr.Variable),
 	}
 	// *p = 0
 	nullRHS := &Expression{
@@ -31,11 +31,11 @@ func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 	if !fm.UpdateFactForAssign(p, 1, nullRHS) {
 		t.Fatalf("update *p=0 failed sticky=%v", HasErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, &arr.Variable)
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &arr.Variable)
 	if got == nil {
 		t.Fatal("missing l_233 fact after *p=0")
 	}
-	if !got.IsNull() {
+	if !got.IsNullSess(testAmbientSession) {
 		pts := []string{}
 		for _, x := range got.PointTo {
 			if x != nil {

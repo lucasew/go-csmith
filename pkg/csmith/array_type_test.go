@@ -156,7 +156,7 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	// global pointer: facts in global + maps
 	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFactAndUpdate(nil, g)
-	if FindRelatedPointTo(fm.GlobalFacts, g) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, g) == nil {
 		t.Fatal("global fact missing")
 	}
 	if len(fm.MapFactsIn[sid]) == 0 || len(fm.MapFactsOut[sid]) == 0 {
@@ -197,7 +197,7 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	// ExprType pointer + Var int → IndirectLevel() == -1 (address-of)
 	g.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// seed GlobalFacts as if RenewFacts already set a *different* points-to
-	fp := MakeFactPointTo(g, NullPtr)
+	fp := MakeFactPointToSess(testAmbientSession, g, NullPtr)
 	if fp == nil {
 		t.Fatal("MakeFactPointTo")
 	}
@@ -210,7 +210,7 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("must not sticky when fact already present")
 	}
-	inF := FindRelatedPointTo(fm.MapFactsIn[sid], g)
+	inF := FindRelatedPointToSess(testAmbientSession, fm.MapFactsIn[sid], g)
 	if inF == nil {
 		t.Fatal("must push init abstract into map_facts_in")
 	}
@@ -221,7 +221,7 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	if IsVariableInSet(inF.PointTo, NullPtr) && len(inF.PointTo) == 1 {
 		t.Fatal("must not push existing NullPtr-related fact as the map entry")
 	}
-	outF := FindRelatedPointTo(fm.MapFactsOut[sid], g)
+	outF := FindRelatedPointToSess(testAmbientSession, fm.MapFactsOut[sid], g)
 	if outF == nil || !IsVariableInSet(outF.PointTo, tgt) {
 		t.Fatal("must push init abstract into map_facts_out")
 	}
@@ -229,7 +229,7 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	if len(fm.GlobalFacts) != 1 {
 		t.Fatalf("GlobalFacts len=%d want 1", len(fm.GlobalFacts))
 	}
-	if gf := FindRelatedPointTo(fm.GlobalFacts, g); gf == nil || !IsVariableInSet(gf.PointTo, NullPtr) {
+	if gf := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, g); gf == nil || !IsVariableInSet(gf.PointTo, NullPtr) {
 		t.Fatal("GlobalFacts must keep post-analysis NullPtr (not overwrite with init)")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -275,13 +275,13 @@ func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) 
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("AddNewVarFactAndUpdate sticky: %v", HasErrorSess(testAmbientSession))
 	}
-	if FindRelatedPointTo(fm.MapFactsIn[body.StmID], loc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.MapFactsIn[body.StmID], loc) != nil {
 		t.Fatal("declaring block map_facts_in must not get body-local (in_block self is false)")
 	}
-	if FindRelatedPointTo(fm.MapFactsIn[inner.StmID], loc) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.MapFactsIn[inner.StmID], loc) == nil {
 		t.Fatal("nested stmt in body must get the local on map_facts_in")
 	}
-	if FindRelatedPointTo(fm.GlobalFacts, loc) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, loc) == nil {
 		t.Fatal("GlobalFacts must still get init fact")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -316,14 +316,14 @@ func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
 		t.Fatalf("sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	// then arm Block out must receive init fact (Block key, not FindStmtByID)
-	thenF := FindRelatedPointTo(fm.MapFactsOut[thenB.StmID], loc)
+	thenF := FindRelatedPointToSess(testAmbientSession, fm.MapFactsOut[thenB.StmID], loc)
 	if thenF == nil {
 		t.Fatal("map_facts_out[if_true Block] must get parent-local init fact")
 	}
 	if !IsVariableInSet(thenF.PointTo, tgt) {
 		t.Fatalf("then out must point to g_99, got %v", pointToNames(thenF))
 	}
-	elseF := FindRelatedPointTo(fm.MapFactsOut[elseB.StmID], loc)
+	elseF := FindRelatedPointToSess(testAmbientSession, fm.MapFactsOut[elseB.StmID], loc)
 	if elseF == nil || !IsVariableInSet(elseF.PointTo, tgt) {
 		t.Fatal("map_facts_out[if_false Block] must also get init fact")
 	}
@@ -372,12 +372,12 @@ func TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration(t *testing.T) {
 		t.Fatalf("AddNewVarFactAndUpdate sticky: err=%v", GetErrorSess(testAmbientSession))
 	}
 	// Goto out must receive the new fact (C++ add_fact_out, not tree in_block)
-	if FindRelatedPointTo(fm.MapFactsOut[gt.StmID], loc) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.MapFactsOut[gt.StmID], loc) == nil {
 		t.Fatalf("map_facts_out[goto] must get parent-local mid-if construction; out=%v",
 			fm.MapFactsOut[gt.StmID])
 	}
 	// Assign dest also (visible at dest)
-	if FindRelatedPointTo(fm.MapFactsOut[asg.StmID], loc) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.MapFactsOut[asg.StmID], loc) == nil {
 		t.Fatal("map_facts_out[assign] must get parent-local")
 	}
 	ClearErrorSess(testAmbientSession)

@@ -811,7 +811,7 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, GotoDestStmID: 20}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -824,9 +824,9 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete facts, incomplete prev out
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		10: {MakeFactPointTo(p, GarbagePtr), nil},
+		10: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	if VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("incomplete prev MapFactsOut must fail closed")
@@ -959,12 +959,12 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	lp := CreateVariableScalarsSess(testAmbientSession, "l_early", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// IsLocal is name-prefix "l_" (Variable.cpp:is_local)
 	blk.LocalVars = append(blk.LocalVars, lp)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, lp, NullPtr)}
 	// dest statement created with map_in that lacks l_early (pre-make snapshot)
 	dest := Stmt{Kind: StmtAssign, StmID: 10}
 	blk.Stmts = []Stmt{dest}
 	// map_in[dest] is incomplete relative to GlobalFacts (no l_early)
-	otherFact := MakeFactPointTo(
+	otherFact := MakeFactPointToSess(testAmbientSession, 
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false),
 		NullPtr,
 	)
@@ -972,22 +972,22 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	fm.SetMapFactsOut(10, []*FactPointTo{otherFact})
 
 	// Makeup from live GlobalFacts into map_in clone must re-add l_early
-	stmIn := CloneFactSlice(fm.GetMapFactsIn(10))
-	if FindRelatedPointTo(stmIn, lp) != nil {
+	stmIn := CloneFactSliceSess(testAmbientSession, fm.GetMapFactsIn(10))
+	if FindRelatedPointToSess(testAmbientSession, stmIn, lp) != nil {
 		t.Fatal("map_in should start without l_early")
 	}
 	if !MakeupNewVarFacts(&stmIn, fm.GlobalFacts) {
 		t.Fatal("MakeupNewVarFacts", HasErrorSess(testAmbientSession))
 	}
-	if FindRelatedPointTo(stmIn, lp) == nil {
+	if FindRelatedPointToSess(testAmbientSession, stmIn, lp) == nil {
 		t.Fatal("MakeupNewVarFacts must re-add later local fact into visit inputs")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete makeup must not sticky")
 	}
 	// without makeup, SetGlobalFacts(map_in) would wipe l_early from live env
-	wiped := CloneFactSlice(fm.GetMapFactsIn(10))
-	if FindRelatedPointTo(wiped, lp) != nil {
+	wiped := CloneFactSliceSess(testAmbientSession, fm.GetMapFactsIn(10))
+	if FindRelatedPointToSess(testAmbientSession, wiped, lp) != nil {
 		t.Fatal("raw map_in still must lack l_early")
 	}
 }

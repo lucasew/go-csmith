@@ -12,7 +12,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	f.Body = body
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
-	fm.AddFactOut(st, body, MakeFactPointTo(loc, NullPtr))
+	fm.AddFactOut(st, body, MakeFactPointToSess(testAmbientSession, loc, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("incomplete stack must fail closed incomplete out, not invent empty complete", fm.MapFactsOut[3])
 	}
@@ -22,7 +22,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// later appends must not invent cleaned facts onto incomplete map
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
+	fm.AddFactOut(st, body, MakeFactPointToSess(testAmbientSession, gp, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("append after incomplete must stay incomplete", fm.MapFactsOut[3])
 	}
@@ -56,7 +56,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	fm3 := NewFactMgrSess(testAmbientSession, f3)
 	stGoto := &Stmt{Kind: StmtGoto, StmID: 9, GotoDestStmID: 99}
 	// FindParentBlockOfStmID walks Blocks; nil hole stickies residual
-	fm3.AddFactOut(stGoto, body3, MakeFactPointTo(gp3, NullPtr))
+	fm3.AddFactOut(stGoto, body3, MakeFactPointToSess(testAmbientSession, gp3, NullPtr))
 	if FactsComplete(fm3.MapFactsOut[9]) {
 		t.Fatal("FindParentBlock residual must fail closed incomplete out", fm3.MapFactsOut[9])
 	}
@@ -74,13 +74,13 @@ func TestAddFactOutVisible(t *testing.T) {
 	f.Blocks = []*Block{body}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
-	fm.AddFactOut(st, body, MakeFactPointTo(
+	fm.AddFactOut(st, body, MakeFactPointToSess(testAmbientSession, 
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false),
 		NullPtr,
 	))
 	// use global pointer fact
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.AddFactOut(st, body, MakeFactPointTo(p, NullPtr))
+	fm.AddFactOut(st, body, MakeFactPointToSess(testAmbientSession, p, NullPtr))
 	if len(fm.MapFactsOut[5]) != 2 {
 		// first call also used a fresh p - ok
 		if len(fm.MapFactsOut[5]) < 1 {
@@ -89,7 +89,7 @@ func TestAddFactOutVisible(t *testing.T) {
 	}
 	// return drops non-global
 	ret := &Stmt{Kind: StmtReturn, StmID: 6}
-	fm.AddFactOut(ret, body, MakeFactPointTo(
+	fm.AddFactOut(ret, body, MakeFactPointToSess(testAmbientSession, 
 		// local as subject — need pointer local
 		func() *Variable {
 			lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
@@ -102,7 +102,7 @@ func TestAddFactOutVisible(t *testing.T) {
 		t.Fatal("return non-global should drop", fm.MapFactsOut[6])
 	}
 	// return keeps global
-	fm.AddFactOut(ret, body, MakeFactPointTo(p, NullPtr))
+	fm.AddFactOut(ret, body, MakeFactPointToSess(testAmbientSession, p, NullPtr))
 	if len(fm.MapFactsOut[6]) != 1 {
 		t.Fatal(fm.MapFactsOut[6])
 	}
@@ -125,13 +125,13 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 		GotoDestStmID:  20,
 		GotoDestParent: outer,
 	}
-	fm.AddFactOut(st, inner, MakeFactPointTo(loc, NullPtr))
+	fm.AddFactOut(st, inner, MakeFactPointToSess(testAmbientSession, loc, NullPtr))
 	if len(fm.MapFactsOut[9]) != 0 {
 		t.Fatal("local invisible at dest should drop", fm.MapFactsOut[9])
 	}
 	// global pointer still recorded
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.AddFactOut(st, inner, MakeFactPointTo(gp, NullPtr))
+	fm.AddFactOut(st, inner, MakeFactPointToSess(testAmbientSession, gp, NullPtr))
 	if len(fm.MapFactsOut[9]) != 1 {
 		t.Fatal("global at dest", fm.MapFactsOut[9])
 	}
@@ -141,7 +141,7 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 		GotoDestStmID:  21,
 		GotoDestParent: inner,
 	}
-	fm.AddFactOut(st2, inner, MakeFactPointTo(loc, NullPtr))
+	fm.AddFactOut(st2, inner, MakeFactPointToSess(testAmbientSession, loc, NullPtr))
 	if len(fm.MapFactsOut[10]) != 1 {
 		t.Fatal("local visible at dest", fm.MapFactsOut[10])
 	}
@@ -149,7 +149,7 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 	tgt := Stmt{Kind: StmtAssign, StmID: 30}
 	outer.Stmts = []Stmt{tgt}
 	st3 := &Stmt{Kind: StmtGoto, StmID: 11, GotoDestStmID: 30}
-	fm.AddFactOut(st3, inner, MakeFactPointTo(loc, NullPtr))
+	fm.AddFactOut(st3, inner, MakeFactPointToSess(testAmbientSession, loc, NullPtr))
 	if len(fm.MapFactsOut[11]) != 0 {
 		t.Fatal("resolved dest parent outer, local drop")
 	}

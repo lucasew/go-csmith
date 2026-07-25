@@ -100,8 +100,8 @@ func TestConstantEquals(t *testing.T) {
 func TestRhsToLhsTransferNullConst(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}}
-	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
-	if len(facts) != 1 || !facts[0].IsNull() {
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
+	if len(facts) != 1 || !facts[0].IsNullSess(testAmbientSession) {
 		t.Fatalf("%+v", facts)
 	}
 }
@@ -109,8 +109,8 @@ func TestRhsToLhsTransferNullConst(t *testing.T) {
 func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	// FactPointTo.cpp:168–169 — nullptr rhs → garbage (AddParamFacts missing arg)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	facts := RhsToLhsTransfer(nil, []*Variable{p}, nil)
-	if len(facts) != 1 || !facts[0].IsDead() {
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, nil)
+	if len(facts) != 1 || !facts[0].IsDeadSess(testAmbientSession) {
 		t.Fatal("nil rhs must abstract as garbage like C++", facts)
 	}
 	// return always has Expression*; sticky fail closed before garbage invent
@@ -148,7 +148,7 @@ func TestRhsToLhsTransferAddrOf(t *testing.T) {
 	if rhs.IndirectLevel() != -1 {
 		t.Fatalf("indir %d", rhs.IndirectLevel())
 	}
-	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if len(facts) != 1 || facts[0].PointTo[0] != tgt {
 		t.Fatalf("%+v", facts[0])
 	}
@@ -158,10 +158,10 @@ func TestRhsToLhsTransferCopy(t *testing.T) {
 	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	in := []*FactPointTo{MakeFactPointTo(p2, tgt)}
+	in := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p2, tgt)}
 	rhs := &Expression{Term: TermVariable, Var: p2, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// p2 level 1, expr 1 → indirect 0; merge uses fact of p2
-	facts := RhsToLhsTransfer(in, []*Variable{p1}, rhs)
+	facts := RhsToLhsTransferSess(testAmbientSession, in, []*Variable{p1}, rhs)
 	if len(facts) != 1 || facts[0].PointTo[0] != tgt {
 		t.Fatalf("%+v", facts)
 	}
@@ -188,7 +188,7 @@ func TestUpdateFactForAssign(t *testing.T) {
 	// Variable.cpp:395 — pointer Constant::make_random is "0" → null on AddNewVarFact
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFact(p)
-	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
+	if !FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p).IsNullSess(testAmbientSession) {
 		t.Fatal("init null")
 	}
 	// assign to non-null target expression
@@ -199,7 +199,7 @@ func TestUpdateFactForAssign(t *testing.T) {
 	if !fm.UpdateFactForAssign(p, 0, rhs) {
 		t.Fatal("update")
 	}
-	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
+	if !FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p).IsNullSess(testAmbientSession) {
 		t.Fatal("null after assign")
 	}
 }
@@ -208,7 +208,7 @@ func TestAbstractFactNonPointerLHS(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	// non-pointer scalar: complete empty (no pointer facts), not incomplete marker
-	if out, _ := AbstractFactForAssign(nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
+	if out, _ := AbstractFactForAssignSess(testAmbientSession, nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
 		t.Fatal("non-ptr must be complete empty", out)
 	}
 }
@@ -222,8 +222,8 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 		CommaRHS: &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))},
 		ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
 	}
-	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
-	if len(facts) != 1 || !facts[0].IsNull() {
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
+	if len(facts) != 1 || !facts[0].IsNullSess(testAmbientSession) {
 		t.Fatalf("%+v", facts)
 	}
 }
@@ -237,7 +237,7 @@ func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
 		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		// CommaRHS nil
 	}
-	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	out := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if FactsComplete(out) {
 		t.Fatal("nil CommaRHS must fail closed incomplete, not invent GarbagePtr", out)
 	}
@@ -253,7 +253,7 @@ func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// force Indir < -1 by ExprType deeper than Var.Type
 	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false), ExprType: PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level & must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -272,8 +272,8 @@ func TestRhsToLhsTransferAssignPeel(t *testing.T) {
 		AssignOp: AssignSimple,
 	}
 	rhs := &Expression{Term: TermAssignment, Assign: assign, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
-	if len(facts) != 1 || !facts[0].IsNull() {
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
+	if len(facts) != 1 || !facts[0].IsNullSess(testAmbientSession) {
 		t.Fatalf("%+v", facts)
 	}
 }
@@ -289,7 +289,7 @@ func TestRhsToLhsTransferAssignNilExprFailClosed(t *testing.T) {
 		AssignOp: AssignSimple,
 	}
 	rhs := &Expression{Term: TermAssignment, Assign: assign, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	out := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if FactsComplete(out) {
 		t.Fatal("nil Assign.Expr must fail closed incomplete, not invent GarbagePtr", out)
 	}
@@ -308,9 +308,9 @@ func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
 	fn := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fn.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fi := &Invocation{User: fn}
-	AddReturnFactForInvocation(fi, MakeFactPointTo(fn.RV, tgt))
+	AddReturnFactForInvocation(fi, MakeFactPointToSess(testAmbientSession, fn.RV, tgt))
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if len(facts) != 1 || len(facts[0].PointTo) != 1 || facts[0].PointTo[0] != tgt {
 		t.Fatalf("%+v", facts)
 	}
@@ -326,7 +326,7 @@ func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
 	fn.RV = &Variable{Name: "f_rv", Type: nil}
 	fi := &Invocation{User: fn}
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("Type-nil RV must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -345,7 +345,7 @@ func TestRhsToLhsTransferUnionParentTypeNilSticky(t *testing.T) {
 		{Name: "f0", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: -1},
 	}}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: ut, Value: "{0}"}, ExprType: ut}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{f0}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{f0}, rhs)) {
 		t.Fatal("Type-nil union parent must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -365,9 +365,9 @@ func TestRhsToLhsTransferUnionAggregateFields(t *testing.T) {
 	uv.FieldVars = []*Variable{pf}
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	lhsP := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	in := []*FactPointTo{MakeFactPointTo(pf, tgt)}
+	in := []*FactPointTo{MakeFactPointToSess(testAmbientSession, pf, tgt)}
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
-	facts := RhsToLhsTransfer(in, []*Variable{lhsP}, rhs)
+	facts := RhsToLhsTransferSess(testAmbientSession, in, []*Variable{lhsP}, rhs)
 	if len(facts) != 1 || len(facts[0].PointTo) != 1 || facts[0].PointTo[0] != tgt {
 		t.Fatalf("%+v", facts)
 	}
@@ -381,8 +381,8 @@ func TestRhsToLhsTransferStructIsGarbage(t *testing.T) {
 	sv := &Variable{Name: "g_s", Type: st}
 	lhsP := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rhs := &Expression{Term: TermVariable, Var: sv, ExprType: st}
-	facts := RhsToLhsTransfer(nil, []*Variable{lhsP}, rhs)
-	if len(facts) != 1 || !facts[0].IsDead() {
+	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{lhsP}, rhs)
+	if len(facts) != 1 || !facts[0].IsDeadSess(testAmbientSession) {
 		t.Fatalf("%+v", facts)
 	}
 }
@@ -428,9 +428,9 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 	}
 	// assign non-pointer field x = 0 → union path updates p0 and p1
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
-	facts, _ := AbstractFactForAssign(nil, xField, 0, rhs)
-	got0 := FindRelatedPointTo(facts, p0)
-	got1 := FindRelatedPointTo(facts, p1)
+	facts, _ := AbstractFactForAssignSess(testAmbientSession, nil, xField, 0, rhs)
+	got0 := FindRelatedPointToSess(testAmbientSession, facts, p0)
+	got1 := FindRelatedPointToSess(testAmbientSession, facts, p1)
 	if got0 == nil || got1 == nil {
 		t.Fatalf("union walk should yield ptr field facts: %+v", facts)
 	}
@@ -441,7 +441,7 @@ func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	i := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{i}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-pointer lvar must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -460,7 +460,7 @@ func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	if rhs.IndirectLevel() != -2 {
 		t.Fatalf("want indir -2 got %d", rhs.IndirectLevel())
 	}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level address-of must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -483,7 +483,7 @@ func TestRhsToLhsTransferAggregateLenMismatchNDEBUG(t *testing.T) {
 	lhs1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
 	// two LHS pointers vs one field pointer → must not sticky-poison (NDEBUG assert).
-	_ = RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)
+	_ = RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{lhs0, lhs1}, rhs)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("NDEBUG len mismatch must not sticky-poison", GetErrorSess(testAmbientSession))
 	}
@@ -501,7 +501,7 @@ func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	fi := &Invocation{User: fn}
 	// no AddReturnFactForInvocation
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("missing rv_fact must fail closed incomplete")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -516,9 +516,9 @@ func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// incomplete map: nil hole so MergePointeesOfPointer fails closed incomplete
-	hole := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
+	hole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, NullPtr), nil}
 	rhs := &Expression{Term: TermVariable, Var: q, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	if FactsComplete(RhsToLhsTransfer(hole, []*Variable{p}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, hole, []*Variable{p}, rhs)) {
 		t.Fatal("incomplete map transfer must fail closed incomplete")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -529,7 +529,7 @@ func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 
 func TestAbstractFactForAssignNilLhsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	outAF, _ := AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)})
+	outAF, _ := AbstractFactForAssignSess(testAmbientSession, nil, nil, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)})
 	if FactsComplete(outAF) {
 		t.Fatal("nil lhs AbstractFactForAssign must fail closed incomplete")
 	}
@@ -550,11 +550,11 @@ func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	shell := &Variable{Name: "g_hole"} // Type nil
 	factsIn := []*FactPointTo{
-		MakeFactPointTo(p, q),
-		MakeFactPointTo(q, shell),
+		MakeFactPointToSess(testAmbientSession, p, q),
+		MakeFactPointToSess(testAmbientSession, q, shell),
 	}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
-	out, _ := AbstractFactForAssign(factsIn, p, 1, rhs)
+	out, _ := AbstractFactForAssignSess(testAmbientSession, factsIn, p, 1, rhs)
 	if FactsComplete(out) {
 		t.Fatal("Type-nil more pointee must fail closed incomplete, not partial transfer", out)
 	}
@@ -598,7 +598,7 @@ func TestRhsToLhsTransferGetTypeResidualSticky(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// Type-nil constant shell → GetType residual
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("GetType residual must fail closed IncompleteFactSlice")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -612,7 +612,7 @@ func TestRhsToLhsTransferIsPointerResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special IsPointer residual ERROR+false
 	hole := &Variable{Name: "g_x", Type: nil}
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{hole}, nil)) {
+	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{hole}, nil)) {
 		t.Fatal("IsPointer residual must fail closed IncompleteFactSlice")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -647,7 +647,7 @@ func TestRhsToLhsTransferGetCollectiveResidualSticky(t *testing.T) {
 	shell := &Variable{Name: "g_a", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2}}
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rhs := &Expression{Term: TermVariable, Var: shell, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	out := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if FactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete empty
 	}
@@ -662,7 +662,7 @@ func TestAbstractFactForAssignGetCollectiveResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2}}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
-	out, _ := AbstractFactForAssign(nil, shell, 0, rhs)
+	out, _ := AbstractFactForAssignSess(testAmbientSession, nil, shell, 0, rhs)
 	if FactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}
@@ -690,7 +690,7 @@ func TestMergePointeesFindRelatedResidualSticky(t *testing.T) {
 	// FindRelated residual soft invent was invent soft-empty merge past nil ptr subject.
 	ClearErrorSess(testAmbientSession)
 	// VariablesComplete(ptrs) fails sticky on nil ptr (hard IR)
-	out := MergePointeesOfPointers([]*Variable{nil}, nil)
+	out := MergePointeesOfPointersSess(testAmbientSession, []*Variable{nil}, nil)
 	if VariablesComplete(out) {
 		t.Fatal("nil ptr MergePointeesOfPointers must fail closed incomplete")
 	}
@@ -699,7 +699,7 @@ func TestMergePointeesFindRelatedResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// FindRelated residual via nil subject
-	if FindRelatedPointTo(nil, nil) != nil {
+	if FindRelatedPointToSess(testAmbientSession, nil, nil) != nil {
 		t.Fatal("nil subject FindRelatedPointTo must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {

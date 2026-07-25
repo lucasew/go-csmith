@@ -66,11 +66,11 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("want 1 complete fact complete=%v n=%d", FactsComplete(pt), len(pt))
 	}
-	rel := FindRelatedPointTo(pt, p)
+	rel := FindRelatedPointToSess(testAmbientSession, pt, p)
 	if rel == nil {
 		t.Fatal("related fact missing after abstract")
 	}
-	if rel.IsNull() {
+	if rel.IsNullSess(testAmbientSession) {
 		t.Fatal("address-of field must not be null")
 	}
 	// pointee should be collective field (not itemized)
@@ -83,10 +83,10 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	if HasErrorSess(testAmbientSession) || !FactsComplete(facts) {
 		t.Fatalf("AddNewVarFactInto err=%v complete=%v", GetErrorSess(testAmbientSession), FactsComplete(facts))
 	}
-	if FindRelatedPointTo(facts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, facts, p) == nil {
 		t.Fatal("makeup nofact")
 	}
-	if !IsValidPtr(p, facts, 0, 0) {
+	if !IsValidPtrSess(testAmbientSession, p, facts, 0, 0) {
 		t.Fatalf("IsValidPtr after makeup err=%v", GetErrorSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)

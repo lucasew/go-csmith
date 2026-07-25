@@ -82,14 +82,14 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	opts.MaxFuncs = 0
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	eff := EmptyEffect().WriteVarSess(testAmbientSession, p)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.Funcs = list
 	// snapshot
 	preEff := eff.CloneSess(testAmbientSession)
-	preFacts := CloneFactSlice(fm.GlobalFacts)
+	preFacts := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	// invoke may fail or succeed; if fail, empty Stmt + state restored
 	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg)
 	if !stmtOK(st) {
@@ -101,7 +101,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 			t.Fatal("effect should still have pre write after restore or no change")
 		}
 		// facts restored (may equal pre)
-		if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+		if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 			t.Fatal("facts")
 		}
 	}
@@ -111,10 +111,10 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// force failed path: nil rng already handled; use list at max
 	// mutate during a call that fails by using Failed invocation manually
 	// Directly verify RestoreFacts + accum restore pattern used in MakeRandomExprStmt
-	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(
+	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointToSess(testAmbientSession, 
 		CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false), NullPtr))
 	cg.FM.RestoreFacts(preFacts)
-	if FindRelatedPointTo(fm.GlobalFacts, p) == nil || len(fm.GlobalFacts) < 1 {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil || len(fm.GlobalFacts) < 1 {
 		t.Fatal("restore")
 	}
 }

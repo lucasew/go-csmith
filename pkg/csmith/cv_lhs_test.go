@@ -179,7 +179,7 @@ func TestGetAllQualifiers(t *testing.T) {
 func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	// bare pointer as LHS (want int* → indirect 0)
 	lhs0 := &Lhs{Var: p, Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	if lhs0.IndirectLevelSess(testAmbientSession) != 0 {

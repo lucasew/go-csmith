@@ -23,23 +23,23 @@ func TestCallerToCalleeHandoverKeepsGlobals(t *testing.T) {
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	// g points to loc — loc should be kept transitively
 	facts := []*FactPointTo{
-		MakeFactPointTo(g, loc),
-		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
+		MakeFactPointToSess(testAmbientSession, g, loc),
+		MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
 	}
 	// subject l_p is local name — not kept unless pointed
 	fm.CallerToCalleeHandover(nil, &facts)
 	// keep g (global); drop l_p unless pointed by keep
-	if FindRelatedPointTo(facts, g) == nil {
+	if FindRelatedPointToSess(testAmbientSession, facts, g) == nil {
 		t.Fatal("lost global")
 	}
 	// loc subject not in facts initially as subject; g points to loc so if there was a fact for loc as subject...
 	// only subjects kept: g and p (after param facts)
 	// FactMgr.cpp:108–114 — nil arg → abstract nullptr rhs → garbage for pointer param
 	// (no invent NewFactPointTo outside abstract path)
-	if FindRelatedPointTo(facts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, facts, p) == nil {
 		t.Fatal("nil-arg param must get abstract garbage fact", facts)
 	}
-	if !FindRelatedPointTo(facts, p).IsDead() {
+	if !FindRelatedPointToSess(testAmbientSession, facts, p).IsDeadSess(testAmbientSession) {
 		t.Fatal("nil arg → garbage, not invent other pointee")
 	}
 }
@@ -54,12 +54,12 @@ func TestCallerToCalleeHandoverTransitive(t *testing.T) {
 	// better: subject is another pointer that lives on stack
 	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{
-		MakeFactPointTo(g, lp),   // global points to stack ptr
-		MakeFactPointTo(lp, loc), // stack ptr facts
+		MakeFactPointToSess(testAmbientSession, g, lp),   // global points to stack ptr
+		MakeFactPointToSess(testAmbientSession, lp, loc), // stack ptr facts
 	}
 	fm.CallerToCalleeHandover(nil, &facts)
 	// g kept; lp kept because g points to it; loc not a subject of pointer fact kept unless...
-	if FindRelatedPointTo(facts, g) == nil || FindRelatedPointTo(facts, lp) == nil {
+	if FindRelatedPointToSess(testAmbientSession, facts, g) == nil || FindRelatedPointToSess(testAmbientSession, facts, lp) == nil {
 		t.Fatal("transitive", facts)
 	}
 }
@@ -69,7 +69,7 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	fm.CallerToCalleeHandover(nil, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
@@ -151,7 +151,7 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, callee)
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, ut), true, false)
 	fm2.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, lu, 1)}
-	keepPT := []*FactPointTo{MakeFactPointTo(gp, lu)}
+	keepPT := []*FactPointTo{MakeFactPointToSess(testAmbientSession, gp, lu)}
 	fm2.FilterUnionFactsForHandover(keepPT)
 	if FindRelatedUnionSess(testAmbientSession, fm2.UnionFacts, lu) == nil {
 		t.Fatal("pointee local union FactUnion must survive transitive keep", fm2.UnionFacts)
@@ -234,10 +234,10 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	body := &Block{StmID: 10, Func: f, LocalVars: []*Variable{lu}, Parent: &Block{StmID: 1, Func: f}}
 	f.Body = body
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	// Nested block: OOS locals only (parent != nil skips remove_function_local)
-	outPT := CloneFactSlice(fm.GlobalFacts)
+	outPT := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	UpdateFactsForOOSVars(body.LocalVars, &outPT)
 	fm.SetMapFactsOutForBlock(body, outPT)
 	if HasErrorSess(testAmbientSession) {
@@ -266,7 +266,7 @@ func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	callee.Param = []*Variable{p, nil}
 	fm := NewFactMgrSess(testAmbientSession, callee)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr), MakeFactPointTo(p, NullPtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, g, NullPtr), MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.CallerToCalleeHandover(nil, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("incomplete Param must fail closed nil inputs, not invent drop param", facts)
@@ -314,7 +314,7 @@ func TestRemoveRVFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	other := CreateVariableScalarsSess(testAmbientSession, "other_rv", GetIntTypeSess(testAmbientSession), false, false)
 	facts := []*FactPointTo{
-		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
+		MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
 		{Var: other, PointTo: []*Variable{NullPtr}},
 		{Var: f.RV, PointTo: []*Variable{NullPtr}},
 	}
@@ -341,7 +341,7 @@ func TestRemoveRVFactsMatchResidualSticky(t *testing.T) {
 	other := CreateVariableScalarsSess(testAmbientSession, "other_rv", GetIntTypeSess(testAmbientSession), false, false)
 	facts := []*FactPointTo{
 		{Var: other, PointTo: []*Variable{NullPtr}}, // IsRV; Match residual vs Type-nil f.RV
-		MakeFactPointTo(gp, NullPtr),
+		MakeFactPointToSess(testAmbientSession, gp, NullPtr),
 	}
 	fm.RemoveRVFacts(&facts)
 	if FactsComplete(facts) {
@@ -369,21 +369,21 @@ func TestAddParamFacts(t *testing.T) {
 	facts := []*FactPointTo{}
 	arg := &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fm.AddParamFacts([]*Expression{arg}, &facts)
-	got := FindRelatedPointTo(facts, p)
+	got := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if got == nil {
 		t.Fatal("param fact", facts)
 	}
-	if got.IsDead() {
+	if got.IsDeadSess(testAmbientSession) {
 		t.Fatal("null arg must not invent garbage")
 	}
-	if !got.IsNull() {
+	if !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("want null, got %+v", got.PointTo)
 	}
 	// missing arg → nullptr rhs → garbage via abstract
 	facts2 := []*FactPointTo{}
 	fm.AddParamFacts(nil, &facts2)
-	got2 := FindRelatedPointTo(facts2, p)
-	if got2 == nil || !got2.IsDead() {
+	got2 := FindRelatedPointToSess(testAmbientSession, facts2, p)
+	if got2 == nil || !got2.IsDeadSess(testAmbientSession) {
 		t.Fatal("nil args → garbage via abstract", facts2)
 	}
 }

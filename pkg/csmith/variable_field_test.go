@@ -96,7 +96,7 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	// MarkDeadVar / OOS must not invent leave field pointees live past hole
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, child)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, child)}
 	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("OOS incomplete FieldVars must clear facts, not invent live pointee", facts)
@@ -116,7 +116,7 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	blk := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, loc)}
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
 		t.Fatal("incomplete frame stack must fail closed incomplete, not invent empty complete")
 	}
@@ -142,7 +142,7 @@ func TestFindReachableFrameVarsIsVisibleResidualSticky(t *testing.T) {
 	// second good pointee that would invent partial frame set after residual soft-skip
 	loc2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
 	loc2.Name = "l_2"
-	facts := []*FactPointTo{MakeFactPointTo(p, loc), MakeFactPointTo(p, loc2)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, loc), MakeFactPointToSess(testAmbientSession, p, loc2)}
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
 		t.Fatal("IsVisibleLocal residual must fail closed incomplete frame set")
 	}

@@ -138,13 +138,13 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 		t.Fatal("itemize")
 	}
 	// facts keyed on collective only (C++ style)
-	facts := []*FactPointTo{MakeFactPointTo(&collAV.Variable, loc)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, &collAV.Variable, loc)}
 	// direct collective: pointing to local
-	if !IsPointingToLocals(&collAV.Variable, blk, 0, facts) {
+	if !IsPointingToLocalsSess(testAmbientSession, &collAV.Variable, blk, 0, facts) {
 		t.Fatal("collective array fact must detect local pointee")
 	}
 	// itemized member must use collective — same answer
-	if !IsPointingToLocals(&item.Variable, blk, 0, facts) {
+	if !IsPointingToLocalsSess(testAmbientSession, &item.Variable, blk, 0, facts) {
 		t.Fatal("itemized array must use collective points-to (FactPointTo.cpp:506–508)")
 	}
 	// as_return ExpressionVariable must reject itemized local-pointing array
@@ -174,7 +174,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 func TestIsPointingToLocalsNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky true (no invent not-local soft-skip)
-	if !IsPointingToLocals(nil, &Block{}, 0, nil) {
+	if !IsPointingToLocalsSess(testAmbientSession, nil, &Block{}, 0, nil) {
 		t.Fatal("nil Variable IsPointingToLocals must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -184,7 +184,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// incomplete PointTo sticky as pointing-to-locals
 	facts := []*FactPointTo{{Var: ptr, PointTo: []*Variable{nil}}}
-	if !IsPointingToLocals(ptr, &Block{}, 0, facts) {
+	if !IsPointingToLocalsSess(testAmbientSession, ptr, &Block{}, 0, facts) {
 		t.Fatal("nil pointee hole must fail closed as pointing-to-locals")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -195,8 +195,8 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
-	holeMap := []*FactPointTo{nil, MakeFactPointTo(ptr, loc)}
-	if !IsPointingToLocals(ptr, blk, 0, holeMap) {
+	holeMap := []*FactPointTo{nil, MakeFactPointToSess(testAmbientSession, ptr, loc)}
+	if !IsPointingToLocalsSess(testAmbientSession, ptr, blk, 0, holeMap) {
 		t.Fatal("incomplete map must fail closed as pointing-to-locals")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -205,8 +205,8 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete stack sticky true
 	badBlk := &Block{LocalVars: []*Variable{loc, nil}}
-	okFacts := []*FactPointTo{MakeFactPointTo(ptr, loc)}
-	if !IsPointingToLocals(ptr, badBlk, 0, okFacts) {
+	okFacts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, loc)}
+	if !IsPointingToLocalsSess(testAmbientSession, ptr, badBlk, 0, okFacts) {
 		t.Fatal("incomplete stack must fail closed as pointing-to-locals")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -216,7 +216,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	// Type-nil subject soft invent: IsPointer residual ERROR+false → not-local
 	// fair: sticky true (restrictive) before classify
 	shell := &Variable{Name: "g_typeless"}
-	if !IsPointingToLocals(shell, blk, 0, []*FactPointTo{}) {
+	if !IsPointingToLocalsSess(testAmbientSession, shell, blk, 0, []*FactPointTo{}) {
 		t.Fatal("Type-nil subject must fail closed as pointing-to-locals")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -226,8 +226,8 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	// Type-nil non-special pointee: IsPointer residual false skips recurse → invent not-local
 	// fair: sticky true before IsPointer gate
 	tyNilPointee := &Variable{Name: "l_typeless"}
-	factsTy := []*FactPointTo{MakeFactPointTo(ptr, tyNilPointee)}
-	if !IsPointingToLocals(ptr, blk, 0, factsTy) {
+	factsTy := []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, tyNilPointee)}
+	if !IsPointingToLocalsSess(testAmbientSession, ptr, blk, 0, factsTy) {
 		t.Fatal("Type-nil pointee must fail closed as pointing-to-locals")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -240,7 +240,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	loc2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
 	loc2.Name = "l_2"
 	badParent := &Block{LocalVars: []*Variable{loc2, nil}}
-	if !IsPointingToLocals(loc2, badParent, -1, nil) {
+	if !IsPointingToLocalsSess(testAmbientSession, loc2, badParent, -1, nil) {
 		t.Fatal("IsVisibleLocal residual must fail closed true pointing-to-locals")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -256,13 +256,13 @@ func TestIsPointingToLocals(t *testing.T) {
 	blk.LocalVars = []*Variable{loc}
 	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// fact points to local → true
-	facts := []*FactPointTo{MakeFactPointTo(ptr, loc)}
-	if !IsPointingToLocals(ptr, blk, 0, facts) {
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, loc)}
+	if !IsPointingToLocalsSess(testAmbientSession, ptr, blk, 0, facts) {
 		t.Fatal("points to local")
 	}
 	// points to null → false
-	facts = []*FactPointTo{MakeFactPointTo(ptr, NullPtr)}
-	if IsPointingToLocals(ptr, blk, 0, facts) {
+	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, NullPtr)}
+	if IsPointingToLocalsSess(testAmbientSession, ptr, blk, 0, facts) {
 		t.Fatal("null")
 	}
 }
@@ -364,8 +364,8 @@ func TestAddNewVarFactPointer(t *testing.T) {
 	// Variable.cpp:395 — pointer init Constant::make_random → "0" → null fact
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFact(p)
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
-	if fp == nil || !fp.IsNull() {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if fp == nil || !fp.IsNullSess(testAmbientSession) {
 		t.Fatalf("init null from make_random pointer, got %+v", fp)
 	}
 	// idempotent
@@ -388,12 +388,12 @@ func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	blk.LocalVars = append(blk.LocalVars, lp)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(lp, loc))
+	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointToSess(testAmbientSession, lp, loc))
 	// also a global pointer to global target (ok to return)
 	gt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	vs.GlobalList = []*Variable{gp, gt}
-	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(gp, gt))
+	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointToSess(testAmbientSession, gp, gt))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// many tries — should never return the local-pointing ptr when filter works
 	for seed := uint64(1); seed < 30; seed++ {

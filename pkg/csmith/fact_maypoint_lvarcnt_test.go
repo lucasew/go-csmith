@@ -13,17 +13,17 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 
 	// g_73 may-null before definitive-looking transfer fact {g_4}
 	facts := []*FactPointTo{
-		MakeFactPointToSet(g73, []*Variable{NullPtr, g4}),
+		MakeFactPointToSetSess(testAmbientSession, g73, []*Variable{NullPtr, g4}),
 	}
 	// facts_out for g_73 only (make_facts skipped null special)
 	// lvar_cnt==2 because lvars were {null, g_73} (may-point-to)
-	newFacts := []*FactPointTo{MakeFactPointToSet(g73, []*Variable{g4})}
+	newFacts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, g73, []*Variable{g4})}
 	_, ok := applyPointToAssignFacts(&facts, g73, 0, newFacts, 2)
 	if !ok {
 		t.Fatalf("apply failed err=%v", HasErrorSess(testAmbientSession))
 	}
-	fp := FindRelatedPointTo(facts, g73)
-	if fp == nil || !fp.IsNull() {
+	fp := FindRelatedPointToSess(testAmbientSession, facts, g73)
+	if fp == nil || !fp.IsNullSess(testAmbientSession) {
 		names := []string{}
 		if fp != nil {
 			for _, p := range fp.PointTo {
@@ -37,14 +37,14 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 
 	// Control: same newFacts with lvar_cnt==1 renews and drops null
 	facts2 := []*FactPointTo{
-		MakeFactPointToSet(g73, []*Variable{NullPtr, g4}),
+		MakeFactPointToSetSess(testAmbientSession, g73, []*Variable{NullPtr, g4}),
 	}
 	_, ok = applyPointToAssignFacts(&facts2, g73, 0, newFacts, 1)
 	if !ok {
 		t.Fatalf("renew apply failed err=%v", HasErrorSess(testAmbientSession))
 	}
-	fp2 := FindRelatedPointTo(facts2, g73)
-	if fp2 == nil || fp2.IsNull() {
+	fp2 := FindRelatedPointToSess(testAmbientSession, facts2, g73)
+	if fp2 == nil || fp2.IsNullSess(testAmbientSession) {
 		t.Fatal("lvar_cnt==1 renew must replace with {g_4} only (control)")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -56,9 +56,9 @@ func TestMergePointeesIncludesNullSpecial(t *testing.T) {
 	g73 := CreateVariableScalarsSess(testAmbientSession, "g_73c", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	g72 := CreateVariableScalarsSess(testAmbientSession, "g_72c", PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))), true, false)
 	factsIn := []*FactPointTo{
-		MakeFactPointToSet(g72, []*Variable{NullPtr, g73}),
+		MakeFactPointToSetSess(testAmbientSession, g72, []*Variable{NullPtr, g73}),
 	}
-	lvars := MergePointeesOfPointer(g72, 1, factsIn)
+	lvars := MergePointeesOfPointerSess(testAmbientSession, g72, 1, factsIn)
 	if !VariablesComplete(lvars) {
 		t.Fatalf("incomplete lvars err=%v", HasErrorSess(testAmbientSession))
 	}

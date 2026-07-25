@@ -105,10 +105,10 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	ClearPointToAggregatesSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, a), MakeFactPointTo(p, NullPtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	var ptrs []*Variable
 	var aliases [][]*Variable
-	if !UpdatePtrAliases(facts[:1], &ptrs, &aliases) || !UpdatePtrAliases(facts[1:], &ptrs, &aliases) {
+	if !UpdatePtrAliasesSess(testAmbientSession, facts[:1], &ptrs, &aliases) || !UpdatePtrAliasesSess(testAmbientSession, facts[1:], &ptrs, &aliases) {
 		t.Fatal("complete facts must succeed")
 	}
 	if len(ptrs) != 1 || len(aliases[0]) != 2 {
@@ -118,14 +118,14 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	// Type-nil non-special must fail closed (no invent soft-skip partial alias)
 	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntTypeSess(testAmbientSession), false, false)
 	broken.Type = nil
-	if UpdatePtrAliases([]*FactPointTo{MakeFactPointTo(broken, p)}, &ptrs, &aliases) {
+	if UpdatePtrAliasesSess(testAmbientSession, []*FactPointTo{MakeFactPointToSess(testAmbientSession, broken, p)}, &ptrs, &aliases) {
 		t.Fatal("Type-nil subject must fail closed UpdatePtrAliases")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil subject UpdatePtrAliases must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if UpdatePtrAliases([]*FactPointTo{nil}, &ptrs, &aliases) {
+	if UpdatePtrAliasesSess(testAmbientSession, []*FactPointTo{nil}, &ptrs, &aliases) {
 		t.Fatal("nil fact hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -140,7 +140,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	f := &Function{Name: "f", BuildState: BuildBuilt, IsBuilt: true}
 	fms := NewFactMgrMapSess(testAmbientSession)
 	fms.byFunc = map[*Function]*FactMgr{f: fm}
-	AggregateAllPointToSets([]*Function{f}, fms)
+	AggregateAllPointToSetsSess(testAmbientSession, []*Function{f}, fms)
 	if len(currentSession().AllPtrs) != 1 {
 		t.Fatal(currentSession().AllPtrs)
 	}
@@ -150,7 +150,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	}
 	// nil Function hole / missing FM fails closed sticky (clears aggregates)
 	ClearErrorSess(testAmbientSession)
-	AggregateAllPointToSets([]*Function{f, nil}, fms)
+	AggregateAllPointToSetsSess(testAmbientSession, []*Function{f, nil}, fms)
 	if len(currentSession().AllPtrs) != 0 {
 		t.Fatal("nil hole must clear aggregates", currentSession().AllPtrs)
 	}
@@ -158,7 +158,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 		t.Fatal("nil Function hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	AggregateAllPointToSets([]*Function{f}, nil)
+	AggregateAllPointToSetsSess(testAmbientSession, []*Function{f}, nil)
 	if len(currentSession().AllPtrs) != 0 {
 		t.Fatal("nil FactMgrMap must clear aggregates", currentSession().AllPtrs)
 	}
@@ -172,7 +172,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	fBad := &Function{Name: "f_bad", BuildState: BuildBuilt, IsBuilt: true}
 	fmsBad := NewFactMgrMapSess(testAmbientSession)
 	fmsBad.byFunc = map[*Function]*FactMgr{fBad: fmBad}
-	AggregateAllPointToSets([]*Function{fBad}, fmsBad)
+	AggregateAllPointToSetsSess(testAmbientSession, []*Function{fBad}, fmsBad)
 	if len(currentSession().AllPtrs) != 0 {
 		t.Fatal("incomplete GlobalFacts must clear aggregates", currentSession().AllPtrs)
 	}

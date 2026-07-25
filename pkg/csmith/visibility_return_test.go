@@ -80,8 +80,8 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 		t.Fatal("IsVarOnStack incomplete stack must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
-	MarkFuncEndOnFacts(&facts, f, blk)
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, loc)}
+	MarkFuncEndOnFactsSess(testAmbientSession, &facts, f, blk)
 	if FactsComplete(facts) {
 		t.Fatal("MarkFuncEndOnFacts must clear on incomplete stack, not invent live pointee", facts)
 	}
@@ -90,12 +90,12 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// facts slice always live; sticky no invent soft-skip mark past hole
-	MarkFuncEndOnFacts(nil, f, blk)
+	MarkFuncEndOnFactsSess(testAmbientSession, nil, f, blk)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts MarkFuncEndOnFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	facts2 := []*FactPointTo{MakeFactPointTo(p, loc)}
+	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, loc)}
 	out := RemoveFunctionLocalFactsAt(facts2, f, blk)
 	if FactsComplete(out) {
 		t.Fatal("RemoveFunctionLocalFactsAt must fail closed on incomplete stack", out)
@@ -138,7 +138,7 @@ func TestAddBackReturnFacts(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	retFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	retFacts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	st := Stmt{Kind: StmtReturn, StmID: 42}
 	fm.SetMapFactsOutPair(42, retFacts, []*FactUnion{})
 	body := &Block{Stmts: []Stmt{
@@ -206,8 +206,8 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// first return incomplete out
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		10: {MakeFactPointTo(p, NullPtr), nil},
-		20: {MakeFactPointTo(q, NullPtr)},
+		10: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
+		20: {MakeFactPointToSess(testAmbientSession, q, NullPtr)},
 	}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{
 		10: {},
@@ -229,8 +229,8 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	// nested if Then with incomplete return must stop before Else returns
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
-		30: {MakeFactPointTo(p, NullPtr), nil},
-		40: {MakeFactPointTo(q, NullPtr)},
+		30: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
+		40: {MakeFactPointToSess(testAmbientSession, q, NullPtr)},
 	}
 	fm2.MapUnionFactsOut = map[int][]*FactUnion{
 		30: {},
@@ -256,8 +256,8 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{
-		MakeFactPointTo(p, loc),
-		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
+		MakeFactPointToSess(testAmbientSession, p, loc),
+		MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
 	}
 	// second fact subject is l_p local-named — Match with l_1? no
 	lp := facts[1].Var
@@ -266,12 +266,12 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	if len(facts) != 1 || facts[0].Var != p {
 		t.Fatal(facts)
 	}
-	if !facts[0].IsDead() {
+	if !facts[0].IsDeadSess(testAmbientSession) {
 		t.Fatal("should mark dead pointee")
 	}
 	// nil fact hole fails closed sticky — no invent clean filter past hole
 	ClearErrorSess(testAmbientSession)
-	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	hole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	UpdateFactsForOOSVars([]*Variable{loc}, &hole)
 	if FactsComplete(hole) {
 		t.Fatal("nil fact hole must fail closed", hole)
@@ -281,7 +281,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil OOS var hole fails closed sticky
-	ok := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	ok := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	UpdateFactsForOOSVars([]*Variable{nil}, &ok)
 	if FactsComplete(ok) {
 		t.Fatal("nil OOS var hole must fail closed", ok)
@@ -306,7 +306,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	// Match residual: Type-nil OOS var soft invent was soft-continue keep later fact.
 	// Fair: sticky IncompleteFactSlice.
 	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	facts2 := []*FactPointTo{MakeFactPointTo(p2, NullPtr)}
+	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p2, NullPtr)}
 	holeOOS := &Variable{Name: "l_hole", Type: nil, FieldVars: nil}
 	// FieldVarsComplete for Type-nil with empty FieldVars is true (no nil holes)
 	UpdateFactsForOOSVars([]*Variable{holeOOS}, &facts2)

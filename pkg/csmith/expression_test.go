@@ -963,12 +963,12 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// mark as written so restore is observable if accum mutates
-	pre := CloneFactSlice(fm.GlobalFacts)
+	pre := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	// force failed user path: nil list / max funcs
 	list := &FunctionList{}
 	// std may succeed; use void type to force user and fail
@@ -976,7 +976,7 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	// facts should still be recoverable (either unchanged or restored)
 	if len(fm.GlobalFacts) != len(pre) {
 		// RestoreFacts may replace; ensure related fact still present
-		if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+		if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 			t.Fatal("facts lost")
 		}
 	}

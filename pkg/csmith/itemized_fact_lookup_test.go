@@ -28,21 +28,21 @@ func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
 	item.AsArray = item
 
 	// Only collective on lattice with live pointee (not dead/garbage).
-	facts := []*FactPointTo{MakeFactPointTo(&coll.Variable, tgt)}
-	if FindRelatedPointTo(facts, &item.Variable) != nil {
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, &coll.Variable, tgt)}
+	if FindRelatedPointToSess(testAmbientSession, facts, &item.Variable) != nil {
 		t.Fatal("itemized must not be dual-keyed on lattice")
 	}
 	currentSession().InUserInvocationRevisit = false
-	if IsValidPtr(&item.Variable, facts, 0, 0) {
-		t.Fatal("gen IsValidPtr(itemized) must miss without dual-reg")
+	if IsValidPtrSess(testAmbientSession, &item.Variable, facts, 0, 0) {
+		t.Fatal("gen IsValidPtrSess(testAmbientSession, itemized) must miss without dual-reg")
 	}
 	ClearErrorSess(testAmbientSession)
 	currentSession().InUserInvocationRevisit = true
 	defer func() { currentSession().InUserInvocationRevisit = false }()
-	if !IsValidPtr(&item.Variable, facts, 0, 0) {
-		t.Fatalf("revisit IsValidPtr(itemized) must fall back to collective err=%v", GetErrorSess(testAmbientSession))
+	if !IsValidPtrSess(testAmbientSession, &item.Variable, facts, 0, 0) {
+		t.Fatalf("revisit IsValidPtrSess(testAmbientSession, itemized) must fall back to collective err=%v", GetErrorSess(testAmbientSession))
 	}
-	if FindRelatedPointTo(facts, &item.Variable) != nil {
+	if FindRelatedPointToSess(testAmbientSession, facts, &item.Variable) != nil {
 		t.Fatal("fallback must not invent dual-reg entry")
 	}
 	ClearErrorSess(testAmbientSession)

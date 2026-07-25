@@ -128,7 +128,7 @@ func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	prev := ProcessOptionsSess(testAmbientSession)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// default dead prob 0 → dangling reject
 	opts := Defaults()
@@ -208,7 +208,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	cgMod := EmptyCGContext().WithSession(testAmbientSession)
 	cgMod.EffectStm = IncompleteEffect()
 	cgMod.FM = NewFactMgrSess(testAmbientSession, nil)
-	cgMod.FM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false))}
+	cgMod.FM.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false))}
 	if cgMod.VisitFactsLhs(lhsPtr, Defaults()) {
 		t.Fatal("PtrModified residual VisitFactsLhs must fail closed false")
 	}
@@ -247,7 +247,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 	opts.DeadPointerDerefProb = 0
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -262,7 +262,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 	// Fair: sticky false. pointee with incomplete EffectStm stickies CheckReadVar residual.
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
-	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectStm = IncompleteEffect()
 	eff2 := EmptyEffect()

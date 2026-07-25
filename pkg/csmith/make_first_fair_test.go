@@ -8,7 +8,7 @@ func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{StmID: 10}}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	prior := MakeFactPointTo(p, NullPtr)
+	prior := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	// no MapFactsOut[10]
 	// mirror MakeFirst handoff assign
@@ -16,10 +16,10 @@ func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 	if !FactsComplete(out) {
 		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
-		fm.GlobalFacts = CloneFactSlice(out)
+		fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, out)
 	}
 	// missing MapFactsOut is complete empty (C++ map[]); must not keep prior
-	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) != nil {
 		t.Fatal("missing body out must clear prior GlobalFacts, not invent keep prior")
 	}
 	if !FactsComplete(fm.GlobalFacts) {
@@ -32,15 +32,15 @@ func TestBodyOutAssignIncompleteFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{StmID: 11}}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		11: {MakeFactPointTo(p, NullPtr), nil},
+		11: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	out := fm.MapFactsOut[f.Body.StmID]
 	if !FactsComplete(out) {
 		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
-		fm.GlobalFacts = CloneFactSlice(out)
+		fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, out)
 	}
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body out must fail closed incomplete GlobalFacts")
@@ -53,13 +53,13 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	callee := &Function{Name: "g", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{StmID: 20}}
 	calFM := NewFactMgrSess(testAmbientSession, callee)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	calFM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	calFM.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	// no MapFactsOut[20]
 	var retFacts []*FactPointTo
 	var retUnions []*FactUnion
 	out := calFM.MapFactsOut[callee.Body.StmID]
 	if FactsComplete(out) {
-		retFacts = CloneFactSlice(out)
+		retFacts = CloneFactSliceSess(testAmbientSession, out)
 		retUnions = []*FactUnion{}
 		AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions)
 	}
@@ -71,15 +71,15 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	ret := Stmt{Kind: StmtReturn, StmID: 99}
 	callee.Body.Stmts = []Stmt{ret}
 	calFM.MapFactsOut = map[int][]*FactPointTo{
-		20: {MakeFactPointTo(p, NullPtr), nil},
-		99: {MakeFactPointTo(p, GarbagePtr)},
+		20: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
+		99: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr)},
 	}
 	calFM.MapUnionFactsOut = map[int][]*FactUnion{20: {}, 99: {}}
 	retFacts = nil
 	retUnions = nil
 	out = calFM.MapFactsOut[callee.Body.StmID]
 	if FactsComplete(out) {
-		retFacts = CloneFactSlice(out)
+		retFacts = CloneFactSliceSess(testAmbientSession, out)
 		retUnions = []*FactUnion{}
 		if !AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) {
 			retFacts = IncompleteFactSlice()
@@ -91,11 +91,11 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	}
 	// complete body out + incomplete return out — AddBack fails closed
 	calFM.MapFactsOut = map[int][]*FactPointTo{
-		20: {MakeFactPointTo(p, NullPtr)},
-		99: {MakeFactPointTo(p, GarbagePtr), nil},
+		20: {MakeFactPointToSess(testAmbientSession, p, NullPtr)},
+		99: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	calFM.MapUnionFactsOut = map[int][]*FactUnion{20: {}, 99: {}}
-	retFacts = CloneFactSlice(calFM.MapFactsOut[20])
+	retFacts = CloneFactSliceSess(testAmbientSession, calFM.MapFactsOut[20])
 	retUnions = []*FactUnion{}
 	ClearErrorSess(testAmbientSession)
 	if AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) || FactsComplete(retFacts) {

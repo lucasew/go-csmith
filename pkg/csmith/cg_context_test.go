@@ -58,7 +58,7 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st.Expr = &Expression{Term: TermVariable, Var: g, ExprType: GetIntTypeSess(testAmbientSession)}
 	fm.AddNewVarFact(g)
-	facts := CloneFactSlice(fm.GlobalFacts)
+	facts := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	// Parent block must be on stack for other paths; CurrBlk set from blk arg
 	f.Stack = []*Block{parent}
 	_ = ValidateAndUpdateFacts(st, &facts, &cg, Defaults(), parent)

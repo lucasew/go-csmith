@@ -350,12 +350,12 @@ func TestFindContainedLabels(t *testing.T) {
 func TestCombineBranchFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	preU := []*FactUnion{}
 	thenB := &Block{StmID: 10}
 	elseB := &Block{StmID: 11}
-	fm.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
-	fm.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	fm.SetMapFactsOut(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
+	fm.SetMapFactsOut(11, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
 	// both return → pre
 	st := &Stmt{
 		Kind: StmtIfElse,
@@ -378,11 +378,11 @@ func TestCombineBranchFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	CombineBranchFacts(st, &pre, &preU, fm)
-	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 		// both must return → pre facts
 	}
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
-	if fp == nil || !fp.IsNull() {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if fp == nil || !fp.IsNullSess(testAmbientSession) {
 		t.Fatal("both return use pre", fp)
 	}
 	// nil hole in branch outs fails closed sticky — no invent partial combine
@@ -390,16 +390,16 @@ func TestCombineBranchFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
-		10: {MakeFactPointTo(p, GarbagePtr), nil},
-		11: {MakeFactPointTo(p, NullPtr)},
+		10: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
+		11: {MakeFactPointToSess(testAmbientSession, p, NullPtr)},
 	}
 	st2 := &Stmt{
 		Kind: StmtIfElse,
 		Then: &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
-	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	pre2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
+	pre2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	preU2 := []*FactUnion{}
 	CombineBranchFacts(st2, &pre2, &preU2, fm2)
 	if FactsComplete(fm2.GlobalFacts) {
@@ -411,10 +411,10 @@ func TestCombineBranchFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// missing Then/Else arm — no invent empty branch via FactsComplete(nil)
 	fm3 := NewFactMgrSess(testAmbientSession, nil)
-	fm3.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm3.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	st3 := &Stmt{Kind: StmtIfElse, Then: &Block{StmID: 10}, Else: nil}
-	fm3.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
-	pre3 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm3.SetMapFactsOut(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
+	pre3 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	preU3 := []*FactUnion{}
 	CombineBranchFacts(st3, &pre3, &preU3, fm3)
 	if FactsComplete(fm3.GlobalFacts) {
@@ -426,14 +426,14 @@ func TestCombineBranchFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// arm Block StmID 0 — no invent empty outs via FactsComplete(nil)
 	fm4 := NewFactMgrSess(testAmbientSession, nil)
-	fm4.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm4.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	st4 := &Stmt{
 		Kind: StmtIfElse,
 		Then: &Block{StmID: IncompleteStmID, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
-	fm4.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	pre4 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm4.SetMapFactsOut(11, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	pre4 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	preU4 := []*FactUnion{}
 	CombineBranchFacts(st4, &pre4, &preU4, fm4)
 	if FactsComplete(fm4.GlobalFacts) {
@@ -446,9 +446,9 @@ func TestCombineBranchFacts(t *testing.T) {
 	// MustReturn residual soft invent was soft-continue branch-merge invent complete GlobalFacts.
 	// Then last is If with nil arm → MustReturn residual sticky false.
 	fm5 := NewFactMgrSess(testAmbientSession, nil)
-	fm5.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
-	fm5.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
-	fm5.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm5.SetMapFactsOut(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
+	fm5.SetMapFactsOut(11, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
+	fm5.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	st5 := &Stmt{
 		Kind: StmtIfElse,
 		Then: &Block{
@@ -457,7 +457,7 @@ func TestCombineBranchFacts(t *testing.T) {
 		},
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
-	pre5 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	pre5 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	preU5 := []*FactUnion{}
 	CombineBranchFacts(st5, &pre5, &preU5, fm5)
 	if FactsComplete(fm5.GlobalFacts) {
@@ -556,7 +556,7 @@ func TestPostCreationAssignFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -568,7 +568,7 @@ func TestPostCreationAssignFacts(t *testing.T) {
 	}
 	// pointer assign from variable of type int won't abstract well; use Null
 	st.Expr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
-	pre := CloneFactSlice(fm.GlobalFacts)
+	pre := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	PostCreationAnalysis(st, pre, nil, EmptyEffect(), &cg, Defaults())
 	if !fm.MapVisited[3] {
 		t.Fatal("visited")
@@ -655,7 +655,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	}
 	// Pre-install gen map as PostCreation would after saving EffectStm, then run
 	// full post_creation (saves EffectStm then special validate).
-	pre := []*FactPointTo{MakeFactPointTo(v, NullPtr)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, v, NullPtr)}
 	PostCreationAnalysis(st, pre, []*FactUnion{}, EmptyEffect(), &cg, opts)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("post_creation sticky", GetErrorSess(testAmbientSession))

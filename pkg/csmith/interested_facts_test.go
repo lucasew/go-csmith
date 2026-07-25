@@ -12,7 +12,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFact(p)
-	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 		t.Fatal("want pt fact")
 	}
 	// union fact should not be created when disabled
@@ -27,7 +27,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	AddInterestedFacts(FactCategoryUnionWrite)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.AddNewVarFact(p)
-	if FindRelatedPointTo(fm2.GlobalFacts, p) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fm2.GlobalFacts, p) != nil {
 		t.Fatal("pt disabled")
 	}
 	// FactUnion.cpp:82 assert(rhs); Constant init → fid 0 (no invent TOP on nil init)

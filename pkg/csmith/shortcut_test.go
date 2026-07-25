@@ -7,12 +7,12 @@ import (
 func TestSameFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	a := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	b := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	a := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
+	b := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	if !SameFacts(a, b) {
 		t.Fatal("same")
 	}
-	b2 := []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	b2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	if SameFacts(a, b2) {
 		t.Fatal("diff")
 	}
@@ -35,7 +35,7 @@ func TestSameFacts(t *testing.T) {
 		t.Fatal("SameFacts nil pointee must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindFact(ptHole, MakeFactPointTo(p, NullPtr)) >= 0 {
+	if FindFact(ptHole, MakeFactPointToSess(testAmbientSession, p, NullPtr)) >= 0 {
 		t.Fatal("FindFact incomplete map must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -45,7 +45,7 @@ func TestSameFacts(t *testing.T) {
 	// Equal residual soft invent was soft-continue later match invent found index.
 	// Fair: sticky -1. Want with PointTo hole stickies Equal residual false.
 	wantHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
-	complete := []*FactPointTo{MakeFactPointTo(p, NullPtr), MakeFactPointTo(p, GarbagePtr)}
+	complete := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	if FindFact(complete, wantHole) >= 0 {
 		t.Fatal("Equal residual FindFact must fail closed -1")
 	}
@@ -69,8 +69,8 @@ func TestSubsetFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// wider set implies narrower
-	wide := []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})}
-	narrow := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	wide := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})}
+	narrow := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	// subset_facts(narrow, wide): each narrow must be implied by related in wide
 	// wide.Imply(narrow) means wide covers narrow's points
 	if !SubsetFacts(narrow, wide) {
@@ -78,17 +78,17 @@ func TestSubsetFacts(t *testing.T) {
 		// Imply: f.Imply(other) means f covers other
 		// SubsetFacts(a,b): for each f1 in a, related f2 in b implies f1
 		// so f2.Imply(f1) — wide implies narrow ✓
-		if !wide[0].Imply(narrow[0]) {
+		if !wide[0].ImplySess(testAmbientSession, narrow[0]) {
 			t.Fatal("imply")
 		}
 		// size must match for subset_facts upstream
 		t.Log("size mismatch expected fail")
 	}
 	// same size: both one fact
-	if !SubsetFacts(narrow, []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})}) {
+	if !SubsetFacts(narrow, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})}) {
 		// related wide implies null-only? wide implies null-only yes
 		// wait SubsetFacts(narrow, wide2) with same len
-		w := []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})}
+		w := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})}
 		if !SubsetFacts(narrow, w) {
 			t.Fatal("subset")
 		}
@@ -106,7 +106,7 @@ func TestSubsetFacts(t *testing.T) {
 	// Imply residual: PointTo nil hole soft invent was soft-continue not-subset then invent subset later.
 	// Fair: sticky fail closed not-subset with ERROR.
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{NullPtr, nil}}
-	ok := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	ok := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	if SubsetFacts(ok, []*FactPointTo{broken}) {
 		t.Fatal("Imply residual must fail closed not-subset")
 	}
@@ -149,7 +149,7 @@ func TestSameFactVec(t *testing.T) {
 	u0 := MakeFactUnionSess(testAmbientSession, parent, 0)
 	u1 := MakeFactUnionSess(testAmbientSession, parent, 1)
 	pvar := CreateVariableScalarsSess(testAmbientSession, "g_p_sfv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	pt := []*FactPointTo{MakeFactPointTo(pvar, NullPtr)}
+	pt := []*FactPointTo{MakeFactPointToSess(testAmbientSession, pvar, NullPtr)}
 	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}) {
 		t.Fatal("same full vec")
 	}
@@ -537,8 +537,8 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// inject foreign RV into working facts
 	facts := []*FactPointTo{
-		MakeFactPointTo(otherRV, GarbagePtr),
-		MakeFactPointTo(f.RV, v),
+		MakeFactPointToSess(testAmbientSession, otherRV, GarbagePtr),
+		MakeFactPointToSess(testAmbientSession, f.RV, v),
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
@@ -557,12 +557,12 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 		}
 	}
 	// validate sets fact_in from pre-visit copy
-	pre := []*FactPointTo{MakeFactPointTo(v, GarbagePtr)}
+	pre := []*FactPointTo{MakeFactPointToSess(testAmbientSession, v, GarbagePtr)}
 	st2 := &Stmt{
 		Kind: StmtAssign, StmID: 43, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}, AssignOp: AssignSimple,
 	}
-	work := CloneFactSlice(pre)
+	work := CloneFactSliceSess(testAmbientSession, pre)
 	if !ValidateAndUpdateFacts(st2, &work, &cg, Defaults(), nil) {
 		t.Fatal("validate")
 	}
@@ -652,14 +652,14 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	fm.MapVisited = map[int]bool{20: true}
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
-	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{a, b})})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	root := &Stmt{Kind: StmtBlock, Then: body, StmID: 1}
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("expect unfixed when dest does not imply jump src")
 	}
 	// equal sets → fixed
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	if ContainsUnfixedGoto(root, fm) {
 		t.Fatal("equal should be fixed")
 	}
@@ -667,7 +667,7 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	// Fair: sticky unfixed true.
 	ClearErrorSess(testAmbientSession)
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{a, nil}}
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	fm.SetMapFactsIn(10, []*FactPointTo{broken})
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("Imply residual must fail closed unfixed")
@@ -676,9 +676,9 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 		t.Fatal("Imply residual ContainsUnfixedGoto must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	// incomplete srcOut hole: fail closed unfixed (no invent fixed past hole)
-	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointTo(p, a), nil}
+	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("incomplete MapFactsOut must fail closed unfixed")
 	}
@@ -721,28 +721,28 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	fm.MapVisited = map[int]bool{20: true}
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
-	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{a, b})})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	// Root is only the assign — goto lives outside this tree (sibling for)
 	assign := &body.Stmts[0]
 	if !ContainsUnfixedGoto(assign, fm) {
 		t.Fatal("inbound visited goto with non-imply dest facts must be unfixed")
 	}
 	// equal jump facts → fixed (no invent permanent unfixed)
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	if ContainsUnfixedGoto(assign, fm) {
 		t.Fatal("inbound goto with equal facts must be fixed")
 	}
 	// empty dest in + nonempty src out → unfixed (StatementGoto visit_facts special case)
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)})
 	fm.SetMapFactsIn(10, []*FactPointTo{})
 	if !ContainsUnfixedGoto(assign, fm) {
 		t.Fatal("nonempty srcOut + empty destIn must be unfixed")
 	}
 	// Shortcut must not reuse when unfixed (Statement.cpp:551–553)
 	ClearErrorSess(testAmbientSession)
-	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
-	facts := []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{a, b})})
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	fm.UnionFacts = []*FactUnion{}
 	fm.SetMapFactsInPair(10, facts, []*FactUnion{})
 	fm.SetMapFactsOutPair(10, facts, []*FactUnion{})
@@ -840,7 +840,7 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	facts := []*FactPointTo{MakeFactPointTo(v, GarbagePtr), nil}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, v, GarbagePtr), nil}
 	if StmVisitFacts(st, &facts, &cg, Defaults()) {
 		t.Fatal("incomplete inputs must fail closed")
 	}
@@ -865,7 +865,7 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	facts := []*FactPointTo{MakeFactPointTo(v, GarbagePtr), nil}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, v, GarbagePtr), nil}
 	if ValidateAndUpdateFacts(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("incomplete inputs must fail closed")
 	}
@@ -912,17 +912,17 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	in := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.SetMapFactsIn(8, in)
 	// plant hole bypassing SetMapFactsOut (CloneFactSlice strips holes)
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		8: {MakeFactPointTo(p, GarbagePtr), nil},
+		8: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	fm.SetMapStmEffect(8, EmptyEffect())
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	facts := CloneFactSlice(in)
+	facts := CloneFactSliceSess(testAmbientSession, in)
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("incomplete MapFactsOut must fail closed ShortcutNone")
 	}
@@ -951,16 +951,16 @@ func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	body := &Block{StmID: 70, Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}}}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	in := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.SetMapFactsIn(70, in)
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		70: {MakeFactPointTo(p, GarbagePtr), nil},
+		70: {MakeFactPointToSess(testAmbientSession, p, GarbagePtr), nil},
 	}
 	fm.SetMapStmEffect(70, EmptyEffect())
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	facts := CloneFactSlice(in)
+	facts := CloneFactSliceSess(testAmbientSession, in)
 	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutNone {
 		t.Fatal("block incomplete MapFactsOut must fail closed")
 	}

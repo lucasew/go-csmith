@@ -63,11 +63,11 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	f.Stack = []*Block{body}
 
 	entry := []*FactPointTo{
-		MakeFactPointTo(g99, g77),
-		MakeFactPointTo(g77, tgt),
+		MakeFactPointToSess(testAmbientSession, g99, g77),
+		MakeFactPointToSess(testAmbientSession, g77, tgt),
 	}
-	fm.SetMapFactsIn(body.StmID, CloneFactSlice(entry))
-	fm.GlobalFacts = CloneFactSlice(entry)
+	fm.SetMapFactsIn(body.StmID, CloneFactSliceSess(testAmbientSession, entry))
+	fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, entry)
 
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
@@ -79,7 +79,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	if !VisitFactsStatementIf(&ifSt, &cg, opts) {
 		t.Fatalf("gen VisitFacts if: err=%v", HasErrorSess(testAmbientSession))
 	}
-	if fg := FindRelatedPointTo(fm.GlobalFacts, g77); fg == nil || !fg.IsNull() {
+	if fg := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, g77); fg == nil || !fg.IsNullSess(testAmbientSession) {
 		t.Fatalf("after if, g77 must may-null, got %v", fg)
 	}
 	// Reinstall complete map_stm_effect (visit may rewrite)
@@ -157,11 +157,11 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	}
 	// is_loop_body = !mustBR && looping → false; no FP strip expected
 	entry := []*FactPointTo{
-		MakeFactPointTo(g99, g77),
-		MakeFactPointTo(g77, tgt),
+		MakeFactPointToSess(testAmbientSession, g99, g77),
+		MakeFactPointToSess(testAmbientSession, g77, tgt),
 	}
-	fm.SetMapFactsIn(body.StmID, CloneFactSlice(entry))
-	fm.GlobalFacts = CloneFactSlice(entry)
+	fm.SetMapFactsIn(body.StmID, CloneFactSliceSess(testAmbientSession, entry))
+	fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, entry)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	pre := EmptyEffect()

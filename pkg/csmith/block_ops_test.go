@@ -582,14 +582,14 @@ func TestAddNewVarFactTo(t *testing.T) {
 	}
 	var facts []*FactPointTo
 	AddNewVarFactTo(p, &facts)
-	got := FindRelatedPointTo(facts, p)
+	got := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if got == nil {
 		t.Fatal(facts)
 	}
-	if got.IsDead() {
+	if got.IsDeadSess(testAmbientSession) {
 		t.Fatal("must not invent garbage for null-init pointer")
 	}
-	if !got.IsNull() {
+	if !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("want null from init, got %+v", got.PointTo)
 	}
 	// idempotent
@@ -630,7 +630,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	}
 	v.FieldVars = []*Variable{nil, q}
 	// seed a prior fact so clear is observable vs empty start
-	prior := MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_other", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr)
+	prior := MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_other", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr)
 	facts := []*FactPointTo{prior}
 	AddNewVarFactInto(v, &facts)
 	if FactsComplete(facts) {
@@ -798,7 +798,7 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// mid-gen may-null
-	live := MakeFactPointToSet(p, []*Variable{NullPtr})
+	live := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr})
 	if live == nil {
 		t.Fatal("live")
 	}
@@ -811,14 +811,14 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 		fm.CFGEdges[len(fm.CFGEdges)-1].DestStmID = 51
 	}
 	// map_facts_in without may-null (stale entry) — FP would reinject issue if forced
-	fm.SetMapFactsIn(50, []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), true, false))})
+	fm.SetMapFactsIn(50, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), true, false))})
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	inner.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
 	// no FP → mid-gen may-null survives (after OOS of empty locals)
-	got := FindRelatedPointTo(fm.GlobalFacts, p)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("without has_edge_in(block), must not FP-wipe mid-gen may-null: %+v hasEdge=%v", got, fm.HasEdgeIn(50, false, true))
 	}
 	// ContainsBackEdge true would have invent-forced FP under old hasBack
@@ -840,7 +840,7 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	prior := MakeFactPointTo(p, GarbagePtr)
+	prior := MakeFactPointToSess(testAmbientSession, p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	fm.SetMapFactsIn(70, []*FactPointTo{prior})
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -850,7 +850,7 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	b.PostCreationAnalysis(&cg, Defaults(), pre, nil, nil)
 	// MapFactsOut missing (C++ map[] empty) → complete empty, not prior garbage
 	if _, ok := fm.MapFactsOut[70]; !ok {
-		if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+		if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) != nil {
 			t.Fatal("missing MapFactsOut must not invent keep prior GlobalFacts")
 		}
 		return
@@ -882,10 +882,10 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	b.Stmts[0].Lhs = &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	// plant hole in MapFactsIn (bypass SetMapFactsIn which stores nil for incomplete)
 	fm.MapFactsIn = map[int][]*FactPointTo{
-		80: {MakeFactPointTo(p, NullPtr), nil},
+		80: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -1109,8 +1109,8 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 	loc.Name = "l_1"
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{
-		MakeFactPointTo(loc, NullPtr),
-		MakeFactPointTo(f.RV, NullPtr),
+		MakeFactPointToSess(testAmbientSession, loc, NullPtr),
+		MakeFactPointToSess(testAmbientSession, f.RV, NullPtr),
 	}
 	body := &Block{Func: f, StmID: AllocStmID(), LocalVars: []*Variable{loc}}
 	f.Body = body
@@ -1124,7 +1124,7 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 		t.Fatal(st)
 	}
 	out := fm.MapFactsOut[st.StmID]
-	if FindRelatedPointTo(out, loc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, out, loc) != nil {
 		t.Fatal("local fact must drop on return out", out)
 	}
 }
@@ -1517,13 +1517,13 @@ func TestMakeDummyBlockCGFactIn(t *testing.T) {
 	f := &Function{Name: "builtin_x", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	b := MakeDummyBlockCG(&cg, opts)
 	if b == nil || b.StmID == 0 {
 		t.Fatal("nil dummy")
 	}
-	if in, ok := fm.MapFactsIn[b.StmID]; !ok || FindRelatedPointTo(in, p) == nil {
+	if in, ok := fm.MapFactsIn[b.StmID]; !ok || FindRelatedPointToSess(testAmbientSession, in, p) == nil {
 		t.Fatal("fact_in missing")
 	}
 	// stack popped after make
@@ -1622,9 +1622,9 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	// clean entry: g_p → g_t only
-	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	entry := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	// live GlobalFacts polluted as if mid-gen assign set may-null then stmt stripped
-	polluted := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	polluted := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, NullPtr})
 	if polluted == nil {
 		t.Fatal("make fact")
 	}
@@ -1639,20 +1639,20 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	if !ok {
 		t.Fatal("empty-body fixed-point must succeed")
 	}
-	got := FindRelatedPointTo(out, p)
+	got := FindRelatedPointToSess(testAmbientSession, out, p)
 	if got == nil {
 		t.Fatal("missing fact for g_p")
 	}
-	if got.IsNull() {
+	if got.IsNullSess(testAmbientSession) {
 		t.Fatalf("stripped may-null must not reinject into out: %v", got.PointTo)
 	}
 	// map_facts_out is the installed analysis env — must stay clean
 	mout := fm.GetMapFactsOut(100)
-	if g := FindRelatedPointTo(mout, p); g != nil && g.IsNull() {
+	if g := FindRelatedPointToSess(testAmbientSession, mout, p); g != nil && g.IsNullSess(testAmbientSession) {
 		t.Fatal("map_facts_out must not reinject stripped may-null")
 	}
 	// global_facts unchanged by find_fixed_point (C++); may still hold mid-gen
-	if g := FindRelatedPointTo(fm.GlobalFacts, p); g == nil || !g.IsNull() {
+	if g := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p); g == nil || !g.IsNullSess(testAmbientSession) {
 		t.Fatal("find_fixed_point must not assign global_facts from out")
 	}
 }
@@ -1663,8 +1663,8 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	inputs := []*FactPointTo{MakeFactPointTo(p, tgt)}
-	live := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	inputs := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
+	live := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, NullPtr})
 	if live == nil {
 		t.Fatal("live fact")
 	}
@@ -1678,12 +1678,12 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	facts := CloneFactSlice(inputs)
+	facts := CloneFactSliceSess(testAmbientSession, inputs)
 	if !StmVisitFacts(st, &facts, &cg, Defaults()) {
 		t.Fatalf("simple assign visit must ok hasErr=%v", HasErrorSess(testAmbientSession))
 	}
-	gotLive := FindRelatedPointTo(fm.GlobalFacts, p)
-	if gotLive == nil || !gotLive.IsNull() {
+	gotLive := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if gotLive == nil || !gotLive.IsNullSess(testAmbientSession) {
 		t.Fatalf("live GlobalFacts must restore mid-gen may-null: %+v", gotLive)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -1769,11 +1769,11 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	// mid-gen: may-null
-	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	mid := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, NullPtr})
 	if mid == nil {
 		t.Fatal("mid")
 	}
-	entry := []*FactPointTo{MakeFactPointTo(p, tgt)} // pre-block entry non-null only
+	entry := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)} // pre-block entry non-null only
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{mid}
 	b := &Block{StmID: 50, Func: f, Looping: true, LocalVars: nil}
@@ -1791,8 +1791,8 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	if !ok {
 		t.Fatalf("FP must succeed sticky=%v", HasErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(out, p)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, out, p)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("self-back must bring mid-gen may-null into out: %+v", got)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -1863,7 +1863,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	pointee := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// may-null entry (as after self-back merge of mid-gen)
-	entry := []*FactPointTo{MakeFactPointToSet(ptr, []*Variable{pointee, NullPtr})}
+	entry := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, ptr, []*Variable{pointee, NullPtr})}
 	// *g_p = 0
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
@@ -1873,7 +1873,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.GlobalFacts = CloneFactSlice(entry)
+	fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, entry)
 	fm.SetMapFactsIn(1, entry)
 	fm.MapVisited = map[int]bool{1: true}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -1900,8 +1900,8 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
-	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
-	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	entry := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
+	mid := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, NullPtr})
 	if mid == nil {
 		t.Fatal("mid fact")
 	}
@@ -1926,8 +1926,8 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	if !ok {
 		t.Fatalf("FP must succeed idx=%d err=%v", idx, HasErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(out, p)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, out, p)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("unrelated assign must keep self-back may-null on g_p, got %+v", got)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -1953,8 +1953,8 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	lu.Init = MakeIntSess(testAmbientSession, 0)
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	gu.Init = MakeIntSess(testAmbientSession, 0)
-	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
-	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	entry := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
+	mid := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, NullPtr})
 	if mid == nil {
 		t.Fatal("mid")
 	}
@@ -1975,7 +1975,7 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 		t.Fatalf("full visit must return pre-OOS post_facts ok=%v post=%v err=%v", ok, post, HasErrorSess(testAmbientSession))
 	}
 	// pre-OOS outputs include local facts
-	if FindRelatedPointTo(post, loc) == nil {
+	if FindRelatedPointToSess(testAmbientSession, post, loc) == nil {
 		t.Fatal("post_facts (pre-OOS) must include local var fact")
 	}
 	// pre-OOS eUnionWrite half includes body-local union subject (AddNewVarFact)
@@ -1990,7 +1990,7 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	}
 	// map_facts_out is post-OOS — local removed
 	mout := fm.GetMapFactsOut(1)
-	if FindRelatedPointTo(mout, loc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, mout, loc) != nil {
 		t.Fatal("map_facts_out must OOS local var")
 	}
 	moutU := fm.GetMapUnionFactsOut(1)
@@ -2038,7 +2038,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	outer := CreateVariableScalarsSess(testAmbientSession, "l_outer", pt, false, false)
 	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", GetIntTypeSess(testAmbientSession), false, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(outer, bodyLoc)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, outer, bodyLoc)}
 	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
@@ -2051,7 +2051,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 		LocalVars: []*Variable{bodyLoc},
 		Stmts:     []Stmt{asg},
 	}
-	fm.SetMapFactsIn(body.StmID, CloneFactSlice(fm.GlobalFacts))
+	fm.SetMapFactsIn(body.StmID, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts))
 	if fm.MapStmEffect == nil {
 		fm.MapStmEffect = make(map[int]Effect)
 	}
@@ -2062,7 +2062,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Pre-OOS live must not be dead before/during construction
-	if FindRelatedPointTo(fm.GlobalFacts, outer) == nil || FindRelatedPointTo(fm.GlobalFacts, outer).IsDead() {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, outer) == nil || FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, outer).IsDeadSess(testAmbientSession) {
 		t.Fatal("setup: outer must be live→bodyLoc")
 	}
 	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
@@ -2106,8 +2106,8 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 
 	// Pure entry (pre-body) in map_facts_in; live GlobalFacts already has may-null
 	// as after mid-gen *p=null assign before post_creation.
-	entry := []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{g})}
-	mayNull := []*FactPointTo{MakeFactPointToSet(&av.Variable, []*Variable{g, NullPtr})}
+	entry := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, &av.Variable, []*Variable{g})}
+	mayNull := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, &av.Variable, []*Variable{g, NullPtr})}
 	nullRHS := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
 	st := Stmt{
 		Kind: StmtAssign, StmID: 2, LhsVar: &av.Variable,
@@ -2122,7 +2122,7 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	f.Stack = []*Block{body}
 	fm.SetMapFactsIn(body.StmID, entry)
 	// Mid-gen lattice after null assign (pre-post_creation).
-	fm.GlobalFacts = CloneFactSlice(mayNull)
+	fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, mayNull)
 	// Stmt effect complete so set_accumulated_effect succeeds.
 	fm.SetMapStmEffect(st.StmID, EmptyEffect())
 
@@ -2135,8 +2135,8 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 		t.Fatalf("PostCreationAnalysis sticky err=%v", HasErrorSess(testAmbientSession))
 	}
 	inAfter := fm.GetMapFactsIn(body.StmID)
-	fpIn := FindRelatedPointTo(inAfter, &av.Variable)
-	if fpIn == nil || !fpIn.IsNull() {
+	fpIn := FindRelatedPointToSess(testAmbientSession, inAfter, &av.Variable)
+	if fpIn == nil || !fpIn.IsNullSess(testAmbientSession) {
 		pts := []string{}
 		if fpIn != nil {
 			for _, p := range fpIn.PointTo {
@@ -2149,7 +2149,7 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 			pts, fm.MapVisited[body.StmID])
 	}
 	// post_loop contract: map_facts_in keeps may-null for StatementFor.cpp:355 restore
-	if !factHasL233MayNull(inAfter) {
+	if !factHasL233MayNull(testAmbientSession, inAfter) {
 		t.Fatal("factHasL233MayNull map_facts_in")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -2219,8 +2219,8 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	}
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{
-		MakeFactPointTo(param, NullPtr),
-		MakeFactPointTo(gp, param),
+		MakeFactPointToSess(testAmbientSession, param, NullPtr),
+		MakeFactPointToSess(testAmbientSession, gp, param),
 	}
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	if fm.MapStmEffect == nil {
@@ -2265,8 +2265,8 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	fn.Body = body
 	fm2 := NewFactMgrSess(testAmbientSession, fn)
 	fm2.GlobalFacts = []*FactPointTo{
-		MakeFactPointTo(param, NullPtr),
-		MakeFactPointTo(gp, param),
+		MakeFactPointToSess(testAmbientSession, param, NullPtr),
+		MakeFactPointToSess(testAmbientSession, gp, param),
 	}
 	fm2.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, bodyLoc, 0)}
 	fm2.MapStmEffect = map[int]Effect{
@@ -2282,7 +2282,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 		t.Fatalf("function-body no-FP sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	// live: param subject still present (C++ OOS only local_vars, not remove_function_local)
-	if FindRelatedPointTo(fm2.GlobalFacts, param) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm2.GlobalFacts, param) == nil {
 		t.Fatal("no-FP live must not remove_function_local param subject", fm2.GlobalFacts)
 	}
 	// map_out: parent==nil strips params
@@ -2323,7 +2323,7 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	}
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm.UnionFacts = []*FactUnion{}
 	fm.MapStmEffect = map[int]Effect{
 		b.StmID:   EmptyEffect(),

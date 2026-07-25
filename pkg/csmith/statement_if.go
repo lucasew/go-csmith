@@ -36,7 +36,7 @@ func MakeRandomIf(
 	}
 	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition
 	// C++: FactVec pre_facts = fm->global_facts (shallow Fact* vector copy).
-	// Soft invent was CloneFactSlice (deep), which freezes the pre-condition
+	// Soft invent was CloneFactSliceSess(sessFromCG(cg), deep), which freezes the pre-condition
 	// lattice so mid-condition Join on shared Fact* (what C++ pre_facts observes)
 	// is lost on StatementIf.cpp:80–89 restore + re-visit. Soft invent was also
 	// PT-only snapshot so re-analyze left UnionFacts at post-condition last-writes.

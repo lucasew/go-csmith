@@ -25,19 +25,19 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	g106 := CreateVariableScalarsSess(testAmbientSession, "g_106", GetIntTypeSess(testAmbientSession), true, false)
 	l2181 := CreateVariableScalarsSess(testAmbientSession, "l_2181", GetIntTypeSess(testAmbientSession), false, false)
 	l2156 := CreateVariableScalarsSess(testAmbientSession, "l_2156", GetIntTypeSess(testAmbientSession), false, false)
-	wide := MakeFactPointToSet(g124, []*Variable{l2181, g106, l2156})
-	precise := MakeFactPointTo(g124, g106)
+	wide := MakeFactPointToSetSess(testAmbientSession, g124, []*Variable{l2181, g106, l2156})
+	precise := MakeFactPointToSess(testAmbientSession, g124, g106)
 
 	// Simulate: pre-visit clone would capture precise; post-visit live map is wide.
 	fm.SetMapFactsOutPair(10, []*FactPointTo{precise}, []*FactUnion{})
 	fm.SetMapFactsOutPair(10, []*FactPointTo{wide}, []*FactUnion{})
 
 	// Contract: re-fetch like C++ live reference must see wide lattice.
-	gotoIn := CloneFactSlice(fm.GetMapFactsOut(10))
+	gotoIn := CloneFactSliceSess(testAmbientSession, fm.GetMapFactsOut(10))
 	if HasErrorSess(testAmbientSession) || !FactsComplete(gotoIn) {
 		t.Fatalf("GetMapFactsOut: err=%v facts=%v", GetErrorSess(testAmbientSession), gotoIn)
 	}
-	got := FindRelatedPointTo(gotoIn, g124)
+	got := FindRelatedPointToSess(testAmbientSession, gotoIn, g124)
 	if got == nil || len(got.PointTo) < 3 {
 		t.Fatalf("re-fetch must see wide live lattice, got %v", ptsNamesGoto(got))
 	}
@@ -48,7 +48,7 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("UpdateFactsForDest sticky: %v", GetErrorSess(testAmbientSession))
 	}
-	outF := FindRelatedPointTo(gotoOut, g124)
+	outF := FindRelatedPointToSess(testAmbientSession, gotoOut, g124)
 	if outF == nil {
 		t.Fatal("goto_out missing g_124")
 	}
@@ -58,13 +58,13 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	}
 
 	// Statement.cpp:797–800 — dest-in precise does not imply wide jump-src → unfixed
-	destIn := []*FactPointTo{MakeFactPointTo(g124, g106)}
-	df := FindRelatedPointTo(destIn, g124)
-	sf := FindRelatedPointTo(gotoOut, g124)
+	destIn := []*FactPointTo{MakeFactPointToSess(testAmbientSession, g124, g106)}
+	df := FindRelatedPointToSess(testAmbientSession, destIn, g124)
+	sf := FindRelatedPointToSess(testAmbientSession, gotoOut, g124)
 	if df == nil || sf == nil {
 		t.Fatal("need both g_124 facts")
 	}
-	if df.Imply(sf) {
+	if df.ImplySess(testAmbientSession, sf) {
 		t.Fatal("precise dest must not imply wide jump src (contains_unfixed_goto path)")
 	}
 	ClearErrorSess(testAmbientSession)

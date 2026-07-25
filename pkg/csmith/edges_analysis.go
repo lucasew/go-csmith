@@ -46,7 +46,7 @@ func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactP
 		if isReturnVar(f.Var) {
 			continue
 		}
-		jumpF := FindRelatedPointTo(jumpFacts, f.Var)
+		jumpF := FindRelatedPointToSess(s, jumpFacts, f.Var)
 		// residual ERROR sticky — no invent soft-continue garbage path past FindRelated residual
 		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
@@ -54,7 +54,7 @@ func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactP
 		}
 		if jumpF == nil {
 			// jump over initializer → garbage
-			jumpF = MakeFactPointTo(f.Var, GarbagePtr)
+			jumpF = MakeFactPointToSess(s, f.Var, GarbagePtr)
 			if jumpF == nil || sessHasError(s) {
 				if !sessHasError(s) {
 					sessNoteError(s, ErrGeneric)
@@ -63,7 +63,7 @@ func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactP
 				return false, false
 			}
 		}
-		before := FindRelatedPointTo(*facts, f.Var)
+		before := FindRelatedPointToSess(s, *facts, f.Var)
 		// residual ERROR sticky — no invent soft-continue merge past FindRelated residual
 		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
@@ -77,7 +77,7 @@ func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactP
 			return false, false
 		}
 		*facts = merged
-		after := FindRelatedPointTo(*facts, f.Var)
+		after := FindRelatedPointToSess(s, *facts, f.Var)
 		// residual ERROR sticky — no invent soft-continue equal check past FindRelated residual
 		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
@@ -87,7 +87,7 @@ func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactP
 			changed = true
 			continue
 		}
-		eq := before.Equal(after)
+		eq := before.EqualSess(s, after)
 		// residual ERROR sticky — no invent soft-continue no-change past Equal residual hole
 		if sessHasError(s) {
 			*facts = IncompleteFactSlice()

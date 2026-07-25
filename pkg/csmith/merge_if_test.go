@@ -6,19 +6,19 @@ func TestFactPointToImplyJoin(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	wide := MakeFactPointToSet(p, []*Variable{a, b})
-	narrow := MakeFactPointTo(p, a)
-	if !wide.Imply(narrow) {
+	wide := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{a, b})
+	narrow := MakeFactPointToSess(testAmbientSession, p, a)
+	if !wide.ImplySess(testAmbientSession, narrow) {
 		t.Fatal("wide implies narrow")
 	}
-	if narrow.Imply(wide) {
+	if narrow.ImplySess(testAmbientSession, wide) {
 		t.Fatal("narrow not imply wide")
 	}
-	n2 := narrow.Clone()
-	if !n2.Join(MakeFactPointTo(p, b)) {
+	n2 := narrow.CloneSess(testAmbientSession)
+	if !n2.JoinSess(testAmbientSession, MakeFactPointToSess(testAmbientSession, p, b)) {
 		t.Fatal("join changed")
 	}
-	if !n2.Imply(wide) || !wide.Imply(n2) {
+	if !n2.ImplySess(testAmbientSession, wide) || !wide.ImplySess(testAmbientSession, n2) {
 		// same set
 		if len(n2.PointTo) != 2 {
 			t.Fatal(len(n2.PointTo))
@@ -33,10 +33,10 @@ func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	base := MakeFactPointTo(p, a)
+	base := MakeFactPointToSess(testAmbientSession, p, a)
 	hole := &FactPointTo{Var: p, PointTo: []*Variable{nil, b}}
-	cp := base.Clone()
-	if cp.Join(hole) {
+	cp := base.CloneSess(testAmbientSession)
+	if cp.JoinSess(testAmbientSession, hole) {
 		t.Fatal("Join must fail closed on nil pointee hole, not soft-skip")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -46,21 +46,21 @@ func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
 	if len(cp.PointTo) != 1 || cp.PointTo[0] != a {
 		t.Fatal("Join must not partially absorb past hole", cp.PointTo)
 	}
-	if base.Imply(hole) {
+	if base.ImplySess(testAmbientSession, hole) {
 		t.Fatal("Imply must fail closed on other nil pointee")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Imply other nil pointee must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if hole.Imply(base) {
+	if hole.ImplySess(testAmbientSession, base) {
 		t.Fatal("Imply must fail closed on self nil pointee")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Imply self nil pointee must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if base.Equal(hole) || hole.Equal(base) {
+	if base.EqualSess(testAmbientSession, hole) || hole.EqualSess(testAmbientSession, base) {
 		t.Fatal("equal must fail closed on nil pointee")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -74,15 +74,15 @@ func TestMergeFactLattice(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, a)}
-	facts = MergeFactInto(facts, MakeFactPointTo(p, b))
-	fp := FindRelatedPointTo(facts, p)
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	facts = MergeFactIntoSess(testAmbientSession, facts, MakeFactPointToSess(testAmbientSession, p, b))
+	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if fp == nil || len(fp.PointTo) != 2 {
 		t.Fatalf("%+v", fp)
 	}
 	// weaker fact no change
 	n := len(facts)
-	facts = MergeFactInto(facts, MakeFactPointTo(p, a))
+	facts = MergeFactIntoSess(testAmbientSession, facts, MakeFactPointToSess(testAmbientSession, p, a))
 	if len(facts) != n {
 		t.Fatal("len")
 	}
@@ -91,7 +91,7 @@ func TestMergeFactLattice(t *testing.T) {
 func TestMergeFactsNilAccumulatorSticky(t *testing.T) {
 	// Fact merge always has live accumulator; sticky no invent soft-skip join
 	ClearErrorSess(testAmbientSession)
-	if MergeFacts(nil, nil) {
+	if MergeFactsSess(testAmbientSession, nil, nil) {
 		t.Fatal("nil facts must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -104,23 +104,23 @@ func TestMergeFacts(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, a)}
-	other := []*FactPointTo{MakeFactPointTo(q, a), MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false))}
-	MergeFacts(&facts, other)
-	if FindRelatedPointTo(facts, q) == nil {
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	other := []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, a), MakeFactPointToSess(testAmbientSession, p, CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false))}
+	MergeFactsSess(testAmbientSession, &facts, other)
+	if FindRelatedPointToSess(testAmbientSession, facts, q) == nil {
 		t.Fatal("q")
 	}
-	if len(FindRelatedPointTo(facts, p).PointTo) < 2 {
+	if len(FindRelatedPointToSess(testAmbientSession, facts, p).PointTo) < 2 {
 		t.Fatal("p joined")
 	}
 	// nil hole fails closed sticky — no invent skip partial join / soft re-pick past wipe
 	ClearErrorSess(testAmbientSession)
-	hole := []*FactPointTo{MakeFactPointTo(p, a), nil}
-	base := []*FactPointTo{MakeFactPointTo(q, a)}
-	if MergeFacts(&base, hole) {
+	hole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
+	base := []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, a)}
+	if MergeFactsSess(testAmbientSession, &base, hole) {
 		t.Fatal("nil new hole must fail closed")
 	}
-	if FindRelatedPointTo(base, p) != nil {
+	if FindRelatedPointToSess(testAmbientSession, base, p) != nil {
 		t.Fatal("must not invent partial merge past hole")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -130,8 +130,8 @@ func TestMergeFacts(t *testing.T) {
 	// PointTo nil hole: Imply/Join residual soft invent was soft-continue merge later.
 	// Fair: sticky wipe IncompleteFactSlice whole MergeFacts.
 	brokenPT := &FactPointTo{Var: p, PointTo: []*Variable{a, nil}}
-	base2 := []*FactPointTo{MakeFactPointTo(p, a)}
-	if MergeFacts(&base2, []*FactPointTo{brokenPT}) {
+	base2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	if MergeFactsSess(testAmbientSession, &base2, []*FactPointTo{brokenPT}) {
 		t.Fatal("PointTo nil hole must fail closed MergeFacts")
 	}
 	if FactsComplete(base2) {
@@ -141,7 +141,7 @@ func TestMergeFacts(t *testing.T) {
 		t.Fatal("PointTo nil hole MergeFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FactsComplete(MergeFactInto(facts, nil)) {
+	if FactsComplete(MergeFactIntoSess(testAmbientSession, facts, nil)) {
 		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -149,7 +149,7 @@ func TestMergeFacts(t *testing.T) {
 	}
 	// MergeFactInto incomplete map marker stays non-sticky (soft re-pick); MergeFacts sticks.
 	ClearErrorSess(testAmbientSession)
-	if FactsComplete(MergeFactInto([]*FactPointTo{MakeFactPointTo(p, a), nil}, MakeFactPointTo(p, a))) {
+	if FactsComplete(MergeFactIntoSess(testAmbientSession, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}, MakeFactPointToSess(testAmbientSession, p, a))) {
 		t.Fatal("incomplete map MergeFactInto must fail closed")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -190,7 +190,7 @@ func TestIfMergesFacts(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	vs.GlobalList = []*Variable{p, a, b, CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	f.Stack = []*Block{{Func: f}}
@@ -199,7 +199,7 @@ func TestIfMergesFacts(t *testing.T) {
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal("if")
 	}
-	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {
 		t.Fatal("p fact lost")
 	}
 }

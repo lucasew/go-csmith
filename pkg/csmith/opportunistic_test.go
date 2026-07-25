@@ -5,18 +5,18 @@ import "testing"
 func TestOpportunisticValidateNoDeref(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), v, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 1 {
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), v, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 1 {
 		t.Fatal("same level")
 	}
 	// nil var/type sticky — no invent not-valid soft success past hole
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), nil, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 0 {
 		t.Fatal("nil var must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var OpportunisticValidate must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), v, nil, nil, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), v, nil, nil, 0, 0) != 0 {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -29,11 +29,11 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// nil facts is complete empty — no related fact → 0
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 0 {
 		t.Fatal("no fact")
 	}
 	// incomplete map hole → 0 sticky (not invent ok / soft re-pick past hole)
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), []*FactPointTo{nil}, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), []*FactPointTo{nil}, 0, 0) != 0 {
 		t.Fatal("incomplete must reject")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -41,10 +41,10 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// null, prob 0 → 0; FactPointTo.cpp:455 still rnd_flipcoin(0)
-	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	rNull := NewRngSess(testAmbientSession, 1)
 	d0 := rNull.RandDepth()
-	if OpportunisticValidate(rNull, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, rNull, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
 		t.Fatal("null blocked")
 	}
 	if rNull.RandDepth() != d0+1 {
@@ -52,20 +52,20 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	}
 	// live target → 1 (no flip when not null/dead)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	facts = []*FactPointTo{MakeFactPointTo(p, tgt)}
+	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	rLive := NewRngSess(testAmbientSession, 1)
 	dLive := rLive.RandDepth()
-	if OpportunisticValidate(rLive, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 1 {
+	if OpportunisticValidateSess(testAmbientSession, rLive, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 1 {
 		t.Fatal("live")
 	}
 	if rLive.RandDepth() != dLive {
 		t.Fatalf("live pointees must not flipcoin: depth %d → %d", dLive, rLive.RandDepth())
 	}
 	// garbage, prob 0 → 0; FactPointTo.cpp:464 still rnd_flipcoin(0)
-	facts = []*FactPointTo{NewFactPointTo(p)}
+	facts = []*FactPointTo{NewFactPointToSess(testAmbientSession, p)}
 	rDead := NewRngSess(testAmbientSession, 1)
 	dDead := rDead.RandDepth()
-	if OpportunisticValidate(rDead, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, rDead, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
 		t.Fatal("dead blocked")
 	}
 	if rDead.RandDepth() != dDead+1 {
@@ -75,18 +75,18 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 		t.Fatal("complete dead blocked must not sticky")
 	}
 	// null+dead both set: two flips (null then dead)
-	facts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	// make dead+null fact: NewFactPointTo is garbage/dead; force null+dead via fields
-	fBoth := MakeFactPointTo(p, NullPtr)
+	fBoth := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	// IsDead for null pointees? if only null, one flip. dead-only above. allow-unsafe path:
 	rAllow := NewRngSess(testAmbientSession, 1)
-	if OpportunisticValidate(rAllow, p, GetIntTypeSess(testAmbientSession), []*FactPointTo{fBoth}, 100, 0) != 2 {
+	if OpportunisticValidateSess(testAmbientSession, rAllow, p, GetIntTypeSess(testAmbientSession), []*FactPointTo{fBoth}, 100, 0) != 2 {
 		// p=100 always allows null unsafe when is_null
 		t.Fatal("null with nullProb=100 must allow ret=2")
 	}
 	// nil r on null path sticky (C++ always has process RNG for flipcoin)
 	ClearErrorSess(testAmbientSession)
-	if OpportunisticValidate(nil, p, GetIntTypeSess(testAmbientSession), []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 0, 0) != 0 {
+	if OpportunisticValidateSess(testAmbientSession, nil, p, GetIntTypeSess(testAmbientSession), []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 0, 0) != 0 {
 		t.Fatal("nil r null path must reject")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -108,7 +108,7 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 	}
 	coll.AsArray = coll
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", elem, false, false)
-	facts := []*FactPointTo{MakeFactPointTo(&coll.Variable, tgt)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, &coll.Variable, tgt)}
 	// itemized member of that collective
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_arr", Type: pt, IsArray: true, ArraySizes: []int{3}},
@@ -116,15 +116,15 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 		Collective: coll,
 	}
 	item.AsArray = item
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), &item.Variable, elem, facts, 0, 0) != 1 {
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), &item.Variable, elem, facts, 0, 0) != 1 {
 		t.Fatal("itemized must find fact via get_collective()")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete collective path must not sticky")
 	}
 	// fact keyed only on item (not collective) must miss when looking up via collective
-	factsItemOnly := []*FactPointTo{MakeFactPointTo(&item.Variable, tgt)}
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), &item.Variable, elem, factsItemOnly, 0, 0) != 0 {
+	factsItemOnly := []*FactPointTo{MakeFactPointToSess(testAmbientSession, &item.Variable, tgt)}
+	if OpportunisticValidateSess(testAmbientSession, NewRngSess(testAmbientSession, 1), &item.Variable, elem, factsItemOnly, 0, 0) != 0 {
 		t.Fatal("fact on item alone must miss when lookup uses collective identity")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -226,13 +226,13 @@ func TestHasDereferenceableVar(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if !HasDereferenceableVar([]*Variable{p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("valid ptr")
 	}
 	// garbage not valid
-	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(p)}
+	fm.GlobalFacts = []*FactPointTo{NewFactPointToSess(testAmbientSession, p)}
 	if HasDereferenceableVar([]*Variable{p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("dead")
 	}
@@ -248,7 +248,7 @@ func TestHasDereferenceableVar(t *testing.T) {
 	// IsArray without AsArray soft invent was residual soft-continue then true
 	// from later good ptr. Fair: sticky fail closed whole probe.
 	shell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	if HasDereferenceableVar([]*Variable{shell, p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("IsArray without AsArray HasDereferenceableVar must fail closed false")
 	}
@@ -258,7 +258,7 @@ func TestHasDereferenceableVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsValidPtr residual soft invent was soft-continue later good invent true.
 	// Fair: sticky false. incomplete facts on first candidate stickies residual.
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt), nil}
 	if HasDereferenceableVar([]*Variable{p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("IsValidPtr residual (incomplete facts) must fail closed false")
 	}

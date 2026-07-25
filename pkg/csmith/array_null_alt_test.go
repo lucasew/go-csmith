@@ -25,8 +25,8 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(HasErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &av.Variable)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("primary pointer-0 must yield null/may-null, got %+v", got)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -46,8 +46,8 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 		Sizes:    []int{10},
 	}
 	arr.AsArray = arr
-	entryMay := MakeFactPointToSet(&arr.Variable, []*Variable{g, NullPtr})
-	outDef := MakeFactPointTo(&arr.Variable, g)
+	entryMay := MakeFactPointToSetSess(testAmbientSession, &arr.Variable, []*Variable{g, NullPtr})
+	outDef := MakeFactPointToSess(testAmbientSession, &arr.Variable, g)
 	body := &Block{StmID: 25, Func: f, Looping: true}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(25, []*FactPointTo{entryMay})
@@ -57,8 +57,8 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{outDef}, nil, EmptyEffect(), &cg)
-	got := FindRelatedPointTo(fm.GlobalFacts, &arr.Variable)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, &arr.Variable)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("post_loop must install map_in may-null (not map_out definitive): %+v", got)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -74,7 +74,7 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	ptType := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ptType, false, false)
-	entry := []*FactPointTo{MakeFactPointToSet(p, []*Variable{g, NullPtr})}
+	entry := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{g, NullPtr})}
 	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
@@ -87,7 +87,7 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	fm.SetMapFactsIn(1, entry)
 	fm.MapVisited = map[int]bool{1: true}
 	fm.ResetBlockFactMaps(b)
-	factsCopy := CloneFactSlice(entry)
+	factsCopy := CloneFactSliceSess(testAmbientSession, entry)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
@@ -96,8 +96,8 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	if !ok {
 		t.Fatalf("FP after reset must succeed err=%v", HasErrorSess(testAmbientSession))
 	}
-	got := FindRelatedPointTo(fm.GetMapFactsIn(1), p)
-	if got == nil || !got.IsNull() {
+	got := FindRelatedPointToSess(testAmbientSession, fm.GetMapFactsIn(1), p)
+	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatalf("map_in after FP must keep entry may-null: %+v", got)
 	}
 	ClearErrorSess(testAmbientSession)

@@ -28,7 +28,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 		t.Fatal("MakeFactUnion body", HasErrorSess(testAmbientSession))
 	}
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), true, false)
-	pt := MakeFactPointTo(p, NullPtr)
+	pt := MakeFactPointToSess(testAmbientSession, p, NullPtr)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{pt}
 	fm.UnionFacts = []*FactUnion{entryU}
@@ -36,7 +36,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	fm.SetMapFactsIn(10, fm.GlobalFacts)
 	// mutate live lattice as body would
 	fm.UnionFacts = []*FactUnion{bodyU}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	// post_loop: global_facts = map_facts_in[&body]
 	fm.AssignGlobalFactsFromMapIn(10)
 	if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
@@ -46,8 +46,8 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	if got == nil || got.LastWrittenFID != 0 {
 		t.Fatalf("want entry last-write 0 restored, got %+v", fm.UnionFacts)
 	}
-	gotPT := FindRelatedPointTo(fm.GlobalFacts, p)
-	if gotPT == nil || !gotPT.IsNull() {
+	gotPT := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if gotPT == nil || !gotPT.IsNullSess(testAmbientSession) {
 		t.Fatalf("want entry PT null restored, got %+v", fm.GlobalFacts)
 	}
 }
@@ -70,17 +70,17 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	preU := MakeFactUnionSess(testAmbientSession, uv, 0)
 	liveU := MakeFactUnionSess(testAmbientSession, uv, FactUnionBottom)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), true, false)
-	prePT := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	prePT := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.RestoreFactsPair(prePT, []*FactUnion{preU})
 	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
 	if got == nil || got.LastWrittenFID != 0 {
 		t.Fatalf("restore pair want fid 0, got %+v", fm.UnionFacts)
 	}
-	gotPT := FindRelatedPointTo(fm.GlobalFacts, p)
-	if gotPT == nil || !gotPT.IsNull() {
+	gotPT := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if gotPT == nil || !gotPT.IsNullSess(testAmbientSession) {
 		t.Fatalf("restore pair want null PT, got %+v", fm.GlobalFacts)
 	}
 }

@@ -23,8 +23,8 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	fn.Body = body
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	facts := []*FactPointTo{
-		MakeFactPointTo(p, NullPtr),
-		MakeFactPointTo(g, p),
+		MakeFactPointToSess(testAmbientSession, p, NullPtr),
+		MakeFactPointToSess(testAmbientSession, g, p),
 	}
 	fm.SetMapFactsOutForBlock(body, facts)
 	if HasErrorSess(testAmbientSession) {
@@ -66,8 +66,8 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	inner := &Block{Func: fn, Parent: body, StmID: AllocStmID()}
 	facts2 := []*FactPointTo{
-		MakeFactPointTo(p, NullPtr),
-		MakeFactPointTo(g, p),
+		MakeFactPointToSess(testAmbientSession, p, NullPtr),
+		MakeFactPointToSess(testAmbientSession, g, p),
 	}
 	fm.SetMapFactsOutForBlock(inner, facts2)
 	if HasErrorSess(testAmbientSession) {

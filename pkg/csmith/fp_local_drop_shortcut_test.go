@@ -18,23 +18,23 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_pt", GetIntTypeSess(testAmbientSession), false, false)
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_body", GetIntTypeSess(testAmbientSession), false, false)
 	// Point-to facts: g and local both point to g
-	ptG := MakeFactPointTo(g, g)
-	ptLoc := MakeFactPointTo(loc, g)
+	ptG := MakeFactPointToSess(testAmbientSession, g, g)
+	ptLoc := MakeFactPointToSess(testAmbientSession, loc, g)
 	if ptG == nil || ptLoc == nil {
 		t.Fatal("facts")
 	}
-	entry := []*FactPointTo{ptG.Clone()}
+	entry := []*FactPointTo{ptG.CloneSess(testAmbientSession)}
 	// map_in is entry without body local (as after Drop)
 	b := &Block{
 		Func: f, StmID: AllocStmID(), Looping: true,
 		LocalVars: []*Variable{loc},
 		Stmts:     []Stmt{},
 	}
-	fm.SetMapFactsIn(b.StmID, CloneFactSlice(entry))
-	fm.SetMapFactsOut(b.StmID, CloneFactSlice(entry))
+	fm.SetMapFactsIn(b.StmID, CloneFactSliceSess(testAmbientSession, entry))
+	fm.SetMapFactsOut(b.StmID, CloneFactSliceSess(testAmbientSession, entry))
 	fm.MapVisited[b.StmID] = true
 	// Self-back edge whose out still lists body local (goto/break-style pollution)
-	outWithLocal := []*FactPointTo{ptG.Clone(), ptLoc.Clone()}
+	outWithLocal := []*FactPointTo{ptG.CloneSess(testAmbientSession), ptLoc.CloneSess(testAmbientSession)}
 	// Use a dummy src statement id that has out with local
 	srcID := AllocStmID()
 	fm.SetMapFactsOut(srcID, outWithLocal)
@@ -45,18 +45,18 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	pre := EmptyEffect()
 	cg.EffectAccum = &pre
-	fm.GlobalFacts = CloneFactSlice(entry)
+	fm.GlobalFacts = CloneFactSliceSess(testAmbientSession, entry)
 	fm.UnionFacts = []*FactUnion{}
 
 	// First call visitOnce=true forces full walk; second with false should shortcut
 	// if drop-before-shortcut makes same_facts match after first set_fact_in.
-	_, _, _, ok1 := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), true)
+	_, _, _, ok1 := FindFixedPointBlock(b, CloneFactSliceSess(testAmbientSession, entry), &cg, Defaults(), true)
 	if !ok1 && HasErrorSess(testAmbientSession) {
 		// may fail on empty body; still check map_in shape
 		ClearErrorSess(testAmbientSession)
 	}
 	inAfter := fm.GetMapFactsIn(b.StmID)
-	if FindRelatedPointTo(inAfter, loc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, inAfter, loc) != nil {
 		t.Fatal("map_facts_in must not keep body local after FP store")
 	}
 	// Reset visited and force second iteration path: visited true, visitOnce false
@@ -64,7 +64,7 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	// Simulate currentInputs after merge including local — Drop must make shortcut OK.
 	// Call FP again with entry; merge will reintroduce local from src out.
 	ClearErrorSess(testAmbientSession)
-	_, _, _, ok2 := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), false)
+	_, _, _, ok2 := FindFixedPointBlock(b, CloneFactSliceSess(testAmbientSession, entry), &cg, Defaults(), false)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("sticky err after second FP: %v", GetErrorSess(testAmbientSession))
 	}
@@ -74,7 +74,7 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 		t.Log("second FP returned false; may be empty-body policy — map_in check is primary")
 	}
 	in2 := fm.GetMapFactsIn(b.StmID)
-	if FindRelatedPointTo(in2, loc) != nil {
+	if FindRelatedPointToSess(testAmbientSession, in2, loc) != nil {
 		t.Fatal("map_facts_in must still exclude body local after second FP")
 	}
 	_ = ok1

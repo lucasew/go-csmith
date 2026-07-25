@@ -5,18 +5,18 @@ import "testing"
 func TestMarkDeadVar(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	f := MakeFactPointTo(p, tgt)
-	nf := f.MarkDeadVar(tgt)
-	if nf == nil || !nf.IsDead() {
+	f := MakeFactPointToSess(testAmbientSession, p, tgt)
+	nf := f.MarkDeadVarSess(testAmbientSession, tgt)
+	if nf == nil || !nf.IsDeadSess(testAmbientSession) {
 		t.Fatal("dead")
 	}
 	// already garbage + another — remove
-	f2 := MakeFactPointToSet(p, []*Variable{tgt, GarbagePtr})
-	nf2 := f2.MarkDeadVar(tgt)
+	f2 := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, GarbagePtr})
+	nf2 := f2.MarkDeadVarSess(testAmbientSession, tgt)
 	if nf2 == nil || len(nf2.PointTo) != 1 || nf2.PointTo[0] != GarbagePtr {
 		t.Fatalf("%+v", nf2)
 	}
-	if f.MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) != nil {
+	if f.MarkDeadVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) != nil {
 		t.Fatal("unrelated")
 	}
 }
@@ -28,23 +28,23 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 	// fact for local pointer removed when oos
 	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{
-		MakeFactPointTo(lp, loc),
-		MakeFactPointTo(p, loc),
+		MakeFactPointToSess(testAmbientSession, lp, loc),
+		MakeFactPointToSess(testAmbientSession, p, loc),
 	}
 	fm.UpdateFactsForOOSVars([]*Variable{lp, loc})
 	// lp fact gone
-	if FindRelatedPointTo(fm.GlobalFacts, lp) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, lp) != nil {
 		t.Fatal("lp fact should drop")
 	}
 	// p should now point garbage (loc dead)
-	fp := FindRelatedPointTo(fm.GlobalFacts, p)
-	if fp == nil || !fp.IsDead() {
+	fp := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p)
+	if fp == nil || !fp.IsDeadSess(testAmbientSession) {
 		t.Fatalf("p fact %+v", fp)
 	}
 	// nil fact hole fails closed sticky
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
-	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	fm2.UpdateFactsForOOSVars([]*Variable{loc})
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil fact hole must fail closed", fm2.GlobalFacts)
@@ -101,7 +101,7 @@ func TestVariableMatchAggregate(t *testing.T) {
 
 func TestMarkDeadVarNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) != nil {
+	if (*FactPointTo)(nil).MarkDeadVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) != nil {
 		t.Fatal("nil Fact MarkDeadVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -110,8 +110,8 @@ func TestMarkDeadVarNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
-	f := MakeFactPointTo(p, tgt)
-	if f.MarkDeadVar(nil) != nil {
+	f := MakeFactPointToSess(testAmbientSession, p, tgt)
+	if f.MarkDeadVarSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil var MarkDeadVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -134,19 +134,19 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 	}
 	fld := agg.FieldVars[0]
 	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	f := MakeFactPointToSet(p, []*Variable{fld, NullPtr})
-	nf := f.MarkDeadVar(agg)
+	f := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{fld, NullPtr})
+	nf := f.MarkDeadVarSess(testAmbientSession, agg)
 	if nf == nil {
 		t.Fatal("MarkDeadVar aggregate must hit field pointee")
 	}
-	if !nf.IsDead() {
+	if !nf.IsDeadSess(testAmbientSession) {
 		t.Fatalf("want garbage for field, got %+v", nf.PointTo)
 	}
 	// OOS path
-	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld, NullPtr})}
+	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{fld, NullPtr})}
 	UpdateFactsForOOSVars([]*Variable{agg}, &facts)
-	fp := FindRelatedPointTo(facts, p)
-	if fp == nil || !fp.IsDead() {
+	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
+	if fp == nil || !fp.IsDeadSess(testAmbientSession) {
 		t.Fatalf("OOS aggregate must garbage field pointee, got %+v", fp)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -163,9 +163,9 @@ func TestMarkFuncEndLocalsStructFieldPointee(t *testing.T) {
 	agg.CreateFieldVarsSess(testAmbientSession)
 	fld := agg.FieldVars[0]
 	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld, NullPtr})}
-	nf := facts[0].MarkFuncEndLocals([]*Variable{agg})
-	if nf == nil || !nf.IsDead() {
+	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{fld, NullPtr})}
+	nf := facts[0].MarkFuncEndLocalsSess(testAmbientSession, []*Variable{agg})
+	if nf == nil || !nf.IsDeadSess(testAmbientSession) {
 		t.Fatalf("MarkFuncEndLocals must garbage field pointee via CollectExpandable, got %+v", nf)
 	}
 }

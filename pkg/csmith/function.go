@@ -725,14 +725,14 @@ func (f *Function) generateBodyCore(
 					f.IsBuilt = false
 					return
 				}
-				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
+				if FindRelatedPointToSess(sessFromVS(vs), cg.FM.GlobalFacts, p) == nil {
 					// residual ERROR sticky — no invent soft-continue later params past FindRelated hole
 					if hasErrVS(vs) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
-					nf := MakeFactPointTo(p, TBDPtr)
+					nf := MakeFactPointToSess(sessFromVS(vs), p, TBDPtr)
 					if nf == nil || hasErrVS(vs) {
 						if !hasErrVS(vs) {
 							noteErrVS(vs, ErrGeneric)

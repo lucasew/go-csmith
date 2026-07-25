@@ -297,7 +297,7 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 		t.Fatal("Type-nil param GenerateBody must SetError sticky")
 	}
 	// no invent partial TBD seed for later pointer param past Type-nil shell
-	if FindRelatedPointTo(fmTy.GlobalFacts, fTy.Param[1]) != nil {
+	if FindRelatedPointToSess(testAmbientSession, fmTy.GlobalFacts, fTy.Param[1]) != nil {
 		t.Fatal("Type-nil param must not soft-seed later pointer TBD past hole")
 	}
 	ClearErrorSess(testAmbientSession)

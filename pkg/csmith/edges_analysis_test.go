@@ -7,12 +7,12 @@ import (
 func TestMergeJumpFacts(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, a)}
-	jump := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
+	jump := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	if !MergeJumpFacts(&facts, jump) {
 		t.Fatal("changed")
 	}
-	fp := FindRelatedPointTo(facts, p)
+	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
 	// joined set should include both
 	if fp == nil || len(fp.PointTo) < 2 {
 		t.Fatal(fp)
@@ -22,13 +22,13 @@ func TestMergeJumpFacts(t *testing.T) {
 func TestMergeJumpFactsMissingIsGarbage(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, a)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	// jump has no fact for p → garbage join
 	if !MergeJumpFacts(&facts, nil) {
 		t.Fatal("expect garbage merge")
 	}
-	fp := FindRelatedPointTo(facts, p)
-	if fp == nil || !fp.IsDead() {
+	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
+	if fp == nil || !fp.IsDeadSess(testAmbientSession) {
 		// garbage_ptr is IsDead
 		if fp == nil || !IsVariableInSet(fp.PointTo, GarbagePtr) {
 			t.Fatal(fp)
@@ -135,8 +135,8 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
-	facts := []*FactPointTo{MakeFactPointTo(p, a), nil}
-	jump := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
+	jump := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	// incomplete subject map must not soft-join past hole — sticky
 	if MergeJumpFacts(&facts, jump) {
 		t.Fatal("nil subject hole must fail closed")
@@ -149,7 +149,7 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil subject hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	holeSubj := []*FactPointTo{MakeFactPointTo(p, a), nil}
+	holeSubj := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
 	if _, ok := tryMergeJumpFacts(&holeSubj, jump); ok {
 		t.Fatal("tryMerge incomplete subject must ok=false")
 	}
@@ -160,7 +160,7 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("tryMerge incomplete must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
+	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	jumpHole := []*FactPointTo{nil}
 	if MergeJumpFacts(&facts2, jumpHole) {
 		t.Fatal("nil jump hole must fail closed")
@@ -195,7 +195,7 @@ func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
@@ -273,16 +273,16 @@ func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.CreateCFGEdgeTo(10, &Block{}, 20, false, false)
 	fm.MapVisited = map[int]bool{10: true}
-	fm.MapFactsOut[10] = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.MapFactsOut[10] = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	// also seed p fact at dest
-	facts := []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false))}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false))}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("analyze")
 	}
-	fp := FindRelatedPointTo(facts, p)
+	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if fp == nil || len(fp.PointTo) < 2 {
 		t.Fatal("merged jump", fp)
 	}
@@ -301,9 +301,9 @@ func TestAnalyzeWithEdgesInIncompleteOutFailClosed(t *testing.T) {
 	fm.CreateCFGEdgeTo(10, &Block{}, 20, false, false)
 	fm.MapVisited = map[int]bool{10: true}
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		10: {MakeFactPointTo(p, NullPtr), nil},
+		10: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
-	facts := []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false))}
+	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false))}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -328,12 +328,12 @@ func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {
 	fm.MapVisited = map[int]bool{50: true}
 	fm.CreateCFGEdgeTo(60, b, 50, false, true)
 	fm.MapFactsOut = map[int][]*FactPointTo{
-		60: {MakeFactPointTo(p, NullPtr), nil},
+		60: {MakeFactPointToSess(testAmbientSession, p, NullPtr), nil},
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	_, _, _, ok := FindFixedPointBlock(b, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}, &cg, Defaults(), false)
+	_, _, _, ok := FindFixedPointBlock(b, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}, &cg, Defaults(), false)
 	if ok {
 		t.Fatal("incomplete back-edge MapFactsOut must fail closed")
 	}
