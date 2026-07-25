@@ -502,7 +502,7 @@ func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
-		q := e.Invoke.GetQualifiers()
+		q := e.Invoke.GetQualifiersSess(s)
 		// residual ERROR sticky — no invent invoke quals past nested residual hole
 		if sessHasError(s) {
 			return CVQualifiers{}

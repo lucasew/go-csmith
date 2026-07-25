@@ -629,7 +629,7 @@ func BuildUserInvocation(
 	fi.Failed = false
 	first := GetFirstFunction(list)
 	// skip revisit for first function (func_1) — no params, single call, DFA hack
-	needRev := callee != first && callee.NeedsRevisit()
+	needRev := callee != first && callee.NeedsRevisitSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-skip revisit past NeedsRevisit residual
 	if sessHasError(cgSess(cg)) {
 		fi.Failed = true
@@ -976,8 +976,8 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:214 / 358–365 — save_return_fact full FactVec
 	// (ePointTo + eUnionWrite). Soft invent was PT-only registry so FactUnion
 	// rhs_to_lhs_transfer for FuncCall params missed rv_fact (seed-213 p_34).
-	fi.SaveReturnFacts(retFacts)
-	fi.SaveReturnUnionFacts(retUnions)
+	fi.SaveReturnFactsSess(cgSess(cg), retFacts)
+	fi.SaveReturnUnionFactsSess(cgSess(cg), retUnions)
 	if sessHasError(cgSess(cg)) {
 		fi.Failed = true
 		return fi

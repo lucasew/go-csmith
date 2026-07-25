@@ -171,9 +171,14 @@ func InvocationReturnFactsDoFinalizationSess(s *Session) {
 // FunctionInvocationUser.cpp:358–365 — facts matching func.rv.
 // Incomplete maps fail closed (no invent soft-skip holes and still save later).
 func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
+	fi.SaveReturnFactsSess(nil, facts)
+}
+
+// SaveReturnFactsSess is SaveReturnFacts with explicit session residual sticky.
+func (fi *Invocation) SaveReturnFactsSess(s *Session, facts []*FactPointTo) {
 	// nil fi/User is hard IR sticky; nil RV is complete no-op (void/non-pointer return)
 	if fi == nil || fi.User == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if fi.User.RV == nil {
@@ -181,26 +186,26 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 	}
 	// incomplete maps sticky (no invent soft-skip holes and still save later)
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for _, f := range facts {
 		// Fact* always live after FactsComplete
 		if f == nil || f.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		if fi.User.RV.Match(f.Var) {
 			// residual ERROR sticky — no invent soft-continue save past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return
 			}
-			AddReturnFactForInvocationSess(nil, fi, f)
+			AddReturnFactForInvocationSess(s, fi, f)
 			// residual ERROR sticky — no invent soft-continue registry past Add hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-skip not-match then save later
 			return
 		}
@@ -210,31 +215,36 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 // SaveReturnUnionFacts mirrors save_return_fact for eUnionWrite facts.
 // FunctionInvocationUser.cpp:358–365 — full FactVec includes FactUnion for union RV.
 func (fi *Invocation) SaveReturnUnionFacts(facts []*FactUnion) {
+	fi.SaveReturnUnionFactsSess(nil, facts)
+}
+
+// SaveReturnUnionFactsSess is SaveReturnUnionFacts with explicit session residual sticky.
+func (fi *Invocation) SaveReturnUnionFactsSess(s *Session, facts []*FactUnion) {
 	if fi == nil || fi.User == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if fi.User.RV == nil {
 		return
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for _, f := range facts {
 		if f == nil || f.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		if fi.User.RV.Match(f.Var) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return
 			}
-			AddReturnUnionFactForInvocation(fi, f)
-			if sessHasError(nil) {
+			AddReturnUnionFactForInvocationSess(s, fi, f)
+			if sessHasError(s) {
 				return
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			return
 		}
 	}
@@ -354,9 +364,14 @@ func RenewFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) 
 // FunctionInvocation.cpp:462 — assert(orders.size() > 0) on visit_unordered path.}
 
 func (fi *Invocation) PermuteParamOrders() [][]int {
+	return fi.PermuteParamOrdersSess(nil)
+}
+
+// PermuteParamOrdersSess is PermuteParamOrders with explicit session residual sticky.
+func (fi *Invocation) PermuteParamOrdersSess(s *Session) [][]int {
 	// Invocation always live; sticky incomplete no invent empty orders soft-skip
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	n := len(fi.Args)
@@ -373,13 +388,13 @@ func (fi *Invocation) PermuteParamOrders() [][]int {
 		// param_value[i] always live; nil / incomplete FuncCount sticky fail closed
 		// (no invent skip hole as non-call when building permute slots)
 		if fi.Args[i] == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		fc := FuncCount(fi.Args[i])
+		fc := FuncCountSess(s, fi.Args[i])
 		if fc < 0 {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return nil
 		}
@@ -458,7 +473,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	inputsCopy := CloneFactSlice(*facts)
-	orders := fi.PermuteParamOrders()
+	orders := fi.PermuteParamOrdersSess(cgSess(cg))
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
 	if len(orders) == 0 {
 		sessNoteError(cgSess(cg), ErrGeneric)
@@ -532,17 +547,22 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 // FunctionInvocationUser.cpp:274–276.
 // Incomplete Function sticky false (no invent not-revisit soft-skip past hole).
 func (f *Function) NeedsRevisit() bool {
+	return f.NeedsRevisitSess(nil)
+}
+
+// NeedsRevisitSess is NeedsRevisit with explicit session residual sticky.
+func (f *Function) NeedsRevisitSess(s *Session) bool {
 	// Function always live; sticky incomplete no invent not-revisit soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.FactChanged || f.UnionFieldRead {
 		return true
 	}
 	// residual ERROR sticky — no invent not-revisit soft-skip past IsPointerReferenced hole
-	ref := f.IsPointerReferenced()
-	if sessHasError(nil) {
+	ref := f.IsPointerReferencedSess(s)
+	if sessHasError(s) {
 		// incomplete ReferencedPtrs already sticky true; keep residual restrictive
 		return true
 	}
@@ -554,14 +574,19 @@ func (f *Function) NeedsRevisit() bool {
 // Incomplete ReferencedPtrs sticky true (NeedsRevisit — no invent
 // "no pointers" via VariablesComplete(nil)/len==0 empty-complete).
 func (f *Function) IsPointerReferenced() bool {
+	return f.IsPointerReferencedSess(nil)
+}
+
+// IsPointerReferencedSess is IsPointerReferenced with explicit session residual sticky.
+func (f *Function) IsPointerReferencedSess(s *Session) bool {
 	// Function always live; sticky incomplete no invent no-ptrs soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !VariablesComplete(f.ReferencedPtrs) {
 		// incomplete ReferencedPtrs sticky has-pointers (restrictive revisit)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	return len(f.ReferencedPtrs) > 0
@@ -603,8 +628,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	outCopy := cloneFactMap(fm.MapFactsOut)
 	unionInCopy := cloneUnionFactMap(fm.MapUnionFactsIn)
 	unionOutCopy := cloneUnionFactMap(fm.MapUnionFactsOut)
-	effCopy := cloneEffectMap(fm.MapStmEffect)
-	accCopy := cloneEffectMap(fm.MapAccumEffect)
+	effCopy := cloneEffectMapSess(cgSess(cg), fm.MapStmEffect)
+	accCopy := cloneEffectMapSess(cgSess(cg), fm.MapAccumEffect)
 	// Live UnionFacts on callee FM (replaced for visit; restored on fail).
 	savedUnion := fm.UnionFacts
 	// FunctionInvocationUser.cpp:315 — inputs_copy = inputs (pre-handover caller lattice).
@@ -759,8 +784,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	// FunctionInvocationUser.cpp:358–365 — save full FactVec matching rv (ePointTo + eUnionWrite).
-	fi.SaveReturnFacts(retFacts)
-	fi.SaveReturnUnionFacts(retUnions)
+	fi.SaveReturnFactsSess(cgSess(cg), retFacts)
+	fi.SaveReturnUnionFactsSess(cgSess(cg), retUnions)
 	if sessHasError(cgSess(cg)) {
 		restore()
 		return false
@@ -897,6 +922,10 @@ func cloneUnionFactMap(m map[int][]*FactUnion) map[int][]*FactUnion {
 }
 
 func cloneEffectMap(m map[int]Effect) map[int]Effect {
+	return cloneEffectMapSess(nil, m)
+}
+
+func cloneEffectMapSess(s *Session, m map[int]Effect) map[int]Effect {
 	if m == nil {
 		return make(map[int]Effect)
 	}
@@ -904,7 +933,7 @@ func cloneEffectMap(m map[int]Effect) map[int]Effect {
 	for k, v := range m {
 		cp := v.Clone()
 		// residual ERROR sticky — no invent soft-clone map past IncompleteEffect residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return make(map[int]Effect)
 		}
 		out[k] = cp
@@ -917,9 +946,14 @@ func cloneEffectMap(m map[int]Effect) map[int]Effect {
 // Incomplete Invocation / user RV fails closed sticky empty (no invent
 // storage-level non-const non-vol shell / soft re-pick past holes).
 func (fi *Invocation) GetQualifiers() CVQualifiers {
+	return fi.GetQualifiersSess(nil)
+}
+
+// GetQualifiersSess is GetQualifiers with explicit session residual sticky.
+func (fi *Invocation) GetQualifiersSess(s *Session) CVQualifiers {
 	// FunctionInvocation always live; sticky incomplete no invent default quals
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// FunctionInvocation.cpp:486–491 — eFuncCall: assert(func); assert(rv)
@@ -927,11 +961,11 @@ func (fi *Invocation) GetQualifiers() CVQualifiers {
 		// assert(rv) path — incomplete RV sticky empty qfer
 		// (no invent NewCVQualifiers(false,false) storage-level shell)
 		if fi.User.RV == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		return fi.User.RV.Qfer
 	}
 	// binary/unary — non-const non-volatile int-like (C++ default for std ops)
-	return NewCVQualifiers([]bool{false}, []bool{false})
+	return NewCVQualifiersSess(s, []bool{false}, []bool{false})
 }
