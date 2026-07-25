@@ -46,7 +46,7 @@ func TestOutputDefWithAttrs(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	v.Init = MakeInt(0)
 	// force attrs with 100% boolean
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 	currentSession().VarAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 	}}
@@ -54,12 +54,12 @@ func TestOutputDefWithAttrs(t *testing.T) {
 	if !strings.Contains(s, "__attribute__((unused))") {
 		t.Fatal(s)
 	}
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 }
 
 func TestOutputFuncWithAttrs(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 	currentSession().FuncAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "noinline", Prob: 100},
 	}}
@@ -67,7 +67,7 @@ func TestOutputFuncWithAttrs(t *testing.T) {
 	if !strings.Contains(d, "static ") || !strings.Contains(d, "noinline") {
 		t.Fatal(d)
 	}
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 }
 
 func TestArrayOutputInitNoPostIncr(t *testing.T) {

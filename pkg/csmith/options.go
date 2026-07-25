@@ -95,11 +95,9 @@ func sessScopeTab(s *Session) *ThresholdTable {
 	return s.ScopeTab
 }
 
-// InitScopeTable mirrors VariableSelector::InitScopeTable.
+// InitScopeTableSess installs VariableSelector::scopeTable_ on an explicit bag.
 // VariableSelector.cpp:110–122 — create once from CGOptions::global_variables.
-func InitScopeTable(opts Options) { InitScopeTableSess(testAmbientSession, opts) }
-
-// InitScopeTableSess installs scopeTable_ on an explicit session bag.
+// Non-Sess InitScopeTable deleted — pass testAmbientSession from unit tests.
 func InitScopeTableSess(s *Session, opts Options) {
 	SetProcessScopeTabSess(s, NewScopeThresholdTable(opts))
 }
@@ -136,15 +134,11 @@ func sessExprTables(s *Session) *ExprTables {
 	return s.ExprTables
 }
 
-// InitSessionProbabilityTables mirrors Probabilities::initialize_group_probs
-// StatementAssign::InitProbabilityTable + Expression::InitProbabilityTables
-// and installs Statement::stmtTable_ from process Probabilities pStatementProb.
-// Probabilities.cpp:565–578 / Statement.cpp:133–139.
-func InitSessionProbabilityTables(opts Options) {
-	InitSessionProbabilityTablesSess(testAmbientSession, opts)
-}
-
 // InitSessionProbabilityTablesSess installs assign/expr/stmt tables on s.
+// Mirrors Probabilities::initialize_group_probs + StatementAssign /
+// Expression InitProbabilityTables + Statement::stmtTable_ from pStatementProb.
+// Probabilities.cpp:565–578 / Statement.cpp:133–139.
+// Non-Sess InitSessionProbabilityTables deleted — pass testAmbientSession from tests.
 func InitSessionProbabilityTablesSess(s *Session, opts Options) {
 	s = sessOrAmbient(s)
 	s.AssignOpsTab = NewAssignOpsTable(opts)

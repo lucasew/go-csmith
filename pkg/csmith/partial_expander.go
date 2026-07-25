@@ -113,13 +113,9 @@ func SetStmtExpandSess(s *Session, t StatementType, value bool) {
 	s.PartialExpands[t] = value
 }
 
-// RestorePartialExpanderInitValues mirrors restore_init_values.
-// PartialExpander.cpp:122–125.
-func RestorePartialExpanderInitValues() {
-	RestorePartialExpanderInitValuesSess(testAmbientSession)
-}
-
-// RestorePartialExpanderInitValuesSess restores on an explicit session bag.
+// RestorePartialExpanderInitValuesSess restores PartialExpander init values on bag s.
+// Mirrors restore_init_values (PartialExpander.cpp:122–125).
+// Non-Sess RestorePartialExpanderInitValues deleted — pass bag explicitly.
 func RestorePartialExpanderInitValuesSess(s *Session) {
 	s = sessOrAmbient(s)
 	if s.PartialExpandsBackup != nil {

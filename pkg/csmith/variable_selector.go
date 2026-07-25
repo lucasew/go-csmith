@@ -3482,7 +3482,7 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return MaxVarScope
 	}
-	// VariableSelector.cpp:1050 — InitScopeTable(); use session scopeTable_ only
+	// VariableSelector.cpp:1050 — InitScopeTableSess(testAmbientSession); use session scopeTable_ only
 	// (no invent NewScopeThresholdTable per draw)
 	tab := sessScopeTab(cgSess(cg))
 	if tab == nil {

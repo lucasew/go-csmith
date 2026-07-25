@@ -33,7 +33,7 @@ func TestDoFinalizationResetsGensym(t *testing.T) {
 	}()
 	ResetDefaultGensym()
 	_ = Gensym("g_")
-	DoFinalization()
+	DoFinalizationSess(testAmbientSession)
 	if Gensym("g_") != "g_1" {
 		t.Fatal("DoFinalization must reset process gensym_count")
 	}

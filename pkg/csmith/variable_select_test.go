@@ -7,7 +7,7 @@ import (
 func TestVariableSelectionProbabilityRange(t *testing.T) {
 	// VariableSelector.cpp:110–122 InitScopeTable once; no invent table per draw
 	opts := Defaults()
-	InitScopeTable(opts)
+	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	seen := map[VariableScope]bool{}
 	r := NewRng(2)
@@ -39,7 +39,7 @@ func TestVariableSelectionProbabilityNilRNGSticky(t *testing.T) {
 	// VariableSelector.cpp:1053 ERROR_GUARD sticky without RNG
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	InitScopeTable(opts)
+	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	if sc := VariableSelectionProbability(nil, opts); sc != MaxVarScope {
 		t.Fatalf("nil RNG must fail closed MAX, got %v", sc)
@@ -61,7 +61,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	// VariableSelector.cpp:98–105 — ParentParam filtered when param.empty()
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	InitScopeTable(opts)
+	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
@@ -93,7 +93,7 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 	// incomplete Param must not invent scope filter / soft re-pick past holes
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	InitScopeTable(opts)
+	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType(), Param: IncompleteVariables()}
 	cg := WithFunc(f, EmptyEffect())
@@ -108,7 +108,7 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 
 func TestSelectCreatesOrFinds(t *testing.T) {
 	opts := Defaults()
-	InitScopeTable(opts)
+	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	vs := NewVariableSelector(opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}

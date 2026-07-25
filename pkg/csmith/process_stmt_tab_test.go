@@ -44,7 +44,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 		t.Fatal("nil assignOpsTable must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	InitSessionProbabilityTables(opts)
+	InitSessionProbabilityTablesSess(testAmbientSession, opts)
 	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
 	// may still fail for other reasons; at least table is live
 	_ = st
@@ -117,20 +117,20 @@ func TestGenerateSeed65WithProcessStmtTab(t *testing.T) {
 
 func TestEnsureAttrGeneratorsNoInvent(t *testing.T) {
 	// InitAttrGenerators required; no soft invent zero-opts generators
-	ClearAttrGenerators()
-	if EnsureVarAttrGenerator() != nil || EnsureFuncAttrGenerator() != nil {
+	ClearAttrGeneratorsSess(testAmbientSession)
+	if EnsureVarAttrGeneratorSess(testAmbientSession) != nil || EnsureFuncAttrGeneratorSess(testAmbientSession) != nil {
 		t.Fatal("must not invent generators without InitAttrGenerators")
 	}
 	// Output nil-safe
-	if EnsureVarAttrGenerator().Output(NewRng(1)) != "" {
+	if EnsureVarAttrGeneratorSess(testAmbientSession).Output(NewRng(1)) != "" {
 		t.Fatal("nil Output must be empty")
 	}
 	opts := Defaults()
-	InitAttrGenerators(opts, NewProbabilities(opts))
-	if EnsureVarAttrGenerator() == nil {
+	InitAttrGeneratorsSess(testAmbientSession, opts, NewProbabilities(opts))
+	if EnsureVarAttrGeneratorSess(testAmbientSession) == nil {
 		t.Fatal("want generator after init")
 	}
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 }
 
 func TestNewVariableSelectorNoInventProbs(t *testing.T) {

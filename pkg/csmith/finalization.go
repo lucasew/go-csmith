@@ -2,13 +2,9 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// DoFinalization mirrors Finalization::doFinalization.
-// Finalization.cpp:45–55 — clear session bag pools between runs (ambient when s==nil).
-func DoFinalization() {
-	DoFinalizationSess(testAmbientSession)
-}
-
 // DoFinalizationSess clears generation pools on an explicit session bag.
+// Mirrors Finalization::doFinalization (Finalization.cpp:45–55).
+// Non-Sess DoFinalization deleted — pass testAmbientSession from unit tests.
 func DoFinalizationSess(s *Session) {
 	s = sessOrAmbient(s)
 	// ArrayVariable.cpp static seed in build_init_recursive — fresh generation

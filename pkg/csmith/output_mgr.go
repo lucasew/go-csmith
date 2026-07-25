@@ -374,12 +374,8 @@ func CreateDFSOutputMgrSess(s *Session, opts Options) {
 	}
 }
 
-// ClearOutputMgr resets process OutputMgr singleton state (finalization / tests).
-func ClearOutputMgr() {
-	ClearOutputMgrSess(testAmbientSession)
-}
-
 // ClearOutputMgrSess clears OutputMgr selection state on an explicit session bag.
+// Non-Sess ClearOutputMgr deleted — pass testAmbientSession from unit tests.
 func ClearOutputMgrSess(s *Session) {
 	s = sessOrAmbient(s)
 	s.OutputMgrKind = OutputMgrKindDefault

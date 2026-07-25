@@ -429,7 +429,7 @@ func TestDoFinalization(t *testing.T) {
 	IncrCounter(&currentSession().BK.structDepthCnts, 1)
 	currentSession().NextStmID = 5
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	DoFinalization()
+	DoFinalizationSess(testAmbientSession)
 	if len(currentSession().BK.structDepthCnts) != 0 || currentSession().NextStmID != 0 || HasErrorSess(testAmbientSession) {
 		t.Fatal("not cleared")
 	}

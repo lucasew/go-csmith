@@ -7,7 +7,7 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	prevO := ProcessOptionsSess(testAmbientSession)
 	defer func() {
-		DoFinalization()
+		DoFinalizationSess(testAmbientSession)
 		ReinstallTestProcessSingletons()
 		SetProcessOptionsSess(testAmbientSession, prevO)
 		ClearErrorSess(testAmbientSession)
@@ -36,7 +36,7 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	}
 	// reset then loop should exit immediately if already all_done after one choice
 	// Rebuild with fresh generator for loop test
-	DoFinalization()
+	DoFinalizationSess(testAmbientSession)
 	ReinstallTestProcessSingletons()
 	ClearErrorSess(testAmbientSession)
 	o.DFSDebugSequence = "0"

@@ -45,7 +45,7 @@ func TestInitPartialExpanderForOnly(t *testing.T) {
 		// mode off
 	}
 	// restore backup
-	RestorePartialExpanderInitValues()
+	RestorePartialExpanderInitValuesSess(testAmbientSession)
 	if !currentSession().PartialExpands[MaxStatementType] {
 		t.Fatal("restored MAX")
 	}

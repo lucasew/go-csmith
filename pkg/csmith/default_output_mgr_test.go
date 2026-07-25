@@ -7,7 +7,7 @@ import (
 
 func TestCreateDefaultOutputMgrSplit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	ClearOutputMgr()
+	ClearOutputMgrSess(testAmbientSession)
 	o := Defaults()
 	o.MaxSplitFiles = 3
 	o.SplitFilesDir = "/tmp/csmith-split-unit"
@@ -24,12 +24,12 @@ func TestCreateDefaultOutputMgrSplit(t *testing.T) {
 	if GetMainOutPath(o) != paths[0] {
 		t.Fatal(GetMainOutPath(o))
 	}
-	ClearOutputMgr()
+	ClearOutputMgrSess(testAmbientSession)
 }
 
 func TestCreateDefaultOutputMgrSplitDirSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	ClearOutputMgr()
+	ClearOutputMgrSess(testAmbientSession)
 	o := Defaults()
 	o.MaxSplitFiles = 2
 	o.SplitFilesDir = ""
@@ -37,7 +37,7 @@ func TestCreateDefaultOutputMgrSplitDirSticky(t *testing.T) {
 		t.Fatal("empty dir sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	ClearOutputMgr()
+	ClearOutputMgrSess(testAmbientSession)
 }
 
 func TestRandomOutputVarDefsAssign(t *testing.T) {
@@ -96,7 +96,7 @@ func TestSplitAllHeadersContent(t *testing.T) {
 
 func TestCreateDFSOutputMgr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	ClearOutputMgr()
+	ClearOutputMgrSess(testAmbientSession)
 	o := Defaults()
 	CreateDFSOutputMgr(o)
 	if ProcessOutputMgrKindSess(testAmbientSession) != OutputMgrKindDFS {
@@ -116,7 +116,7 @@ func TestCreateDFSOutputMgr(t *testing.T) {
 	if DFSOutputHeader("HDR\n", false) != "HDR\n" {
 		t.Fatal("non-compact")
 	}
-	ClearOutputMgr()
+	ClearOutputMgrSess(testAmbientSession)
 }
 
 func TestGetCountPrefix(t *testing.T) {
@@ -153,7 +153,7 @@ func TestProcessProgramGenerator(t *testing.T) {
 	if g.GetOutputMgrKind() != OutputMgrKindDefault {
 		t.Fatal(g.GetOutputMgrKind())
 	}
-	DoFinalization()
+	DoFinalizationSess(testAmbientSession)
 	ReinstallTestProcessSingletons()
 	if ProcessProgramGeneratorSess(testAmbientSession) != nil {
 		// finalization clears; may sticky on Get
@@ -165,7 +165,7 @@ func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	prevO := ProcessOptionsSess(testAmbientSession)
 	defer func() {
-		DoFinalization()
+		DoFinalizationSess(testAmbientSession)
 		ReinstallTestProcessSingletons()
 		SetProcessOptionsSess(testAmbientSession, prevO)
 		ClearErrorSess(testAmbientSession)

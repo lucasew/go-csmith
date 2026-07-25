@@ -365,14 +365,10 @@ func NewUnionTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGen
 
 // Package-level generators (Variable::var_attr_generator / Function::func_attr_generator).
 
-// InitAttrGenerators wires generators from options/probabilities (generation start).
+// InitAttrGeneratorsSess installs attribute generators on an explicit session bag.
 // Mirrors InitializeVariableAttributes / InitializeAttributes / InitializeLabelAttributes /
 // InitializeTypeAttributes when flags are on.
-func InitAttrGenerators(opts Options, probs *Probabilities) {
-	InitAttrGeneratorsSess(testAmbientSession, opts, probs)
-}
-
-// InitAttrGeneratorsSess installs attribute generators on an explicit session bag.
+// Non-Sess InitAttrGenerators deleted — pass testAmbientSession from unit tests.
 func InitAttrGeneratorsSess(s *Session, opts Options, probs *Probabilities) {
 	s = sessOrAmbient(s)
 	s.Opts = opts
@@ -384,68 +380,35 @@ func InitAttrGeneratorsSess(s *Session, opts Options, probs *Probabilities) {
 	s.UnionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
 }
 
-// EnsureVarAttrGenerator returns Variable::var_attr_generator after InitAttrGenerators.
-// No soft invent NewVarAttrGenerator with zero opts when init was skipped
-// (C++ InitializeVariableAttributes runs from CreateVariable / generation start).
-func EnsureVarAttrGenerator() *AttributeGenerator {
-	return EnsureVarAttrGeneratorSess(testAmbientSession)
-}
-
-// EnsureVarAttrGeneratorSess returns the generator on an explicit session bag.
+// EnsureVarAttrGeneratorSess returns Variable::var_attr_generator after InitAttrGenerators.
+// No soft invent NewVarAttrGenerator with zero opts when init was skipped.
+// Non-Sess Ensure* deleted — pass bag explicitly.
 func EnsureVarAttrGeneratorSess(s *Session) *AttributeGenerator {
 	return sessOrAmbient(s).VarAttrGenerator
 }
 
-// EnsureFuncAttrGenerator returns function attributes after InitAttrGenerators.
-// No soft invent generator when process init skipped.
-func EnsureFuncAttrGenerator() *AttributeGenerator {
-	return EnsureFuncAttrGeneratorSess(testAmbientSession)
-}
-
-// EnsureFuncAttrGeneratorSess returns the generator on an explicit session bag.
+// EnsureFuncAttrGeneratorSess returns the function attribute generator on bag s.
 func EnsureFuncAttrGeneratorSess(s *Session) *AttributeGenerator {
 	return sessOrAmbient(s).FuncAttrGenerator
 }
 
-// EnsureLabelAttrGenerator returns label attributes after InitAttrGenerators.
-// No soft invent generator when process init skipped.
-func EnsureLabelAttrGenerator() *AttributeGenerator {
-	return EnsureLabelAttrGeneratorSess(testAmbientSession)
-}
-
-// EnsureLabelAttrGeneratorSess returns the generator on an explicit session bag.
+// EnsureLabelAttrGeneratorSess returns the label attribute generator on bag s.
 func EnsureLabelAttrGeneratorSess(s *Session) *AttributeGenerator {
 	return sessOrAmbient(s).LabelAttrGenerator
 }
 
-// EnsureStructTypeAttrGenerator returns struct type attributes after InitAttrGenerators.
-// No soft invent generator when process init skipped.
-func EnsureStructTypeAttrGenerator() *AttributeGenerator {
-	return EnsureStructTypeAttrGeneratorSess(testAmbientSession)
-}
-
-// EnsureStructTypeAttrGeneratorSess returns the generator on an explicit session bag.
+// EnsureStructTypeAttrGeneratorSess returns the struct type attribute generator on bag s.
 func EnsureStructTypeAttrGeneratorSess(s *Session) *AttributeGenerator {
 	return sessOrAmbient(s).StructTypeAttrGen
 }
 
-// EnsureUnionTypeAttrGenerator returns union type attributes after InitAttrGenerators.
-// No soft invent generator when process init skipped.
-func EnsureUnionTypeAttrGenerator() *AttributeGenerator {
-	return EnsureUnionTypeAttrGeneratorSess(testAmbientSession)
-}
-
-// EnsureUnionTypeAttrGeneratorSess returns the generator on an explicit session bag.
+// EnsureUnionTypeAttrGeneratorSess returns the union type attribute generator on bag s.
 func EnsureUnionTypeAttrGeneratorSess(s *Session) *AttributeGenerator {
 	return sessOrAmbient(s).UnionTypeAttrGen
 }
 
-// ClearAttrGenerators for Finalization between runs.
-func ClearAttrGenerators() {
-	ClearAttrGeneratorsSess(testAmbientSession)
-}
-
 // ClearAttrGeneratorsSess clears attribute generators on an explicit session bag.
+// Non-Sess ClearAttrGenerators deleted — pass bag explicitly.
 func ClearAttrGeneratorsSess(s *Session) {
 	s = sessOrAmbient(s)
 	s.VarAttrGenerator = nil

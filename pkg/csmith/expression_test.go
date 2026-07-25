@@ -1523,7 +1523,7 @@ func TestExpressionCloneGetInvokeComplexity(t *testing.T) {
 		t.Fatal("comma clone sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	tabs := InitProbabilityTables(Defaults())
+	tabs := InitProbabilityTablesSess(testAmbientSession, Defaults())
 	if tabs == nil || ProcessExprTablesSess(testAmbientSession) != tabs {
 		t.Fatal("init tables")
 	}

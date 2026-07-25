@@ -1362,7 +1362,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	opts.MaxBlockSize = 1
 	// Minimal process tables so MakeRandomFor can run or fail cleanly
 	prevStmt := ProcessStmtTabSess(testAmbientSession)
-	SetProcessStmtTabSess(testAmbientSession, InitProbabilityTable(opts))
+	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTable(opts))
 	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1395,7 +1395,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	opts.MaxBlockDepth = 5
 	opts.MaxBlockSize = 1
 	prevStmt := ProcessStmtTabSess(testAmbientSession)
-	SetProcessStmtTabSess(testAmbientSession, InitProbabilityTable(opts))
+	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTable(opts))
 	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}

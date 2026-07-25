@@ -974,13 +974,9 @@ func NewExprTables(opts Options) *ExprTables {
 	return t
 }
 
-// InitProbabilityTables mirrors Expression::InitProbabilityTables static setup.
-// Expression.cpp:93–96 — installs process session expr/param tables from opts.
-func InitProbabilityTables(opts Options) *ExprTables {
-	return InitProbabilityTablesSess(testAmbientSession, opts)
-}
-
 // InitProbabilityTablesSess installs ExprTables on an explicit session bag.
+// Mirrors Expression::InitProbabilityTables (Expression.cpp:93–96).
+// Non-Sess InitProbabilityTables deleted — pass testAmbientSession from tests.
 func InitProbabilityTablesSess(s *Session, opts Options) *ExprTables {
 	t := NewExprTables(opts)
 	SetProcessExprTablesSess(s, t)

@@ -175,7 +175,7 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 }
 
 func TestLabelAttrEmit(t *testing.T) {
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 	currentSession().LabelAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "hot", Prob: 100},
 	}}
@@ -193,7 +193,7 @@ func TestLabelAttrEmit(t *testing.T) {
 	if !strings.Contains(out, "lbl_1:") || !strings.Contains(out, "hot") {
 		t.Fatal(out)
 	}
-	ClearAttrGenerators()
+	ClearAttrGeneratorsSess(testAmbientSession)
 }
 
 func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {

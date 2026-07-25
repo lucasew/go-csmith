@@ -1631,7 +1631,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 			g.VS.DoFinalization()
 		}
 		ResetDefaultGensymSess(g.Sess)
-		RestorePartialExpanderInitValues()
+		RestorePartialExpanderInitValuesSess(g.Sess)
 	}
 	return all.String()
 }

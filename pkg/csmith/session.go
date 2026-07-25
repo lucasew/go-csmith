@@ -10,7 +10,8 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - non-Sess helpers still hardcode ambient (InitScopeTable, r.RndUpto, …)
+//   - non-Sess helpers still hardcode ambient (r.RndUpto, bookkeeper Record*,
+//     Ensure-style leftovers, PartialExpand DirectExpandCheck, …)
 //   - NewVariableSelector / NewFactMgr / EmptyCGContext install ambient
 //   - vsSess/envSess/fmSess/cgSess/gSess panic if owner.Sess unset
 //     (constructors / NewProgramGenerator set it)

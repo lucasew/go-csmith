@@ -464,7 +464,7 @@ func TestGotoLabelsClearedOnFinalization(t *testing.T) {
 	}()
 	GotoLabelsDoFinalization()
 	_ = LabelForGotoDest(1, func() string { return "lbl_x" })
-	DoFinalization()
+	DoFinalizationSess(testAmbientSession)
 	// after finalization map empty → new gensym path
 	lab := LabelForGotoDest(1, func() string { return "lbl_y" })
 	if lab != "lbl_y" {
