@@ -109,7 +109,7 @@ func (b *Block) ContainsStmtSess(s *Session, st *Stmt) bool {
 		if !StmIDUnset(st.StmID) && cur.StmID == st.StmID {
 			return true
 		}
-		blks := GetBlocksStmt(cur)
+		blks := GetBlocksStmtSess(s, cur)
 		for _, nb := range blks {
 			if nb == nil {
 				// incomplete arm sticky fail closed not-contain

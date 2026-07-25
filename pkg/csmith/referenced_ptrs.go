@@ -481,7 +481,7 @@ func ReadUnionFieldStmtSess(s *Session, st *Stmt) bool {
 	}
 	// Statement.cpp:671–676 — get_called_funcs; callee->union_field_read
 	var calls []*Invocation
-	if !collectCalledInvocationsStmt(st, &calls) {
+	if !collectCalledInvocationsStmt(s, st, &calls) {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
 		}

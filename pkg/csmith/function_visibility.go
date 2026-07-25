@@ -316,7 +316,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 		return true
 	}
 	// Statement.cpp:530–535 — get_blocks then recurse (Then/Else for if/for)
-	for _, blk := range GetBlocksStmt(st) {
+	for _, blk := range GetBlocksStmtSess(fmSess(fm), st) {
 		// Block* always live from get_blocks; nil hole fails closed sticky
 		if blk == nil {
 			*facts = IncompleteFactSlice()

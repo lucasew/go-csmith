@@ -27,7 +27,7 @@ func TestFindTypedStmts(t *testing.T) {
 		Else: &Block{Stmts: []Stmt{gotos}},
 	}
 	var stms []*Stmt
-	n := FindTypedStmts(&inner, &stms, []StatementType{StmtReturn, StmtGoto})
+	n := FindTypedStmtsSess(testAmbientSession, &inner, &stms, []StatementType{StmtReturn, StmtGoto})
 	if n != 2 {
 		t.Fatalf("count %d stms=%v", n, stms)
 	}
@@ -40,7 +40,7 @@ func TestFindTypedStmts(t *testing.T) {
 	}
 	// block walk
 	var stms2 []*Stmt
-	FindTypedStmtsInBlock(&Block{Stmts: []Stmt{inner}}, &stms2, []StatementType{StmtAssign})
+	FindTypedStmtsInBlockSess(testAmbientSession, &Block{Stmts: []Stmt{inner}}, &stms2, []StatementType{StmtAssign})
 	if len(stms2) != 1 || stms2[0].Kind != StmtAssign {
 		t.Fatal(stms2)
 	}
@@ -50,13 +50,13 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	// complete if both arms
 	ClearErrorSess(testAmbientSession)
 	thenB, elseB := &Block{StmID: 1}, &Block{StmID: 2}
-	ifBlks := GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB})
+	ifBlks := GetBlocksStmtSess(testAmbientSession, &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB})
 	if len(ifBlks) != 2 || ifBlks[0] != thenB || ifBlks[1] != elseB {
 		t.Fatalf("if arms: %+v", ifBlks)
 	}
 	// missing Else sticky IncompleteBlocks (no invent soft list with nil hole)
 	ClearErrorSess(testAmbientSession)
-	if BlocksComplete(GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: &Block{StmID: 1}})) {
+	if BlocksComplete(GetBlocksStmtSess(testAmbientSession, &Stmt{Kind: StmtIfElse, Then: &Block{StmID: 1}})) {
 		t.Fatal("nil Else GetBlocksStmt must fail closed IncompleteBlocks")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -65,7 +65,7 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// missing Else fails typed walk sticky
 	var stms []*Stmt
-	if FindTypedStmts(&Stmt{Kind: StmtIfElse, Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}}}, &stms, []StatementType{StmtReturn}) >= 0 {
+	if FindTypedStmtsSess(testAmbientSession, &Stmt{Kind: StmtIfElse, Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}}}, &stms, []StatementType{StmtReturn}) >= 0 {
 		t.Fatal("nil Else arm must fail closed typed walk")
 	}
 	if StmtsComplete(stms) {
@@ -76,7 +76,7 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// for without body sticky IncompleteBlocks
-	if BlocksComplete(GetBlocksStmt(&Stmt{Kind: StmtFor})) {
+	if BlocksComplete(GetBlocksStmtSess(testAmbientSession, &Stmt{Kind: StmtFor})) {
 		t.Fatal("nil for body GetBlocksStmt must fail closed IncompleteBlocks")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -85,12 +85,12 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// for with body
 	body := &Block{StmID: 3}
-	forBlks := GetBlocksStmt(&Stmt{Kind: StmtFor, Then: body})
+	forBlks := GetBlocksStmtSess(testAmbientSession, &Stmt{Kind: StmtFor, Then: body})
 	if len(forBlks) != 1 || forBlks[0] != body {
 		t.Fatalf("for body: %+v", forBlks)
 	}
 	// assign has empty get_blocks even if Then is wrongly set
-	if blks := GetBlocksStmt(&Stmt{Kind: StmtAssign, Then: &Block{}}); len(blks) != 0 {
+	if blks := GetBlocksStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign, Then: &Block{}}); len(blks) != 0 {
 		t.Fatal("assign must not invent get_blocks from stray Then", blks)
 	}
 	// StatementArrayOp.h:69–71 — array_init Expression ctor has body=0.
@@ -101,7 +101,7 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
 	}}}
 	arr := &Stmt{Kind: StmtArrayOp, Then: initBody, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
-	if blks := GetBlocksStmt(arr); len(blks) != 0 {
+	if blks := GetBlocksStmtSess(testAmbientSession, arr); len(blks) != 0 {
 		t.Fatal("array-init ArrayOp get_blocks must be empty (C++ body=null)", blks)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -115,17 +115,17 @@ func TestIs1stStm(t *testing.T) {
 		{Kind: StmtAssign, StmID: 1},
 		{Kind: StmtAssign, StmID: 2},
 	}}
-	if !Is1stStm(&b.Stmts[0], b) {
+	if !Is1stStmSess(testAmbientSession, &b.Stmts[0], b) {
 		t.Fatal("first")
 	}
-	if Is1stStm(&b.Stmts[1], b) {
+	if Is1stStmSess(testAmbientSession, &b.Stmts[1], b) {
 		t.Fatal("second")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete Is1stStm must not sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if Is1stStm(nil, b) {
+	if Is1stStmSess(testAmbientSession, nil, b) {
 		t.Fatal("nil stmt Is1stStm must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -142,35 +142,35 @@ func TestFindContainerAndDominate(t *testing.T) {
 	body.Parent = outer
 	// fix Then pointer to outer.Stmts[0].Then
 	outer.Stmts[0].Then = body
-	c := FindContainerStm(body)
+	c := FindContainerStmSess(testAmbientSession, body)
 	if c == nil || c.StmID != 10 {
 		t.Fatal(c)
 	}
 	// if dominates stmt inside then
 	inner := &Stmt{Kind: StmtAssign, StmID: 21}
 	body.Stmts = []Stmt{*inner}
-	if !Dominate(&outer.Stmts[0], outer, &body.Stmts[0], body) {
+	if !DominateSess(testAmbientSession, &outer.Stmts[0], outer, &body.Stmts[0], body) {
 		t.Fatal("if dominates then body stmt")
 	}
 	// earlier dominates later same block
-	if !Dominate(&outer.Stmts[0], outer, &outer.Stmts[1], outer) {
+	if !DominateSess(testAmbientSession, &outer.Stmts[0], outer, &outer.Stmts[1], outer) {
 		t.Fatal("10 dominates 11")
 	}
-	if Dominate(&outer.Stmts[1], outer, &outer.Stmts[0], outer) {
+	if DominateSess(testAmbientSession, &outer.Stmts[1], outer, &outer.Stmts[0], outer) {
 		t.Fatal("11 does not dominate 10")
 	}
 	// stray Then on assign is not get_blocks — no invent container/dominate
 	stray := &Block{StmID: 99, Parent: outer}
 	outer.Stmts[1].Then = stray
-	if FindContainerStm(stray) != nil {
+	if FindContainerStmSess(testAmbientSession, stray) != nil {
 		t.Fatal("assign Then must not invent container")
 	}
-	if Dominate(&outer.Stmts[1], outer, &Stmt{Kind: StmtAssign, StmID: 100}, stray) {
+	if DominateSess(testAmbientSession, &outer.Stmts[1], outer, &Stmt{Kind: StmtAssign, StmID: 100}, stray) {
 		t.Fatal("assign must not invent dominate via stray Then")
 	}
 	// Block always live; sticky nil (no invent soft-skip missing container past hole)
 	ClearErrorSess(testAmbientSession)
-	if FindContainerStm(nil) != nil {
+	if FindContainerStmSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil FindContainerStm must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -178,7 +178,7 @@ func TestFindContainerAndDominate(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// root complete nil
-	if FindContainerStm(&Block{StmID: 1}) != nil {
+	if FindContainerStmSess(testAmbientSession, &Block{StmID: 1}) != nil {
 		t.Fatal("root FindContainerStm must complete nil")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -190,7 +190,7 @@ func TestFindContainerAndDominate(t *testing.T) {
 	outer2 := &Block{Stmts: []Stmt{{Kind: StmtIfElse, StmID: 31, Then: body2, Else: nil}}}
 	body2.Parent = outer2
 	outer2.Stmts[0].Then = body2
-	if FindContainerStm(body2) != nil {
+	if FindContainerStmSess(testAmbientSession, body2) != nil {
 		t.Fatal("nil Else FindContainerStm must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -200,7 +200,7 @@ func TestFindContainerAndDominate(t *testing.T) {
 	// Dominate via incomplete if get_blocks sticky (no invent match Then past nil Else)
 	inner2 := Stmt{Kind: StmtAssign, StmID: 32}
 	body2.Stmts = []Stmt{inner2}
-	if Dominate(&outer2.Stmts[0], outer2, &body2.Stmts[0], body2) {
+	if DominateSess(testAmbientSession, &outer2.Stmts[0], outer2, &body2.Stmts[0], body2) {
 		t.Fatal("nil Else Dominate must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -215,7 +215,7 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	parent := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	orphanA := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	orphanB := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
-	if Dominate(orphanA, parent, orphanB, parent) {
+	if DominateSess(testAmbientSession, orphanA, parent, orphanB, parent) {
 		t.Fatal("orphan StmID 0 pair must fail closed not dominate")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -224,10 +224,10 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// same-parent members with StmID 0 still order by index
 	parent.Stmts = []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}, {Kind: StmtAssign, StmID: IncompleteStmID}}
-	if !Dominate(&parent.Stmts[0], parent, &parent.Stmts[1], parent) {
+	if !DominateSess(testAmbientSession, &parent.Stmts[0], parent, &parent.Stmts[1], parent) {
 		t.Fatal("index order must dominate when both in parent")
 	}
-	if Dominate(&parent.Stmts[1], parent, &parent.Stmts[0], parent) {
+	if DominateSess(testAmbientSession, &parent.Stmts[1], parent, &parent.Stmts[0], parent) {
 		t.Fatal("later must not dominate earlier")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -265,7 +265,7 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Dominate nil sticky
-	if Dominate(nil, nil, &Stmt{StmID: 1}, nil) {
+	if DominateSess(testAmbientSession, nil, nil, &Stmt{StmID: 1}, nil) {
 		t.Fatal("nil Dominate a must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -273,7 +273,7 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// GetBlocksStmt nil sticky IncompleteBlocks
-	if BlocksComplete(GetBlocksStmt(nil)) {
+	if BlocksComplete(GetBlocksStmtSess(testAmbientSession, nil)) {
 		t.Fatal("nil Stmt GetBlocksStmt must fail closed IncompleteBlocks")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -289,13 +289,13 @@ func TestIsPtrUsedForTestExpr(t *testing.T) {
 	pv := CreateVariableScalars("p", pt, false, false)
 	test := &Expression{Term: TermVariable, Var: pv, ExprType: pt}
 	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}}
-	if !IsPtrUsed(st) {
+	if !IsPtrUsedSess(testAmbientSession, st) {
 		t.Fatal("for-test pointer must be used")
 	}
 	// incomplete for without TestExpr fails closed sticky as true (IsPtrUsed)
 	ClearErrorSess(testAmbientSession)
 	st2 := &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}
-	if !IsPtrUsed(st2) {
+	if !IsPtrUsedSess(testAmbientSession, st2) {
 		t.Fatal("incomplete for must fail closed ptr-used true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -307,12 +307,12 @@ func TestIsPtrUsedForTestExpr(t *testing.T) {
 func TestIsPtrUsed(t *testing.T) {
 	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: p, Expr: &Expression{Term: TermVariable, Var: p}}
-	if !IsPtrUsed(st) {
+	if !IsPtrUsedSess(testAmbientSession, st) {
 		t.Fatal("ptr")
 	}
 	st2 := &Stmt{Kind: StmtAssign, LhsVar: CreateVariableScalars("i", GetIntType(), false, false),
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
-	if IsPtrUsed(st2) {
+	if IsPtrUsedSess(testAmbientSession, st2) {
 		t.Fatal("no ptr")
 	}
 }
@@ -323,19 +323,19 @@ func TestContainsStmtTree(t *testing.T) {
 	thenB := &Block{Stmts: []Stmt{inner}}
 	elseB := &Block{}
 	root := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB, Else: elseB}
-	if !ContainsStmtTree(root, root) {
+	if !ContainsStmtTreeSess(testAmbientSession, root, root) {
 		t.Fatal("self")
 	}
-	if !ContainsStmtTree(root, &thenB.Stmts[0]) {
+	if !ContainsStmtTreeSess(testAmbientSession, root, &thenB.Stmts[0]) {
 		t.Fatal("nested")
 	}
 	// assign with stray Then must not invent contains via non-get_blocks Then
 	stray := &Stmt{Kind: StmtAssign, StmID: 5, Then: thenB}
-	if ContainsStmtTree(stray, &thenB.Stmts[0]) {
+	if ContainsStmtTreeSess(testAmbientSession, stray, &thenB.Stmts[0]) {
 		t.Fatal("assign must not invent contains via stray Then")
 	}
 	// nil if arm sticky fail closed false
-	if ContainsStmtTree(&Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}, &thenB.Stmts[0]) {
+	if ContainsStmtTreeSess(testAmbientSession, &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}, &thenB.Stmts[0]) {
 		t.Fatal("nil Else must fail closed (no invent membership)")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -343,14 +343,14 @@ func TestContainsStmtTree(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// blockHasStmtIDDeep: Block + live StmID always required sticky
-	if blockHasStmtIDDeep(nil, 1) {
+	if blockHasStmtIDDeepSess(testAmbientSession, nil, 1) {
 		t.Fatal("nil block blockHasStmtIDDeep must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block blockHasStmtIDDeep must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if blockHasStmtIDDeep(thenB, 0) {
+	if blockHasStmtIDDeepSess(testAmbientSession, thenB, 0) {
 		t.Fatal("StmID 0 blockHasStmtIDDeep must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -359,7 +359,7 @@ func TestContainsStmtTree(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete nested arm sticky
 	bad := &Block{Stmts: []Stmt{{Kind: StmtIfElse, StmID: 9, Then: &Block{StmID: 10}, Else: nil}}}
-	if blockHasStmtIDDeep(bad, 10) {
+	if blockHasStmtIDDeepSess(testAmbientSession, bad, 10) {
 		t.Fatal("incomplete if arm must fail closed not invent nest match")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -374,7 +374,7 @@ func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {
 	elseB := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
 	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB, Else: elseB}
 	var stms []*Stmt
-	n := FindTypedStmts(st, &stms, []StatementType{StmtReturn})
+	n := FindTypedStmtsSess(testAmbientSession, st, &stms, []StatementType{StmtReturn})
 	if n != 1 || len(stms) != 1 {
 		t.Fatal(n, stms)
 	}

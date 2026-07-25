@@ -24,15 +24,6 @@ func StmtInBlock(stParent, b *Block) bool {
 	return false
 }
 
-// GetBlocksStmt returns child blocks of a statement (Statement::get_blocks).
-// Kind-gated like C++ overrides — assign/break/goto push nothing.
-// StatementIf always pushes if_true and if_false (live Block refs in C++);
-// nil arms are incomplete IR so walkers fail closed (no invent soft-skip missing arm).
-// StatementFor always pushes body; ArrayOp/Block push Then when non-nil (C++ if(body)).
-func GetBlocksStmt(st *Stmt) []*Block {
-	return GetBlocksStmtSess(testAmbientSession, st)
-}
-
 func GetBlocksStmtSess(s *Session, st *Stmt) []*Block {
 	// Statement always live; sticky incomplete IncompleteBlocks (no invent empty-complete)
 	if st == nil {
@@ -105,12 +96,6 @@ func IncompleteStmtsSlice() []*Stmt {
 }
 
 // FindTypedStmts mirrors Statement::find_typed_stmts.
-// Statement.cpp:631–646 — collect statements whose Kind is in kinds (recursive).
-// Returns count of matches appended to stms, or -1 on incomplete IR sticky
-// (nil Block hole — *stms IncompleteStmtsSlice; no invent empty match / soft re-pick).
-func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
-	return FindTypedStmtsSess(testAmbientSession, st, stms, kinds)
-}
 
 func FindTypedStmtsSess(s *Session, st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
@@ -128,7 +113,7 @@ func FindTypedStmtsSess(s *Session, st *Stmt, stms *[]*Stmt, kinds []StatementTy
 			break
 		}
 	}
-	blks := GetBlocksStmt(st)
+	blks := GetBlocksStmtSess(s, st)
 	// residual ERROR sticky — no invent soft-walk past GetBlocksStmt residual
 	if sessHasError(s) {
 		*stms = IncompleteStmtsSlice()
@@ -170,10 +155,6 @@ func FindTypedStmtsSess(s *Session, st *Stmt, stms *[]*Stmt, kinds []StatementTy
 // FindTypedStmtsInBlock walks a block's statements for typed collection.
 // Returns -1 on incomplete IR sticky (same as FindTypedStmts).}
 
-func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
-	return FindTypedStmtsInBlockSess(testAmbientSession, b, stms, kinds)
-}
-
 func FindTypedStmtsInBlockSess(s *Session, b *Block, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
 		return -1
@@ -198,10 +179,6 @@ func FindTypedStmtsInBlockSess(s *Session, b *Block, stms *[]*Stmt, kinds []Stat
 // Statement.cpp:649–651 — first statement of parent block.
 // Incomplete Statement/parent sticky false (no invent is-first / soft re-pick past holes).}
 
-func Is1stStm(st *Stmt, parent *Block) bool {
-	return Is1stStmSess(testAmbientSession, st, parent)
-}
-
 // Is1stStmSess is Is1stStm with explicit session residual sticky.
 func Is1stStmSess(s *Session, st *Stmt, parent *Block) bool {
 	// Statement + parent always live; sticky incomplete no invent is-first soft-skip
@@ -220,14 +197,6 @@ func Is1stStmSess(s *Session, st *Stmt, parent *Block) bool {
 }
 
 // FindContainerStm mirrors Statement::find_container_stm for a nested block.
-// Statement.cpp:414–430 — parent-block statement whose get_blocks contains b.
-// Kind-gated get_blocks only (no invent container via stray Then on assign).
-// Block always live; sticky nil (no invent soft-skip missing container past hole).
-// Missing parent is complete nil (root block — not incomplete).
-// Incomplete parent get_blocks hole sticky nil (no invent soft-skip missing container).
-func FindContainerStm(b *Block) *Stmt {
-	return FindContainerStmSess(testAmbientSession, b)
-}
 
 // FindContainerStmSess is FindContainerStm with explicit session residual sticky.
 func FindContainerStmSess(s *Session, b *Block) *Stmt {
@@ -268,16 +237,6 @@ func FindContainerStmSess(s *Session, b *Block) *Stmt {
 }
 
 // Dominate mirrors Statement::dominate.
-// Statement.cpp:393–410 — a dominates s (same block order or ancestor container).
-// aParent / sParent are parent blocks of a and s (Stmt has no Parent field).
-// Statement::stm_id is always live after create; StmID 0 is incomplete IR.
-// Same-parent incomplete IDs resolve by parent membership when possible; unresolved
-// membership fails closed sticky false (no invent dominate true via 0<=0 / soft re-pick).
-// Nested-in-a uses get_blocks only (no invent dominate via stray Then on assign).
-// Incomplete get_blocks arms sticky false (no invent match Then then soft-skip nil Else).
-func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
-	return DominateSess(testAmbientSession, a, aParent, s, sParent)
-}
 
 // DominateSess is Dominate with sticky on run bag (sess; stmt param remains s).
 func DominateSess(sess *Session, a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
@@ -386,11 +345,6 @@ func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, 
 }
 
 // IsPtrUsed mirrors Statement::is_ptr_used.
-// Statement.cpp:355–359.
-// Incomplete IR fails closed sticky as true (no invent "no pointer used" / soft re-pick past holes).
-func IsPtrUsed(st *Stmt) bool {
-	return IsPtrUsedSess(testAmbientSession, st)
-}
 
 // IsPtrUsedSess is IsPtrUsed with explicit session residual sticky.
 func IsPtrUsedSess(s *Session, st *Stmt) bool {
@@ -404,11 +358,6 @@ func IsPtrUsedSess(s *Session, st *Stmt) bool {
 }
 
 // ContainsStmtInBlock mirrors Block as Statement::contains_stmt for a block root.
-// Statement.cpp:684–694 — s's parent chain includes block.
-// Incomplete block root sticky false (no invent not-contain / soft re-pick past hole).
-func ContainsStmtInBlock(b *Block, stParent *Block) bool {
-	return ContainsStmtInBlockSess(testAmbientSession, b, stParent)
-}
 
 // ContainsStmtInBlockSess is ContainsStmtInBlock with explicit session residual sticky.
 func ContainsStmtInBlockSess(s *Session, b *Block, stParent *Block) bool {
@@ -421,12 +370,6 @@ func ContainsStmtInBlockSess(s *Session, b *Block, stParent *Block) bool {
 }
 
 // ContainsStmtTree mirrors Statement::contains_stmt for compound statements.
-// Statement.cpp:684–705 — self or nested get_blocks trees by StmID.
-// Incomplete Block* hole fails closed sticky false (no invent membership / soft re-pick).
-// Walks only get_blocks kinds (no invent search via stray Then on assign).
-func ContainsStmtTree(root, s *Stmt) bool {
-	return ContainsStmtTreeSess(testAmbientSession, root, s)
-}
 
 // ContainsStmtTreeSess is ContainsStmtTree with explicit session residual sticky.
 func ContainsStmtTreeSess(sess *Session, root, s *Stmt) bool {
@@ -456,13 +399,6 @@ func ContainsStmtTreeSess(sess *Session, root, s *Stmt) bool {
 		}
 	}
 	return false
-}
-
-// blockHasStmtIDDeep walks get_blocks for stm_id under b.
-// Block + live StmID always required; sticky false (no invent not-found soft-skip past hole).
-// Incomplete arm sticky false (no invent membership via partial arm scan before hole).
-func blockHasStmtIDDeep(b *Block, id int) bool {
-	return blockHasStmtIDDeepSess(testAmbientSession, b, id)
 }
 
 // blockHasStmtIDDeepSess is blockHasStmtIDDeep with explicit session residual sticky.

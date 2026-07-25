@@ -37,14 +37,14 @@ func CollectCalledInvocationsExprSess(s *Session, e *Expression, out *[]*Invocat
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !collectCalledInvocationsExpr(e, out) {
+	if !collectCalledInvocationsExpr(s, e, out) {
 		*out = IncompleteInvocationsSlice()
 		sessNoteError(s, ErrGeneric)
 	}
 }
 
 // collectCalledInvocationsExpr returns false on incomplete IR (*out cleared by caller).
-func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
+func collectCalledInvocationsExpr(s *Session, e *Expression, out *[]*Invocation) bool {
 	if e == nil || out == nil {
 		return false
 	}
@@ -60,7 +60,7 @@ func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
 			if a == nil {
 				return false
 			}
-			if !collectCalledInvocationsExpr(a, out) {
+			if !collectCalledInvocationsExpr(s, a, out) {
 				return false
 			}
 		}
@@ -72,15 +72,15 @@ func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			return false
 		}
-		if !collectCalledInvocationsExpr(e.CommaLHS, out) {
+		if !collectCalledInvocationsExpr(s, e.CommaLHS, out) {
 			return false
 		}
-		return collectCalledInvocationsExpr(e.CommaRHS, out)
+		return collectCalledInvocationsExpr(s, e.CommaRHS, out)
 	case TermAssignment:
 		if e.Assign == nil {
 			return false
 		}
-		return collectCalledInvocationsStmt(e.Assign, out)
+		return collectCalledInvocationsStmt(s, e.Assign, out)
 	default:
 		// unknown term — incomplete IR
 		return false
@@ -100,13 +100,13 @@ func CollectCalledInvocationsStmtSess(s *Session, st *Stmt, out *[]*Invocation) 
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !collectCalledInvocationsStmt(st, out) {
+	if !collectCalledInvocationsStmt(s, st, out) {
 		*out = IncompleteInvocationsSlice()
 		sessNoteError(s, ErrGeneric)
 	}
 }
 
-func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
+func collectCalledInvocationsStmt(s *Session, st *Stmt, out *[]*Invocation) bool {
 	if st == nil || out == nil {
 		return false
 	}
@@ -119,13 +119,13 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			return false
 		}
-		if !collectCalledInvocationsExpr(st.Loop.TestExpr, out) {
+		if !collectCalledInvocationsExpr(s, st.Loop.TestExpr, out) {
 			return false
 		}
 	case StmtArrayOp:
 		// optional init_value; body path has none (walk get_blocks)
 		if st.Expr != nil {
-			if !collectCalledInvocationsExpr(st.Expr, out) {
+			if !collectCalledInvocationsExpr(s, st.Expr, out) {
 				return false
 			}
 		}
@@ -135,23 +135,23 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 		if st.Expr == nil {
 			return false
 		}
-		if !collectCalledInvocationsExpr(st.Expr, out) {
+		if !collectCalledInvocationsExpr(s, st.Expr, out) {
 			return false
 		}
 	default:
 		// other kinds: optional expr if present
 		if st.Expr != nil {
-			if !collectCalledInvocationsExpr(st.Expr, out) {
+			if !collectCalledInvocationsExpr(s, st.Expr, out) {
 				return false
 			}
 		}
 	}
 	// get_blocks → Then/Else
-	for _, b := range GetBlocksStmt(st) {
+	for _, b := range GetBlocksStmtSess(s, st) {
 		if b == nil {
 			return false
 		}
-		if !collectCalledInvocationsBlock(b, out) {
+		if !collectCalledInvocationsBlock(s, b, out) {
 			return false
 		}
 	}
@@ -170,18 +170,18 @@ func CollectCalledInvocationsBlockSess(s *Session, b *Block, out *[]*Invocation)
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !collectCalledInvocationsBlock(b, out) {
+	if !collectCalledInvocationsBlock(s, b, out) {
 		*out = IncompleteInvocationsSlice()
 		sessNoteError(s, ErrGeneric)
 	}
 }
 
-func collectCalledInvocationsBlock(b *Block, out *[]*Invocation) bool {
+func collectCalledInvocationsBlock(s *Session, b *Block, out *[]*Invocation) bool {
 	if b == nil || out == nil {
 		return false
 	}
 	for i := range b.Stmts {
-		if !collectCalledInvocationsStmt(&b.Stmts[i], out) {
+		if !collectCalledInvocationsStmt(s, &b.Stmts[i], out) {
 			return false
 		}
 	}
@@ -532,7 +532,7 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 		*labels = append(*labels, lab)
 	}
 	// get_blocks only — no invent labels via stray Then on assign
-	blks := GetBlocksStmt(st)
+	blks := GetBlocksStmtSess(labelWalkSess(fm), st)
 	for _, b := range blks {
 		if b == nil {
 			return false
@@ -779,4 +779,12 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		}
 		fm.UnionFacts = u
 	}
+}
+
+// labelWalkSess prefers FactMgr bag; unit-test ambient when fm unset.
+func labelWalkSess(fm *FactMgr) *Session {
+	if fm != nil {
+		return fmSess(fm)
+	}
+	return testAmbientSession
 }

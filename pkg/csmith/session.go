@@ -10,8 +10,9 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - residual non-Sess duals: effect/CV/statement_meta method bridges,
+//   - residual non-Sess duals: effect/CV/variable method bridges,
 //     NewVariableSelector ambient install, rSess/vsSess/… nil→ambient
+//   - statement_meta GetBlocksStmt/Dominate/… duals deleted (*Sess only)
 //   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set
 //   - EmptyCGContext/WithFunc leave Sess nil — callers WithSession(…)
 //   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag
