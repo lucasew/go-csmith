@@ -450,17 +450,17 @@ func IncompleteLabelsSlice() []string {
 // IncompleteLabelsSlice (not bare nil invent empty-complete / soft re-pick past hole).
 func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	// incomplete CFG fails whole label collect sticky (no invent partial / empty complete)
 	if fm != nil && !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	var labels []string
 	if !findContainedLabels(st, &labels, fm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	return labels
@@ -518,7 +518,7 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 // Non-if Kind is complete no-op.
 func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUnion, fm *FactMgr) {
 	if st == nil || fm == nil || preFacts == nil || preUnion == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	if st.Kind != StmtIfElse {
@@ -529,7 +529,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	if st.Then == nil || st.Else == nil {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	// Block::stm_id always live; StmID 0 + FactsComplete(nil) would invent empty
@@ -537,7 +537,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	if StmIDUnset(st.Then.StmID) || StmIDUnset(st.Else.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	thenOut := fm.GetMapFactsOut(st.Then.StmID)
@@ -549,7 +549,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		!UnionFactsComplete(*preUnion) || !UnionFactsComplete(thenOutU) || !UnionFactsComplete(elseOutU) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	// makeup new vars from branch outs into pre snapshot (full FactVec)
@@ -557,30 +557,30 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	if !MakeupNewVarFacts(preFacts, thenOut) || !MakeupNewVarFacts(preFacts, elseOut) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(fmSess(fm)) {
+			sessNoteError(fmSess(fm), ErrGeneric)
 		}
 		return
 	}
 	if !makeupNewUnionFacts(preUnion, thenOutU) || !makeupNewUnionFacts(preUnion, elseOutU) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(fmSess(fm)) {
+			sessNoteError(fmSess(fm), ErrGeneric)
 		}
 		return
 	}
 
 	trueMust := st.Then.MustReturn()
 	// residual ERROR sticky — no invent soft-continue branch-merge past Then MustReturn residual
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
 	falseMust := st.Else.MustReturn()
 	// residual ERROR sticky — no invent soft-continue branch-merge past Else MustReturn residual
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
@@ -589,17 +589,17 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	case trueMust && falseMust:
 		// StatementIf.cpp:217–218 — outputs = pre_facts (full)
 		fm.SetGlobalFacts(CloneFactSlice(*preFacts), "auto_call_analysis_596")
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
 		cl := CloneUnionFactSliceDeep(*preUnion)
-		if sessHasError(nil) || !UnionFactsComplete(cl) {
+		if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
@@ -611,17 +611,17 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	case trueMust:
 		// StatementIf.cpp:219–222 — outputs = map_facts_out[if_false]
 		fm.SetGlobalFacts(CloneFactSlice(elseOut), "auto_call_analysis_603")
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
 		cl := CloneUnionFactSliceDeep(elseOutU)
-		if sessHasError(nil) || !UnionFactsComplete(cl) {
+		if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
@@ -633,17 +633,17 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	case falseMust:
 		// StatementIf.cpp:223–227 — outputs = map_facts_out[if_true] + makeup from if_false in
 		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_610")
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
 		cl := CloneUnionFactSliceDeep(thenOutU)
-		if sessHasError(nil) || !UnionFactsComplete(cl) {
+		if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
@@ -658,22 +658,22 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		if !FactsComplete(in) || !UnionFactsComplete(inU) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
 		if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
 		if !makeupNewUnionFacts(&fm.UnionFacts, inU) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
@@ -683,32 +683,32 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
 		if !FactsComplete(elseOut) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
 		_ = MergeFacts(&fm.GlobalFacts, elseOut)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
 		// eUnionWrite half of merge_facts (Fact.cpp:192–199 + FactUnion::join)
 		// Deep-clone then arm outs so merge_fact join cannot alias map_facts_out.
 		u := CloneUnionFactSliceDeep(thenOutU)
-		if sessHasError(nil) || !UnionFactsComplete(u) {
+		if sessHasError(fmSess(fm)) || !UnionFactsComplete(u) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return
 		}
@@ -721,15 +721,15 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			if nf == nil {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(fmSess(fm), ErrGeneric)
 				return
 			}
 			u = MergeUnionFact(u, nf)
 			if !UnionFactsComplete(u) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(fmSess(fm)) {
+					sessNoteError(fmSess(fm), ErrGeneric)
 				}
 				return
 			}

@@ -7,7 +7,7 @@ package csmith
 // Incomplete IR fails closed sticky (no soft invent true / soft re-pick past holes).
 func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	switch st.Kind {
@@ -30,7 +30,7 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 		if cg.FM != nil {
 			if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -40,13 +40,13 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		return VisitFactsStatementExpr(st, cg, opts)
 	case StmtBlock:
 		if st.Then == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		return VisitFactsBlock(st.Then, cg, opts)
 	default:
 		// unknown kind hard IR sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 }
@@ -55,12 +55,12 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementBreak.cpp:126–134 / StatementContinue.cpp:125–133 — test then effect_stm.
 func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// C++ always has live test Expression*; nil Expr sticky hard IR
 	if st.Expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !VisitFactsExpression(st.Expr, cg, opts) {
@@ -70,7 +70,7 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if cg.FM != nil {
 		if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -82,12 +82,12 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementGoto.cpp:364–402 — test; check_write skipped vars; subset re-analysis of dest.
 func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementGoto.cpp:366–368 — test.visit_facts always; nil Expr sticky
 	if st.Expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !VisitFactsExpression(st.Expr, cg, opts) {
@@ -98,12 +98,12 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	facts := cg.pointToFacts()
 	// incomplete working facts sticky (no invent write-check past holes / soft re-pick)
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	for _, v := range st.InitSkippedVars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !cg.CheckWriteVar(v, facts) {
@@ -114,7 +114,7 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	if fm != nil {
 		// Statement::stm_id always live; StmID 0 sticky
 		if StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		// StatementGoto.cpp:390–398 — force dest re-analysis when current outs
@@ -129,20 +129,20 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 			prevOutU := fm.GetMapUnionFactsOut(st.StmID)
 			cur := facts
 			if !FactsComplete(prevOut) || !UnionFactsComplete(prevOutU) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			if !UnionFactsComplete(fm.UnionFacts) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			curU := fm.UnionFacts
 			if !visitedThis && !visitedDest &&
 				!SameFactVec(cur, curU, prevOut, prevOutU) &&
 				SubsetFactVec(cur, curU, prevOut, prevOutU) {
-				if sessHasError(nil) {
+				if sessHasError(cgSess(cg)) {
 					return false
 				}
 				delete(fm.MapFactsIn, destID)
@@ -150,13 +150,13 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 				delete(fm.MapUnionFactsIn, destID)
 				delete(fm.MapUnionFactsOut, destID)
 			}
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 		}
 		// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 		if !EffectComplete(cg.EffectStm) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -168,12 +168,12 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementExpr.cpp:104–110 — expr.visit_facts; store effect_stm.
 func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementExpr.cpp:106 — expr always live; nil Expr sticky
 	if st.Expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !VisitFactsExpression(st.Expr, cg, opts) {
@@ -183,7 +183,7 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if cg.FM != nil {
 		if StmIDUnset(st.StmID) || !EffectComplete(cg.EffectStm) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -196,7 +196,7 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 // effect_accum; on success inputs=map_facts_out and map_visited[this]=true.
 func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if b == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Block.cpp:472 — Effect pre_effect = cg_context.get_accum_effect();
@@ -204,11 +204,11 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	havePre := false
 	if cg.EffectAccum != nil {
 		if !EffectComplete(*cg.EffectAccum) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		preEffect = cg.EffectAccum.Clone()
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		havePre = true
@@ -217,12 +217,12 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		// incomplete GlobalFacts sticky (no invent fixed-point / soft re-pick past holes)
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		inputs = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-fixed-point past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		// Block.cpp:471–480 — visit_facts does NOT clear map_visited[this] before
@@ -249,14 +249,14 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		mout := cg.FM.GetMapFactsOut(b.StmID)
 		if FactsComplete(mout) {
 			cg.FM.AssignGlobalFactsFromMapOut(b.StmID)
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 		} else if FactsComplete(out) {
 			cl := CloneFactSlice(out)
-			if sessHasError(nil) || !FactsComplete(cl) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(cgSess(cg)) || !FactsComplete(cl) {
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -277,7 +277,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 // When both arms must_return, outputs restore pre-condition inputs (inputs_copy).
 func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtIfElse {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementIf.cpp:164 — inputs_copy before condition (full FactVec)
@@ -285,25 +285,25 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	var inputsCopyU []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if visit past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		inputsCopyU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(inputsCopyU) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(inputsCopyU) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 	}
 	// StatementIf.cpp:165–168 — evaluate condition first; nil test sticky
 	if st.Expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !VisitFactsExpression(st.Expr, cg, opts) {
@@ -312,7 +312,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementIf.cpp:169 — effect_stm after condition
 	condEff := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	// post-condition env shared as entry to both arms (full FactVec)
@@ -320,27 +320,27 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	var postCondU []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		postCond = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if arms past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		postCondU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(postCondU) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(postCondU) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 	}
 	// StatementIf.cpp:170–177 — both arms always live Blocks sticky
 	if st.Then == nil || st.Else == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementIf.cpp:170–177 — both arms use the SAME cg_context (shared
@@ -357,20 +357,20 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		// incomplete then-arm facts sticky (no invent soft re-pick past hole as visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-then facts past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		thenUnions = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(thenUnions) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(thenUnions) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -381,13 +381,13 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		// effect_accum is NOT reset (C++ continues growing through false arm).
 		cg.FM.SetGlobalFacts(CloneFactSlice(postCond), "auto_statement_visit_317")
 		// residual ERROR sticky — no invent soft-else start past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		clU := CloneUnionFactSliceDeep(postCondU)
-		if sessHasError(nil) || !UnionFactsComplete(clU) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -407,20 +407,20 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		// incomplete else-arm facts sticky (no invent soft re-pick past hole as visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-else facts past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		elseUnions = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(elseUnions) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(elseUnions) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -436,8 +436,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			thenFacts = DropFactSubjectsByVars(thenFacts, st.Else.LocalVars)
 			thenUnions = DropUnionSubjectsByVars(thenUnions, st.Else.LocalVars)
 			if !FactsComplete(thenFacts) || !UnionFactsComplete(thenUnions) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -446,8 +446,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			elseFacts = DropFactSubjectsByVars(elseFacts, st.Then.LocalVars)
 			elseUnions = DropUnionSubjectsByVars(elseUnions, st.Then.LocalVars)
 			if !FactsComplete(elseFacts) || !UnionFactsComplete(elseUnions) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -460,46 +460,46 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// Incomplete arm effects sticky (no invent SetMapStmEffect incomplete then true)
 	if cg.FM != nil {
 		if StmIDUnset(st.Then.StmID) || StmIDUnset(st.Else.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !EffectComplete(condEff) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		thenE := cg.FM.GetMapStmEffect(st.Then.StmID)
 		elseE := cg.FM.GetMapStmEffect(st.Else.StmID)
 		if !EffectComplete(thenE) || !EffectComplete(elseE) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		acc := condEff.AddEffect(thenE)
 		// residual ERROR sticky — no invent soft-continue else merge past then AddEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		if !EffectComplete(acc) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		acc = acc.AddEffect(elseE)
 		// residual ERROR sticky — no invent soft-continue set-map past else AddEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		if !EffectComplete(acc) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, acc)
 		// residual ERROR sticky — no invent soft-continue visit past SetMapStmEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 	}
@@ -508,25 +508,25 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		trueMust := st.Then.MustReturn()
 		// residual ERROR sticky — no invent soft-continue merge path past Then MustReturn residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		falseMust := st.Else.MustReturn()
 		// residual ERROR sticky — no invent soft-continue merge path past Else MustReturn residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		installU := func(u []*FactUnion) bool {
 			if !UnionFactsComplete(u) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			cl := CloneUnionFactSliceDeep(u)
-			if sessHasError(nil) || !UnionFactsComplete(cl) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(cgSess(cg)) || !UnionFactsComplete(cl) {
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -540,50 +540,50 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		switch {
 		case trueMust && falseMust:
 			if !FactsComplete(inputsCopy) || !UnionFactsComplete(inputsCopyU) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(CloneFactSlice(inputsCopy), "auto_statement_visit_419")
-			if sessHasError(nil) || !installU(inputsCopyU) {
+			if sessHasError(cgSess(cg)) || !installU(inputsCopyU) {
 				return false
 			}
 		case trueMust:
 			if !FactsComplete(elseFacts) || !UnionFactsComplete(elseUnions) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(elseFacts, "auto_statement_visit_427")
-			if sessHasError(nil) || !installU(elseUnions) {
+			if sessHasError(cgSess(cg)) || !installU(elseUnions) {
 				return false
 			}
 		case falseMust:
 			if !FactsComplete(thenFacts) || !UnionFactsComplete(thenUnions) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_435")
-			if sessHasError(nil) || !installU(thenUnions) {
+			if sessHasError(cgSess(cg)) || !installU(thenUnions) {
 				return false
 			}
 		default:
 			if !FactsComplete(thenFacts) || !FactsComplete(elseFacts) ||
 				!UnionFactsComplete(thenUnions) || !UnionFactsComplete(elseUnions) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_443")
 			_ = MergeFacts(&cg.FM.GlobalFacts, elseFacts)
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -593,8 +593,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			for _, uf := range elseUnions {
 				merged := MergeUnionFact(cg.FM.UnionFacts, uf)
 				if !UnionFactsComplete(merged) {
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					return false
 				}
@@ -614,17 +614,17 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 // visit/body policy fails stay non-sticky false.
 func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementFor.cpp:430+ — always has init StatementAssign, body Block, IV sticky
 	if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementFor.cpp:430–432 — init StatementAssign always live sticky
 	if st.Loop.InitStmt == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
@@ -635,52 +635,52 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	var factsCopyU []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-for visit past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		factsCopyU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(factsCopyU) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(factsCopyU) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 	}
 	eff := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-for visit past EffectStm Clone residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 
 	iv := st.Loop.IV
 	// StatementFor.cpp:440 — assert(iv->type->eType == eSimple) sticky
 	if iv.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !iv.Type.IsSimple() {
 		// residual ERROR sticky — no invent soft-continue for-visit past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue for-visit past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	// StatementFor.cpp:441 — assert(iv_bounds.find(iv) == end); hard sticky re-bind
 	if cg.IVBounds != nil {
 		if _, ok := cg.IVBounds[iv]; ok {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 	}
@@ -699,29 +699,29 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		// StatementFor.cpp:452–458 — body Block always has stm_id sticky
 		if StmIDUnset(st.Then.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if st.Then.MustReturn() {
 			// residual ERROR sticky — no invent soft-continue pre-loop path past MustReturn residual true
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			// control reaches end of for with pre-loop (post-init) env — full FactVec
 			if !UnionFactsComplete(factsCopyU) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			cg.FM.SetGlobalFacts(CloneFactSlice(factsCopy), "auto_statement_visit_559")
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			clU := CloneUnionFactSliceDeep(factsCopyU)
-			if sessHasError(nil) || !UnionFactsComplete(clU) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -732,12 +732,12 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 		} else {
 			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			// map_facts_in[&body] — fixed-point entry full FactVec
 			cg.FM.AssignGlobalFactsFromMapIn(st.Then.StmID)
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			// Drop body LocalVars from restored entry (see post_loop / DropFactSubjectsByVars).
@@ -745,8 +745,8 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 				cg.FM.GlobalFacts = DropFactSubjectsByVars(cg.FM.GlobalFacts, st.Then.LocalVars)
 				cg.FM.UnionFacts = DropUnionSubjectsByVars(cg.FM.UnionFacts, st.Then.LocalVars)
 				if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					return false
 				}
@@ -756,13 +756,13 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
 		// nil FindEdgesIn sticky incomplete CFG; tryMergeJumpFacts already sticky
 		if StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		edges := cg.FM.FindEdgesIn(st.StmID, true, false)
 		if edges == nil {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -785,24 +785,24 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	bodyEff := EmptyEffect()
 	if cg.FM != nil {
 		if StmIDUnset(st.Then.StmID) || StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		bodyEff = cg.FM.GetMapStmEffect(st.Then.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(eff) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 	} else if !EffectComplete(eff) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	SetAccumulatedEffectAfterBlock(st, bodyEff, cg, eff)
 	if cg.FM != nil && !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -815,7 +815,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 // CheckWrite/visit policy fails stay non-sticky false.
 func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// collect IVs from nested ArrayOp Loop chain
@@ -823,7 +823,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	var ivs []*Variable
 	for cur := st; cur != nil && cur.Kind == StmtArrayOp; {
 		if cur.Loop == nil || cur.Loop.IV == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		ivs = append(ivs, cur.Loop.IV)
@@ -839,7 +839,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementArrayOp.cpp:270–275 — empty ctrl chain incomplete sticky
 	if len(ivs) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementArrayOp.cpp:270–275 — check_write_var each ctrl var
@@ -847,7 +847,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	facts := cg.pointToFacts()
 	for _, iv := range ivs {
 		if iv == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !cg.CheckWriteVar(iv, facts) {
@@ -860,7 +860,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	inner := findArrayOpInnermost(st)
 	// StatementArrayOp.cpp:276–317 — body OR init_value path; neither is incomplete sticky
 	if inner == nil || inner.Then == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 
@@ -871,14 +871,14 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		// StatementAssign always has live Lhs + Expression*
 		asg := &inner.Then.Stmts[0]
 		if asg.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !VisitFactsExpression(asg.Expr, cg, opts) {
 			return false
 		}
 		if asg.LhsVar == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		lhs := &Lhs{Var: asg.LhsVar, Type: asg.LhsVar.Type}
@@ -888,25 +888,25 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		if cg.FM != nil {
 			// Statement::stm_id always live; StmID 0 sticky
 			if StmIDUnset(st.StmID) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			_ = cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
 			// incomplete assign sticky (no invent visit success / soft re-pick)
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			// Incomplete EffectStm sticky
 			if !EffectComplete(cg.EffectStm) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			effCl := cg.EffectStm.Clone()
 			// residual ERROR sticky — no invent soft-map effect past IncompleteEffect Clone residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			cg.FM.SetMapStmEffect(st.StmID, effCl)
@@ -918,17 +918,17 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	// incomplete GlobalFacts sticky (no invent cleaned pre-body snapshot)
 	ptFacts := cg.pointToFacts()
 	if !FactsComplete(ptFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	preFacts := CloneFactSlice(ptFacts)
 	// residual ERROR sticky — no invent soft-arrayop visit past CloneFactSlice residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	preStm := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-arrayop visit past EffectStm Clone residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	// StatementArrayOp.cpp:284–287 — body->visit_facts(inputs, cg_context) on the
@@ -940,25 +940,25 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		// StatementArrayOp.cpp:285–291 — body Block always has stm_id sticky
 		if StmIDUnset(inner.Then.StmID) || StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if inner.Then.MustReturn() {
 			// residual ERROR sticky — no invent soft-continue pre-loop path past MustReturn residual true
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			cg.FM.SetGlobalFacts(preFacts, "auto_statement_visit_770")
 		} else {
 			// residual ERROR sticky — no invent soft-continue map_facts_in path past MustReturn residual false
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			// map_facts_in[&body] — C++ map[] always; missing → empty
 			in := cg.FM.GetMapFactsIn(inner.Then.StmID)
 			if !FactsComplete(in) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -968,8 +968,8 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		// nil FindEdgesIn sticky incomplete CFG
 		edges := cg.FM.FindEdgesIn(st.StmID, true, false)
 		if edges == nil {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -983,15 +983,15 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		// Incomplete body/pre sticky
 		bodyEff := cg.FM.GetMapStmEffect(inner.Then.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(preStm) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
 		if !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}

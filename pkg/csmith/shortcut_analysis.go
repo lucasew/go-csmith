@@ -291,12 +291,12 @@ func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 // Statement + FactMgr always live; sticky (no invent soft-skip mark past hole).
 func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 	if root == nil || fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	// incomplete CFG sticky (no invent partial mark-as-visited / soft re-pick past holes)
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	if fm.MapVisited == nil {
@@ -336,24 +336,24 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 	// Statement.cpp:770–771 — get_fact_mgr_for_func; assert(fm)
 	// fail closed sticky: nil FM is unfixed (no invent "all gotos fixed" / soft re-pick)
 	if root == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	if fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	ids := map[int]bool{}
 	if !collectStmIDs(root, ids) {
 		// incomplete get_blocks tree sticky unfixed
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(fmSess(fm)) {
+			sessNoteError(fmSess(fm), ErrGeneric)
 		}
 		return true
 	}
 	ok := containsUnfixedGotoIDs(ids, fm)
 	// residual ERROR sticky — no invent fixed/unfixed soft-skip past CFG residual hole
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		return true
 	}
 	return ok
@@ -365,11 +365,11 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 // assert(fm) sticky unfixed without FactMgr.
 func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	if fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	ids := map[int]bool{}
@@ -378,15 +378,15 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 	}
 	for i := range b.Stmts {
 		if !collectStmIDs(&b.Stmts[i], ids) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(fmSess(fm)) {
+				sessNoteError(fmSess(fm), ErrGeneric)
 			}
 			return true
 		}
 	}
 	ok := containsUnfixedGotoIDs(ids, fm)
 	// residual ERROR sticky — no invent fixed/unfixed soft-skip past CFG residual hole
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		return true
 	}
 	return ok
@@ -405,7 +405,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 	}
 	// incomplete CFG sticky unfixed (no invent skip holes as fixed / soft re-pick)
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	for _, e := range fm.CFGEdges {
@@ -417,7 +417,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			src := FindStmtByID(fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue fixed-scan past FindStmt hole
 			// (incomplete if-arm residual soft invents skip then later invents fixed tree)
-			if sessHasError(nil) {
+			if sessHasError(fmSess(fm)) {
 				return true
 			}
 			if src == nil || src.Kind != StmtGoto {
@@ -452,8 +452,8 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			// incomplete maps sticky unfixed (GetMap may already SetError)
 			if !FactsComplete(srcOut) || !FactsComplete(destIn) ||
 				!UnionFactsComplete(srcOutU) || !UnionFactsComplete(destInU) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(fmSess(fm)) {
+					sessNoteError(fmSess(fm), ErrGeneric)
 				}
 				return true
 			}
@@ -465,30 +465,30 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			}
 			for _, f := range destIn {
 				if f.Var == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(fmSess(fm), ErrGeneric)
 					return true
 				}
 				if f.Var.IsRV() {
 					// residual ERROR sticky — no invent soft-continue unfixed scan past IsRV hole
-					if sessHasError(nil) {
+					if sessHasError(fmSess(fm)) {
 						return true
 					}
 					continue
 				}
 				// residual ERROR sticky — no invent soft-continue past IsRV residual false path
-				if sessHasError(nil) {
+				if sessHasError(fmSess(fm)) {
 					return true
 				}
 				// Statement.cpp:797–800 — jump_src_f && !f->imply(*jump_src_f)
 				jumpSrc := FindRelatedPointTo(srcOut, f.Var)
 				// residual ERROR sticky — no invent soft-continue fixed past FindRelated hole
-				if sessHasError(nil) {
+				if sessHasError(fmSess(fm)) {
 					return true
 				}
 				if jumpSrc != nil {
 					ok := f.Imply(jumpSrc)
 					// residual ERROR sticky — no invent soft-continue fixed past Imply hole
-					if sessHasError(nil) {
+					if sessHasError(fmSess(fm)) {
 						return true
 					}
 					if !ok {
@@ -499,25 +499,25 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 			// eUnionWrite half of full FactVec (same imply gate as ePointTo)
 			for _, fu := range destInU {
 				if fu == nil || fu.Var == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(fmSess(fm), ErrGeneric)
 					return true
 				}
 				if fu.Var.IsRV() {
-					if sessHasError(nil) {
+					if sessHasError(fmSess(fm)) {
 						return true
 					}
 					continue
 				}
-				if sessHasError(nil) {
+				if sessHasError(fmSess(fm)) {
 					return true
 				}
 				jumpSrcU := FindRelatedUnion(srcOutU, fu.Var)
-				if sessHasError(nil) {
+				if sessHasError(fmSess(fm)) {
 					return true
 				}
 				if jumpSrcU != nil {
 					ok := fu.Imply(jumpSrcU)
-					if sessHasError(nil) {
+					if sessHasError(fmSess(fm)) {
 						return true
 					}
 					if !ok {
@@ -564,7 +564,7 @@ func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 // Nil FM / StmID≤0 is non-sticky ShortcutNone (intentional reuse miss / soft re-pick).
 func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) int {
 	if st == nil || facts == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return ShortcutNone
 	}
 	if cg.FM == nil {
@@ -595,25 +595,25 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	if !SameFactVec(*facts, fm.UnionFacts, in, inU) || IsCtrlStmt(st) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts true path
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	// contains_unfixed_goto — conservative none if any unvisited goto in tree
 	if ContainsUnfixedGoto(st, fm) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual true
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual false
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	// Incomplete map_stm_effect / accum fails closed before AddEffect
@@ -630,13 +630,13 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	if cg.InConflict(eff) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual true
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return ShortcutConflict
 		}
 		return ShortcutConflict
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual false
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutConflict
 	}
 	// Statement.cpp:559 — inputs = map_facts_out[this]; C++ map[] empty if missing.
@@ -659,7 +659,7 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	fm.UnionFacts = clU
 	cg.AddEffect(eff, false)
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past AddEffect residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	if !EffectComplete(cg.EffectStm) {
@@ -671,7 +671,7 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	fm.SetMapAccumEffect(st.StmID, acc)
 	// residual ERROR sticky — no invent ShortcutOK past SetMapAccumEffect residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	if fm.MapVisited == nil {
@@ -703,12 +703,12 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	// Statement.cpp:609+ — always live Statement* + inputs + cg_context
 	// incomplete call sticky (no soft invent true / soft re-pick past holes)
 	if st == nil || facts == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Fact* always live; incomplete working set sticky before visit
 	if !FactsComplete(*facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
@@ -735,9 +735,9 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 		}
 		cl := CloneFactSlice(*facts)
-		if sessHasError(nil) || !FactsComplete(cl) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !FactsComplete(cl) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -752,18 +752,18 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		// Statement.cpp:621–624 — remove_rv on inputs; accum; visited always set
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			*facts = IncompleteFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			ok = false
 		} else {
 			*facts = CloneFactSlice(cg.FM.GlobalFacts)
-			if sessHasError(nil) || !FactsComplete(*facts) {
+			if sessHasError(cgSess(cg)) || !FactsComplete(*facts) {
 				// residual visit HasError with complete empty work: still harvest
 				if !FactsComplete(*facts) {
 					*facts = IncompleteFactSlice()
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					ok = false
 				}
@@ -771,8 +771,8 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			if FactsComplete(*facts) {
 				cg.FM.RemoveRVFacts(facts)
 				if !FactsComplete(*facts) {
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					ok = false
 				}
@@ -793,7 +793,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			if !haveLive {
 				cg.FM.GlobalFacts = IncompleteFactSlice()
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		// Incomplete accum fails closed sticky visit (record IncompleteEffect; no invent ok true)
@@ -801,7 +801,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		if !EffectComplete(acc) {
 			ok = false
 			acc = IncompleteEffect()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		cg.FM.SetMapAccumEffect(st.StmID, acc)
 		// residual ERROR sticky — visit already may be false; still record incomplete marker
@@ -820,17 +820,17 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	// Statement.cpp:574+ — always live this + inputs + cg_context
 	// incomplete call sticky (no soft invent true / soft re-pick past holes)
 	if st == nil || facts == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent
 	// validate success without set_fact_in/out)
 	if cg.FM != nil && StmIDUnset(st.StmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Statement.cpp:574–606 — validate_and_update_facts does NOT assign
@@ -844,8 +844,8 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	case ShortcutOK:
 		// incomplete clone of out sticky (no invent shortcut success / soft re-pick)
 		if !FactsComplete(*facts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -864,22 +864,22 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	inputsCopy := CloneFactSlice(*facts)
 	// incomplete pre-visit clone sticky (CloneFactSlice already sticks on holes)
 	if !FactsComplete(inputsCopy) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	var unionInCopy []*FactUnion
 	if cg.FM != nil {
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		// deep clone: visit may Join/SetBottom in place on live FactUnion objects
 		unionInCopy = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
 		if !UnionFactsComplete(unionInCopy) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -893,8 +893,8 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	}
 	// incomplete post-visit sticky (no invent set_fact_in/out success / soft re-pick past hole)
 	if !FactsComplete(*facts) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
