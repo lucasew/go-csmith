@@ -11,7 +11,7 @@ import (
 // then for non-global lists OutputArrayInitializers (ctrl decl even when all brace-init).
 // Incomplete Variable* list fails closed sticky empty (no invent skip holes / partial section).
 func OutputVariableList(vars []*Variable, indent string, forceStatic bool) string {
-	return OutputVariableListOpts(vars, indent, forceStatic, ProcessOptions())
+	return OutputVariableListSess(nil, vars, indent, forceStatic, sessOpts(nil))
 }
 
 // OutputVariableListOpts is OutputVariableList with explicit session Options.
@@ -87,7 +87,7 @@ func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceSt
 // VariableSelector.cpp:1594–1601 — comment header + list (no access_once toggle).
 // no invent section header without any live global defs
 func OutputGlobalVariables(vars []*Variable) string {
-	return OutputGlobalVariablesOpts(vars, ProcessOptions())
+	return OutputGlobalVariablesSess(nil, vars, sessOpts(nil))
 }
 
 // OutputGlobalVariablesOpts is OutputGlobalVariables with explicit session Options.
@@ -119,7 +119,7 @@ func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) strin
 // VariableSelector.cpp:1604–1612.
 // no invent section header without any live decls
 func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
-	return OutputGlobalVariablesDeclsOpts(vars, prefix, ProcessOptions())
+	return OutputGlobalVariablesDeclsSess(nil, vars, prefix, sessOpts(nil))
 }
 
 // OutputGlobalVariablesDeclsOpts is OutputGlobalVariablesDecls with explicit Options.

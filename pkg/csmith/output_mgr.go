@@ -461,7 +461,12 @@ func PureRndUptoIndexSess(s *Session, nFiles int) int {
 // DefaultOutputMgr.cpp:144–151 — each global → pure_rnd_upto(nFiles) file bucket.
 // Returns nFiles content strings (defs only, no headers). Incomplete globals sticky nil.
 func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []string {
-	return RandomOutputVarDefsOpts(globals, nFiles, forceStatic, ProcessOptions())
+	return RandomOutputVarDefsSess(nil, globals, nFiles, forceStatic)
+}
+
+// RandomOutputVarDefsSess is RandomOutputVarDefs with Options/sticky from an explicit bag.
+func RandomOutputVarDefsSess(s *Session, globals []*Variable, nFiles int, forceStatic bool) []string {
+	return RandomOutputVarDefsOptsSess(s, globals, nFiles, forceStatic, sessOpts(s))
 }
 
 // RandomOutputVarDefsOpts is RandomOutputVarDefs with explicit session Options.
@@ -512,7 +517,12 @@ func RandomOutputVarDefsOptsSess(s *Session, globals []*Variable, nFiles int, fo
 // Returns nFiles body strings. Incomplete funcs sticky nil.}
 
 func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
-	return RandomOutputFuncDefsOpts(funcs, nFiles, forceStatic, funcAttr, rng, ProcessOptions())
+	return RandomOutputFuncDefsSess(nil, funcs, nFiles, forceStatic, funcAttr, rng)
+}
+
+// RandomOutputFuncDefsSess is RandomOutputFuncDefs with Options/sticky from an explicit bag.
+func RandomOutputFuncDefsSess(s *Session, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
+	return RandomOutputFuncDefsOptsSess(s, funcs, nFiles, forceStatic, funcAttr, rng, sessOpts(s))
 }
 
 // RandomOutputFuncDefsOpts is RandomOutputFuncDefs with explicit session Options.
@@ -557,7 +567,12 @@ func RandomOutputFuncDefsOptsSess(s *Session, funcs []*Function, nFiles int, for
 // DefaultOutputMgr.cpp:165–168 — var defs then func defs into same nFiles buckets.}
 
 func RandomOutputDefs(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
-	return RandomOutputDefsOpts(globals, funcs, nFiles, forceStatic, funcAttr, rng, ProcessOptions())
+	return RandomOutputDefsSess(nil, globals, funcs, nFiles, forceStatic, funcAttr, rng)
+}
+
+// RandomOutputDefsSess is RandomOutputDefs with Options/sticky from an explicit bag.
+func RandomOutputDefsSess(s *Session, globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
+	return RandomOutputDefsOptsSess(s, globals, funcs, nFiles, forceStatic, funcAttr, rng, sessOpts(s))
 }
 
 // RandomOutputDefsOpts is RandomOutputDefs with explicit session Options.

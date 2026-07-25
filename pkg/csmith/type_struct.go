@@ -318,13 +318,18 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputStructDecl emits a C struct definition.
 func (t *Type) OutputStructDecl() string {
-	return t.OutputStructDeclWith(nil, nil, ProcessOptions())
+	return t.OutputStructDeclSess(nil, nil, nil)
+}
+
+// OutputStructDeclSess is OutputStructDecl with Options/sticky from an explicit bag.
+func (t *Type) OutputStructDeclSess(s *Session, r *Rng, attrs *AttributeGenerator) string {
+	return t.OutputStructDeclWithSess(s, r, attrs, sessOpts(s))
 }
 
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	return t.OutputStructDeclWith(r, attrs, ProcessOptions())
+	return t.OutputStructDeclSess(nil, r, attrs)
 }
 
 // OutputStructDeclWith is OutputStructDeclOpts with explicit session Options (ccomp pack).
@@ -865,13 +870,18 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputUnionDecl emits a C union definition.
 func (t *Type) OutputUnionDecl() string {
-	return t.OutputUnionDeclWith(nil, nil, ProcessOptions())
+	return t.OutputUnionDeclSess(nil, nil, nil)
+}
+
+// OutputUnionDeclSess is OutputUnionDecl with Options/sticky from an explicit bag.
+func (t *Type) OutputUnionDeclSess(s *Session, r *Rng, attrs *AttributeGenerator) string {
+	return t.OutputUnionDeclWithSess(s, r, attrs, sessOpts(s))
 }
 
 // OutputUnionDeclOpts optionally emits type attributes.
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	return t.OutputUnionDeclWith(r, attrs, ProcessOptions())
+	return t.OutputUnionDeclSess(nil, r, attrs)
 }
 
 // OutputUnionDeclWith is OutputUnionDeclOpts with explicit session Options.

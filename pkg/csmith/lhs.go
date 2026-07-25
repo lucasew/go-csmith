@@ -471,10 +471,15 @@ func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 
 // outputExpressionVariable mirrors ExpressionVariable::Output without cast.
 // ExpressionVariable.cpp:202–219 — (*…)/& + Variable::Output.
-// Ambient ProcessOptions bridge; emit prefers outputExpressionVariableOpts.}
+// Ambient ProcessOptions bridge; emit prefers outputExpressionVariableSess.}
 
 func outputExpressionVariable(v *Variable, want *Type) string {
-	return outputExpressionVariableOpts(v, want, ProcessOptions())
+	return outputExpressionVariableSess(nil, v, want)
+}
+
+// outputExpressionVariableSess is outputExpressionVariable with Options/sticky from bag s.
+func outputExpressionVariableSess(s *Session, v *Variable, want *Type) string {
+	return outputExpressionVariableOptsSess(s, v, want, sessOpts(s))
 }
 
 // outputExpressionVariableOpts is outputExpressionVariable with access_once Options.

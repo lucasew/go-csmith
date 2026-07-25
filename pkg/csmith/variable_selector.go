@@ -85,7 +85,19 @@ func ChooseVisibleReadVar(
 	typ *Type,
 	unionFacts []*FactUnion,
 ) *Variable {
-	return ChooseVisibleReadVarOptsSess(nil, r, b, readVars, typ, unionFacts, ProcessOptions())
+	return ChooseVisibleReadVarSess(nil, r, b, readVars, typ, unionFacts)
+}
+
+// ChooseVisibleReadVarSess is ChooseVisibleReadVar with Options/sticky from bag s.
+func ChooseVisibleReadVarSess(
+	s *Session,
+	r *Rng,
+	b *Block,
+	readVars []*Variable,
+	typ *Type,
+	unionFacts []*FactUnion,
+) *Variable {
+	return ChooseVisibleReadVarOptsSess(s, r, b, readVars, typ, unionFacts, sessOpts(s))
 }
 
 // ChooseVisibleReadVarOpts is ChooseVisibleReadVar with explicit session Options
@@ -2026,7 +2038,12 @@ func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Vari
 // Ambient ProcessOptions bridge; generation prefers ChooseOKVarMatchOpts.}
 
 func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
-	return ChooseOKVarMatchOpts(r, vars, want, mt, skipConst, ProcessOptions())
+	return ChooseOKVarMatchSess(nil, r, vars, want, mt, skipConst)
+}
+
+// ChooseOKVarMatchSess is ChooseOKVarMatch with Options/sticky from bag s.
+func ChooseOKVarMatchSess(s *Session, r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
+	return ChooseOKVarMatchOptsSess(s, r, vars, want, mt, skipConst, sessOpts(s))
 }
 
 // ChooseOKVarMatchOpts is ChooseOKVarMatch with explicit session Options.

@@ -871,7 +871,12 @@ func PointerToSess(s *Session, pointee *Type) *Type {
 // Match mirrors Type::match (Type.cpp:1475–1488).
 // Type* always live on both sides; sticky false (no invent equal/not-match soft-skip past hole).
 func (t *Type) Match(other *Type, mt MatchType) bool {
-	return t.MatchOpts(other, mt, ProcessOptions())
+	return t.MatchSess(nil, other, mt)
+}
+
+// MatchSess is Match with Options/sticky from an explicit session bag.
+func (t *Type) MatchSess(s *Session, other *Type, mt MatchType) bool {
+	return t.MatchOptsSess(s, other, mt, sessOpts(s))
 }
 
 // MatchOpts is Match with explicit session Options (MatchConvert / is_convertable).
@@ -972,7 +977,12 @@ func (t *Type) IsPromotableSess(s *Session, other *Type) bool {
 // Type.cpp:1423–1455 — float→int forbidden; pointer same size unless strict_float/lang_cpp.
 // Uses session CGOptions; no soft invent Defaults().
 func (t *Type) IsConvertable(other *Type) bool {
-	return t.IsConvertableOpts(other, ProcessOptions())
+	return t.IsConvertableSess(nil, other)
+}
+
+// IsConvertableSess is IsConvertable with Options/sticky from an explicit session bag.
+func (t *Type) IsConvertableSess(s *Session, other *Type) bool {
+	return t.IsConvertableOptsSess(s, other, sessOpts(s))
 }
 
 // IsConvertableOpts applies CGOptions::strict_float / lang_cpp pointer rules.

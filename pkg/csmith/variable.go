@@ -2967,16 +2967,30 @@ func (v *Variable) CollectExpandableSess(s *Session) []*Variable {
 // mutating the package ctrl-var pool when no last set exists.
 // unionFacts nil → hash all union fields (no FactMgr); non-nil → IsFieldReadable.
 func (v *Variable) HashOutput() string {
-	return v.hashOutputOptsSess(nil, nil, nil, ProcessOptions())
+	return v.HashOutputSess(nil)
+}
+
+// HashOutputSess is HashOutput with Options/sticky from an explicit session bag.
+func (v *Variable) HashOutputSess(s *Session) string {
+	return v.hashOutputOptsSess(s, nil, nil, sessOpts(s))
 }
 
 // HashOutputWithUnionFacts is HashOutput with FactUnion last-write filtering.
 func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
-	return v.hashOutputOptsSess(nil, nil, unionFacts, ProcessOptions())
+	return v.HashOutputWithUnionFactsSess(nil, unionFacts)
+}
+
+// HashOutputWithUnionFactsSess is HashOutputWithUnionFacts with Options/sticky from bag s.
+func (v *Variable) HashOutputWithUnionFactsSess(s *Session, unionFacts []*FactUnion) string {
+	return v.hashOutputOptsSess(s, nil, unionFacts, sessOpts(s))
 }
 
 func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
-	return v.hashOutputOptsSess(nil, ctrl, unionFacts, ProcessOptions())
+	return v.hashOutputSess(nil, ctrl, unionFacts)
+}
+
+func (v *Variable) hashOutputSess(s *Session, ctrl []*Variable, unionFacts []*FactUnion) string {
+	return v.hashOutputOptsSess(s, ctrl, unionFacts, sessOpts(s))
 }
 
 // hashOutputOpts is hashOutput with explicit Options (array post_incr etc.).
@@ -3125,7 +3139,11 @@ func hashArrayUnionExcludedFieldsSess(s *Session, v *Variable, unionFacts []*Fac
 // Variable always live; sticky empty (no invent soft-skip hash past hole).
 // Zero-rank / no payload is complete empty (not incomplete IR shell).
 func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
-	return hashArrayVariableOptsSess(nil, v, ctrl, unionFacts, ProcessOptions())
+	return hashArrayVariableSess(nil, v, ctrl, unionFacts)
+}
+
+func hashArrayVariableSess(s *Session, v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
+	return hashArrayVariableOptsSess(s, v, ctrl, unionFacts, sessOpts(s))
 }
 
 func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {

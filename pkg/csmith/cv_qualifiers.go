@@ -250,9 +250,14 @@ func (q CVQualifiers) StricterThanSess(s *Session, other CVQualifiers) bool {
 }
 
 // Match mirrors CVQualifiers::match (ambient ProcessOptions for CGOptions bit).
-// Prefer MatchOpts with session Options when available.
+// Prefer MatchSess / MatchOpts with session Options when available.
 func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
-	return q.MatchOpts(other, matchExact, ProcessOptions())
+	return q.MatchSess(nil, other, matchExact)
+}
+
+// MatchSess is Match with Options/sticky from an explicit session bag.
+func (q CVQualifiers) MatchSess(s *Session, other CVQualifiers, matchExact bool) bool {
+	return q.MatchOptsSess(s, other, matchExact, sessOpts(s))
 }
 
 // MatchOpts is Match with explicit session Options (match_exact_qualifiers process bit).
@@ -797,7 +802,12 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 // CVQualifiers.cpp:639–650 — leading const/volatile of level 0.
 // assert(0) if const/vol bit set when option disabled — emit nothing for that bit.
 func (q CVQualifiers) OutputFirstQuals() string {
-	return q.OutputFirstQualsOpts(ProcessOptions())
+	return q.OutputFirstQualsSess(nil)
+}
+
+// OutputFirstQualsSess is OutputFirstQuals with Options/sticky from an explicit bag.
+func (q CVQualifiers) OutputFirstQualsSess(s *Session) string {
+	return q.OutputFirstQualsOptsSess(s, sessOpts(s))
 }
 
 // OutputFirstQualsOpts is OutputFirstQuals with explicit session Options.
@@ -848,7 +858,12 @@ func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 
 // MatchIndirect mirrors CVQualifiers::match_indirect (ambient Options for exact bit).
 func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
-	return q.MatchIndirectOpts(other, matchExact, ProcessOptions())
+	return q.MatchIndirectSess(nil, other, matchExact)
+}
+
+// MatchIndirectSess is MatchIndirect with Options/sticky from an explicit bag.
+func (q CVQualifiers) MatchIndirectSess(s *Session, other CVQualifiers, matchExact bool) bool {
+	return q.MatchIndirectOptsSess(s, other, matchExact, sessOpts(s))
 }
 
 // MatchIndirectOpts is MatchIndirect with explicit session Options.
@@ -981,9 +996,14 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 
 // OutputQualifiedType mirrors CVQualifiers::output_qualified_type.
 // CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
-// Uses ProcessOptions for CGOptions::consts/volatiles (assert when bit set but option off).
+// Uses session Options for CGOptions::consts/volatiles (assert when bit set but option off).
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
-	return q.OutputQualifiedTypeOpts(t, ProcessOptions())
+	return q.OutputQualifiedTypeSess(nil, t)
+}
+
+// OutputQualifiedTypeSess is OutputQualifiedType with Options/sticky from an explicit bag.
+func (q CVQualifiers) OutputQualifiedTypeSess(s *Session, t *Type) string {
+	return q.OutputQualifiedTypeOptsSess(s, t, sessOpts(s))
 }
 
 // OutputQualifiedTypeOpts is OutputQualifiedType with explicit session Options.
