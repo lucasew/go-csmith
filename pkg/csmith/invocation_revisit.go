@@ -249,52 +249,56 @@ func (fi *Invocation) SaveReturnUnionFacts(facts []*FactUnion) {
 // Fact* always live; incomplete subject map or nf PointTo fails closed
 // (*facts IncompleteFactSlice, false — no invent renew / leave incomplete as no-op).
 func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
+	return RenewFactSess(nil, facts, nf)
+}
+
+func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if nf == nil || nf.Var == nil {
 		// incomplete renew wiped sticky (no invent soft re-pick past hole)
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete([]*FactPointTo{nf}) {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for i, f := range *facts {
 		// Fact* always live after FactsComplete
 		if f == nil || f.Var == nil {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		// Fact.cpp:177 — new_fact->is_related(*facts[i]) only (not Variable::match)
 		if !f.IsRelated(nf) {
 			// residual ERROR sticky — no invent soft-skip not-related then renew later
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return false
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
 		if f.Equal(nf) {
 			// residual ERROR sticky — no invent no-change soft-success past Equal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent replace past Equal hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
@@ -307,7 +311,8 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 
 // RenewFacts mirrors renew_facts.
 // Fact.cpp:203–210.
-// Incomplete maps fail closed (*facts nil, false — no invent partial renew).
+// Incomplete maps fail closed (*facts nil, false — no invent partial renew).}
+
 func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
 	if facts == nil {
@@ -322,7 +327,7 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	}
 	changed := false
 	for _, nf := range newFacts {
-		if RenewFact(facts, nf) {
+		if RenewFactSess(nil, facts, nf) {
 			// residual ERROR sticky — no invent soft-continue partial renew past hole
 			if sessHasError(nil) {
 				*facts = IncompleteFactSlice()
@@ -496,7 +501,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 				return false
 			}
 			// MergeFacts sticky on incomplete mid-join
-			_ = MergeFacts(&merged, cur)
+			_ = MergeFactsSess(cgSess(cg), &merged, cur)
 			if !FactsComplete(merged) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -755,7 +760,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		restore()
 		return false
 	}
-	_ = MergeFacts(&work, retFacts)
+	_ = MergeFactsSess(cgSess(cg), &work, retFacts)
 	if !FactsComplete(work) {
 		restore()
 		if !sessHasError(cgSess(cg)) {

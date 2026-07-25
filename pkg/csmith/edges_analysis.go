@@ -10,24 +10,33 @@ package csmith
 // Incomplete / mid-join failure clears *facts and returns false (same as no-change);
 // callers that need to distinguish use tryMergeJumpFacts.
 func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
-	changed, ok := tryMergeJumpFacts(facts, jumpFacts)
+	return MergeJumpFactsSess(nil, facts, jumpFacts)
+}
+
+func MergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
+	changed, ok := tryMergeJumpFactsSess(s, facts, jumpFacts)
 	return ok && changed
 }
 
 // tryMergeJumpFacts merges jump outs into facts; fails closed on incomplete maps.
 // Distinguishes incomplete (ok=false, *facts nil) from complete no-change
 // (ok=true, changed=false). Mid-join MergeFactInto nil clears *facts (no invent
-// leave partial join as ok success).
+// leave partial join as ok success).}
+
 func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
+	return tryMergeJumpFactsSess(nil, facts, jumpFacts)
+}
+
+func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
 	// facts out always live; sticky (no invent soft-skip jump merge past hole)
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false, false
 	}
 	// pre-validate: incomplete maps must not soft-join past holes — sticky ERROR
 	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false, false
 	}
 	// iterate a snapshot of subjects so we can grow via MergeFactInto
@@ -39,16 +48,16 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		}
 		jumpF := FindRelatedPointTo(jumpFacts, f.Var)
 		// residual ERROR sticky — no invent soft-continue garbage path past FindRelated residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
 		if jumpF == nil {
 			// jump over initializer → garbage
 			jumpF = MakeFactPointTo(f.Var, GarbagePtr)
-			if jumpF == nil || sessHasError(nil) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if jumpF == nil || sessHasError(s) {
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				*facts = IncompleteFactSlice()
 				return false, false
@@ -56,7 +65,7 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		}
 		before := FindRelatedPointTo(*facts, f.Var)
 		// residual ERROR sticky — no invent soft-continue merge past FindRelated residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -64,13 +73,13 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		if !FactsComplete(merged) {
 			// mid-join incomplete — clear partial sticky, no invent keep half-merged map
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false, false
 		}
 		*facts = merged
 		after := FindRelatedPointTo(*facts, f.Var)
 		// residual ERROR sticky — no invent soft-continue equal check past FindRelated residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -80,7 +89,7 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		}
 		eq := before.Equal(after)
 		// residual ERROR sticky — no invent soft-continue no-change past Equal residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -103,37 +112,41 @@ func isReturnVar(v *Variable) bool {
 // mergeJumpUnionFacts is the eUnionWrite half of FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact; missing → BOTTOM.
 func mergeJumpUnionFacts(facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
+	return mergeJumpUnionFactsSess(nil, facts, jumpFacts)
+}
+
+func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !UnionFactsComplete(*facts) || !UnionFactsComplete(jumpFacts) {
 		*facts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	subjects := append([]*FactUnion(nil), *facts...)
 	for _, f := range subjects {
 		if f == nil || f.Var == nil {
 			*facts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if isReturnVar(f.Var) {
 			continue
 		}
 		jumpF := FindRelatedUnion(jumpFacts, f.Var)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteUnionFactSlice()
 			return false
 		}
 		if jumpF == nil {
 			// FactMgr.cpp:580–582 — jump over init → BOTTOM for eUnionWrite
 			jumpF = MakeFactUnion(f.Var, FactUnionBottom)
-			if jumpF == nil || sessHasError(nil) {
+			if jumpF == nil || sessHasError(s) {
 				*facts = IncompleteUnionFactSlice()
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return false
 			}
@@ -141,7 +154,7 @@ func mergeJumpUnionFacts(facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
 		merged := MergeUnionFact(*facts, jumpF)
 		if !UnionFactsComplete(merged) {
 			*facts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		*facts = merged
@@ -152,7 +165,8 @@ func mergeJumpUnionFacts(facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
 // FindEdgesIn mirrors Statement::find_edges_in for dest StmID.
 // Statement.cpp:453–467 — edges with matching dest, post_dest, back_link.
 // Incomplete CFG fails closed sticky nil (no invent soft re-pick empty edges past holes).
-// Complete scan with no matches returns empty non-nil slice.
+// Complete scan with no matches returns empty non-nil slice.}
+
 func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdge {
 	// FactMgr always live for CFG lookup; sticky no invent empty edges without it
 	if fm == nil {
@@ -266,12 +280,12 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				// Incomplete out fails closed sticky (no invent partial jump merge)
 				// FactMgr.cpp:569–588 — full FactVec (ePointTo + eUnionWrite)
 				out := fm.GetMapFactsOut(e.SrcID)
-				if _, ok := tryMergeJumpFacts(facts, out); !ok {
+				if _, ok := tryMergeJumpFactsSess(cgSess(cg), facts, out); !ok {
 					// tryMergeJumpFacts already SetError sticky
 					return false
 				}
 				outU := fm.GetMapUnionFactsOut(e.SrcID)
-				if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
+				if !mergeJumpUnionFactsSess(cgSess(cg), &fm.UnionFacts, outU) {
 					return false
 				}
 				// map_accum_effect[src] — missing live id → empty; SrcID 0 IncompleteEffect
@@ -306,11 +320,11 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			}
 			// Statement.cpp:830–831 — always merge_jump_facts / add_effect (full FactVec)
 			out := fm.GetMapFactsOut(e.SrcID)
-			if _, ok := tryMergeJumpFacts(facts, out); !ok {
+			if _, ok := tryMergeJumpFactsSess(cgSess(cg), facts, out); !ok {
 				return false
 			}
 			outU := fm.GetMapUnionFactsOut(e.SrcID)
-			if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
+			if !mergeJumpUnionFactsSess(cgSess(cg), &fm.UnionFacts, outU) {
 				return false
 			}
 			accE := fm.GetMapAccumEffect(e.SrcID)
@@ -758,7 +772,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					return currentInputs, nil, -1, false
 				}
 				// MergeFacts clears on mid-join failure — fail closed fixed-point
-				_ = MergeFacts(&currentInputs, out)
+				_ = MergeFactsSess(cgSess(cg), &currentInputs, out)
 				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
 				if sessHasError(cgSess(cg)) {
 					return currentInputs, nil, -1, false

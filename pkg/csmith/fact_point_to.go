@@ -328,14 +328,18 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 // including prob==0 (still consumes RNG + traces F p=0). Do not skip the draw.
 // Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).
 func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
+	return OpportunisticValidateSess(nil, r, v, typ, facts, nullProb, deadProb)
+}
+
+func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
 	// live Variable* + Type* required; sticky no invent "not valid" soft success past hole
 	if v == nil || v.Type == nil || typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	// incomplete facts fail closed sticky (no invent soft re-pick as "not valid ptr")
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	// no extra indirection needed
@@ -343,21 +347,21 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 		return 1
 	}
 	// residual ERROR sticky — no invent soft-validate past IndirectLevel residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0
 	}
 	// FactPointTo.cpp:448–450 — FactPointTo tmp(var->get_collective()); find_related_fact
 	coll := varCollective(v)
 	if coll == nil {
 		// residual ERROR sticky — no invent soft-miss fact past get_collective hole
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return 0
 	}
 	fp := FindRelatedPointTo(facts, coll)
 	// residual ERROR sticky — no invent soft-continue validate past FindRelated hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0
 	}
 	if fp == nil {
@@ -366,13 +370,13 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 	ret := 0
 	if fp.IsNull() {
 		// residual ERROR sticky — no invent ok past IsNull residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return 0
 		}
 		// FactPointTo.cpp:455 — rnd_flipcoin(null_pointer_dereference_prob()) always
 		// (p=0 still draws). Process RNG always live; sticky no invent reject without draw.
 		if r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return 0
 		}
 		p := nullProb
@@ -386,19 +390,19 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 		}
 	} else {
 		// residual ERROR sticky — no invent soft-continue not-null past IsNull residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return 0
 		}
 		ret = 1
 	}
 	if fp.IsDead() {
 		// residual ERROR sticky — no invent ok past IsDead residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return 0
 		}
 		// FactPointTo.cpp:464 — rnd_flipcoin(dead_pointer_dereference_prob()) always
 		if r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return 0
 		}
 		p := deadProb
@@ -410,7 +414,7 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 		} else {
 			return 0
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent not-dead soft-skip past IsDead residual false
 		return 0
 	}
@@ -421,7 +425,8 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 // FactPointTo.cpp:340–348 — vars[i] always live; skip only type==null specials.
 // no invent skip of nil Variable* holes as partial success; non-special Type-nil
 // is incomplete IR (fail closed sticky whole batch — IncompleteFactSlice, not bare nil;
-// FactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).
+// FactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).}
+
 func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 	var out []*FactPointTo
 	for _, v := range lvars {
@@ -1207,33 +1212,37 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 // (no invent no-change success via FactsComplete(nil) or soft re-pick past wipe).
 // facts always live; sticky (no invent soft-skip join-visits past hole).
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	return JoinVisitsIntoSess(nil, facts, newFacts)
+}
+
+func JoinVisitsIntoSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	changed := false
 	for _, nf := range newFacts {
 		cur := FindRelatedPointTo(*facts, nf.Var)
 		// residual ERROR sticky — no invent soft-continue later merges past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
 		if cur == nil {
 			cl := nf.Clone()
 			// residual ERROR sticky — no invent soft-append past Clone residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return false
 			}
 			if cl == nil {
 				*facts = IncompleteFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 			*facts = append(*facts, cl)
@@ -1243,18 +1252,18 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		// join into clone then replace
 		cp := cur.Clone()
 		// residual ERROR sticky — no invent soft-join past Clone residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
 		if cp == nil {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if cp.JoinVisits(nf) {
 			// residual ERROR sticky — no invent soft-replace past JoinVisits residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return false
 			}
@@ -1266,7 +1275,7 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 				}
 			}
 			changed = true
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue no-change past JoinVisits residual false
 			*facts = IncompleteFactSlice()
 			return false
@@ -1278,7 +1287,8 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // Clone shallow-copies the fact (new PointTo slice).
 // Fact always live; sticky nil (no invent soft-skip clone past hole).
 // Incomplete PointTo (nil hole) fails closed sticky nil — no invent clone of broken set
-// / soft re-pick past holes. Empty top (nil PointTo) clones as empty non-nil set.
+// / soft re-pick past holes. Empty top (nil PointTo) clones as empty non-nil set.}
+
 func (f *FactPointTo) Clone() *FactPointTo {
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1325,9 +1335,13 @@ func IncompleteFactSlice() []*FactPointTo {
 // Incomplete map is non-sticky IncompleteFactSlice (soft re-pick; MergeFacts sticks).
 // Clone fail sticky IncompleteFactSlice (hard incomplete PointTo).
 func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
+	return MergeFactIntoSess(nil, facts, f)
+}
+
+func MergeFactIntoSess(s *Session, facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	// Fact* always live; sticky (no invent soft-skip nil fact as empty merge)
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// incomplete map must not invent join success when match appears before a hole
@@ -1339,28 +1353,28 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 		if old.Var == f.Var {
 			if old.Imply(f) {
 				// residual ERROR sticky — no invent soft-skip join past Imply hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return IncompleteFactSlice()
 				}
 				// old already covers f
 				return facts
 			}
 			// residual ERROR sticky — no invent soft-continue join past Imply residual false path
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			// join: copy f, join old into it
 			cp := f.Clone()
 			if cp == nil {
 				// incomplete PointTo on f — fail closed sticky
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return IncompleteFactSlice()
 			}
 			_ = cp.Join(old)
 			// residual ERROR sticky — no invent soft-skip Join residual then keep partial merge
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			facts[i] = cp
@@ -1369,8 +1383,8 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	}
 	cl := f.Clone()
 	if cl == nil {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return IncompleteFactSlice()
 	}
@@ -1380,40 +1394,45 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 // MergeFacts mirrors merge_facts — merge each of new into facts.
 // Fact.cpp:192–200.
 // Returns whether any fact changed. Incomplete maps fail closed: *facts set nil,
-// returns false (no invent skip partial join / keep broken partial).
+// returns false (no invent skip partial join / keep broken partial).}
+
 func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	return MergeFactsSess(nil, facts, newFacts)
+}
+
+func MergeFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	// Fact merge always has live accumulator; sticky no invent soft-skip join
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
 		// incomplete maps wiped sticky (no invent soft re-pick past wiped join)
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	changed := false
 	for _, f := range newFacts {
 		before := FindRelatedPointTo(*facts, f.Var)
 		// residual ERROR sticky — no invent soft-continue merge later past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
-		merged := MergeFactInto(*facts, f)
+		merged := MergeFactIntoSess(s, *facts, f)
 		// MergeFactInto incomplete / residual = hole marker
-		if sessHasError(nil) || !FactsComplete(merged) {
+		if sessHasError(s) || !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return false
 		}
 		*facts = merged
 		after := FindRelatedPointTo(*facts, f.Var)
 		// residual ERROR sticky — no invent soft-continue Equal/changed past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
@@ -1423,7 +1442,7 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		}
 		eq := before.Equal(after)
 		// residual ERROR sticky — no invent soft-continue changed/not-changed past Equal hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false
 		}
@@ -1437,7 +1456,8 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // CloneFactSlice deep-clones a FactPointTo slice.
 // Complete empty: nil in → nil out; non-nil {} → non-nil {}.
 // Incomplete maps fail closed sticky IncompleteFactSlice (not bare nil —
-// FactsComplete(nil)==true invents empty-complete clone / soft re-pick past hole).
+// FactsComplete(nil)==true invents empty-complete clone / soft re-pick past hole).}
+
 func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 	if facts == nil {
 		return nil

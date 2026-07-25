@@ -84,7 +84,7 @@ func MakeRandomIf(
 		return nil
 	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
-	hasUnc := func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test)
+	hasUnc := func1Hack && cg.FM != nil && HasUncertainCallRecursiveExprSess(cgSess(cg), test)
 	// residual ERROR sticky — no invent soft-continue if arms past HasUncertain residual
 	if sessHasError(cgSess(cg)) {
 		return nil

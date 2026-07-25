@@ -473,7 +473,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeftPT)
+		_ = MergeFactsSess(cgSess(cg), &cg.FM.GlobalFacts, afterLeftPT)
 		// residual ERROR sticky — no invent visit success past MergeFacts residual hole
 		if sessHasError(cgSess(cg)) {
 			return false

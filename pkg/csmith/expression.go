@@ -1628,7 +1628,7 @@ func makeExpressionVariableFlags(
 			}
 			facts = cg.FM.GlobalFacts
 		}
-		if OpportunisticValidate(r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
+		if OpportunisticValidateSess(cgSess(cg), r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
 			// residual ERROR sticky — no invent soft-continue past validate hole
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {

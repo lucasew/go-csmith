@@ -271,7 +271,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 			sessNoteError(fmSess(fm), ErrGeneric)
 			return false
 		}
-		_ = MergeFacts(facts, out)
+		_ = MergeFactsSess(fmSess(fm), facts, out)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()

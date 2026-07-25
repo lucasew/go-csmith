@@ -382,7 +382,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		if c := MakeStructConstant(r, opts, probs, typ); c != nil {
+		if c := MakeStructConstantSess(s, r, opts, probs, typ); c != nil {
 			// residual ERROR sticky — no invent soft-empty value past MakeStruct residual
 			if sessHasError(s) {
 				return ""
@@ -408,7 +408,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		if c := MakeUnionConstant(r, opts, probs, typ); c != nil {
+		if c := MakeUnionConstantSess(s, r, opts, probs, typ); c != nil {
 			// residual ERROR sticky — no invent soft-empty value past MakeUnion residual
 			if sessHasError(s) {
 				return ""

@@ -284,56 +284,60 @@ func (fi *Invocation) HasSimpleParams() bool {
 // ExpressionFuncall / Comma / Assign overrides; default false.
 // Incomplete IR sticky true (no invent "no uncertain call" soft-skip past hole).
 func HasUncertainCallRecursiveExpr(e *Expression) bool {
+	return HasUncertainCallRecursiveExprSess(nil, e)
+}
+
+func HasUncertainCallRecursiveExprSess(s *Session, e *Expression) bool {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	switch e.Term {
 	case TermFunction:
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		ok := e.Invoke.HasUncertainCallRecursive()
 		// residual ERROR sticky — no invent certain soft-skip past Invoke recurse residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if HasUncertainCallRecursiveExpr(e.CommaLHS) {
+		if HasUncertainCallRecursiveExprSess(s, e.CommaLHS) {
 			// residual ERROR sticky — no invent uncertain true past LHS hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue RHS past LHS residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
-		if HasUncertainCallRecursiveExpr(e.CommaRHS) {
-			if sessHasError(nil) {
+		if HasUncertainCallRecursiveExprSess(s, e.CommaRHS) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	case TermAssignment:
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		ok := HasUncertainCallRecursiveStmt(e.Assign)
 		// residual ERROR sticky — no invent certain soft-skip past Assign recurse hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
@@ -351,22 +355,27 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 // func_1 if whose pre_facts was empty (capture before pointer globals), wiping
 // post-combine may-null lattices (seed-250 g_67 → init-only; Lhs F0 miss).
 // C++ StatementIf never overrides — special path never runs for if (combine
-// result kept). StatementIf.cpp:79 is condition re-analyze at make_random only.
+// result kept). StatementIf.cpp:79 is condition re-analyze at make_random only.}
+
 func HasUncertainCallRecursiveStmt(st *Stmt) bool {
+	return HasUncertainCallRecursiveStmtSess(nil, st)
+}
+
+func HasUncertainCallRecursiveStmtSess(s *Session, st *Stmt) bool {
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	switch st.Kind {
 	case StmtAssign, StmtInvoke:
 		// StatementAssign / StatementExpr overrides only
 		if st.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		ok := HasUncertainCallRecursiveExpr(st.Expr)
+		ok := HasUncertainCallRecursiveExprSess(s, st.Expr)
 		// residual ERROR sticky — no invent certain soft-skip past expr recurse residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
@@ -379,7 +388,8 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 // GetDirectInvocation mirrors Statement::get_direct_invocation.
 // Statement.cpp:714–734 — assign RHS, invoke, or if-test when TermFunction.
 // Expression* always live for these kinds; incomplete Expr/Invoke fails closed
-// as Failed shell (no invent nil "no call" for broken IR).
+// as Failed shell (no invent nil "no call" for broken IR).}
+
 func GetDirectInvocation(st *Stmt) *Invocation {
 	// Statement always live for call extract; sticky no invent "no call" without it
 	if st == nil {
@@ -692,7 +702,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
-		_ = MergeFacts(&fm.GlobalFacts, elseOut)
+		_ = MergeFactsSess(fmSess(fm), &fm.GlobalFacts, elseOut)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()

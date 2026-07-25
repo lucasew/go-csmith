@@ -21,12 +21,16 @@ func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
 // collectReferencedPtrsExpression returns false on incomplete IR.
 // On failure *ptrs is IncompleteVariables (caller may also overwrite).
 func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
+	return collectReferencedPtrsExpressionSess(nil, e, ptrs)
+}
+
+func collectReferencedPtrsExpressionSess(s *Session, e *Expression, ptrs *[]*Variable) bool {
 	if e == nil || ptrs == nil {
 		if ptrs != nil {
 			*ptrs = IncompleteVariables()
 		}
 		// Expression always live for get_referenced_ptrs; sticky incomplete
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	switch e.Term {
@@ -36,22 +40,22 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		// (no invent complete no-ptrs soft-success past type hole via IsPointer false)
 		if e.Var == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if e.Var.IsPointer() {
 			// residual ERROR sticky — no invent complete no-ptrs past IsPointer hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*ptrs = IncompleteVariables()
 				return false
 			}
 			*ptrs = appendUniqueVar(*ptrs, e.Var)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent complete no-ptrs soft-skip past IsPointer hole
 			*ptrs = IncompleteVariables()
 			return false
@@ -61,17 +65,17 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		// both sides always live
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if !collectReferencedPtrsExpression(e.CommaLHS, ptrs) {
+		if !collectReferencedPtrsExpressionSess(s, e.CommaLHS, ptrs) {
 			return false
 		}
-		return collectReferencedPtrsExpression(e.CommaRHS, ptrs)
+		return collectReferencedPtrsExpressionSess(s, e.CommaRHS, ptrs)
 	case TermAssignment:
 		if e.Assign == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		return collectReferencedPtrsStmt(e.Assign, ptrs)
@@ -80,17 +84,17 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		// Invoke always live for TermFunction; sticky incomplete (public Collect also sticks)
 		if e.Invoke == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		for _, a := range e.Invoke.Args {
 			// Expression* args always live after ERROR_GUARD
 			if a == nil {
 				*ptrs = IncompleteVariables()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
-			if !collectReferencedPtrsExpression(a, ptrs) {
+			if !collectReferencedPtrsExpressionSess(s, a, ptrs) {
 				return false
 			}
 		}
@@ -99,7 +103,7 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 			// incomplete callee ReferencedPtrs sticky (no invent skip hole as empty refs)
 			if !VariablesComplete(e.Invoke.User.ReferencedPtrs) {
 				*ptrs = IncompleteVariables()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 			for _, p := range e.Invoke.User.ReferencedPtrs {
@@ -112,7 +116,7 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	default:
 		// unknown term — incomplete IR sticky
 		*ptrs = IncompleteVariables()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 }
@@ -120,7 +124,8 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 // CollectReferencedPtrsStmt mirrors Statement::get_referenced_ptrs.
 // Statement.cpp:331–345 — exprs + nested blocks.
 // Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
-// ptrs always live; sticky (no invent soft-skip collect past hole).
+// ptrs always live; sticky (no invent soft-skip collect past hole).}
+
 func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
 	if ptrs == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -133,12 +138,16 @@ func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
 }
 
 func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
+	return collectReferencedPtrsStmtSess(nil, st, ptrs)
+}
+
+func collectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) bool {
 	if st == nil || ptrs == nil {
 		if ptrs != nil {
 			*ptrs = IncompleteVariables()
 		}
 		// Statement always live for get_referenced_ptrs; sticky incomplete
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// Statement.cpp:331–345 — get_exprs + get_blocks; get_exprs always live for
@@ -153,17 +162,17 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		// Incomplete Loop without TestExpr sticky (no invent skip for-test ptrs)
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
+		if !collectReferencedPtrsExpressionSess(s, st.Loop.TestExpr, ptrs) {
 			return false
 		}
 	case StmtArrayOp:
 		// StatementArrayOp.h:65–68 — if (init_value) push; optional (body path has none).
 		// Go array_init may nest RHS under Then assign (get_blocks); Expr is init_value when set.
 		if st.Expr != nil {
-			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+			if !collectReferencedPtrsExpressionSess(s, st.Expr, ptrs) {
 				return false
 			}
 		}
@@ -172,15 +181,15 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		// incomplete nil Expr sticky (no invent partial ptr list as success)
 		if st.Expr == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+		if !collectReferencedPtrsExpressionSess(s, st.Expr, ptrs) {
 			return false
 		}
 	default:
 		if st.Expr != nil {
-			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+			if !collectReferencedPtrsExpressionSess(s, st.Expr, ptrs) {
 				return false
 			}
 		}
@@ -189,16 +198,16 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		// Type* always live; Type-nil non-special sticky (no invent complete no-ptrs)
 		if st.LhsVar.Type == nil && !IsSpecialPtr(st.LhsVar) {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if st.LhsVar.IsPointer() {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*ptrs = IncompleteVariables()
 				return false
 			}
 			*ptrs = appendUniqueVar(*ptrs, st.LhsVar)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			*ptrs = IncompleteVariables()
 			return false
 		}
@@ -207,22 +216,22 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		// Lhs always has live Var in C++; incomplete Lhs.Var sticky
 		if st.Lhs.Var == nil {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		// Type-nil non-special sticky (no invent complete no-ptrs via IsPointer false)
 		if st.Lhs.Var.Type == nil && !IsSpecialPtr(st.Lhs.Var) {
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if st.Lhs.Var.IsPointer() {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*ptrs = IncompleteVariables()
 				return false
 			}
 			*ptrs = appendUniqueVar(*ptrs, st.Lhs.Var)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			*ptrs = IncompleteVariables()
 			return false
 		}
@@ -233,7 +242,7 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		if b == nil {
 			// incomplete arm sticky (no invent partial ptr list past hole)
 			*ptrs = IncompleteVariables()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 	}
@@ -248,7 +257,8 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 // CollectReferencedPtrsBlock walks all statements in a block.
 // Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
 // CollectReferencedPtrsBlock walks all statements in a block for referenced pointers.
-// ptrs always live; sticky (no invent soft-skip collect past hole).
+// ptrs always live; sticky (no invent soft-skip collect past hole).}
+
 func CollectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) {
 	if ptrs == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -297,66 +307,70 @@ func appendUniqueVar(s []*Variable, v *Variable) []*Variable {
 // Statement.cpp:665+ subset via IsInsideUnionField.
 // Incomplete IR sticky true (no invent "no union field read" / soft re-pick).
 func ReadUnionFieldExpr(e *Expression) bool {
+	return ReadUnionFieldExprSess(nil, e)
+}
+
+func ReadUnionFieldExprSess(s *Session, e *Expression) bool {
 	// Expression always live; sticky incomplete as reads-union (restrictive)
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	switch e.Term {
 	case TermVariable:
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		ok := e.Var.IsInsideUnionField()
 		// residual ERROR sticky — no invent no-union-read soft-skip past IsInsideUnionField hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if ReadUnionFieldExpr(e.CommaLHS) {
+		if ReadUnionFieldExprSess(s, e.CommaLHS) {
 			// residual ERROR sticky — no invent union-read true past LHS hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue RHS past LHS residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
-		if ReadUnionFieldExpr(e.CommaRHS) {
-			if sessHasError(nil) {
+		if ReadUnionFieldExprSess(s, e.CommaRHS) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	case TermAssignment:
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		return ReadUnionFieldStmt(e.Assign)
 	case TermFunction:
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		for _, a := range e.Invoke.Args {
 			if a == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
-			if ReadUnionFieldExpr(a) {
+			if ReadUnionFieldExprSess(s, a) {
 				return true
 			}
 		}
@@ -368,11 +382,16 @@ func ReadUnionFieldExpr(e *Expression) bool {
 // Statement.cpp:665–678 — map_stm_effect union_field_is_read + callees'
 // union_field_read. Go subset: IR walk of get_exprs/get_blocks + callee flags.
 // Incomplete for-test / call-collect / block holes sticky true
-// (no invent "no union field read" / soft re-pick past holes).
+// (no invent "no union field read" / soft re-pick past holes).}
+
 func ReadUnionFieldStmt(st *Stmt) bool {
+	return ReadUnionFieldStmtSess(nil, st)
+}
+
+func ReadUnionFieldStmtSess(s *Session, st *Stmt) bool {
 	// Statement always live; sticky incomplete as reads-union (restrictive)
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// get_exprs: for → Loop.TestExpr; ArrayOp → optional init_value (not For test);
@@ -381,73 +400,73 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 	switch st.Kind {
 	case StmtFor:
 		if st.Loop == nil || st.Loop.TestExpr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if ReadUnionFieldExpr(st.Loop.TestExpr) {
+		if ReadUnionFieldExprSess(s, st.Loop.TestExpr) {
 			return true
 		}
 	case StmtArrayOp:
 		// optional init_value; body path walks get_blocks only
-		if st.Expr != nil && ReadUnionFieldExpr(st.Expr) {
+		if st.Expr != nil && ReadUnionFieldExprSess(s, st.Expr) {
 			return true
 		}
 	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
 		// C++ get_exprs always live; nil Expr sticky fail closed true
 		if st.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if ReadUnionFieldExpr(st.Expr) {
+		if ReadUnionFieldExprSess(s, st.Expr) {
 			return true
 		}
 	default:
-		if st.Expr != nil && ReadUnionFieldExpr(st.Expr) {
+		if st.Expr != nil && ReadUnionFieldExprSess(s, st.Expr) {
 			return true
 		}
 	}
 	if st.LhsVar != nil {
 		if st.LhsVar.IsInsideUnionField() {
 			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue no-union-read past IsInside residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
 	if st.Lhs != nil {
 		// Lhs always has live Var; incomplete sticky fail closed
 		if st.Lhs.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if st.Lhs.Var.IsInsideUnionField() {
 			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue no-union-read past IsInside residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
 	// Statement.cpp:671–676 — get_called_funcs; callee->union_field_read
 	var calls []*Invocation
 	if !collectCalledInvocationsStmt(st, &calls) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
 	for _, inv := range calls {
 		if inv == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if inv.User != nil && inv.User.UnionFieldRead {
@@ -457,7 +476,7 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 	// get_blocks → nested stmts (Then/Else for if/for body)
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if ReadUnionFieldBlock(b) {
@@ -468,7 +487,8 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 }
 
 // ReadUnionFieldBlock walks statements for union field access.
-// Incomplete Block sticky false for nil shell is complete empty walk; live block only.
+// Incomplete Block sticky false for nil shell is complete empty walk; live block only.}
+
 func ReadUnionFieldBlock(b *Block) bool {
 	// nil block is complete empty (no stmts) — not incomplete IR
 	if b == nil {

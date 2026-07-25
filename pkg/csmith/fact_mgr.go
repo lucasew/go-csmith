@@ -1536,7 +1536,7 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			return
 		}
 		// MergeFacts clears *facts sticky on incomplete mid-join
-		_ = MergeFacts(&facts1, facts2)
+		_ = MergeFactsSess(fmSess(fm), &facts1, facts2)
 		if !FactsComplete(facts1) {
 			if !sessHasError(fmSess(fm)) {
 				sessNoteError(fmSess(fm), ErrGeneric)
@@ -1552,7 +1552,7 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			failClosedWipe(0, id)
 			return
 		}
-		_ = MergeFacts(&facts1, facts2)
+		_ = MergeFactsSess(fmSess(fm), &facts1, facts2)
 		if !FactsComplete(facts1) {
 			if !sessHasError(fmSess(fm)) {
 				sessNoteError(fmSess(fm), ErrGeneric)
@@ -2569,7 +2569,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				sessNoteError(fmSess(fm), ErrGeneric)
 				return
 			}
-			merged := MergeFactInto(fm.GlobalFacts, f)
+			merged := MergeFactIntoSess(fmSess(fm), fm.GlobalFacts, f)
 			if !FactsComplete(merged) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				sessNoteError(fmSess(fm), ErrGeneric)
@@ -3199,7 +3199,7 @@ func applyPointToAssignFactsSess(s *Session, facts *[]*FactPointTo, lhs *Variabl
 	if lvarCnt == 1 && newFacts[0] != nil && newFacts[0].Var != nil && !newFacts[0].Var.IsArray {
 		// definitive assignment — renew (strong replace)
 		// residual ERROR sticky — no invent soft-continue merge later past RenewFact hole
-		if !RenewFact(facts, newFacts[0]) && sessHasError(s) {
+		if !RenewFactSess(s, facts, newFacts[0]) && sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -3208,7 +3208,7 @@ func applyPointToAssignFactsSess(s *Session, facts *[]*FactPointTo, lhs *Variabl
 			return false, false
 		}
 		for j := 1; j < len(newFacts); j++ {
-			merged := MergeFactInto(*facts, newFacts[j])
+			merged := MergeFactIntoSess(s, *facts, newFacts[j])
 			if !FactsComplete(merged) {
 				*facts = IncompleteFactSlice()
 				if !sessHasError(s) {
@@ -3226,7 +3226,7 @@ func applyPointToAssignFactsSess(s *Session, facts *[]*FactPointTo, lhs *Variabl
 		return true, true
 	}
 	for _, f := range newFacts {
-		merged := MergeFactInto(*facts, f)
+		merged := MergeFactIntoSess(s, *facts, f)
 		if !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
 			if !sessHasError(s) {

@@ -85,7 +85,7 @@ func ChooseVisibleReadVar(
 	typ *Type,
 	unionFacts []*FactUnion,
 ) *Variable {
-	return ChooseVisibleReadVarOpts(r, b, readVars, typ, unionFacts, ProcessOptions())
+	return ChooseVisibleReadVarOptsSess(nil, r, b, readVars, typ, unionFacts, ProcessOptions())
 }
 
 // ChooseVisibleReadVarOpts is ChooseVisibleReadVar with explicit session Options
@@ -98,27 +98,38 @@ func ChooseVisibleReadVarOpts(
 	unionFacts []*FactUnion,
 	opts Options,
 ) *Variable {
+	return ChooseVisibleReadVarOptsSess(nil, r, b, readVars, typ, unionFacts, opts)
+}
+
+func ChooseVisibleReadVarOptsSess(s *Session, 
+	r *Rng,
+	b *Block,
+	readVars []*Variable,
+	typ *Type,
+	unionFacts []*FactUnion,
+	opts Options,
+) *Variable {
 	// VariableSelector.cpp:363 — type from caller (goto uses get_int_type); sticky no invent
 	if typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// incomplete union fact map fails closed sticky (no invent soft-filter nonreadable past holes)
 	if unionFacts != nil && !UnionFactsComplete(unionFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
 	// IncompleteVariables expand — fail closed sticky (not invent filter past hole)
 	if !VariablesComplete(expanded) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// incomplete stack lists must not invent filter that drops all locals
 	if b != nil && !b.StackScanComplete() {
 		// residual ERROR sticky — no invent soft-filter past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}
@@ -126,57 +137,57 @@ func ChooseVisibleReadVarOpts(
 	for _, v := range expanded {
 		// pre-validated VariablesComplete; Type always live for match
 		if v.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (IsVirtual residual ERROR+false soft-continues then invents pick shell)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if v.IsVirtual() || v.IsVolatile() {
 			// residual ERROR sticky — no invent soft-continue then pick later past hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsVirtual/IsVolatile residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if !typ.MatchOpts(v.Type, MatchConvert, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent keep after Match residual true path
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		onStack := b != nil && b.IsVarOnStack(v)
 		// residual ERROR sticky — no invent soft-continue past IsVarOnStack hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if !onStack && !v.IsGlobal() {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsGlobal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent keep after IsGlobal residual true path
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		nonread := IsNonreadableField(v, unionFacts)
 		// residual ERROR sticky — no invent soft-continue then pick later past hole
 		// (IsInsideUnionField may sticky residual true/false then soft-return)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if nonread {
@@ -190,7 +201,8 @@ func ChooseVisibleReadVarOpts(
 
 // FindVarByName mirrors VariableSelector::find_var_by_name.
 // VariableSelector.cpp:1571–1579 — scan AllVars via match_var_name.
-// Variable* always live on AllVars; nil hole fails closed (no invent skip).
+// Variable* always live on AllVars; nil hole fails closed (no invent skip).}
+
 func (vs *VariableSelector) FindVarByName(name string) *Variable {
 	// VariableSelector always live; sticky no invent name lookup without it
 	if vs == nil {
@@ -1979,6 +1991,10 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 
 // ChooseOKVarMatchOpts is ChooseOKVarMatch with explicit session Options.
 func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
+	return ChooseOKVarMatchOptsSess(nil, r, vars, want, mt, skipConst, opts)
+}
+
+func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
 	if want == nil {
 		return ChooseOKVar(r, vars)
 	}
@@ -1986,13 +2002,13 @@ func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, sk
 	cands := vars
 	simple := want.IsSimple()
 	// residual ERROR sticky — no invent soft-expand past IsSimple residual
-	if sessHasError(nil) {
-		sessNoteError(nil, ErrGeneric)
+	if sessHasError(s) {
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	agg := want.IsAggregate()
 	// residual ERROR sticky — no invent soft-expand past IsAggregate residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if simple || agg {
@@ -2000,25 +2016,25 @@ func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, sk
 	}
 	// incomplete expand / candidate list — fail closed sticky
 	if !VariablesComplete(cands) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var ok []*Variable
 	for _, x := range cands {
 		if x.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if skipConst && x.IsConst() {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsConst hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			continue
 		}
 		matched := want.MatchOpts(x.Type, mt, opts)
 		// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if matched {

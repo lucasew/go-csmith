@@ -1393,15 +1393,15 @@ func MakeRandomBinaryInvocation(
 	// so the first-program && never makeup-joined empty post-LHS with post-RHS
 	// live last=fN → BOTTOM (seed 199: UP nCopy=0 then JOIN 0⊕3, Go kept f3).
 	if IsOrderedBinary(op) && cg.FM != nil {
-		if !MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts) ||
-			!makeupNewUnionFacts(&unionCopy, cg.FM.UnionFacts) ||
+		if !MakeupNewVarFactsSess(cgSess(cg), &factsCopy, cg.FM.GlobalFacts) ||
+			!makeupNewUnionFactsSess(cgSess(cg), &unionCopy, cg.FM.UnionFacts) ||
 			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) ||
 			!UnionFactsComplete(unionCopy) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup/merge base — fail closed sticky, no invent bare binary
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
-		_ = MergeFacts(&cg.FM.GlobalFacts, factsCopy)
+		_ = MergeFactsSess(cgSess(cg), &cg.FM.GlobalFacts, factsCopy)
 		// residual ERROR sticky — no invent soft-binary past MergeFacts residual
 		if sessHasError(cgSess(cg)) {
 			return nil

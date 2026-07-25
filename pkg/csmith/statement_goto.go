@@ -760,12 +760,12 @@ func MakeRandomGoto(
 		}
 		// tryMerge distinguishes incomplete wipe from complete no-change
 		// (no invent treat MergeJumpFacts false as "unchanged" after wipe)
-		changed, mok := tryMergeJumpFacts(&stmInMerged, gotoOut)
+		changed, mok := tryMergeJumpFactsSess(cgSess(cg), &stmInMerged, gotoOut)
 		if !mok {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return makeGotoFailed()
 		}
-		if !mergeJumpUnionFacts(&stmInMergedU, gotoOutU) {
+		if !mergeJumpUnionFactsSess(cgSess(cg), &stmInMergedU, gotoOutU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
 			}

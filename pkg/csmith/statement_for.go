@@ -706,14 +706,14 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
-			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
+			if _, ok := tryMergeJumpFactsSess(cgSess(cg), &fm.GlobalFacts, out); !ok {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
 			// eUnionWrite half of merge_jump_facts on full FactVec
-			if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
+			if !mergeJumpUnionFactsSess(cgSess(cg), &fm.UnionFacts, outU) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				if !sessHasError(cgSess(cg)) {

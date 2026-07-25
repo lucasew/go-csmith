@@ -1041,7 +1041,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		}
 		return false
 	}
-	if IsNonreadableField(v, c.unionFacts()) {
+	if IsNonreadableFieldSess(cgSess(c), v, c.unionFacts()) {
 		// residual ERROR sticky — no invent read-ok past nonreadable hole
 		return false
 	}

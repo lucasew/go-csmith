@@ -580,7 +580,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				return false
 			}
 			cg.FM.SetGlobalFacts(thenFacts, "auto_statement_visit_443")
-			_ = MergeFacts(&cg.FM.GlobalFacts, elseFacts)
+			_ = MergeFactsSess(cgSess(cg), &cg.FM.GlobalFacts, elseFacts)
 			if !FactsComplete(cg.FM.GlobalFacts) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -591,7 +591,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				return false
 			}
 			for _, uf := range elseUnions {
-				merged := MergeUnionFact(cg.FM.UnionFacts, uf)
+				merged := MergeUnionFactSess(cgSess(cg), cg.FM.UnionFacts, uf)
 				if !UnionFactsComplete(merged) {
 					if !sessHasError(cgSess(cg)) {
 						sessNoteError(cgSess(cg), ErrGeneric)
@@ -771,11 +771,11 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			// FactMgr.cpp:569–588 — merge_jump_facts is full FactVec (ePointTo + eUnionWrite).
 			// Soft invent was PT-only tryMergeJumpFacts; break arms' eUnionWrite never joined
 			// (post_loop already merges both; visit path must match StatementFor.cpp:465).
-			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
+			if _, mok := tryMergeJumpFactsSess(cgSess(cg), &cg.FM.GlobalFacts, out); !mok {
 				return false
 			}
 			outU := cg.FM.GetMapUnionFactsOut(e.SrcID)
-			if !mergeJumpUnionFacts(&cg.FM.UnionFacts, outU) {
+			if !mergeJumpUnionFactsSess(cgSess(cg), &cg.FM.UnionFacts, outU) {
 				return false
 			}
 		}
@@ -975,7 +975,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		for _, e := range edges {
 			out := cg.FM.GetMapFactsOut(e.SrcID)
-			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
+			if _, mok := tryMergeJumpFactsSess(cgSess(cg), &cg.FM.GlobalFacts, out); !mok {
 				return false
 			}
 		}

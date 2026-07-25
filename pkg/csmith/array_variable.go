@@ -338,16 +338,20 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 // Incomplete IR fails closed sticky as -1 (no invent constant-0 / var-1 / soft re-pick
 // variant match past broken shells).
 func CountExprKeyVar(e *Expression) int {
+	return CountExprKeyVarSess(nil, e)
+}
+
+func CountExprKeyVarSess(s *Session, e *Expression) int {
 	if e == nil {
 		// ArrayVariable.cpp:89 assert(0) for unexpected; nil is broken IR sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	switch e.Term {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		return 1
@@ -355,13 +359,13 @@ func CountExprKeyVar(e *Expression) int {
 		// live Constant* Type+Value; incomplete shell fails closed sticky
 		// (no invent key-count 0 for Type-nil / empty-value soft-miss)
 		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		return 0
 	case TermFunction:
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		// user call → 2 (ArrayVariable.cpp:76–77)
@@ -372,12 +376,12 @@ func CountExprKeyVar(e *Expression) int {
 		if n == 1 {
 			// param always live; nil arg fails closed sticky
 			if e.Invoke.Args[0] == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return -1
 			}
-			c := CountExprKeyVar(e.Invoke.Args[0])
+			c := CountExprKeyVarSess(s, e.Invoke.Args[0])
 			// residual ERROR sticky — no invent key-count past nested residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return -1
 			}
 			return c
@@ -385,43 +389,48 @@ func CountExprKeyVar(e *Expression) int {
 		// ArrayVariable.cpp:84 — assert(param_value.size() == 2) for binary
 		if n == 2 {
 			if e.Invoke.Args[0] == nil || e.Invoke.Args[1] == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return -1
 			}
-			a := CountExprKeyVar(e.Invoke.Args[0])
+			a := CountExprKeyVarSess(s, e.Invoke.Args[0])
 			// residual ERROR sticky — no invent soft-sum past left residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return -1
 			}
-			b := CountExprKeyVar(e.Invoke.Args[1])
+			b := CountExprKeyVarSess(s, e.Invoke.Args[1])
 			// residual ERROR sticky — no invent soft-sum past right residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return -1
 			}
 			if a < 0 || b < 0 {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return -1
 			}
 			return a + b
 		}
 		// wrong arity — fail closed sticky -1 (no invent sum of first two)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	default:
 		// ArrayVariable.cpp:89 assert(0)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 }
 
 // FindExprKeyVar mirrors find_expr_key_var (ArrayVariable.cpp:98–119).
 // Sole key variable of an index expression, or nil if none / ambiguous.
-// Incomplete IR (nil Invoke/args) fails closed sticky nil (no invent key from partial).
+// Incomplete IR (nil Invoke/args) fails closed sticky nil (no invent key from partial).}
+
 func FindExprKeyVar(e *Expression) *Variable {
+	return FindExprKeyVarSess(nil, e)
+}
+
+func FindExprKeyVarSess(s *Session, e *Expression) *Variable {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	switch e.Term {
@@ -429,17 +438,17 @@ func FindExprKeyVar(e *Expression) *Variable {
 		// incomplete Variable* shell sticky → nil
 		// Type-nil non-special sticky (no invent key var soft-success past type hole)
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		return e.Var
 	case TermFunction:
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if e.Invoke.User != nil && !e.Invoke.IsStd {
@@ -448,12 +457,12 @@ func FindExprKeyVar(e *Expression) *Variable {
 		n := len(e.Invoke.Args)
 		if n == 1 {
 			if e.Invoke.Args[0] == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return nil
 			}
-			kv := FindExprKeyVar(e.Invoke.Args[0])
+			kv := FindExprKeyVarSess(s, e.Invoke.Args[0])
 			// residual ERROR sticky — no invent key past nested residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			return kv
@@ -461,17 +470,17 @@ func FindExprKeyVar(e *Expression) *Variable {
 		// ArrayVariable.cpp:110 — assert(param_value.size() == 2)
 		if n == 2 {
 			if e.Invoke.Args[0] == nil || e.Invoke.Args[1] == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return nil
 			}
-			v0 := FindExprKeyVar(e.Invoke.Args[0])
+			v0 := FindExprKeyVarSess(s, e.Invoke.Args[0])
 			// residual ERROR sticky — no invent soft-pick right past left residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
-			v1 := FindExprKeyVar(e.Invoke.Args[1])
+			v1 := FindExprKeyVarSess(s, e.Invoke.Args[1])
 			// residual ERROR sticky — no invent soft-pick left past right residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			if v0 == nil && v1 != nil {
@@ -491,7 +500,8 @@ func FindExprKeyVar(e *Expression) *Variable {
 // ArrayVariable.cpp:394–412 — same collective; each dim has exactly one key var
 // and those key vars match across the two itemized members.
 // Incomplete IndexExprs fails closed sticky false (no invent soft-skip nil hole then
-// string Indices match as complete variant; no invent mixed expr/string dual path).
+// string Indices match as complete variant; no invent mixed expr/string dual path).}
+
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	// both ArrayVariable shells always live; sticky incomplete no invent not-variant
 	if av == nil || other == nil {
@@ -528,12 +538,12 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 		for i := range av.IndexExprs {
 			e, oe := av.IndexExprs[i], ov.IndexExprs[i]
 			// ArrayVariable.cpp:403–405 — Expression path; live Expression* only
-			ce := CountExprKeyVar(e)
+			ce := CountExprKeyVarSess(nil, e)
 			// residual ERROR sticky — no invent soft-continue count past residual hole
 			if sessHasError(nil) {
 				return false
 			}
-			coe := CountExprKeyVar(oe)
+			coe := CountExprKeyVarSess(nil, oe)
 			// residual ERROR sticky — no invent soft-continue count past oe residual hole
 			if sessHasError(nil) {
 				return false
@@ -541,12 +551,12 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 			if ce != 1 || coe != 1 {
 				return false
 			}
-			ke := FindExprKeyVar(e)
+			ke := FindExprKeyVarSess(nil, e)
 			// residual ERROR sticky — no invent soft-continue key match past residual hole
 			if sessHasError(nil) {
 				return false
 			}
-			koe := FindExprKeyVar(oe)
+			koe := FindExprKeyVarSess(nil, oe)
 			// residual ERROR sticky — no invent soft-continue key match past oe residual
 			if sessHasError(nil) {
 				return false

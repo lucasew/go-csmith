@@ -519,25 +519,29 @@ func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
 // FactUnion.cpp:262–270.
 // Incomplete facts fail closed sticky false (no invent readable past UnionFacts hole).
 func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
+	return IsFieldReadableSess(nil, v, fid, facts)
+}
+
+func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) bool {
 	// subject always live union; incomplete subject sticky not-readable
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !v.Type.IsUnion() || fid < 0 {
 		// residual ERROR sticky — no invent not-readable soft-skip past IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue readable past IsUnion residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if !UnionFactsComplete(facts) {
 		// incomplete map sticky (no invent readable / soft re-pick past hole)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if fid >= len(v.Type.Fields) && fid >= len(v.FieldVars) {
@@ -546,14 +550,14 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 	tmp := MakeFactUnion(v, fid)
 	if tmp == nil {
 		// MakeFactUnion may already sticky non-union; ensure sticky
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return false
 	}
 	fu := FindRelatedUnion(facts, v)
 	// residual ERROR sticky — no invent readable/not-readable soft-skip past FindRelated hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if fu == nil {
@@ -561,7 +565,7 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 	}
 	ok := tmp.Imply(fu)
 	// residual ERROR sticky — no invent readable true past Imply hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -573,26 +577,31 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 // Empty complete facts ⇒ no related fact ⇒ nonreadable (same as C++ find_related null).
 // Variable always live; sticky nonreadable (no invent readable soft-skip past hole).
 // Incomplete FactUnion maps fail closed nonreadable (no invent readable while
-// FindRelatedUnion returns nil past a hole before a matching parent fact).
+// FindRelatedUnion returns nil past a hole before a matching parent fact).}
+
 func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
+	return IsNonreadableFieldSess(nil, v, facts)
+}
+
+func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if !v.IsInsideUnionField() {
 		// residual ERROR sticky — no invent not-nonreadable soft-skip past IsInsideUnionField hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue nonreadable past IsInsideUnion residual true path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if !UnionFactsComplete(facts) {
 		// incomplete union map sticky nonreadable (no invent readable past hole)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// walk to the union field variable
@@ -600,19 +609,19 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	uf := v
 	for uf != nil && !uf.IsUnionField() {
 		// residual ERROR sticky — no invent soft-continue walk past IsUnionField residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		uf = uf.FieldVarOf
 	}
 	// residual ERROR sticky — no invent soft-continue past final IsUnionField residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	// broken IR (no union field in ancestry) — sticky fail closed nonreadable
 	// (no invent readable / soft re-pick past hole)
 	if uf == nil || uf.FieldVarOf == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	parent := uf.FieldVarOf
@@ -621,14 +630,14 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	tmp := MakeFactUnion(parent, fid)
 	if tmp == nil {
 		// parent not union type — sticky fail closed nonreadable
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
 	fu := FindRelatedUnion(facts, parent)
 	// residual ERROR sticky — no invent soft-continue readable past FindRelatedUnion hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if fu == nil {
@@ -637,7 +646,7 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	}
 	ok := tmp.Imply(fu)
 	// residual ERROR sticky — no invent soft-continue readable past Imply hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if !ok {
@@ -651,7 +660,8 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 // FactUnion.cpp:226–245 — merge existing facts for vars into one.
 // Variable* always live in vars; nil hole / incomplete union map fails closed
 // (nil join — callers of transfer must not invent empty complete from that alone;
-// RhsToLhsTransferUnion pre-checks completeness before join).
+// RhsToLhsTransferUnion pre-checks completeness before join).}
+
 func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 	// incomplete union map / vars fails closed sticky (no invent soft nil join success path)
 	if !UnionFactsComplete(facts) || !VariablesComplete(vars) {

@@ -538,10 +538,14 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 // MakeStructConstant mirrors GenerateRandomStructConstant.
 // Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
+	return MakeStructConstantSess(nil, r, opts, probs, st)
+}
+
+func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
 	// Constant.cpp:255 — assert(eStruct); always has RNG for field constants sticky
 	// no invent "{}" shell without live RNG / fields path
 	if r == nil || st == nil || !st.isStruct {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var b strings.Builder
@@ -555,7 +559,7 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 		// Type* always live on Fields; Type-nil sticky (no invent soft-empty val then
 		// ERROR_GUARD as complete field miss / soft re-pick past incomplete field Type)
 		if f.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		var val string
@@ -563,50 +567,50 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
 			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
 			// residual ERROR sticky — no invent soft-field past range residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 		} else if f.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft-field past IsStruct residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
-			if c := MakeStructConstant(r, opts, probs, f.Type); c != nil {
+			if c := MakeStructConstantSess(s, r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue past IsStruct residual false
 			return nil
 		} else if f.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-field past IsUnion residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
-			if c := MakeUnionConstant(r, opts, probs, f.Type); c != nil {
+			if c := MakeUnionConstantSess(s, r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 			return nil
 		} else {
 			// Constant.cpp:271 — GenerateRandomConstant(fields[i]); no soft invent "0"
-			if c := MakeRandom(f.Type, opts, probs, r); c != nil {
+			if c := MakeRandomSess(s, f.Type, opts, probs, r); c != nil {
 				val = c.Value
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 		}
 		// Constant.cpp ERROR_GUARD("") on empty field — sticky fail whole struct, no invent hole
 		if val == "" {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return nil
 		}
@@ -627,7 +631,8 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 // prevZero mirrors Type.cpp:640 no_zero_len = fields_length.empty() || back()==0
 // (non-bitfield pushes -1, so after a normal field zero-width bitfields are allowed).
 // Invent always-true prevZero forced every union bitfield non-zero (seed 33: UP
-// `const signed : 0` vs GO `const signed f3 : 2` after normal fields).
+// `const signed : 0` vs GO `const signed f3 : 2` after normal fields).}
+
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int, prevZero bool) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
@@ -975,59 +980,63 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 // MakeUnionConstant mirrors GenerateRandomUnionConstant — initialize first field only.
 // Constant.cpp:288–294.
 func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
+	return MakeUnionConstantSess(nil, r, opts, probs, ut)
+}
+
+func MakeUnionConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
 	// Constant.cpp:289–291 — assert union with fields; always has RNG sticky
 	// no soft invent MakeInt(0) / "{}" without live RNG
 	if r == nil || ut == nil || !ut.isUnion || len(ut.Fields) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	f0 := ut.Fields[0]
 	// Type* always live on Fields; Type-nil sticky (no invent soft-empty val then
 	// ERROR_GUARD as complete first-field miss / soft re-pick past incomplete Type)
 	if f0.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var val string
 	if f0.Type.IsStruct() {
 		// residual ERROR sticky — no invent soft-union past IsStruct residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
-		if c := MakeStructConstant(r, opts, probs, f0.Type); c != nil {
+		if c := MakeStructConstantSess(s, r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		return nil
 	} else if f0.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-union past IsUnion residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
-		if c := MakeUnionConstant(r, opts, probs, f0.Type); c != nil {
+		if c := MakeUnionConstantSess(s, r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		return nil
 	} else {
 		// Constant.cpp:292 — GenerateRandomConstant(fields[0]); no soft invent "0"
-		if c := MakeRandom(f0.Type, opts, probs, r); c != nil {
+		if c := MakeRandomSess(s, f0.Type, opts, probs, r); c != nil {
 			val = c.Value
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 	}
 	// ERROR_GUARD on empty first field sticky — no invent "{}"
 	if val == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}

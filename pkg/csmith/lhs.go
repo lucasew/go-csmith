@@ -642,7 +642,7 @@ func MakeRandomLhs(
 		// Lhs.cpp:103–122 — validity filters before visit_facts
 		valid := true
 		if cg.FM != nil {
-			if OpportunisticValidate(r, v, typ, cg.FM.GlobalFacts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) == 0 {
+			if OpportunisticValidateSess(cgSess(cg), r, v, typ, cg.FM.GlobalFacts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) == 0 {
 				valid = false
 			}
 			// residual ERROR sticky — no invent soft-continue past validate hole
