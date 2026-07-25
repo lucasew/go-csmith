@@ -122,7 +122,7 @@ func (b *Block) MustReturn() bool {
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) == 0 {
@@ -135,19 +135,19 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	last := b.GetLastStm()
 	if last == nil || !last.MustReturn() {
 		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn residual
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue escape check past MustReturn residual true
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		return false
 	}
 	// Block.cpp:318–326 — back edges into block (continue) can skip end return
 	esc := b.hasEscapeBackEdge(fm)
 	// residual ERROR sticky — no invent must-return true past escape CFG residual hole
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		return false
 	}
 	return !esc
@@ -193,7 +193,7 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	// Block::stm_id always live for CFG-indexed edges; StmID 0 is valid (fair sid).
 	// IncompleteStmID sticky possible escape (no invent "no back edge").
 	if StmIDUnset(b.StmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	// Statement.cpp:453–467 — e->dest == this only (DestStmID == block.StmID).
@@ -202,8 +202,8 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	back := fm.FindEdgesIn(b.StmID, false, true)
 	// incomplete CFG sticky possible escape
 	if back == nil {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(fmSess(fm)) {
+			sessNoteError(fmSess(fm), ErrGeneric)
 		}
 		return true
 	}

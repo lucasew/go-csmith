@@ -149,7 +149,7 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 	// Type::choose_random requires AllTypes + RNG; ERROR_GUARD path → nil
 	// sticky no invent default int when r nil; empty env stays non-sticky soft nil
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	if env == nil || len(env.AllTypes) == 0 {

@@ -2508,7 +2508,7 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 	cands := okStructUnionLTypes(env, noVolatile, true, true)
 	// incomplete ok pool fails closed sticky (no invent keep original typ past hole)
 	if !typesComplete(cands) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	if len(cands) == 0 {
@@ -2516,7 +2516,7 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 	}
 	st := cands[r.RndUpto(uint32(len(cands)))]
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	return st

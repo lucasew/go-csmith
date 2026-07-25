@@ -776,7 +776,7 @@ func HashGlobalVariables(vs *VariableSelector) string {
 func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactUnion) string {
 	// VariableSelector always live for global hash; sticky no invent empty hash without it
 	if vs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return ""
 	}
 	note := func(code int) { sessNoteError(vs.Sess, code) }

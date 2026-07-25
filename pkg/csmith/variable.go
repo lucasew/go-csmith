@@ -166,7 +166,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	// C++ isArray always ArrayVariable*; missing AsArray sticky
 	// (no invent scalar OutputDef for IsArray shell — use ArrayVariable::OutputDef)
 	if v.IsArray && v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:659 — assert(init); sticky no soft invent empty "= ;" RHS
@@ -174,7 +174,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	if v.InitExpr != nil {
 		initOut = v.InitExpr.Output()
 		// residual ERROR sticky — no invent soft-continue def past InitExpr Output residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	} else if v.Init != nil {
@@ -183,7 +183,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	if initOut == "" {
 		// missing init is broken IR sticky (union-field CreateVariable uses null init
 		// and those fields are not OutputDef'd as standalone defs)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:640–660 — OutputDecl always live; sticky no invent " = init;" without decl
@@ -193,7 +193,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 		return ""
 	}
 	if decl == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -204,7 +204,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 			b.WriteString(ag.Output(r))
 		}
 		// residual ERROR sticky — no invent soft-continue def past attr residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
@@ -216,12 +216,12 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	// OutputMgr.cpp:314–319 — immediately "/* " + comment + " */" (no invent space before /*)
 	if v.IsVolatile() {
 		// residual ERROR sticky — no invent soft-skip comment past IsVolatile residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		nm := v.GetActualName(prefixName)
 		// residual ERROR sticky — no invent complete def past GetActualName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if nm != "" {
@@ -229,7 +229,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 			b.WriteString(nm)
 			b.WriteString(" */")
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent complete def past IsVolatile residual false path
 		return ""
 	}

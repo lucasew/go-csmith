@@ -324,7 +324,7 @@ func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilit
 		s.ExtKind = "coverage"
 		s.CoverageSize = opts.CoverageTestSize
 		if s.CoverageSize <= 0 {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 	} else {
@@ -333,16 +333,16 @@ func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilit
 
 	// AbsExtension::Initialize(func1_max_params, values)
 	s.ExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
-	if s.ExtValues == nil || sessHasError(nil) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if s.ExtValues == nil || sessHasError(s) {
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		s.ExtKind = ""
 		return
 	}
 	if s.ExtKind == "coverage" {
 		s.CoverageTests = CoverageGenerateValues(s.ExtValues, s.CoverageSize, r, opts, probs)
-		if s.CoverageTests == nil || sessHasError(nil) {
+		if s.CoverageTests == nil || sessHasError(s) {
 			s.ExtKind = ""
 			s.ExtValues = nil
 			return

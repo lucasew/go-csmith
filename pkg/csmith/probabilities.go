@@ -230,7 +230,7 @@ func UnregisterExtraFilterSess(s *Session, pname ProbName, filter Filter) {
 	}
 	cur, ok := p.extraFilters[pname]
 	if !ok || cur == nil || !filterPtrEqual(cur, filter) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	p.extraFilters[pname] = nil

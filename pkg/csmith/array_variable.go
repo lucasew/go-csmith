@@ -577,7 +577,7 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 // Itemized member (Collective set) is complete soft miss (not incomplete IR).
 func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSelector) *ArrayVariable {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
 	if av.Collective != nil {
@@ -614,13 +614,13 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 	// ArrayVariable.cpp:288–291 — type always live; type->is_aggregate()
 	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
 	if item.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
 	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
-		if sessHasError(nil) {
+		if sessHasError(vsSess(vs)) {
 			return nil
 		}
 	}
@@ -1171,13 +1171,13 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 	if av == nil || r == nil {
 		// nil receiver/RNG incomplete sticky (no invent itemize without live array/rng)
 		if av != nil && r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(vsSess(vs), ErrGeneric)
 		}
 		return nil
 	}
 	// ArrayVariable.cpp:250 — assert(collective == 0); sticky no soft invent re-itemize self
 	if av.Collective != nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
 	item := &ArrayVariable{
@@ -1213,13 +1213,13 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 	// ArrayVariable.cpp:261–264 — type always live; only expand aggregate itemized
 	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
 	if item.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
 	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
-		if sessHasError(nil) {
+		if sessHasError(vsSess(vs)) {
 			return nil
 		}
 	}

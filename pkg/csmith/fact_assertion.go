@@ -326,12 +326,12 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool) string {
 	// FactMgr + Statement always live for assertion emit; sticky no invent section without them
 	if fm == nil || st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return ""
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent empty assertion section)
 	if StmIDUnset(st.StmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return ""
 	}
 	var facts []*FactPointTo
@@ -346,8 +346,8 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	}
 	// incomplete maps fail closed sticky (no invent empty assertion block / soft re-pick)
 	if !FactsComplete(facts) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(fmSess(fm)) {
+			sessNoteError(fmSess(fm), ErrGeneric)
 		}
 		return ""
 	}
@@ -363,24 +363,24 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	for _, f := range facts {
 		// Fact* always live in fact maps; nil hole sticky (no invent skip holes)
 		if f == nil || f.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return ""
 		}
 		// skip globals neither read nor written in this function
 		isG := f.Var.IsGlobal()
 		// residual ERROR sticky — no invent soft-skip then partial assert emit past IsGlobal residual
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			return ""
 		}
 		if isG {
 			rd := eff.IsRead(f.Var)
 			// residual ERROR sticky — no invent soft-skip assert past IsRead residual
-			if sessHasError(nil) {
+			if sessHasError(fmSess(fm)) {
 				return ""
 			}
 			wr := eff.IsWritten(f.Var)
 			// residual ERROR sticky — no invent soft-skip assert past IsWritten residual
-			if sessHasError(nil) {
+			if sessHasError(fmSess(fm)) {
 				return ""
 			}
 			if !rd && !wr {
@@ -390,7 +390,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 		// IsTop / empty OutputAssertion intentionally silent; non-nil fact still live
 		body.WriteString(f.OutputAssertion(stParent, indent))
 		// residual ERROR sticky — no invent partial assertion section past hard IR hole
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			return ""
 		}
 	}
@@ -509,7 +509,7 @@ func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, 
 	}
 	// when paranoid, Statement + FactMgr always live sticky
 	if st == nil || fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return ""
 	}
 	if st.Kind == StmtBlock {
@@ -517,7 +517,7 @@ func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, 
 	}
 	out := fm.OutputAssertions(st, stParent, indent, true)
 	// residual ERROR sticky — no invent soft-empty post past OutputAssertions residual
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		return ""
 	}
 	return out

@@ -35,7 +35,7 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return StructField{}
 	}
 	// Type.cpp:658–666 make_one_struct_field — rnd_upto(AllTypes, filter for_field_var)
@@ -45,7 +45,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 		ft = env.chooseRandomForStructField(r, opts, probs)
 	}
 	// Type.cpp:661 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
-	if ft == nil || sessHasError(nil) {
+	if ft == nil || sessHasError(envSess(env)) {
 		return StructField{}
 	}
 	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
@@ -53,7 +53,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
 	// Type.cpp:694 ERROR_RETURN after random_qualifiers
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return StructField{}
 	}
 	return StructField{
@@ -124,7 +124,7 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
 	// Type.cpp always has process RNG; sticky no invent struct type without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1077–1081 — max_struct_fields as-is; no soft invent maxCnt=1
@@ -139,17 +139,17 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	}
 	if fieldCnt < 1 {
 		// fixed + max 0 → empty type IR; sticky no invent zero-field struct shell
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1082 — ERROR_GUARD(nullptr) after field_cnt draw
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return nil
 	}
 	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
 	// Type.cpp:1086–1088 — ERROR_GUARD after flip
 	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldsCreationProb)))
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)
@@ -159,13 +159,13 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		if fullBitfields {
 			// make_full_bitfields_struct_fields: ScalarFieldInFullBitFieldsProb → normal else bitfield
 			if r.RndFlipcoin(uint32(probs.Single(PScalarFieldInFullBitFieldsProb))) {
-				if sessHasError(nil) {
+				if sessHasError(envSess(env)) {
 					return nil
 				}
 				f = MakeOneStructField(r, opts, probs, env, i)
 				prevZero = false
 			} else {
-				if sessHasError(nil) {
+				if sessHasError(envSess(env)) {
 					return nil
 				}
 				f = MakeOneBitfield(r, opts, probs, i, prevZero)
@@ -173,20 +173,20 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			}
 		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
 			// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return nil
 			}
 			f = MakeOneBitfield(r, opts, probs, i, prevZero)
 			prevZero = f.Type != nil && f.BitWidth == 0
 		} else {
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return nil
 			}
 			f = MakeOneStructField(r, opts, probs, env, i)
 			prevZero = false
 		}
 		// Type.cpp:1090 ERROR_GUARD after make_*_struct_fields; no soft invent nil-type field
-		if f.Type == nil || sessHasError(nil) {
+		if f.Type == nil || sessHasError(envSess(env)) {
 			return nil
 		}
 		fields = append(fields, f)
@@ -198,13 +198,13 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			// leave packed false
 		} else {
 			packed = r.RndFlipcoin(50)
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return nil
 			}
 		}
 	}
 	hasAssign := IfStructWillHaveAssignOps(r, opts, probs)
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return nil
 	}
 	// Type.cpp:1088–1091 make_random_struct_type — does not set used or record_type_with_bitfields.
@@ -217,7 +217,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		env.AggregateSeq++
 		name = fmt.Sprintf("S%d", sid)
 	} else if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	st := &Type{
@@ -264,7 +264,7 @@ func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
 // TypeEnv always live; sticky (no invent soft-skip type gen past hole).
 func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEnv) {
 	if env == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return
 	}
 	// Type.cpp:1170–1176 GenerateSimpleTypes — push eChar..eUInt128 always.
@@ -280,7 +280,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if opts.Structs && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
 			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
-			if MakeRandomStructType(r, opts, probs, env, "") == nil || sessHasError(nil) {
+			if MakeRandomStructType(r, opts, probs, env, "") == nil || sessHasError(envSess(env)) {
 				break
 			}
 			if len(env.StructTypes) > 20 {
@@ -290,7 +290,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	if opts.Unions && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
-			if MakeRandomUnionType(r, opts, probs, env, "") == nil || sessHasError(nil) {
+			if MakeRandomUnionType(r, opts, probs, env, "") == nil || sessHasError(envSess(env)) {
 				break
 			}
 			if len(env.UnionTypes) > 20 {
@@ -631,19 +631,19 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int, prevZero bool) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return StructField{}
 	}
 	// Type.cpp:677–680 — bitfield when bitfields && !ccomp && flipcoin(BitFieldInNormalStructProb)
 	// bitfield path uses traced rnd_flipcoin (not pure_rnd)
 	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
-		if sessHasError(nil) {
+		if sessHasError(envSess(env)) {
 			return StructField{}
 		}
 		// Type.cpp:680 make_one_bitfield(fields, qfers, lens) — no_zero_len from lens
 		return MakeOneBitfield(r, opts, probs, fieldIdx, prevZero)
 	}
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return StructField{}
 	}
 	// Build ok_nonstruct_types and struct_types (Type.cpp:682–713)
@@ -655,22 +655,22 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		for _, t := range env.AllTypes {
 			// Type* always live on AllTypes; nil hole fails closed sticky (empty field shell)
 			if t == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(envSess(env), ErrGeneric)
 				return StructField{}
 			}
 			// Type.cpp:691–692 — contain_pointer_field rejected (pointers + aggregates with ptr fields)
 			if t.ContainPointerField() {
-				if sessHasError(nil) {
+				if sessHasError(envSess(env)) {
 					return StructField{}
 				}
 				continue
 			}
 			isSt := t.IsStruct()
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
 			isUn := t.IsUnion()
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
 			if !isSt && !isUn {
@@ -680,7 +680,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			}
 			// Type.cpp:701–702 — no bitfields in union members for now
 			if t.HasBitfields() {
-				if sessHasError(nil) {
+				if sessHasError(envSess(env)) {
 					return StructField{}
 				}
 				continue
@@ -703,54 +703,54 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	var ft *Type
 	for tries := 0; tries < 256; tries++ {
 		if len(structTypes) > 0 && r.RndFlipcoin(15) {
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
 			ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
 			break
 		}
-		if sessHasError(nil) {
+		if sessHasError(envSess(env)) {
 			return StructField{}
 		}
 		if len(nonStruct) == 0 {
 			break
 		}
 		cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
-		if sessHasError(nil) {
+		if sessHasError(envSess(env)) {
 			return StructField{}
 		}
 		// Type.cpp:723–727 — SIMPLE_TYPES_PROB_FILTER reject (weight 0), retry; pool stays full
 		if cand.IsSimple() {
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
 			if probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
-				if sessHasError(nil) {
+				if sessHasError(envSess(env)) {
 					return StructField{}
 				}
 				continue
 			}
-			if sessHasError(nil) {
+			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(envSess(env)) {
 			return StructField{}
 		}
 		ft = cand
 		break
 	}
 	// Type.cpp:730 — while (type == nullptr); no soft invent simple when pools empty
-	if ft == nil || sessHasError(nil) {
+	if ft == nil || sessHasError(envSess(env)) {
 		return StructField{}
 	}
 	// Type.cpp:733–735 — FieldConstProb / FieldVolatileProb (traced random_qualifiers)
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return StructField{}
 	}
 	return StructField{Name: fmt.Sprintf("f%d", fieldIdx), Type: ft, Qfer: q, BitWidth: -1}
@@ -761,7 +761,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
 	// Type.cpp always has process RNG; sticky no invent union type without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1133–1135 — max_union_fields as-is; no soft invent maxCnt=1
@@ -771,12 +771,12 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	fieldCnt := int(r.RndUpto(uint32(maxCnt))) + 1
 	// Type.cpp:1136 — ERROR_GUARD after field_cnt
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return nil
 	}
 	if fieldCnt < 1 {
 		// sticky no invent zero-field union shell
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)
@@ -787,14 +787,14 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		f := MakeOneUnionField(r, opts, probs, env, i, prevZero)
 		// Type.cpp:1140–1141 — make_one_union_field; assert no bitfields on last
 		// no soft invent nil-type union field
-		if f.Type == nil || sessHasError(nil) {
+		if f.Type == nil || sessHasError(envSess(env)) {
 			return nil
 		}
 		if f.Type.HasBitfields() {
 			// residual ERROR sticky — no invent soft-skip assert fail past incomplete field Type
-			if !sessHasError(nil) {
+			if !sessHasError(envSess(env)) {
 				// C++ assert(!fields.back()->has_bitfields()) — complete bitfields still fail closed
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(envSess(env), ErrGeneric)
 			}
 			return nil
 		}
@@ -804,7 +804,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		fields = append(fields, f)
 	}
 	hasAssign := IfUnionWillHaveAssignOps(r, opts, probs)
-	if sessHasError(nil) {
+	if sessHasError(envSess(env)) {
 		return nil
 	}
 	// Type.cpp:1110–1112 make_random_union_type — does not set used or record bitfields.
@@ -817,7 +817,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		env.AggregateSeq++
 		name = fmt.Sprintf("U%d", sid)
 	} else if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(envSess(env), ErrGeneric)
 		return nil
 	}
 	ut := &Type{
