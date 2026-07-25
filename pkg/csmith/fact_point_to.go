@@ -2368,7 +2368,7 @@ func AggregateAllPointToSetsSess(s *Session, funcs []*Function, fms *FactMgrMap)
 			sessNoteError(s, ErrGeneric)
 			return
 		}
-		fm := fms.ForFunc(f)
+		fm := fms.ForFuncSess(s, f)
 		if fm == nil {
 			ClearPointToAggregatesSess(s)
 			sessNoteError(s, ErrGeneric)

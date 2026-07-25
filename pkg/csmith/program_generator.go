@@ -315,7 +315,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
 		cg.CurrentFunc = f
 		cg.Types = &g.Types
-		if fm := g.FactMgrs.ForFunc(f); fm != nil {
+		if fm := g.FactMgrs.ForFuncSess(g.Sess, f); fm != nil {
 			// seed global pointer facts already known
 			// Variable* always live on GlobalList; nil hole / incomplete AddNewVarFact
 			// fails closed sticky (no invent soft-continue GenerateBody past holes)
@@ -838,7 +838,7 @@ func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
 		// no first function → empty eUnionWrite partition (complete)
 		return []*FactUnion{}
 	}
-	fm := g.FactMgrs.ForFunc(first)
+	fm := g.FactMgrs.ForFuncSess(g.Sess, first)
 	if fm == nil {
 		g.noteErr(ErrGeneric)
 		return IncompleteUnionFactSlice()
@@ -928,7 +928,7 @@ func (g *ProgramGenerator) OutputMain() string {
 		// program end facts for union readability (FactMgr::get_program_end_facts)
 		var endUnion []*FactUnion
 		if f0 != nil && g.FactMgrs != nil {
-			if fm := g.FactMgrs.ForFunc(f0); fm != nil {
+			if fm := g.FactMgrs.ForFuncSess(g.Sess, f0); fm != nil {
 				endUnion = fm.UnionFacts
 			}
 		}

@@ -207,7 +207,7 @@ func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts
 		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
 	}
 	fm.MapFactsIn[stmID] = storeFactMapEntry(facts)
-	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntry(unionFacts)
+	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntrySess(fmSess(fm), unionFacts)
 }
 
 // SetMapFactsOut records post-statement facts.
@@ -315,7 +315,7 @@ func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFact
 		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
 	fm.MapFactsOut[stmID] = storeFactMapEntry(facts)
-	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntry(unionFacts)
+	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntrySess(fmSess(fm), unionFacts)
 }
 
 // storeFactMapEntry normalizes fact-map values so incomplete is not confused with
@@ -343,11 +343,15 @@ func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
 // combine_branch_facts then_fid=0 else_fid=1 bottomed g_721 while sibling
 // unions kept init f0 → choose_var ok pool 36 vs UP 37).
 func storeUnionFactMapEntry(facts []*FactUnion) []*FactUnion {
+	return storeUnionFactMapEntrySess(nil, facts)
+}
+
+func storeUnionFactMapEntrySess(s *Session, facts []*FactUnion) []*FactUnion {
 	if !UnionFactsComplete(facts) {
 		return IncompleteUnionFactSlice()
 	}
-	cl := CloneUnionFactSliceDeep(facts)
-	if sessHasError(nil) {
+	cl := CloneUnionFactSliceDeepSess(s, facts)
+	if sessHasError(s) {
 		return IncompleteUnionFactSlice()
 	}
 	if cl == nil {
@@ -592,7 +596,7 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 	if st != nil && st.Kind == StmtGoto {
 		destParent = st.GotoDestParent
 		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && fm != nil && fm.Func != nil {
-			destParent = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
+			destParent = FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, st.GotoDestStmID)
 		}
 	}
 	fm.SetMapFactsOutForStmtDest(st, facts, blk, destParent)
@@ -688,7 +692,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 			dp = st.GotoDestParent
 		}
 		if dp == nil && !StmIDUnset(st.GotoDestStmID) && fm.Func != nil {
-			dp = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
+			dp = FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, st.GotoDestStmID)
 		}
 		// FactMgr.cpp:427–428 assert(func); no soft invent RemoveFunctionLocalFacts
 		// when dest unknown (wrong filter vs update_facts_for_dest).
@@ -739,9 +743,14 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 // (no invent soft-continue past incomplete arm then miss a stmt in complete Then,
 // or invent soft-skip missing arm then find under sibling of same if).
 func FindParentBlockOfStmID(f *Function, stmID int) *Block {
+	return FindParentBlockOfStmIDSess(nil, f, stmID)
+}
+
+// FindParentBlockOfStmIDSess is FindParentBlockOfStmID with explicit session residual sticky.
+func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
 	// Function + live StmID always required; sticky no invent parent miss soft-success
 	if f == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var walk func(b *Block) *Block
@@ -754,12 +763,12 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 			if st.StmID == stmID {
 				return b
 			}
-			blks := GetBlocksStmt(st)
+			blks := GetBlocksStmtSess(s, st)
 			for _, nb := range blks {
 				if nb == nil {
 					// incomplete get_blocks arm sticky fail whole search
 					// (no invent soft-continue past hole / miss Then when Else nil)
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return nil
 				}
 			}
@@ -774,7 +783,7 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 	for _, b := range f.Blocks {
 		// Block* always live on Function.Blocks; nil hole sticky miss (no invent soft-success)
 		if b == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if p := walk(b); p != nil {
@@ -788,11 +797,16 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 // Complements FindParentBlockOfStmID for CFG edge source resolution.
 // Function + live StmID always required; sticky nil (no invent miss soft-success past hole).
 func FindStmtByID(f *Function, stmID int) *Stmt {
+	return FindStmtByIDSess(nil, f, stmID)
+}
+
+// FindStmtByIDSess is FindStmtByID with explicit session residual sticky.
+func FindStmtByIDSess(s *Session, f *Function, stmID int) *Stmt {
 	if f == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	b := FindParentBlockOfStmID(f, stmID)
+	b := FindParentBlockOfStmIDSess(s, f, stmID)
 	if b == nil {
 		return nil
 	}
@@ -930,7 +944,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		// Prefer GotoDestParent; else resolve parent of GotoDestStmID via function blocks.
 		destParent := st.GotoDestParent
 		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && f != nil {
-			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
+			destParent = FindParentBlockOfStmIDSess(fmSess(fm), f, st.GotoDestStmID)
 			// residual ERROR sticky — no invent soft-skip dest parent miss past hole
 			if sessHasError(fmSess(fm)) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
@@ -1088,7 +1102,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 	case StmtGoto:
 		destParent := st.GotoDestParent
 		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && f != nil {
-			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
+			destParent = FindParentBlockOfStmIDSess(fmSess(fm), f, st.GotoDestStmID)
 			if sessHasError(fmSess(fm)) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
@@ -1616,10 +1630,10 @@ func (fm *FactMgr) BackupStmFactMaps(
 			factsOut[st.StmID] = storeFactMapEntry(out)
 		}
 		if in, ok := fm.MapUnionFactsIn[st.StmID]; ok {
-			unionIn[st.StmID] = storeUnionFactMapEntry(in)
+			unionIn[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
 		}
 		if out, ok := fm.MapUnionFactsOut[st.StmID]; ok {
-			unionOut[st.StmID] = storeUnionFactMapEntry(out)
+			unionOut[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
 		}
 	}
 }
@@ -1643,10 +1657,10 @@ func (fm *FactMgr) backupBlockFactMaps(
 			factsOut[b.StmID] = storeFactMapEntry(out)
 		}
 		if in, ok := fm.MapUnionFactsIn[b.StmID]; ok {
-			unionIn[b.StmID] = storeUnionFactMapEntry(in)
+			unionIn[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
 		}
 		if out, ok := fm.MapUnionFactsOut[b.StmID]; ok {
-			unionOut[b.StmID] = storeUnionFactMapEntry(out)
+			unionOut[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
 		}
 	}
 	for i := range b.Stmts {
@@ -1718,12 +1732,12 @@ func (fm *FactMgr) RestoreStmFactMaps(
 			delete(fm.MapFactsOut, st.StmID)
 		}
 		if in, ok := unionIn[st.StmID]; ok {
-			fm.MapUnionFactsIn[st.StmID] = storeUnionFactMapEntry(in)
+			fm.MapUnionFactsIn[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
 		} else {
 			delete(fm.MapUnionFactsIn, st.StmID)
 		}
 		if out, ok := unionOut[st.StmID]; ok {
-			fm.MapUnionFactsOut[st.StmID] = storeUnionFactMapEntry(out)
+			fm.MapUnionFactsOut[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
 		} else {
 			delete(fm.MapUnionFactsOut, st.StmID)
 		}
@@ -1753,12 +1767,12 @@ func (fm *FactMgr) restoreBlockFactMaps(
 			delete(fm.MapFactsOut, b.StmID)
 		}
 		if in, ok := unionIn[b.StmID]; ok {
-			fm.MapUnionFactsIn[b.StmID] = storeUnionFactMapEntry(in)
+			fm.MapUnionFactsIn[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
 		} else {
 			delete(fm.MapUnionFactsIn, b.StmID)
 		}
 		if out, ok := unionOut[b.StmID]; ok {
-			fm.MapUnionFactsOut[b.StmID] = storeUnionFactMapEntry(out)
+			fm.MapUnionFactsOut[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
 		} else {
 			delete(fm.MapUnionFactsOut, b.StmID)
 		}
@@ -1897,7 +1911,7 @@ func RemoveLoopLocalFactsSess(s *Session, facts []*FactPointTo, blk *Block) []*F
 		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	locals := collectLoopLocalVars(blk)
+	locals := collectLoopLocalVarsSess(s, blk)
 	// incomplete LocalVars hole — fail closed sticky
 	if !VariablesComplete(locals) {
 		sessNoteError(s, ErrGeneric)
@@ -1947,7 +1961,7 @@ func RemoveLoopLocalUnionFactsSess(s *Session, facts []*FactUnion, blk *Block) [
 		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
-	locals := collectLoopLocalVars(blk)
+	locals := collectLoopLocalVarsSess(s, blk)
 	if !VariablesComplete(locals) {
 		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
@@ -1990,11 +2004,15 @@ func RemoveLoopLocalUnionFactsForStmt(facts []*FactUnion, st *Stmt, parent *Bloc
 // (not bare nil invent empty-complete loop-local set / soft re-pick past hole).
 // Empty complete walk returns non-nil empty slice.
 func collectLoopLocalVars(blk *Block) []*Variable {
+	return collectLoopLocalVarsSess(nil, blk)
+}
+
+func collectLoopLocalVarsSess(s *Session, blk *Block) []*Variable {
 	locals := make([]*Variable, 0)
 	b := blk
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		locals = append(locals, b.LocalVars...)
@@ -2156,11 +2174,15 @@ func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Func
 // (no invent keep subjects that match only after a drop-list hole).}
 
 func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
+	return filterFactsNotInVarsSess(nil, facts, drop)
+}
+
+func filterFactsNotInVarsSess(s *Session, facts []*FactPointTo, drop []*Variable) []*FactPointTo {
 	if len(drop) == 0 {
 		return facts
 	}
 	if !FactsComplete(facts) || !VariablesComplete(drop) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	out := make([]*FactPointTo, 0, len(facts))
@@ -2311,8 +2333,16 @@ func NewFactMgrMapSess(s *Session) *FactMgrMap {
 // get_fact_mgr_for_func itself only looks up — create happens at signature time.
 // FactMgrMap + Function always live; sticky nil (no invent miss soft-skip past hole).
 func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
+	return m.ForFuncSess(nil, f)
+}
+
+// ForFuncSess is ForFunc with explicit session residual sticky.
+func (m *FactMgrMap) ForFuncSess(s *Session, f *Function) *FactMgr {
+	if s == nil && m != nil {
+		s = m.Sess
+	}
 	if m == nil || f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if m.byFunc == nil {
@@ -2716,7 +2746,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		// and would IncompleteFactSlice the out slot (generation poison).
 		if fm.MapFactsIn != nil {
 			for id := range fm.MapFactsIn {
-				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapInSess(fmSess(fm), fm.Func, id, blk) {
 					continue
 				}
 				// incomplete map slot — stay incomplete (no invent soft-append past hole)
@@ -2768,7 +2798,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			// read g_99 after l_1326=&g_99 then reassigned in else).
 			// AddFactOut already drops facts not visible at stm / goto dest.
 			for id := range fm.MapFactsOut {
-				st := FindStmtByID(fm.Func, id)
+				st := FindStmtByIDSess(fmSess(fm), fm.Func, id)
 				// residual ERROR sticky — no invent soft-continue partial IncompleteFactSlice past FindStmt hole
 				if sessHasError(fmSess(fm)) {
 					fm.GlobalFacts = IncompleteFactSlice()
@@ -2811,7 +2841,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)
 					continue
 				}
-				parent := FindParentBlockOfStmID(fm.Func, id)
+				parent := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, id)
 				// residual ERROR sticky — no invent soft-continue AddFactOut past parent residual hole
 				if sessHasError(fmSess(fm)) {
 					fm.GlobalFacts = IncompleteFactSlice()
@@ -2884,7 +2914,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		// map_facts_in eUnionWrite — iterate PT keys (C++ one map); create missing union slots
 		if fm.MapFactsIn != nil {
 			for id := range fm.MapFactsIn {
-				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapInSess(fmSess(fm), fm.Func, id, blk) {
 					continue
 				}
 				if fm.MapUnionFactsIn == nil {
@@ -2904,7 +2934,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		} else if fm.MapUnionFactsIn != nil {
 			// union-only map (tests): keep prior behavior
 			for id := range fm.MapUnionFactsIn {
-				if blk != nil && !stmtIDInBlockMapIn(fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapInSess(fmSess(fm), fm.Func, id, blk) {
 					continue
 				}
 				if !UnionFactsComplete(fm.MapUnionFactsIn[id]) {
@@ -2974,7 +3004,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 		}
 		for id := range outIDs {
-			st := FindStmtByID(fm.Func, id)
+			st := FindStmtByIDSess(fmSess(fm), fm.Func, id)
 			if sessHasError(fmSess(fm)) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
@@ -3016,7 +3046,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				fm.MapUnionFactsOut[id] = append(slot, cp)
 				continue
 			}
-			parent := FindParentBlockOfStmID(fm.Func, id)
+			parent := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, id)
 			if sessHasError(fmSess(fm)) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
@@ -3051,14 +3081,18 @@ func blockByStmID(f *Function, stmID int) *Block {
 // Tree walk (BlockContainsStmID) for MapFactsOut — statement must already be
 // linked so FindStmtByID can resolve it.
 func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
+	return stmtIDInBlockSess(nil, f, stmID, blk)
+}
+
+func stmtIDInBlockSess(s *Session, f *Function, stmID int, blk *Block) bool {
 	_ = f
 	// Block + live StmID always required; sticky false (align BlockContainsStmID)
 	if blk == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// BlockContainsStmID walks nested Then/Else under blk
-	return BlockContainsStmID(blk, stmID)
+	return BlockContainsStmIDSess(s, blk, stmID)
 }
 
 // stmtIDInBlockMapIn is Statement::in_block for map_facts_in updates.
@@ -3072,8 +3106,12 @@ func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
 // Lhs opportunistic_validate rejected the still-live local (seed-2 e9003:
 // UP U120 vs Go F80 after SelectParentLocal l_138).
 func stmtIDInBlockMapIn(f *Function, stmID int, blk *Block) bool {
+	return stmtIDInBlockMapInSess(nil, f, stmID, blk)
+}
+
+func stmtIDInBlockMapInSess(s *Session, f *Function, stmID int, blk *Block) bool {
 	if blk == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// Statement.cpp:380–389 — in_block walks parent starting at parent; a statement
@@ -3085,11 +3123,11 @@ func stmtIDInBlockMapIn(f *Function, stmID int, blk *Block) bool {
 	if stmID == blk.StmID {
 		return false
 	}
-	if BlockContainsStmID(blk, stmID) {
+	if BlockContainsStmIDSess(s, blk, stmID) {
 		return true
 	}
 	// Tree miss: sticky incomplete IR from BlockContainsStmID stays fail closed.
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if f == nil {
@@ -3846,7 +3884,7 @@ func (fm *FactMgr) FilterUnionFactsForHandover(keepPT []*FactPointTo) {
 		}
 		if !keep {
 			for _, pt := range keepPT {
-				ptOK := pt.PointsTo(v)
+				ptOK := pt.PointsToSess(fmSess(fm), v)
 				if sessHasError(fmSess(fm)) {
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					return
@@ -3982,33 +4020,38 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 // FactPointTo.cpp:398–405 — v->loose_match(pointee) || pointee->loose_match(v).
 // Incomplete PointTo (nil hole) fails closed true — no invent not-points-to past holes.
 func (f *FactPointTo) PointsTo(v *Variable) bool {
+	return f.PointsToSess(nil, v)
+}
+
+// PointsToSess is PointsTo with explicit session residual sticky.
+func (f *FactPointTo) PointsToSess(s *Session, v *Variable) bool {
 	// Fact + subject always live; sticky incomplete — fail closed as points-to
 	// (no invent not-points-to / soft re-pick past hole)
 	if f == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if v.LooseMatch(p) {
-			if sessHasError(nil) {
+		if v.LooseMatchSess(s, p) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
-		if p.LooseMatch(v) {
-			if sessHasError(nil) {
+		if p.LooseMatchSess(s, v) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -4088,7 +4131,7 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 					sessNoteError(fmSess(fm), ErrGeneric)
 					return
 				}
-				pt := kf.PointsTo(rf.Var)
+				pt := kf.PointsToSess(fmSess(fm), rf.Var)
 				// residual ERROR sticky — no invent soft-partition past PointsTo residual
 				if sessHasError(fmSess(fm)) {
 					*inputs = IncompleteFactSlice()
@@ -4179,10 +4222,10 @@ func (fm *FactMgr) SanityCheckMap() {
 			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
-		st := FindStmtByID(fm.Func, stmID)
+		st := FindStmtByIDSess(fmSess(fm), fm.Func, stmID)
 		var parent *Block
 		if st != nil {
-			parent = FindParentBlockOfStmID(fm.Func, stmID)
+			parent = FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, stmID)
 		}
 		for _, f := range facts {
 			if f == nil || f.Var == nil {
@@ -4212,7 +4255,7 @@ func (fm *FactMgr) SanityCheckMap() {
 			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
-		parent := FindParentBlockOfStmID(fm.Func, stmID)
+		parent := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, stmID)
 		for _, f := range facts {
 			if f == nil || f.Var == nil {
 				sessNoteError(fmSess(fm), ErrGeneric)
@@ -4259,7 +4302,7 @@ func GetProgramEndFactsSess(s *Session, list *FunctionList, fms *FactMgrMap) []*
 		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	fm := fms.ForFunc(first)
+	fm := fms.ForFuncSess(s, first)
 	if fm == nil {
 		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()

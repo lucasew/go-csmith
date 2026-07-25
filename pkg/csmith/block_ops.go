@@ -238,7 +238,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 					// Fair: sticky fail closed wipe CFG (no invent goto cascade past hole).
 					if e.SrcID > 0 && !ids[e.SrcID] {
 						if fm.Func != nil {
-							src := FindStmtByID(fm.Func, e.SrcID)
+							src := FindStmtByIDSess(fmSess(fm), fm.Func, e.SrcID)
 							if sessHasError(fmSess(fm)) {
 								scrubIncomplete = true
 								break
@@ -337,7 +337,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		seenGoto[gid] = true
 		parent := b
 		if fm != nil && fm.Func != nil {
-			if p := FindParentBlockOfStmID(fm.Func, gid); p != nil {
+			if p := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, gid); p != nil {
 				parent = p
 			}
 		}
@@ -612,7 +612,7 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 		// Statement.cpp:501 — e->src->eType == eGoto (src always live Statement*)
 		// unresolved SrcID with Func set = incomplete IR sticky (no invent skip as non-goto)
 		if fm.Func != nil {
-			src := FindStmtByID(fm.Func, e.SrcID)
+			src := FindStmtByIDSess(fmSess(fm), fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue sources past FindStmt hole
 			if sessHasError(fmSess(fm)) {
 				return nil
@@ -654,7 +654,7 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 			continue
 		}
 		if fm.Func != nil {
-			src := FindStmtByID(fm.Func, e.SrcID)
+			src := FindStmtByIDSess(fmSess(fm), fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue label scan past FindStmt hole
 			if sessHasError(fmSess(fm)) {
 				return ""

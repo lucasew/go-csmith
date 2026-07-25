@@ -689,7 +689,7 @@ func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
 	}
 	// 2) Func.Blocks scan — finds stmts on sibling/parent blocks not yet in root tree.
 	if owner == nil && b.Func != nil {
-		owner = FindParentBlockOfStmID(b.Func, stmID)
+		owner = FindParentBlockOfStmIDSess(s, b.Func, stmID)
 		if sessHasError(s) {
 			return false
 		}
@@ -743,7 +743,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				continue
 			}
 			// VariableSelector.cpp:773 — edge->src->eType == eGoto
-			src := FindStmtByID(fm.Func, e.SrcID)
+			src := FindStmtByIDSess(cg.Sess, fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue expand past FindStmt residual hole
 			if sessHasError(cg.Sess) {
 				return nil
@@ -762,7 +762,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			// C++ edge->src is a live Statement* with parent; no root-tree membership.
 			srcParent := (*Block)(nil)
 			if b.Func != nil {
-				srcParent = FindParentBlockOfStmID(b.Func, e.SrcID)
+				srcParent = FindParentBlockOfStmIDSess(cg.Sess, b.Func, e.SrcID)
 				if sessHasError(cg.Sess) {
 					return nil
 				}

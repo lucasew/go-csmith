@@ -422,7 +422,7 @@ func MakeFirst(
 			fmMap.Sess = runSess
 		}
 		// register same instance into session FMList map
-		_ = fmMap.ForFunc(f)
+		_ = fmMap.ForFuncSess(runSess, f)
 	}
 	// seed existing globals so first function sees them (generation convenience)
 	// Variable* always live on GlobalList; nil hole fails closed sticky

@@ -469,7 +469,7 @@ func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAtt
 			label = FindJumpLabel(fm, st.StmID)
 			// resolve from source stmt when FindJumpLabel missed registry
 			if label == "" && fm.Func != nil {
-				src := FindStmtByID(fm.Func, srcs[0])
+				src := FindStmtByIDSess(s, fm.Func, srcs[0])
 				// residual ERROR sticky — no invent soft-continue label/SourceLabel past FindStmt hole
 				if sessHasError(s) {
 					return "", false

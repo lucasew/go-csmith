@@ -444,7 +444,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		}
 		// Statement.cpp:781/785 — edge->src is eGoto (not loop/block CFG edges).
 		if fm.Func != nil {
-			src := FindStmtByID(fm.Func, e.SrcID)
+			src := FindStmtByIDSess(fmSess(fm), fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue fixed-scan past FindStmt hole
 			// (incomplete if-arm residual soft invents skip then later invents fixed tree)
 			if sessHasError(fmSess(fm)) {
