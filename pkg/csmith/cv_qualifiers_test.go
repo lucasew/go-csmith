@@ -16,14 +16,14 @@ func TestNewCVQualifiersMismatchSticky(t *testing.T) {
 	// unpaired shells sticky on Match / StricterThan
 	unpaired := CVQualifiers{IsConsts: []bool{true, false}, IsVolatiles: []bool{false}}
 	other := NewCVQualifiers([]bool{false}, []bool{false})
-	if unpaired.Match(other, false) {
+	if unpaired.MatchSess(testAmbientSession, other, false) {
 		t.Fatal("unpaired Match must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unpaired Match must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if unpaired.StricterThan(other) {
+	if unpaired.StricterThanSess(testAmbientSession, other) {
 		t.Fatal("unpaired StricterThan must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -37,37 +37,37 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 	opts := Defaults()
 	opts.MatchExactQualifiers = true
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
-	if got := q.RandomStricterConsts(NewRng(2), opts, NewProbabilities(opts)); !boolsEqual(got, q.IsConsts) {
+	if got := q.RandomStricterConstsSess(testAmbientSession, NewRng(2), opts, NewProbabilities(opts)); !boolsEqual(got, q.IsConsts) {
 		t.Fatal("exact stricter const", got)
 	}
-	if got := q.RandomLooserVolatiles(NewRng(2), opts, NewProbabilities(opts)); !boolsEqual(got, q.IsVolatiles) {
+	if got := q.RandomLooserVolatilesSess(testAmbientSession, NewRng(2), opts, NewProbabilities(opts)); !boolsEqual(got, q.IsVolatiles) {
 		t.Fatal("exact looser vol", got)
 	}
 	// non-exact: already-const level stays const under stricter
 	opts.MatchExactQualifiers = false
 	q2 := NewCVQualifiers([]bool{true}, []bool{false})
-	got := q2.RandomStricterConsts(NewRng(2), opts, NewProbabilities(opts))
+	got := q2.RandomStricterConstsSess(testAmbientSession, NewRng(2), opts, NewProbabilities(opts))
 	if len(got) != 1 || !got[0] {
 		t.Fatal("already const stays", got)
 	}
 	// looser: non-const stays false
 	q3 := NewCVQualifiers([]bool{false}, []bool{false})
-	got3 := q3.RandomLooserConsts(NewRng(2), opts, NewProbabilities(opts))
+	got3 := q3.RandomLooserConstsSess(testAmbientSession, NewRng(2), opts, NewProbabilities(opts))
 	if len(got3) != 1 || got3[0] {
 		t.Fatal("non-const stays false", got3)
 	}
 	// CVQualifiers.cpp:390+ DEPTH_GUARD on flipcoin paths — random mode always GOOD
 	q4 := NewCVQualifiers([]bool{false, false}, []bool{false, false})
-	if len(q4.RandomStricterConsts(NewRng(3), opts, NewProbabilities(opts))) != 2 {
+	if len(q4.RandomStricterConstsSess(testAmbientSession, NewRng(3), opts, NewProbabilities(opts))) != 2 {
 		t.Fatal("stricter depth guard path")
 	}
-	added := q4.RandomAddQualifiers(NewRng(3), opts, NewProbabilities(opts), false)
+	added := q4.RandomAddQualifiersSess(testAmbientSession, NewRng(3), opts, NewProbabilities(opts), false)
 	if len(added.IsConsts) != 3 {
 		t.Fatalf("add level %d", len(added.IsConsts))
 	}
 	// nil RNG sticky — no invent fixed non-const non-vol pointer level
 	ClearErrorSess(testAmbientSession)
-	if got := q4.RandomAddQualifiers(nil, opts, NewProbabilities(opts), false); len(got.IsConsts) != len(q4.IsConsts) {
+	if got := q4.RandomAddQualifiersSess(testAmbientSession, nil, opts, NewProbabilities(opts), false); len(got.IsConsts) != len(q4.IsConsts) {
 		t.Fatalf("nil RNG must not invent grow, got %d", len(got.IsConsts))
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -112,28 +112,28 @@ func TestRandomStricterLooserNilRNGAndProbs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if q.RandomStricterConsts(nil, opts, NewProbabilities(opts)) != nil {
+	if q.RandomStricterConstsSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG stricter const must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomStricterConsts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if q.RandomStricterVolatiles(nil, opts, NewProbabilities(opts)) != nil {
+	if q.RandomStricterVolatilesSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG stricter vol must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomStricterVolatiles must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if q.RandomLooserConsts(nil, opts, NewProbabilities(opts)) != nil {
+	if q.RandomLooserConstsSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG looser const must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomLooserConsts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if q.RandomLooserVolatiles(nil, opts, NewProbabilities(opts)) != nil {
+	if q.RandomLooserVolatilesSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG looser vol must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -141,14 +141,14 @@ func TestRandomStricterLooserNilRNGAndProbs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil probs → 0% (no invent default 50); drawable non-const stays false under stricter
-	got := q.RandomStricterConsts(NewRng(1), opts, nil)
+	got := q.RandomStricterConstsSess(testAmbientSession, NewRng(1), opts, nil)
 	if len(got) != 1 || got[0] {
 		t.Fatalf("nil probs stricter must not invent 50%% true, got %v", got)
 	}
 	// exact match still identity without RNG (no sticky — short-circuit before RNG)
 	opts.MatchExactQualifiers = true
 	q2 := NewCVQualifiers([]bool{true, false}, []bool{false, true})
-	if got := q2.RandomStricterConsts(nil, opts, nil); !boolsEqual(got, q2.IsConsts) {
+	if got := q2.RandomStricterConstsSess(testAmbientSession, nil, opts, nil); !boolsEqual(got, q2.IsConsts) {
 		t.Fatal("exact match still identity", got)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -475,17 +475,17 @@ func TestCVQualifiersCloneIsolatesRestrict(t *testing.T) {
 	// C++ value-copy owns vectors; shallow Go copy + Restrict must not strip source var qfer.
 	ClearErrorSess(testAmbientSession)
 	src := NewCVQualifiers([]bool{false}, []bool{true}) // storage volatile
-	if !src.IsVolatile() {
+	if !src.IsVolatileSess(testAmbientSession) {
 		t.Fatal("src must be volatile")
 	}
 	// IndirectQualifiers(0) / Clone used by ExpressionVariable get_qualifiers
-	cp := src.IndirectQualifiers(0)
+	cp := src.IndirectQualifiersSess(testAmbientSession, 0)
 	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession) // non-SE-free → Restrict clears vol
 	cp.Restrict(AccessWrite, cg)
-	if cp.IsVolatile() {
+	if cp.IsVolatileSess(testAmbientSession) {
 		t.Fatal("copy Restrict must clear volatile under non-SE-free")
 	}
-	if !src.IsVolatile() {
+	if !src.IsVolatileSess(testAmbientSession) {
 		t.Fatal("Restrict on copy must not mutate source CVQualifiers (seed-4 g_81)")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -550,7 +550,7 @@ func TestSanityCheckIndirectLevelResidualSticky(t *testing.T) {
 	// IndirectLevel residual soft invent was invent sanity true past Type-nil.
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if q.SanityCheck(nil) {
+	if q.SanityCheckSess(testAmbientSession, nil) {
 		t.Fatal("nil Type SanityCheck must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -558,7 +558,7 @@ func TestSanityCheckIndirectLevelResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete scalar depth 1
-	if !q.SanityCheck(GetIntType()) {
+	if !q.SanityCheckSess(testAmbientSession, GetIntType()) {
 		t.Fatal("complete SanityCheck")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -628,22 +628,22 @@ func TestStricterThanStorageVolatileMustMatch(t *testing.T) {
 	nonVolTarget := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	// address-of vol scalar: vols=[true,false]
 	volTarget := NewCVQualifiers([]bool{false, false}, []bool{true, false})
-	if ptrQ.StricterThan(nonVolTarget) {
+	if ptrQ.StricterThanSess(testAmbientSession, nonVolTarget) {
 		t.Fatal("storage vol mismatch must fail StricterThan (depth>1)")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete storage-vol mismatch must not sticky")
 	}
-	if !ptrQ.StricterThan(volTarget) {
+	if !ptrQ.StricterThanSess(testAmbientSession, volTarget) {
 		t.Fatal("matching storage vol must pass StricterThan")
 	}
 	// MatchIndirect path used by make_init_value (pointer qfer vs scalar target)
 	scalarNonVol := NewCVQualifiers([]bool{false}, []bool{false})
 	scalarVol := NewCVQualifiers([]bool{false}, []bool{true})
-	if ptrQ.MatchIndirect(scalarNonVol, false) {
+	if ptrQ.MatchIndirectSess(testAmbientSession, scalarNonVol, false) {
 		t.Fatal("MatchIndirect must reject non-vol scalar for volatile pointer init")
 	}
-	if !ptrQ.MatchIndirect(scalarVol, false) {
+	if !ptrQ.MatchIndirectSess(testAmbientSession, scalarVol, false) {
 		t.Fatal("MatchIndirect must accept vol scalar for volatile pointer init")
 	}
 }
@@ -660,22 +660,22 @@ func TestStricterThanMultiLevelVolatileExact(t *testing.T) {
 	// Wait: check is `if (depth-i > 2 && is_volatiles[i] != v_volatiles[i])`
 	// i=0: depth-0=3>2, a[0]=false b[0]=false match
 	// i=1: depth-1=2 not >2, skip exact; other vol false, ok
-	// So a.StricterThan(b) should be true (a has extra vol at level 1)
-	if !a.StricterThan(b) {
+	// So a.StricterThanSess(testAmbientSession, b) should be true (a has extra vol at level 1)
+	if !a.StricterThanSess(testAmbientSession, b) {
 		t.Fatal("extra mid-level vol without ** rule should still be stricter")
 	}
 	// force multi-level exact fail: mismatch at i=0 with depth 3
 	c := NewCVQualifiers([]bool{false, false, false}, []bool{true, false, false})
 	d := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
 	// Also storage rule: depth>1 && vols[0] differ → false
-	if c.StricterThan(d) {
+	if c.StricterThanSess(testAmbientSession, d) {
 		t.Fatal("storage vol mismatch at depth 3 must fail")
 	}
 	// exact multi-level: same storage, mismatch at level followed by two *
 	// depth=4 so i=1 has depth-i=3>2
 	e := NewCVQualifiers([]bool{false, false, false, false}, []bool{false, true, false, false})
 	f := NewCVQualifiers([]bool{false, false, false, false}, []bool{false, false, false, false})
-	if e.StricterThan(f) {
+	if e.StricterThanSess(testAmbientSession, f) {
 		t.Fatal("multi-level ** volatile mismatch must fail StricterThan")
 	}
 }

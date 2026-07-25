@@ -66,7 +66,7 @@ func TestRenewFacts(t *testing.T) {
 	parent.Type = &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1}}}
 	parent.FieldVars = []*Variable{p}
 	p.FieldVarOf = parent
-	if !parent.Match(p) {
+	if !parent.MatchSess(testAmbientSession, p) {
 		t.Fatal("setup: parent must Match field for this anti-soft-invent test")
 	}
 	factsX := []*FactPointTo{
@@ -235,16 +235,16 @@ func TestGetQualifiers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{IsStd: true}
 	q := fi.GetQualifiers()
-	if q.IsConst() || q.IsVolatile() {
+	if q.IsConstSess(testAmbientSession) || q.IsVolatileSess(testAmbientSession) {
 		t.Fatal(q)
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("std Invoke GetQualifiers must not sticky")
 	}
 	rv := CreateVariableScalars("f_rv", GetIntType(), false, false)
-	rv.Qfer.SetConst(true, 0)
+	rv.Qfer.SetConstSess(testAmbientSession, true, 0)
 	fi2 := &Invocation{User: &Function{RV: rv}}
-	if !fi2.GetQualifiers().IsConst() {
+	if !fi2.GetQualifiers().IsConstSess(testAmbientSession) {
 		t.Fatal("rv const")
 	}
 	// nil RV sticky empty qfer (no invent storage-level false/false shell)

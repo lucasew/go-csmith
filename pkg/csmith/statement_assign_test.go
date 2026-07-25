@@ -365,12 +365,12 @@ func TestCompoundAssignAlwaysClearsVolatileOnQfer(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Caller qf: volatile int (func param path)
 	qfer := NewCVQualifiers([]bool{false}, []bool{true})
-	if !qfer.IsVolatile() {
+	if !qfer.IsVolatileSess(testAmbientSession) {
 		t.Fatal("setup: want volatile qfer")
 	}
 	// C++ compound branch: not gated on (qf == nullptr)
-	qfer.SetVolatile(false, 0)
-	if qfer.IsVolatile() {
+	qfer.SetVolatileSess(testAmbientSession, false, 0)
+	if qfer.IsVolatileSess(testAmbientSession) {
 		t.Fatal("compound must clear volatile even with non-nil caller qf")
 	}
 	// Simple assign does not force this clear in StatementAssign (only compound
@@ -378,7 +378,7 @@ func TestCompoundAssignAlwaysClearsVolatileOnQfer(t *testing.T) {
 	qfer2 := NewCVQualifiers([]bool{false}, []bool{true})
 	// multi-level pointer: set_volatile(false) only pos=0 (outermost storage)
 	qfer3 := NewCVQualifiers([]bool{false, false}, []bool{true, true})
-	qfer3.SetVolatile(false, 0)
+	qfer3.SetVolatileSess(testAmbientSession, false, 0)
 	if qfer3.IsVolatiles[len(qfer3.IsVolatiles)-1] {
 		t.Fatal("set_volatile(false,0) must clear storage slot (last)")
 	}

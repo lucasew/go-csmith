@@ -4,11 +4,11 @@ import "testing"
 
 func TestCreateVariableAndPredicates(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetSimpleType(EInt), true, false)
-	if v == nil || !v.IsGlobal() || v.IsLocal() || !v.IsConst() || v.IsVolatile() {
-		t.Fatalf("global const int: %+v const=%v vol=%v", v, v.IsConst(), v.IsVolatile())
+	if v == nil || !v.IsGlobal() || v.IsLocal() || !v.IsConst() || v.IsVolatileSess(testAmbientSession) {
+		t.Fatalf("global const int: %+v const=%v vol=%v", v, v.IsConst(), v.IsVolatileSess(testAmbientSession))
 	}
 	p := CreateVariableScalars("p_1", GetSimpleType(EShort), false, true)
-	if !p.IsArgument() || !p.IsVolatile() {
+	if !p.IsArgument() || !p.IsVolatileSess(testAmbientSession) {
 		t.Fatal("param volatile")
 	}
 	l := CreateVariableScalars("l_1", GetSimpleType(EChar), false, false)
@@ -303,7 +303,7 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 		t.Fatal("nil IsGlobal must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Variable)(nil).IsConst() || (*Variable)(nil).IsVolatile() {
+	if (*Variable)(nil).IsConst() || (*Variable)(nil).IsVolatileSess(testAmbientSession) {
 		t.Fatal("nil IsConst/IsVolatile must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -549,15 +549,15 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 	// Force type (CreateVariableScalars may wrap)
 	v.Type = st
 	v.Qfer = NewCVQualifiers([]bool{false}, []bool{false})
-	if !v.IsVolatile() {
+	if !v.IsVolatileSess(testAmbientSession) {
 		t.Fatal("IsVolatile must true for volatile-field struct (qfer non-vol)")
 	}
-	if v.IsVolatile() != v.IsVolatileAfterDeref(0) {
+	if v.IsVolatileSess(testAmbientSession) != v.IsVolatileAfterDeref(0) {
 		t.Fatal("IsVolatile must equal IsVolatileAfterDeref(0)")
 	}
 	// plain int remains non-vol
 	iv := CreateVariableScalars("g_i", GetIntType(), true, false)
-	if iv.IsVolatile() {
+	if iv.IsVolatileSess(testAmbientSession) {
 		t.Fatal("plain int non-vol")
 	}
 	// ReadVar of vol struct must clear SE-free
@@ -595,19 +595,19 @@ func TestCreateFieldVarsStorageVolOnly(t *testing.T) {
 		t.Fatalf("fields err=%v n=%d", HasErrorSess(testAmbientSession), len(v.FieldVars))
 	}
 	// parent IsVolatile true (vol struct fields)
-	if !v.IsVolatile() {
+	if !v.IsVolatileSess(testAmbientSession) {
 		t.Fatal("parent must IsVolatile via struct fields")
 	}
 	// f1 must stay non-vol (only storage OR field qfer)
 	f1 := v.FieldVars[1]
-	if f1.Qfer.IsVolatile() {
+	if f1.Qfer.IsVolatileSess(testAmbientSession) {
 		t.Fatal("plain field must not inherit parent IsVolatile() type-OR")
 	}
-	if f1.IsVolatile() {
+	if f1.IsVolatileSess(testAmbientSession) {
 		t.Fatal("plain field Variable.IsVolatile must false")
 	}
 	// f0 stays vol from field qfer
-	if !v.FieldVars[0].IsVolatile() {
+	if !v.FieldVars[0].IsVolatileSess(testAmbientSession) {
 		t.Fatal("vol field must remain volatile")
 	}
 }

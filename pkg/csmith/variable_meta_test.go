@@ -20,7 +20,7 @@ func TestIsValidVolatile(t *testing.T) {
 	}
 	// const null pointer invalid
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	p.Qfer.SetConst(true, 0)
+	p.Qfer.SetConstSess(testAmbientSession, true, 0)
 	p.Init = MakeInt(0)
 	if !p.IsConst() {
 		t.Fatal("expected const")
@@ -30,7 +30,7 @@ func TestIsValidVolatile(t *testing.T) {
 	}
 	// const non-null ok
 	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), true, false)
-	p2.Qfer.SetConst(true, 0)
+	p2.Qfer.SetConstSess(testAmbientSession, true, 0)
 	p2.Init = MakeInt(1)
 	if !p2.IsValidVolatile() {
 		t.Fatal("const non-null")

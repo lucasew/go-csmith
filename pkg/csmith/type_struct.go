@@ -416,7 +416,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 			}
 			b.WriteString("   ")
 			// Type.cpp:1867 — OutputFirstQuals
-			if f.Qfer.IsConst() {
+			if f.Qfer.IsConstSess(s) {
 				// residual ERROR sticky — no invent soft-const past IsConst residual hole
 				if sessHasError(s) {
 					return ""
@@ -961,7 +961,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 				return ""
 			}
 			b.WriteString("   ")
-			if f.Qfer.IsConst() {
+			if f.Qfer.IsConstSess(s) {
 				// residual ERROR sticky — no invent soft-const past IsConst residual hole
 				if sessHasError(s) {
 					return ""

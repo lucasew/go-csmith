@@ -345,7 +345,7 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
-	cp := e.Clone()
+	cp := e.CloneSess(cgSess(c))
 	// residual ERROR sticky — no invent soft-reset past IncompleteEffect Clone residual
 	if sessHasError(cgSess(c)) {
 		return
@@ -1225,7 +1225,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	// Clone() matches; shallow *EffectAccum shares maps with live accum.
 	var accumCopy *Effect
 	if c.EffectAccum != nil {
-		cp := c.EffectAccum.Clone()
+		cp := c.EffectAccum.CloneSess(cgSess(c))
 		// residual ERROR sticky — no invent soft-read_pointed past Effect Clone residual
 		if sessHasError(cgSess(c)) {
 			return false
@@ -1328,7 +1328,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	// CGContext.cpp:257 — Effect effect_accum_copy = *effect_accum (deep copy)
 	var accumCopy *Effect
 	if c.EffectAccum != nil {
-		cp := c.EffectAccum.Clone()
+		cp := c.EffectAccum.CloneSess(cgSess(c))
 		// residual ERROR sticky — no invent soft-write_pointed past Effect Clone residual
 		if sessHasError(cgSess(c)) {
 			return false

@@ -13,20 +13,20 @@ func TestCVQualifiersMatch(t *testing.T) {
 	a := NewCVQualifiers([]bool{false}, []bool{false})
 	b := NewCVQualifiers([]bool{true}, []bool{false})
 	// one-level → always match (non-exact)
-	if !a.Match(b, false) {
+	if !a.MatchSess(testAmbientSession, b, false) {
 		t.Fatal("1-level")
 	}
-	if a.Match(b, true) {
+	if a.MatchSess(testAmbientSession, b, true) {
 		t.Fatal("exact")
 	}
 	w := CVQualifiers{Wildcard: true}
-	if !w.Match(b, true) {
+	if !w.MatchSess(testAmbientSession, b, true) {
 		t.Fatal("wild")
 	}
 	// process CGOptions::match_exact_qualifiers true → Match(false) still exact via Options
 	po.MatchExactQualifiers = true
 	SetProcessOptionsSess(testAmbientSession, po)
-	if a.Match(b, false) {
+	if a.MatchSess(testAmbientSession, b, false) {
 		t.Fatal("process exact should reject differing 1-level")
 	}
 }
@@ -64,8 +64,8 @@ func TestMatchIndirect(t *testing.T) {
 	// wanted scalar qfer vs pointer var qfer (2 levels)
 	want := NewCVQualifiers([]bool{false}, []bool{false})
 	have := NewCVQualifiers([]bool{false, false}, []bool{false, false})
-	// deref = 2-1 = 1; match want with have.IndirectQualifiers(1)
-	if !want.MatchIndirect(have, false) {
+	// deref = 2-1 = 1; match want with have.IndirectQualifiersSess(testAmbientSession, 1)
+	if !want.MatchIndirectSess(testAmbientSession, have, false) {
 		t.Fatal("indirect")
 	}
 	// multi-level address gap complete false (C++ return false, no assert)
@@ -73,7 +73,7 @@ func TestMatchIndirect(t *testing.T) {
 	deep := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
 	shallow := NewCVQualifiers([]bool{false}, []bool{false})
 	// want deep vs shallow: deref = 1-3 = -2
-	if deep.MatchIndirect(shallow, false) {
+	if deep.MatchIndirectSess(testAmbientSession, shallow, false) {
 		t.Fatal("deref < -1 must fail closed false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -86,19 +86,19 @@ func TestIndirectQualifiers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
 	// address — push_back false,false
-	addr := q.IndirectQualifiers(-1)
+	addr := q.IndirectQualifiersSess(testAmbientSession, -1)
 	if len(addr.IsConsts) != 3 {
 		t.Fatal(len(addr.IsConsts))
 	}
 	// deref 1 — pop_back (upstream remove_qualifiers)
 	// [true, false] → [true]
-	d := q.IndirectQualifiers(1)
+	d := q.IndirectQualifiersSess(testAmbientSession, 1)
 	if len(d.IsConsts) != 1 || d.IsConsts[0] != true {
 		t.Fatalf("%v", d.IsConsts)
 	}
 	// over-deref sticky empty (no invent partial pop)
 	ClearErrorSess(testAmbientSession)
-	got := q.IndirectQualifiers(5)
+	got := q.IndirectQualifiersSess(testAmbientSession, 5)
 	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
 		t.Fatal("over-deref must fail closed empty", got)
 	}

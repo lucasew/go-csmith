@@ -8,16 +8,16 @@ import (
 func TestRestrictWrite(t *testing.T) {
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	q.Restrict(AccessWrite, EmptyCGContext().WithSession(testAmbientSession))
-	if q.IsConst() {
+	if q.IsConstSess(testAmbientSession) {
 		t.Fatal("const cleared")
 	}
 	// SE-free keeps volatile
-	if !q.IsVolatile() {
+	if !q.IsVolatileSess(testAmbientSession) {
 		t.Fatal("vol kept se-free")
 	}
 	q2 := NewCVQualifiers([]bool{false}, []bool{true})
 	q2.Restrict(AccessRead, WithEffectContext(WithSideEffects()).WithSession(testAmbientSession))
-	if q2.IsVolatile() {
+	if q2.IsVolatileSess(testAmbientSession) {
 		t.Fatal("vol cleared non-se-free")
 	}
 }
@@ -27,8 +27,8 @@ func TestRestrictIncompleteEffectSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	q.Restrict(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession))
-	if !q.IsConst() || !q.IsVolatile() {
-		t.Fatalf("incomplete ambient must not mutate qfer: const=%v vol=%v", q.IsConst(), q.IsVolatile())
+	if !q.IsConstSess(testAmbientSession) || !q.IsVolatileSess(testAmbientSession) {
+		t.Fatalf("incomplete ambient must not mutate qfer: const=%v vol=%v", q.IsConstSess(testAmbientSession), q.IsVolatileSess(testAmbientSession))
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
@@ -39,17 +39,17 @@ func TestRestrictIncompleteEffectSticky(t *testing.T) {
 func TestSetConstPosFromEnd(t *testing.T) {
 	// CVQualifiers.cpp:588–592 — set_const(v, pos) → is_consts[len-pos-1]
 	q := NewCVQualifiers([]bool{true, true}, []bool{false, false})
-	q.SetConst(false, 0) // storage (last)
+	q.SetConstSess(testAmbientSession, false, 0) // storage (last)
 	if q.IsConsts[1] || !q.IsConsts[0] {
 		t.Fatalf("pos0 clears last only: %v", q.IsConsts)
 	}
-	q.SetConst(false, 1) // pointee level
+	q.SetConstSess(testAmbientSession, false, 1) // pointee level
 	if q.IsConsts[0] {
 		t.Fatalf("pos1 clears first: %v", q.IsConsts)
 	}
 	// no invent grow on empty
 	empty := CVQualifiers{}
-	empty.SetConst(true, 0)
+	empty.SetConstSess(testAmbientSession, true, 0)
 	if len(empty.IsConsts) != 0 {
 		t.Fatal("must not invent slots")
 	}
@@ -86,7 +86,7 @@ func TestOutputQualifiedTypeSimple(t *testing.T) {
 	// Defaults enable Consts/Volatiles
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	q := NewCVQualifiers([]bool{true}, []bool{true})
-	s := q.OutputQualifiedType(GetIntType())
+	s := q.OutputQualifiedTypeSess(testAmbientSession, GetIntType())
 	if !strings.Contains(s, "const") || !strings.Contains(s, "volatile") || !strings.Contains(s, "int") {
 		t.Fatal(s)
 	}
@@ -102,7 +102,7 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, Defaults())
 	q := NewCVQualifiers([]bool{true}, []bool{true})
-	s := q.OutputQualifiedType(GetIntType())
+	s := q.OutputQualifiedTypeSess(testAmbientSession, GetIntType())
 	if s != "" {
 		t.Fatalf("const bit without Consts option must fail closed empty, got %q", s)
 	}
@@ -116,7 +116,7 @@ func TestOutputQualifiedTypeNoInventVoidForNil(t *testing.T) {
 	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void"
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if s := q.OutputQualifiedType(nil); s != "" {
+	if s := q.OutputQualifiedTypeSess(testAmbientSession, nil); s != "" {
 		t.Fatal("nil type must fail closed empty, got", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -703,7 +703,7 @@ func TestOutputQualifiedTypeBadSanityFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false}, []bool{false}) // too short
-	if s := q.OutputQualifiedType(pt); s != "" {
+	if s := q.OutputQualifiedTypeSess(testAmbientSession, pt); s != "" {
 		t.Fatal("bad qfer layout must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -859,7 +859,7 @@ func TestOutputQualifiedTypeCNameResidualSticky(t *testing.T) {
 	// CName residual soft invent was invent "const " / partial qualified type past hole.
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if s := q.OutputQualifiedType(&Type{isStruct: true}); s != "" {
+	if s := q.OutputQualifiedTypeSess(testAmbientSession, &Type{isStruct: true}); s != "" {
 		t.Fatal("CName residual must fail closed OutputQualifiedType", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -961,7 +961,7 @@ func TestOutputQualifiedTypeConstVolatilePointerDoubleSpace(t *testing.T) {
 		[]bool{false, false, true},
 		[]bool{false, false, true},
 	)
-	s := q.OutputQualifiedType(pt)
+	s := q.OutputQualifiedTypeSess(testAmbientSession, pt)
 	if !strings.Contains(s, "const  volatile") {
 		t.Fatalf("want double space const  volatile, got %q", s)
 	}

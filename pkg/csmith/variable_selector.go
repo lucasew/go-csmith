@@ -1176,7 +1176,7 @@ func (vs *VariableSelector) MakeInitValue(
 			noVolatile = !seFree
 		}
 		qferDeref := qfer.RandomLooseQualifiers(noVolatile, access, cg, vs.Opts, vs.Probs, r)
-		qferDeref.RemoveQualifiers(1)
+		qferDeref.RemoveQualifiersSess(vsSess(vs), 1)
 		qferDeref.AcceptStricter = false
 		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
 		isPtrLike := pointee.IsPointerLikeSess(firstSess(vsSess(vs), cgSess(&cg)))
@@ -2687,7 +2687,7 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		st = chooseRandomStructFromType(vs.Types, pointee, false, r)
 		if qfer != nil {
 			// VariableSelector.cpp:621–622 — qfer->indirect_qualifiers(level)
-			q1 := qfer.IndirectQualifiers(level)
+			q1 := qfer.IndirectQualifiersSess(vsSess(vs), level)
 			// residual ERROR sticky — no invent soft-create past IndirectQualifiers residual
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -2776,7 +2776,7 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		}
 		st = chooseRandomStructFromType(vs.Types, pointee, true, r)
 		if qfer != nil {
-			q1 := qfer.IndirectQualifiers(level)
+			q1 := qfer.IndirectQualifiersSess(vsSess(vs), level)
 			// residual ERROR sticky — no invent soft-create past IndirectQualifiers residual
 			if sessHasError(vsSess(vs)) {
 				return nil

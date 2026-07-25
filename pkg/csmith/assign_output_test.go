@@ -265,7 +265,7 @@ func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
 	opts.Volatiles = true
 	// with real probs, may get bits; with nil, always non-const/non-vol under Regular*
 	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), false, opts, nil, NewRng(1))
-	if q.IsConst() || q.IsVolatile() {
+	if q.IsConstSess(testAmbientSession) || q.IsVolatileSess(testAmbientSession) {
 		t.Fatal("nil probs must not invent non-zero regular const/vol")
 	}
 }

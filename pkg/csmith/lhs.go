@@ -1152,14 +1152,14 @@ func selectDerefPointerInv(
 	pq.AcceptStricter = false
 	if access == AccessWrite {
 		// VariableSelector.cpp:1283–1285 — set_const(false, 1)
-		pq.SetConst(false, 1)
+		pq.SetConstSess(cgSess(&cg), false, 1)
 	}
 	if vs == nil {
 		return nil
 	}
 	// VariableSelector.cpp:1286–1316 — expand_struct fail → Error::set_error, no Generate fallthrough
 	if vs.Opts.ExpandStruct {
-		if pq.IsVolatile() {
+		if pq.IsVolatileSess(cgSess(&cg)) {
 			v := vs.EagerCreateGlobalStruct(access, cg, ptrType, &pq, r, MatchDereference, invalidVars)
 			if sessHasError(cgSess(&cg)) {
 				return nil
@@ -1185,7 +1185,7 @@ func selectDerefPointerInv(
 		return nil
 	}
 	// VariableSelector.cpp:1286–1315 non-expand: volatile global else parent local
-	if pq.IsVolatile() {
+	if pq.IsVolatileSess(cgSess(&cg)) {
 		v := vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
 		if sessHasError(cgSess(&cg)) {
 			return nil
