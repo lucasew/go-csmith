@@ -353,7 +353,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 				}
 				arrVars = append(arrVars, &av.Variable)
 			}
-			pick := ChooseOKVar(r, arrVars)
+			pick := ChooseOKVarSess(cgSess(cg), r, arrVars)
 			// StatementFor.cpp:210–211 — assert(av); library fail closed
 			if pick == nil || pick.AsArray == nil {
 				if !sessHasError(cgSess(cg)) {

@@ -209,6 +209,10 @@ func HasInitSkippedVars(src *Block, destParent *Block) bool {
 // destParent nil → complete empty (no dest chain).
 // Incomplete LocalVars fails closed sticky IncompleteVariables (no soft re-pick past hole).
 func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
+	return CollectInitSkippedVarsSess(nil, src, destParent)
+}
+
+func CollectInitSkippedVarsSess(s *Session, src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
 		return []*Variable{}
 	}
@@ -222,7 +226,7 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 		}
 		for _, loc := range b.LocalVars {
 			if loc == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteVariables()
 			}
 			intermediate = append(intermediate, loc)
@@ -238,7 +242,7 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 		}
 		visible := v.IsVisibleLocal(src)
 		// residual ERROR sticky — no invent complete skip list past IsVisibleLocal hard IR hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		if !visible {
@@ -250,11 +254,16 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 
 // OutputSkippedVarInits mirrors StatementGoto::output_skipped_var_inits.
 // StatementGoto.cpp:264–275 — re-init skipped locals at destination label via init->Output.
-// Incomplete InitSkippedVars fails closed sticky empty (no invent soft-skip hole partial re-inits).
+// Incomplete InitSkippedVars fails closed sticky empty (no invent soft-skip hole partial re-inits).}
+
 func OutputSkippedVarInits(st *Stmt, indent string) string {
+	return OutputSkippedVarInitsSess(nil, st, indent)
+}
+
+func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
 	// Statement always live at goto dest re-init; sticky no invent re-inits without it
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// no skipped locals: soft empty
@@ -262,7 +271,7 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 		return ""
 	}
 	if !VariablesComplete(st.InitSkippedVars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -271,21 +280,21 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 		// StatementGoto.cpp:271 — assert(v->init); sticky no invent "name = ;" for missing init
 		init := variableInitOutput(v)
 		// residual ERROR sticky — no invent soft-continue later re-inits past init residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if init == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// get_actual_name always live; sticky no invent " = init;" without identifier
 		name := v.GetActualName(false)
 		// residual ERROR sticky — no invent soft-continue later re-inits past GetActualName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if name == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString(indent)
@@ -299,7 +308,8 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 
 // variableInitOutput mirrors Variable::init->Output for re-init at goto dest.
 // Prefer InitExpr (full Expression*); else Constant value.
-// StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".
+// StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".}
+
 func variableInitOutput(v *Variable) string {
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -348,9 +358,13 @@ func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
 // Mutates blocks slice by removing bad candidates (caller should pass a copy).
 // Incomplete Blocks list fails closed sticky (no invent soft-skip hole / re-pick past hole).
 func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
+	return FindGoodJumpBlockSess(nil, r, blocks, curr, asDest)
+}
+
+func FindGoodJumpBlockSess(s *Session, r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
 	// StatementGoto always has process RNG; sticky no invent jump block without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// empty blocks pool: soft re-pick (no candidates)
@@ -359,7 +373,7 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 	}
 	// incomplete Blocks pool fails closed sticky (no invent soft-skip nil hole as absent)
 	if !BlocksComplete(blocks) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// StatementGoto.cpp:314–324
@@ -374,7 +388,7 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 			if last := curr.GetLastStm(); last != nil {
 				must := last.MustReturn()
 				// residual ERROR sticky — no invent soft-reject/allow dest past MustReturn residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return nil
 				}
 				if must {
@@ -389,7 +403,7 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 	for len(blks) > 0 {
 		idx := int(r.RndUpto(uint32(len(blks))))
 		// StatementGoto.cpp:326 ERROR_GUARD
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		b := blks[idx]
@@ -416,7 +430,7 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 		if asDest {
 			if curr != nil && HasInitSkippedVars(curr, b) {
 				// residual ERROR sticky — no invent soft-continue then pick later past hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return nil
 				}
 				blks = append(blks[:idx], blks[idx+1:]...)
@@ -425,7 +439,7 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 		} else {
 			if curr != nil && len(curr.Stmts) > 0 && HasInitSkippedVars(b, curr) {
 				// residual ERROR sticky — no invent soft-continue then pick later past hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return nil
 				}
 				blks = append(blks[:idx], blks[idx+1:]...)
@@ -438,7 +452,8 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 }
 
 // makeGotoFailed is StatementGoto::make_random returning nullptr (empty Stmt;
-// no invent Kind-only shell — stmtOK rejects zero-value).
+// no invent Kind-only shell — stmtOK rejects zero-value).}
+
 func makeGotoFailed() Stmt {
 	return Stmt{}
 }
@@ -498,7 +513,7 @@ func MakeRandomGoto(
 	backEdge := false
 	if wantBack {
 		// as_dest=true: pick destination for backward jump
-		okBlk = FindGoodJumpBlock(r, blocks, blk, true)
+		okBlk = FindGoodJumpBlockSess(cgSess(cg), r, blocks, blk, true)
 		if okBlk != nil {
 			backEdge = true
 		}
@@ -511,7 +526,7 @@ func MakeRandomGoto(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return makeGotoFailed()
 		}
-		okBlk = FindGoodJumpBlock(r, blocks, blk, false)
+		okBlk = FindGoodJumpBlockSess(cgSess(cg), r, blocks, blk, false)
 	}
 	if okBlk == nil {
 		// StatementGoto.cpp:86–87 — return nullptr
@@ -627,7 +642,7 @@ func MakeRandomGoto(
 		}
 		// incomplete LocalVars on intermediate blocks fails closed sticky (Collect nil)
 		// no invent goto with empty InitSkippedVars when skip list is incomplete
-		skipped := CollectInitSkippedVars(blk, okBlk)
+		skipped := CollectInitSkippedVarsSess(cgSess(cg), blk, okBlk)
 		if !VariablesComplete(skipped) {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return makeGotoFailed()
@@ -973,7 +988,7 @@ func MakeRandomGoto(
 	// StatementGoto.cpp:184–192 — insert goto after other_stm in other_blk
 	// incomplete LocalVars on intermediate blocks fails closed sticky (IncompleteVariables)
 	// no invent forward goto with empty InitSkippedVars when skip list is incomplete
-	skippedFwd := CollectInitSkippedVars(okBlk, blk)
+	skippedFwd := CollectInitSkippedVarsSess(cgSess(cg), okBlk, blk)
 	if !VariablesComplete(skippedFwd) {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return makeGotoFailed()

@@ -1075,23 +1075,27 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 // CVQualifiers.cpp:269–293 — non-C++ always OK; struct/union need has_assign_ops;
 // union with struct field (or nested bad union) forbids volatile.
 func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
+	return isVolatileOKOnOneLevelSess(nil, opts, t)
+}
+
+func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
 	if !opts.LangCPP {
 		return true
 	}
 	// Type always live on ptr chain; sticky not-OK (no invent volatile-OK past hole)
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !t.IsStruct() && !t.IsUnion() {
 		// residual ERROR sticky — no invent soft volatile-OK past IsStruct/IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past IsStruct/IsUnion residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if !t.HasAssignOps {
@@ -1099,13 +1103,13 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	}
 	if t.IsStruct() {
 		// residual ERROR sticky — no invent soft volatile-OK past IsStruct residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue union walk past IsStruct residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	// Union: nested struct field blocks volatile; nested unions recurse.
@@ -1113,36 +1117,36 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	// (no invent volatile-OK / soft re-pick past holes).
 	for _, f := range t.Fields {
 		if f.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if f.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft not-OK past nested IsStruct residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue past nested IsStruct residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		if f.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-continue past nested IsUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
-			if !isVolatileOKOnOneLevel(opts, f.Type) {
+			if !isVolatileOKOnOneLevelSess(s, opts, f.Type) {
 				// residual ERROR sticky — no invent soft not-OK past recurse residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return false
 				}
 				return false
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			return false
 		}
 	}
@@ -1153,7 +1157,8 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 //
 //	t, access, cg_context, no_volatile, const_prob, volatile_prob).
 //
-// CVQualifiers.cpp:295–353.
+// CVQualifiers.cpp:295–353.}
+
 func RandomQualifiersForType(
 	t *Type,
 	access Access,

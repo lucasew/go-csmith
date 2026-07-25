@@ -67,21 +67,25 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 // MakeOneBitfield mirrors Type::make_one_bitfield.
 // Type.cpp:638–668 — signed flip, int/uint type, field qfer, length rnd_upto(int_size*8).
 func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
+	return MakeOneBitfieldSess(nil, r, opts, probs, fieldIdx, prevZero)
+}
+
+func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
 	// Type.cpp:641 — CGOptions::int_size()*8; no soft invent 32 when size is 0
 	// empty StructField uses BitWidth -1 (not a bitfield) so callers can detect fail
 	fail := StructField{BitWidth: -1}
 	maxLen := opts.IntSize * 8
 	if maxLen < 1 {
 		// broken options IR sticky — empty field (no invent maxLen=32)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return fail
 	}
 	if r == nil || probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return fail
 	}
 	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return fail
 	}
 	var ft *Type
@@ -93,11 +97,11 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return fail
 	}
 	length := int(r.RndUpto(uint32(maxLen)))
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return fail
 	}
 	// force non-zero if first field or previous was zero-length
@@ -106,7 +110,7 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 			length = 1
 		} else {
 			length = int(r.RndUpto(uint32(maxLen-1))) + 1
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return fail
 			}
 		}
@@ -120,7 +124,8 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 }
 
 // MakeRandomStructType mirrors Type::make_random_struct_type.
-// Type.cpp:1075–1130 — BitFieldsCreationProb chooses full-bitfields vs normal fields.
+// Type.cpp:1075–1130 — BitFieldsCreationProb chooses full-bitfields vs normal fields.}
+
 func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
 	// Type.cpp always has process RNG; sticky no invent struct type without it
 	if r == nil {
@@ -168,7 +173,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 				if sessHasError(envSess(env)) {
 					return nil
 				}
-				f = MakeOneBitfield(r, opts, probs, i, prevZero)
+				f = MakeOneBitfieldSess(envSess(env), r, opts, probs, i, prevZero)
 				prevZero = f.Type != nil && f.BitWidth == 0
 			}
 		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
@@ -176,7 +181,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			if sessHasError(envSess(env)) {
 				return nil
 			}
-			f = MakeOneBitfield(r, opts, probs, i, prevZero)
+			f = MakeOneBitfieldSess(envSess(env), r, opts, probs, i, prevZero)
 			prevZero = f.Type != nil && f.BitWidth == 0
 		} else {
 			if sessHasError(envSess(env)) {
@@ -468,35 +473,39 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 // GenerateRandomConstantInRange mirrors GenerateRandomConstantInRange for bitfields.
 // Constant.cpp:225–250 — small random value within ~2^(bound/2).
 func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) string {
+	return GenerateRandomConstantInRangeSess(nil, typ, bound, opts, r)
+}
+
+func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Options, r *Rng) string {
 	// Constant.cpp:222–246 — GenerateRandomConstantInRange
 	// Constant.cpp:223 — assert(type->eType == eSimple)
 	// Constant.cpp:226–245 — only eInt / eUInt; else assert(0)
 	// sticky no invent empty/default constant past broken range IR
 	if r == nil || typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if !typ.IsSimple() {
 		// residual ERROR sticky — no invent soft-empty range past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-continue range past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	st := typ.Simple()
 	if st != EInt && st != EUInt {
 		// assert(0) for other simples — sticky no soft invent generic decimal
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if bound <= 0 {
 		// invalid bitfield width; sticky no invent "0" for broken range
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Constant.cpp:228 / 238 — int b = (int)pow(2, (double)bound / 2);
@@ -509,7 +518,7 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	}
 	if b < 1 {
 		// pure_rnd_upto domain; no invent b=1 soft-success past broken pow
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// pure_rnd_upto(b); C++ unsigned int domain (random mode == RndUpto)
@@ -536,7 +545,8 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 }
 
 // MakeStructConstant mirrors GenerateRandomStructConstant.
-// Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.
+// Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.}
+
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
 	return MakeStructConstantSess(nil, r, opts, probs, st)
 }
@@ -565,7 +575,7 @@ func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabiliti
 		var val string
 		if f.BitWidth > 0 {
 			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
-			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
+			val = GenerateRandomConstantInRangeSess(s, f.Type, f.BitWidth, opts, r)
 			// residual ERROR sticky — no invent soft-field past range residual
 			if sessHasError(s) {
 				return nil
@@ -646,7 +656,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			return StructField{}
 		}
 		// Type.cpp:680 make_one_bitfield(fields, qfers, lens) — no_zero_len from lens
-		return MakeOneBitfield(r, opts, probs, fieldIdx, prevZero)
+		return MakeOneBitfieldSess(envSess(env), r, opts, probs, fieldIdx, prevZero)
 	}
 	if sessHasError(envSess(env)) {
 		return StructField{}

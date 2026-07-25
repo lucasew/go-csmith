@@ -995,7 +995,7 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
-		_ = RenewFacts(&callerFM.GlobalFacts, retFacts)
+		_ = RenewFactsSess(cgSess(cg), &callerFM.GlobalFacts, retFacts)
 		if !FactsComplete(callerFM.GlobalFacts) {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			fi.Failed = true
@@ -1016,7 +1016,7 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
-		_ = RenewUnionFacts(&callerFM.UnionFacts, retUF)
+		_ = RenewUnionFactsSess(cgSess(cg), &callerFM.UnionFacts, retUF)
 		if !UnionFactsComplete(callerFM.UnionFacts) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)

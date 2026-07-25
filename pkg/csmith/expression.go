@@ -1095,7 +1095,7 @@ func MakeRandomParam(
 		if sessHasError(cgSess(cg)) {
 			return nil
 		}
-		if e != nil && cg != nil && BumpsExprDepth(e) {
+		if e != nil && cg != nil && BumpsExprDepthSess(cgSess(cg), e) {
 			cg.ExprDepth++
 		}
 		return e
@@ -1110,8 +1110,12 @@ func MakeRandomParam(
 // Incomplete Function IR (nil Invoke / non-std without User) sticky true — C++ would
 // crash on get_invoke()/get_func(); no invent not-bump past holes for siblings.
 func BumpsExprDepth(e *Expression) bool {
+	return BumpsExprDepthSess(nil, e)
+}
+
+func BumpsExprDepthSess(s *Session, e *Expression) bool {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	switch e.Term {
@@ -1119,25 +1123,25 @@ func BumpsExprDepth(e *Expression) bool {
 		// Constant always has live Type*+Value; incomplete sticky bump (restrictive)
 		// (no invent not-bump soft-skip depth past Type-nil / empty-value shell)
 		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		return true
 	case TermVariable:
 		// Variable* always live; Type-nil non-special sticky bump (restrictive)
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		return true
 	case TermFunction:
 		// ExpressionFuncall always has live invoke before get_func/is_std_func
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.Invoke.IsStd {
@@ -1145,7 +1149,7 @@ func BumpsExprDepth(e *Expression) bool {
 		}
 		// user-defined path: Function* always live; incomplete sticky bump
 		if e.Invoke.User == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		return true
@@ -1157,7 +1161,8 @@ func BumpsExprDepth(e *Expression) bool {
 // MakeRandomExpression mirrors Expression::make_random (const/var/funcall).
 // Expression.cpp:141–219.
 // cg is *CGContext so ExpressionVariable::visit_facts mutates the caller's
-// context (C++ CGContext&); by-value dropped EffectStm / merge_param updates.
+// context (C++ CGContext&); by-value dropped EffectStm / merge_param updates.}
+
 func MakeRandomExpression(
 	r *Rng,
 	opts Options,
@@ -1334,7 +1339,7 @@ func MakeRandomExpression(
 		// C++ would crash on e->term_type; factories return null only with error
 		return nil
 	}
-	if BumpsExprDepth(e) {
+	if BumpsExprDepthSess(cgSess(cg), e) {
 		cg.ExprDepth++
 	}
 	return e

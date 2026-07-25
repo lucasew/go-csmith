@@ -1049,7 +1049,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// SetMapFactsOutForBlock clones+OOS live unions for map_union_out.
 		outCopy := CloneFactSlice(outputs)
 		if len(b.LocalVars) > 0 {
-			UpdateFactsForOOSVars(b.LocalVars, &outCopy)
+			UpdateFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &outCopy)
 			if !FactsComplete(outCopy) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)

@@ -876,7 +876,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			return
 		}
 		if len(b.LocalVars) > 0 {
-			UpdateFactsForOOSVars(b.LocalVars, &outPost)
+			UpdateFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &outPost)
 			if !FactsComplete(outPost) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -1170,7 +1170,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							// fm.UpdateFactsForOOSVars — that also strips UnionFacts).
 							outCopy := CloneFactSlice(preOOS)
 							if len(b.LocalVars) > 0 {
-								UpdateFactsForOOSVars(b.LocalVars, &outCopy)
+								UpdateFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &outCopy)
 								if !FactsComplete(outCopy) {
 									if !sessHasError(cgSess(cg)) {
 										sessNoteError(cgSess(cg), ErrGeneric)
@@ -1248,7 +1248,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				return
 			}
 			if len(b.LocalVars) > 0 {
-				UpdateUnionFactsForOOSVars(b.LocalVars, &fm.UnionFacts)
+				UpdateUnionFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &fm.UnionFacts)
 				if !UnionFactsComplete(fm.UnionFacts) || sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()

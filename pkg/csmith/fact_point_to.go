@@ -292,23 +292,27 @@ func IsValidPtrSess(s *Session, p *Variable, facts []*FactPointTo, nullProb, dea
 // Incomplete fact maps fail closed sticky as dangling (true — no invent not-dangling
 // / soft re-pick past holes when FindRelated would skip holes).
 func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
+	return IsDanglingPtrSess(nil, p, facts, deadProb)
+}
+
+func IsDanglingPtrSess(s *Session, p *Variable, facts []*FactPointTo, deadProb int) bool {
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// Type* always live for non-special subjects; Type-nil sticky dangling
 	// (restrictive — no invent not-dangling past Type-nil shell)
 	if !IsSpecialPtr(p) && p.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	fact := FindRelatedPointTo(facts, p)
 	// residual ERROR sticky — no invent not-dangling soft-skip past FindRelated hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if fact == nil {
@@ -316,7 +320,7 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 	}
 	dead := fact.IsDead()
 	// residual ERROR sticky — no invent not-dangling soft-skip past IsDead hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return dead && deadProb == 0
@@ -326,7 +330,8 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 // FactPointTo.cpp:442–472 — 0 reject, 1 ok, 2 allowed unsafe deref via flipcoin.
 // FactPointTo.cpp:455 / 464 — always rnd_flipcoin(prob) when is_null / is_dead,
 // including prob==0 (still consumes RNG + traces F p=0). Do not skip the draw.
-// Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).
+// Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).}
+
 func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
 	return OpportunisticValidateSess(nil, r, v, typ, facts, nullProb, deadProb)
 }
@@ -1700,21 +1705,25 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 // no invent partial mark / leave stack pointees live past Param/LocalVars holes).
 // facts slice always live; sticky (no invent soft-skip mark past hole).
 func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
+	MarkFuncEndOnFactsSess(nil, facts, fn, stParent)
+}
+
+func MarkFuncEndOnFactsSess(s *Session, facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// incomplete maps/stack fail closed sticky (no invent keep facts past holes)
 	if !FactsComplete(*facts) {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if fn != nil && !fn.StackScanComplete(stParent) {
 		*facts = IncompleteFactSlice()
 		// residual ERROR sticky — no invent soft-mark past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return
 	}
@@ -1722,7 +1731,7 @@ func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 		// nil without error = no lattice change; sticky = incomplete fail closed
 		if nf := f.MarkFuncEnd(fn, stParent); nf != nil {
 			(*facts)[i] = nf
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return
 		}
@@ -1732,7 +1741,8 @@ func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 // indexExprUsesVar reports whether a string index expression refers to indexVar.
 // Indices are stored as strings (e.g. "i", "(i + 2)"); approximate Expression::use_var.
 // Variable always live; sticky false (no invent not-used soft-skip past hole).
-// Empty idx is complete not-used.
+// Empty idx is complete not-used.}
+
 func indexExprUsesVar(idx string, indexVar *Variable) bool {
 	if indexVar == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -2139,18 +2149,22 @@ func ClearPointToAggregatesSess(s *Session) {
 // Fact* always live; nil hole fails closed sticky (false — no invent skip partial
 // alias / soft re-pick past holes). Returns false on incomplete maps; true when done.
 func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) bool {
+	return UpdatePtrAliasesSess(nil, facts, ptrs, aliases)
+}
+
+func UpdatePtrAliasesSess(s *Session, facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) bool {
 	if ptrs == nil || aliases == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for _, f := range facts {
 		// Fact* always live; nil hole sticky
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if f.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		// FactPointTo.cpp: type != 0 — specials may have Type-nil; other Type-nil sticky
@@ -2158,13 +2172,13 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 			if IsSpecialPtr(f.Var) {
 				continue
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		// PointTo Variable* always live; nil hole sticky
 		for _, v := range f.PointTo {
 			if v == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 		}
@@ -2193,7 +2207,8 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 
 // FunctionsComplete reports every Function* is live (no nil holes).
 // Note: FunctionsComplete(nil)==true (complete empty). Fail-closed incomplete
-// Funcs wipes / walks must not invent skip hole as absent function.
+// Funcs wipes / walks must not invent skip hole as absent function.}
+
 func FunctionsComplete(funcs []*Function) bool {
 	for _, f := range funcs {
 		if f == nil {
@@ -2244,7 +2259,7 @@ func AggregateAllPointToSetsSess(s *Session, funcs []*Function, fms *FactMgrMap)
 		}
 		// prefer map_facts_out values; also include GlobalFacts
 		for _, facts := range fm.MapFactsOut {
-			if !UpdatePtrAliases(facts, &s.AllPtrs, &s.AllAliases) {
+			if !UpdatePtrAliasesSess(s, facts, &s.AllPtrs, &s.AllAliases) {
 				ClearPointToAggregatesSess(s)
 				// UpdatePtrAliases already sticky; keep cleared (no invent partial AllPtrs)
 				if !sessHasError(s) {
@@ -2253,7 +2268,7 @@ func AggregateAllPointToSetsSess(s *Session, funcs []*Function, fms *FactMgrMap)
 				return
 			}
 		}
-		if !UpdatePtrAliases(fm.GlobalFacts, &s.AllPtrs, &s.AllAliases) {
+		if !UpdatePtrAliasesSess(s, fm.GlobalFacts, &s.AllPtrs, &s.AllAliases) {
 			ClearPointToAggregatesSess(s)
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)

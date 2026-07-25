@@ -428,30 +428,34 @@ func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
 // RenewUnionFact mirrors renew_fact for FactUnion (Fact.cpp:178–201).
 // Related subject replaced; else append. Incomplete maps fail closed sticky wipe.
 func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
+	return RenewUnionFactSess(nil, facts, nf)
+}
+
+func RenewUnionFactSess(s *Session, facts *[]*FactUnion, nf *FactUnion) bool {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if nf == nil || nf.Var == nil {
 		*facts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !UnionFactsComplete(*facts) {
 		*facts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for i, f := range *facts {
 		if f.Var == nf.Var {
 			if f.Equal(nf) {
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					*facts = IncompleteUnionFactSlice()
 					return false
 				}
 				return false
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteUnionFactSlice()
 				return false
 			}
@@ -464,26 +468,31 @@ func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
 }
 
 // RenewUnionFacts mirrors renew_facts for FactUnion (Fact.cpp:222–229).
-// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts) includes eUnionWrite.
+// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts) includes eUnionWrite.}
+
 func RenewUnionFacts(facts *[]*FactUnion, newFacts []*FactUnion) bool {
+	return RenewUnionFactsSess(nil, facts, newFacts)
+}
+
+func RenewUnionFactsSess(s *Session, facts *[]*FactUnion, newFacts []*FactUnion) bool {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !UnionFactsComplete(*facts) || !UnionFactsComplete(newFacts) {
 		*facts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	changed := false
 	for _, nf := range newFacts {
-		if RenewUnionFact(facts, nf) {
-			if sessHasError(nil) {
+		if RenewUnionFactSess(s, facts, nf) {
+			if sessHasError(s) {
 				*facts = IncompleteUnionFactSlice()
 				return false
 			}
 			changed = true
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			*facts = IncompleteUnionFactSlice()
 			return false
 		}
@@ -493,7 +502,8 @@ func RenewUnionFacts(facts *[]*FactUnion, newFacts []*FactUnion) bool {
 
 // GlobalUnionFactsOnly keeps FactUnion subjects that are global.
 // FactMgr::remove_function_local_facts drops stack/other-RV; ret_facts for renew
-// are body map_facts_out after that filter — global union last-writes remain.
+// are body map_facts_out after that filter — global union last-writes remain.}
+
 func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
@@ -663,16 +673,20 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 // RhsToLhsTransferUnion pre-checks completeness before join).}
 
 func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
+	return JoinVarFactsUnionSess(nil, facts, vars)
+}
+
+func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *FactUnion {
 	// incomplete union map / vars fails closed sticky (no invent soft nil join success path)
 	if !UnionFactsComplete(facts) || !VariablesComplete(vars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var fu *FactUnion
 	for _, v := range vars {
 		exist := FindRelatedUnion(facts, v)
 		// residual ERROR sticky — no invent soft-continue join past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if exist == nil {
@@ -681,9 +695,9 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 		if fu == nil {
 			fu = exist.Clone()
 			// residual ERROR sticky — no invent soft-continue past Clone hole
-			if sessHasError(nil) || fu == nil {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(s) || fu == nil {
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return nil
 			}
@@ -693,7 +707,7 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 		fu.Var = exist.Var
 		fu.Join(exist)
 		// residual ERROR sticky — no invent soft-continue partial join past Join hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 	}
@@ -703,7 +717,8 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 // MergeUnionFactInto merges nf into facts slice (join if related).
 // Fact.cpp:149–171 merge_fact — same as MergeUnionFact (imply short-circuit,
 // copy=new.clone(); copy.join(old)). Soft invent always-joined old.clone().join(new)
-// without imply short-circuit (see call_analysis comment at if-combine).
+// without imply short-circuit (see call_analysis comment at if-combine).}
+
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	return MergeUnionFact(facts, nf)
 }
@@ -804,7 +819,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 		if !VariablesComplete(rvars) {
 			return IncompleteUnionFactSlice()
 		}
-		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
+		rhsFact := JoinVarFactsUnionSess(s, unionFacts, rvars)
 		// residual ERROR sticky — no invent soft-empty transfer past JoinVarFacts residual
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()

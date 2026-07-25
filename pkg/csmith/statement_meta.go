@@ -104,13 +104,17 @@ func IncompleteStmtsSlice() []*Stmt {
 // Returns count of matches appended to stms, or -1 on incomplete IR sticky
 // (nil Block hole — *stms IncompleteStmtsSlice; no invent empty match / soft re-pick).
 func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
+	return FindTypedStmtsSess(nil, st, stms, kinds)
+}
+
+func FindTypedStmtsSess(s *Session, st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
 		return -1
 	}
 	if st == nil {
 		// incomplete Statement* — fail closed sticky hole marker
 		*stms = IncompleteStmtsSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	for _, k := range kinds {
@@ -121,7 +125,7 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	}
 	blks := GetBlocksStmt(st)
 	// residual ERROR sticky — no invent soft-walk past GetBlocksStmt residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*stms = IncompleteStmtsSlice()
 		return -1
 	}
@@ -129,13 +133,13 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 		// Block* always live from get_blocks; nil hole fails closed sticky
 		if b == nil {
 			*stms = IncompleteStmtsSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		for i := range b.Stmts {
-			if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+			if n := FindTypedStmtsSess(s, &b.Stmts[i], stms, kinds); n < 0 {
 				// residual ERROR sticky — no invent soft-continue walk past child residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					if StmtsComplete(*stms) {
 						*stms = IncompleteStmtsSlice()
 					}
@@ -144,12 +148,12 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 				// child already set IncompleteStmtsSlice sticky when it failed closed
 				if StmtsComplete(*stms) {
 					*stms = IncompleteStmtsSlice()
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 				}
 				return -1
 			}
 			// residual ERROR sticky — no invent soft-continue later stmts past child residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*stms = IncompleteStmtsSlice()
 				return -1
 			}
@@ -159,18 +163,23 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 }
 
 // FindTypedStmtsInBlock walks a block's statements for typed collection.
-// Returns -1 on incomplete IR sticky (same as FindTypedStmts).
+// Returns -1 on incomplete IR sticky (same as FindTypedStmts).}
+
 func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
+	return FindTypedStmtsInBlockSess(nil, b, stms, kinds)
+}
+
+func FindTypedStmtsInBlockSess(s *Session, b *Block, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
 		return -1
 	}
 	if b == nil {
 		*stms = IncompleteStmtsSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	for i := range b.Stmts {
-		if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+		if n := FindTypedStmtsSess(s, &b.Stmts[i], stms, kinds); n < 0 {
 			if StmtsComplete(*stms) {
 				*stms = IncompleteStmtsSlice()
 			}
@@ -182,7 +191,8 @@ func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 
 // Is1stStm mirrors Statement::is_1st_stm.
 // Statement.cpp:649–651 — first statement of parent block.
-// Incomplete Statement/parent sticky false (no invent is-first / soft re-pick past holes).
+// Incomplete Statement/parent sticky false (no invent is-first / soft re-pick past holes).}
+
 func Is1stStm(st *Stmt, parent *Block) bool {
 	// Statement + parent always live; sticky incomplete no invent is-first soft-skip
 	if st == nil || parent == nil {

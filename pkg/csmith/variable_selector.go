@@ -119,7 +119,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
+	expanded := ExpandStructUnionVarsSess(s, append([]*Variable(nil), readVars...), typ)
 	// IncompleteVariables expand — fail closed sticky (not invent filter past hole)
 	if !VariablesComplete(expanded) {
 		sessNoteError(s, ErrGeneric)
@@ -196,7 +196,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		ok = append(ok, v)
 	}
 	// VariableSelector.cpp always has RNG for multi-pick; ChooseOKVar handles n==0/1/nil r
-	return ChooseOKVar(r, ok)
+	return ChooseOKVarSess(s, r, ok)
 }
 
 // FindVarByName mirrors VariableSelector::find_var_by_name.
@@ -371,7 +371,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			}
 			boundOf[iv] = bound
 		}
-		v := ChooseOKVar(r, ok)
+		v := ChooseOKVarSess(vsSess(vs), r, ok)
 		if v == nil {
 			return nil
 		}
@@ -494,8 +494,12 @@ func cgHasSignedCharIndex(vs *VariableSelector) bool {
 // ChooseOKVar picks one eligible variable (optionally itemizing arrays).
 // Incomplete candidate list fails closed sticky (nil pick — no invent skip hole).
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
+	return ChooseOKVarSess(nil, r, vars)
+}
+
+func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
 	if !VariablesComplete(vars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	n := len(vars)
@@ -513,12 +517,12 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 		}
 		// VariableSelector.cpp:326–329 — rnd_upto(len); sticky no invent vars[0] without RNG
 		if r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		idx := r.RndUpto(uint32(n))
 		// VariableSelector.cpp:327 ERROR_GUARD
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		v = vars[idx]
@@ -527,7 +531,7 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	// C++ always itemize(); sticky no soft return collective on itemize fail / missing RNG
 	if v != nil && v.IsArray && v.AsArray != nil && v.AsArray.Collective == nil {
 		if r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		item := v.AsArray.Itemize(r)
@@ -539,7 +543,8 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	return v
 }
 
-// ChooseOKVarExactType filters vars whose Type matches want with eExact.
+// ChooseOKVarExactType filters vars whose Type matches want with eExact.}
+
 func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
 	return ChooseOKVarMatch(r, vars, want, MatchExact, false)
 }
@@ -1858,10 +1863,14 @@ func ChooseVarFull(
 // chooseVarFromOK biases among already-filtered candidates.
 // Variable* always live in ok; nil hole fails closed (nil pick).
 func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
+	return chooseVarFromOKSess(nil, r, want, ok, opts)
+}
+
+func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
 	for _, vv := range ok {
 		if vv == nil || vv.Type == nil {
 			// incomplete ok pool fails closed sticky (no invent soft-skip / empty pick)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 	}
@@ -1870,20 +1879,20 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 		var ptrs []*Variable
 		wantInd := want.IndirectLevel()
 		// residual ERROR sticky — no invent soft-bias past want IndirectLevel residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		for _, vv := range ok {
 			lv := vv.Type.IndirectLevel()
 			// residual ERROR sticky — no invent soft-bias past candidate IndirectLevel residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			if wantInd < lv {
 				ptrs = append(ptrs, vv)
 			}
 		}
-		if v := ChooseOKVar(r, ptrs); v != nil {
+		if v := ChooseOKVarSess(s, r, ptrs); v != nil {
 			return v
 		}
 	}
@@ -1892,20 +1901,20 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 		var addressable []*Variable
 		wantInd := want.IndirectLevel()
 		// residual ERROR sticky — no invent soft-bias past want IndirectLevel residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		for _, vv := range ok {
 			lv := vv.Type.IndirectLevel()
 			// residual ERROR sticky — no invent soft-bias past candidate IndirectLevel residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			if wantInd > lv {
 				// VariableSelector.cpp:490–494
 				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionField() {
 					// Type-nil ancestry stickies residual ERROR — no invent soft-continue bias
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return nil
 					}
 					continue
@@ -1913,21 +1922,26 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 				addressable = append(addressable, vv)
 			}
 		}
-		if v := ChooseOKVar(r, addressable); v != nil {
+		if v := ChooseOKVarSess(s, r, addressable); v != nil {
 			return v
 		}
 	}
-	return ChooseOKVar(r, ok)
+	return ChooseOKVarSess(s, r, ok)
 }
 
 // ExpandStructUnionVars mirrors VariableSelector::expand_struct_union_vars.
 // VariableSelector.cpp:156–173 — replace non-matching aggregates with field_vars.
 // Variable* always live; nil hole / incomplete FieldVars fails closed
-// IncompleteVariables (not bare nil invent empty-complete expand pool).
+// IncompleteVariables (not bare nil invent empty-complete expand pool).}
+
 func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
+	return ExpandStructUnionVarsSess(nil, vars, want)
+}
+
+func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Variable {
 	if !VariablesComplete(vars) {
 		// incomplete pool fails closed sticky (no invent soft re-pick empty expand)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := append([]*Variable(nil), vars...)
@@ -1936,13 +1950,13 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 		// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
 		// (IsVirtual residual ERROR+false soft-continues then invents keep shell)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		virt := v.IsVirtual()
 		// residual ERROR sticky — no invent soft-continue keep shell past IsVirtual hole
 		// (FieldVarOf ancestry IsArray-without-AsArray residual ERROR+false soft-continues)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		if virt {
@@ -1955,18 +1969,18 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 			if IsSpecialPtr(v) {
 				continue
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		// don't break up a struct if it matches the given type
 		if v.Type.IsAggregate() && v.Type != want {
 			// residual ERROR sticky — no invent soft-expand past IsAggregate residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteVariables()
 			}
 			// FieldVars always live; incomplete fails closed sticky
 			if !v.FieldVarsComplete() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteVariables()
 			}
 			// erase i, append field_vars at end (upstream insert end + i--)
@@ -1974,7 +1988,7 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 			out = append(out[:i], out[i+1:]...)
 			out = append(out, fields...)
 			i--
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue expand past IsAggregate residual false
 			return IncompleteVariables()
 		}
@@ -1984,7 +1998,8 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 
 // ChooseOKVarMatch mirrors choose_var type filter + choose_ok_var.
 // VariableSelector.cpp choose_var — expand_struct_union_vars; Type::match(mt); optional skip const.
-// Ambient ProcessOptions bridge; generation prefers ChooseOKVarMatchOpts.
+// Ambient ProcessOptions bridge; generation prefers ChooseOKVarMatchOpts.}
+
 func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
 	return ChooseOKVarMatchOpts(r, vars, want, mt, skipConst, ProcessOptions())
 }
@@ -1996,7 +2011,7 @@ func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, sk
 
 func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
 	if want == nil {
-		return ChooseOKVar(r, vars)
+		return ChooseOKVarSess(s, r, vars)
 	}
 	// expand aggregates when want is simple or aggregate (choose_var:403–406)
 	cands := vars
@@ -2012,7 +2027,7 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 		return nil
 	}
 	if simple || agg {
-		cands = ExpandStructUnionVars(vars, want)
+		cands = ExpandStructUnionVarsSess(s, vars, want)
 	}
 	// incomplete expand / candidate list — fail closed sticky
 	if !VariablesComplete(cands) {
@@ -2041,7 +2056,7 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 			ok = append(ok, x)
 		}
 	}
-	return ChooseOKVar(r, ok)
+	return ChooseOKVarSess(s, r, ok)
 }
 
 func typesMatchExact(a, b *Type) bool {
@@ -2173,7 +2188,7 @@ func (vs *VariableSelector) createAndInitialize(
 	if ie == nil || sessHasError(vsSess(vs)) {
 		return nil
 	}
-	v := CreateVariableWithInit(name, t, nil, qfer)
+	v := CreateVariableWithInitSess(vsSess(vs), name, t, nil, qfer)
 	if v == nil {
 		// VariableSelector.cpp:535 assert(var) sticky
 		sessNoteError(vsSess(vs), ErrGeneric)
@@ -2263,7 +2278,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	if ie == nil || sessHasError(vsSess(vs)) {
 		return nil
 	}
-	v := CreateVariableWithInit(name, t, nil, varQfer)
+	v := CreateVariableWithInitSess(vsSess(vs), name, t, nil, varQfer)
 	if v == nil {
 		return nil
 	}

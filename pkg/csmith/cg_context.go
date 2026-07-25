@@ -1084,7 +1084,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
 	// CGOptions::dead_pointer_dereference_prob only (no dual residual knob)
-	if v.IsPointer() && IsDanglingPtr(v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
+	if v.IsPointer() && IsDanglingPtrSess(cgSess(c), v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
 		// residual ERROR sticky — no invent read-ok past IsPointer/dangling hole
 		if sessHasError(cgSess(c)) {
 			return false
@@ -1169,7 +1169,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob
-	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
+	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtrSess(cgSess(c), v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
 		if sessHasError(cgSess(c)) {
 			return false
 		}

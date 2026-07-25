@@ -822,22 +822,26 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 // CreateVariableWithInit mirrors Variable::CreateVariable(name, type, init, qfer).
 // Variable.cpp:405–421.
 func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
+	return CreateVariableWithInitSess(nil, name, typ, init, qfer)
+}
+
+func CreateVariableWithInitSess(s *Session, name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
 	// Variable.cpp:412–414 — assert(type); assert simple != eVoid sticky
 	// name always live from gensym/caller; empty name non-sticky soft factory gate
 	if name == "" {
 		return nil
 	}
 	if typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	simple := typ.IsSimple()
 	// residual ERROR sticky — no invent soft-create past IsSimple residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if simple && typ.Simple() == EVoid {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// C++ Variable stores its own CVQualifiers value (owning vectors). Clone so
@@ -850,16 +854,16 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 	}
 	if typ.IsAggregate() {
 		// residual ERROR sticky — no invent soft-create past IsAggregate residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		v.CreateFieldVars()
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-create past IsAggregate residual false
 		return nil
 	}
 	// Variable.cpp:420 — ERROR_GUARD_AND_DEL1(nullptr, var)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	return v
@@ -867,7 +871,8 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 
 // createVarRng mirrors process DefaultRndNumGenerator for CreateVariable init.
 // Variable.cpp:395 Constant::make_random uses the process RNG stream.
-// Nil when session Rng unset — fail closed (no invent private advancing NewRng stream).
+// Nil when session Rng unset — fail closed (no invent private advancing NewRng stream).}
+
 func createVarRng() *Rng {
 	return createVarRngSess(nil)
 }

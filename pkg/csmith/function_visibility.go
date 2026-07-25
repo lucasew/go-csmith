@@ -402,8 +402,12 @@ func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion 
 }
 
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
+	UpdateFactsForOOSVarsSess(nil, vars, facts)
+}
+
+func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPointTo) {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if len(vars) == 0 {
@@ -412,13 +416,13 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 	if !FactsComplete(*facts) {
 		// incomplete map/vars fail closed sticky (no invent soft re-pick OOS cleanup)
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for _, v := range vars {
 		if v == nil || !v.FieldVarsComplete() {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 	}
@@ -429,7 +433,7 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		for _, v := range vars {
 			if v.Match(f.Var) {
 				// residual ERROR sticky — no invent drop-true past Match hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					*facts = IncompleteFactSlice()
 					return
 				}
@@ -438,7 +442,7 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 			}
 			// residual ERROR sticky — no invent soft-continue keep later past Match residual
 			// (Type-nil Match ERROR+false soft invents not-drop then keep fact)
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return
 			}
@@ -453,12 +457,12 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		for _, v := range vars {
 			if nf := cur.MarkDeadVar(v); nf != nil {
 				// residual ERROR sticky — no invent mark-dead success past MarkDeadVar hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					*facts = IncompleteFactSlice()
 					return
 				}
 				cur = nf
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue later mark past MarkDead residual
 				*facts = IncompleteFactSlice()
 				return
@@ -471,7 +475,8 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 
 // OutputCommentLine mirrors OutputMgr::output_comment_line.
 // OutputMgr.cpp:314–320 — "/* comment */\n" unless quiet/concise.
-// empty comment is incomplete IR — no invent "/*  */" shell (still emits "\n" when quiet/concise).
+// empty comment is incomplete IR — no invent "/*  */" shell (still emits "\n" when quiet/concise).}
+
 func OutputCommentLine(comment string, quiet, concise bool) string {
 	if quiet || concise {
 		return "\n"

@@ -30,6 +30,10 @@ func NewAssignOpsTable(opts Options) *DistributionTable {
 // AssignOpsProbability mirrors StatementAssign::AssignOpsProbability.
 // StatementAssign.cpp:84–106.
 func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *Type) AssignOp {
+	return AssignOpsProbabilitySess(nil, r, opts, table, typ)
+}
+
+func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *DistributionTable, typ *Type) AssignOp {
 	if !opts.CompoundAssignment {
 		return AssignSimple
 	}
@@ -37,7 +41,7 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	if typ != nil {
 		simple := typ.IsSimple()
 		// residual ERROR sticky — no invent soft-simple past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return AssignOp(-1)
 		}
 		if !simple {
@@ -45,7 +49,7 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 		}
 		isF := typ.IsFloat()
 		// residual ERROR sticky — no invent soft-simple past IsFloat residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return AssignOp(-1)
 		}
 		if isF {
@@ -54,12 +58,12 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	}
 	// C++ always has RNG + assignOpsTable_ sticky; no invent table or simple without pick
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return AssignOp(-1)
 	}
 	if table == nil {
 		// StatementAssign::InitProbabilityTable always live; sticky fail closed invalid op
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return AssignOp(-1)
 	}
 	f := NewVectorFilter(table)
@@ -67,7 +71,7 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	if typ != nil {
 		signed := typ.IsSigned()
 		// residual ERROR sticky — no invent soft-filter past IsSigned residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return AssignOp(-1)
 		}
 		if signed {
@@ -79,7 +83,8 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 }
 
 // SafeAssign mirrors StatementAssign::safe_assign — bit ops need no overflow wrap.
-// StatementAssign.cpp:233–242.
+// StatementAssign.cpp:233–242.}
+
 func SafeAssign(op AssignOp) bool {
 	switch op {
 	case AssignBitAnd, AssignBitXor, AssignBitOr:
@@ -146,10 +151,10 @@ func MakeRandomAssignQfer(
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
-	// StatementAssign.cpp:115–123 — AssignOpsProbability(type) once; if type null
+	// StatementAssign.cpp:115–123 — AssignOpsProbabilitySess(cgSess(cg), type) once; if type null
 	// SelectLType(no_vol, op) using that op. Do NOT re-pick op after SelectLType
 	// (seed-2 event 45 was an invented second AssignOpsProbability draw).
-	op := AssignOpsProbability(r, opts, assignTab, typ)
+	op := AssignOpsProbabilitySess(cgSess(cg), r, opts, assignTab, typ)
 	if op < 0 {
 		// AssignOpsProbability already stickies on nil r/table; other invalid op soft
 		return Stmt{}

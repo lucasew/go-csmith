@@ -314,27 +314,31 @@ func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 // Incomplete maps fail closed (*facts nil, false — no invent partial renew).}
 
 func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	return RenewFactsSess(nil, facts, newFacts)
+}
+
+func RenewFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
 		// incomplete maps wiped sticky (no invent soft re-pick past hole)
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	changed := false
 	for _, nf := range newFacts {
 		if RenewFactSess(nil, facts, nf) {
 			// residual ERROR sticky — no invent soft-continue partial renew past hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return false
 			}
 			changed = true
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-skip failed renew then renew later
 			*facts = IncompleteFactSlice()
 			return false
@@ -347,7 +351,8 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // FunctionInvocation.cpp:418–455 — for 2 args both orders; else permute call-bearing slots.
 // Returns sequences of arg indices.
 // Empty result matches C++ when n!=2 and no call-bearing params (permute empty base).
-// FunctionInvocation.cpp:462 — assert(orders.size() > 0) on visit_unordered path.
+// FunctionInvocation.cpp:462 — assert(orders.size() > 0) on visit_unordered path.}
+
 func (fi *Invocation) PermuteParamOrders() [][]int {
 	// Invocation always live; sticky incomplete no invent empty orders soft-skip
 	if fi == nil {
@@ -793,7 +798,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	}
 	// FunctionInvocationUser.cpp:344 — update_facts_for_oos_vars(func->param, inputs)
 	// Full FactVec: ePointTo + eUnionWrite.
-	UpdateFactsForOOSVars(f.Param, &work)
+	UpdateFactsForOOSVarsSess(cgSess(cg), f.Param, &work)
 	if !FactsComplete(work) {
 		restore()
 		if !sessHasError(cgSess(cg)) {
@@ -801,7 +806,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	UpdateUnionFactsForOOSVars(f.Param, &fm.UnionFacts)
+	UpdateUnionFactsForOOSVarsSess(cgSess(cg), f.Param, &fm.UnionFacts)
 	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
 		if !sessHasError(cgSess(cg)) {
@@ -830,7 +835,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// Restore pre-handover caller lattice (incl. frame-local may-null) then apply body deltas.
 	// Full FactVec renew: ePointTo + global eUnionWrite (build path
 	// function_invocation.go GlobalUnionFactsOnly + RenewUnionFacts).
-	_ = RenewFacts(&inputsCopy, work)
+	_ = RenewFactsSess(cgSess(cg), &inputsCopy, work)
 	if !FactsComplete(inputsCopy) {
 		restore()
 		if !sessHasError(cgSess(cg)) {
@@ -854,7 +859,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 			}
 			return false
 		}
-		_ = RenewUnionFacts(&cg.FM.UnionFacts, retUF)
+		_ = RenewUnionFactsSess(cgSess(cg), &cg.FM.UnionFacts, retUF)
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
 			if !sessHasError(cgSess(cg)) {
