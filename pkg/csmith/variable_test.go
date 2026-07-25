@@ -525,7 +525,6 @@ func TestCreateVariableWithInitVoidIsSimpleResidualSticky(t *testing.T) {
 	ClearError()
 }
 
-
 func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 	// Variable.cpp:519 — is_volatile() → is_volatile_after_deref(0) which ORs
 	// type->is_volatile_struct_union(). Qfer-only IsVolatile missed S0-style
@@ -567,7 +566,6 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 		t.Fatal("ReadVar volatile struct must clear side_effect_free")
 	}
 }
-
 
 func TestCreateFieldVarsStorageVolOnly(t *testing.T) {
 	// Variable.cpp:344–358 — create_field_vars ORs qfer.is_volatile() (storage),

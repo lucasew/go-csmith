@@ -52,15 +52,15 @@ type optionsField struct {
 type cliStyle int
 
 const (
-	cliNone cliStyle = iota
-	cliBoolPair      // --name / --no-name
-	cliBoolOn        // only when true: --name
-	cliBoolOff       // only when false: --name (e.g. --no-hash-value-printf)
-	cliBoolNomain    // --nomain / --main
-	cliBoolRetDead   // --no-return-dead-pointer / --return-dead-pointer
-	cliInt           // --flag N
-	cliStr           // --flag val
-	cliSeed          // -s N always
+	cliNone        cliStyle = iota
+	cliBoolPair             // --name / --no-name
+	cliBoolOn               // only when true: --name
+	cliBoolOff              // only when false: --name (e.g. --no-hash-value-printf)
+	cliBoolNomain           // --nomain / --main
+	cliBoolRetDead          // --no-return-dead-pointer / --return-dead-pointer
+	cliInt                  // --flag N
+	cliStr                  // --flag val
+	cliSeed                 // -s N always
 )
 
 // optionsRegistry lists every Options field. Order of bool/int/str planes in the

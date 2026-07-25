@@ -71,7 +71,7 @@ func TestRenewFacts(t *testing.T) {
 	}
 	factsX := []*FactPointTo{
 		MakeFactPointToSet(parent, []*Variable{NullPtr}), // unrelated aggregate subject
-		MakeFactPointToSet(p, []*Variable{GarbagePtr}),  // field pointer still dead
+		MakeFactPointToSet(p, []*Variable{GarbagePtr}),   // field pointer still dead
 	}
 	tgt := CreateVariableScalars("g_tgt", GetIntType(), true, false)
 	nfField := MakeFactPointTo(p, tgt) // definitive p = &tgt

@@ -698,7 +698,6 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	return MergeUnionFact(facts, nf)
 }
 
-
 // RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.
 // FactUnion.cpp:74–118 — constant→fid 0; variable→join RHS union facts;
 // assign/comma peel to RHS; function return uses registry when available.

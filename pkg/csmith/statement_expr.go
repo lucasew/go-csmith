@@ -15,14 +15,14 @@ func MakeRandomExprStmt(
 ) Stmt {
 	// StatementExpr.cpp always has RNG + CGContext; sticky no invent Kind-only shell
 	if r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent expr stmt / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// StatementExpr.cpp:53 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementExpr, nullptr)
@@ -36,7 +36,7 @@ func MakeRandomExprStmt(
 		// pre-validated EffectComplete
 		preEffect = cg.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-expr stmt past Effect Clone residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 	}
@@ -48,7 +48,7 @@ func MakeRandomExprStmt(
 	var unionCopy []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return Stmt{}
 		}
 		// shallow Fact* vector snapshot (C++ facts_copy = global_facts)
@@ -59,7 +59,7 @@ func MakeRandomExprStmt(
 	// is_std_func=false (StatementExpr.cpp:60)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, nil, nil, false)
 	// StatementExpr.cpp:61 ERROR_GUARD(nullptr)
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preEffect
 		}
@@ -77,14 +77,14 @@ func MakeRandomExprStmt(
 			cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		}
 		// residual ERROR sticky — no invent soft re-pick past Failed residual (restore may residual)
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		// Statement::make_random retries on null
 		return Stmt{}
 	}
 	// residual ERROR sticky — no invent invoke stmt past MakeRandomInvocation residual success path
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preEffect
 		}

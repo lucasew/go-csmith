@@ -4,7 +4,9 @@ import "testing"
 
 // TestOrderedBinaryMergeMakeupUnionInitLast0 —
 // FunctionInvocation.cpp:275–279 ordered &&/|| after RHS:
-//   makeup_new_var_facts(facts_copy, global) then merge_facts(global, facts_copy).
+//
+//	makeup_new_var_facts(facts_copy, global) then merge_facts(global, facts_copy).
+//
 // When g_u is absent from facts_copy (not present after LHS) but live holds
 // last_written=f3, makeup calls add_new_var_fact → abstract_fact_for_var_init
 // (last=f0=0); merge_facts joins live f3 with copy f0 → BOTTOM (FactUnion::join).

@@ -917,7 +917,6 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	}
 }
 
-
 func TestIsVisibleLocalUsesMatch(t *testing.T) {
 	// Variable.cpp:490–500 — match() for params and locals.
 	ClearError()

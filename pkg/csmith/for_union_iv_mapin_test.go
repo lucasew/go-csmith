@@ -48,7 +48,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	iv := g88.FieldVars[1]
 	initSt := &Stmt{
 		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
 		AssignOp: AssignSimple, StmID: AllocStmID(),
 	}
 	if !VisitFactsStatementAssign(initSt, &cg, opts) {

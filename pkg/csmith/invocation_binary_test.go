@@ -840,7 +840,6 @@ func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
 	ClearError()
 }
 
-
 func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
 	// FunctionInvocation.cpp:111–118 — rnd_flipcoin(StdUnaryFuncProb()) always,
 	// even when type is null. Old Go skipped the draw when typ==nil (unfair

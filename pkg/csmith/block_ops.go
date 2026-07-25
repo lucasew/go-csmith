@@ -8,7 +8,7 @@ package csmith
 // Block always live; sticky false (no invent not-must-break soft-skip past hole).
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) == 0 {
@@ -17,19 +17,19 @@ func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 	last := b.GetLastStm()
 	if last == nil || !last.MustReturn() {
 		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn hole
-		if sessHasError(nil) {
+		if sessHasError(fmSess(fm)) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent must-return true past MustReturn hole
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		return false
 	}
 	// Block.cpp:345–353 — same back-edge escape check as must_return
 	esc := b.hasEscapeBackEdge(fm)
 	// residual ERROR sticky — no invent no-escape soft-skip past CFG hole
-	if sessHasError(nil) {
+	if sessHasError(fmSess(fm)) {
 		// incomplete CFG sticky restrictive must-return false (escape uncertain)
 		return false
 	}
@@ -42,7 +42,7 @@ func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	// Block + Rng always live; sticky incomplete no invent not-nested soft-skip
 	if b == nil || r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return false
 	}
 	if !b.Looping {
@@ -54,7 +54,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	}
 	// residual ERROR sticky — no invent not-must-jump soft-skip past MustJump hole
 	// incomplete last jump sticky restrictive need nested (no invent "no nested" past hole)
-	if sessHasError(nil) {
+	if sessHasError(cg.Sess) {
 		return true
 	}
 	if cg.RW == nil {
@@ -63,7 +63,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	// incomplete must-use lists fail closed sticky true (no invent "no nested loop"
 	// by soft-skipping holes as absent must-use / soft re-pick past incomplete RW)
 	if !VariablesComplete(cg.RW.MustReadVars) || !VariablesComplete(cg.RW.MustWriteVars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return true
 	}
 	ivDepth := 0
@@ -76,7 +76,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 		dimen := v.GetDimension()
 		// incomplete array IR (IsArray without AsArray) stickies via GetDimension
 		// sticky need nested (restrictive — no invent "no nested" past broken dim)
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			return true
 		}
 		if dimen == 0 {
@@ -111,7 +111,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 // Block always live; sticky 0 (no invent no-op remove soft-skip past hole).
 func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return 0
 	}
 	if StmIDUnset(stmID) {
@@ -134,7 +134,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 			// soft-skip missing arm then search sibling arm as complete tree)
 			for _, blk := range blks {
 				if blk == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(fmSess(fm), ErrGeneric)
 					return 0
 				}
 			}
@@ -158,7 +158,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		// (not bare nil — CFGEdgesComplete(nil) invents empty-complete edge set)
 		if fm != nil {
 			fm.CFGEdges = IncompleteCFGEdges()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 		}
 		cfgIDs = map[int]bool{}
 	}
@@ -185,7 +185,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		// (no invent keep-hole partial scrub / empty-complete via bare nil)
 		if !CFGEdgesComplete(fm.CFGEdges) {
 			fm.CFGEdges = IncompleteCFGEdges()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			gotoSrcIDs = nil
 		} else {
 			ne := make([]*CFGEdge, 0, len(fm.CFGEdges))
@@ -210,7 +210,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 					// Block* dest: parent-chain contains_stmt (not Stmts walk)
 					destIn = stmtContainsBlock(removed, e.DestBlock)
 					// residual ERROR sticky — no invent dest-in scan past contains residual
-					if sessHasError(nil) {
+					if sessHasError(fmSess(fm)) {
 						scrubIncomplete = true
 						break
 					}
@@ -222,7 +222,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 					for _, blk := range fm.Func.Blocks {
 						if blk != nil && blk.StmID == e.DestStmID {
 							destIn = stmtContainsBlock(removed, blk)
-							if sessHasError(nil) {
+							if sessHasError(fmSess(fm)) {
 								scrubIncomplete = true
 							}
 							break
@@ -239,13 +239,13 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 					if e.SrcID > 0 && !ids[e.SrcID] {
 						if fm.Func != nil {
 							src := FindStmtByID(fm.Func, e.SrcID)
-							if sessHasError(nil) {
+							if sessHasError(fmSess(fm)) {
 								scrubIncomplete = true
 								break
 							}
 							if src == nil {
 								// unresolved with Func = incomplete IR sticky
-								sessNoteError(nil, ErrGeneric)
+								sessNoteError(fmSess(fm), ErrGeneric)
 								scrubIncomplete = true
 								break
 							}
@@ -264,8 +264,8 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 			if scrubIncomplete {
 				fm.CFGEdges = IncompleteCFGEdges()
 				gotoSrcIDs = nil
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(fmSess(fm)) {
+					sessNoteError(fmSess(fm), ErrGeneric)
 				}
 			} else {
 				fm.CFGEdges = ne
@@ -288,20 +288,20 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		// IncompleteBlocks (not bare nil invent empty-complete Blocks list)
 		if !BlocksComplete(f.Blocks) {
 			f.Blocks = IncompleteBlocks()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 		} else {
 			nb := make([]*Block, 0, len(f.Blocks))
 			for _, blk := range f.Blocks {
 				if stmtContainsBlock(removed, blk) {
 					// residual ERROR sticky — no invent keep-block past contains residual
-					if sessHasError(nil) {
+					if sessHasError(fmSess(fm)) {
 						f.Blocks = IncompleteBlocks()
 						break
 					}
 					continue
 				}
 				// residual ERROR sticky — no invent keep-block past contains residual false
-				if sessHasError(nil) {
+				if sessHasError(fmSess(fm)) {
 					f.Blocks = IncompleteBlocks()
 					break
 				}
@@ -513,7 +513,7 @@ func stmtTreeContainsID(st *Stmt, id int) bool {
 // FactMgr + Statement always live; sticky (no invent soft-skip reset past hole).
 func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 	if fm == nil || st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	ids := map[int]bool{}
@@ -531,7 +531,7 @@ func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 // FactMgr + Block always live; sticky (no invent soft-skip reset past hole).
 func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 	if fm == nil || b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
 	ids := map[int]bool{}
@@ -596,12 +596,12 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
 // Complete empty → non-nil [].
 func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 	if fm == nil || StmIDUnset(destStmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return nil
 	}
 	// incomplete CFG fails closed sticky nil (distinct from complete empty non-nil [])
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return nil
 	}
 	srcs := make([]int, 0)
@@ -614,11 +614,11 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue sources past FindStmt hole
-			if sessHasError(nil) {
+			if sessHasError(fmSess(fm)) {
 				return nil
 			}
 			if src == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(fmSess(fm), ErrGeneric)
 				return nil
 			}
 			if src.Kind != StmtGoto {
@@ -636,17 +636,17 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 func FindJumpLabel(fm *FactMgr, destStmID int) string {
 	// FactMgr always live for CFG label lookup; sticky no invent empty label without it
 	if fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return ""
 	}
 	// StmID ≤0 incomplete dest sticky (no invent label for key 0 / soft re-pick)
 	if StmIDUnset(destStmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return ""
 	}
 	// incomplete CFG fails closed sticky (no invent label from partial scan or registry)
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return ""
 	}
 	for _, e := range fm.CFGEdges {
@@ -656,12 +656,12 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue label scan past FindStmt hole
-			if sessHasError(nil) {
+			if sessHasError(fmSess(fm)) {
 				return ""
 			}
 			// unresolved src = incomplete function tree sticky; no invent skip hole to registry
 			if src == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(fmSess(fm), ErrGeneric)
 				return ""
 			}
 			if src.Kind != StmtGoto {
@@ -694,14 +694,14 @@ func (b *Block) AppendNestedLoop(
 	// Block.cpp:422+ — Statement::make_random(eFor) always has RNG
 	// sticky no invent nested for shell without live block/context/RNG
 	if b == nil || r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky before EffectStm clear (no invent nested for)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// Block.cpp:422–427 — outer pre_facts snapshot, clear effect_stm, then
@@ -716,7 +716,7 @@ func (b *Block) AppendNestedLoop(
 	if cg.FM != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-for snapshot)
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// Block.cpp:426 — FactVec pre_facts = fm->global_facts (shallow)
@@ -726,7 +726,7 @@ func (b *Block) AppendNestedLoop(
 	cg.ClearEffectStm()
 	// Statement.cpp make_random(eFor): full factory + post_creation + null re-pick
 	made := makeRandomStmtForced(r, opts, probs, vs, tables, stmtTab, cg, b, StmtFor)
-	if sessHasError(nil) || !stmtOK(made) {
+	if sessHasError(cgSess(cg)) || !stmtOK(made) {
 		return nil
 	}
 	st := &made
@@ -738,7 +738,7 @@ func (b *Block) AppendNestedLoop(
 		// Block::stm_id always live when FM bound (no invent fold into key 0)
 		if StmIDUnset(b.StmID) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// Block.cpp:429 — makeup_new_var_facts(pre_facts, global_facts) full FactVec
@@ -751,7 +751,7 @@ func (b *Block) AppendNestedLoop(
 			!UnionFactsComplete(preUnion) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// map_facts_in pre-make full FactVec after makeup; map_facts_out pairs live
@@ -761,12 +761,12 @@ func (b *Block) AppendNestedLoop(
 		acc := cg.AccumEffect()
 		if !EffectComplete(acc) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		cg.FM.SetMapAccumEffect(st.StmID, acc)
 		// residual ERROR sticky — no invent soft-append past SetMapAccum residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
@@ -779,24 +779,24 @@ func (b *Block) AppendNestedLoop(
 		stE := cg.FM.GetMapStmEffect(st.StmID)
 		if !EffectComplete(be) || !EffectComplete(stE) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		merged := be.AddEffect(stE)
 		// residual ERROR sticky — no invent soft-complete for fold past AddEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
 		if !EffectComplete(merged) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		cg.FM.SetMapStmEffect(b.StmID, merged)
 		cg.FM.SetMapAccumEffect(b.StmID, acc)
 		// residual ERROR sticky — no invent soft-append past block SetMapAccum residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
@@ -817,7 +817,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	fm := cg.FM
@@ -826,14 +826,14 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	if fm != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-return snapshot)
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		preFacts = CloneFactSlice(fm.GlobalFacts)
 		preUnion = CloneUnionFactSlice(fm.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(preUnion) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnion) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return nil
 		}
@@ -853,7 +853,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		// Block::stm_id always live when FM bound (no invent fold into key 0)
 		if StmIDUnset(b.StmID) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// Block.cpp:383 — makeup_new_var_facts(pre_facts, global_facts) full FactVec
@@ -864,7 +864,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			!UnionFactsComplete(preUnion) || !UnionFactsComplete(fm.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// Block.cpp:383–384 — sr->visit_facts; assert(visited)
@@ -872,7 +872,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		if !VisitFactsStatementReturn(st, cg, opts) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			// C++ assert(visited) — sticky error for ERROR_GUARD callers
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
@@ -884,12 +884,12 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		acc := cg.AccumEffect()
 		if !EffectComplete(acc) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		fm.SetMapAccumEffect(st.StmID, acc)
 		// residual ERROR sticky — no invent soft-return past SetMapAccum residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
@@ -902,30 +902,30 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		stE := fm.GetMapStmEffect(st.StmID)
 		if !EffectComplete(be) || !EffectComplete(stE) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		merged := be.AddEffect(stE)
 		// residual ERROR sticky — no invent soft-complete return fold past AddEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
 		if !EffectComplete(merged) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		fm.SetMapStmEffect(b.StmID, merged)
 		fm.SetMapAccumEffect(b.StmID, acc)
 		// residual ERROR sticky — no invent soft-return past block SetMapAccum residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
 		// FactMgr.cpp:268–270 — set_fact_out(Block*) with parent==nullptr filter
 		fm.SetMapFactsOutForBlock(b, fm.GlobalFacts)
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
@@ -940,18 +940,18 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
 	// Block always live; sticky incomplete no invent no-back-edge soft-skip
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return false
 	}
 	if fm == nil {
 		// missing CFG sticky has-back (restrictive)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(fmSess(fm), ErrGeneric)
 		return true
 	}
 	for _, e := range fm.CFGEdges {
 		if e == nil {
 			// incomplete CFGEdges sticky has-back
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(fmSess(fm), ErrGeneric)
 			return true
 		}
 		if !e.BackLink {
@@ -987,14 +987,14 @@ func blockHasStmtID(b *Block, id int) bool {
 func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	// Block.cpp:96–97 — assert(curr_func) sticky
 	if cg == nil || cg.CurrentFunc == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky before stack push (no invent dummy past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	f := cg.CurrentFunc
@@ -1024,21 +1024,21 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 		// pre-validated EffectComplete(*EffectAccum)
 		preEffect = cg.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-snapshot past IncompleteEffect Clone residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			popStack()
 			return nil
 		}
 	}
 	if !EffectComplete(preEffect) {
 		popStack()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// Block.cpp:105 — set_fact_in(b, global_facts)
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			popStack()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
@@ -1050,9 +1050,9 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	// incomplete post-creation must not invent dummy block success
 	// Block.cpp:95–110 still returns b after post_creation; ERROR is caller-visible.
 	// Keep b on Function.Blocks (no invent erase). Nil only when ERROR/incomplete.
-	if sessHasError(nil) || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if sessHasError(cgSess(cg)) || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return nil
 	}
@@ -1081,7 +1081,7 @@ func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
 // Nil FM / StmID 0 is non-sticky ShortcutNone (intentional reuse miss / soft re-pick).
 func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if b == nil || facts == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return ShortcutNone
 	}
 	if cg.FM == nil || StmIDUnset(b.StmID) {
@@ -1105,25 +1105,25 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	}
 	if !SameFactVec(*facts, fm.UnionFacts, in, inU) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts true path
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	// Statement.cpp:552 — !contains_unfixed_goto()
 	if ContainsUnfixedGotoBlock(b, fm) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual true
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return ShortcutNone
 		}
 		return ShortcutNone
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual false
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	// block is not is_ctrl_stmt
@@ -1141,13 +1141,13 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	}
 	if cg.InConflict(eff) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual true
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return ShortcutConflict
 		}
 		return ShortcutConflict
 	}
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past InConflict residual false
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutConflict
 	}
 	// Statement.cpp:559 — inputs = map_facts_out[this]; C++ map[] empty if missing.
@@ -1168,7 +1168,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	fm.UnionFacts = clU
 	cg.AddEffect(eff, false)
 	// residual ERROR sticky — no invent soft-continue ShortcutOK past AddEffect residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	if !EffectComplete(cg.EffectStm) {
@@ -1180,7 +1180,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	}
 	fm.SetMapAccumEffect(b.StmID, acc)
 	// residual ERROR sticky — no invent ShortcutOK past SetMapAccum residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return ShortcutNone
 	}
 	if fm.MapVisited == nil {

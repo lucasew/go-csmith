@@ -216,4 +216,3 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 		t.Fatal(st)
 	}
 }
-

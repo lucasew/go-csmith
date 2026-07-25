@@ -7,7 +7,9 @@ import "testing"
 // FactMgr.cpp:370–391 (lvar_cnt==1 non-array → renew_fact).
 //
 // Seed 17809409409875472624: func_61 for body has
-//   if (...) { (*g_99)=(void*)0; ... } else { (*g_77)^=...; }
+//
+//	if (...) { (*g_99)=(void*)0; ... } else { (*g_77)^=...; }
+//
 // with g_99→g_77. Then-arm nulls g_77; if-merge may-nulls g_77 so later
 // is_valid_ptr fails. C++ post_creation FP strips the for; Go keeps it when
 // this transfer/merge path is wrong or skipped (shortcut).

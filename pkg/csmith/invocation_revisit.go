@@ -4,7 +4,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-
 // return-fact registry (FunctionInvocationUser.cpp static invocations/return_facts).
 // C++ stores Fact* of any eCat; Go splits ePointTo / eUnionWrite into parallel registries
 // (same inv may appear once per category — FunctionInvocationUser.cpp:91–102).
@@ -440,19 +439,19 @@ func permuteInts(a []int) [][]int {
 func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
 	// FunctionInvocation.cpp:457+ — always live this + facts sticky
 	if fi == nil || facts == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// incomplete working facts sticky (no invent cleaned permute base / soft re-pick)
 	if !FactsComplete(*facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	inputsCopy := CloneFactSlice(*facts)
 	orders := fi.PermuteParamOrders()
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
 	if len(orders) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	var merged []*FactPointTo
@@ -460,13 +459,13 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 		cur := CloneFactSlice(inputsCopy)
 		for _, paramID := range order {
 			if paramID < 0 || paramID >= len(fi.Args) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			arg := fi.Args[paramID]
 			// param_value[i] always non-null after ERROR_GUARD sticky
 			if arg == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			// visit under working facts
@@ -479,8 +478,8 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 			if cg.FM != nil {
 				// incomplete GlobalFacts after arg visit sticky
 				if !FactsComplete(cg.FM.GlobalFacts) {
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					if !sessHasError(cgSess(cg)) {
+						sessNoteError(cgSess(cg), ErrGeneric)
 					}
 					return false
 				}
@@ -491,24 +490,24 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 			merged = cur
 		} else {
 			if !FactsComplete(merged) || !FactsComplete(cur) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 			// MergeFacts sticky on incomplete mid-join
 			_ = MergeFacts(&merged, cur)
 			if !FactsComplete(merged) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
 		}
 	}
 	if !FactsComplete(merged) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -565,12 +564,12 @@ func (f *Function) IsPointerReferenced() bool {
 func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
 	// FunctionInvocationUser.cpp:309+ — get_fact_mgr_for_func + body always live sticky
 	if fi == nil || fi.User == nil || facts == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	f := fi.User
 	if f.Body == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// FunctionInvocationUser.cpp:311 — FactMgr *fm = get_fact_mgr_for_func(func);
@@ -580,12 +579,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// nested arms (seed-2 e2342: goto nblocks 8 vs UP 10).
 	fm := f.PairedFactMgr()
 	if fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// incomplete caller facts sticky (no invent cleaned revisit / soft re-pick)
 	if !FactsComplete(*facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// backup maps — FactVec partitions (ePointTo + eUnionWrite) + effects
@@ -644,38 +643,38 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if cg.FM != nil && cg.FM != fm {
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		clU := CloneUnionFactSlice(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(clU) {
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
 			restore()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		fm.UnionFacts = clU
 	} else if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// handover params into working lattice (not directly into caller GlobalFacts)
 	fm.CallerToCalleeHandover(fi.Args, &work)
 	if !FactsComplete(work) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	// FactMgr.cpp:324–353 — drop union subjects not kept by PT partition
 	fm.FilterUnionFactsForHandover(work)
-	if sessHasError(nil) || !UnionFactsComplete(fm.UnionFacts) {
+	if sessHasError(cgSess(cg)) || !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -700,8 +699,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if !FactsComplete(fm.GlobalFacts) {
 		restore()
 		fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_523")
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -711,28 +710,28 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// body Block::stm_id always live; StmID 0 sticky
 	if StmIDUnset(f.Body.StmID) {
 		restore()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Incomplete body map_stm_effect sticky
 	bodyEff := fm.GetMapStmEffect(f.Body.StmID)
 	if !EffectComplete(bodyEff) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	cg.AddEffect(bodyEff, false)
 	// residual ERROR sticky — no invent soft-continue ret-facts past AddEffect residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		restore()
 		return false
 	}
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -744,45 +743,45 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if !AddBackReturnFacts(f.Body, fm, &retFacts, &retUnions) ||
 		!FactsComplete(retFacts) || !UnionFactsComplete(retUnions) || !FactsComplete(work) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	// FunctionInvocationUser.cpp:358–365 — save full FactVec matching rv (ePointTo + eUnionWrite).
 	fi.SaveReturnFacts(retFacts)
 	fi.SaveReturnUnionFacts(retUnions)
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		restore()
 		return false
 	}
 	_ = MergeFacts(&work, retFacts)
 	if !FactsComplete(work) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	// eUnionWrite half of merge_facts(inputs, ret_facts)
 	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	for _, nf := range retUnions {
 		if nf == nil {
 			restore()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, nf)
 		if !UnionFactsComplete(fm.UnionFacts) {
 			restore()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -792,16 +791,16 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	UpdateFactsForOOSVars(f.Param, &work)
 	if !FactsComplete(work) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	UpdateUnionFactsForOOSVars(f.Param, &fm.UnionFacts)
 	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -809,16 +808,16 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// Incomplete external merge sticky
 	if !EffectComplete(cg.EffectContext()) || !EffectComplete(f.AccumEffContext) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
 	f.AccumEffContext = f.AccumEffContext.AddExternalEffect(cg.EffectContext())
 	if !EffectComplete(f.AccumEffContext) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -829,8 +828,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	_ = RenewFacts(&inputsCopy, work)
 	if !FactsComplete(inputsCopy) {
 		restore()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -839,22 +838,22 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if cg.FM != nil && cg.FM != fm {
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		retUF := GlobalUnionFactsOnly(fm.UnionFacts)
 		if !UnionFactsComplete(retUF) {
 			restore()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		_ = RenewUnionFacts(&cg.FM.UnionFacts, retUF)
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}

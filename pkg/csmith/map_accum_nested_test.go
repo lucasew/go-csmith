@@ -160,4 +160,3 @@ func mapAccumNamesOf(vs []*Variable) []string {
 	}
 	return out
 }
-

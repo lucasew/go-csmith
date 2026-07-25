@@ -879,7 +879,6 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	_ = st
 }
 
-
 // TestVisitFactsBlockResetsEffectAccumOnFail — Block.cpp:472–475.
 // On find_fixed_point failure, reset_effect_accum(pre_effect); do not leave
 // polluted EffectAccum for the outer StatementFor / validate path.
@@ -892,7 +891,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 	// when FM is bound (StmID 0 incomplete).
 	x := CreateVariableScalars("g_x", GetIntType(), false, false)
 	bad := Stmt{Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: x,
-		Lhs: &Lhs{Var: x, Type: GetIntType()},
+		Lhs:  &Lhs{Var: x, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple}
 	b := &Block{StmID: 50, Func: f, Stmts: []Stmt{bad}}
 	cg := EmptyCGContext().WithFactMgr(fm)

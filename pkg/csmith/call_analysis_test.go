@@ -107,8 +107,8 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 2,
-		LhsVar: CreateVariableScalars("a", GetIntType(), false, false),
-		Expr:   &Expression{Term: TermConstant, Con: MakeInt(0)},
+		LhsVar:      CreateVariableScalars("a", GetIntType(), false, false),
+		Expr:        &Expression{Term: TermConstant, Con: MakeInt(0)},
 		ArrayAccess: "a[i]",
 	}}}
 	var callsArr []*Invocation
@@ -714,7 +714,6 @@ func TestGetDirectInvocationNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
-
 
 // Statement.h:185 — StatementIf does not override has_uncertain_call_recursive.
 // Soft invent checked condition expr and took Statement.cpp:969 special path for

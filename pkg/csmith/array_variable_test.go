@@ -712,9 +712,9 @@ func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 		{Name: "f0", Type: GetSimpleType(EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
 	item := &ArrayVariable{
-		Variable:  Variable{Name: "g_42", Type: st, IsArray: true, ArraySizes: []int{2}},
-		Sizes:     []int{2},
-		Indices:   []string{"1"},
+		Variable:   Variable{Name: "g_42", Type: st, IsArray: true, ArraySizes: []int{2}},
+		Sizes:      []int{2},
+		Indices:    []string{"1"},
 		Collective: &ArrayVariable{Variable: Variable{Name: "g_42"}, Sizes: []int{2}},
 	}
 	item.AsArray = item
@@ -1195,14 +1195,14 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 	pt := PointerTo(GetIntType())
 	av := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_38",
-			Type: pt,
-			IsArray: true,
+			Name:       "g_38",
+			Type:       pt,
+			IsArray:    true,
 			ArraySizes: []int{1},
-			Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, true}),
-			Init: &Constant{Type: pt, Value: "0"},
+			Qfer:       NewCVQualifiers([]bool{false, false}, []bool{false, true}),
+			Init:       &Constant{Type: pt, Value: "0"},
 		},
-		Sizes: []int{1},
+		Sizes:      []int{1},
 		InitValues: []string{"&g_37"},
 	}
 	av.AsArray = av

@@ -159,9 +159,9 @@ func TestForDropInParityClearsLibraryOnly(t *testing.T) {
 	o := Defaults()
 	o.Seed = 9
 	o.Jumps = false
-	o.MaxParams = 2          // library-only
-	o.WrapVolatiles = true   // library-only
-	o.MaxGlobals = 10        // go-only
+	o.MaxParams = 2        // library-only
+	o.WrapVolatiles = true // library-only
+	o.MaxGlobals = 10      // go-only
 	got := o.ForDropInParity()
 	if got.Jumps {
 		t.Fatal("CLI field Jumps should stay false")

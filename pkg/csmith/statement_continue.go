@@ -19,24 +19,24 @@ func MakeRandomContinue(
 	}
 	// StatementContinue always has RNG + CGContext; sticky no invent continue shell without them
 	if r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementContinue.cpp:71 — assert(b) sticky; no soft invent continue without looping block
 	if loop == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// StatementContinue.cpp:72 — clear effect_stm before condition
@@ -44,7 +44,7 @@ func MakeRandomContinue(
 	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	// residual ERROR sticky — no invent soft-return continue past condition make residual
-	if expr == nil || sessHasError(nil) {
+	if expr == nil || sessHasError(cgSess(cg)) {
 		return Stmt{}
 	}
 	st := Stmt{Kind: StmtContinue, Expr: expr, StmID: AllocStmIDSess(cgSess(cg))}
@@ -52,7 +52,7 @@ func MakeRandomContinue(
 	if cg.FM != nil {
 		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)
 		// residual ERROR sticky — no invent soft-return continue past CreateCFGEdge residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 	}

@@ -2,7 +2,6 @@ package csmith
 
 import "testing"
 
-
 // TestIsVarOOSLocalAggregateField — Function.cpp:187–224 / find_variable_in_set.
 // C++ find_variable_in_set uses Variable::match: a field of a stack aggregate
 // matches the parent in local_vars → is_var_on_stack true (not OOS). Soft invent

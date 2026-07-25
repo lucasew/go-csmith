@@ -331,8 +331,10 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 // TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock — gen-time revisit handoff
 // uses get_current_block(), not curr_blk.
 // FunctionInvocationUser.cpp:287–289:
-//   assert(cg_context.get_current_block());
-//   add_visible_effect(*accum, get_current_block());
+//
+//	assert(cg_context.get_current_block());
+//	add_visible_effect(*accum, get_current_block());
+//
 // Visit path uses curr_blk (FunctionInvocation.cpp:543–546 / VisitFactsInvocation).
 // Mid-gen FP leaves CurrBlk on a nested statement parent; preferring AnalysisBlock
 // folds visible effects against the wrong frame (ok-var eligibility / seed-7 pool size).

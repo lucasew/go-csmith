@@ -209,7 +209,9 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 }
 
 // FunctionInvocation.cpp:536–541 — visit_facts builds
-//   CGContext new_context(cg, callee, effect_context, &fresh_accum)
+//
+//	CGContext new_context(cg, callee, effect_context, &fresh_accum)
+//
 // before revisit. Parent CurrRHS / EffectAccum must not leak into nested body
 // visit (Lhs.cpp:318–328 overlap uses curr_rhs; effect_accum shares would
 // corrupt the outer StatementAssign analysis — seed-2 func_49 e37241).
