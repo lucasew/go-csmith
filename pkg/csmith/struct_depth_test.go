@@ -66,7 +66,7 @@ func TestChooseRandomTypeFilterNoReturnUnionsGate(t *testing.T) {
 	u := &Type{isUnion: true, StructName: "U0", Used: false}
 	env.AllTypes = []*Type{u}
 	env.UnionTypes = []*Type{u}
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	found := false
 	for i := 0; i < 20; i++ {
 		ty := env.ChooseRandom(r, opts, probs, false)
@@ -103,7 +103,7 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	if typesComplete(bad) {
 		t.Fatal("StructTypes hole must IncompleteTypes")
 	}
-	if chooseRandomStructFromType(env, GetIntType(), true, NewRng(1)) != nil {
+	if chooseRandomStructFromType(env, GetIntType(), true, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete ok pool must fail closed nil, not invent keep original")
 	}
 	if !HasErrorSess(testAmbientSession) {

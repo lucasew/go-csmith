@@ -53,7 +53,7 @@ func TestPureGenStrictResidual(t *testing.T) {
 			testAmbientSession.NextStmID = marker
 			testAmbientSession.GenError = ErrSuccess
 			// Poison ambient RNG so residual ProcessRng draws would desync body.
-			testAmbientSession.Rng = NewRng(0xDEAD)
+			testAmbientSession.Rng = NewRngSess(testAmbientSession, 0xDEAD)
 			out, err := s.Generate(context.Background())
 			if err != nil {
 				t.Fatal(err)

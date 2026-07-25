@@ -26,7 +26,7 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 		f := &Function{Name: "f"}
 		// force non-pointer path by empty derived
 		vs.Types.DerivedTypes = nil
-		_ = vs.GenerateParameterVariable(f, NewRng(seed))
+		_ = vs.GenerateParameterVariable(f, NewRngSess(testAmbientSession, seed))
 		if len(f.Param) == 0 {
 			continue
 		}
@@ -47,7 +47,7 @@ func TestGenerateParameterVariablePointerChoice(t *testing.T) {
 	for seed := uint64(1); seed < 50; seed++ {
 		ClearErrorSess(testAmbientSession)
 		f := &Function{Name: "f"}
-		_ = vs.GenerateParameterVariable(f, NewRng(seed))
+		_ = vs.GenerateParameterVariable(f, NewRngSess(testAmbientSession, seed))
 		if len(f.Param) > 0 && f.Param[0].Type != nil && f.Param[0].Type.IsPointerLike() {
 			foundPtr = true
 			break
@@ -67,7 +67,7 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 	// empty Derived after flip: HasPointerType false → nonvoid path
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	f := &Function{Name: "f"}
-	v := vs.GenerateParameterVariable(f, NewRng(1))
+	v := vs.GenerateParameterVariable(f, NewRngSess(testAmbientSession, 1))
 	if v == nil || v.Type == nil {
 		t.Fatal("expected nonvoid param")
 	}
@@ -77,7 +77,7 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 	// nil Types → fail closed (no GetSimpleType invent)
 	vs2 := NewVariableSelector(testAmbientSession, opts)
 	vs2.Types = nil
-	if vs2.GenerateParameterVariable(&Function{Name: "g"}, NewRng(2)) != nil {
+	if vs2.GenerateParameterVariable(&Function{Name: "g"}, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("nil Types must not invent simple param")
 	}
 }

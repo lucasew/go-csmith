@@ -7,7 +7,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
 	vs.Opts = opts
@@ -18,7 +18,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 		blk := &Block{Func: f}
 		f.Stack = []*Block{blk}
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-		av := vs.CreateRandomArray(NewRng(seed), cg)
+		av := vs.CreateRandomArray(NewRngSess(testAmbientSession, seed), cg)
 		if av == nil || av.Type == nil {
 			continue
 		}
@@ -39,13 +39,13 @@ func TestChooseRandomNonvoidNonvolatile(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(3), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 3), opts, probs, env)
 	// inject volatile struct
 	volt := &Type{isStruct: true, StructName: "SV", Fields: []StructField{
 		{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
 	}}
 	env.AllTypes = append(env.AllTypes, volt)
-	r := NewRng(4)
+	r := NewRngSess(testAmbientSession, 4)
 	for i := 0; i < 50; i++ {
 		ty := env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
 		if ty != nil && ty.IsVolatileStructUnion() {
@@ -123,7 +123,7 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	// force global path: seed 25% — try several
 	var av *ArrayVariable
 	for seed := uint64(1); seed < 40; seed++ {
-		av = vs.CreateRandomArray(NewRng(seed), cg)
+		av = vs.CreateRandomArray(NewRngSess(testAmbientSession, seed), cg)
 		if av != nil && av.IsGlobalSess(testAmbientSession) {
 			break
 		}
@@ -451,7 +451,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
+	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewGlobal")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -462,7 +462,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntType(), nil, NewRng(2)) != nil {
+	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntType(), nil, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewNonArrayGlobal")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -475,7 +475,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm3)
-	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
+	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntType(), nil, NewRngSess(testAmbientSession, 3)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewParentLocal")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -498,7 +498,7 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false))).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	// VariableSelector.cpp — no soft invent int elem; nil OK when AcceptType rejects
-	av := vs.CreateRandomArray(NewRng(3), cg)
+	av := vs.CreateRandomArray(NewRngSess(testAmbientSession, 3), cg)
 	_ = av // may be nil when no acceptable element type
 }
 
@@ -512,7 +512,7 @@ func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
 	f.Stack = []*Block{nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = vs.Types
-	if vs.CreateRandomArray(NewRng(1), cg) != nil {
+	if vs.CreateRandomArray(NewRngSess(testAmbientSession, 1), cg) != nil {
 		t.Fatal("incomplete Stack must fail closed CreateRandomArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -544,7 +544,7 @@ func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
 	sawSticky := false
 	for seed := uint64(1); seed < 400; seed++ {
 		ClearErrorSess(testAmbientSession)
-		if vs.CreateRandomArray(NewRng(seed), cg) != nil {
+		if vs.CreateRandomArray(NewRngSess(testAmbientSession, seed), cg) != nil {
 			t.Fatalf("IsConstStructUnion residual must fail closed CreateRandomArray seed %d", seed)
 		}
 		if HasErrorSess(testAmbientSession) {

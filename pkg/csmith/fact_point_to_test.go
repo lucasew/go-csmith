@@ -166,7 +166,7 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 	if !parent.IsVirtualSess(testAmbientSession) {
 		t.Fatal("parent collective must be virtual")
 	}
-	item := parent.Itemize(NewRng(1))
+	item := parent.Itemize(NewRngSess(testAmbientSession, 1))
 	if item == nil || item.IsVirtualSess(testAmbientSession) {
 		t.Fatal("itemized member must not be virtual")
 	}
@@ -280,7 +280,7 @@ func TestIsValidPtr(t *testing.T) {
 	if !IsDanglingPtr(p, hole, 0) {
 		t.Fatal("incomplete facts must fail closed as dangling")
 	}
-	if OpportunisticValidate(NewRng(1), p, GetIntType(), hole, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntType(), hole, 0, 0) != 0 {
 		t.Fatal("incomplete facts must reject opportunistic validate")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -94,7 +94,7 @@ func TestSimpleTypeWeightsNoInt64(t *testing.T) {
 func TestChooseRandomNonvoidSimpleNeverVoid(t *testing.T) {
 	// Type::choose_random_nonvoid_simple with SIMPLE_TYPES_PROB_FILTER
 	p := NewProbabilities(Defaults())
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seen := map[ESimpleType]int{}
 	for i := 0; i < 200; i++ {
 		st := ChooseRandomNonvoidSimple(r, p)
@@ -115,10 +115,10 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	// Deterministic first draw: rnd_upto(14, filter) after seed 2.
 	// First genrand = 1959434203; scan until weight>0.
 	p := NewProbabilities(Defaults())
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	st := ChooseRandomNonvoidSimple(r, p)
 	// Manual: try v = raw%14 until not filtered.
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	raw := r2.Genrand()
 	v := raw % 14
 	for p.SimpleTypeWeight(int(v)) == 0 {
@@ -137,7 +137,7 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 		t.Fatal("nil RNG ChooseRandomNonvoidSimple must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomNonvoidSimple(NewRng(1), nil) != EVoid {
+	if ChooseRandomNonvoidSimple(NewRngSess(testAmbientSession, 1), nil) != EVoid {
 		t.Fatal("nil probs must fail closed EVoid")
 	}
 	if !HasErrorSess(testAmbientSession) {

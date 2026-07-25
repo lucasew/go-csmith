@@ -77,7 +77,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
-	fi := BuildInvocationAndFunction(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 	if fi == nil || fi.Failed || fi.User == nil {
 		t.Fatal("fail")
 	}
@@ -101,7 +101,7 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	_ = BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+	_ = BuildUserInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if !eff.IsWrittenSess(testAmbientSession, g) {
 		t.Fatal("external write into accum")
 	}

@@ -187,7 +187,7 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	f.Stack = []*Block{parent, thenArm}
 	beforeP, beforeT := len(parent.LocalVars), len(thenArm.LocalVars)
-	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntType(), nil, NewRng(5))
+	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 5))
 	if v == nil {
 		t.Fatal("nil var", HasErrorSess(testAmbientSession))
 	}
@@ -295,7 +295,7 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 
 	beforeOuter := len(outer.LocalVars)
 	beforeInner := len(inner.LocalVars)
-	v := vs.GenerateNewParentLocal(inner, AccessWrite, cg, GetIntType(), nil, NewRng(3))
+	v := vs.GenerateNewParentLocal(inner, AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 3))
 	if v == nil {
 		t.Fatal("nil var")
 	}
@@ -330,7 +330,7 @@ func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	beforeG := len(vs.GlobalList)
-	v := vs.GenerateNewParentLocal(blk, AccessRead, cg, st, nil, NewRng(1))
+	v := vs.GenerateNewParentLocal(blk, AccessRead, cg, st, nil, NewRngSess(testAmbientSession, 1))
 	if v == nil {
 		t.Fatal("nil")
 	}

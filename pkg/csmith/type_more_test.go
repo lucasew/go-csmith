@@ -587,10 +587,10 @@ func TestChooseRandomStructFromType(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	st := &Type{isStruct: true, StructName: "S0"}
 	env.AllTypes = []*Type{st}
-	if env.ChooseRandomStructFromType(NewRng(1), st, false) != st {
+	if env.ChooseRandomStructFromType(NewRngSess(testAmbientSession, 1), st, false) != st {
 		t.Fatal("same")
 	}
-	got := ChooseRandomStructUnionType(NewRng(2), []*Type{st})
+	got := ChooseRandomStructUnionType(NewRngSess(testAmbientSession, 2), []*Type{st})
 	if got != st {
 		t.Fatal(got)
 	}
@@ -598,15 +598,15 @@ func TestChooseRandomStructFromType(t *testing.T) {
 
 func TestIfStructAssignOps(t *testing.T) {
 	opts := Defaults()
-	if IfStructWillHaveAssignOps(NewRng(1), opts, NewProbabilities(opts)) {
+	if IfStructWillHaveAssignOps(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts)) {
 		t.Fatal("C mode false")
 	}
 	opts.LangCPP = true
 	// may or may not flip — just exercise
-	_ = IfUnionWillHaveAssignOps(NewRng(3), opts, NewProbabilities(opts))
+	_ = IfUnionWillHaveAssignOps(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts))
 	// nil probs → 0% (no invent default 50)
 	for seed := uint64(1); seed < 30; seed++ {
-		if IfStructWillHaveAssignOps(NewRng(seed), opts, nil) {
+		if IfStructWillHaveAssignOps(NewRngSess(testAmbientSession, seed), opts, nil) {
 			t.Fatal("nil probs must not invent assign-ops true at 50%")
 		}
 	}
@@ -623,11 +623,11 @@ func TestIfStructAssignOps(t *testing.T) {
 
 func TestMoreTypesProbabilityNilProbs(t *testing.T) {
 	// below threshold still true; above threshold nil probs → 0% not invent 50
-	if !MoreTypesProbability(NewRng(1), nil, 5) {
+	if !MoreTypesProbability(NewRngSess(testAmbientSession, 1), nil, 5) {
 		t.Fatal("count<10 always true")
 	}
 	for seed := uint64(1); seed < 40; seed++ {
-		if MoreTypesProbability(NewRng(seed), nil, 20) {
+		if MoreTypesProbability(NewRngSess(testAmbientSession, seed), nil, 20) {
 			t.Fatal("nil probs past threshold must not invent 50% true")
 		}
 	}

@@ -10,10 +10,10 @@ func TestMakeExpressionAssign(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// ExpressionAssign.cpp:56–62 — get_fact_mgr always live
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	e := func() *Expression {
 		c := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		return MakeExpressionAssign(r, opts, probs, vs, tables, &c, GetIntType(), nil)
@@ -32,7 +32,7 @@ func TestMakeExpressionAssignRequiresFactMgr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	e := MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntType(), nil)
+	e := MakeExpressionAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntType(), nil)
 	if e != nil {
 		t.Fatal("nil FM must fail closed")
 	}
@@ -62,7 +62,7 @@ func TestPickTermAssignmentDepthOk(t *testing.T) {
 	tables := NewExprTables(opts)
 	// depth 0 allows assignment in table
 	found := false
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 80; i++ {
 		tt := PickTermType(r, tables, opts, GetIntType(), false, false, 0)
 		if tt == TermAssignment {
@@ -98,7 +98,7 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
+	if MakeExpressionAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -108,7 +108,7 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if MakeExpressionAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType(), nil) != nil {
+	if MakeExpressionAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeExpressionAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -132,7 +132,7 @@ func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// incomplete EffectStm sticky before MakeExpressionAssign
 	cg.EffectStm = IncompleteEffect()
-	if MakeExpressionAssign(NewRng(1), opts, probs, vs, tables, &cg, GetIntType(), nil) != nil {
+	if MakeExpressionAssign(NewRngSess(testAmbientSession, 1), opts, probs, vs, tables, &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectStm must fail closed MakeExpressionAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -143,7 +143,7 @@ func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 
 func TestMakeExpressionAssignNilCGSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if MakeExpressionAssign(NewRng(1), Defaults(), nil, nil, nil, nil, GetIntType(), nil) != nil {
+	if MakeExpressionAssign(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil, nil, GetIntType(), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

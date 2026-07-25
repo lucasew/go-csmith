@@ -90,7 +90,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -111,7 +111,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// force SelectArray to return our av by only having one
-	st := MakeRandomArrayInit(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatalf("kind %v", st.Kind)
 	}
@@ -153,7 +153,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntType(), MakeInt(0), q)
 	av.Sizes = nil
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -161,7 +161,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomArrayInit(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	// empty dims → fail (no soft invent size [1] or access[0])
 	if st.Loop != nil || st.Then != nil {
 		t.Fatal("empty sizes must not soft-succeed")
@@ -173,7 +173,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	// no float types in simple select — just ensure no panic with empty filter path
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{4}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -183,7 +183,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomArrayInit(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Loop == nil && st.Then == nil {
 		t.Fatal("empty")
 	}
@@ -197,17 +197,17 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
-	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	v := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
 	// FactMgr required when condition may build ExpressionAssign
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = vs.Types
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
-	st := MakeRandomIf(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
 	}

@@ -87,7 +87,7 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	opts := Defaults()
 	opts.Builtins = true
 	list := &FunctionList{}
-	f := MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil,
+	f := MakeBuiltinFunction(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil,
 		"Int; __builtin_clz; (UInt); x86")
 	if f == nil || !f.IsBuiltin || f.Name != "__builtin_clz" {
 		t.Fatal(f)
@@ -108,7 +108,7 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	}
 	// empty name token — sticky no invent shell
 	ClearErrorSess(testAmbientSession)
-	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "Int; ; (UInt); x86") != nil {
+	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "Int; ; (UInt); x86") != nil {
 		t.Fatal("empty builtin name must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -123,7 +123,7 @@ func TestMakeBuiltinFunction(t *testing.T) {
 		t.Fatal("nil RNG must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "badformat") != nil {
+	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "badformat") != nil {
 		t.Fatal("invalid format must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -136,7 +136,7 @@ func TestInitializeBuiltinFunctions(t *testing.T) {
 	opts := Defaults()
 	opts.Builtins = true
 	list := &FunctionList{}
-	n := InitializeBuiltinFunctions(opts, NewProbabilities(opts), NewRng(2), list, nil)
+	n := InitializeBuiltinFunctions(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 2), list, nil)
 	// x86 builtins only by default (~18)
 	if n < 10 || n > 25 {
 		t.Fatal(n, len(list.Funcs))
@@ -205,7 +205,7 @@ func TestChooseFuncCanPickBuiltin(t *testing.T) {
 	opts.BuiltinFunctionProb = 100
 	bi := &Function{Name: "__builtin_clz", ReturnType: GetIntType(), IsBuiltin: true, BuildState: BuildBuilt, IsBuilt: true}
 	user := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
-	got := ChooseFuncContext(NewRng(3), []*Function{user, bi}, GetIntType(), nil, nil, opts, nil)
+	got := ChooseFuncContext(NewRngSess(testAmbientSession, 3), []*Function{user, bi}, GetIntType(), nil, nil, opts, nil)
 	if got != bi {
 		t.Fatalf("want builtin got %v", got)
 	}

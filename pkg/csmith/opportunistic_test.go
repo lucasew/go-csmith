@@ -5,18 +5,18 @@ import "testing"
 func TestOpportunisticValidateNoDeref(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	if OpportunisticValidate(NewRng(1), v, GetIntType(), nil, 0, 0) != 1 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), v, GetIntType(), nil, 0, 0) != 1 {
 		t.Fatal("same level")
 	}
 	// nil var/type sticky — no invent not-valid soft success past hole
-	if OpportunisticValidate(NewRng(1), nil, GetIntType(), nil, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), nil, GetIntType(), nil, 0, 0) != 0 {
 		t.Fatal("nil var must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var OpportunisticValidate must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if OpportunisticValidate(NewRng(1), v, nil, nil, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), v, nil, nil, 0, 0) != 0 {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -29,11 +29,11 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// nil facts is complete empty — no related fact → 0
-	if OpportunisticValidate(NewRng(1), p, GetIntType(), nil, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntType(), nil, 0, 0) != 0 {
 		t.Fatal("no fact")
 	}
 	// incomplete map hole → 0 sticky (not invent ok / soft re-pick past hole)
-	if OpportunisticValidate(NewRng(1), p, GetIntType(), []*FactPointTo{nil}, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntType(), []*FactPointTo{nil}, 0, 0) != 0 {
 		t.Fatal("incomplete must reject")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -42,7 +42,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// null, prob 0 → 0; FactPointTo.cpp:455 still rnd_flipcoin(0)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	rNull := NewRng(1)
+	rNull := NewRngSess(testAmbientSession, 1)
 	d0 := rNull.RandDepth()
 	if OpportunisticValidate(rNull, p, GetIntType(), facts, 0, 0) != 0 {
 		t.Fatal("null blocked")
@@ -53,7 +53,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	// live target → 1 (no flip when not null/dead)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	facts = []*FactPointTo{MakeFactPointTo(p, tgt)}
-	rLive := NewRng(1)
+	rLive := NewRngSess(testAmbientSession, 1)
 	dLive := rLive.RandDepth()
 	if OpportunisticValidate(rLive, p, GetIntType(), facts, 0, 0) != 1 {
 		t.Fatal("live")
@@ -63,7 +63,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	}
 	// garbage, prob 0 → 0; FactPointTo.cpp:464 still rnd_flipcoin(0)
 	facts = []*FactPointTo{NewFactPointTo(p)}
-	rDead := NewRng(1)
+	rDead := NewRngSess(testAmbientSession, 1)
 	dDead := rDead.RandDepth()
 	if OpportunisticValidate(rDead, p, GetIntType(), facts, 0, 0) != 0 {
 		t.Fatal("dead blocked")
@@ -79,7 +79,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	// make dead+null fact: NewFactPointTo is garbage/dead; force null+dead via fields
 	fBoth := MakeFactPointTo(p, NullPtr)
 	// IsDead for null pointees? if only null, one flip. dead-only above. allow-unsafe path:
-	rAllow := NewRng(1)
+	rAllow := NewRngSess(testAmbientSession, 1)
 	if OpportunisticValidate(rAllow, p, GetIntType(), []*FactPointTo{fBoth}, 100, 0) != 2 {
 		// p=100 always allows null unsafe when is_null
 		t.Fatal("null with nullProb=100 must allow ret=2")
@@ -116,7 +116,7 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 		Collective: coll,
 	}
 	item.AsArray = item
-	if OpportunisticValidate(NewRng(1), &item.Variable, elem, facts, 0, 0) != 1 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), &item.Variable, elem, facts, 0, 0) != 1 {
 		t.Fatal("itemized must find fact via get_collective()")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -124,7 +124,7 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 	}
 	// fact keyed only on item (not collective) must miss when looking up via collective
 	factsItemOnly := []*FactPointTo{MakeFactPointTo(&item.Variable, tgt)}
-	if OpportunisticValidate(NewRng(1), &item.Variable, elem, factsItemOnly, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), &item.Variable, elem, factsItemOnly, 0, 0) != 0 {
 		t.Fatal("fact on item alone must miss when lookup uses collective identity")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -274,7 +274,7 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
-	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	// force a volatile field if possible — check method on non-vol struct pointer
 	pt := PointerTo(st)
 	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -313,7 +313,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	opts.CompatibleCheck = true
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(2))
+	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 2))
 	if g == nil {
 		t.Fatal("g")
 	}
@@ -323,7 +323,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 		ClearErrorSess(testAmbientSession) // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
 			c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-			return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
+			return MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
 		}()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)

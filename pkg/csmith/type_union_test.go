@@ -12,7 +12,7 @@ func TestMakeRandomUnionType(t *testing.T) {
 	env := TypeEnv{Sess: testAmbientSession}
 	// Type.cpp shared sid: after any prior aggregates, next union is U{seq} not always U0
 	env.AllTypes = []*Type{GetIntType()}
-	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "")
+	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 3), opts, probs, &env, "")
 	if ut == nil || !ut.IsUnion() || len(ut.Fields) < 1 {
 		t.Fatal(ut)
 	}
@@ -24,11 +24,11 @@ func TestMakeRandomUnionType(t *testing.T) {
 		t.Fatal(decl)
 	}
 	// after S0, next union is U1
-	st := MakeRandomStructType(NewRng(4), opts, probs, &env, "")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 4), opts, probs, &env, "")
 	if st == nil || st.StructName != "S1" {
 		t.Fatalf("second aggregate want S1, got %v", st)
 	}
-	ut2 := MakeRandomUnionType(NewRng(5), opts, probs, &env, "")
+	ut2 := MakeRandomUnionType(NewRngSess(testAmbientSession, 5), opts, probs, &env, "")
 	if ut2 == nil || ut2.StructName != "U2" {
 		t.Fatalf("third aggregate want U2, got %v name=%q", ut2, func() string {
 			if ut2 == nil {
@@ -52,7 +52,7 @@ func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
 			{Name: "f1", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	c := MakeUnionConstant(NewRng(2), opts, probs, ut)
+	c := MakeUnionConstant(NewRngSess(testAmbientSession, 2), opts, probs, ut)
 	if c == nil {
 		t.Fatal("union constant")
 	}

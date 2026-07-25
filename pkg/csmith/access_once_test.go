@@ -17,7 +17,7 @@ func TestAccessOnceMarking(t *testing.T) {
 	// force many creates until AccessOnce set
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
 		if v != nil && v.IsAccessOnce {
 			found = true
@@ -63,13 +63,13 @@ func TestForSafeIncrEmit(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	// StatementFor.cpp:172 assert(blk) — parent on stack after MakeFirst
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	st := MakeRandomFor(NewRng(5), opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 5), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Loop == nil {
 		t.Skip("no for")
 	}

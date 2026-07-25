@@ -11,12 +11,12 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	var list FunctionList
 	seedTypesForTest(r, opts, probs, vs, &list)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(&list)
-	st := MakeRandomExprStmt(NewRng(7), opts, probs, vs, tables, &cg)
+	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 7), opts, probs, vs, tables, &cg)
 	// success → Kind Invoke + expr; fail → empty (nullptr), not Kind-only shell
 	if st.Expr != nil {
 		if st.Kind != StmtInvoke {
@@ -91,7 +91,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	preEff := eff.CloneSess(testAmbientSession)
 	preFacts := CloneFactSlice(fm.GlobalFacts)
 	// invoke may fail or succeed; if fail, empty Stmt + state restored
-	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg)
+	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg)
 	if !stmtOK(st) {
 		// rollback path (nullptr factory)
 		if st.Kind != 0 {
@@ -200,7 +200,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	cg.EffectAccum = &eff
 	// try several seeds for a successful invoke stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		st := MakeRandomExprStmt(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg)
+		st := MakeRandomExprStmt(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg)
 		if st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
 			// Statement.cpp:364–367 — Statement ctor always assigns stm_id
 			if st.StmID == 0 {
@@ -216,7 +216,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 func TestMakeRandomExprStmtNilCGFailClosed(t *testing.T) {
 	// StatementExpr.cpp always has CGContext; sticky no invent Kind shell
 	ClearErrorSess(testAmbientSession)
-	st := MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil)
+	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil, nil)
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil cg invent %#v", st)
 	}

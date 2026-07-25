@@ -82,7 +82,7 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	item.AsArray = item
 	// may-null on collective (post_loop / merge lattice)
 	facts := []*FactPointTo{MakeFactPointToSet(&coll.Variable, []*Variable{NullPtr, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)})}
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	d0 := r.RandDepth()
 	// need one more indir than var for validate to check null
 	got := OpportunisticValidate(r, &item.Variable, GetIntType(), facts, 0, 0)
@@ -94,7 +94,7 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	}
 	// pure non-null: no flipcoin
 	live := []*FactPointTo{MakeFactPointTo(&coll.Variable, CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntType(), false, false))}
-	r2 := NewRng(1)
+	r2 := NewRngSess(testAmbientSession, 1)
 	d1 := r2.RandDepth()
 	if OpportunisticValidate(r2, &item.Variable, GetIntType(), live, 0, 0) != 1 {
 		t.Fatal("pure live must accept without null flip")

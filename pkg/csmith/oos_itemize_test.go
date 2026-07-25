@@ -57,12 +57,12 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 
 func TestChooseOKVarItemizesArray(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil || av.AsArray == nil {
 		t.Fatal("av")
 	}
 	// sole array → itemize consumes per-dim RNG
-	r := NewRng(5)
+	r := NewRngSess(testAmbientSession, 5)
 	got := ChooseOKVar(r, []*Variable{&av.Variable})
 	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
 		t.Fatalf("itemize %+v", got)
@@ -76,9 +76,9 @@ func TestRandomTypeFromTypeNoVolatile(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	// should not panic; with noVolatile prefer nonvol path
-	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, true, false)
+	ty := RandomTypeFromType(NewRngSess(testAmbientSession, 3), env, opts, probs, nil, true, false)
 	if ty == nil {
 		t.Fatal("nil")
 	}
@@ -89,7 +89,7 @@ func TestVariableMatchAggregate(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
-	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Skip("no fields")

@@ -12,8 +12,8 @@ func TestMakeFirstCreatesFactMgr(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	m := NewFactMgrMapSess(testAmbientSession)
 	list := FunctionList{}
-	seedTypesForTest(NewRng(2), opts, probs, vs, &list)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), &list, m)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, &list)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), &list, m)
 	if f == nil {
 		t.Fatal("nil")
 	}

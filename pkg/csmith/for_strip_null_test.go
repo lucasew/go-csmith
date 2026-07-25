@@ -18,7 +18,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
-	SetProcessRngSess(testAmbientSession, NewRng(1))
+	SetProcessRngSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 
 	i32 := GetIntType()
 	pt := PointerTo(i32)
@@ -88,7 +88,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	}
 
 	nBefore := len(body.Stmts)
-	body.PostCreationAnalysis(&cg, opts, pre, NewRng(1), nil)
+	body.PostCreationAnalysis(&cg, opts, pre, NewRngSess(testAmbientSession, 1), nil)
 	ClearErrorSess(testAmbientSession)
 	if len(body.Stmts) != 0 {
 		t.Fatalf("Block.cpp:709–714: self-back may-null re-entry must strip if; before=%d after=%d",
@@ -172,7 +172,7 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 		fm.SetMapStmEffect(id, EmptyEffect())
 	}
 	nBefore := len(body.Stmts)
-	body.PostCreationAnalysis(&cg, opts, pre, NewRng(1), nil)
+	body.PostCreationAnalysis(&cg, opts, pre, NewRngSess(testAmbientSession, 1), nil)
 	ClearErrorSess(testAmbientSession)
 	if len(body.Stmts) != nBefore {
 		t.Fatalf("must_return loop body must not self-back-strip (is_loop_body false); before=%d after=%d",

@@ -8,7 +8,7 @@ import (
 func TestMakeRandomSignatureSetsAlias(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
+	f := MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
 	if f == nil || f.AliasName != f.Name+"_alias" {
 		t.Fatalf("%+v", f)
 	}
@@ -61,7 +61,7 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	env.AllTypes = []*Type{GetIntType(), deep}
 	// force nested pick: many trials with seed that might pick nest — with max 1, all rejected → simple
 	for seed := uint64(1); seed < 40; seed++ {
-		f := MakeOneStructField(NewRng(seed), opts, probs, env, 0)
+		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
 		if f.Type != nil && f.Type.IsStruct() {
 			t.Fatalf("nested not allowed at max=1 got %s depth %d", f.Type.StructName, f.Type.StructDepth())
 		}
@@ -70,7 +70,7 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	opts.MaxNestedStructLevel = 2
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
-		f := MakeOneStructField(NewRng(seed), opts, probs, env, 0)
+		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.StructName == "Sdeep" {
 			found = true
 			break

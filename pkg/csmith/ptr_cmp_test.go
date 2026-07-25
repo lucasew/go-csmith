@@ -26,7 +26,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 		cg2.Types = env
 		eff2 := EmptyEffect()
 		cg2.EffectAccum = &eff2
-		fi = MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg2, env)
+		fi = MakeRandomBinaryPtrComparison(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg2, env)
 		if fi != nil {
 			break
 		}
@@ -67,7 +67,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	// And flags consume draws before any ChooseRandomPointerType U(n=1)
 	// Use Rng depth only through the flag section via a harness that stops early:
 	// Compare two runs: pure MakeRandomBinaryKind depth vs full ptr-cmp prefix.
-	rFlags := NewRng(7)
+	rFlags := NewRngSess(testAmbientSession, 7)
 	d0 := rFlags.RandDepth()
 	// eq/ne draw alone
 	eqFlip := rFlags.RndFlipcoin(50)
@@ -90,12 +90,12 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		cg.Types = env
-		fi := MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, env)
+		fi := MakeRandomBinaryPtrComparison(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg, env)
 		if fi == nil {
 			continue
 		}
 		// Replay first flip alone with same seed
-		r0 := NewRng(seed)
+		r0 := NewRngSess(testAmbientSession, seed)
 		wantEq := r0.RndFlipcoin(50)
 		if wantEq && fi.Binary == "==" {
 			foundEq = true
@@ -128,7 +128,7 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	for seed := uint64(1); seed < 100; seed++ {
-		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, GetIntType())
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg, GetIntType())
 		if fi != nil && fi.PtrCmp {
 			if fi.Binary != "==" && fi.Binary != "!=" {
 				t.Fatal(fi.Binary)

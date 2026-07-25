@@ -16,7 +16,7 @@ func ReinstallTestProcessSingletons() {
 	testAmbientSession = newSession()
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	SetProcessRngSess(testAmbientSession, NewRng(1))
+	SetProcessRngSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	InitScopeTableSess(testAmbientSession, opts)
 	InitSessionProbabilityTablesSess(testAmbientSession, opts)

@@ -50,7 +50,7 @@ func TestOutputDefWithAttrs(t *testing.T) {
 	currentSession().VarAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 	}}
-	s := v.OutputDefFullSess(testAmbientSession, true, false, true, NewRng(1))
+	s := v.OutputDefFullSess(testAmbientSession, true, false, true, NewRngSess(testAmbientSession, 1))
 	if !strings.Contains(s, "__attribute__((unused))") {
 		t.Fatal(s)
 	}
@@ -63,7 +63,7 @@ func TestOutputFuncWithAttrs(t *testing.T) {
 	currentSession().FuncAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "noinline", Prob: 100},
 	}}
-	d := f.OutputForwardDeclOpts(true, NewRng(1), true)
+	d := f.OutputForwardDeclOpts(true, NewRngSess(testAmbientSession, 1), true)
 	if !strings.Contains(d, "static ") || !strings.Contains(d, "noinline") {
 		t.Fatal(d)
 	}

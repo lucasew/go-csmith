@@ -99,7 +99,7 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
+	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntType())
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -149,7 +149,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// make block — should tend to returns when stop is low
-	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil")
@@ -221,7 +221,7 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 	// StatementAssign.cpp:543 — avoid_signed_overflow() && op_flags
 	// no soft invent safe_* when SafeMath off despite flags present
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
+	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntType())
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -264,7 +264,7 @@ func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
 	opts.Consts = true
 	opts.Volatiles = true
 	// with real probs, may get bits; with nil, always non-const/non-vol under Regular*
-	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), false, opts, nil, NewRng(1))
+	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), false, opts, nil, NewRngSess(testAmbientSession, 1))
 	if q.IsConstSess(testAmbientSession) || q.IsVolatileSess(testAmbientSession) {
 		t.Fatal("nil probs must not invent non-zero regular const/vol")
 	}

@@ -31,7 +31,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	// Fixed seed that may add offset; accept g_106[4] or (g_106[4] + N)
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	ivParent := &ArrayVariable{
 		Variable: Variable{Name: "g_106", Type: GetIntType(), IsArray: true, ArraySizes: []int{5}},

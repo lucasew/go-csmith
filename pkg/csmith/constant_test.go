@@ -7,7 +7,7 @@ import (
 
 func TestMakeRandomPointerIsZero(t *testing.T) {
 	// Constant.cpp: pointer → "0", no RNG
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	c := MakeRandom(PointerTo(GetSimpleType(EInt)), Defaults(), nil, r)
 	if c.Value != "0" {
 		t.Fatalf("pointer const: %q", c.Value)
@@ -20,7 +20,7 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 func TestMakeRandomVoidFailClosed(t *testing.T) {
 	// Constant.cpp:312 — assert(st != eVoid) sticky; no invent "/* void */" / soft success
 	ClearErrorSess(testAmbientSession)
-	c := MakeRandom(GetSimpleType(EVoid), Defaults(), nil, NewRng(1))
+	c := MakeRandom(GetSimpleType(EVoid), Defaults(), nil, NewRngSess(testAmbientSession, 1))
 	if c != nil {
 		t.Fatalf("void constant must fail closed, got %+v", c)
 	}
@@ -29,7 +29,7 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type* always live; sticky no invent Constant{Type:nil, Value:"0"} shell
-	if MakeRandom(nil, Defaults(), nil, NewRng(1)) != nil {
+	if MakeRandom(nil, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil type MakeRandom must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -45,7 +45,7 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Constant.cpp:411 unsupported kind sticky
-	if MakeRandom(&Type{}, Defaults(), nil, NewRng(1)) != nil {
+	if MakeRandom(&Type{}, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("non-simple/non-ptr MakeRandom must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -61,14 +61,14 @@ func TestMakeRandomIntHexPathSeed2(t *testing.T) {
 	opts := Defaults()
 	// Find a seed where first flipcoin(50) is false for eInt hex path.
 	for seed := uint64(0); seed < 200; seed++ {
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		if r.RndFlipcoin(50) {
 			continue // small path
 		}
 		// hex path: RandomHexDigits(8) then + L
 		hex := r.RandomHexDigits(8)
 		want := "0x" + hex + "L"
-		r2 := NewRng(seed)
+		r2 := NewRngSess(testAmbientSession, seed)
 		c := MakeRandom(GetSimpleType(EInt), opts, nil, r2)
 		if c.Value != want {
 			t.Fatalf("seed %d: got %q want %q", seed, c.Value, want)
@@ -81,7 +81,7 @@ func TestMakeRandomIntHexPathSeed2(t *testing.T) {
 func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 	opts := Defaults()
 	for seed := uint64(0); seed < 200; seed++ {
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		if !r.RndFlipcoin(50) {
 			continue // need small path
 		}
@@ -93,7 +93,7 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 			num = int(r.RndUpto(20)) - 10
 		}
 		want := formatSmallConstant(EInt, num, opts)
-		r2 := NewRng(seed)
+		r2 := NewRngSess(testAmbientSession, seed)
 		c := MakeRandom(GetSimpleType(EInt), opts, nil, r2)
 		if c.Value != want {
 			t.Fatalf("seed %d: got %q want %q", seed, c.Value, want)
@@ -105,13 +105,13 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 
 func TestMakeRandomUpto(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// first RndUpto(10) = 3 for seed2
 	c := MakeRandomUpto(10, r)
 	if c.Value != "3" || c.Type != GetSimpleType(EUInt) {
 		t.Fatalf("%+v", c)
 	}
-	// Constant.cpp always has RNG; sticky no invent NewRng(0)
+	// Constant.cpp always has RNG; sticky no invent NewRngSess(testAmbientSession, 0)
 	if MakeRandomUpto(10, nil) != nil {
 		t.Fatal("nil RNG MakeRandomUpto must fail closed")
 	}
@@ -132,7 +132,7 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 	// Constant.cpp:192–196 — pure_rnd_flipcoin(50) chooses + or − exp; no invent always +
 	sawPlus, sawMinus := false, false
 	for seed := uint64(1); seed < 40; seed++ {
-		s := generateRandomFloatHexConstant(NewRng(seed))
+		s := generateRandomFloatHexConstant(NewRngSess(testAmbientSession, seed))
 		if s == "" {
 			t.Fatal("nil rng invent empty")
 		}
@@ -185,7 +185,7 @@ func TestBinaryConstantPath(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, probs)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	s := generateRandomIntConstant(opts, NewRng(1))
+	s := generateRandomIntConstant(opts, NewRngSess(testAmbientSession, 1))
 	if !strings.HasPrefix(s, "0b") {
 		t.Fatalf("want binary int, got %q", s)
 	}
@@ -196,14 +196,14 @@ func TestBinaryConstantPath(t *testing.T) {
 		}
 	}
 	// long long binary includes LL
-	sll := generateRandomLongLongConstant(opts, NewRng(1))
+	sll := generateRandomLongLongConstant(opts, NewRngSess(testAmbientSession, 1))
 	if !strings.HasPrefix(sll, "0b") || !strings.HasSuffix(sll, "LL") {
 		t.Fatalf("ll binary %q", sll)
 	}
 	// BinaryConstant off → never invent 0b
 	opts.BinaryConstant = false
 	for seed := uint64(1); seed < 20; seed++ {
-		s = generateRandomIntConstant(opts, NewRng(seed))
+		s = generateRandomIntConstant(opts, NewRngSess(testAmbientSession, seed))
 		if strings.HasPrefix(s, "0b") {
 			t.Fatalf("binary off invent %q", s)
 		}
@@ -235,7 +235,7 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 	opts := Defaults()
 	opts.MarkMutableConst = true
 	// force deterministic simple path via MakeRandom int
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	c := MakeRandom(GetSimpleType(EInt), opts, nil, r)
 	if c == nil || c.Value == "" {
 		t.Fatal("nil const")
@@ -244,19 +244,19 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 		t.Fatalf("want paren wrap, got %q", c.Value)
 	}
 	// pointer is not simple wrap path in C++ (type ePointer, not eSimple)
-	c2 := MakeRandom(PointerTo(GetIntType()), opts, nil, NewRng(1))
+	c2 := MakeRandom(PointerTo(GetIntType()), opts, nil, NewRngSess(testAmbientSession, 1))
 	if c2 == nil || c2.Value != "0" {
 		t.Fatalf("pointer must stay 0, got %+v", c2)
 	}
 	// off → no invent wrap
 	opts.MarkMutableConst = false
-	c3 := MakeRandom(GetSimpleType(EInt), opts, nil, NewRng(2))
+	c3 := MakeRandom(GetSimpleType(EInt), opts, nil, NewRngSess(testAmbientSession, 2))
 	if c3 == nil || strings.HasPrefix(c3.Value, "(") {
 		t.Fatalf("off must not wrap, got %q", c3.Value)
 	}
 	// bitfield InRange also wraps
 	opts.MarkMutableConst = true
-	s := GenerateRandomConstantInRange(GetIntType(), 8, opts, NewRng(3))
+	s := GenerateRandomConstantInRange(GetIntType(), 8, opts, NewRngSess(testAmbientSession, 3))
 	if s == "" || !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") {
 		t.Fatalf("InRange wrap got %q", s)
 	}
@@ -265,19 +265,19 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	// Constant.cpp:207–223 — RandomHexDigits(1) + flipcoin ±1; no invent from num%
 	// positive num
-	s := generateSmallRandomFloatHexConstant(2, NewRng(1))
+	s := generateSmallRandomFloatHexConstant(2, NewRngSess(testAmbientSession, 1))
 	if !strings.HasPrefix(s, "0x2.") || !strings.Contains(s, "p") {
 		t.Fatalf("got %q", s)
 	}
 	// negative num → -0x…
-	s = generateSmallRandomFloatHexConstant(-3, NewRng(2))
+	s = generateSmallRandomFloatHexConstant(-3, NewRngSess(testAmbientSession, 2))
 	if !strings.HasPrefix(s, "-0x3.") {
 		t.Fatalf("neg got %q", s)
 	}
 	// both p+1 and p-1 across seeds
 	sawP, sawM := false, false
 	for seed := uint64(1); seed < 30; seed++ {
-		s = generateSmallRandomFloatHexConstant(1, NewRng(seed))
+		s = generateSmallRandomFloatHexConstant(1, NewRngSess(testAmbientSession, seed))
 		if strings.HasSuffix(s, "p+1") {
 			sawP = true
 		}
@@ -310,7 +310,7 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
 	// AbsRndNumGenerator always has live RNG sticky
 	ClearErrorSess(testAmbientSession)
-	if NewRng(1).RandomHexDigits(0) != "" {
+	if NewRngSess(testAmbientSession, 1).RandomHexDigits(0) != "" {
 		t.Fatal("num<=0 returns empty non-sticky")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -329,7 +329,7 @@ func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent Constant void shell past eVoid.
 	ClearErrorSess(testAmbientSession)
 	vt := GetSimpleType(EVoid)
-	if MakeRandom(vt, Defaults(), nil, NewRng(1)) != nil {
+	if MakeRandom(vt, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("void MakeRandom must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -337,7 +337,7 @@ func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Type sticky
-	if MakeRandom(nil, Defaults(), nil, NewRng(1)) != nil {
+	if MakeRandom(nil, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil Type MakeRandom must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -348,7 +348,7 @@ func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 
 func TestMakeRandomNonzero(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	c := MakeRandomNonzero(GetIntType(), opts, probs, r)

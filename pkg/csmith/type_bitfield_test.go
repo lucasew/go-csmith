@@ -9,7 +9,7 @@ func TestMakeOneBitfieldWidth(t *testing.T) {
 	opts := Defaults()
 	opts.IntSize = 4
 	probs := NewProbabilities(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	f := MakeOneBitfield(r, opts, probs, 0, true)
 	if f.BitWidth < 0 || f.BitWidth > 32 {
 		t.Fatal(f.BitWidth)
@@ -31,7 +31,7 @@ func TestMakeRandomStructTypeCanHaveBitfields(t *testing.T) {
 		env := TypeEnv{Sess: testAmbientSession}
 		// Type.cpp AllTypes has simples before make_random_struct_type
 		env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
-		st := MakeRandomStructType(NewRng(seed), opts, probs, &env, "S0")
+		st := MakeRandomStructType(NewRngSess(testAmbientSession, seed), opts, probs, &env, "S0")
 		if st == nil {
 			// ERROR_GUARD / empty field path fail closed — retry seed
 			ClearErrorSess(testAmbientSession)
@@ -58,7 +58,7 @@ func TestMakeRandomStructTypeFailClosedEmptyEnv(t *testing.T) {
 	probs := NewProbabilities(opts)
 	ClearErrorSess(testAmbientSession)
 	// empty AllTypes → MakeOneStructField fails; whole struct abort
-	st := MakeRandomStructType(NewRng(1), opts, probs, &TypeEnv{Sess: testAmbientSession}, "Sempty")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 1), opts, probs, &TypeEnv{Sess: testAmbientSession}, "Sempty")
 	if st != nil {
 		// only succeeds if full-bitfields path never needs ChooseRandom
 		for _, f := range st.Fields {
@@ -197,7 +197,7 @@ func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	opts := Defaults()
 	opts.IntSize = 0
 	probs := NewProbabilities(opts)
-	f := MakeOneBitfield(NewRng(2), opts, probs, 0, true)
+	f := MakeOneBitfield(NewRngSess(testAmbientSession, 2), opts, probs, 0, true)
 	if f.Type != nil || f.BitWidth >= 0 {
 		t.Fatalf("IntSize 0 must fail closed, got %+v", f)
 	}
@@ -207,7 +207,7 @@ func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	// normal IntSize still works after ClearError
 	ClearErrorSess(testAmbientSession)
 	opts.IntSize = 4
-	f2 := MakeOneBitfield(NewRng(2), opts, probs, 0, true)
+	f2 := MakeOneBitfield(NewRngSess(testAmbientSession, 2), opts, probs, 0, true)
 	if f2.Type == nil || f2.BitWidth < 1 || f2.BitWidth > 32 {
 		t.Fatalf("want live bitfield, got %+v", f2)
 	}
@@ -221,7 +221,7 @@ func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
 	opts.Bitfields = false
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	if st := MakeRandomStructType(NewRng(1), opts, probs, env, "S0"); st != nil {
+	if st := MakeRandomStructType(NewRngSess(testAmbientSession, 1), opts, probs, env, "S0"); st != nil {
 		t.Fatalf("fixed max 0 must not invent struct, got %d fields", len(st.Fields))
 	}
 }

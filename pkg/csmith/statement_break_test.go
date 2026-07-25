@@ -11,7 +11,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -22,7 +22,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	// StatementBreak.cpp:76 — clear effect_stm on CGContext& before condition
 	pre := CreateVariableScalarsSess(testAmbientSession, "g_pre", GetIntType(), false, false)
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, pre)
-	st := MakeRandomBreak(NewRng(9), opts, vs, tables, &cg)
+	st := MakeRandomBreak(NewRngSess(testAmbientSession, 9), opts, vs, tables, &cg)
 	if st.Kind != StmtBreak {
 		t.Fatalf("%v", st.Kind)
 	}
@@ -112,13 +112,13 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(2))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 2))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// force non-init path: flipcoin(5) false — seed until we get array loop (for) not array_init
 	var got *Stmt
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		st := MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
+		st := MakeRandomArrayOp(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st.Kind == StmtFor && st.Loop != nil && st.Then != nil {
 			got = &st
 			break
@@ -176,7 +176,7 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Flags |= FlagInLoop // flag alone is not enough without Looping parent
-	st := MakeRandomBreak(NewRng(1), opts, vs, NewExprTables(opts), &cg)
+	st := MakeRandomBreak(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTables(opts), &cg)
 	if st.Expr != nil {
 		t.Fatal("no expr without looping block")
 	}
@@ -225,7 +225,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	cg.Flags |= FlagInLoop
-	st := MakeRandomBreak(NewRng(1), opts, vs, NewExprTables(opts), &cg)
+	st := MakeRandomBreak(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTables(opts), &cg)
 	if st.Expr != nil || stmtOK(st) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBreak")
 	}
@@ -237,7 +237,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
 	cg2.Flags |= FlagInLoop
-	st2 := MakeRandomContinue(NewRng(2), opts, vs, NewExprTables(opts), &cg2, loop)
+	st2 := MakeRandomContinue(NewRngSess(testAmbientSession, 2), opts, vs, NewExprTables(opts), &cg2, loop)
 	if st2.Expr != nil || stmtOK(st2) {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomContinue")
 	}
@@ -252,7 +252,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	eff3 := EmptyEffect()
 	cg3.EffectAccum = &eff3
 	cg3.Flags |= FlagInLoop
-	st3 := MakeRandomBreak(NewRng(3), opts, vs, NewExprTables(opts), &cg3)
+	st3 := MakeRandomBreak(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTables(opts), &cg3)
 	if st3.Expr != nil || stmtOK(st3) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBreak")
 	}
@@ -296,7 +296,7 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	// empty block → nullptr (empty Stmt; no Kind shell invent)
 	// first-stmt reject is non-sticky soft re-pick (StatementContinue.cpp:63–66)
 	blk := &Block{}
-	st := MakeRandomContinue(NewRng(3), opts, vs, tables, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), blk)
+	st := MakeRandomContinue(NewRngSess(testAmbientSession, 3), opts, vs, tables, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), blk)
 	if st.Kind != 0 || st.Expr != nil {
 		t.Fatalf("want null continue, got %+v", st)
 	}
@@ -319,7 +319,7 @@ func TestMakeRandomContinueRequiresLoop(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Flags |= FlagInLoop
-	st := MakeRandomContinue(NewRng(1), opts, vs, NewExprTables(opts), &cg, blk)
+	st := MakeRandomContinue(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTables(opts), &cg, blk)
 	if st.Expr != nil || stmtOK(st) {
 		t.Fatalf("no looping parent must fail closed, got %+v", st)
 	}
@@ -336,8 +336,8 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	probs := NewProbabilities(opts)
-	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	if f == nil {
 		t.Fatal("MakeFirst nil", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
@@ -345,7 +345,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	cg.Flags |= 2
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	f.Stack = []*Block{loop}
-	st := MakeRandomContinue(NewRng(11), opts, vs, tables, &cg, loop)
+	st := MakeRandomContinue(NewRngSess(testAmbientSession, 11), opts, vs, tables, &cg, loop)
 	if st.Kind != StmtContinue {
 		t.Fatalf("got %v", st.Kind)
 	}
@@ -383,7 +383,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
@@ -397,7 +397,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Types = vs.Types
 	// force variable term with existing global
-	st := MakeRandomBreak(NewRng(3), opts, vs, NewExprTables(opts), &cg)
+	st := MakeRandomBreak(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTables(opts), &cg)
 	if st.Expr == nil {
 		t.Skip("break expr nil")
 	}
@@ -415,7 +415,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 func TestMakeRandomBreakNilCGSticky(t *testing.T) {
 	// nil CG residual soft invent was invent Kind-only break shell.
 	ClearErrorSess(testAmbientSession)
-	if MakeRandomBreak(NewRng(1), Defaults(), nil, nil, nil).Kind != 0 {
+	if MakeRandomBreak(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil).Kind != 0 {
 		t.Fatal("nil cg MakeRandomBreak must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {

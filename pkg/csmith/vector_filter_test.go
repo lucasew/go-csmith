@@ -107,10 +107,10 @@ func TestVectorFilterLookupWithTable(t *testing.T) {
 func TestBlockProbabilityMatchesDisabledKeepFilter(t *testing.T) {
 	// Block.cpp:87–93 — disable fDefault → uniform rnd_upto(block_size)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// first genrand % 4 == 1959434203 % 4
-	want := int(NewRng(2).RndUpto(4))
-	r = NewRng(2)
+	want := int(NewRngSess(testAmbientSession, 2).RndUpto(4))
+	r = NewRngSess(testAmbientSession, 2)
 	got := BlockProbability(4, r)
 	if got != want {
 		t.Fatalf("BlockProbability(4) seed2: got %d want %d (uniform)", got, want)

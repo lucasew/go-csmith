@@ -8,7 +8,7 @@ import (
 func TestMakeRandomBinarySafeName(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	f := MakeRandomBinary(r, opts, probs, GetIntType())
 	if f == nil {
 		t.Fatal("nil flags")
@@ -35,7 +35,7 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	for seed := uint64(1); seed < 20; seed++ {
-		f := MakeRandomBinaryKind(NewRng(seed), opts, nil, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd)
+		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, nil, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd)
 		if f == nil {
 			// size pick may fail closed without call-site probs if process cleared
 			continue
@@ -44,7 +44,7 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 			t.Fatalf("nil probs must not invent signed true at 50%% seed=%d", seed)
 		}
 	}
-	u := MakeRandomUnary(NewRng(2), opts, nil, GetIntType(), GetIntType(), UnMinus)
+	u := MakeRandomUnary(NewRngSess(testAmbientSession, 2), opts, nil, GetIntType(), GetIntType(), UnMinus)
 	if u != nil && u.Op1Signed {
 		t.Fatal("nil probs unary must not invent signed true at 50%")
 	}
@@ -65,7 +65,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
+		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
 		}
@@ -91,7 +91,7 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	f.Stack = []*Block{blk}
 	// C++ always builds SafeOpFlags; Output must not emit safe_* when SafeMath off.
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	fi := MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &cg, GetIntType())
+	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 3), opts, probs, vs, tables, &cg, GetIntType())
 	if fi == nil {
 		t.Fatal("nil inv")
 	}
@@ -135,7 +135,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearErrorSess(testAmbientSession)
 	// nil probs arg + nil process → sticky fail closed
-	if _, ok := pickSafeOpSize(NewRng(1), nil); ok {
+	if _, ok := pickSafeOpSize(NewRngSess(testAmbientSession, 1), nil); ok {
 		t.Fatal("nil probs must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -151,7 +151,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// explicit probs works
-	sz, ok := pickSafeOpSize(NewRng(2), probs)
+	sz, ok := pickSafeOpSize(NewRngSess(testAmbientSession, 2), probs)
 	if !ok || int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat {
 		t.Fatalf("got %v ok=%v", sz, ok)
 	}
@@ -160,7 +160,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	opts.UInt8 = false
 	probs2 := NewProbabilities(opts)
 	for i := 0; i < 100; i++ {
-		sz, ok := pickSafeOpSize(NewRng(uint64(i+1)), probs2)
+		sz, ok := pickSafeOpSize(NewRngSess(testAmbientSession, uint64(i+1)), probs2)
 		if !ok {
 			t.Fatal("want size")
 		}

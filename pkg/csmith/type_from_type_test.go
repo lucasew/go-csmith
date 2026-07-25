@@ -9,8 +9,8 @@ func TestRandomTypeFromTypeNil(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
-	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, false, false)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
+	ty := RandomTypeFromType(NewRngSess(testAmbientSession, 3), env, opts, probs, nil, false, false)
 	if ty == nil || (ty.IsSimple() && ty.Simple() == EVoid) {
 		t.Fatalf("%v", ty)
 	}
@@ -21,7 +21,7 @@ func TestRandomTypeFromTypeSimpleRerolls(t *testing.T) {
 	probs := NewProbabilities(opts)
 	// requesting int may yield another simple when strict_simple_type=false
 	seen := map[ESimpleType]bool{}
-	r := NewRng(5)
+	r := NewRngSess(testAmbientSession, 5)
 	for i := 0; i < 40; i++ {
 		ty := RandomTypeFromType(r, nil, opts, probs, GetIntType(), false, false)
 		if ty == nil || !ty.IsSimple() {
@@ -40,7 +40,7 @@ func TestRandomTypeFromTypeStrictSimpleKeeps(t *testing.T) {
 	probs := NewProbabilities(opts)
 	want := GetIntType()
 	for seed := uint64(1); seed < 20; seed++ {
-		ty := RandomTypeFromType(NewRng(seed), nil, opts, probs, want, false, true)
+		ty := RandomTypeFromType(NewRngSess(testAmbientSession, seed), nil, opts, probs, want, false, true)
 		if ty != want {
 			t.Fatalf("strict simple seed %d: got %v want int", seed, ty)
 		}
@@ -51,7 +51,7 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	st := &Type{isStruct: true, StructName: "S9"}
-	ty := RandomTypeFromType(NewRng(1), nil, opts, probs, st, false, false)
+	ty := RandomTypeFromType(NewRngSess(testAmbientSession, 1), nil, opts, probs, st, false, false)
 	if ty != st {
 		t.Fatal("struct should pass through")
 	}
@@ -77,14 +77,14 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// TypeEnv + AllTypes always live after GenerateAllTypes; sticky nil
-	if RandomTypeFromType(NewRng(1), nil, opts, probs, nil, false, false) != nil {
+	if RandomTypeFromType(NewRngSess(testAmbientSession, 1), nil, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil env + nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil env RandomTypeFromType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if RandomTypeFromType(NewRng(1), &TypeEnv{Sess: testAmbientSession}, opts, probs, nil, false, false) != nil {
+	if RandomTypeFromType(NewRngSess(testAmbientSession, 1), &TypeEnv{Sess: testAmbientSession}, opts, probs, nil, false, false) != nil {
 		t.Fatal("empty AllTypes + nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

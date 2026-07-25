@@ -6,7 +6,7 @@ import (
 )
 
 func TestMakeRandomArrayControlLe(t *testing.T) {
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// force Le by unsigned
 	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControl(r, 10, false, 0)
 	if testOp != BinCmpLe {
@@ -33,11 +33,11 @@ func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	foundLe, foundGe := false, false
 	for seed := uint64(1); seed < 80 && !(foundLe && foundGe); seed++ {
-		r0 := NewRng(seed)
+		r0 := NewRngSess(testAmbientSession, seed)
 		// skip oob flip (prob 0 still draws)
 		_ = r0.RndFlipcoin(0)
 		wantLe := r0.RndFlipcoin(50)
-		_, _, _, testOp, _, _ := MakeRandomArrayControl(NewRng(seed), 10, true, 0)
+		_, _, _, testOp, _, _ := MakeRandomArrayControl(NewRngSess(testAmbientSession, seed), 10, true, 0)
 		if wantLe && testOp != BinCmpLe {
 			t.Fatalf("seed %d flip true must be Le got %v", seed, testOp)
 		}
@@ -62,12 +62,12 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// 100% OOB
-	_, _, _, _, _, _ = MakeRandomArrayControl(NewRng(1), 8, false, 100)
+	_, _, _, _, _, _ = MakeRandomArrayControl(NewRngSess(testAmbientSession, 1), 8, false, 100)
 	if OOBCount() != 1 {
 		t.Fatalf("oob %d", OOBCount())
 	}
 	// 0% OOB
-	_, _, _, _, _, _ = MakeRandomArrayControl(NewRng(2), 8, false, 0)
+	_, _, _, _, _, _ = MakeRandomArrayControl(NewRngSess(testAmbientSession, 2), 8, false, 0)
 	if OOBCount() != 1 {
 		t.Fatalf("still 1 after no-oob %d", OOBCount())
 	}
@@ -88,7 +88,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -105,7 +105,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// StatementFor.cpp:204–208 — must-use via rw_directive (not invent MustUseArrays list)
 	cg.RW = &RWDirective{MustReadVars: []*Variable{&av.Variable}}
-	lc := MakeIteration(NewRng(5), opts, probs, vs, &cg)
+	lc := MakeIteration(NewRngSess(testAmbientSession, 5), opts, probs, vs, &cg)
 	if lc == nil {
 		t.Fatal("nil lc")
 	}
@@ -122,7 +122,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{5, 5}
 	av.ArraySizes = av.Sizes
 	vs.Arrays = []*ArrayVariable{av}
@@ -141,7 +141,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 			MustWriteVars: []*Variable{&av.Variable},
 		}
 	}
-	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("for")
 	}
@@ -200,7 +200,7 @@ func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
 	// empty stack → CreateRandomArray cannot invent local array
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
-	st := MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("nil select_array must fail closed whole array-loop, not soft-skip slots")
 	}
@@ -216,7 +216,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// seed several arrays so select_array can pick
 	for i := 0; i < 3; i++ {
-		av := CreateArrayVariable(NewRng(uint64(10+i)), opts, NewProbabilities(opts), nil, nil, nil, "g_"+string(rune('a'+i)), GetIntType(), MakeInt(0), q)
+		av := CreateArrayVariable(NewRngSess(testAmbientSession, uint64(10+i)), opts, NewProbabilities(opts), nil, nil, nil, "g_"+string(rune('a'+i)), GetIntType(), MakeInt(0), q)
 		if av == nil {
 			continue
 		}
@@ -236,7 +236,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	foundSplit := false
 	for seed := uint64(1); seed < 60; seed++ {
 		// reset must-use by cloning selector inventories (reuse vs)
-		st := MakeRandomArrayLoop(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
+		st := MakeRandomArrayLoop(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st == nil || st.Loop == nil {
 			continue
 		}
@@ -252,7 +252,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 		t.Log("InArrayLoop not set in scan — still exercised create path")
 	}
 	// explicit unit: access split builds distinct read/write sets
-	r := NewRng(42)
+	r := NewRngSess(testAmbientSession, 42)
 	// manual simulation of access choices via AddVariableToSet
 	av0 := vs.Arrays[0]
 	var mr, mw []*Variable
@@ -275,12 +275,12 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(2))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 2))
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// pre-seed effect_stm as dirty
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
-	st := MakeRandomFor(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil {
 		t.Fatal("nil")
 	}
@@ -303,7 +303,7 @@ func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 	// no Types → CreateRandomArray fails → SelectArray nil
 	vs.Types = nil
 	vs.Arrays = nil
-	got := MakeRandomArrayLoopSetup(NewRng(1), opts, vs, EmptyCGContext().WithSession(testAmbientSession))
+	got := MakeRandomArrayLoopSetup(NewRngSess(testAmbientSession, 1), opts, vs, EmptyCGContext().WithSession(testAmbientSession))
 	if got != nil {
 		t.Fatal("nil SelectArray must fail closed whole setup, not invent fewer arrays")
 	}
@@ -328,7 +328,7 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomArrayLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -342,14 +342,14 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg2.EffectAccum = &eff
 	cg2.RW = &RWDirective{NoReadVars: IncompleteVariables()}
-	if MakeRandomArrayLoop(NewRng(2), opts0, NewProbabilities(opts0), vs, NewExprTables(opts0), NewStatementThresholdTable(opts0), &cg2) != nil {
+	if MakeRandomArrayLoop(NewRngSess(testAmbientSession, 2), opts0, NewProbabilities(opts0), vs, NewExprTables(opts0), NewStatementThresholdTable(opts0), &cg2) != nil {
 		t.Fatal("incomplete RW NoReadVars must fail closed MakeRandomArrayLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete RW lists must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if stmtOK(MakeRandomArrayOp(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)) {
+	if stmtOK(MakeRandomArrayOp(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayOp")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -365,7 +365,7 @@ func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
-	if MakeRandomArrayLoopSetup(NewRng(1), opts, vs, cg) != nil {
+	if MakeRandomArrayLoopSetup(NewRngSess(testAmbientSession, 1), opts, vs, cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoopSetup")
 	}
 	if !HasErrorSess(testAmbientSession) {

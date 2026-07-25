@@ -20,7 +20,7 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		// reset tmp vars
 		blk.TmpVars = nil
-		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
+		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.Safe != nil && fi.MathNoTmp && fi.Tmp1 != "" && SafeOpsBinary(fi.Binary) {
 			break
 		}

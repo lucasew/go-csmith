@@ -145,7 +145,7 @@ func TestRandomAddQualifiers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{false}, []bool{false})
-	got := base.RandomAddQualifiersSess(testAmbientSession, NewRng(1), opts, probs, true)
+	got := base.RandomAddQualifiersSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, probs, true)
 	if len(got.IsConsts) != 2 {
 		t.Fatal(len(got.IsConsts))
 	}
@@ -155,7 +155,7 @@ func TestRandomAddQualifiers(t *testing.T) {
 	}
 	// match_exact → always false,false
 	opts.MatchExactQualifiers = true
-	got2 := base.RandomAddQualifiersSess(testAmbientSession, NewRng(1), opts, probs, false)
+	got2 := base.RandomAddQualifiersSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, probs, false)
 	if got2.IsConsts[1] || got2.IsVolatiles[1] {
 		t.Fatal("exact")
 	}

@@ -146,7 +146,7 @@ func TestChooseFuncContextSkipsConflict(t *testing.T) {
 	good := &Function{Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// context already wrote g → bad conflicts
 	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, g)).WithSession(testAmbientSession)
-	got := ChooseFuncContext(NewRng(2), []*Function{bad, good}, GetIntType(), nil, &cg, Defaults(), nil)
+	got := ChooseFuncContext(NewRngSess(testAmbientSession, 2), []*Function{bad, good}, GetIntType(), nil, &cg, Defaults(), nil)
 	if got != good {
 		t.Fatalf("got %v", got)
 	}
@@ -487,7 +487,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 
 func TestNeedNestedLoopIsEffectKnownSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).NeedNestedLoop(EmptyCGContext().WithSession(testAmbientSession), NewRng(1)) {
+	if (*Block)(nil).NeedNestedLoop(EmptyCGContext().WithSession(testAmbientSession), NewRngSess(testAmbientSession, 1)) {
 		t.Fatal("nil Block NeedNestedLoop must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

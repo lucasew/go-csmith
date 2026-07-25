@@ -55,7 +55,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 	// many seeds: never get pointer-containing struct
 	for seed := uint64(1); seed < 60; seed++ {
 		ClearErrorSess(testAmbientSession)
-		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
+		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.ContainPointerField() {
 			t.Fatalf("pointer struct in union field seed %d", seed)
 		}
@@ -86,7 +86,7 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	ok := 0
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		f := MakeOneUnionField(NewRng(seed), opts, probs, &env, 0, true)
+		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, &env, 0, true)
 		if f.Type == nil || HasErrorSess(testAmbientSession) {
 			continue
 		}
@@ -116,7 +116,7 @@ func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, GetIntType()}}
 	// disable bitfield path so we always hit type-pool filter
 	opts.Bitfields = false
-	f := MakeOneUnionField(NewRng(1), opts, probs, env, 0, true)
+	f := MakeOneUnionField(NewRngSess(testAmbientSession, 1), opts, probs, env, 0, true)
 	if f.Type != nil {
 		t.Fatal("ContainPointerField residual must fail closed MakeOneUnionField")
 	}
@@ -138,7 +138,7 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 	}
 	found := false
 	for seed := uint64(1); seed < 100; seed++ {
-		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
+		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.StructName == "S0" {
 			found = true
 			break
@@ -182,7 +182,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	foundPad := false
 	for seed := uint64(1); seed < 500 && !foundPad; seed++ {
 		ClearErrorSess(testAmbientSession)
-		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 1, false)
+		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env, 1, false)
 		if f.Type != nil && f.BitWidth == 0 {
 			foundPad = true
 		}
@@ -193,7 +193,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	// First field / after pad: prevZero true — length 0 must be forced non-zero.
 	for seed := uint64(1); seed < 200; seed++ {
 		ClearErrorSess(testAmbientSession)
-		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
+		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.BitWidth == 0 {
 			t.Fatalf("seed %d: prevZero=true must not leave zero-width (no_zero_len)", seed)
 		}
@@ -204,12 +204,12 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort), GetSimpleType(EUShort)}}
 	// Craft: first field normal (BitWidth -1) → prevZero becomes false;
 	// second call with prevZero=false can return pad.
-	f0 := MakeOneUnionField(NewRng(1), opts, probs, env2, 0, true)
+	f0 := MakeOneUnionField(NewRngSess(testAmbientSession, 1), opts, probs, env2, 0, true)
 	if f0.Type == nil {
 		// rare; try other seeds
 		for seed := uint64(2); seed < 50 && f0.Type == nil; seed++ {
 			ClearErrorSess(testAmbientSession)
-			f0 = MakeOneUnionField(NewRng(seed), opts, probs, env2, 0, true)
+			f0 = MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env2, 0, true)
 		}
 	}
 	if f0.Type == nil {

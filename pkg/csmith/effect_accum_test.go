@@ -18,12 +18,12 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	// StatementAssign.cpp:127 assert(fm) — assign needs FactMgr
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
-	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// single-statement block
 	opts.MaxBlockSize = 1
-	b := MakeRandomBlock(NewRng(2), opts, probs, vs, tables, tab, &cg, false)
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 2), opts, probs, vs, tables, tab, &cg, false)
 	if b == nil {
 		t.Fatal("nil block")
 	}
@@ -126,10 +126,10 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	cg.Types = env
-	e := MakeExpressionComma(NewRng(3), opts, probs, vs, tables, &cg, GetIntType(), nil)
+	e := MakeExpressionComma(NewRngSess(testAmbientSession, 3), opts, probs, vs, tables, &cg, GetIntType(), nil)
 	if e == nil || e.Term != TermCommaExpr {
 		t.Fatal(e)
 	}

@@ -9,7 +9,7 @@ func TestPickBinaryOpFullRange(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	seen := map[BinaryOp]bool{}
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 500; i++ {
 		op := PickBinaryOp(r, opts)
 		if int(op) < 0 || int(op) >= MaxBinaryOp {
@@ -31,7 +31,7 @@ func TestPickBinaryOpRespectsNoMuls(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 200; i++ {
 		op := PickBinaryOp(r, opts)
 		if op == BinMul || op == BinDiv {
@@ -46,7 +46,7 @@ func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	op := PickBinaryOp(NewRng(1), Defaults())
+	op := PickBinaryOp(NewRngSess(testAmbientSession, 1), Defaults())
 	if int(op) != MaxBinaryOp {
 		t.Fatalf("want MAX without process probs, got %v", op)
 	}

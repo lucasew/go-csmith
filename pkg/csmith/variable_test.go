@@ -161,7 +161,7 @@ func TestNewProgramGeneratorSetsProcessProbs(t *testing.T) {
 func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
 	// Variable.cpp:395 — Constant::make_random uses process DefaultRndNumGenerator
 	opts := Defaults()
-	r := NewRng(42)
+	r := NewRngSess(testAmbientSession, 42)
 	prevR := ProcessRngSess(testAmbientSession)
 	prevP := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessRngSess(testAmbientSession, r)

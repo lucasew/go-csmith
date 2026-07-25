@@ -9,7 +9,7 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	prev := ProcessExprTablesSess(testAmbientSession)
 	SetProcessExprTablesSess(testAmbientSession, nil)
 	defer SetProcessExprTablesSess(testAmbientSession, prev)
-	tt := PickTermType(NewRng(1), nil, Defaults(), GetIntType(), false, false, 0)
+	tt := PickTermType(NewRngSess(testAmbientSession, 1), nil, Defaults(), GetIntType(), false, false, 0)
 	if tt != MaxTermTypes {
 		t.Fatalf("want MaxTermTypes, got %v", tt)
 	}
@@ -17,7 +17,7 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 		t.Fatal("nil tables PickTermType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	tt = PickParamTermType(NewRng(1), nil, Defaults(), GetIntType(), 0)
+	tt = PickParamTermType(NewRngSess(testAmbientSession, 1), nil, Defaults(), GetIntType(), 0)
 	if tt != MaxTermTypes {
 		t.Fatalf("param want MaxTermTypes, got %v", tt)
 	}
@@ -36,7 +36,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(f.ensurePairedFactMgr())
-	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType())
+	st := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType())
 	if stmtOK(st) {
 		t.Fatal("nil assignOpsTable must fail closed")
 	}
@@ -45,7 +45,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	InitSessionProbabilityTablesSess(testAmbientSession, opts)
-	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType())
+	st = MakeRandomAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType())
 	// may still fail for other reasons; at least table is live
 	_ = st
 	ClearErrorSess(testAmbientSession)
@@ -54,7 +54,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 	// StatementAssign::assignOpsTable_ always live sticky; no invent NewAssignOpsTable
 	ClearErrorSess(testAmbientSession)
-	op := AssignOpsProbability(NewRng(1), Defaults(), nil, GetIntType())
+	op := AssignOpsProbability(NewRngSess(testAmbientSession, 1), Defaults(), nil, GetIntType())
 	if op != AssignOp(-1) {
 		t.Fatalf("want invalid op, got %v", op)
 	}
@@ -87,7 +87,7 @@ func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(f.PairedFactMgr())
 	cg.CurrentFunc = f
 	// force user path that would create a new function
-	fi := MakeRandomInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, GetIntType(), nil, false)
+	fi := MakeRandomInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, GetIntType(), nil, false)
 	// without ProcessStmtTab, create-new path fails closed sticky Failed; may pick existing or fail
 	if fi != nil && !fi.Failed && fi.User != nil && fi.User != f && fi.User.Body != nil {
 		// if somehow built without stmt tab, bad
@@ -122,7 +122,7 @@ func TestEnsureAttrGeneratorsNoInvent(t *testing.T) {
 		t.Fatal("must not invent generators without InitAttrGenerators")
 	}
 	// Output nil-safe
-	if EnsureVarAttrGeneratorSess(testAmbientSession).Output(NewRng(1)) != "" {
+	if EnsureVarAttrGeneratorSess(testAmbientSession).Output(NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("nil Output must be empty")
 	}
 	opts := Defaults()
@@ -199,7 +199,7 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 
 func TestMakeRandomExprStmtNilCGSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil).Kind != 0 {
+	if MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil, nil).Kind != 0 {
 		t.Fatal("nil cg MakeRandomExprStmt must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {

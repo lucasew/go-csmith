@@ -37,7 +37,7 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 		*cg.EffectAccum = EmptyEffect()
 		cg.EffectStm = EmptyEffect()
 		fm.GlobalFacts = []*FactPointTo{}
-		forSt = MakeRandomFor(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
+		forSt = MakeRandomFor(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, stmtTab, &cg)
 		if forSt == nil || HasErrorSess(testAmbientSession) || forSt.Loop == nil || forSt.Loop.IV == nil {
 			continue
 		}

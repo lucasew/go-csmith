@@ -88,7 +88,7 @@ func TestParseStringIntArg(t *testing.T) {
 
 func TestKleeCrestCoverageEmit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	probs := NewProbabilities(Defaults())
 	vals := AbsExtensionInitialize(2, r, probs)
 	if vals == nil {

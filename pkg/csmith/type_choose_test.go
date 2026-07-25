@@ -10,12 +10,12 @@ func TestChooseRandomFromAllTypes(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	if len(env.AllTypes) < 5 {
 		t.Fatalf("AllTypes %d", len(env.AllTypes))
 	}
 	seenStruct := false
-	r := NewRng(3)
+	r := NewRngSess(testAmbientSession, 3)
 	for i := 0; i < 200; i++ {
 		ty := env.ChooseRandom(r, opts, probs, false)
 		if ty == nil {
@@ -38,8 +38,8 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(5), opts, probs, env)
-	ty := RandomReturnType(NewRng(7), probs, env, opts)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 5), opts, probs, env)
+	ty := RandomReturnType(NewRngSess(testAmbientSession, 7), probs, env, opts)
 	if ty == nil {
 		t.Fatal("nil")
 	}
@@ -65,7 +65,7 @@ func TestMakeRandomParamNoConstant(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		e := func() *Expression {
 			c := EmptyCGContext().WithSession(testAmbientSession)
-			return MakeRandomParam(NewRng(seed), opts, tables, vs, &c, GetIntType(), nil, 0)
+			return MakeRandomParam(NewRngSess(testAmbientSession, seed), opts, tables, vs, &c, GetIntType(), nil, 0)
 		}()
 		if e != nil && e.Term == TermConstant {
 			t.Fatalf("constant param seed %d", seed)

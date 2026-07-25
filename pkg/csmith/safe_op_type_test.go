@@ -28,7 +28,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		fi = func() *Invocation {
 			c := EmptyCGContext().WithSession(testAmbientSession)
-			return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType())
+			return MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &c, GetIntType())
 		}()
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
@@ -51,8 +51,8 @@ func TestMakeRandomPointerTypeMayBeIntStar(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
-	p := env.MakeRandomPointerType(NewRng(3), opts, probs)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
+	p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, 3), opts, probs)
 	if p == nil || p.PtrType() == nil {
 		t.Fatal(p)
 	}

@@ -189,11 +189,11 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -206,7 +206,7 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 		cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
-		st = MakeRandomIf(NewRng(seed), opts, probs, vs, NewExprTables(opts),
+		st = MakeRandomIf(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts),
 			NewStatementThresholdTable(opts), &cg2)
 		if st != nil && st.Kind == StmtIfElse {
 			break

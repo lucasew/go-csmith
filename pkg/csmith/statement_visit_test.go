@@ -319,7 +319,7 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
-	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(2), GetIntType(), lhs, AssignAdd, rhs, nil)
+	st := makePossibleCompoundAssign(cg, opts, probs, NewRngSess(testAmbientSession, 2), GetIntType(), lhs, AssignAdd, rhs, nil)
 	if st.SafeFlags == nil {
 		t.Fatal("flags")
 	}
@@ -357,7 +357,7 @@ func TestMakePossibleCompoundAssignGetTypeResidualSticky(t *testing.T) {
 	// Lhs Type-nil + Var Type-nil → GetType residual
 	lhs := &Lhs{Var: &Variable{Name: "g_hole"}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(3), GetIntType(), lhs, AssignAdd, rhs, nil)
+	st := makePossibleCompoundAssign(cg, opts, probs, NewRngSess(testAmbientSession, 3), GetIntType(), lhs, AssignAdd, rhs, nil)
 	if st.Kind != 0 || st.SafeFlags != nil || st.Rhs != nil {
 		t.Fatal("GetType residual must fail closed compound, not invent shell", st)
 	}
@@ -378,7 +378,7 @@ func TestMakePossibleCompoundAssignNoSafeMathStillCanonizes(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(3), GetIntType(), lhs, AssignBitAnd, rhs, nil)
+	st := makePossibleCompoundAssign(cg, opts, probs, NewRngSess(testAmbientSession, 3), GetIntType(), lhs, AssignBitAnd, rhs, nil)
 	if st.SafeFlags == nil {
 		t.Fatal("dummy flags for safe_assign bit op")
 	}

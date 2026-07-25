@@ -17,7 +17,7 @@ func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
-	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
+	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("need union with ≥2 fields")
 	}

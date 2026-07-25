@@ -18,7 +18,7 @@ func TestGenrandSeed2Sequence(t *testing.T) {
 		1466698862,
 		1314478799,
 	}
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	for i, w := range want {
 		got := r.Genrand()
 		if got != w {
@@ -33,7 +33,7 @@ func TestGenrandSeed0And1(t *testing.T) {
 		1: {89400484, 976015093, 1792756325, 721524505},
 	}
 	for seed, want := range cases {
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		for i, w := range want {
 			got := r.Genrand()
 			if got != w {
@@ -46,7 +46,7 @@ func TestGenrandSeed0And1(t *testing.T) {
 func TestRndUptoUsesModulo(t *testing.T) {
 	// DefaultRndNumGenerator::rnd_upto: v = genrand() % n; rand_depth++.
 	ClearErrorSess(testAmbientSession)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// first genrand % 10 == 1959434203 % 10 == 3
 	if got := r.RndUpto(10); got != 3 {
 		t.Fatalf("RndUpto(10) first: got %d want 3", got)
@@ -72,7 +72,7 @@ func TestRndUptoUsesModulo(t *testing.T) {
 func TestRndUptoFilterRetries(t *testing.T) {
 	// Reject first candidate (3); should re-genrand until accepted.
 	// seed2: first raw%10=3 reject, second raw%10=5 accept.
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	got := r.RndUptoFilter(10, RejectEQ(3))
 	if got != 5 {
 		t.Fatalf("RndUptoFilter reject 3: got %d want 5", got)
@@ -88,7 +88,7 @@ func TestRndUptoFilterResidualSticky(t *testing.T) {
 	// Fair: sticky fail closed return 0 without infinite soft-retry.
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	residualReject := filterFunc(func(v uint32) bool {
 		SetErrorSess(testAmbientSession, ErrGeneric)
 		return true
@@ -105,7 +105,7 @@ func TestRndUptoFilterResidualSticky(t *testing.T) {
 
 func TestRndFlipcoin(t *testing.T) {
 	// seed2 first genrand%100 = 1959434203%100 = 3 < 50 → true
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	if !r.RndFlipcoin(50) {
 		t.Fatal("RndFlipcoin(50) first seed2: want true")
 	}
@@ -116,12 +116,12 @@ func TestRndFlipcoin(t *testing.T) {
 
 func TestRndFlipcoinFilterForce(t *testing.T) {
 	// Filter rejects 0 → return true without genrand (depth still increments once).
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	if !r.RndFlipcoinFilter(50, RejectEQ(0)) {
 		t.Fatal("filter reject 0: want true without draw")
 	}
 	// State must be unchanged (no Genrand).
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	want := r2.Genrand()
 	// r never called Genrand; next Genrand should match first of fresh seed2
 	if got := r.Genrand(); got != want {
@@ -132,7 +132,7 @@ func TestRndFlipcoinFilterForce(t *testing.T) {
 func TestRandomHexDigits(t *testing.T) {
 	// DefaultRndNumGenerator::RandomHexDigits: each digit genrand()%16, depth++.
 	// AbsRndNumGenerator.cpp:50 — hex1 uppercase ABCDEF
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// 1959434203%16 = 11 → 'B'
 	hex := r.RandomHexDigits(1)
 	if hex != "B" {
@@ -144,7 +144,7 @@ func TestRandomHexDigits(t *testing.T) {
 }
 
 func TestRandomDigits(t *testing.T) {
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// 1959434203%10 = 3
 	d := r.RandomDigits(1)
 	if d != "3" {
@@ -210,7 +210,7 @@ func TestAbsRndNumGeneratorCount(t *testing.T) {
 
 func TestDefaultRndKind(t *testing.T) {
 	// DefaultRndNumGenerator::kind
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	if r.Kind() != RngKindDefault {
 		t.Fatalf("kind: got %d want Default", r.Kind())
 	}
@@ -233,7 +233,7 @@ func TestDefaultGetPrefixedNameIdentity(t *testing.T) {
 
 func TestDefaultTraceDepthAndSequenceEmpty(t *testing.T) {
 	// DefaultRndNumGenerator::trace_depth starts empty; get_sequence empty when Sequence add_number is no-op
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	if r.TraceDepth() != "" {
 		t.Fatalf("trace_depth initial: %q", r.TraceDepth())
 	}
@@ -244,7 +244,7 @@ func TestDefaultTraceDepthAndSequenceEmpty(t *testing.T) {
 
 func TestSetRandDepth(t *testing.T) {
 	// DefaultRndNumGenerator::set_rand_depth
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	r.SetRandDepth(42)
 	if r.RandDepth() != 42 {
 		t.Fatalf("set_rand_depth: got %d want 42", r.RandDepth())
@@ -258,7 +258,7 @@ func TestSetRandDepth(t *testing.T) {
 func TestRandomHexDigitsMulti(t *testing.T) {
 	// DefaultRndNumGenerator::RandomHexDigits — per-digit genrand%16, depth++ each
 	// seed2: raw0=1959434203%16=11→B, raw1=341627945%16=9→9
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	got := r.RandomHexDigits(2)
 	if got != "B9" {
 		t.Fatalf("RandomHexDigits(2) seed2: got %q want B9", got)
@@ -267,7 +267,7 @@ func TestRandomHexDigitsMulti(t *testing.T) {
 		t.Fatalf("rand_depth after 2 hex: got %d want 2", r.RandDepth())
 	}
 	// zero / negative → empty, no draw
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	if r2.RandomHexDigits(0) != "" || r2.RandomHexDigits(-1) != "" {
 		t.Fatal("RandomHexDigits(<=0) must be empty")
 	}
@@ -278,7 +278,7 @@ func TestRandomHexDigitsMulti(t *testing.T) {
 
 func TestRandomDigitsMulti(t *testing.T) {
 	// seed2: 1959434203%10=3, 341627945%10=5 → "35"
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	got := r.RandomDigits(2)
 	if got != "35" {
 		t.Fatalf("RandomDigits(2) seed2: got %q want 35", got)
@@ -290,11 +290,11 @@ func TestRandomDigitsMulti(t *testing.T) {
 
 func TestRndFlipcoinFilterForceFalse(t *testing.T) {
 	// DefaultRndNumGenerator::rnd_flipcoin: filter(1) → return false without genrand
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	if r.RndFlipcoinFilter(50, RejectEQ(1)) {
 		t.Fatal("filter reject 1: want false without draw")
 	}
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	want := r2.Genrand()
 	if got := r.Genrand(); got != want {
 		t.Fatalf("after force-false flipcoin, Genrand desynced: got %d want %d", got, want)
@@ -303,38 +303,38 @@ func TestRndFlipcoinFilterForceFalse(t *testing.T) {
 
 func TestRndFlipcoinP0And100(t *testing.T) {
 	// p=0 → always false; p=100 → always true (genrand still burned)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	if r.RndFlipcoin(0) {
 		t.Fatal("RndFlipcoin(0) want false")
 	}
-	r = NewRng(2)
+	r = NewRngSess(testAmbientSession, 2)
 	if !r.RndFlipcoin(100) {
 		t.Fatal("RndFlipcoin(100) want true")
 	}
 	// clamp p>100 to 100 (C++ asserts p<=100; non-assert builds use clamp safety)
-	r = NewRng(2)
+	r = NewRngSess(testAmbientSession, 2)
 	if !r.RndFlipcoin(150) {
 		t.Fatal("RndFlipcoin(150) clamped to 100 want true")
 	}
 }
 
 func TestSeedrandIndependence(t *testing.T) {
-	// AbsRndNumGenerator::seedrand — each NewRng(seed) reseeds independently (srand48)
-	a := NewRng(7)
-	b := NewRng(7)
+	// AbsRndNumGenerator::seedrand — each NewRngSess(testAmbientSession, seed) reseeds independently (srand48)
+	a := NewRngSess(testAmbientSession, 7)
+	b := NewRngSess(testAmbientSession, 7)
 	for i := 0; i < 5; i++ {
 		if a.Genrand() != b.Genrand() {
 			t.Fatalf("same seed diverged at i=%d", i)
 		}
 	}
-	c := NewRng(8)
-	a = NewRng(7)
+	c := NewRngSess(testAmbientSession, 8)
+	a = NewRngSess(testAmbientSession, 7)
 	if a.Genrand() == c.Genrand() {
 		// extremely unlikely equal; if equal still ok for this weak check — compare sequences
 	}
 	// stronger: full first value differs for seed 7 vs 8
-	a = NewRng(7)
-	c = NewRng(8)
+	a = NewRngSess(testAmbientSession, 7)
+	c = NewRngSess(testAmbientSession, 8)
 	if a.Genrand() == c.Genrand() {
 		t.Fatal("seed 7 and 8 should not share first genrand")
 	}
@@ -343,11 +343,11 @@ func TestSeedrandIndependence(t *testing.T) {
 func TestProcessRndWrappers(t *testing.T) {
 	// random.cpp process wrappers vs direct Rng methods (random mode).
 	prev := ProcessRngSess(testAmbientSession)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	SetProcessRngSess(testAmbientSession, r)
 	defer SetProcessRngSess(testAmbientSession, prev)
 
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	// pure_rnd_upto(n==0) short-circuits without draw
 	if PureRndUpto(0, nil) != 0 {
 		t.Fatal("pure_rnd_upto(0) → 0")
@@ -415,7 +415,7 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 	if GetRndNumGeneratorSess(testAmbientSession) == nil {
 		t.Fatal("GetRndNumGenerator")
 	}
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	got := rn.RndUpto(10, nil)
 	want := r2.RndUpto(10)
 	if got != want {

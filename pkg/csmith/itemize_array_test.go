@@ -27,7 +27,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// size 8 so remain > 1 when bound is 0 → offset possible
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	// force size
 	if av == nil {
 		t.Fatal("nil av")
@@ -40,7 +40,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	// scan seeds for offset form
 	foundOff := false
 	for seed := uint64(1); seed < 40; seed++ {
-		item := vs.ItemizeArray(NewRng(seed), cg, av)
+		item := vs.ItemizeArray(NewRngSess(testAmbientSession, seed), cg, av)
 		if item == nil {
 			t.Fatal("itemize")
 		}
@@ -83,7 +83,7 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: InvalidIVBound}
-	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
 		t.Fatal("invalid bound must not itemize")
 	}
 }
@@ -101,7 +101,7 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{nil: 0, iv: 0}
-	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
 		t.Fatal("nil IVBounds key must fail closed whole itemize")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -124,7 +124,7 @@ func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	cg.IVBounds = map[*Variable]int{iv: 0}
-	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed ItemizeArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -146,7 +146,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
-	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
 		t.Fatal("Type-nil array must fail closed ItemizeArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -162,7 +162,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	ivHole := &Variable{Name: "j", Type: nil}
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.IVBounds = map[*Variable]int{ivHole: 0}
-	if vs.ItemizeArray(NewRng(1), cg2, av2) != nil {
+	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg2, av2) != nil {
 		t.Fatal("Type-nil IV must fail closed ItemizeArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -184,7 +184,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 	// visible via GlobalList (C++ find_all_visible_vars); not Arrays invent list
 	vs.GlobalList = []*Variable{&av.Variable}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if vs.SelectArray(NewRng(1), cg) != nil {
+	if vs.SelectArray(NewRngSess(testAmbientSession, 1), cg) != nil {
 		t.Fatal("Type-nil SelectArray must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -196,7 +196,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
 	// mark partially written → filtered → CreateRandomArray may still run
@@ -204,7 +204,7 @@ func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	cg := WithEffectContext(eff).WithSession(testAmbientSession)
 	// disable global create by turning off globals? CreateRandomArray uses globals
 	// ensure filter drops av: if CreateRandomArray returns different name ok
-	got := vs.SelectArray(NewRng(3), cg)
+	got := vs.SelectArray(NewRngSess(testAmbientSession, 3), cg)
 	if got == av {
 		t.Fatal("partially written array must not be selected")
 	}
@@ -217,16 +217,16 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
-	av2 := CreateArrayVariable(NewRng(4), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av2 := CreateArrayVariable(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av, av2}
 	vs.GlobalList = []*Variable{&av.Variable, &av2.Variable}
 	// incomplete NoWriteVars hole stickies IsNonWritable residual during filter of av
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
-	if vs.SelectArray(NewRng(3), cg) != nil {
+	if vs.SelectArray(NewRngSess(testAmbientSession, 3), cg) != nil {
 		t.Fatal("IsNonWritable residual must fail closed SelectArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -236,7 +236,7 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	// IsSideEffectFree residual soft invent was soft-continue keep/filter invent pick.
 	// Fair: sticky fail closed whole SelectArray (EffectComplete gate + sefree residual).
 	cg2 := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
-	if vs.SelectArray(NewRng(3), cg2) != nil {
+	if vs.SelectArray(NewRngSess(testAmbientSession, 3), cg2) != nil {
 		t.Fatal("IsSideEffectFree residual must fail closed SelectArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -254,7 +254,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	av := CreateArrayVariable(NewRng(2), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -281,7 +281,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	blk.LocalVars = []*Variable{fieldIV}
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	st := MakeRandomArrayOp(NewRng(5), opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 5), opts, probs, vs, tables, stmtTab, &cg)
 	if stmtOK(st) {
 		t.Fatal("packed residual must fail closed MakeRandomArrayOp")
 	}
@@ -353,7 +353,7 @@ func TestItemizeIsAggregateResidualSticky(t *testing.T) {
 	}
 	parent.AsArray = parent
 	// Itemize may CreateFieldVars residual on nil field Type
-	item := parent.Itemize(NewRng(1))
+	item := parent.Itemize(NewRngSess(testAmbientSession, 1))
 	if item != nil && !HasErrorSess(testAmbientSession) {
 		// if itemize succeeded without expand hole, CreateFieldVars may not run on non-aggregate wait - Type is struct aggregate
 		// CreateFieldVars on nil field Type should sticky

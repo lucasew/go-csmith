@@ -20,7 +20,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 	for seed := uint64(1); seed <= 500; seed++ {
 		ClearErrorSess(testAmbientSession)
 		ResetArrayInitSeedSess(testAmbientSession)
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		SetProcessRngSess(testAmbientSession, r)
 		vs := NewVariableSelector(testAmbientSession, opts)
 		vs.Probs = probs
@@ -29,7 +29,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 		if init == nil {
 			continue
 		}
-		r = NewRng(seed)
+		r = NewRngSess(testAmbientSession, seed)
 		SetProcessRngSess(testAmbientSession, r)
 		av := CreateArrayVariable(r, opts, probs, vs, nil, blk, "l_arr", elem, init, NewCVQualifiers(nil, nil))
 		if av == nil || HasErrorSess(testAmbientSession) {

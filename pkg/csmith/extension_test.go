@@ -15,7 +15,7 @@ func TestExtensionValueAndInitialize(t *testing.T) {
 		t.Fatal("empty name sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	probs := NewProbabilities(Defaults())
 	vals := AbsExtensionInitialize(3, r, probs)
 	if vals == nil || len(vals) != 3 || HasErrorSess(testAmbientSession) {
@@ -71,7 +71,7 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	o.Klee = true
 	o.Func1MaxParams = 2
 	SetProcessOptionsSess(testAmbientSession, o)
-	SetProcessRngSess(testAmbientSession, NewRng(1))
+	SetProcessRngSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(o))
 	CreateExtension(o)
 	if HasErrorSess(testAmbientSession) || !ExtensionActiveSess(testAmbientSession) || ExtensionKindSess(testAmbientSession) != "klee" {

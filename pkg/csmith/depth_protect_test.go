@@ -30,7 +30,7 @@ func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, nil); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 1), opts, NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, nil); fi != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -53,10 +53,10 @@ func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
 		t.Fatal("dtSafeOpFlags")
 	}
 	probs := NewProbabilities(opts)
-	if f := MakeRandomBinaryKind(NewRng(1), opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f == nil {
+	if f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 1), opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f == nil {
 		t.Fatal("binary flags")
 	}
-	if t2 := RandomTypeFromType(NewRng(1), nil, opts, probs, GetIntType(), false, false); t2 == nil {
+	if t2 := RandomTypeFromType(NewRngSess(testAmbientSession, 1), nil, opts, probs, GetIntType(), false, false); t2 == nil {
 		t.Fatal("random type from simple")
 	}
 }
@@ -90,8 +90,8 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	if f == nil {
 		t.Fatal("nil")
 	}

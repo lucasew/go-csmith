@@ -19,7 +19,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Prefer multi-dim so nested shells exist
-	av := CreateArrayVariable(NewRng(1), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("CreateArrayVariable")
 	}
@@ -40,7 +40,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	// Count AllocStmID consumed by multi-dim array-init
 	currentSession().NextStmID = 200
 	before := currentSession().NextStmID
-	st := MakeRandomArrayInit(NewRng(7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("MakeRandomArrayInit sticky: %v", GetErrorSess(testAmbientSession))
 	}

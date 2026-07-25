@@ -5,7 +5,7 @@ import "testing"
 func TestFindMustUseArrays(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -54,7 +54,7 @@ func TestSelectMustUseVar(t *testing.T) {
 	vs.GlobalList = []*Variable{g}
 	rw := &RWDirective{MustWriteVars: []*Variable{g}}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
-	v := vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil)
+	v := vs.SelectMustUseVar(NewRngSess(testAmbientSession, 2), AccessWrite, cg, GetIntType(), nil)
 	if v != g {
 		t.Fatalf("%v", v)
 	}
@@ -74,7 +74,7 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntType(), false, false)
 	rw := &RWDirective{MustWriteVars: []*Variable{broken, good}}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
-	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 2), AccessWrite, cg, GetIntType(), nil) != nil {
 		t.Fatal("Type-nil must-use entry must fail closed whole select")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -86,7 +86,7 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	rw2 := &RWDirective{MustWriteVars: []*Variable{shell, good}}
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw2)
-	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 2), AccessWrite, cg2, GetIntType(), nil) != nil {
 		t.Fatal("IsArray without AsArray must fail closed SelectMustUseVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -106,7 +106,7 @@ func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	rw := &RWDirective{MustWriteVars: []*Variable{g}}
 	cg := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithRW(rw)
-	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 2), AccessWrite, cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectContext must fail closed SelectMustUseVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -116,7 +116,7 @@ func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw).WithFactMgr(fm)
-	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 2), AccessWrite, cg2, GetIntType(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed SelectMustUseVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -131,7 +131,7 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), false, false)
 	broken.Type = nil
 	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntType(), false, false)
-	if ChooseVarFull(NewRng(1), []*Variable{broken, good}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	if ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{broken, good}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		nil, nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("Type-nil with want==nil must fail closed")
 	}
@@ -142,7 +142,7 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 	// IsArray without AsArray soft invent was IsEligible residual false soft-continue
 	// then invent pick later good. Fair: sticky fail closed whole choose.
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if ChooseVarFull(NewRng(1), []*Variable{shell, good}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	if ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{shell, good}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		nil, nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("IsArray without AsArray want==nil must fail closed")
 	}
@@ -151,7 +151,7 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// same for want!=nil path
-	if ChooseVarFull(NewRng(1), []*Variable{shell, good}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	if ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{shell, good}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("IsArray without AsArray want!=nil must fail closed")
 	}
@@ -171,7 +171,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	f.Stack = []*Block{blk}
 	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntType(), false, false)
 	// ItemizeArray Type-nil IV residual: soft invent was try-next then pick good.
-	av := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -179,7 +179,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	rwArr := &RWDirective{MustReadVars: []*Variable{&av.Variable, good}}
 	cgArr := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rwArr)
 	cgArr.IVBounds = map[*Variable]int{ivBroken: 0}
-	if vs.SelectMustUseVar(NewRng(5), AccessRead, cgArr, GetIntType(), nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 5), AccessRead, cgArr, GetIntType(), nil) != nil {
 		t.Fatal("ItemizeArray Type-nil IV residual must fail closed SelectMustUseVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -191,7 +191,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	badQfer := CVQualifiers{IsConsts: []bool{false, false}, IsVolatiles: []bool{true}} // len mismatch
 	rwQ := &RWDirective{MustWriteVars: []*Variable{brokenQ, good}}
 	cgQ := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rwQ)
-	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cgQ, GetIntType(), &badQfer) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 2), AccessWrite, cgQ, GetIntType(), &badQfer) != nil {
 		t.Fatal("Match residual must fail closed SelectMustUseVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -203,7 +203,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -212,7 +212,7 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
 	// VariableSelector.cpp:1442 — need IV bounds for itemize_array
 	cg.IVBounds = map[*Variable]int{iv: 0}
-	v := vs.SelectMustUseVar(NewRng(5), AccessRead, cg, GetIntType(), nil)
+	v := vs.SelectMustUseVar(NewRngSess(testAmbientSession, 5), AccessRead, cg, GetIntType(), nil)
 	if v == nil {
 		t.Fatal("nil")
 	}
@@ -236,7 +236,7 @@ func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	rw := &RWDirective{}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(rw)
-	if vs.SelectMustUseVar(NewRng(1), AccessWrite, cg, nil, nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 1), AccessWrite, cg, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -244,7 +244,7 @@ func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil RW is soft re-pick (no must-use list)
-	if vs.SelectMustUseVar(NewRng(1), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil) != nil {
+	if vs.SelectMustUseVar(NewRngSess(testAmbientSession, 1), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil) != nil {
 		t.Fatal("nil RW must fail closed")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -261,7 +261,7 @@ func TestMakeRandomLhsMustUse(t *testing.T) {
 	rw := &RWDirective{MustWriteVars: []*Variable{g}}
 	// force only must-use by empty globals after? keep g
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(rw)
-	lhs := MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil")
 	}
@@ -274,7 +274,7 @@ func TestChooseVarQferFilter(t *testing.T) {
 	// use exact: non-vol wanted vs vol var
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Match exact false for 1-level returns true always — skip
-	got := ChooseVarQfer(NewRng(2), []*Variable{vol, nv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, MatchFlexible)
+	got := ChooseVarQfer(NewRngSess(testAmbientSession, 2), []*Variable{vol, nv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, MatchFlexible)
 	if got == nil {
 		t.Fatal("nil")
 	}

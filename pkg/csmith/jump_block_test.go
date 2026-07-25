@@ -42,18 +42,18 @@ func TestFindGoodJumpBlock(t *testing.T) {
 	b1 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	b2 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
 	f.Blocks = []*Block{b1, b2}
-	got := FindGoodJumpBlock(NewRng(2), f.Blocks, b1, true)
+	got := FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), f.Blocks, b1, true)
 	if got == nil {
 		t.Fatal("nil")
 	}
 	// empty blocks rejected
 	empty := &Block{Func: f}
-	if FindGoodJumpBlock(NewRng(2), []*Block{empty}, b1, true) != nil {
+	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), []*Block{empty}, b1, true) != nil {
 		t.Fatal("empty")
 	}
 	// array loop dest rejected
 	arr := &Block{Func: f, InArrayLoop: true, Stmts: []Stmt{{Kind: StmtAssign}}}
-	if FindGoodJumpBlock(NewRng(2), []*Block{arr}, b1, true) != nil {
+	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), []*Block{arr}, b1, true) != nil {
 		t.Fatal("array dest")
 	}
 }
@@ -68,7 +68,7 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	hole := &Block{Func: f, Parent: src, LocalVars: []*Variable{nil}, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
 	good := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
 	// asDest: HasInitSkippedVars(src, hole) stickies residual; soft invent picks good
-	if FindGoodJumpBlock(NewRng(1), []*Block{hole, good}, src, true) != nil {
+	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 1), []*Block{hole, good}, src, true) != nil {
 		t.Fatal("HasInitSkippedVars residual must fail closed FindGoodJumpBlock")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -83,7 +83,7 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 		Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}},
 	}
 	good2 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
-	if FindGoodJumpBlock(NewRng(1), []*Block{good2}, curr, true) != nil {
+	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 1), []*Block{good2}, curr, true) != nil {
 		t.Fatal("MustReturn residual must fail closed FindGoodJumpBlock asDest")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -120,7 +120,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	// uses Constant::make_random so library test can omit VS/CGContext.
 	opts.StrictConstArrays = true
 	_ = GetNewCtrlVarsSess(testAmbientSession, opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -175,7 +175,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
+	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 2))
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	for i := range b1.Stmts {
@@ -185,7 +185,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	}
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		st = MakeRandomGoto(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b1)
+		st = MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b1)
 		if st.GotoBack || (st.Label == "" && !stmtOK(st)) {
 			// success back-edge or fair null after forward insert
 			if st.GotoBack {

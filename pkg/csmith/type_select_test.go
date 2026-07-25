@@ -38,7 +38,7 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 	// Type.cpp:523 assert(sz > 0) — empty ok_types must not invent a type
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomStructUnionType(NewRng(1), nil) != nil {
+	if ChooseRandomStructUnionType(NewRngSess(testAmbientSession, 1), nil) != nil {
 		t.Fatal("empty pool")
 	}
 	// empty pool non-sticky soft (no candidates)
@@ -94,9 +94,9 @@ func TestMakeRandomPointerTypeIntStar(t *testing.T) {
 	probs := NewProbabilities(opts)
 	// Type.cpp GenerateSimpleTypes seeds AllTypes before make_random_pointer_type
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 1), opts, probs, env)
 	// Force non-20% path often; result should be int* when simple base consolidated
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// first flip 20% for double ptr — seed2 first flipcoin(20)
 	p := env.MakeRandomPointerType(r, opts, probs)
 	if p == nil || p.PtrType() == nil {
@@ -110,7 +110,7 @@ func TestMakeRandomPointerTypeIntStar(t *testing.T) {
 		}
 	}
 	// Type.cpp:1141 — nil env/rng → ERROR_GUARD nullptr, no soft invent
-	if (*TypeEnv)(nil).MakeRandomPointerType(NewRng(1), opts, probs) != nil {
+	if (*TypeEnv)(nil).MakeRandomPointerType(NewRngSess(testAmbientSession, 1), opts, probs) != nil {
 		t.Fatal("nil env must not invent int*")
 	}
 }
@@ -124,7 +124,7 @@ func TestMakeRandomPointerTypeConsolidatesAllSimple(t *testing.T) {
 	// avoid 20% derived path (empty derived)
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
-		p := env.MakeRandomPointerType(NewRng(seed), opts, probs)
+		p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs)
 		if p != nil && p.IndirectLevel() == 1 && p.PtrType() == GetIntType() {
 			found = true
 			break
@@ -141,7 +141,7 @@ func TestSelectLTypeDefaultInt(t *testing.T) {
 	// Force no pointer: use op that isn't simple assign... still pointer only on simple assign
 	// With PointerAsLTypeProb=50, may get pointer. Use many seeds with compound op.
 	env := TypeEnv{Sess: testAmbientSession}
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	ty := SelectLType(r, opts, probs, &env, false, AssignBitAnd)
 	if ty != GetIntType() {
 		// float off, no struct → int
@@ -160,7 +160,7 @@ func TestSelectLTypeIncompleteStructPoolFailClosed(t *testing.T) {
 	probs.single[PStructAsLTypeProb] = 100
 	probs.single[PPointerAsLTypeProb] = 0
 	probs.single[PFloatAsLTypeProb] = 0
-	ty := SelectLType(NewRng(1), opts, probs, env, false, AssignSimple)
+	ty := SelectLType(NewRngSess(testAmbientSession, 1), opts, probs, env, false, AssignSimple)
 	if ty != nil {
 		t.Fatalf("incomplete AllTypes must fail closed SelectLType, got %v", ty.CName())
 	}
@@ -175,15 +175,15 @@ func TestSelectLTypeErrorGuard(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 1), opts, probs, env)
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if SelectLType(NewRng(1), opts, probs, env, false, AssignSimple) != nil {
+	if SelectLType(NewRngSess(testAmbientSession, 1), opts, probs, env, false, AssignSimple) != nil {
 		t.Fatal("sticky error must not invent LType (not soft fall through to int)")
 	}
 	// also compound assign: same ERROR_GUARD before default int
-	if SelectLType(NewRng(2), opts, probs, env, false, AssignBitAnd) != nil {
+	if SelectLType(NewRngSess(testAmbientSession, 2), opts, probs, env, false, AssignBitAnd) != nil {
 		t.Fatal("sticky error on compound must not invent int LType")
 	}
 }
@@ -196,7 +196,7 @@ func TestChooseRandomErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if env.ChooseRandom(NewRng(1), opts, probs, false) != nil {
+	if env.ChooseRandom(NewRngSess(testAmbientSession, 1), opts, probs, false) != nil {
 		t.Fatal("sticky error must fail ChooseRandom")
 	}
 }
@@ -207,21 +207,21 @@ func TestChooseRandomNilTypeHole(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil, GetSimpleType(EShort)}}
-	if env.ChooseRandom(NewRng(1), opts, probs, false) != nil {
+	if env.ChooseRandom(NewRngSess(testAmbientSession, 1), opts, probs, false) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandom")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AllTypes hole must SetError sticky ChooseRandom")
 	}
 	ClearErrorSess(testAmbientSession)
-	if env.ChooseRandomNonvoid(NewRng(2), opts, probs) != nil {
+	if env.ChooseRandomNonvoid(NewRngSess(testAmbientSession, 2), opts, probs) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandomNonvoid")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AllTypes hole must SetError sticky ChooseRandomNonvoid")
 	}
 	ClearErrorSess(testAmbientSession)
-	if env.ChooseRandomNonvoidNonvolatile(NewRng(3), opts, probs) != nil {
+	if env.ChooseRandomNonvoidNonvolatile(NewRngSess(testAmbientSession, 3), opts, probs) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandomNonvoidNonvolatile")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -235,7 +235,7 @@ func TestChooseRandomPointerTypeNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	intStar := PointerTo(GetIntType())
 	env := &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{intStar, nil}}
-	if env.ChooseRandomPointerType(NewRng(1)) != nil {
+	if env.ChooseRandomPointerType(NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil DerivedTypes hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -247,7 +247,7 @@ func TestChooseRandomPointerTypeNilHole(t *testing.T) {
 func TestChooseRandomStructUnionTypeNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0"}
-	if ChooseRandomStructUnionType(NewRng(1), []*Type{st, nil}) != nil {
+	if ChooseRandomStructUnionType(NewRngSess(testAmbientSession, 1), []*Type{st, nil}) != nil {
 		t.Fatal("nil ok_types hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -269,7 +269,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	}
 	for seed := uint64(1); seed < 30; seed++ {
 		ClearErrorSess(testAmbientSession)
-		if envBad.MakeRandomPointerType(NewRng(seed), opts, probs) != nil {
+		if envBad.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs) != nil {
 			t.Fatalf("incomplete type pools must fail closed MakeRandomPointerType seed=%d", seed)
 		}
 	}
@@ -285,13 +285,13 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	sawNilOnDerivedPath := false
 	for seed := uint64(1); seed < 200; seed++ {
 		ClearErrorSess(testAmbientSession)
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		// peek same flip as MakeRandomPointerType first coin
 		if !r.RndFlipcoin(20) {
 			continue
 		}
 		// re-run full make with same seed — first flip true → derived incomplete → nil
-		if envDerived.MakeRandomPointerType(NewRng(seed), opts, probs) != nil {
+		if envDerived.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs) != nil {
 			t.Fatalf("derived nil hole + flipcoin(20) must fail closed seed=%d", seed)
 		}
 		if !HasErrorSess(testAmbientSession) {
@@ -311,10 +311,10 @@ func TestSelectLTypeCanBePointer(t *testing.T) {
 	probs := NewProbabilities(opts)
 	// Type.cpp always has AllTypes after GenerateSimpleTypes / GenerateAllTypes
 	env := &TypeEnv{Sess: testAmbientSession}
-	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 1), opts, probs, env)
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		ty := SelectLType(r, opts, probs, env, false, AssignSimple)
 		if ty != nil && ty.PtrType() != nil {
 			found = true
@@ -405,7 +405,7 @@ func TestChooseRandomStructFromTypeIsVolatileResidualSticky(t *testing.T) {
 	typ := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if env.ChooseRandomStructFromType(NewRng(1), typ, true) != nil {
+	if env.ChooseRandomStructFromType(NewRngSess(testAmbientSession, 1), typ, true) != nil {
 		t.Fatal("IsVolatileStructUnion residual must fail closed ChooseRandomStructFromType")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -419,7 +419,7 @@ func TestRandomTypeFromTypeVoidIsSimpleResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// strict simple void
 	got := RandomTypeFromType(r, nil, opts, probs, GetSimpleType(EVoid), true, true)
 	if got != nil {
@@ -450,7 +450,7 @@ func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
 	ok := 0
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		p := env.MakeRandomPointerType(NewRng(seed), opts, probs)
+		p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs)
 		if p != nil && p.PtrType() != nil {
 			ok++
 		}
@@ -463,11 +463,11 @@ func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
 	// seed that hits flip true with empty derived: brute
 	found := false
 	for seed := uint64(0); seed < 200; seed++ {
-		r := NewRng(seed)
+		r := NewRngSess(testAmbientSession, seed)
 		if r.RndFlipcoin(20) {
 			// this seed's first draw is heads — MakeRandomPointerType must still return
 			ClearErrorSess(testAmbientSession)
-			p := env.MakeRandomPointerType(NewRng(seed), opts, probs)
+			p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs)
 			if p == nil || HasErrorSess(testAmbientSession) {
 				t.Fatalf("empty derived + flip true must fall through choose_random, seed=%d p=%v err=%v", seed, p, HasErrorSess(testAmbientSession))
 			}

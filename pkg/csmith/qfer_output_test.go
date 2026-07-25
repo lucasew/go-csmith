@@ -70,7 +70,7 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 	// pointee type for *p selection; qfer depth 1 for int
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// force create path: empty nonvol list; ExpandStruct with no struct types → fail
-	got := selectDerefPointer(NewRng(3), opts, NewProbabilities(opts), vs, cg, GetIntType(), &q, AccessRead)
+	got := selectDerefPointer(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, cg, GetIntType(), &q, AccessRead)
 	if got != nil && len(vs.GlobalList) > 0 {
 		// if somehow created without expand path, ok only when ExpandStruct off
 	}
@@ -646,7 +646,7 @@ func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	_, _, _, _, _ = MakeRandomLoopControl(NewRng(1), opts, true)
+	_, _, _, _, _ = MakeRandomLoopControl(NewRngSess(testAmbientSession, 1), opts, true)
 	// sticky remains; MakeIteration would abort
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ERROR_RETURN must keep sticky error")

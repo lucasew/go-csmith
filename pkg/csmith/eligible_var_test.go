@@ -8,7 +8,7 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
-	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	if st == nil {
 		t.Fatal("struct")
 	}
@@ -128,7 +128,7 @@ func TestChooseVarSkipsIneligible(t *testing.T) {
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, a)).WithSession(testAmbientSession)
 	// only b eligible
-	got := ChooseVar(NewRng(2), []*Variable{a, b}, AccessRead, cg, GetIntType(), MatchFlexible)
+	got := ChooseVar(NewRngSess(testAmbientSession, 2), []*Variable{a, b}, AccessRead, cg, GetIntType(), MatchFlexible)
 	if got != b {
 		t.Fatalf("got %v", got)
 	}
@@ -266,7 +266,7 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	f.Stack = []*Block{blk}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	v := vs.SelectParentParam(AccessRead, cg, GetIntType(), &q, NewRng(3), MatchFlexible)
+	v := vs.SelectParentParam(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 3), MatchFlexible)
 	if v == nil {
 		t.Fatal("nil")
 	}
@@ -278,7 +278,7 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 
 func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if ChooseOKVar(NewRng(1), []*Variable{nil}) != nil {
+	if ChooseOKVar(NewRngSess(testAmbientSession, 1), []*Variable{nil}) != nil {
 		t.Fatal("incomplete list must fail closed ChooseOKVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -286,7 +286,7 @@ func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	if ChooseVarFull(NewRng(2), []*Variable{g, nil}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+	if ChooseVarFull(NewRngSess(testAmbientSession, 2), []*Variable{g, nil}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete vars must fail closed ChooseVarFull")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -300,7 +300,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vars := []*Variable{g}
-	if ChooseVarFull(NewRng(1), vars, AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+	if ChooseVarFull(NewRngSess(testAmbientSession, 1), vars, AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectContext must fail closed ChooseVarFull")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -311,7 +311,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
-	if ChooseVarFull(NewRng(2), vars, AccessRead, cg, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+	if ChooseVarFull(NewRngSess(testAmbientSession, 2), vars, AccessRead, cg, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed ChooseVarFull")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -321,7 +321,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectStm = inc
-	if ChooseVarFull(NewRng(3), vars, AccessRead, cg2, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+	if ChooseVarFull(NewRngSess(testAmbientSession, 3), vars, AccessRead, cg2, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectStm must fail closed ChooseVarFull")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -336,7 +336,7 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// nil qfer
-	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil, NewRng(1)) != nil {
+	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil qfer must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -345,7 +345,7 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// VariableSelector.cpp:838–839 assert simple != void sticky
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EVoid), &q, nil, NewRng(2)) != nil {
+	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EVoid), &q, nil, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("void type must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -363,7 +363,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
-	if vs.MakeInitValue(AccessRead, cg, GetIntType(), &q, nil, NewRng(1)) != nil {
+	if vs.MakeInitValue(AccessRead, cg, GetIntType(), &q, nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -373,7 +373,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
-	if vs.MakeInitValue(AccessRead, cg2, GetIntType(), &q, nil, NewRng(2)) != nil {
+	if vs.MakeInitValue(AccessRead, cg2, GetIntType(), &q, nil, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -383,7 +383,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	cg3 := WithFunc(nil, IncompleteEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
-	if vs.MakeInitValue(AccessRead, cg3, GetIntType(), &q, nil, NewRng(3)) != nil {
+	if vs.MakeInitValue(AccessRead, cg3, GetIntType(), &q, nil, NewRngSess(testAmbientSession, 3)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {

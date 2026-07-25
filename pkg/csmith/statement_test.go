@@ -5,7 +5,7 @@ import "testing"
 func TestStatementProbabilitySeed2(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	tab := NewStatementThresholdTable(Defaults())
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	// first RndUpto(100) seed2 = 1959434203 % 100 = 3 → IfElse
 	st := StatementProbability(r, tab)
 	if st != StmtIfElse {
@@ -13,7 +13,7 @@ func TestStatementProbabilitySeed2(t *testing.T) {
 	}
 	// nil table sticky MAX
 	ClearErrorSess(testAmbientSession)
-	if StatementProbability(NewRng(1), nil) != MaxStatementType {
+	if StatementProbability(NewRngSess(testAmbientSession, 1), nil) != MaxStatementType {
 		t.Fatal("nil table must fail closed MAX")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -30,7 +30,7 @@ func TestStatementProbabilityFilterRejectCompound(t *testing.T) {
 	f := filterFunc(func(v uint32) bool {
 		return IsCompound(NumberToType(tab, v))
 	})
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 30; i++ {
 		st := StatementProbabilityFilter(r, tab, f)
 		if IsCompound(st) {
@@ -55,7 +55,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := makeRandomStmtKind(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
+	st := makeRandomStmtKind(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, MaxStatementType)
 	if stmtOK(st) {
 		t.Fatal("unknown kind must not invent usable stmt")
@@ -65,7 +65,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil CGContext sticky — no invent Kind-only shell
-	st2 := makeRandomStmtKind(NewRng(1), opts, nil, nil, nil, nil, nil, nil, StmtAssign)
+	st2 := makeRandomStmtKind(NewRngSess(testAmbientSession, 1), opts, nil, nil, nil, nil, nil, nil, StmtAssign)
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil cg soft invent %#v", st2)
 	}

@@ -44,7 +44,7 @@ func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
 	// const qfer wants exact match — volatile var should fail
 	q := NewCVQualifiers([]bool{true}, []bool{false})
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	got := ChooseVarFull(NewRng(1), []*Variable{vol, plain}, AccessRead, cg, GetIntType(), &q, MatchFlexible, nil, false, false, false)
+	got := ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{vol, plain}, AccessRead, cg, GetIntType(), &q, MatchFlexible, nil, false, false, false)
 	// neither matches exact const; plain is non-const non-vol
 	if got != nil {
 		// may still be nil if eligibility rejects; process exact must not pick vol for const want
@@ -178,7 +178,7 @@ func TestFindPointerFields(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
-	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	// inject a pointer field if none
 	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	ptrs := sv.FindPointerFieldsSess(testAmbientSession)

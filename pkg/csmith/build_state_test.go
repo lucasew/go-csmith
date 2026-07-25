@@ -14,13 +14,13 @@ func TestBuildStateTransitions(t *testing.T) {
 	if f.BuildState != BuildUnbuilt || f.IsEffectKnown() {
 		t.Fatal("unbuilt")
 	}
-	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
+	f.GenerateBody(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
 	if f.BuildState != BuildBuilt || !f.IsBuilt || !f.IsEffectKnown() {
 		t.Fatalf("built %v", f.BuildState)
 	}
 	// regenerate ignored
 	body := f.Body
-	f.GenerateBody(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
+	f.GenerateBody(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
 	if f.Body != body {
 		t.Fatal("regen")
 	}
@@ -38,7 +38,7 @@ func TestPointerParamTBD(t *testing.T) {
 	// pair FactMgr at create (Function.cpp FMList); pass same via CGContext
 	fm := f.ensurePairedFactMgr()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	f.GenerateBody(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
 	// after build, may still have fact (or oos); at least was added during building
 	// regenerate blocked so check via second function
 	f2 := &Function{Name: "f2", ReturnType: GetIntType()}
@@ -99,8 +99,8 @@ func TestMakeFirstMarksBuilt(t *testing.T) {
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil)
 	if f == nil || !f.IsEffectKnown() {
 		t.Fatal("built")
 	}
@@ -109,7 +109,7 @@ func TestMakeFirstMarksBuilt(t *testing.T) {
 func TestChooseFuncSkipsBuilding(t *testing.T) {
 	built := &Function{Name: "a", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	building := &Function{Name: "b", ReturnType: GetIntType(), BuildState: BuildBuilding}
-	got := ChooseFunc(NewRng(2), []*Function{building, built}, GetIntType(), nil)
+	got := ChooseFunc(NewRngSess(testAmbientSession, 2), []*Function{building, built}, GetIntType(), nil)
 	if got != built {
 		t.Fatal(got)
 	}
@@ -122,7 +122,7 @@ func TestGenerateBodyIncompleteAmbientResidualSticky(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildUnbuilt}
 	prev := EmptyCGContext().WithSession(testAmbientSession)
 	prev.EffectStm = IncompleteEffect()
-	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	f.GenerateBody(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if f.BuildState != BuildUnbuilt {
 		t.Fatal("incomplete ambient must leave Unbuilt", f.BuildState)
 	}

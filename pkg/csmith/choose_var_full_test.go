@@ -9,7 +9,7 @@ func TestChooseVarFullInvalidVars(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	// invalid_vars contains a → only b
-	got := ChooseVarFull(NewRng(2), []*Variable{a, b}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	got := ChooseVarFull(NewRngSess(testAmbientSession, 2), []*Variable{a, b}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, []*Variable{a}, false, false, false)
 	if got != b {
 		t.Fatalf("got %v want b", got)
@@ -20,7 +20,7 @@ func TestChooseVarFullNoBitfield(t *testing.T) {
 	bf := CreateVariableScalarsSess(testAmbientSession, "g_bf", GetIntType(), false, false)
 	bf.IsBitfield = true
 	ok := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
-	got := ChooseVarFull(NewRng(3), []*Variable{bf, ok}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	got := ChooseVarFull(NewRngSess(testAmbientSession, 3), []*Variable{bf, ok}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, true, false, false)
 	if got != ok {
 		t.Fatalf("got %v want ok", got)
@@ -42,7 +42,7 @@ func TestChooseVarFullNoUnion(t *testing.T) {
 	}
 	plain := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), false, false)
 	// expand would surface union fields; noUnion must reject them
-	got := ChooseVarFull(NewRng(5), []*Variable{uv, plain}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	got := ChooseVarFull(NewRngSess(testAmbientSession, 5), []*Variable{uv, plain}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, false, true)
 	if got != plain {
 		t.Fatalf("got %v want plain", got)
@@ -59,13 +59,13 @@ func TestChooseVarFullNoExpandKeepsStruct(t *testing.T) {
 	}
 	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	// no expand + want int → struct itself does not match int
-	got := ChooseVarFull(NewRng(1), []*Variable{sv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	got := ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{sv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, true, false)
 	if got != nil {
 		t.Fatalf("want nil without expand, got %v", got)
 	}
 	// with expand (default) → field selected
-	got2 := ChooseVarFull(NewRng(1), []*Variable{sv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	got2 := ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{sv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, false, false)
 	if got2 == nil || got2 != sv.FieldVars[0] {
 		t.Fatalf("want field, got %v", got2)
@@ -80,7 +80,7 @@ func TestChooseVarFullAmbientResidualSticky(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if ChooseVarFull(NewRng(2), []*Variable{a, b}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
+	if ChooseVarFull(NewRngSess(testAmbientSession, 2), []*Variable{a, b}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("ambient residual must fail closed ChooseVarFull, not invent later pick")
 	}
@@ -142,7 +142,7 @@ func TestChooseVarFromOKPreferDeref(t *testing.T) {
 	opts := Defaults()
 	// multiple seeds: always prefer pointer when both match want int
 	for seed := uint64(1); seed < 20; seed++ {
-		got := chooseVarFromOK(NewRng(seed), GetIntType(), []*Variable{iv, pv}, opts)
+		got := chooseVarFromOK(NewRngSess(testAmbientSession, seed), GetIntType(), []*Variable{iv, pv}, opts)
 		if got != pv {
 			t.Fatalf("seed %d: got %v want ptr", seed, got)
 		}
@@ -156,7 +156,7 @@ func TestChooseVarFromOKPreferAddressOf(t *testing.T) {
 	want := PointerTo(GetIntType())
 	opts := Defaults()
 	for seed := uint64(1); seed < 20; seed++ {
-		got := chooseVarFromOK(NewRng(seed), want, []*Variable{iv, pv}, opts)
+		got := chooseVarFromOK(NewRngSess(testAmbientSession, seed), want, []*Variable{iv, pv}, opts)
 		if got != iv {
 			t.Fatalf("seed %d: got %v want addressable int", seed, got)
 		}
@@ -182,14 +182,14 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 	opts := Defaults()
 	opts.TakeUnionFieldAddr = false
 	// only union field is lower-indirection; bias empty → fall back to any ok
-	got := chooseVarFromOK(NewRng(1), want, []*Variable{f0, pv}, opts)
+	got := chooseVarFromOK(NewRngSess(testAmbientSession, 1), want, []*Variable{f0, pv}, opts)
 	if got != f0 && got != pv {
 		t.Fatalf("unexpected %v", got)
 	}
 	// with take_union_field_addr on, bias prefers f0 every time
 	opts.TakeUnionFieldAddr = true
 	for seed := uint64(1); seed < 20; seed++ {
-		got = chooseVarFromOK(NewRng(seed), want, []*Variable{f0, pv}, opts)
+		got = chooseVarFromOK(NewRngSess(testAmbientSession, seed), want, []*Variable{f0, pv}, opts)
 		if got != f0 {
 			t.Fatalf("seed %d: want union field, got %v", seed, got)
 		}
@@ -199,7 +199,7 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 func TestChooseVarFromOKSingleNoBias(t *testing.T) {
 	// size==1 skips bias paths
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
-	got := chooseVarFromOK(NewRng(1), GetIntType(), []*Variable{iv}, Defaults())
+	got := chooseVarFromOK(NewRngSess(testAmbientSession, 1), GetIntType(), []*Variable{iv}, Defaults())
 	if got != iv {
 		t.Fatal(got)
 	}
@@ -216,7 +216,7 @@ func TestChooseVarFromOKIsInsideUnionFieldResidualSticky(t *testing.T) {
 	want := PointerTo(GetIntType())
 	opts := Defaults()
 	opts.TakeUnionFieldAddr = false
-	got := chooseVarFromOK(NewRng(1), want, []*Variable{field, pv}, opts)
+	got := chooseVarFromOK(NewRngSess(testAmbientSession, 1), want, []*Variable{field, pv}, opts)
 	if got != nil {
 		t.Fatalf("Type-nil ancestry residual must fail closed nil, got %v", got)
 	}

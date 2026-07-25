@@ -11,7 +11,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
-	SetProcessRngSess(testAmbientSession, NewRng(1))
+	SetProcessRngSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 
 	st := &Type{
 		isStruct:   true,
@@ -33,7 +33,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	if HasErrorSess(testAmbientSession) || len(av.FieldVars) < 4 {
 		t.Fatalf("collective fields n=%d err=%v", len(av.FieldVars), GetErrorSess(testAmbientSession))
 	}
-	item := av.Itemize(NewRng(2))
+	item := av.Itemize(NewRngSess(testAmbientSession, 2))
 	if item == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("itemize", HasErrorSess(testAmbientSession))
 	}

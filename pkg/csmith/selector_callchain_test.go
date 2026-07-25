@@ -93,7 +93,7 @@ func TestIsSeenName(t *testing.T) {
 func TestItemizeArrayWithIV(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}
@@ -105,7 +105,7 @@ func TestItemizeArrayWithIV(t *testing.T) {
 		av.Sizes = []int{4}
 	}
 	// one IV for one dim
-	item := vs.ItemizeArray(NewRng(2), cg, av)
+	item := vs.ItemizeArray(NewRngSess(testAmbientSession, 2), cg, av)
 	if item == nil {
 		t.Fatal("itemize")
 	}
@@ -137,7 +137,7 @@ func TestItemizeArrayTooFewIV(t *testing.T) {
 	// only one IV for 2 dims
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg.IVBounds = map[*Variable]int{iv: 0}
-	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
 		t.Fatal("expect nil")
 	}
 }

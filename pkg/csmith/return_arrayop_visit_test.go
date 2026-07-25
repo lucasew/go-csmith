@@ -61,7 +61,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{3}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -72,7 +72,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	st := MakeRandomArrayInit(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatal(st.Kind)
 	}
@@ -92,10 +92,10 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	st := MakeRandomReturn(NewRng(3), opts, vs, &cg)
+	st := MakeRandomReturn(NewRngSess(testAmbientSession, 3), opts, vs, &cg)
 	if st.Kind != StmtReturn || st.Expr == nil {
 		t.Fatal(st)
 	}

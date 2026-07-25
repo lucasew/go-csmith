@@ -16,7 +16,7 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	if MakeIteration(NewRng(1), opts, NewProbabilities(opts), vs, &cg) != nil {
+	if MakeIteration(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg) != nil {
 		t.Fatal("nil FM must fail closed")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -48,7 +48,7 @@ func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	// IV bound makes writing IV in init visit fail
 	cg.IVBounds = map[*Variable]int{iv: 10}
 	// force select this IV only
-	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, &cg)
+	lc := MakeIteration(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), vs, &cg)
 	if lc != nil {
 		// may create different IV if SelectLoopCtrlVar creates new; only fail when same iv
 		if lc.IV == iv {
@@ -73,7 +73,7 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	var lc *LoopControl
 	for seed := uint64(1); seed < 30; seed++ {
 		ClearErrorSess(testAmbientSession)
-		lc = MakeIteration(NewRng(seed), opts, NewProbabilities(opts), vs, &cg)
+		lc = MakeIteration(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, &cg)
 		if lc != nil {
 			break
 		}
@@ -95,9 +95,9 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	// seed an int global as potential IV
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), &q, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), &q, NewRngSess(testAmbientSession, 1))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, &cg)
+	lc := MakeIteration(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil || lc.IV == nil {
 		t.Fatal("nil iteration")
 	}
@@ -130,16 +130,16 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 func TestMakeIterationArrayBoundPath(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	av.Sizes = []int{5}
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(3))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 3))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// StatementFor.cpp:204–208 — find_must_use_arrays from rw_directive only
 	cg.RW = &RWDirective{MustReadVars: []*Variable{&av.Variable}}
-	lc := MakeIteration(NewRng(11), opts, NewProbabilities(opts), vs, &cg)
+	lc := MakeIteration(NewRngSess(testAmbientSession, 11), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil {
 		t.Fatal("nil")
 	}
@@ -161,9 +161,9 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(2))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 2))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomFor(NewRng(9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")
 	}
@@ -184,8 +184,8 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
-	lc := MakeIteration(NewRng(4), opts, NewProbabilities(opts), vs, &cg)
+	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	lc := MakeIteration(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil {
 		t.Skip("no IV")
 	}
@@ -216,7 +216,7 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	// incomplete RW FindMustUseArrays (nil hole on must_read)
 	cg.RW = &RWDirective{MustReadVars: []*Variable{nil}}
-	if MakeIteration(NewRng(2), opts, probs, vs, &cg) != nil {
+	if MakeIteration(NewRngSess(testAmbientSession, 2), opts, probs, vs, &cg) != nil {
 		t.Fatal("incomplete FindMustUseArrays must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -237,7 +237,7 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeIteration(NewRng(3), opts, probs, vs, &cg) != nil {
+	if MakeIteration(NewRngSess(testAmbientSession, 3), opts, probs, vs, &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeIteration")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -249,7 +249,7 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
-	if MakeIteration(NewRng(4), opts, probs, vs, &cg2) != nil {
+	if MakeIteration(NewRngSess(testAmbientSession, 4), opts, probs, vs, &cg2) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeIteration")
 	}
 	if !HasErrorSess(testAmbientSession) {

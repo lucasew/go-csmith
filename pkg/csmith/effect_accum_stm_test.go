@@ -35,7 +35,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect()
-		st := MakeRandomAssign(NewRng(seed), opts, probs, vs, tables, &cg, nil)
+		st := MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, nil)
 		if st.Kind != StmtAssign {
 			continue
 		}

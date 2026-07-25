@@ -52,7 +52,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	// nil type sticky
-	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, nil, nil) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -60,7 +60,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// only a in read set and global
-	got := ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, b}, GetIntType(), nil)
+	got := ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, b}, GetIntType(), nil)
 	if got != a && got != b {
 		// both global so either ok if both in list
 		if got == nil {
@@ -69,18 +69,18 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	// local not on stack from empty block → only global
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntType(), false, false)
-	got = ChooseVisibleReadVar(NewRng(2), blk, []*Variable{loc}, GetIntType(), nil)
+	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntType(), nil)
 	if got != nil {
 		t.Fatal("local not on stack")
 	}
 	blk.LocalVars = []*Variable{loc}
-	got = ChooseVisibleReadVar(NewRng(2), blk, []*Variable{loc}, GetIntType(), nil)
+	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntType(), nil)
 	if got != loc {
 		t.Fatal("local on stack")
 	}
 	// nil candidate hole fails closed sticky
 	ClearErrorSess(testAmbientSession)
-	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil readVars hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -88,7 +88,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete union facts must not invent soft-filter pick
-	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, GetIntType(), IncompleteUnionFactSlice()) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, GetIntType(), IncompleteUnionFactSlice()) != nil {
 		t.Fatal("incomplete union facts must fail closed nil pick")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -98,7 +98,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	// IsArray without AsArray soft invent was IsVirtual residual false then pick shell
 	// fair: sticky nil fail closed
 	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, arrShell}, GetIntType(), nil) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, arrShell}, GetIntType(), nil) != nil {
 		t.Fatal("IsArray without AsArray must fail closed ChooseVisibleReadVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -111,7 +111,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	// empty facts: IsInsideUnionField still stickies residual before early return not-banned
 	blk.LocalVars = []*Variable{field, a}
-	if ChooseVisibleReadVar(NewRng(3), blk, []*Variable{field, a}, GetIntType(), nil) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 3), blk, []*Variable{field, a}, GetIntType(), nil) != nil {
 		t.Fatal("IsInsideUnionField residual must fail closed ChooseVisibleReadVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -160,7 +160,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// seed a read so choose_visible may work
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
+	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 2))
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	// force back by trying many seeds
@@ -168,7 +168,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		fm.CFGEdges = nil
 		blk.Stmts = []Stmt{prior}
-		st := MakeRandomGoto(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
+		st := MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
 		if st.GotoBack && len(fm.CFGEdges) > 0 {
 			e := fm.CFGEdges[0]
 			if e.BackLink && e.DestStmID == prior.StmID {
@@ -229,7 +229,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	for seedN := uint64(1); seedN < 40; seedN++ {
 		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, seed)
-		st := MakeRandomGoto(NewRng(seedN), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
+		st := MakeRandomGoto(NewRngSess(testAmbientSession, seedN), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
 		if st.Expr == nil {
 			continue
 		}
@@ -246,7 +246,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// sticky ERROR after flipcoin → fail closed (no cond invent)
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
+	st2 := MakeRandomGoto(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
 	if st2.Expr != nil {
 		t.Fatal("sticky error must not invent goto condition")
 	}

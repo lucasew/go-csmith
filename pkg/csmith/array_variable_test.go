@@ -8,7 +8,7 @@ import (
 func TestCreateArrayVariableDimensions(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
 	if av == nil || av.Dimension() < 1 {
@@ -32,21 +32,21 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("void element must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeInt(0), q) != nil {
 		t.Fatal("nil element must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil element must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntType(), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -55,7 +55,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("sticky error after dim draw must fail closed")
 	}
 }
@@ -67,7 +67,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
 	opts.MaxArrayLength = 0
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -83,11 +83,11 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	probs := NewProbabilities(opts)
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
-	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
+	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, env, "S0")
 	if st == nil || !st.IsStruct() {
 		t.Skip("no struct")
 	}
-	av := CreateArrayVariable(NewRng(3), opts, probs, nil, nil, nil, "g_s", st, MakeRandom(st, opts, probs, NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, probs, nil, nil, nil, "g_s", st, MakeRandom(st, opts, probs, NewRngSess(testAmbientSession, 4)), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -107,7 +107,7 @@ func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	// large init_num path still must not invent aggregate alt values without probs
-	av := CreateArrayVariable(NewRng(1), opts, nil, nil, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, nil, nil, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -130,7 +130,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	sawFail := false
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		av := CreateArrayVariable(NewRng(seed), opts, NewProbabilities(opts), nil, nil, nil, "g_a", pt, MakeInt(0), q)
+		av := CreateArrayVariable(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), nil, nil, nil, "g_a", pt, MakeInt(0), q)
 		if av == nil {
 			sawFail = true
 			continue
@@ -146,13 +146,13 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	// with VS+CG: make_init_value path is live
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = NewProbabilities(opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
-	av := CreateArrayVariable(NewRng(3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
 	if av == nil {
 		// make_init_value may ERROR_GUARD; not invent Constant "0"
 		// Clear residual sticky so later tests are not poisoned
@@ -207,7 +207,7 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// hack probs
 	vs.Probs.single[PNewArrayVariableProb] = 100
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	v := vs.createAndInitialize(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), q, nil, "g_9", r)
 	if v == nil || !v.IsArray {
@@ -287,16 +287,16 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
-	item := parent.Itemize(NewRng(1))
+	item := parent.Itemize(NewRngSess(testAmbientSession, 1))
 	if item == nil || item.Collective != parent {
 		t.Fatal("first itemize")
 	}
 	// collective parent may be itemized again (new member); itemized member must not
-	if parent.Itemize(NewRng(2)) == nil {
+	if parent.Itemize(NewRngSess(testAmbientSession, 2)) == nil {
 		t.Fatal("parent collective may itemize again")
 	}
 	ClearErrorSess(testAmbientSession)
-	if item.Itemize(NewRng(3)) != nil {
+	if item.Itemize(NewRngSess(testAmbientSession, 3)) != nil {
 		t.Fatal("re-itemize of itemized must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -681,7 +681,7 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 		Sizes:    []int{3},
 	}
 	av.AsArray = av
-	item := av.Itemize(NewRng(1))
+	item := av.Itemize(NewRngSess(testAmbientSession, 1))
 	if item == nil || item.Collective != av {
 		t.Fatal(item)
 	}
@@ -743,7 +743,7 @@ func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	av.AsArray = av
-	if av.Itemize(NewRng(1)) != nil {
+	if av.Itemize(NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("CreateFieldVars residual must fail closed Itemize, not invent item")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -793,7 +793,7 @@ func TestItemizeConstIndicesNilSticky(t *testing.T) {
 		t.Fatal("Type-nil ItemizeConstIndices must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if av.ItemizeInto(NewRng(1), nil) != nil {
+	if av.ItemizeInto(NewRngSess(testAmbientSession, 1), nil) != nil {
 		t.Fatal("Type-nil ItemizeInto must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

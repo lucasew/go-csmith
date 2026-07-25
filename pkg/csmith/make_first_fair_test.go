@@ -114,8 +114,8 @@ func TestMakeFirstSetupInOutMaps(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	fmMap := NewFactMgrMapSess(testAmbientSession)
-	seedTypesForTest(NewRng(5), opts, NewProbabilities(opts), vs, list)
-	f := MakeFirst(NewRng(5), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, fmMap)
+	seedTypesForTest(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, list)
+	f := MakeFirst(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, fmMap)
 	if f == nil || f.Body == nil {
 		t.Fatal("nil first")
 	}
@@ -142,14 +142,14 @@ func TestMakeRandomFunction(t *testing.T) {
 	opts.MaxBlockDepth = 1
 	opts.MaxFuncs = 5
 	vs := NewVariableSelector(testAmbientSession, opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	list := &FunctionList{}
 	// seed first so list non-empty for choose
-	seedTypesForTest(NewRng(2), opts, NewProbabilities(opts), vs, list)
-	_ = MakeFirst(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, list)
+	_ = MakeFirst(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Funcs = list
-	f := MakeRandomFunction(NewRng(3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list)
+	f := MakeRandomFunction(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -176,13 +176,13 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 	// empty Types → RandomReturnType nil
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	list := &FunctionList{Types: vs.Types}
-	if MakeFirst(NewRng(1), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 1), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("empty AllTypes must fail closed")
 	}
 	// sticky error
-	seedTypesForTest(NewRng(2), opts, probs, vs, list)
+	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, list)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if MakeFirst(NewRng(3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("sticky error")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -200,20 +200,20 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
-	seedTypesForTest(NewRng(4), opts, probs, vs, list)
+	seedTypesForTest(NewRngSess(testAmbientSession, 4), opts, probs, vs, list)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g, nil}
-	if MakeFirst(NewRng(5), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 5), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
 	}
 	ClearErrorSess(testAmbientSession)
 	// MakeRandomFunction same seed path
 	vs2 := NewVariableSelector(testAmbientSession, opts)
 	list2 := &FunctionList{}
-	seedTypesForTest(NewRng(6), opts, probs, vs2, list2)
+	seedTypesForTest(NewRngSess(testAmbientSession, 6), opts, probs, vs2, list2)
 	vs2.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list2)
-	if MakeRandomFunction(NewRng(7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list2) != nil {
+	if MakeRandomFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list2) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
 	ClearErrorSess(testAmbientSession)

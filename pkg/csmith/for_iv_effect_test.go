@@ -56,7 +56,7 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect()
 		*cg.EffectAccum = EmptyEffect()
-		lc = MakeIteration(NewRng(seed), opts, probs, vs, &cg)
+		lc = MakeIteration(NewRngSess(testAmbientSession, seed), opts, probs, vs, &cg)
 		if lc == nil || HasErrorSess(testAmbientSession) || lc.IV == nil {
 			continue
 		}

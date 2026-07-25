@@ -43,7 +43,7 @@ func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
 	f := &Function{Name: "f"}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
+	v := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 2))
 	if v == nil || len(f.NewGlobals) != 1 || f.NewGlobals[0] != v {
 		t.Fatalf("%v %v", v, f.NewGlobals)
 	}
@@ -68,7 +68,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		list.Funcs = []*Function{caller}
 		caller.NewGlobals = nil
-		fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
+		fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 		if fi != nil && !fi.Failed {
 			break
 		}
@@ -104,7 +104,7 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.ExprDepth = 0
-	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if fi == nil || len(fi.Args) != 1 {
 		t.Fatal("args")
 	}
@@ -130,7 +130,7 @@ func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("sticky error must fail invocation, not invent params")
 	}
@@ -147,7 +147,7 @@ func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if MakeRandomSignature(NewRng(1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+	if MakeRandomSignature(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("sticky error must not invent signature")
 	}
 }
@@ -160,14 +160,14 @@ func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	var fi *Invocation
 	var cg CGContext
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
 		cg = WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 		cg.ExprDepth = 1
-		fi = MakeRandomUnaryInvocation(NewRng(seed), opts, vs, NewExprTables(opts), &cg, GetIntType())
+		fi = MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, seed), opts, vs, NewExprTables(opts), &cg, GetIntType())
 		if fi != nil && fi.IsUnary {
 			break
 		}

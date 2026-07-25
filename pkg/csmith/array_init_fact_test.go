@@ -9,7 +9,7 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
-	r := NewRng(42)
+	r := NewRngSess(testAmbientSession, 42)
 	SetProcessRngSess(testAmbientSession, r)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))

@@ -6,7 +6,7 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	built := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true}
 	unbuilt := &Function{Name: "func_2", ReturnType: GetIntType(), IsBuilt: false}
 	funcs := []*Function{built, unbuilt}
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 20; i++ {
 		f := ChooseFunc(r, funcs, GetIntType(), nil)
 		if f == unbuilt {
@@ -17,12 +17,12 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 		}
 	}
 	// only unbuilt → nil
-	if ChooseFunc(NewRng(1), []*Function{unbuilt}, GetIntType(), nil) != nil {
+	if ChooseFunc(NewRngSess(testAmbientSession, 1), []*Function{unbuilt}, GetIntType(), nil) != nil {
 		t.Fatal("expected nil")
 	}
 	// nil Function* hole fails closed sticky — no invent skip as absent / soft re-pick
 	ClearErrorSess(testAmbientSession)
-	if ChooseFunc(NewRng(1), []*Function{built, nil}, GetIntType(), nil) != nil {
+	if ChooseFunc(NewRngSess(testAmbientSession, 1), []*Function{built, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -32,7 +32,7 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	// nil ReturnType when ret wanted fails closed sticky — no invent soft-skip as absent
 	// (C++ is_convertable would deref return_type*; list hole aborts whole choose)
 	noRet := &Function{Name: "bad", ReturnType: nil, IsBuilt: true, BuildState: BuildBuilt}
-	if ChooseFunc(NewRng(1), []*Function{built, noRet}, GetIntType(), nil) != nil {
+	if ChooseFunc(NewRngSess(testAmbientSession, 1), []*Function{built, noRet}, GetIntType(), nil) != nil {
 		t.Fatal("nil ReturnType must fail closed whole choose, not invent skip")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -44,13 +44,13 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 func TestArrayNoLoopInitializer(t *testing.T) {
 	opts := Defaults()
 	// global → true
-	g := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if g == nil || !g.NoLoopInitializer() {
 		t.Fatal("global must no-loop")
 	}
 	// local with no multi inits: force empty InitValues
 	blk := &Block{}
-	loc := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), nil, nil, blk, "l_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
+	loc := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, blk, "l_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
 	if loc == nil {
 		t.Fatal("nil local")
 	}
@@ -87,7 +87,7 @@ func TestChooseFuncContextQferWildcard(t *testing.T) {
 	}
 	wild := NewCVQualifiers([]bool{false}, []bool{false})
 	wild.Wildcard = true
-	got := ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &wild)
+	got := ChooseFuncContext(NewRngSess(testAmbientSession, 2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &wild)
 	if got != good {
 		t.Fatalf("got %v", got)
 	}
@@ -106,7 +106,7 @@ func TestChooseFuncContextNilRVQferFailClosed(t *testing.T) {
 	}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	ClearErrorSess(testAmbientSession)
-	if ChooseFuncContext(NewRng(1), []*Function{good, noRV}, GetIntType(), nil, nil, Defaults(), &q) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{good, noRV}, GetIntType(), nil, nil, Defaults(), &q) != nil {
 		t.Fatal("nil RV among candidates must fail closed whole choose")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -114,7 +114,7 @@ func TestChooseFuncContextNilRVQferFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// good alone with matching qfer still works
-	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &q) != good {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &q) != good {
 		t.Fatal("complete RV must still choose")
 	}
 }
@@ -127,7 +127,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	}
 	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	if ChooseFuncContext(NewRng(1), []*Function{good}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{good}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
 		t.Fatal("incomplete ambient must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -137,7 +137,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	// incomplete EffectStm / GlobalFacts also sticky
 	cgStm := EmptyCGContext().WithSession(testAmbientSession)
 	cgStm.EffectStm = IncompleteEffect()
-	if ChooseFuncContext(NewRng(3), []*Function{good}, GetIntType(), nil, &cgStm, Defaults(), nil) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 3), []*Function{good}, GetIntType(), nil, &cgStm, Defaults(), nil) != nil {
 		t.Fatal("incomplete EffectStm must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -148,7 +148,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cgFacts := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
-	if ChooseFuncContext(NewRng(4), []*Function{good}, GetIntType(), nil, &cgFacts, Defaults(), nil) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 4), []*Function{good}, GetIntType(), nil, &cgFacts, Defaults(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -157,7 +157,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete ambient still chooses
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
-	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, &cg2, Defaults(), nil) != good {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 2), []*Function{good}, GetIntType(), nil, &cg2, Defaults(), nil) != good {
 		t.Fatal("complete ambient must still choose")
 	}
 }
@@ -174,7 +174,7 @@ func TestChooseFuncContextIncompleteFEffectSticky(t *testing.T) {
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	if ChooseFuncContext(NewRng(1), []*Function{good, bad}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{good, bad}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
 		t.Fatal("incomplete FEffect among candidates must fail closed whole choose")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -199,7 +199,7 @@ func TestChooseFuncContextMatchResidualSticky(t *testing.T) {
 	}
 	// request qfer with unpaired const/vol depths → Match SetError
 	badQfer := CVQualifiers{IsConsts: []bool{false, false}, IsVolatiles: []bool{true}}
-	if ChooseFuncContext(NewRng(1), []*Function{broken, good}, GetIntType(), nil, nil, Defaults(), &badQfer) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{broken, good}, GetIntType(), nil, nil, Defaults(), &badQfer) != nil {
 		t.Fatal("Match residual must fail closed ChooseFuncContext")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -211,7 +211,7 @@ func TestChooseFuncContextMatchResidualSticky(t *testing.T) {
 func TestChooseFuncUsesIsConvertable(t *testing.T) {
 	// Function.cpp:288–289 — is_convertable (short → int return ok)
 	f := &Function{Name: "f", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect()}
-	got := ChooseFuncContext(NewRng(1), []*Function{f}, GetSimpleType(EShort), nil, nil, Defaults(), nil)
+	got := ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{f}, GetSimpleType(EShort), nil, nil, Defaults(), nil)
 	if got != f {
 		t.Fatal("short should convert via is_convertable to int return")
 	}
@@ -225,7 +225,7 @@ func TestChooseFuncNoSoftBuiltinFallback(t *testing.T) {
 	opts.BuiltinFunctionProb = 0 // never pick builtin first
 	bi := &Function{Name: "b", ReturnType: GetIntType(), IsBuiltin: true, BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect()}
 	// only builtins eligible
-	got := ChooseFuncContext(NewRng(1), []*Function{bi}, GetIntType(), nil, nil, opts, nil)
+	got := ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{bi}, GetIntType(), nil, nil, opts, nil)
 	if got != nil {
 		t.Fatal("must not fall back to builtins when coin says user pool")
 	}
@@ -246,13 +246,13 @@ func TestChooseFuncBuiltinProbZeroNoInvent50(t *testing.T) {
 	}
 	// only builtins: must stay nil (no invent 50% pick)
 	for seed := uint64(1); seed < 40; seed++ {
-		if ChooseFuncContext(NewRng(seed), []*Function{bi}, GetIntType(), nil, nil, opts, nil) != nil {
+		if ChooseFuncContext(NewRngSess(testAmbientSession, seed), []*Function{bi}, GetIntType(), nil, nil, opts, nil) != nil {
 			t.Fatalf("BuiltinFunctionProb=0 must never pick builtin first seed=%d", seed)
 		}
 	}
 	// with user pool: always user, never invent builtin path at 50%
 	for seed := uint64(1); seed < 40; seed++ {
-		got := ChooseFuncContext(NewRng(seed), []*Function{bi, user}, GetIntType(), nil, nil, opts, nil)
+		got := ChooseFuncContext(NewRngSess(testAmbientSession, seed), []*Function{bi, user}, GetIntType(), nil, nil, opts, nil)
 		if got != user {
 			t.Fatalf("want user only, got %v seed=%d", got, seed)
 		}

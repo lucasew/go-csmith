@@ -4,7 +4,7 @@ package csmith
 // Production always runs GenerateAllTypesEnv first; tests must too (no soft invent return type).
 func seedTypesForTest(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, list *FunctionList) {
 	if r == nil {
-		r = NewRng(1)
+		r = NewRngSess(testAmbientSession, 1)
 	}
 	if probs == nil {
 		probs = NewProbabilities(opts)

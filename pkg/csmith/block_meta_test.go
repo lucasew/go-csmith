@@ -101,7 +101,7 @@ func TestRandomParentBlock(t *testing.T) {
 	outer := &Block{}
 	inner := &Block{Parent: outer}
 	seen := map[*Block]bool{}
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 40; i++ {
 		seen[inner.RandomParentBlock(r, true)] = true
 	}
@@ -110,7 +110,7 @@ func TestRandomParentBlock(t *testing.T) {
 		t.Fatal(seen)
 	}
 	// with global_variables: domain size is 1 (nil) + chain length
-	rN := NewRng(2)
+	rN := NewRngSess(testAmbientSession, 2)
 	d0 := rN.RandDepth()
 	_ = inner.RandomParentBlock(rN, true)
 	// one U draw with n == 3 for [nil, inner, outer]
@@ -118,7 +118,7 @@ func TestRandomParentBlock(t *testing.T) {
 	// without global
 	seen2 := map[*Block]bool{}
 	for i := 0; i < 20; i++ {
-		p := inner.RandomParentBlock(NewRng(uint64(i+2)), false)
+		p := inner.RandomParentBlock(NewRngSess(testAmbientSession, uint64(i+2)), false)
 		if p == nil {
 			t.Fatal("nil without global")
 		}
@@ -127,7 +127,7 @@ func TestRandomParentBlock(t *testing.T) {
 	// with global must be able to return nil
 	foundNil := false
 	for i := 0; i < 80; i++ {
-		if inner.RandomParentBlock(NewRng(uint64(i+1)), true) == nil {
+		if inner.RandomParentBlock(NewRngSess(testAmbientSession, uint64(i+1)), true) == nil {
 			foundNil = true
 			break
 		}
@@ -155,7 +155,7 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 	// Probe domain size by counting distinct results over many seeds with allowGlobal
 	// and comparing draw: first event after NewRng is U with n=3 when chain has 2 blocks.
 	// Use raw Rng: flipcoin not used; only RndUpto(3).
-	r := NewRng(11)
+	r := NewRngSess(testAmbientSession, 11)
 	// Manually mirror domain: [nil, inner, outer]
 	// After one RandomParentBlock(true), depth must advance by 1
 	d0 := r.RandDepth()
@@ -164,7 +164,7 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 		t.Fatalf("one upto draw expected: %d → %d", d0, r.RandDepth())
 	}
 	// without global domain is 2
-	r2 := NewRng(11)
+	r2 := NewRngSess(testAmbientSession, 11)
 	d1 := r2.RandDepth()
 	_ = inner.RandomParentBlock(r2, false)
 	if r2.RandDepth() != d1+1 {
@@ -181,7 +181,7 @@ func TestLabelAttrEmit(t *testing.T) {
 	}}
 	b := &Block{
 		EmitLabelAttrs: true,
-		LabelAttrRng:   NewRng(1),
+		LabelAttrRng:   NewRngSess(testAmbientSession, 1),
 		Stmts: []Stmt{{
 			Kind: StmtAssign, SourceLabel: "lbl_1",
 			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false),
@@ -203,7 +203,7 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// make a small looping block
-	b := MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, true)
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, true)
 	if b == nil {
 		t.Fatal("nil")
 	}

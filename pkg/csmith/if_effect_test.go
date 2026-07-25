@@ -23,7 +23,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	// plant a known global
 	g1 := CreateVariableQferSess(testAmbientSession, "g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.GlobalList = []*Variable{g1}
-	st := MakeRandomIf(NewRng(7), opts, probs, vs, tables, tab, &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 7), opts, probs, vs, tables, tab, &cg)
 	if st == nil || st.Then == nil || st.Else == nil {
 		t.Fatal("if")
 	}
@@ -106,7 +106,7 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 
 func TestArrayBuildInitRecursive(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -143,7 +143,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
@@ -152,7 +152,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}
 	// sticky error after condition would abort; set after a successful path component
-	st := MakeRandomIf(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	// may succeed with empty blocks (max size 0)
 	if HasErrorSess(testAmbientSession) {
 		if st != nil {
@@ -161,7 +161,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	st2 := MakeRandomIf(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st2 := MakeRandomIf(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st2 != nil {
 		t.Fatal("ERROR_GUARD after flip path: want nil")
 	}
@@ -399,7 +399,7 @@ func TestRandomParentBlockERRORGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{}
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if b.RandomParentBlock(NewRng(1), true) != nil {
+	if b.RandomParentBlock(NewRngSess(testAmbientSession, 1), true) != nil {
 		t.Fatal("ERROR_GUARD")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -418,7 +418,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	st := MakeRandomIf(NewRng(1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
 	}
@@ -440,7 +440,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	tab := &ThresholdTable{}
 	tab.Add(100, int(StmtAssign))
 	opts.MaxBlockSize = 2
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	parent := &Block{Func: f}
@@ -454,7 +454,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	cg.EffectAccum = &accum
 	cg.Types = vs.Types
 	preDepth := cg.BlkDepth
-	st := MakeRandomIf(NewRng(9), opts, probs, vs, tables, tab, &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 9), opts, probs, vs, tables, tab, &cg)
 	if cg.EffectAccum == nil {
 		t.Fatal("parent EffectAccum must remain non-nil")
 	}
@@ -491,10 +491,10 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
-	if MakeRandomFor(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomFor(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
 	}
 	// nil return is the invent ban; SetError when iteration path reaches accum check

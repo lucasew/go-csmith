@@ -9,7 +9,7 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	r := NewRng(42)
+	r := NewRngSess(testAmbientSession, 42)
 	elem := PointerTo(GetIntType())
 	init := MakeRandom(elem, opts, probs, r)
 	if init == nil || init.Value != "0" || init.Type == nil || !init.Type.IsPointerLike() {

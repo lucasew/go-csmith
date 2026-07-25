@@ -12,13 +12,13 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	// StatementReturn.cpp:58–59 assert(fm) — session FactMgr required
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	st := MakeRandomReturn(NewRng(5), opts, vs, &cg)
+	st := MakeRandomReturn(NewRngSess(testAmbientSession, 5), opts, vs, &cg)
 	if st.Kind != StmtReturn {
 		t.Fatalf("%v", st.Kind)
 	}
@@ -44,7 +44,7 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// nil vs → ExpressionVariable soft nil (non-sticky) → empty return re-pick
 	ClearErrorSess(testAmbientSession)
-	st := MakeRandomReturn(NewRng(1), opts, nil, &cg)
+	st := MakeRandomReturn(NewRngSess(testAmbientSession, 1), opts, nil, &cg)
 	if st.Expr != nil {
 		t.Fatal("nil vs must yield nullptr-style empty return")
 	}
@@ -73,7 +73,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	st := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), &cg)
+	st := MakeRandomReturn(NewRngSess(testAmbientSession, 1), opts, NewVariableSelector(testAmbientSession, opts), &cg)
 	if st.Expr != nil {
 		t.Fatal("nil FM must fail closed empty return")
 	}
@@ -84,7 +84,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	f.RV = nil
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	st2 := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), &cg2)
+	st2 := MakeRandomReturn(NewRngSess(testAmbientSession, 1), opts, NewVariableSelector(testAmbientSession, opts), &cg2)
 	if st2.Expr != nil {
 		t.Fatal("nil RV must fail closed empty return")
 	}
@@ -104,7 +104,7 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	st := MakeRandomReturn(NewRng(1), opts, vs, &cg)
+	st := MakeRandomReturn(NewRngSess(testAmbientSession, 1), opts, vs, &cg)
 	if st.Expr != nil || stmtOK(st) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomReturn")
 	}
@@ -115,7 +115,7 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	st2 := MakeRandomReturn(NewRng(2), opts, vs, &cg2)
+	st2 := MakeRandomReturn(NewRngSess(testAmbientSession, 2), opts, vs, &cg2)
 	if st2.Expr != nil || stmtOK(st2) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomReturn")
 	}

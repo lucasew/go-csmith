@@ -7,7 +7,7 @@ import (
 
 func TestMakeRandomLoopControlRanges(t *testing.T) {
 	opts := Defaults()
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 50; i++ {
 		init, limit, incr, _, incrOp := MakeRandomLoopControl(r, opts, true)
 		if incr == 0 {
@@ -37,7 +37,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	var list FunctionList
 	// need a function for context
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, &list)
 	ClearErrorSess(testAmbientSession)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
@@ -58,7 +58,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	var st *Stmt
 	for seed := uint64(11); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		st = MakeRandomIf(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
+		st = MakeRandomIf(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st != nil && st.Kind == StmtIfElse && st.Then != nil && st.Else != nil && st.Expr != nil {
 			return
 		}
@@ -72,14 +72,14 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	// StatementFor.cpp:172 assert(blk) — parent block on stack (MakeFirst pops body)
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		t.Fatalf("%+v", st)
 	}
@@ -96,7 +96,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	// StatementFor.cpp always has RNG+CG sticky; nil FM soft re-pick
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
+	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -115,7 +115,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession) // no FM
-	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
+	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatalf("nil FM must return nil, got %#v", st)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -163,7 +163,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	r := NewRng(2)
+	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	parent := &Block{Func: f}
@@ -181,7 +181,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	}
 	// Body code path must not rebind EffectAccum to a private snapshot.
 	// MakeRandomFor is the production path; re-check pointer identity after call.
-	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil {
 		// soft factory miss is ok for this contract; pointer must still be live
 		if cg.EffectAccum != &accum && cg.EffectAccum != bodyCG.EffectAccum {

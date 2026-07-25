@@ -63,9 +63,9 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// RHS make_random may pick comma (type nullptr) — needs Type env
-	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	// seed a global
-	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
+	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
 	if g == nil {
 		t.Fatal("global")
 	}
@@ -85,7 +85,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 		cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
-		st = MakeRandomAssign(NewRng(seed), opts, probs, vs, tables, &cg2, GetIntType())
+		st = MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg2, GetIntType())
 		if stmtOK(st) {
 			cg = cg2
 			break
@@ -376,7 +376,7 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
-	r := NewRng(42)
+	r := NewRngSess(testAmbientSession, 42)
 	SetProcessRngSess(testAmbientSession, r)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)

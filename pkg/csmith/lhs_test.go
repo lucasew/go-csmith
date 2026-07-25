@@ -10,7 +10,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
-	r := NewRng(3)
+	r := NewRngSess(testAmbientSession, 3)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	lhs := MakeRandomLhs(r, opts, probs, vs, &cg, GetIntType(), false, false, nil)
 	if lhs == nil || lhs.Var == nil {
@@ -33,14 +33,14 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	// seed an int* global — qfer depth must be indirect+1 (pointer: 2 levels)
 	p := env.FindPointerType(GetIntType(), true)
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
-	pv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRng(1))
+	pv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRngSess(testAmbientSession, 1))
 	if pv == nil {
 		t.Fatal("no ptr global")
 	}
 	// force high deref probability by trying many seeds
 	var got *Lhs
 	for seed := uint64(1); seed < 100; seed++ {
-		got = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, nil)
+		got = MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, nil)
 		if got != nil && got.Var != nil && got.Var.Type != nil && got.Var.Type.IndirectLevel() == 1 && got.IndirectLevel() == 1 {
 			break
 		}
@@ -71,7 +71,7 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	// (no invent soft fall-through create/accept past incomplete type IR)
 	for seed := uint64(1); seed < 20; seed++ {
 		ClearErrorSess(testAmbientSession)
-		lhs := MakeRandomLhs(NewRng(seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
+		lhs := MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
 		if lhs != nil && lhs.Var == broken {
 			t.Fatal("Type-nil var must not be accepted as Lhs")
 		}
@@ -99,7 +99,7 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	if MakeRandomLhs(NewRng(1), opts, probs, vs, &cg, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, probs, vs, &cg, GetIntType(), false, false, nil) != nil {
 		t.Fatal("must-use Type-nil residual must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -116,7 +116,7 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw2)
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
-	if MakeRandomLhs(NewRng(2), opts, probs, vs, &cg2, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, probs, vs, &cg2, GetIntType(), false, false, nil) != nil {
 		t.Fatal("IsArray without AsArray must-use residual must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -221,7 +221,7 @@ func TestPickUnaryOp(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	seen := map[UnaryOp]bool{}
-	r := NewRng(1)
+	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 100; i++ {
 		seen[PickUnaryOp(r, opts)] = true
 	}
@@ -230,7 +230,7 @@ func TestPickUnaryOp(t *testing.T) {
 	}
 	opts.UnaryPlusOperator = false
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
-	r2 := NewRng(2)
+	r2 := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 50; i++ {
 		if PickUnaryOp(r2, opts) == UnPlus {
 			t.Fatal("unary plus disabled")
@@ -282,13 +282,13 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	p := env.FindPointerType(GetIntType(), true)
 	// pointer type needs two-level qfer for SanityCheck / MakeInitValue
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRngSess(testAmbientSession, 1))
 	ClearErrorSess(testAmbientSession) // sticky ERROR_GUARD on failed qfer/create must not poison Lhs make
 	// bump deref prob
 	probs.single[PSelectDerefPointerProb] = 100
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, nil)
+		_ = MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, nil)
 	}
 	if CalcTotal(currentSession().BK.writeDereferenceCnts) == 0 && currentSession().BK.writeVolatileCnt+currentSession().BK.writeNonVolatileCnt == 0 {
 		t.Fatal("expected some write bookkeeping")
@@ -308,7 +308,7 @@ func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
 	// with only signed available and noSignedOverflow, must not return signed
 	foundSigned := false
 	for seed := uint64(1); seed < 15; seed++ {
-		lhs := MakeRandomLhs(NewRng(seed), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), true, true, nil)
+		lhs := MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), true, true, nil)
 		if lhs == nil {
 			continue
 		}
@@ -337,7 +337,7 @@ func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	// with only g written in stm, make may create another var or fail
-	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs != nil && lhs.Var == g {
 		t.Fatal("must not select var already written in effect_stm")
 	}
@@ -353,7 +353,7 @@ func TestMakeRandomLhsUsesProvidedQferWildcard(t *testing.T) {
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	q.Wildcard = true
-	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, &q)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, &q)
 	if lhs == nil {
 		t.Fatal("nil")
 	}
@@ -372,7 +372,7 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	lhs := MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs == nil || lhs.Var == nil {
 		t.Skip("no lhs")
 	}
@@ -401,7 +401,7 @@ func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 		t.Fatal("nil RNG MakeRandomLhs must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, nil, false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, nil, false, false, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -423,7 +423,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -433,7 +433,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg2, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg2, GetIntType(), false, false, nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -446,7 +446,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
-	if MakeRandomLhs(NewRng(3), opts, NewProbabilities(opts), vs2, &cg3, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs2, &cg3, GetIntType(), false, false, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomLhs/selectWritable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -468,7 +468,7 @@ func TestSelectWritableNilTypSticky(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	if selectWritable(NewRng(1), vs, cg, nil, false) != nil {
+	if selectWritable(NewRngSess(testAmbientSession, 1), vs, cg, nil, false) != nil {
 		t.Fatal("nil typ must fail closed selectWritable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -776,7 +776,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, iv)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs == nil || HasErrorSess(testAmbientSession) {
 		t.Fatalf("expected Lhs from l_ok-only pool err=%v", HasErrorSess(testAmbientSession))
 	}

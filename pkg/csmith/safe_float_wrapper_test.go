@@ -10,7 +10,7 @@ func TestMakeRandomBinaryFloatPath(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
 	ft := GetSimpleType(EFloat)
-	f := MakeRandomBinaryKind(NewRng(1), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
+	f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -30,7 +30,7 @@ func TestMakeRandomBinaryAssignKind(t *testing.T) {
 	opts := Defaults()
 	// assign kind: op2 == op1
 	for seed := uint64(1); seed < 20; seed++ {
-		f := MakeRandomBinaryKind(NewRng(seed), opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpAssign, BinAdd)
+		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpAssign, BinAdd)
 		if f == nil {
 			t.Fatalf("seed %d: nil", seed)
 		}
@@ -44,7 +44,7 @@ func TestMakeRandomUnaryFloatPath(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
 	ft := GetSimpleType(EFloat)
-	f := MakeRandomUnary(NewRng(1), opts, NewProbabilities(opts), ft, nil, UnMinus)
+	f := MakeRandomUnary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, nil, UnMinus)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -69,7 +69,7 @@ func TestMakeRandomUnaryIntPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
-	f := MakeRandomUnary(NewRng(3), opts, NewProbabilities(opts), GetIntType(), nil, UnMinus)
+	f := MakeRandomUnary(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), GetIntType(), nil, UnMinus)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -357,7 +357,7 @@ func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = false
 	ft := GetSimpleType(EFloat)
-	f := MakeRandomBinaryKind(NewRng(2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
+	f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
 		t.Fatal("MakeRandomBinaryKind nil", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
