@@ -119,7 +119,7 @@ func (e *dfsEngine) initializeSequenceSess(s *Session, v []int) {
 		return
 	}
 	for i, n := range v {
-		e.seq.AddNumber(n, 0, i)
+		e.seq.AddNumberSess(s, n, 0, i)
 	}
 }
 
@@ -228,7 +228,7 @@ func (r *Rng) DFSResetStateSess(s *Session) {
 	e.currentPos = -1
 	r.traceString = ""
 	if e.seq != nil {
-		e.seq.Clear()
+		e.seq.ClearSess(s)
 	}
 }
 
@@ -270,7 +270,7 @@ func (e *dfsEngine) revisitNodeSess(s *Session, state *dfsSearchState, localPos,
 		sessNoteError(s, ErrGeneric)
 		return -1
 	}
-	e.seq.AddNumber(rv, bound, localPos)
+	e.seq.AddNumberSess(s, rv, bound, localPos)
 	return rv
 }
 
@@ -307,14 +307,14 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 			sessNoteError(s, ErrGeneric)
 			return -1
 		}
-		rv := e.seq.GetNumberByPos(e.currentPos)
+		rv := e.seq.GetNumberByPosSess(s, e.currentPos)
 		if sessHasError(s) {
 			return -1
 		}
 		if f != nil {
 			_ = f.Filter(uint32(rv))
 		}
-		if e.currentPos >= e.seq.SequenceLength()-1 {
+		if e.currentPos >= e.seq.SequenceLengthSess(s)-1 {
 			e.allDone = true
 		}
 		return rv
@@ -375,7 +375,7 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 			sessNoteError(s, ErrGeneric)
 			return -1
 		}
-		e.seq.AddNumber(rv, bound, localPos)
+		e.seq.AddNumberSess(s, rv, bound, localPos)
 		return rv
 	}
 
@@ -420,7 +420,7 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 		sessNoteError(s, ErrGeneric)
 		return -1
 	}
-	e.seq.AddNumber(v, bound, localPos)
+	e.seq.AddNumberSess(s, v, bound, localPos)
 	return v
 }
 
@@ -463,12 +463,12 @@ func (r *Rng) GetPrefixedNameDFSSess(s *Session, name string) string {
 		sessNoteError(s, ErrGeneric)
 		return name
 	}
-	seq := r.dfs.seq.GetSequence()
+	seq := r.dfs.seq.GetSequenceSess(s)
 	if sessHasError(s) {
 		// empty sequence sticky — no invent "p__name"
 		return name
 	}
-	return "p_" + seq + string(r.dfs.seq.SepChar()) + name
+	return "p_" + seq + string(r.dfs.seq.SepCharSess(s)) + name
 }
 
 // dfsRndUpto mirrors DFSRndNumGenerator::rnd_upto.

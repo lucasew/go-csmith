@@ -39,9 +39,14 @@ func (s *LinearSequence) InitSequence() {}
 // LinearSequence.cpp:58–60 — seq_map_[k] = v (bound ignored).
 // LinearSequence always live; sticky incomplete no invent silent drop.
 func (s *LinearSequence) AddNumber(v, bound, k int) {
+	s.AddNumberSess(nil, v, bound, k)
+}
+
+// AddNumberSess is AddNumber with explicit session residual sticky.
+func (s *LinearSequence) AddNumberSess(sess *Session, v, bound, k int) {
 	_ = bound
 	if s == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return
 	}
 	if s.seqMap == nil {
@@ -53,9 +58,14 @@ func (s *LinearSequence) AddNumber(v, bound, k int) {
 // GetNumber mirrors LinearSequence::get_number — always -1.
 // LinearSequence.cpp:62.
 func (s *LinearSequence) GetNumber(bound int) int {
+	return s.GetNumberSess(nil, bound)
+}
+
+// GetNumberSess is GetNumber with explicit session residual sticky.
+func (s *LinearSequence) GetNumberSess(sess *Session, bound int) int {
 	_ = bound
 	if s == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return -1
 	}
 	return -1
@@ -65,18 +75,23 @@ func (s *LinearSequence) GetNumber(bound int) int {
 // LinearSequence.cpp:64–68 — map[pos]; C++ asserts rv >= 0.
 // Missing key sticky -1 (no invent 0 for unset pos).
 func (s *LinearSequence) GetNumberByPos(pos int) int {
+	return s.GetNumberByPosSess(nil, pos)
+}
+
+// GetNumberByPosSess is GetNumberByPos with explicit session residual sticky.
+func (s *LinearSequence) GetNumberByPosSess(sess *Session, pos int) int {
 	if s == nil || s.seqMap == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return -1
 	}
 	rv, ok := s.seqMap[pos]
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return -1
 	}
 	// C++ assert(rv >= 0); negative stored value sticky
 	if rv < 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return -1
 	}
 	return rv
@@ -85,8 +100,13 @@ func (s *LinearSequence) GetNumberByPos(pos int) int {
 // Clear mirrors LinearSequence::clear.
 // LinearSequence.cpp:70.
 func (s *LinearSequence) Clear() {
+	s.ClearSess(nil)
+}
+
+// ClearSess is Clear with explicit session residual sticky.
+func (s *LinearSequence) ClearSess(sess *Session) {
 	if s == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return
 	}
 	s.seqMap = make(map[int]int)
@@ -96,13 +116,18 @@ func (s *LinearSequence) Clear() {
 // LinearSequence.cpp:72–79 — join map[0..size-1] with sep; empty map asserts in C++.
 // Empty sticky "" (no invent bare sep shell).
 func (s *LinearSequence) GetSequence() string {
+	return s.GetSequenceSess(nil)
+}
+
+// GetSequenceSess is GetSequence with explicit session residual sticky.
+func (s *LinearSequence) GetSequenceSess(sess *Session) string {
 	if s == nil || s.seqMap == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	n := len(s.seqMap)
 	if n == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	// require dense 0..n-1 keys (C++ iterates size()-1 via map.size())
@@ -110,7 +135,7 @@ func (s *LinearSequence) GetSequence() string {
 	for i := 0; i < n; i++ {
 		v, ok := s.seqMap[i]
 		if !ok {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(sess, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -124,8 +149,13 @@ func (s *LinearSequence) GetSequence() string {
 // SequenceLength mirrors LinearSequence::sequence_length.
 // LinearSequence.cpp:81.
 func (s *LinearSequence) SequenceLength() int {
+	return s.SequenceLengthSess(nil)
+}
+
+// SequenceLengthSess is SequenceLength with explicit session residual sticky.
+func (s *LinearSequence) SequenceLengthSess(sess *Session) int {
 	if s == nil || s.seqMap == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return 0
 	}
 	return len(s.seqMap)
@@ -133,8 +163,13 @@ func (s *LinearSequence) SequenceLength() int {
 
 // SepChar mirrors LinearSequence::get_sep_char.
 func (s *LinearSequence) SepChar() byte {
+	return s.SepCharSess(nil)
+}
+
+// SepCharSess is SepChar with explicit session residual sticky.
+func (s *LinearSequence) SepCharSess(sess *Session) byte {
 	if s == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return LinearSequenceDefaultSep
 	}
 	return s.sep
