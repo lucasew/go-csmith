@@ -16,7 +16,7 @@ const (
 // Fact.cpp:237–246 — same size and each fact of facts1 found in facts2.
 // Incomplete maps/PointTo fail closed sticky (no invent same-as-skip / soft re-pick past holes).
 func SameFacts(a, b []*FactPointTo) bool {
-	return SameFactsSess(nil, a, b)
+	return SameFactsSess(testAmbientSession, a, b)
 }
 
 // SameFactsSess is SameFacts with explicit session residual sticky.
@@ -46,7 +46,7 @@ func SameFactsSess(s *Session, a, b []*FactPointTo) bool {
 // Soft invent was PT-only SameFacts in shortcut → reuse when last-written field lattice
 // differed (IsNonreadableField over/under-filters choose_var).
 func SameUnionFacts(a, b []*FactUnion) bool {
-	return SameUnionFactsSess(nil, a, b)
+	return SameUnionFactsSess(testAmbientSession, a, b)
 }
 
 // SameUnionFactsSess is SameUnionFacts with explicit session residual sticky.
@@ -72,7 +72,7 @@ func SameUnionFactsSess(s *Session, a, b []*FactUnion) bool {
 
 // FindUnionFact mirrors find_fact for FactUnion (equal by subject + last_written_fid).
 func FindUnionFact(facts []*FactUnion, want *FactUnion) int {
-	return FindUnionFactSess(nil, facts, want)
+	return FindUnionFactSess(testAmbientSession, facts, want)
 }
 
 func FindUnionFactSess(s *Session, facts []*FactUnion, want *FactUnion) int {
@@ -105,7 +105,7 @@ func FindUnionFactSess(s *Session, facts []*FactUnion, want *FactUnion) int {
 // Fact.cpp:237–246 — total size must match; each fact finds an equal in the other env.}
 
 func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
-	return SameFactVecSess(nil, ptA, uA, ptB, uB)
+	return SameFactVecSess(testAmbientSession, ptA, uA, ptB, uB)
 }
 
 func SameFactVecSess(s *Session, ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
@@ -133,7 +133,7 @@ func SameFactVecSess(s *Session, ptA []*FactPointTo, uA []*FactUnion, ptB []*Fac
 // Incomplete map fails closed sticky -1 (no invent soft-skip hole and match later).}
 
 func FindFact(facts []*FactPointTo, want *FactPointTo) int {
-	return FindFactSess(nil, facts, want)
+	return FindFactSess(testAmbientSession, facts, want)
 }
 
 func FindFactSess(s *Session, facts []*FactPointTo, want *FactPointTo) int {
@@ -170,7 +170,7 @@ func FindFactSess(s *Session, facts []*FactPointTo, want *FactPointTo) int {
 // Incomplete maps/PointTo fail closed sticky (no invent subset / soft re-pick past holes).}
 
 func SubsetFacts(a, b []*FactPointTo) bool {
-	return SubsetFactsSess(nil, a, b)
+	return SubsetFactsSess(testAmbientSession, a, b)
 }
 
 func SubsetFactsSess(s *Session, a, b []*FactPointTo) bool {
@@ -207,7 +207,7 @@ func SubsetFactsSess(s *Session, a, b []*FactPointTo) bool {
 // Fact.cpp:249–260 — same size; each f1 has related f2 that implies f1.}
 
 func SubsetUnionFacts(a, b []*FactUnion) bool {
-	return SubsetUnionFactsSess(nil, a, b)
+	return SubsetUnionFactsSess(testAmbientSession, a, b)
 }
 
 func SubsetUnionFactsSess(s *Session, a, b []*FactUnion) bool {
@@ -245,7 +245,7 @@ func SubsetUnionFactsSess(s *Session, a, b []*FactUnion) bool {
 // Fact.cpp:249–260 — total size match; each fact implied by related in other env.}
 
 func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
-	return SubsetFactVecSess(nil, ptA, uA, ptB, uB)
+	return SubsetFactVecSess(testAmbientSession, ptA, uA, ptB, uB)
 }
 
 func SubsetFactVecSess(s *Session, ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
@@ -273,7 +273,7 @@ func SubsetFactVecSess(s *Session, ptA []*FactPointTo, uA []*FactUnion, ptB []*F
 // Statement always live; sticky false (no invent not-ctrl soft-skip past hole).}
 
 func IsCtrlStmt(st *Stmt) bool {
-	return IsCtrlStmtSess(nil, st)
+	return IsCtrlStmtSess(testAmbientSession, st)
 }
 
 // IsCtrlStmtSess is IsCtrlStmt with explicit session residual sticky.
@@ -293,7 +293,7 @@ func IsCtrlStmtSess(s *Session, st *Stmt) bool {
 // ContainsStmt reports whether root statement tree contains target by StmID.
 // Statement always live; sticky false (no invent not-contained soft-skip past hole).
 func ContainsStmt(root, target *Stmt) bool {
-	return ContainsStmtSess(nil, root, target)
+	return ContainsStmtSess(testAmbientSession, root, target)
 }
 
 // ContainsStmtSess is ContainsStmt with explicit session residual sticky.
@@ -310,7 +310,7 @@ func ContainsStmtSess(s *Session, root, target *Stmt) bool {
 // Incomplete Statement / StmID sticky nil (no invent soft-skip miss / soft re-pick).
 // Incomplete Block* hole fails closed sticky nil (no invent soft-skip arm / soft re-pick).
 func FindStmtInTree(root *Stmt, stmID int) *Stmt {
-	return FindStmtInTreeSess(nil, root, stmID)
+	return FindStmtInTreeSess(testAmbientSession, root, stmID)
 }
 
 // FindStmtInTreeSess is FindStmtInTree with explicit session residual sticky.
@@ -376,7 +376,7 @@ func MarkContainedGotosVisitedSess(s *Session, root *Stmt, fm *FactMgr) {
 // BlockContainsStmt walks a block for target stm_id.
 // Block + Statement always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmt(b *Block, target *Stmt) bool {
-	return BlockContainsStmtSess(nil, b, target)
+	return BlockContainsStmtSess(testAmbientSession, b, target)
 }
 
 // BlockContainsStmtSess is BlockContainsStmt with explicit session residual sticky.
@@ -612,7 +612,7 @@ func containsUnfixedGotoIDsSess(s *Session, ids map[int]bool, fm *FactMgr) bool 
 // collectStmIDs records StmIDs under st via get_blocks. Returns false on incomplete
 // Block* hole sticky (no invent partial id set then claim all gotos fixed / soft re-pick).
 func collectStmIDs(st *Stmt, ids map[int]bool) bool {
-	return collectStmIDsSess(nil, st, ids)
+	return collectStmIDsSess(testAmbientSession, st, ids)
 }
 
 // collectStmIDsSess is collectStmIDs with explicit session residual sticky.

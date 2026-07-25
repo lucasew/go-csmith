@@ -23,10 +23,9 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 }
 
 // Generate runs one generation using s as the only mutable bag for the run.
-// Bag-local: mid-gen paths pass s / g.Sess / cg.Sess; never writes testAmbientSession.
-// pureGenStrict is on for the duration so residual Process*/sessOrAmbient(nil) panics
-// instead of writing the quarantined unit-test ambient bag.
-// Remaining process impurity: pureGenStrict toggle + simpleTypes[].Used marks.
+// Bag-local: mid-gen paths pass s / g.Sess / cg.Sess; no package meta lock toggle.
+// Remaining process impurity: testAmbientSession (unit-test Process* bridge) +
+// simpleTypes[].Used process-static marks (reset in TypeDoFinalizationSess).
 func (s *Session) Generate(ctx context.Context) (string, error) {
 	if s == nil {
 		return "", fmt.Errorf("nil session")
@@ -34,12 +33,6 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-
-	// Lock bag-local purity for this run (panic on residual ambient Process*).
-	// Meta package write — still impure until Process* ambient is deleted.
-	prevStrict := pureGenStrict
-	pureGenStrict = true
-	defer func() { pureGenStrict = prevStrict }()
 
 	opts := s.Opts
 	// Platform resolve when sizes needed later

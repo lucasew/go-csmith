@@ -8,7 +8,7 @@ package csmith
 // ExpressionsComplete(nil)/len==0 invents empty-complete eval list / soft re-pick skip overlap).
 // Complete expressions always yield ≥1 subexp.
 func GetEvalToSubexps(e *Expression) []*Expression {
-	return GetEvalToSubexpsSess(nil, e)
+	return GetEvalToSubexpsSess(testAmbientSession, e)
 }
 
 func GetEvalToSubexpsSess(s *Session, e *Expression) []*Expression {
@@ -116,7 +116,7 @@ func GetEvalToSubexpsSess(s *Session, e *Expression) []*Expression {
 // Complete empty (no union pointees) returns non-nil empty.}
 
 func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
-	return FindUnionPointeesSess(nil, facts, e)
+	return FindUnionPointeesSess(testAmbientSession, facts, e)
 }
 
 func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*Variable {
@@ -195,7 +195,7 @@ func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*V
 // (no invent conflict-free / soft re-pick past holes).}
 
 func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
-	return HaveOverlappingFieldsSess(nil, e1, e2, facts)
+	return HaveOverlappingFieldsSess(testAmbientSession, e1, e2, facts)
 }
 
 func HaveOverlappingFieldsSess(s *Session, e1, e2 *Expression, facts []*FactPointTo) bool {
@@ -262,7 +262,7 @@ func HaveOverlappingFieldsSess(s *Session, e1, e2 *Expression, facts []*FactPoin
 // Incomplete Lhs shell sticky nil (no invent soft-skip / empty expression past hole).}
 
 func LhsAsExpression(lhs *Lhs) *Expression {
-	return LhsAsExpressionSess(nil, lhs)
+	return LhsAsExpressionSess(testAmbientSession, lhs)
 }
 
 func LhsAsExpressionSess(s *Session, lhs *Lhs) *Expression {
@@ -291,7 +291,7 @@ func LhsAsExpressionSess(s *Session, lhs *Lhs) *Expression {
 // Complete no-deref cases return empty non-nil slice so callers can distinguish.}
 
 func GetDereferencedPtrs(e *Expression) []*Expression {
-	return GetDereferencedPtrsSess(nil, e)
+	return GetDereferencedPtrsSess(testAmbientSession, e)
 }
 
 func GetDereferencedPtrsSess(s *Session, e *Expression) []*Expression {

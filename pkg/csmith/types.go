@@ -92,7 +92,7 @@ func init() {
 // Type.cpp get_simple_type indexes simple_types[MAX_SIMPLE_TYPES]; OOB is assert
 // path — fail closed nil (no invent eInt for invalid eSimpleType).
 func GetSimpleType(st ESimpleType) *Type {
-	return GetSimpleTypeSess(nil, st)
+	return GetSimpleTypeSess(testAmbientSession, st)
 }
 
 func GetSimpleTypeSess(s *Session, st ESimpleType) *Type {
@@ -105,7 +105,7 @@ func GetSimpleTypeSess(s *Session, st ESimpleType) *Type {
 
 // IsSimple reports eType == eSimple.
 func (t *Type) IsSimple() bool {
-	return t.IsSimpleSess(nil)
+	return t.IsSimpleSess(testAmbientSession)
 }
 
 func (t *Type) IsSimpleSess(s *Session) bool {
@@ -115,7 +115,7 @@ func (t *Type) IsSimpleSess(s *Session) bool {
 // IsStruct reports eType == eStruct.}
 
 func (t *Type) IsStruct() bool {
-	return t.IsStructSess(nil)
+	return t.IsStructSess(testAmbientSession)
 }
 
 func (t *Type) IsStructSess(s *Session) bool {
@@ -125,7 +125,7 @@ func (t *Type) IsStructSess(s *Session) bool {
 // IsUnion reports eType == eUnion.}
 
 func (t *Type) IsUnion() bool {
-	return t.IsUnionSess(nil)
+	return t.IsUnionSess(testAmbientSession)
 }
 
 func (t *Type) IsUnionSess(s *Session) bool {
@@ -135,7 +135,7 @@ func (t *Type) IsUnionSess(s *Session) bool {
 // IsAggregate mirrors Type::is_aggregate (struct/union).}
 
 func (t *Type) IsAggregate() bool {
-	return t.IsAggregateSess(nil)
+	return t.IsAggregateSess(testAmbientSession)
 }
 
 func (t *Type) IsAggregateSess(s *Session) bool {
@@ -154,7 +154,7 @@ type IntSubfield struct {
 // union field indices (j after padding skip) when listed in excluded.
 // Incomplete field Type sticky empty (no invent partial name list past hole).
 func (t *Type) GetIntSubfieldNames(prefix string, excluded []int) []IntSubfield {
-	return t.GetIntSubfieldNamesSess(nil, prefix, excluded)
+	return t.GetIntSubfieldNamesSess(testAmbientSession, prefix, excluded)
 }
 
 func (t *Type) GetIntSubfieldNamesSess(s *Session, prefix string, excluded []int) []IntSubfield {
@@ -225,7 +225,7 @@ func (t *Type) GetIntSubfieldNamesSess(s *Session, prefix string, excluded []int
 // Type* always live on Fields; nil hole sticky fail closed as const (no invent non-const).}
 
 func (t *Type) IsConstStructUnion() bool {
-	return t.IsConstStructUnionSess(nil)
+	return t.IsConstStructUnionSess(testAmbientSession)
 }
 
 func (t *Type) IsConstStructUnionSess(s *Session) bool {
@@ -270,7 +270,7 @@ func (t *Type) IsConstStructUnionSess(s *Session) bool {
 // Type* always live on Fields; nil hole sticky fail closed as volatile (no invent non-vol).}
 
 func (t *Type) IsVolatileStructUnion() bool {
-	return t.IsVolatileStructUnionSess(nil)
+	return t.IsVolatileStructUnionSess(testAmbientSession)
 }
 
 func (t *Type) IsVolatileStructUnionSess(s *Session) bool {
@@ -321,7 +321,7 @@ const incompleteStructDepth = 256
 // (no invent depth 0 that soft-skips nested-struct caps / soft re-pick).}
 
 func (t *Type) StructDepth() int {
-	return t.StructDepthSess(nil)
+	return t.StructDepthSess(testAmbientSession)
 }
 
 func (t *Type) StructDepthSess(s *Session) int {
@@ -352,7 +352,7 @@ func (t *Type) StructDepthSess(s *Session) int {
 // Type* always live at Simple sites; sticky EVoid (no invent void soft-skip past hole).}
 
 func (t *Type) Simple() ESimpleType {
-	return t.SimpleSess(nil)
+	return t.SimpleSess(testAmbientSession)
 }
 
 func (t *Type) SimpleSess(s *Session) ESimpleType {
@@ -377,7 +377,7 @@ func (t *Type) IsInt() bool {
 
 // IsPointerLike is true for ePointer types (ptrTo set).
 func (t *Type) IsPointerLike() bool {
-	return t.IsPointerLikeSess(nil)
+	return t.IsPointerLikeSess(testAmbientSession)
 }
 
 func (t *Type) IsPointerLikeSess(s *Session) bool {
@@ -390,7 +390,7 @@ func (t *Type) IsPointerLikeSess(s *Session) bool {
 // Type* always live on Fields; nil field hole fails closed as false (no invent has-int).}
 
 func (t *Type) HasIntField() bool {
-	return t.HasIntFieldSess(nil)
+	return t.HasIntFieldSess(testAmbientSession)
 }
 
 func (t *Type) HasIntFieldSess(s *Session) bool {
@@ -436,7 +436,7 @@ func (t *Type) HasIntFieldSess(s *Session) bool {
 // Type* always live on Fields; nil field hole sticky true (no invent pointer-free).}
 
 func (t *Type) ContainPointerField() bool {
-	return t.ContainPointerFieldSess(nil)
+	return t.ContainPointerFieldSess(testAmbientSession)
 }
 
 func (t *Type) ContainPointerFieldSess(s *Session) bool {
@@ -481,7 +481,7 @@ func (t *Type) ContainPointerFieldSess(s *Session) bool {
 // Type* always live; sticky false (no invent not-float soft-skip past hole).}
 
 func (t *Type) IsFloat() bool {
-	return t.IsFloatSess(nil)
+	return t.IsFloatSess(testAmbientSession)
 }
 
 func (t *Type) IsFloatSess(s *Session) bool {
@@ -507,7 +507,7 @@ func (t *Type) IsFloatSess(s *Session) bool {
 // Type.h:265–268 — eSimple && eChar (signed char).
 // Type* always live; sticky false (no invent not-char soft-skip past hole).
 func (t *Type) IsSignedChar() bool {
-	return t.IsSignedCharSess(nil)
+	return t.IsSignedCharSess(testAmbientSession)
 }
 
 func (t *Type) IsSignedCharSess(s *Session) bool {
@@ -533,7 +533,7 @@ func (t *Type) IsSignedCharSess(s *Session) bool {
 // Type.cpp:1316–1324 — every field is a bitfield (BitWidth >= 0).
 // Type* always live; sticky true (no invent not-full-bitfields soft-skip past hole).
 func (t *Type) IsFullBitfieldsStruct() bool {
-	return t.IsFullBitfieldsStructSess(nil)
+	return t.IsFullBitfieldsStructSess(testAmbientSession)
 }
 
 func (t *Type) IsFullBitfieldsStructSess(s *Session) bool {
@@ -563,7 +563,7 @@ func (t *Type) IsFullBitfieldsStructSess(s *Session) bool {
 // IsSigned mirrors Type::is_signed (Type.cpp:1326–1347).
 // Type* always live; sticky true (no invent unsigned soft-skip past hole).
 func (t *Type) IsSigned() bool {
-	return t.IsSignedSess(nil)
+	return t.IsSignedSess(testAmbientSession)
 }
 
 func (t *Type) IsSignedSess(s *Session) bool {
@@ -595,7 +595,7 @@ func (t *Type) IsSignedSess(s *Session) bool {
 // Type.cpp:1349–1377 — map signed simple types to unsigned counterparts.
 // Type* always live at to_unsigned; sticky nil (no invent soft-skip past hole).
 func (t *Type) ToUnsigned() *Type {
-	return t.ToUnsignedSess(nil)
+	return t.ToUnsignedSess(testAmbientSession)
 }
 
 func (t *Type) ToUnsignedSess(s *Session) *Type {
@@ -637,7 +637,7 @@ func (t *Type) ToUnsignedSess(s *Session) *Type {
 
 // SetPlatformSizes mirrors host/platform.info integer and pointer sizes for SizeInBytes.
 func SetPlatformSizes(intSize, ptrSize int) {
-	SetPlatformSizesSess(nil, intSize, ptrSize)
+	SetPlatformSizesSess(testAmbientSession, intSize, ptrSize)
 }
 
 // SetPlatformSizesSess sets platform sizes on an explicit session bag.
@@ -658,7 +658,7 @@ func SetPlatformSizesSess(s *Session, intSize, ptrSize int) {
 // to return 0 — fair port returns 0 (is_convertable compares pointee sizes via this).
 // Type* always live at SizeInBytes sites; sticky 0 (no invent zero-size soft-skip).
 func (t *Type) SizeInBytes() int {
-	return t.SizeInBytesSess(nil)
+	return t.SizeInBytesSess(testAmbientSession)
 }
 
 // SizeInBytesSess is SizeInBytes with PlatformPtrSize read on bag s.
@@ -702,7 +702,7 @@ func (t *Type) SizeInBytesSess(s *Session) int {
 // CName mirrors Type::Output for simple/pointer/struct/union spellings.
 // Type.cpp:1678–1706 — stdint-style intN_t/uintN_t from SizeInBytes*8.
 func (t *Type) CName() string {
-	return t.CNameSess(nil)
+	return t.CNameSess(testAmbientSession)
 }
 
 func (t *Type) CNameSess(s *Session) string {
@@ -801,7 +801,7 @@ func (t *Type) CNameSess(s *Session) string {
 // Type* always live at ptr_type; sticky nil (no invent not-pointer soft-skip past hole).}
 
 func (t *Type) PtrType() *Type {
-	return t.PtrTypeSess(nil)
+	return t.PtrTypeSess(testAmbientSession)
 }
 
 func (t *Type) PtrTypeSess(s *Session) *Type {
@@ -817,7 +817,7 @@ func (t *Type) PtrTypeSess(s *Session) *Type {
 // soft-skip past missing Type shell / soft re-pick).}
 
 func (t *Type) IndirectLevel() int {
-	return t.IndirectLevelSess(nil)
+	return t.IndirectLevelSess(testAmbientSession)
 }
 
 func (t *Type) IndirectLevelSess(s *Session) int {
@@ -839,7 +839,7 @@ func (t *Type) IndirectLevelSess(s *Session) int {
 // simpleTypes stay: permanent eSimple cache (C++ simple_types[] is not reallocated each run).}
 
 func TypeDoFinalization() {
-	TypeDoFinalizationSess(nil)
+	TypeDoFinalizationSess(testAmbientSession)
 }
 
 // TypeDoFinalizationSess clears PointerCache on an explicit session bag and
@@ -857,7 +857,7 @@ func TypeDoFinalizationSess(s *Session) {
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).
 // Type.cpp:423+ find_pointer_type — pointee Type* always live; sticky no invent int* for nil.
 func PointerTo(pointee *Type) *Type {
-	return PointerToSess(nil, pointee)
+	return PointerToSess(testAmbientSession, pointee)
 }
 
 // PointerToSess is PointerTo on an explicit session bag.
@@ -878,7 +878,7 @@ func PointerToSess(s *Session, pointee *Type) *Type {
 // Match mirrors Type::match (Type.cpp:1475–1488).
 // Type* always live on both sides; sticky false (no invent equal/not-match soft-skip past hole).
 func (t *Type) Match(other *Type, mt MatchType) bool {
-	return t.MatchSess(nil, other, mt)
+	return t.MatchSess(testAmbientSession, other, mt)
 }
 
 // MatchSess is Match with Options/sticky from an explicit session bag.
@@ -888,7 +888,7 @@ func (t *Type) MatchSess(s *Session, other *Type, mt MatchType) bool {
 
 // MatchOpts is Match with explicit session Options (MatchConvert / is_convertable).
 func (t *Type) MatchOpts(other *Type, mt MatchType, opts Options) bool {
-	return t.MatchOptsSess(nil, other, mt, opts)
+	return t.MatchOptsSess(testAmbientSession, other, mt, opts)
 }
 
 func (t *Type) MatchOptsSess(s *Session, other *Type, mt MatchType, opts Options) bool {
@@ -941,7 +941,7 @@ func (t *Type) MatchOptsSess(s *Session, other *Type, mt MatchType, opts Options
 // Type* always live; sticky false (no invent not-promotable soft-skip past hole).}
 
 func (t *Type) IsPromotable(other *Type) bool {
-	return t.IsPromotableSess(nil, other)
+	return t.IsPromotableSess(testAmbientSession, other)
 }
 
 func (t *Type) IsPromotableSess(s *Session, other *Type) bool {
@@ -984,7 +984,7 @@ func (t *Type) IsPromotableSess(s *Session, other *Type) bool {
 // Type.cpp:1423–1455 — float→int forbidden; pointer same size unless strict_float/lang_cpp.
 // Uses session CGOptions; no soft invent Defaults().
 func (t *Type) IsConvertable(other *Type) bool {
-	return t.IsConvertableSess(nil, other)
+	return t.IsConvertableSess(testAmbientSession, other)
 }
 
 // IsConvertableSess is IsConvertable with Options/sticky from an explicit session bag.
@@ -995,7 +995,7 @@ func (t *Type) IsConvertableSess(s *Session, other *Type) bool {
 // IsConvertableOpts applies CGOptions::strict_float / lang_cpp pointer rules.
 // Incomplete Type* sticky false (no invent not-convertable soft-skip past holes).
 func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
-	return t.IsConvertableOptsSess(nil, other, opts)
+	return t.IsConvertableOptsSess(testAmbientSession, other, opts)
 }
 
 func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool {
@@ -1089,7 +1089,7 @@ func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool
 // Type* always live; sticky false (no invent not-deref soft-skip past hole).}
 
 func (t *Type) IsDereferencedFrom(other *Type) bool {
-	return t.IsDereferencedFromSess(nil, other)
+	return t.IsDereferencedFromSess(testAmbientSession, other)
 }
 
 func (t *Type) IsDereferencedFromSess(s *Session, other *Type) bool {
@@ -1111,7 +1111,7 @@ func (t *Type) IsDereferencedFromSess(s *Session, other *Type) bool {
 // IsDerivable mirrors Type::is_derivable.
 // Type* always live; sticky false (no invent not-derivable / equal-nil soft-skip past hole).
 func (t *Type) IsDerivable(other *Type) bool {
-	return t.IsDerivableSess(nil, other)
+	return t.IsDerivableSess(testAmbientSession, other)
 }
 
 func (t *Type) IsDerivableSess(s *Session, other *Type) bool {
@@ -1152,7 +1152,7 @@ func (t *Type) IsDerivableSess(s *Session, other *Type) bool {
 // Type* always live; sticky false (no invent equal-nil soft-skip past hole).}
 
 func (t *Type) IsEquivalent(other *Type) bool {
-	return t.IsEquivalentSess(nil, other)
+	return t.IsEquivalentSess(testAmbientSession, other)
 }
 
 func (t *Type) IsEquivalentSess(s *Session, other *Type) bool {
@@ -1200,7 +1200,7 @@ func (t *Type) IsEquivalentSess(s *Session, other *Type) bool {
 // past hole / soft re-pick).}
 
 func (t *Type) BaseType() *Type {
-	return t.BaseTypeSess(nil)
+	return t.BaseTypeSess(testAmbientSession)
 }
 
 func (t *Type) BaseTypeSess(s *Session) *Type {
@@ -1220,7 +1220,7 @@ func (t *Type) BaseTypeSess(s *Session) *Type {
 // Incomplete Type* sticky false for nil shell; incomplete base sticky needs-cast
 // (no invent no-cast / soft re-pick past holes).
 func (t *Type) NeedsCast(other *Type) bool {
-	return t.NeedsCastSess(nil, other)
+	return t.NeedsCastSess(testAmbientSession, other)
 }
 
 func (t *Type) NeedsCastSess(s *Session, other *Type) bool {
@@ -1264,7 +1264,7 @@ func (t *Type) NeedsCastSess(s *Session, other *Type) bool {
 // Type* always live on Fields; nil field hole sticky true (no invent bitfield-free).}
 
 func (t *Type) HasBitfields() bool {
-	return t.HasBitfieldsSess(nil)
+	return t.HasBitfieldsSess(testAmbientSession)
 }
 
 func (t *Type) HasBitfieldsSess(s *Session) bool {
@@ -1306,7 +1306,7 @@ func (t *Type) HasBitfieldsSess(s *Session) bool {
 // IsBitfieldIndex mirrors Type::is_bitfield(index).
 // Type.cpp:1286–1288 — assert(index < bitfields_length_.size()); BitWidth >= 0.
 func (t *Type) IsBitfieldIndex(index int) bool {
-	return t.IsBitfieldIndexSess(nil, index)
+	return t.IsBitfieldIndexSess(testAmbientSession, index)
 }
 
 func (t *Type) IsBitfieldIndexSess(s *Session, index int) bool {
@@ -1326,7 +1326,7 @@ func (t *Type) IsBitfieldIndexSess(s *Session, index int) bool {
 // IsUnamedPadding mirrors Type::is_unamed_padding.
 // Type.cpp:1278–1283 — assert(index < sz); bitfields_length_[index] == 0.
 func (t *Type) IsUnamedPadding(index int) bool {
-	return t.IsUnamedPaddingSess(nil, index)
+	return t.IsUnamedPaddingSess(testAmbientSession, index)
 }
 
 func (t *Type) IsUnamedPaddingSess(s *Session, index int) bool {
@@ -1350,7 +1350,7 @@ func (t *Type) IsUnamedPaddingSess(s *Session, index int) bool {
 // Type* always live on Fields; nil field hole sticky true (no invent padding-free
 // soft-skip nested HasPadding past incomplete field Type).
 func (t *Type) HasPadding() bool {
-	return t.HasPaddingSess(nil)
+	return t.HasPaddingSess(testAmbientSession)
 }
 
 func (t *Type) HasPaddingSess(s *Session) bool {
@@ -1398,7 +1398,7 @@ func (t *Type) HasPaddingSess(s *Session) bool {
 // Type.cpp:1246 — assert(ty != eVoid) on choose_random_simple; filter zeros void weight.}
 
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
-	return ChooseRandomNonvoidSimpleSess(nil, r, probs)
+	return ChooseRandomNonvoidSimpleSess(testAmbientSession, r, probs)
 }
 
 func ChooseRandomNonvoidSimpleSess(s *Session, r *Rng, probs *Probabilities) ESimpleType {
@@ -1419,7 +1419,7 @@ func GetIntType() *Type { return GetSimpleType(EInt) }
 // Type.cpp:482–484 — signed simple with size >= int_size.
 // Type* always live; sticky true (no invent overflow-free soft-skip past hole).
 func (t *Type) SignedOverflowPossible(intSize int) bool {
-	return t.SignedOverflowPossibleSess(nil, intSize)
+	return t.SignedOverflowPossibleSess(testAmbientSession, intSize)
 }
 
 func (t *Type) SignedOverflowPossibleSess(s *Session, intSize int) bool {
@@ -1465,7 +1465,7 @@ func (t *Type) SignedOverflowPossibleSess(s *Session, intSize int) bool {
 // Type.cpp:370–402 — builtin name → simple type; default assert(0) sticky.}
 
 func GetTypeFromString(typeString string) *Type {
-	return GetTypeFromStringSess(nil, typeString)
+	return GetTypeFromStringSess(testAmbientSession, typeString)
 }
 
 func GetTypeFromStringSess(s *Session, typeString string) *Type {
@@ -1510,7 +1510,7 @@ func GetTypeFromStringSess(s *Session, typeString string) *Type {
 // Struct/union sid always live (parity with CName); empty StructName sticky empty
 // (no invent bare empty type-name token / soft re-pick past incomplete aggregate IR).
 func (t *Type) TypeNameString() string {
-	return t.TypeNameStringSess(nil)
+	return t.TypeNameStringSess(testAmbientSession)
 }
 
 func (t *Type) TypeNameStringSess(s *Session) string {
@@ -1580,7 +1580,7 @@ func (t *Type) TypeNameStringSess(s *Session) string {
 // Type* always live at printf emit; sticky empty (no invent empty directive past hole).}
 
 func (t *Type) PrintfDirective() string {
-	return t.PrintfDirectiveSess(nil)
+	return t.PrintfDirectiveSess(testAmbientSession)
 }
 
 func (t *Type) PrintfDirectiveSess(s *Session) string {
@@ -1673,7 +1673,7 @@ func (t *Type) PrintfDirectiveSess(s *Session) string {
 // Type.cpp:1708–1714 — Output on live Type*; sticky no invent sizeof()/sizeof(void).}
 
 func (t *Type) SizeofString() string {
-	return t.SizeofStringSess(nil)
+	return t.SizeofStringSess(testAmbientSession)
 }
 
 func (t *Type) SizeofStringSess(s *Session) string {
@@ -1698,7 +1698,7 @@ func (t *Type) SizeofStringSess(s *Session) string {
 // Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick
 // past incomplete field Type that would soft-skip ccomp packing bans).
 func HasAggregateField(fields []StructField) bool {
-	return HasAggregateFieldSess(nil, fields)
+	return HasAggregateFieldSess(testAmbientSession, fields)
 }
 
 func HasAggregateFieldSess(s *Session, fields []StructField) bool {
@@ -1728,7 +1728,7 @@ func HasAggregateFieldSess(s *Session, fields []StructField) bool {
 // Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick).}
 
 func HasLongLongField(fields []StructField) bool {
-	return HasLongLongFieldSess(nil, fields)
+	return HasLongLongFieldSess(testAmbientSession, fields)
 }
 
 func HasLongLongFieldSess(s *Session, fields []StructField) bool {
@@ -1774,7 +1774,7 @@ func HasLongLongFieldSess(s *Session, fields []StructField) bool {
 // Type* always live; sticky false (no invent not-padding soft success past hole).}
 
 func (t *Type) IsUnnamedPadding(index int) bool {
-	return t.IsUnnamedPaddingSess(nil, index)
+	return t.IsUnnamedPaddingSess(testAmbientSession, index)
 }
 
 func (t *Type) IsUnnamedPaddingSess(s *Session, index int) bool {
@@ -1797,7 +1797,7 @@ func (t *Type) IsUnnamedPaddingSess(s *Session, index int) bool {
 // Non-C++ is complete false. RNG always live under C++; sticky false (no invent
 // no-assign-ops soft-skip past hole). Nil probs → 0% (no invent default 50).
 func IfStructWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool {
-	return IfStructWillHaveAssignOpsSess(nil, r, opts, probs)
+	return IfStructWillHaveAssignOpsSess(testAmbientSession, r, opts, probs)
 }
 
 func IfStructWillHaveAssignOpsSess(s *Session, r *Rng, opts Options, probs *Probabilities) bool {

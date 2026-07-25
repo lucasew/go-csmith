@@ -29,7 +29,7 @@ type SafeOpFlags struct {
 // ReturnFloatTypeBinary mirrors SafeOpFlags::return_float_type for binary.
 // SafeOpFlags.cpp:113–124.
 func ReturnFloatTypeBinary(opts Options, rv, op1, op2 *Type, bop BinaryOp) bool {
-	return ReturnFloatTypeBinarySess(nil, opts, rv, op1, op2, bop)
+	return ReturnFloatTypeBinarySess(testAmbientSession, opts, rv, op1, op2, bop)
 }
 
 func ReturnFloatTypeBinarySess(s *Session, opts Options, rv, op1, op2 *Type, bop BinaryOp) bool {
@@ -79,7 +79,7 @@ func ReturnFloatTypeBinarySess(s *Session, opts Options, rv, op1, op2 *Type, bop
 // SafeOpFlags.cpp:126–136.}
 
 func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
-	return ReturnFloatTypeUnarySess(nil, opts, rv, op1, uop)
+	return ReturnFloatTypeUnarySess(testAmbientSession, opts, rv, op1, uop)
 }
 
 func ReturnFloatTypeUnarySess(s *Session, opts Options, rv, op1 *Type, uop UnaryOp) bool {
@@ -119,7 +119,7 @@ func ReturnFloatTypeUnarySess(s *Session, opts Options, rv, op1 *Type, uop Unary
 // SafeOpFlags* always live at clone; sticky nil (no invent soft-skip past hole).}
 
 func (f *SafeOpFlags) Clone() *SafeOpFlags {
-	return f.CloneSess(nil)
+	return f.CloneSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) CloneSess(s *Session) *SafeOpFlags {
@@ -136,7 +136,7 @@ func (f *SafeOpFlags) CloneSess(s *Session) *SafeOpFlags {
 // SafeOpFlagsToID mirrors SafeOpFlags::to_id.
 // SafeOpFlags.cpp:343–352 — assign stable id to wrapper fname (1-based).
 func SafeOpFlagsToID(fname string) int {
-	return SafeOpFlagsToIDSess(nil, fname)
+	return SafeOpFlagsToIDSess(testAmbientSession, fname)
 }
 
 // SafeOpFlagsToIDSess is SafeOpFlagsToID on an explicit session bag.
@@ -154,7 +154,7 @@ func SafeOpFlagsToIDSess(s *Session, fname string) int {
 
 // ClearSafeOpWrapperNames resets to_id registry (finalization/tests).
 func ClearSafeOpWrapperNames() {
-	ClearSafeOpWrapperNamesSess(nil)
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
 }
 
 // ClearSafeOpWrapperNamesSess clears wrapper names on an explicit session bag.
@@ -163,7 +163,7 @@ func ClearSafeOpWrapperNamesSess(s *Session) {
 }
 
 // WrapperNamesCount mirrors SafeOpFlags::wrapper_names.size().
-func WrapperNamesCount() int { return WrapperNamesCountSess(nil) }
+func WrapperNamesCount() int { return WrapperNamesCountSess(testAmbientSession) }
 
 // WrapperNamesCountSess returns wrapper count on an explicit session bag.
 func WrapperNamesCountSess(s *Session) int { return len(sessOrAmbient(s).WrapperNames) }
@@ -171,7 +171,7 @@ func WrapperNamesCountSess(s *Session) int { return len(sessOrAmbient(s).Wrapper
 // OutputWrapperH mirrors DefaultProgramGenerator identify_wrappers wrapper.h body.
 // DefaultProgramGenerator.cpp:73–77 — #define N_WRAP <count>.
 func OutputWrapperH() string {
-	return OutputWrapperHSess(nil)
+	return OutputWrapperHSess(testAmbientSession)
 }
 
 // OutputWrapperHSess is OutputWrapperH reading wrapper names on bag s.
@@ -207,7 +207,7 @@ func MakeDummyFlags() *SafeOpFlags {
 
 // Op1Sign mirrors SafeOpFlags::get_op1_sign.
 func (f *SafeOpFlags) Op1Sign() bool {
-	return f.Op1SignSess(nil)
+	return f.Op1SignSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) Op1SignSess(s *Session) bool {
@@ -220,7 +220,7 @@ func (f *SafeOpFlags) Op1SignSess(s *Session) bool {
 
 // Op2Sign mirrors SafeOpFlags::get_op2_sign.
 func (f *SafeOpFlags) Op2Sign() bool {
-	return f.Op2SignSess(nil)
+	return f.Op2SignSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) Op2SignSess(s *Session) bool {
@@ -233,7 +233,7 @@ func (f *SafeOpFlags) Op2SignSess(s *Session) bool {
 
 // OpSize mirrors SafeOpFlags::get_op_size.
 func (f *SafeOpFlags) OpSize() SafeOpSize {
-	return f.OpSizeSess(nil)
+	return f.OpSizeSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) OpSizeSess(s *Session) SafeOpSize {
@@ -268,7 +268,7 @@ func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *Sa
 // MakeRandomUnary mirrors SafeOpFlags::make_random_unary.
 // SafeOpFlags.cpp:139–167 — float always signed + SafeFloat; else signed coin + int size.
 func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
-	return MakeRandomUnarySess(nil, r, opts, probs, rvType, op1Type, uop)
+	return MakeRandomUnarySess(testAmbientSession, r, opts, probs, rvType, op1Type, uop)
 }
 
 func MakeRandomUnarySess(s *Session, r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
@@ -324,7 +324,7 @@ func MakeRandomBinaryKind(
 	opKind SafeOpKind,
 	bop BinaryOp,
 ) *SafeOpFlags {
-	return MakeRandomBinaryKindSess(nil, r, opts, probs, rvType, op1Type, op2Type, opKind, bop)
+	return MakeRandomBinaryKindSess(testAmbientSession, r, opts, probs, rvType, op1Type, op2Type, opKind, bop)
 }
 
 func MakeRandomBinaryKindSess(s *Session, 
@@ -398,7 +398,7 @@ func MakeRandomBinaryKindSess(s *Session,
 // No invent opts-only weight table when probs missing.}
 
 func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
-	return pickSafeOpSizeSess(nil, r, probs)
+	return pickSafeOpSizeSess(testAmbientSession, r, probs)
 }
 
 func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, bool) {
@@ -429,7 +429,7 @@ func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, b
 // SafeOpFlags.cpp:245–247 — "func_" or "macro_".}
 
 func (f *SafeOpFlags) OutputFuncOrMacro() string {
-	return f.OutputFuncOrMacroSess(nil)
+	return f.OutputFuncOrMacroSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) OutputFuncOrMacroSess(s *Session) string {
@@ -446,7 +446,7 @@ func (f *SafeOpFlags) OutputFuncOrMacroSess(s *Session) string {
 // OutputSign mirrors SafeOpFlags::OutputSign.
 // SafeOpFlags.cpp:249–251 — "_s" or "_u".
 func (f *SafeOpFlags) OutputSign(signed bool) string {
-	return f.OutputSignSess(nil, signed)
+	return f.OutputSignSess(testAmbientSession, signed)
 }
 
 func (f *SafeOpFlags) OutputSignSess(s *Session, signed bool) string {
@@ -463,7 +463,7 @@ func (f *SafeOpFlags) OutputSignSess(s *Session, signed bool) string {
 // OutputOp1 mirrors SafeOpFlags::OutputOp1 → OutputSign(op1_).
 // SafeOpFlags.cpp:253.
 func (f *SafeOpFlags) OutputOp1() string {
-	return f.OutputOp1Sess(nil)
+	return f.OutputOp1Sess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) OutputOp1Sess(s *Session) string {
@@ -477,7 +477,7 @@ func (f *SafeOpFlags) OutputOp1Sess(s *Session) string {
 // OutputOp2 mirrors SafeOpFlags::OutputOp2 → OutputSign(op2_).
 // SafeOpFlags.cpp:255.
 func (f *SafeOpFlags) OutputOp2() string {
-	return f.OutputOp2Sess(nil)
+	return f.OutputOp2Sess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) OutputOp2Sess(s *Session) string {
@@ -491,7 +491,7 @@ func (f *SafeOpFlags) OutputOp2Sess(s *Session) string {
 // OutputSize mirrors SafeOpFlags::OutputSize.
 // SafeOpFlags.cpp:219–242 — optional leading "u" from !op1_, then type token.
 func (f *SafeOpFlags) OutputSize() string {
-	return f.OutputSizeSess(nil)
+	return f.OutputSizeSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) OutputSizeSess(s *Session) string {
@@ -501,7 +501,7 @@ func (f *SafeOpFlags) OutputSizeSess(s *Session) string {
 // SizeToken mirrors OutputSize (optional leading 'u' for unsigned op1).
 // SafeOpFlags.cpp:219–242 — assert invalid size; method is const on live flags.
 func (f *SafeOpFlags) SizeToken() string {
-	return f.SizeTokenSess(nil)
+	return f.SizeTokenSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) SizeTokenSess(s *Session) string {
@@ -538,7 +538,7 @@ func (f *SafeOpFlags) SizeTokenSess(s *Session) string {
 // FlagsToType mirrors SafeOpFlags::flags_to_type.
 // SafeOpFlags.cpp:65–98.
 func FlagsToType(signed bool, size SafeOpSize) *Type {
-	return FlagsToTypeSess(nil, signed, size)
+	return FlagsToTypeSess(testAmbientSession, signed, size)
 }
 
 func FlagsToTypeSess(s *Session, signed bool, size SafeOpSize) *Type {
@@ -580,7 +580,7 @@ func FlagsToTypeSess(s *Session, signed bool, size SafeOpSize) *Type {
 // LHSType mirrors SafeOpFlags::get_lhs_type.
 // SafeOpFlags.cpp:98–102 — flags_to_type(op1_, op_size_); nil flags → nil (no invent).
 func (f *SafeOpFlags) LHSType() *Type {
-	return f.LHSTypeSess(nil)
+	return f.LHSTypeSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) LHSTypeSess(s *Session) *Type {
@@ -595,7 +595,7 @@ func (f *SafeOpFlags) LHSTypeSess(s *Session) *Type {
 // RHSType mirrors SafeOpFlags::get_rhs_type.
 // SafeOpFlags.cpp:104–108 — flags_to_type(op2_, op_size_); nil flags → nil.
 func (f *SafeOpFlags) RHSType() *Type {
-	return f.RHSTypeSess(nil)
+	return f.RHSTypeSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) RHSTypeSess(s *Session) *Type {
@@ -609,7 +609,7 @@ func (f *SafeOpFlags) RHSTypeSess(s *Session) *Type {
 // BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for safe arithmetic/shifts.
 // SafeOpFlags.cpp:285–320 — float uses safe_*_func_float_f_f.
 func (f *SafeOpFlags) BinaryFuncName(op string) string {
-	return f.BinaryFuncNameSess(nil, op)
+	return f.BinaryFuncNameSess(testAmbientSession, op)
 }
 
 func (f *SafeOpFlags) BinaryFuncNameSess(s *Session, op string) string {
@@ -692,7 +692,7 @@ func safeFloatFuncString(op string) string {
 // UnaryMinusFuncName mirrors to_string(eMinus).
 // SafeOpFlags.cpp:323–341 — no float unary safe function.
 func (f *SafeOpFlags) UnaryMinusFuncName() string {
-	return f.UnaryMinusFuncNameSess(nil)
+	return f.UnaryMinusFuncNameSess(testAmbientSession)
 }
 
 func (f *SafeOpFlags) UnaryMinusFuncNameSess(s *Session) string {

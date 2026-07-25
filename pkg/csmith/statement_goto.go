@@ -11,7 +11,7 @@ import "strings"
 // StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present; else gensym("lbl_").
 // no invent fixed "lbl_1" when nextLabel is nil
 func LabelForGotoDest(destStmID int, nextLabel func() string) string {
-	return LabelForGotoDestSess(nil, destStmID, nextLabel)
+	return LabelForGotoDestSess(testAmbientSession, destStmID, nextLabel)
 }
 
 // LabelForGotoDestSess is LabelForGotoDest on an explicit session bag.
@@ -46,7 +46,7 @@ func LabelForGotoDestSess(s *Session, destStmID int, nextLabel func() string) st
 // GotoLabelsDoFinalization mirrors StatementGoto::doFinalization.
 // StatementGoto.cpp:404 — stm_labels.clear().
 func GotoLabelsDoFinalization() {
-	GotoLabelsDoFinalizationSess(nil)
+	GotoLabelsDoFinalizationSess(testAmbientSession)
 }
 
 // GotoLabelsDoFinalizationSess clears stm_labels on an explicit session bag.
@@ -91,7 +91,7 @@ func goodGotoTarget(st Stmt) bool {
 // Kind-gated get_blocks only; nil arm sticky false (no invent membership
 // by soft-skipping a missing if-arm / stray Then on assign).
 func (b *Block) ContainsStmt(st *Stmt) bool {
-	return b.ContainsStmtSess(nil, st)
+	return b.ContainsStmtSess(testAmbientSession, st)
 }
 
 // ContainsStmtSess is ContainsStmt with explicit session residual sticky.
@@ -134,7 +134,7 @@ func (b *Block) ContainsStmtSess(s *Session, st *Stmt) bool {
 // (seed-154: body NeedRevisit stayed false → no body FP → effect_accum kept
 // make_iteration IV reads in feffect vs UP body FP cleaning them).
 func BlockContainsViaParent(b, destParent *Block) bool {
-	return BlockContainsViaParentSess(nil, b, destParent)
+	return BlockContainsViaParentSess(testAmbientSession, b, destParent)
 }
 
 // BlockContainsViaParentSess is BlockContainsViaParent with explicit session residual sticky.
@@ -156,7 +156,7 @@ func BlockContainsViaParentSess(s *Session, b, destParent *Block) bool {
 // that contains dest (StatementGoto.cpp:141–147).
 // destParent is dest->parent (ok_blk for the chosen other_stm).
 func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
-	MarkNeedRevisitLCASess(nil, curr, dest)
+	MarkNeedRevisitLCASess(testAmbientSession, curr, dest)
 }
 
 // MarkNeedRevisitLCASess is MarkNeedRevisitLCA with explicit session residual sticky.
@@ -167,7 +167,7 @@ func MarkNeedRevisitLCASess(s *Session, curr *Block, dest *Stmt) {
 // MarkNeedRevisitLCAParent is the StatementGoto.cpp:141–147 LCA walk with an
 // explicit dest parent for Block contains_stmt (parent-chain) semantics.
 func MarkNeedRevisitLCAParent(curr *Block, dest *Stmt, destParent *Block) {
-	MarkNeedRevisitLCAParentSess(nil, curr, dest, destParent)
+	MarkNeedRevisitLCAParentSess(testAmbientSession, curr, dest, destParent)
 }
 
 // MarkNeedRevisitLCAParentSess is MarkNeedRevisitLCAParent with explicit session residual sticky.
@@ -203,7 +203,7 @@ func MarkNeedRevisitLCAParentSess(s *Session, curr *Block, dest *Stmt, destParen
 // (no invent none / soft re-pick past hole).
 // Incomplete LocalVars fails closed sticky as has-skipped (no invent none / soft re-pick).
 func HasInitSkippedVars(src *Block, destParent *Block) bool {
-	return HasInitSkippedVarsSess(nil, src, destParent)
+	return HasInitSkippedVarsSess(testAmbientSession, src, destParent)
 }
 
 func HasInitSkippedVarsSess(s *Session, src *Block, destParent *Block) bool {
@@ -234,7 +234,7 @@ func HasInitSkippedVarsSess(s *Session, src *Block, destParent *Block) bool {
 // Incomplete LocalVars fails closed sticky IncompleteVariables (no soft re-pick past hole).}
 
 func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
-	return CollectInitSkippedVarsSess(nil, src, destParent)
+	return CollectInitSkippedVarsSess(testAmbientSession, src, destParent)
 }
 
 func CollectInitSkippedVarsSess(s *Session, src *Block, destParent *Block) []*Variable {
@@ -282,7 +282,7 @@ func CollectInitSkippedVarsSess(s *Session, src *Block, destParent *Block) []*Va
 // Incomplete InitSkippedVars fails closed sticky empty (no invent soft-skip hole partial re-inits).}
 
 func OutputSkippedVarInits(st *Stmt, indent string) string {
-	return OutputSkippedVarInitsSess(nil, st, indent)
+	return OutputSkippedVarInitsSess(testAmbientSession, st, indent)
 }
 
 func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
@@ -336,7 +336,7 @@ func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
 // StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".}
 
 func variableInitOutput(v *Variable) string {
-	return variableInitOutputSess(nil, v)
+	return variableInitOutputSess(testAmbientSession, v)
 }
 
 func variableInitOutputSess(s *Session, v *Variable) string {
@@ -370,7 +370,7 @@ func variableInitOutputSess(s *Session, v *Variable) string {
 // Block* always live on Function.Blocks; no invent soft-skip holes as absent.
 
 func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
-	return copyBlocksNoHoleSess(nil, blocks)
+	return copyBlocksNoHoleSess(testAmbientSession, blocks)
 }
 
 // copyBlocksNoHoleSess is copyBlocksNoHole with explicit session residual sticky.
@@ -393,7 +393,7 @@ func copyBlocksNoHoleSess(s *Session, blocks []*Block) (out []*Block, ok bool) {
 // Mutates blocks slice by removing bad candidates (caller should pass a copy).
 // Incomplete Blocks list fails closed sticky (no invent soft-skip hole / re-pick past hole).
 func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
-	return FindGoodJumpBlockSess(nil, r, blocks, curr, asDest)
+	return FindGoodJumpBlockSess(testAmbientSession, r, blocks, curr, asDest)
 }
 
 func FindGoodJumpBlockSess(s *Session, r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {

@@ -33,7 +33,7 @@ type LoopControl struct {
 // StatementFor.cpp:61–113.
 // Sticky ERROR_RETURN leaves partial values; callers must check HasError.
 func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
-	return MakeRandomLoopControlSess(nil, r, opts, ivSigned)
+	return MakeRandomLoopControlSess(testAmbientSession, r, opts, ivSigned)
 }
 
 func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
@@ -125,7 +125,7 @@ func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) 
 // returns adjusted IV bound (out-param `bound` in C++).}
 
 func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
-	return MakeRandomArrayControlSess(nil, r, bound, isSigned, oobProb)
+	return MakeRandomArrayControlSess(testAmbientSession, r, bound, isSigned, oobProb)
 }
 
 // MakeRandomArrayControlSess is MakeRandomArrayControl with OOB bookkeeping on bag s.
@@ -751,7 +751,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 // StatementFor::Output / StatementAssign OutputAsExpr paths.
 // Not used for StatementArrayOp (that uses arrayOpHeaderOutput with numeric inits).
 func forHeaderOutput(lc *LoopControl) string {
-	return forHeaderOutputSess(nil, lc)
+	return forHeaderOutputSess(testAmbientSession, lc)
 }
 
 func forHeaderOutputSess(s *Session, lc *LoopControl) string {
@@ -790,7 +790,7 @@ func forHeaderOutputSess(s *Session, lc *LoopControl) string {
 // (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).}
 
 func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
-	return arrayOpHeaderOutputSess(nil, lc, opts)
+	return arrayOpHeaderOutputSess(testAmbientSession, lc, opts)
 }
 
 func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
@@ -842,7 +842,7 @@ func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 }
 
 func forInitOutput(lc *LoopControl) string {
-	return forInitOutputSess(nil, lc)
+	return forInitOutputSess(testAmbientSession, lc)
 }
 
 // forInitOutputSess is forInitOutput with explicit session residual sticky.
@@ -866,7 +866,7 @@ func forInitOutputSess(s *Session, lc *LoopControl) string {
 }
 
 func forTestOutput(lc *LoopControl) string {
-	return forTestOutputSess(nil, lc)
+	return forTestOutputSess(testAmbientSession, lc)
 }
 
 // forTestOutputSess is forTestOutput with explicit session residual sticky.
@@ -888,7 +888,7 @@ func forTestOutputSess(s *Session, lc *LoopControl) string {
 // StatementFor.cpp:414 — incr->OutputAsExpr; always live StatementAssign.
 // sticky no invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
 func forIncrOutput(lc *LoopControl) string {
-	return forIncrOutputSess(nil, lc)
+	return forIncrOutputSess(testAmbientSession, lc)
 }
 
 // forIncrOutputSess is forIncrOutput with explicit session residual sticky.

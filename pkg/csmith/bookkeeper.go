@@ -22,7 +22,7 @@ func sessBK(s *Session) *bookkeeperState {
 // Counters always live; sticky (no invent soft-skip stats past hole).
 // pos < 0 is complete no-op (out-of-range index, not hard IR).
 func IncrCounter(counters *[]int, pos int) {
-	IncrCounterSess(nil, counters, pos)
+	IncrCounterSess(testAmbientSession, counters, pos)
 }
 
 // IncrCounterSess is IncrCounter with explicit session residual sticky.
@@ -52,7 +52,7 @@ func CalcTotal(counters []int) int {
 
 // BookkeeperDoFinalization mirrors Bookkeeper::doFinalization.
 // Bookkeeper.cpp:116–126 (subset of cleared fields; full reset of all counters).
-func BookkeeperDoFinalization() { BookkeeperDoFinalizationSess(nil) }
+func BookkeeperDoFinalization() { BookkeeperDoFinalizationSess(testAmbientSession) }
 
 // BookkeeperDoFinalizationSess clears bookkeeper counters on s (or ambient).
 func BookkeeperDoFinalizationSess(s *Session) {
@@ -98,7 +98,7 @@ func BookkeeperDoFinalizationSess(s *Session) {
 }
 
 func formattedOutput(b *strings.Builder, msg string, num int) {
-	formattedOutputSess(nil, b, msg, num)
+	formattedOutputSess(testAmbientSession, b, msg, num)
 }
 
 // formattedOutputSess is formattedOutput with explicit session residual sticky.
@@ -119,7 +119,7 @@ func formattedOutputSess(s *Session, b *strings.Builder, msg string, num int) {
 }
 
 func formattedOutputf(b *strings.Builder, msg string, num float64) {
-	formattedOutputfSess(nil, b, msg, num)
+	formattedOutputfSess(testAmbientSession, b, msg, num)
 }
 
 // formattedOutputfSess is formattedOutputf with explicit session residual sticky.
@@ -142,7 +142,7 @@ func formattedOutputfSess(s *Session, b *strings.Builder, msg string, num float6
 
 // RecordAddressTaken mirrors Bookkeeper::record_address_taken.
 // Bookkeeper.cpp:324–334.
-func RecordAddressTaken(v *Variable) { RecordAddressTakenSess(nil, v) }
+func RecordAddressTaken(v *Variable) { RecordAddressTakenSess(testAmbientSession, v) }
 
 // RecordAddressTakenSess is RecordAddressTaken on an explicit session bag.
 func RecordAddressTakenSess(s *Session, v *Variable) {
@@ -169,7 +169,7 @@ func RecordAddressTakenSess(s *Session, v *Variable) {
 // RecordVolatileAccess mirrors Bookkeeper::record_volatile_access.
 // Bookkeeper.cpp:386–412.
 func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
-	RecordVolatileAccessSess(nil, v, derefLevel, write)
+	RecordVolatileAccessSess(testAmbientSession, v, derefLevel, write)
 }
 
 // RecordVolatileAccessSess is RecordVolatileAccess on an explicit session bag.
@@ -218,7 +218,7 @@ func RecordVolatileAccessSess(s *Session, v *Variable, derefLevel int, write boo
 // Bookkeeper.cpp:336–345.
 // RecordBitfieldsReads counts bitfield reads.
 // Variable + Type always live; sticky (no invent soft-skip bitfield read stats past hole).
-func RecordBitfieldsReads(v *Variable) { RecordBitfieldsReadsSess(nil, v) }
+func RecordBitfieldsReads(v *Variable) { RecordBitfieldsReadsSess(testAmbientSession, v) }
 
 // RecordBitfieldsReadsSess is RecordBitfieldsReads on an explicit session bag.
 func RecordBitfieldsReadsSess(s *Session, v *Variable) {
@@ -245,7 +245,7 @@ func RecordBitfieldsReadsSess(s *Session, v *Variable) {
 // Bookkeeper.cpp:347–356.
 // RecordBitfieldsWrites counts bitfield writes.
 // Variable + Type always live; sticky (no invent soft-skip bitfield write stats past hole).
-func RecordBitfieldsWrites(v *Variable) { RecordBitfieldsWritesSess(nil, v) }
+func RecordBitfieldsWrites(v *Variable) { RecordBitfieldsWritesSess(testAmbientSession, v) }
 
 // RecordBitfieldsWritesSess is RecordBitfieldsWrites on an explicit session bag.
 func RecordBitfieldsWritesSess(s *Session, v *Variable) {
@@ -273,7 +273,7 @@ func RecordBitfieldsWritesSess(s *Session, v *Variable) {
 // RecordPointerComparisons counts pointer comparison kinds.
 // Expression operands always live; sticky (no invent soft-skip cmp stats past hole).
 func RecordPointerComparisons(lhs, rhs *Expression) {
-	RecordPointerComparisonsSess(nil, lhs, rhs)
+	RecordPointerComparisonsSess(testAmbientSession, lhs, rhs)
 }
 
 // RecordPointerComparisonsSess is RecordPointerComparisons on an explicit session bag.
@@ -333,7 +333,7 @@ func RecordPointerComparisonsSess(s *Session, lhs, rhs *Expression) {
 
 // RecordVarsWithBitfields mirrors Bookkeeper::record_vars_with_bitfields.
 // Bookkeeper.cpp:464–474 — assert(type); base aggregate with bitfields.
-func RecordVarsWithBitfields(t *Type) { RecordVarsWithBitfieldsSess(nil, t) }
+func RecordVarsWithBitfields(t *Type) { RecordVarsWithBitfieldsSess(testAmbientSession, t) }
 
 // RecordVarsWithBitfieldsSess is RecordVarsWithBitfields on an explicit session bag.
 func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
@@ -368,7 +368,7 @@ func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 // Type always live; sticky (no invent soft-skip bitfield stats past hole).
 // Non-aggregate is complete no-op.
 func RecordTypeWithBitfields(t *Type) {
-	RecordTypeWithBitfieldsSess(nil, t)
+	RecordTypeWithBitfieldsSess(testAmbientSession, t)
 }
 
 // RecordTypeWithBitfieldsSess is RecordTypeWithBitfields on an explicit session bag.
@@ -446,7 +446,7 @@ func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 // VariableSelector.cpp:1230–1236.
 // RecordVarCreated mirrors use_new_var bookkeeping on create.
 // Variable + Type always live; sticky (no invent soft-skip create stats past hole).
-func RecordVarCreated(v *Variable) { RecordVarCreatedSess(nil, v) }
+func RecordVarCreated(v *Variable) { RecordVarCreatedSess(testAmbientSession, v) }
 
 // RecordVarCreatedSess is RecordVarCreated on an explicit session bag.
 func RecordVarCreatedSess(s *Session, v *Variable) {
@@ -481,7 +481,7 @@ func RecordVarCreatedSess(s *Session, v *Variable) {
 
 // RecordVarReused mirrors use_old_var_cnt++.
 // VariableSelector.cpp:1237–1238.
-func RecordVarReused() { RecordVarReusedSess(nil) }
+func RecordVarReused() { RecordVarReusedSess(testAmbientSession) }
 
 // RecordVarReusedSess records on an explicit session bag.
 func RecordVarReusedSess(s *Session) {
@@ -489,27 +489,27 @@ func RecordVarReusedSess(s *Session) {
 }
 
 // RecordForwardJump mirrors Bookkeeper::forward_jump_cnt++.
-func RecordForwardJump() { RecordForwardJumpSess(nil) }
+func RecordForwardJump() { RecordForwardJumpSess(testAmbientSession) }
 
 // RecordForwardJumpSess records on an explicit session bag.
 func RecordForwardJumpSess(s *Session) { sessBK(s).forwardJumpCnt++ }
 
 // RecordBackwardJump mirrors Bookkeeper::backward_jump_cnt++.
-func RecordBackwardJump() { RecordBackwardJumpSess(nil) }
+func RecordBackwardJump() { RecordBackwardJumpSess(testAmbientSession) }
 
 // RecordBackwardJumpSess records on an explicit session bag.
 func RecordBackwardJumpSess(s *Session) { sessBK(s).backwardJumpCnt++ }
 
 // RecordPointerAvailForDeref mirrors Bookkeeper::pointer_avail_for_dereference++.
 // VariableSelector.cpp:416–419.
-func RecordPointerAvailForDeref() { RecordPointerAvailForDerefSess(nil) }
+func RecordPointerAvailForDeref() { RecordPointerAvailForDerefSess(testAmbientSession) }
 
 // RecordPointerAvailForDerefSess records on an explicit session bag.
 func RecordPointerAvailForDerefSess(s *Session) { sessBK(s).pointerAvailForDeref++ }
 
 // RecordVolatileAvail mirrors Bookkeeper::volatile_avail++.
 // VariableSelector.cpp:311 — has_eligible_volatile_var hit.
-func RecordVolatileAvail() { RecordVolatileAvailSess(nil) }
+func RecordVolatileAvail() { RecordVolatileAvailSess(testAmbientSession) }
 
 // RecordVolatileAvailSess records on an explicit session bag.
 func RecordVolatileAvailSess(s *Session) { sessBK(s).volatileAvail++ }
@@ -519,7 +519,7 @@ func VolatileAvailCount() int { return sessBK(nil).volatileAvail }
 
 // RecordOOB mirrors Bookkeeper::oob_cnt++ when array_oob_prob fires.
 // StatementFor.cpp:157–158 — make_random_array_control.
-func RecordOOB() { RecordOOBSess(nil) }
+func RecordOOB() { RecordOOBSess(testAmbientSession) }
 
 // RecordOOBSess records on an explicit session bag.
 func RecordOOBSess(s *Session) { sessBK(s).oobCnt++ }
@@ -533,7 +533,7 @@ func OOBCount() int { return sessBK(nil).oobCnt }
 // Incomplete IR fails closed sticky as -1 (no invent leaf depth 0 / soft re-pick
 // stats past partial nest counts).
 func ExpressionComplexity(e *Expression) int {
-	return ExpressionComplexitySess(nil, e)
+	return ExpressionComplexitySess(testAmbientSession, e)
 }
 
 func ExpressionComplexitySess(s *Session, e *Expression) int {
@@ -638,7 +638,7 @@ func ExpressionComplexitySess(s *Session, e *Expression) int {
 // Returns false on incomplete IR sticky (no invent partial expr list / soft re-pick past holes).}
 
 func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
-	return collectStmtExprsSess(nil, st, out)
+	return collectStmtExprsSess(testAmbientSession, st, out)
 }
 
 func collectStmtExprsSess(s *Session, st *Stmt, out *[]*Expression) bool {
@@ -700,7 +700,7 @@ func collectStmtExprsSess(s *Session, st *Stmt, out *[]*Expression) bool {
 // no invent counting broken IR as leaf depth 0 / soft re-pick past holes.}
 
 func StatExprDepths(funcs []*Function) {
-	StatExprDepthsSess(nil, funcs)
+	StatExprDepthsSess(testAmbientSession, funcs)
 }
 
 // StatExprDepthsSess is StatExprDepths writing expr depth counters on bag s.
@@ -751,7 +751,7 @@ func StatExprDepthsSess(s *Session, funcs []*Function) {
 // Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
 // Incomplete Funcs / Block* holes fail closed sticky zero counts (no invent partial depths).
 func StatBlkDepths(funcs []*Function) int {
-	return StatBlkDepthsSess(nil, funcs)
+	return StatBlkDepthsSess(testAmbientSession, funcs)
 }
 
 // StatBlkDepthsSess is StatBlkDepths writing block depth counters on bag s.
@@ -818,7 +818,7 @@ func StatBlkDepthsSess(s *Session, funcs []*Function) int {
 // OutputStatistics mirrors Bookkeeper::output_statistics.
 // Bookkeeper.cpp:167–192.
 func OutputStatistics(funcs []*Function, opts Options) string {
-	return OutputStatisticsSess(nil, funcs, opts)
+	return OutputStatisticsSess(testAmbientSession, funcs, opts)
 }
 
 // OutputStatisticsSess is OutputStatistics reading counters on bag s.
@@ -873,7 +873,7 @@ func OutputStatisticsSess(s *Session, funcs []*Function, opts Options) string {
 }
 
 func outputStructUnionStatistics(b *strings.Builder, opts Options) {
-	outputStructUnionStatisticsSess(nil, b, opts)
+	outputStructUnionStatisticsSess(testAmbientSession, b, opts)
 }
 
 func outputStructUnionStatisticsSess(s *Session, b *strings.Builder, opts Options) {
@@ -897,7 +897,7 @@ func outputStructUnionStatisticsSess(s *Session, b *strings.Builder, opts Option
 }
 
 func outputBitfields(b *strings.Builder, opts Options) {
-	outputBitfieldsSess(nil, b, opts)
+	outputBitfieldsSess(testAmbientSession, b, opts)
 }
 
 func outputBitfieldsSess(s *Session, b *strings.Builder, opts Options) {
@@ -922,7 +922,7 @@ func outputBitfieldsSess(s *Session, b *strings.Builder, opts Options) {
 }
 
 func outputExprStatistics(b *strings.Builder, funcs []*Function) {
-	outputExprStatisticsSess(nil, b, funcs)
+	outputExprStatisticsSess(testAmbientSession, b, funcs)
 }
 
 func outputExprStatisticsSess(s *Session, b *strings.Builder, funcs []*Function) {
@@ -1057,7 +1057,7 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 }
 
 func outputVolatileAccessStatistics(b *strings.Builder) {
-	outputVolatileAccessStatisticsSess(nil, b)
+	outputVolatileAccessStatisticsSess(testAmbientSession, b)
 }
 
 func outputVolatileAccessStatisticsSess(s *Session, b *strings.Builder) {
@@ -1077,7 +1077,7 @@ func outputVolatileAccessStatisticsSess(s *Session, b *strings.Builder) {
 }
 
 func outputJumpStatistics(b *strings.Builder) {
-	outputJumpStatisticsSess(nil, b)
+	outputJumpStatisticsSess(testAmbientSession, b)
 }
 
 func outputJumpStatisticsSess(s *Session, b *strings.Builder) {
@@ -1086,7 +1086,7 @@ func outputJumpStatisticsSess(s *Session, b *strings.Builder) {
 }
 
 func outputStmtsStatistics(b *strings.Builder, funcs []*Function) {
-	outputStmtsStatisticsSess(nil, b, funcs)
+	outputStmtsStatisticsSess(testAmbientSession, b, funcs)
 }
 
 func outputStmtsStatisticsSess(s *Session, b *strings.Builder, funcs []*Function) {
@@ -1107,7 +1107,7 @@ func outputStmtsStatisticsSess(s *Session, b *strings.Builder, funcs []*Function
 }
 
 func outputVarFreshness(b *strings.Builder) {
-	outputVarFreshnessSess(nil, b)
+	outputVarFreshnessSess(testAmbientSession, b)
 }
 
 func outputVarFreshnessSess(s *Session, b *strings.Builder) {
@@ -1124,7 +1124,7 @@ func outputVarFreshnessSess(s *Session, b *strings.Builder) {
 // OutputTail mirrors OutputMgr::OutputTail — statistics comment after main.
 // OutputMgr.cpp:223–233.
 func OutputTail(funcs []*Function, opts Options) string {
-	return OutputTailSess(nil, funcs, opts)
+	return OutputTailSess(testAmbientSession, funcs, opts)
 }
 
 // OutputTailSess is OutputTail reading statistics counters on bag s.

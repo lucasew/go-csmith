@@ -57,7 +57,7 @@ func GetBinopString(op BinaryOp) string {
 // Missing Safe is complete non-float (not sticky) — Safe is optional on std binary
 // shells; invent would be treating nil as float, not non-float.
 func (fi *Invocation) IsReturnTypeFloat() bool {
-	return fi.IsReturnTypeFloatSess(nil)
+	return fi.IsReturnTypeFloatSess(testAmbientSession)
 }
 
 // IsReturnTypeFloatSess is IsReturnTypeFloat with explicit session residual sticky.
@@ -77,7 +77,7 @@ func (fi *Invocation) IsReturnTypeFloatSess(s *Session) bool {
 // FunctionInvocationUnary.cpp:114–131; FunctionInvocationBinary.cpp:192–241;
 // FunctionInvocationUser.cpp:380 — return type.
 func (fi *Invocation) GetType() *Type {
-	return fi.GetTypeSess(nil)
+	return fi.GetTypeSess(testAmbientSession)
 }
 
 func (fi *Invocation) GetTypeSess(s *Session) *Type {
@@ -110,7 +110,7 @@ func (fi *Invocation) GetTypeSess(s *Session) *Type {
 // FunctionInvocationUnary.cpp:114–131.}
 
 func (fi *Invocation) getTypeUnary() *Type {
-	return fi.getTypeUnarySess(nil)
+	return fi.getTypeUnarySess(testAmbientSession)
 }
 
 func (fi *Invocation) getTypeUnarySess(s *Session) *Type {
@@ -141,7 +141,7 @@ func (fi *Invocation) getTypeUnarySess(s *Session) *Type {
 // FunctionInvocationBinary.cpp:192–241.}
 
 func (fi *Invocation) getTypeBinary() *Type {
-	return fi.getTypeBinarySess(nil)
+	return fi.getTypeBinarySess(testAmbientSession)
 }
 
 func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
@@ -220,7 +220,7 @@ func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 // Incomplete Invocation sticky false (no invent unsafe soft-skip / soft re-pick).}
 
 func (fi *Invocation) SafeInvocation() bool {
-	return fi.SafeInvocationSess(nil)
+	return fi.SafeInvocationSess(testAmbientSession)
 }
 
 func (fi *Invocation) SafeInvocationSess(s *Session) bool {
@@ -244,7 +244,7 @@ func (fi *Invocation) SafeInvocationSess(s *Session) bool {
 // Incomplete unary operand sticky false (no invent soft-skip / soft re-pick past hole).}
 
 func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
-	return fi.CompatibleVarSess(nil, v, expandStruct)
+	return fi.CompatibleVarSess(testAmbientSession, v, expandStruct)
 }
 
 func (fi *Invocation) CompatibleVarSess(s *Session, v *Variable, expandStruct bool) bool {
@@ -280,7 +280,7 @@ func (fi *Invocation) CompatibleVarSess(s *Session, v *Variable, expandStruct bo
 // Incomplete Invocation sticky false (no invent not-0or1 / soft re-pick past hole).}
 
 func (fi *Invocation) Is0Or1() bool {
-	return fi.Is0Or1Sess(nil)
+	return fi.Is0Or1Sess(testAmbientSession)
 }
 
 func (fi *Invocation) Is0Or1Sess(s *Session) bool {
@@ -313,7 +313,7 @@ func (fi *Invocation) Is0Or1Sess(s *Session) bool {
 // Incomplete param IR sticky false (no invent not-equal fold / soft re-pick past holes).}
 
 func (fi *Invocation) EqualsInt(num int) bool {
-	return fi.EqualsIntSess(nil, num)
+	return fi.EqualsIntSess(testAmbientSession, num)
 }
 
 func (fi *Invocation) EqualsIntSess(s *Session, num int) bool {

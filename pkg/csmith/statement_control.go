@@ -12,7 +12,7 @@ package csmith
 // Block::make_random continues siblings after a for/array-op (seed-2 e13830: Go used
 // to stop the parent block when the for body returned → stack n=4 vs upstream n=5).
 func (st Stmt) MustReturn() bool {
-	return st.MustReturnSess(nil)
+	return st.MustReturnSess(testAmbientSession)
 }
 
 func (st Stmt) MustReturnSess(s *Session) bool {
@@ -56,7 +56,7 @@ func (st Stmt) MustReturnSess(s *Session) bool {
 // Incomplete get_blocks sticky false (no invent not-must-jump soft re-pick past holes).}
 
 func (st Stmt) MustJump() bool {
-	return st.MustJumpSess(nil)
+	return st.MustJumpSess(testAmbientSession)
 }
 
 func (st Stmt) MustJumpSess(s *Session) bool {
@@ -121,7 +121,7 @@ func (st Stmt) MustJumpSess(s *Session) bool {
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 
 func (b *Block) MustReturn() bool {
-	return b.MustReturnSess(nil)
+	return b.MustReturnSess(testAmbientSession)
 }
 
 // MustReturnSess is MustReturn with explicit session residual sticky.
@@ -136,7 +136,7 @@ func (b *Block) MustReturnSess(s *Session) bool {
 // MustReturnWithFM is must_return with an explicit FactMgr for back-edge checks.
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
-	return b.MustReturnWithFMSess(nil, fm)
+	return b.MustReturnWithFMSess(testAmbientSession, fm)
 }
 
 // MustReturnWithFMSess is MustReturnWithFM with explicit session residual sticky.
@@ -183,7 +183,7 @@ func (b *Block) MustReturnWithFMSess(s *Session, fm *FactMgr) bool {
 // Block.cpp:336–341 — last must_jump and break_stms empty.
 // Block always live; sticky false (no invent not-must-jump soft-skip past hole).
 func (b *Block) MustJump() bool {
-	return b.MustJumpSess(nil)
+	return b.MustJumpSess(testAmbientSession)
 }
 
 // MustJumpSess is MustJump with explicit session residual sticky.
@@ -250,7 +250,7 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 // Function.cpp:618–619 — return_type always live; void simple → false.
 // Incomplete Function/ReturnType sticky true (no invent "no return needed" past holes).
 func (f *Function) NeedReturnStmt() bool {
-	return f.NeedReturnStmtSess(nil)
+	return f.NeedReturnStmtSess(testAmbientSession)
 }
 
 // NeedReturnStmtSess is NeedReturnStmt with explicit session residual sticky.

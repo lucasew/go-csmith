@@ -217,7 +217,7 @@ func CreateArrayVariable(
 // Dimension returns get_dimension.
 // ArrayVariable always live at get_dimension; sticky 0 (no invent dim soft-skip past hole).
 func (av *ArrayVariable) Dimension() int {
-	return av.DimensionSess(nil)
+	return av.DimensionSess(testAmbientSession)
 }
 
 // DimensionSess is Dimension with explicit session residual sticky.
@@ -232,7 +232,7 @@ func (av *ArrayVariable) DimensionSess(s *Session) int {
 // TotalSize is product of sizes.
 // ArrayVariable always live; sticky 0 (no invent empty-size soft-skip past hole).
 func (av *ArrayVariable) TotalSize() int {
-	return av.TotalSizeSess(nil)
+	return av.TotalSizeSess(testAmbientSession)
 }
 
 // TotalSizeSess is TotalSize with explicit session residual sticky.
@@ -251,7 +251,7 @@ func (av *ArrayVariable) TotalSizeSess(s *Session) int {
 // IsGlobal for arrays: name prefix g_ (same as Variable).
 // ArrayVariable always live; sticky incomplete no invent not-global soft-skip.
 func (av *ArrayVariable) IsGlobal() bool {
-	return av.IsGlobalSess(nil)
+	return av.IsGlobalSess(testAmbientSession)
 }
 
 // IsGlobalSess is IsGlobal with explicit session residual sticky.
@@ -273,7 +273,7 @@ func (av *ArrayVariable) IsGlobalSess(s *Session) bool {
 // ArrayVariable.cpp:512–521 OutputDecl — output_qualified_type + name + [sizes].
 // Do not invent bare Type.CName + storage IsVolatile (misplaces pointer vol).
 func (av *ArrayVariable) CDeclType() string {
-	return av.CDeclTypeSess(nil)
+	return av.CDeclTypeSess(testAmbientSession)
 }
 
 // CDeclTypeSess is CDeclType with Options/sticky from an explicit session bag.
@@ -283,7 +283,7 @@ func (av *ArrayVariable) CDeclTypeSess(s *Session) string {
 
 // CDeclTypeOpts is CDeclType with explicit session Options (const/volatile asserts).
 func (av *ArrayVariable) CDeclTypeOpts(opts Options) string {
-	return av.CDeclTypeOptsSess(nil, opts)
+	return av.CDeclTypeOptsSess(testAmbientSession, opts)
 }
 
 func (av *ArrayVariable) CDeclTypeOptsSess(s *Session, opts Options) string {
@@ -330,7 +330,7 @@ func (av *ArrayVariable) CDeclTypeOptsSess(s *Session, opts Options) string {
 // Incomplete ArrayVariable/Type sticky true (no invent loop-init eligibility past holes).}
 
 func (av *ArrayVariable) NoLoopInitializer() bool {
-	return av.NoLoopInitializerSess(nil)
+	return av.NoLoopInitializerSess(testAmbientSession)
 }
 
 func (av *ArrayVariable) NoLoopInitializerSess(s *Session) bool {
@@ -381,7 +381,7 @@ func (av *ArrayVariable) NoLoopInitializerSess(s *Session) bool {
 // variant match past broken shells).}
 
 func CountExprKeyVar(e *Expression) int {
-	return CountExprKeyVarSess(nil, e)
+	return CountExprKeyVarSess(testAmbientSession, e)
 }
 
 func CountExprKeyVarSess(s *Session, e *Expression) int {
@@ -468,7 +468,7 @@ func CountExprKeyVarSess(s *Session, e *Expression) int {
 // Incomplete IR (nil Invoke/args) fails closed sticky nil (no invent key from partial).}
 
 func FindExprKeyVar(e *Expression) *Variable {
-	return FindExprKeyVarSess(nil, e)
+	return FindExprKeyVarSess(testAmbientSession, e)
 }
 
 func FindExprKeyVarSess(s *Session, e *Expression) *Variable {
@@ -546,7 +546,7 @@ func FindExprKeyVarSess(s *Session, e *Expression) *Variable {
 // string Indices match as complete variant; no invent mixed expr/string dual path).}
 
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
-	return av.IsVariantSess(nil, other)
+	return av.IsVariantSess(testAmbientSession, other)
 }
 
 func (av *ArrayVariable) IsVariantSess(s *Session, other *Variable) bool {
@@ -585,12 +585,12 @@ func (av *ArrayVariable) IsVariantSess(s *Session, other *Variable) bool {
 		for i := range av.IndexExprs {
 			e, oe := av.IndexExprs[i], ov.IndexExprs[i]
 			// ArrayVariable.cpp:403–405 — Expression path; live Expression* only
-			ce := CountExprKeyVarSess(nil, e)
+			ce := CountExprKeyVarSess(testAmbientSession, e)
 			// residual ERROR sticky — no invent soft-continue count past residual hole
 			if sessHasError(s) {
 				return false
 			}
-			coe := CountExprKeyVarSess(nil, oe)
+			coe := CountExprKeyVarSess(testAmbientSession, oe)
 			// residual ERROR sticky — no invent soft-continue count past oe residual hole
 			if sessHasError(s) {
 				return false
@@ -598,12 +598,12 @@ func (av *ArrayVariable) IsVariantSess(s *Session, other *Variable) bool {
 			if ce != 1 || coe != 1 {
 				return false
 			}
-			ke := FindExprKeyVarSess(nil, e)
+			ke := FindExprKeyVarSess(testAmbientSession, e)
 			// residual ERROR sticky — no invent soft-continue key match past residual hole
 			if sessHasError(s) {
 				return false
 			}
-			koe := FindExprKeyVarSess(nil, oe)
+			koe := FindExprKeyVarSess(testAmbientSession, oe)
 			// residual ERROR sticky — no invent soft-continue key match past oe residual
 			if sessHasError(s) {
 				return false
@@ -693,7 +693,7 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 // sticky no invent pad empty holes or empty Constant "0" stand-ins
 // ArrayVariable always live; sticky (no invent soft-skip index set past hole).
 func (av *ArrayVariable) SetIndex(index int, expr string) {
-	av.SetIndexSess(nil, index, expr)
+	av.SetIndexSess(testAmbientSession, index, expr)
 }
 
 // SetIndexSess is SetIndex with explicit session residual sticky.
@@ -736,7 +736,7 @@ func (av *ArrayVariable) SetIndexSess(s *Session, index int, expr string) {
 // ArrayVariable.cpp:229–231 — stores Expression*; emit string from Output only.
 // ArrayVariable always live; sticky (no invent soft-skip index set past hole).
 func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
-	av.SetIndexExprSess(nil, index, e)
+	av.SetIndexExprSess(testAmbientSession, index, e)
 }
 
 func (av *ArrayVariable) SetIndexExprSess(s *Session, index int, e *Expression) {
@@ -786,7 +786,7 @@ func (av *ArrayVariable) SetIndexExprSess(s *Session, index int, e *Expression) 
 // ArrayVariable always live; sticky (no invent soft-skip add past hole).}
 
 func (av *ArrayVariable) AddIndex(expr string) {
-	av.AddIndexSess(nil, expr)
+	av.AddIndexSess(testAmbientSession, expr)
 }
 
 // AddIndexSess is AddIndex with explicit session residual sticky.
@@ -810,7 +810,7 @@ func (av *ArrayVariable) AddIndexSess(s *Session, expr string) {
 // ArrayVariable.cpp:227 — indices.push_back(e); sticky no soft invent "0".
 // ArrayVariable always live; sticky (no invent soft-skip add past hole).
 func (av *ArrayVariable) AddIndexExpr(e *Expression) {
-	av.AddIndexExprSess(nil, e)
+	av.AddIndexExprSess(testAmbientSession, e)
 }
 
 // AddIndexExprSess is AddIndexExpr with explicit session residual sticky.
@@ -841,7 +841,7 @@ func (av *ArrayVariable) AddIndexExprSess(s *Session, e *Expression) {
 // inside build_init_recursive. Advances across every array OutputDef (do not reset per array).
 
 // ResetArrayInitSeed restores the C++ static seed (tests / Finalization).
-func ResetArrayInitSeed() { ResetArrayInitSeedSess(nil) }
+func ResetArrayInitSeed() { ResetArrayInitSeedSess(testAmbientSession) }
 
 // ResetArrayInitSeedSess restores ArrayInitSeed on an explicit session bag.
 func ResetArrayInitSeedSess(s *Session) { sessOrAmbient(s).ArrayInitSeed = 0xABCDEF }
@@ -849,7 +849,7 @@ func ResetArrayInitSeedSess(s *Session) { sessOrAmbient(s).ArrayInitSeed = 0xABC
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive (ambient seed bag).
 // ArrayVariable.cpp:426–446 — nested braces; process-static seed pick; "," (no space).
 func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) string {
-	return av.buildInitRecursiveSess(nil, dimen, initStrings)
+	return av.buildInitRecursiveSess(testAmbientSession, dimen, initStrings)
 }
 
 // buildInitRecursiveSess is buildInitRecursive with ArrayInitSeed on bag s.
@@ -902,12 +902,12 @@ func (av *ArrayVariable) buildInitRecursiveSess(s *Session, dimen int, initStrin
 // buildInitializerStr mirrors ArrayVariable::build_initializer_str.
 // ArrayVariable.cpp:450–474 — force_non_uniform → recursive seed path; else nested dims.
 func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
-	return av.buildInitializerStrSess(nil, initStrings, sessOpts(nil))
+	return av.buildInitializerStrSess(testAmbientSession, initStrings, sessOpts(nil))
 }
 
 // buildInitializerStrOpts is buildInitializerStr with explicit session Options (ambient seed).
 func (av *ArrayVariable) buildInitializerStrOpts(initStrings []string, opts Options) string {
-	return av.buildInitializerStrSess(nil, initStrings, opts)
+	return av.buildInitializerStrSess(testAmbientSession, initStrings, opts)
 }
 
 // buildInitializerStrSess is buildInitializerStr with seed bag + Options.
@@ -954,16 +954,16 @@ func (av *ArrayVariable) buildInitializerStrSess(s *Session, initStrings []strin
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
 // ArrayVariable.cpp:491–520 — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
-	return av.OutputDefSess(nil, sessOpts(nil))
+	return av.OutputDefSess(testAmbientSession, sessOpts(nil))
 }
 
 // OutputDefOpts is OutputDef with explicit session Options (ambient ArrayInitSeed bag).
 func (av *ArrayVariable) OutputDefOpts(opts Options) string {
-	return av.OutputDefOptsSess(nil, opts)
+	return av.OutputDefOptsSess(testAmbientSession, opts)
 }
 
 func (av *ArrayVariable) OutputDefOptsSess(s *Session, opts Options) string {
-	return av.OutputDefSess(nil, opts)
+	return av.OutputDefSess(testAmbientSession, opts)
 }
 
 // OutputDefSess is OutputDef with seed bag + Options (force_non_uniform init).}
@@ -1074,7 +1074,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 // OutputLowerBound mirrors ArrayVariable::OutputLowerBound — name[0][0]….
 // ArrayVariable.cpp:694–700.
 func (av *ArrayVariable) OutputLowerBound() string {
-	return av.OutputLowerBoundSess(nil)
+	return av.OutputLowerBoundSess(testAmbientSession)
 }
 
 func (av *ArrayVariable) OutputLowerBoundSess(s *Session) string {
@@ -1104,7 +1104,7 @@ func (av *ArrayVariable) OutputLowerBoundSess(s *Session) string {
 // ArrayVariable.cpp:703–711 — cvs[i]->Output only (no letter-name invent).}
 
 func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
-	return av.OutputWithIndicesSess(nil, ctrl)
+	return av.OutputWithIndicesSess(testAmbientSession, ctrl)
 }
 
 // OutputWithIndicesSess is OutputWithIndices with sticky errors on bag s.
@@ -1155,7 +1155,7 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 // OutputInitOpts is OutputInit with post_incr_operator control.
 // ArrayVariable.cpp:619–655 — cvs[i] names only (no letter-name soft invent).
 func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr bool) string {
-	return av.OutputInitOptsSess(nil, indent, ctrl, postIncr)
+	return av.OutputInitOptsSess(testAmbientSession, indent, ctrl, postIncr)
 }
 
 // OutputInitOptsSess is OutputInitOpts with sticky errors on bag s.
@@ -1255,7 +1255,7 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 // ItemizeInto is Itemize with optional VariableSelector for AllVars registration.
 // ArrayVariable.cpp:251–252 — VariableSelector::AllVars.push_back(av).
 func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariable {
-	return av.ItemizeIntoSess(nil, r, vs)
+	return av.ItemizeIntoSess(testAmbientSession, r, vs)
 }
 
 func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelector) *ArrayVariable {
@@ -1334,7 +1334,7 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 // ArrayVariable/Type always live; sticky 0 (no invent zero-size soft-skip past hole).}
 
 func (av *ArrayVariable) SizeInBytesArray() int {
-	return av.SizeInBytesArraySess(nil)
+	return av.SizeInBytesArraySess(testAmbientSession)
 }
 
 // SizeInBytesArraySess is SizeInBytesArray with explicit session residual sticky.
@@ -1361,7 +1361,7 @@ func (av *ArrayVariable) SizeInBytesArraySess(s *Session) int {
 // C++ assert(!indices.empty()) then indices[i]->Output; always `if (1)` path
 // (not signed-cast % size). No sizes-only invent and no soft "[0]".
 func (av *ArrayVariable) OutputAccess() string {
-	return av.OutputAccessSess(nil)
+	return av.OutputAccessSess(testAmbientSession)
 }
 
 func (av *ArrayVariable) OutputAccessSess(s *Session) string {
@@ -1433,7 +1433,7 @@ func (av *ArrayVariable) OutputAccessSess(s *Session) string {
 // ArrayVariable.cpp:572–577 — always (sizes[i] - 1); no soft invent "0" for empty dims.}
 
 func (av *ArrayVariable) OutputUpperBoundArray() string {
-	return av.OutputUpperBoundArraySess(nil)
+	return av.OutputUpperBoundArraySess(testAmbientSession)
 }
 
 func (av *ArrayVariable) OutputUpperBoundArraySess(s *Session) string {
@@ -1471,7 +1471,7 @@ func (av *ArrayVariable) OutputUpperBoundArraySess(s *Session) string {
 // live C++ path uses `if (1)` always. ArrayVariable.cpp:553–568.}
 
 func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
-	return av.OutputIndexModuloSess(nil, i, idx)
+	return av.OutputIndexModuloSess(testAmbientSession, i, idx)
 }
 
 func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expression) string {
@@ -1547,7 +1547,7 @@ func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expressio
 // Fail closed sticky: always nil (no invent variant/offset mutation / soft re-pick).}
 
 func (av *ArrayVariable) RndMutate(r *Rng) *ArrayVariable {
-	return av.RndMutateSess(nil, r)
+	return av.RndMutateSess(testAmbientSession, r)
 }
 
 // RndMutateSess is RndMutate with explicit session residual sticky.
@@ -1561,7 +1561,7 @@ func (av *ArrayVariable) RndMutateSess(s *Session, r *Rng) *ArrayVariable {
 // VariableSelector.cpp:1552–1554 — assert(0 && "invalid call…"); dead API.
 // Fail closed sticky: always nil (no invent new itemized member from index rewrite).
 func CreateMutatedArrayVar(av *ArrayVariable, newIndices []*Expression) *ArrayVariable {
-	return CreateMutatedArrayVarSess(nil, av, newIndices)
+	return CreateMutatedArrayVarSess(testAmbientSession, av, newIndices)
 }
 
 // CreateMutatedArrayVarSess is CreateMutatedArrayVar with explicit session residual sticky.

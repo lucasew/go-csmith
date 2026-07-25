@@ -66,7 +66,7 @@ const IncompleteStmID = -1
 // AllocStmID mirrors Statement ctor: stm_id = sid; sid++.
 // Statement.cpp:370–371 — first statement gets 0.
 func AllocStmID() int {
-	return AllocStmIDSess(nil)
+	return AllocStmIDSess(testAmbientSession)
 }
 
 // AllocStmIDSess allocates a statement id on an explicit session bag.
@@ -119,7 +119,7 @@ type Block struct {
 // BlockSize mirrors Block::block_size.
 // Block.h:85 — CGOptions::max_block_size captured at construction.
 func (b *Block) BlockSize() int {
-	return b.BlockSizeSess(nil)
+	return b.BlockSizeSess(testAmbientSession)
 }
 
 func (b *Block) BlockSizeSess(s *Session) int {
@@ -134,7 +134,7 @@ func (b *Block) BlockSizeSess(s *Session) int {
 // Block.h:76.}
 
 func (b *Block) GetDepthProtect() bool {
-	return b.GetDepthProtectSess(nil)
+	return b.GetDepthProtectSess(testAmbientSession)
 }
 
 func (b *Block) GetDepthProtectSess(s *Session) bool {
@@ -149,7 +149,7 @@ func (b *Block) GetDepthProtectSess(s *Session) bool {
 // Block.h:72–74.}
 
 func (b *Block) SetDepthProtect(v bool) bool {
-	return b.SetDepthProtectSess(nil, v)
+	return b.SetDepthProtectSess(testAmbientSession, v)
 }
 
 func (b *Block) SetDepthProtectSess(s *Session, v bool) bool {
@@ -165,7 +165,7 @@ func (b *Block) SetDepthProtectSess(s *Session, v bool) bool {
 // Incomplete Stmt Kind sticky (no invent append hole).}
 
 func (b *Block) PushStmt(st Stmt) {
-	b.PushStmtSess(nil, st)
+	b.PushStmtSess(testAmbientSession, st)
 }
 
 func (b *Block) PushStmtSess(s *Session, st Stmt) {
@@ -181,7 +181,7 @@ func (b *Block) PushStmtSess(s *Session, st Stmt) {
 // Incomplete funcs sticky nil.
 
 func FindBlockByID(funcs []*Function, blkID int) *Block {
-	return FindBlockByIDSess(nil, funcs, blkID)
+	return FindBlockByIDSess(testAmbientSession, funcs, blkID)
 }
 
 // FindBlockByIDSess is FindBlockByID with explicit session residual sticky.
@@ -241,7 +241,7 @@ func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
 // Block.cpp:336–346 — last stmt, but stop early if return encountered.
 // Incomplete Block sticky nil (no invent soft-skip empty last / soft re-pick past hole).
 func (b *Block) GetLastStm() *Stmt {
-	return b.GetLastStmSess(nil)
+	return b.GetLastStmSess(testAmbientSession)
 }
 
 func (b *Block) GetLastStmSess(s *Session) *Stmt {
@@ -268,7 +268,7 @@ func (b *Block) GetLastStmSess(s *Session) *Stmt {
 // Incomplete Block/last sticky false (no invent fall-through / soft re-pick past holes).}
 
 func (b *Block) FromTailToHead() bool {
-	return b.FromTailToHeadSess(nil)
+	return b.FromTailToHeadSess(testAmbientSession)
 }
 
 func (b *Block) FromTailToHeadSess(s *Session) bool {
@@ -357,7 +357,7 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 // rnd_upto(blks.size()). C++ uses CGOptions::global_variables() for the nil slot
 // (StatementArrayOp::make_random_array_init always hits this with defaults).
 func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
-	return b.RandomParentBlockSess(nil, r, allowGlobal)
+	return b.RandomParentBlockSess(testAmbientSession, r, allowGlobal)
 }
 
 func (b *Block) RandomParentBlockSess(s *Session, r *Rng, allowGlobal bool) *Block {
@@ -402,7 +402,7 @@ func (b *Block) MustBreakOrReturn() bool {
 // Block always live at stack scan; nil shell sticky false (no invent incomplete-scan
 // soft-miss without ERROR so soft re-pick cannot treat hole as clean incomplete).
 func (b *Block) StackScanComplete() bool {
-	return b.StackScanCompleteSess(nil)
+	return b.StackScanCompleteSess(testAmbientSession)
 }
 
 func (b *Block) StackScanCompleteSess(s *Session) bool {
@@ -438,7 +438,7 @@ func (b *Block) StackScanCompleteSess(s *Session) bool {
 // / soft re-pick past holes).}
 
 func (b *Block) IsVarOnStack(v *Variable) bool {
-	return b.IsVarOnStackSess(nil, v)
+	return b.IsVarOnStackSess(testAmbientSession, v)
 }
 
 func (b *Block) IsVarOnStackSess(s *Session, v *Variable) bool {
@@ -510,7 +510,7 @@ func (b *Block) IsVarOnStackSess(s *Session, v *Variable) bool {
 // sym is ignored; kept for call-site compatibility.}
 
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
-	return b.CreateNewTmpVarSess(nil, st)
+	return b.CreateNewTmpVarSess(testAmbientSession, st)
 }
 
 // CreateNewTmpVarSess is CreateNewTmpVar on an explicit session bag.
@@ -541,7 +541,7 @@ func (b *Block) CreateNewTmpVarSess(s *Session, st ESimpleType) string {
 // filter.disable(fDefault). In random mode valid_filter() is false so
 // filter() never rejects → uniform rnd_upto(block_size) in [0, block_size).
 func BlockProbability(blockSize int, r *Rng) int {
-	return BlockProbabilitySess(nil, blockSize, r)
+	return BlockProbabilitySess(testAmbientSession, blockSize, r)
 }
 
 // BlockProbabilitySess is BlockProbability with explicit session residual sticky.
@@ -781,7 +781,7 @@ func MakeRandomBlock(
 // (seed 11466719812903307384).
 // Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
 func abortBlockMake(f *Function, b *Block) {
-	abortBlockMakeSess(nil, f, b)
+	abortBlockMakeSess(testAmbientSession, f, b)
 }
 
 // abortBlockMakeSess is abortBlockMake with explicit session residual sticky.
@@ -1748,7 +1748,7 @@ func stmtOK(st Stmt) bool {
 // outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
 // indent is statement base indent (spaces/4); uses Emit* flags on b.
 func (b *Block) outputStmtsOnly(indent int) string {
-	return b.outputStmtsOnlySess(nil, indent, false, sessOpts(nil))
+	return b.outputStmtsOnlySess(testAmbientSession, indent, false, sessOpts(nil))
 }
 
 // outputStmtsOnlyOpts is outputStmtsOnly with optional PreOutput skip.
@@ -1758,7 +1758,7 @@ func (b *Block) outputStmtsOnly(indent int) string {
 // (seed 86: UP one lbl_1132 vs GO three inside nested fors). Nested shells
 // still emit for-headers/body; only pre_output is suppressed.
 func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) string {
-	return b.outputStmtsOnlySess(nil, indent, skipPre, opts)
+	return b.outputStmtsOnlySess(testAmbientSession, indent, skipPre, opts)
 }
 
 // outputStmtsOnlySess is outputStmtsOnlyOpts with sticky errors on bag s.
@@ -2136,7 +2136,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 
 // Output emits C for the block with indent levels.
 func (b *Block) Output(indent int) string {
-	return b.OutputSess(nil, indent)
+	return b.OutputSess(testAmbientSession, indent)
 }
 
 // OutputSess is Output with Options/sticky from an explicit session bag.
@@ -2146,7 +2146,7 @@ func (b *Block) OutputSess(s *Session, indent int) string {
 
 // OutputOpts is Block.Output with explicit session Options (no ambient ProcessOptions).
 func (b *Block) OutputOpts(indent int, opts Options) string {
-	return b.OutputOptsSess(nil, indent, opts)
+	return b.OutputOptsSess(testAmbientSession, indent, opts)
 }
 
 // OutputOptsSess is OutputOpts with sticky errors on bag s.

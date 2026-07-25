@@ -11,7 +11,7 @@ import (
 // FactPointTo.h:93.
 // Incomplete Fact shell sticky false (no invent TOP / soft re-pick past hole).
 func (f *FactPointTo) IsTop() bool {
-	return f.IsTopSess(nil)
+	return f.IsTopSess(testAmbientSession)
 }
 
 // IsTopSess is IsTop with explicit session residual sticky.
@@ -27,7 +27,7 @@ func (f *FactPointTo) IsTopSess(s *Session) bool {
 // IsBottom mirrors FactPointTo::is_bottom — always false (no bottom lattice).
 // FactPointTo.h:94–96.
 func (f *FactPointTo) IsBottom() bool {
-	return f.IsBottomSess(nil)
+	return f.IsBottomSess(testAmbientSession)
 }
 
 // IsBottomSess is IsBottom with explicit session residual sticky.
@@ -42,7 +42,7 @@ func (f *FactPointTo) IsBottomSess(s *Session) bool {
 // SetTop mirrors FactPointTo::set_top — clear points-to set.
 // FactPointTo.h:97.
 func (f *FactPointTo) SetTop() {
-	f.SetTopSess(nil)
+	f.SetTopSess(testAmbientSession)
 }
 
 // SetTopSess is SetTop with explicit session residual sticky.
@@ -57,7 +57,7 @@ func (f *FactPointTo) SetTopSess(s *Session) {
 // SetBottom mirrors FactPointTo::set_bottom — no-op.
 // FactPointTo.h:98.
 func (f *FactPointTo) SetBottom() {
-	f.SetBottomSess(nil)
+	f.SetBottomSess(testAmbientSession)
 }
 
 // SetBottomSess is SetBottom with explicit session residual sticky.
@@ -71,7 +71,7 @@ func (f *FactPointTo) SetBottomSess(s *Session) {
 // GetVar mirrors Fact::get_var / FactPointTo::get_var.
 // FactPointTo.h:64.
 func (f *FactPointTo) GetVar() *Variable {
-	return f.GetVarSess(nil)
+	return f.GetVarSess(testAmbientSession)
 }
 
 // GetVarSess is GetVar with explicit session residual sticky.
@@ -86,7 +86,7 @@ func (f *FactPointTo) GetVarSess(s *Session) *Variable {
 // Output mirrors FactPointTo::Output — pointee set diagnostic.
 // FactPointTo.cpp Output — subject and pointees by name.
 func (f *FactPointTo) Output() string {
-	return f.OutputSess(nil)
+	return f.OutputSess(testAmbientSession)
 }
 
 // OutputSess is Output with explicit session residual sticky.
@@ -121,7 +121,7 @@ func (f *FactPointTo) OutputSess(s *Session) string {
 // Incomplete Param/LocalVars / PointTo holes fail closed sticky as invisible
 // (no invent "all visible" / soft re-pick past holes).
 func (f *FactPointTo) HasInvisible(stParent *Block) bool {
-	return f.HasInvisibleSess(nil, stParent)
+	return f.HasInvisibleSess(testAmbientSession, stParent)
 }
 
 func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
@@ -174,7 +174,7 @@ func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 // / soft re-pick past hole via IsVariableInSet false membership).}
 
 func (f *FactPointTo) IsAssertable(stParent *Block) bool {
-	return f.IsAssertableSess(nil, stParent)
+	return f.IsAssertableSess(testAmbientSession, stParent)
 }
 
 // IsAssertableSess is IsAssertable with explicit session residual sticky.
@@ -212,7 +212,7 @@ func (f *FactPointTo) IsAssertableSess(s *Session, stParent *Block) bool {
 // OutputCondition mirrors FactPointTo::Output — C expression for the fact.
 // FactPointTo.cpp:627–658.
 func (f *FactPointTo) OutputCondition() string {
-	return f.OutputConditionSess(nil)
+	return f.OutputConditionSess(testAmbientSession)
 }
 
 func (f *FactPointTo) OutputConditionSess(s *Session) string {
@@ -291,7 +291,7 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 }
 
 func outputFactVar(v *Variable) string {
-	return outputFactVarSess(nil, v)
+	return outputFactVarSess(testAmbientSession, v)
 }
 
 func outputFactVarSess(s *Session, v *Variable) string {
@@ -334,7 +334,7 @@ func outputFactVarSess(s *Session, v *Variable) string {
 // Fact.cpp:64–73 — assert(cond); comment-out if not assertable.}
 
 func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
-	return f.OutputAssertionSess(nil, stParent, indent)
+	return f.OutputAssertionSess(testAmbientSession, stParent, indent)
 }
 
 func (f *FactPointTo) OutputAssertionSess(s *Session, stParent *Block, indent string) string {
@@ -472,7 +472,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 // Label resolution: Statement.cpp:908–914 — find_jump_sources only (gotos[0]->label).
 // SourceLabel is generation-side dest mirror used when FactMgr is absent (no CFG).
 func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
-	return PreOutputSess(nil, st, fm, emitStepHash, emitLabelAttrs, attrRng, indent)
+	return PreOutputSess(testAmbientSession, st, fm, emitStepHash, emitLabelAttrs, attrRng, indent)
 }
 
 func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {

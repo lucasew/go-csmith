@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime/debug"
 	"testing"
 )
 
-// TestPureGenStrictResidual panics on residual sessOrAmbient(nil) under pureGenStrict.
-// Generate itself enables pureGenStrict; this probe also re-asserts multi-seed.
-// Opt-in multi-seed battery: PURE_GEN_STRICT=1 (extra seeds beyond always-on Generate lock).
+// TestPureGenStrictResidual asserts bag-local Generate does not write the
+// quarantined testAmbientSession (no package pureGenStrict meta lock).
+// Opt-in multi-seed battery: PURE_GEN_STRICT=1.
 func TestPureGenStrictResidual(t *testing.T) {
 	seeds := []uint64{2}
 	if os.Getenv("PURE_GEN_STRICT") != "" {
@@ -22,22 +21,14 @@ func TestPureGenStrictResidual(t *testing.T) {
 			opts := Defaults()
 			opts.Seed = seed
 			ReinstallTestProcessSingletons()
-			// Generate enables pureGenStrict; also force here for mid-test clarity.
-			prev := pureGenStrict
-			pureGenStrict = true
-			defer func() {
-				pureGenStrict = prev
-				ReinstallTestProcessSingletons()
-			}()
+			defer ReinstallTestProcessSingletons()
 			s := NewSession(opts)
-			defer func() {
-				if r := recover(); r != nil {
-					t.Fatalf("%v\n%s", r, debug.Stack())
-				}
-			}()
 			// Marker on quarantined ambient: Generate must not write testAmbientSession.
 			marker := 0xC0FFEE ^ int(seed)
 			testAmbientSession.NextStmID = marker
+			testAmbientSession.GenError = ErrSuccess
+			// Poison ambient RNG so residual ProcessRng draws would desync body.
+			testAmbientSession.Rng = NewRng(0xDEAD)
 			out, err := s.Generate(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -48,6 +39,19 @@ func TestPureGenStrictResidual(t *testing.T) {
 			if testAmbientSession.NextStmID != marker {
 				t.Fatalf("Generate mutated testAmbientSession.NextStmID: got %d want %d",
 					testAmbientSession.NextStmID, marker)
+			}
+			if testAmbientSession.GenError != ErrSuccess {
+				t.Fatalf("Generate residual sessNoteError(nil) polluted ambient GenError=%d",
+					testAmbientSession.GenError)
+			}
+			// Re-generate with clean ambient: body must match (no ambient dependence).
+			ReinstallTestProcessSingletons()
+			again, err := NewSession(opts).Generate(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if again != out {
+				t.Fatal("Generate body depends on ambient bag state")
 			}
 			t.Logf("pure gen ok seed=%d len=%d", seed, len(out))
 		})

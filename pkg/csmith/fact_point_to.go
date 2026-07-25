@@ -26,7 +26,7 @@ type FactPointTo struct {
 // FactPointTo.cpp:354–359 — Variable* always live at construction sites.
 // nil subject sticky (no invent FactPointTo{nil, garbage} shell / soft re-pick).
 func NewFactPointTo(v *Variable) *FactPointTo {
-	return NewFactPointToSess(nil, v)
+	return NewFactPointToSess(testAmbientSession, v)
 }
 
 func NewFactPointToSess(s *Session, v *Variable) *FactPointTo {
@@ -40,7 +40,7 @@ func NewFactPointToSess(s *Session, v *Variable) *FactPointTo {
 // MakeFactPointTo mirrors FactPointTo::make_fact(v, point_to).
 // nil subject/pointee sticky (no invent fact without live Variable* / soft re-pick).
 func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
-	return MakeFactPointToSess(nil, v, pointTo)
+	return MakeFactPointToSess(testAmbientSession, v, pointTo)
 }
 
 func MakeFactPointToSess(s *Session, v *Variable, pointTo *Variable) *FactPointTo {
@@ -56,7 +56,7 @@ func MakeFactPointToSess(s *Session, v *Variable, pointTo *Variable) *FactPointT
 // no invent empty IsTop PointTo from nil); nil pointee hole sticky.
 // Valid empty sets use non-nil empty slice []*Variable{}.
 func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
-	return MakeFactPointToSetSess(nil, v, set)
+	return MakeFactPointToSetSess(testAmbientSession, v, set)
 }
 
 func MakeFactPointToSetSess(s *Session, v *Variable, set []*Variable) *FactPointTo {
@@ -81,7 +81,7 @@ func MakeFactPointToSetSess(s *Session, v *Variable, set []*Variable) *FactPoint
 // IsNull mirrors FactPointTo::is_null — any null_ptr in the set.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-null past holes.
 func (f *FactPointTo) IsNull() bool {
-	return f.IsNullSess(nil)
+	return f.IsNullSess(testAmbientSession)
 }
 
 func (f *FactPointTo) IsNullSess(s *Session) bool {
@@ -105,7 +105,7 @@ func (f *FactPointTo) IsNullSess(s *Session) bool {
 // IsDead mirrors FactPointTo::is_dead — garbage_ptr in the set.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-dead past holes.
 func (f *FactPointTo) IsDead() bool {
-	return f.IsDeadSess(nil)
+	return f.IsDeadSess(testAmbientSession)
 }
 
 func (f *FactPointTo) IsDeadSess(s *Session) bool {
@@ -129,7 +129,7 @@ func (f *FactPointTo) IsDeadSess(s *Session) bool {
 // IsTBDOnly mirrors FactPointTo::is_tbd_only.
 // Incomplete Fact/PointTo sticky false (no invent TBD-only / soft re-pick past holes).
 func (f *FactPointTo) IsTBDOnly() bool {
-	return f.IsTBDOnlySess(nil)
+	return f.IsTBDOnlySess(testAmbientSession)
 }
 
 func (f *FactPointTo) IsTBDOnlySess(s *Session) bool {
@@ -157,7 +157,7 @@ func IsSpecialPtr(p *Variable) bool {
 // PointToStr mirrors FactPointTo::point_to_str.
 // FactPointTo.cpp:530–540 — specials as 0/tbd/garbage; else "&name".
 func PointToStr(v *Variable) string {
-	return PointToStrSess(nil, v)
+	return PointToStrSess(testAmbientSession, v)
 }
 
 func PointToStrSess(s *Session, v *Variable) string {
@@ -180,7 +180,7 @@ func PointToStrSess(s *Session, v *Variable) string {
 // Size mirrors FactPointTo::size — number of pointees.
 // FactPointTo.cpp:155.
 func (f *FactPointTo) Size() int {
-	return f.SizeSess(nil)
+	return f.SizeSess(testAmbientSession)
 }
 
 func (f *FactPointTo) SizeSess(s *Session) int {
@@ -194,7 +194,7 @@ func (f *FactPointTo) SizeSess(s *Session) int {
 // GetPointToVars mirrors FactPointTo::get_point_to_vars.
 // FactPointTo.h:69 — returns pointee slice (may be nil when empty).
 func (f *FactPointTo) GetPointToVars() []*Variable {
-	return f.GetPointToVarsSess(nil)
+	return f.GetPointToVarsSess(testAmbientSession)
 }
 
 func (f *FactPointTo) GetPointToVarsSess(s *Session) []*Variable {
@@ -207,7 +207,7 @@ func (f *FactPointTo) GetPointToVarsSess(s *Session) []*Variable {
 
 // Clear mirrors FactPointTo::clear / empty point-to set (set_top lattice).
 func (f *FactPointTo) Clear() {
-	f.ClearSess(nil)
+	f.ClearSess(testAmbientSession)
 }
 
 // ClearSess is Clear with explicit session residual sticky.
@@ -217,7 +217,7 @@ func (f *FactPointTo) ClearSess(s *Session) {
 
 // Empty mirrors FactPointTo::empty — no pointees (same as is_top).
 func (f *FactPointTo) Empty() bool {
-	return f.EmptySess(nil)
+	return f.EmptySess(testAmbientSession)
 }
 
 // EmptySess is Empty with explicit session residual sticky.
@@ -228,7 +228,7 @@ func (f *FactPointTo) EmptySess(s *Session) bool {
 // IsRelated mirrors Fact::is_related for PointTo — same category + same subject var.
 // Fact.h:81–83.
 func (f *FactPointTo) IsRelated(other *FactPointTo) bool {
-	return f.IsRelatedSess(nil, other)
+	return f.IsRelatedSess(testAmbientSession, other)
 }
 
 func (f *FactPointTo) IsRelatedSess(s *Session, other *FactPointTo) bool {
@@ -243,7 +243,7 @@ func (f *FactPointTo) IsRelatedSess(s *Session, other *FactPointTo) bool {
 // Fact* always live; nil hole fails closed (nil — no invent skip to later match).}
 
 func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
-	return FindRelatedPointToSess(nil, facts, p)
+	return FindRelatedPointToSess(testAmbientSession, facts, p)
 }
 
 func FindRelatedPointToSess(s *Session, facts []*FactPointTo, p *Variable) *FactPointTo {
@@ -274,7 +274,7 @@ func FindRelatedPointToSess(s *Session, facts []*FactPointTo, p *Variable) *Fact
 // Missing related fact / null/dead policy rejects stay non-sticky false.
 // Ambient InUserInvocationRevisit bridge; generation prefers IsValidPtrSess.
 func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
-	return IsValidPtrSess(nil, p, facts, nullProb, deadProb)
+	return IsValidPtrSess(testAmbientSession, p, facts, nullProb, deadProb)
 }
 
 // IsValidPtrSess is IsValidPtr with InUserInvocationRevisit from bag s.
@@ -347,7 +347,7 @@ func IsValidPtrSess(s *Session, p *Variable, facts []*FactPointTo, nullProb, dea
 // Incomplete fact maps fail closed sticky as dangling (true — no invent not-dangling
 // / soft re-pick past holes when FindRelated would skip holes).
 func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
-	return IsDanglingPtrSess(nil, p, facts, deadProb)
+	return IsDanglingPtrSess(testAmbientSession, p, facts, deadProb)
 }
 
 func IsDanglingPtrSess(s *Session, p *Variable, facts []*FactPointTo, deadProb int) bool {
@@ -388,7 +388,7 @@ func IsDanglingPtrSess(s *Session, p *Variable, facts []*FactPointTo, deadProb i
 // Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).}
 
 func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
-	return OpportunisticValidateSess(nil, r, v, typ, facts, nullProb, deadProb)
+	return OpportunisticValidateSess(testAmbientSession, r, v, typ, facts, nullProb, deadProb)
 }
 
 func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
@@ -488,7 +488,7 @@ func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts
 // FactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).}
 
 func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
-	return MakeFactsPointToSess(nil, lvars, pointTo)
+	return MakeFactsPointToSess(testAmbientSession, lvars, pointTo)
 }
 
 func MakeFactsPointToSess(s *Session, lvars []*Variable, pointTo *Variable) []*FactPointTo {
@@ -521,7 +521,7 @@ func MakeFactsPointToSess(s *Session, lvars []*Variable, pointTo *Variable) []*F
 // (no invent empty complete — FactsComplete(nil)==true / soft re-pick past hole).}
 
 func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
-	return MakeFactsPointToSetSess(nil, lvars, set)
+	return MakeFactsPointToSetSess(testAmbientSession, lvars, set)
 }
 
 func MakeFactsPointToSetSess(s *Session, lvars []*Variable, set []*Variable) []*FactPointTo {
@@ -561,7 +561,7 @@ func MakeFactsPointToSetSess(s *Session, lvars []*Variable, set []*Variable) []*
 // FindPointerFields / fact-map holes stay non-sticky hole markers.}
 
 func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
-	return RhsToLhsTransferSess(nil, facts, lvars, rhs)
+	return RhsToLhsTransferSess(testAmbientSession, facts, lvars, rhs)
 }
 
 func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
@@ -938,7 +938,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 // MergePointees / abstract transfer results stay non-sticky hole markers.}
 
 func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) ([]*FactPointTo, int) {
-	return AbstractFactForAssignSess(nil, factsIn, lhs, lhsIndir, rhs)
+	return AbstractFactForAssignSess(testAmbientSession, factsIn, lhs, lhsIndir, rhs)
 }
 
 func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) ([]*FactPointTo, int) {
@@ -1128,7 +1128,7 @@ func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable
 // Incomplete PointTo nil hole fails closed sticky as unequal (no invent equal / soft re-pick).}
 
 func (f *FactPointTo) Equal(other *FactPointTo) bool {
-	return f.EqualSess(nil, other)
+	return f.EqualSess(testAmbientSession, other)
 }
 
 func (f *FactPointTo) EqualSess(s *Session, other *FactPointTo) bool {
@@ -1172,7 +1172,7 @@ func (f *FactPointTo) EqualSess(s *Session, other *FactPointTo) bool {
 // FactPointTo.cpp:602–609.
 // Incomplete PointTo (nil hole) fails closed sticky as not-imply (no invent cover / soft re-pick).
 func (f *FactPointTo) Imply(other *FactPointTo) bool {
-	return f.ImplySess(nil, other)
+	return f.ImplySess(testAmbientSession, other)
 }
 
 func (f *FactPointTo) ImplySess(s *Session, other *FactPointTo) bool {
@@ -1209,7 +1209,7 @@ func (f *FactPointTo) ImplySess(s *Session, other *FactPointTo) bool {
 // Incomplete PointTo (nil hole) fails closed sticky false without partial absorb
 // (no invent soft-skip hole and still join later pointees / soft re-pick).
 func (f *FactPointTo) Join(other *FactPointTo) bool {
-	return f.JoinSess(nil, other)
+	return f.JoinSess(testAmbientSession, other)
 }
 
 func (f *FactPointTo) JoinSess(s *Session, other *FactPointTo) bool {
@@ -1253,7 +1253,7 @@ func (f *FactPointTo) JoinSess(s *Session, other *FactPointTo) bool {
 // clear TBD-only self before absorbing concrete pointees.
 // Nil shells sticky; Join already sticky on PointTo holes.
 func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
-	return f.JoinVisitsSess(nil, other)
+	return f.JoinVisitsSess(testAmbientSession, other)
 }
 
 func (f *FactPointTo) JoinVisitsSess(s *Session, other *FactPointTo) bool {
@@ -1299,7 +1299,7 @@ func (f *FactPointTo) JoinVisitsSess(s *Session, other *FactPointTo) bool {
 // facts always live; sticky (no invent soft-skip join-visits past hole).}
 
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
-	return JoinVisitsIntoSess(nil, facts, newFacts)
+	return JoinVisitsIntoSess(testAmbientSession, facts, newFacts)
 }
 
 func JoinVisitsIntoSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
@@ -1377,7 +1377,7 @@ func JoinVisitsIntoSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPoint
 // / soft re-pick past holes. Empty top (nil PointTo) clones as empty non-nil set.}
 
 func (f *FactPointTo) Clone() *FactPointTo {
-	return f.CloneSess(nil)
+	return f.CloneSess(testAmbientSession)
 }
 
 func (f *FactPointTo) CloneSess(s *Session) *FactPointTo {
@@ -1426,7 +1426,7 @@ func IncompleteFactSlice() []*FactPointTo {
 // Incomplete map is non-sticky IncompleteFactSlice (soft re-pick; MergeFacts sticks).
 // Clone fail sticky IncompleteFactSlice (hard incomplete PointTo).
 func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
-	return MergeFactIntoSess(nil, facts, f)
+	return MergeFactIntoSess(testAmbientSession, facts, f)
 }
 
 func MergeFactIntoSess(s *Session, facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
@@ -1488,7 +1488,7 @@ func MergeFactIntoSess(s *Session, facts []*FactPointTo, f *FactPointTo) []*Fact
 // returns false (no invent skip partial join / keep broken partial).}
 
 func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
-	return MergeFactsSess(nil, facts, newFacts)
+	return MergeFactsSess(testAmbientSession, facts, newFacts)
 }
 
 func MergeFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
@@ -1550,7 +1550,7 @@ func MergeFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) 
 // FactsComplete(nil)==true invents empty-complete clone / soft re-pick past hole).}
 
 func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
-	return CloneFactSliceSess(nil, facts)
+	return CloneFactSliceSess(testAmbientSession, facts)
 }
 
 func CloneFactSliceSess(s *Session, facts []*FactPointTo) []*FactPointTo {
@@ -1584,7 +1584,7 @@ func CloneFactSliceSess(s *Session, facts []*FactPointTo) []*FactPointTo {
 // Incomplete FieldVars on v fails closed (nil — no invent leave stack field
 // pointees live because HasFieldVar returned false past a hole).
 func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
-	return f.MarkDeadVarSess(nil, v)
+	return f.MarkDeadVarSess(testAmbientSession, v)
 }
 
 func (f *FactPointTo) MarkDeadVarSess(s *Session, v *Variable) *FactPointTo {
@@ -1661,7 +1661,7 @@ func isAncestorField(field, root *Variable) bool {
 // MarkFuncEndLocals marks pointees that are locals as garbage/dead at function end.
 // Variable* always live in locals/PointTo; nil hole fails closed (nil fact).
 func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
-	return f.MarkFuncEndLocalsSess(nil, locals)
+	return f.MarkFuncEndLocalsSess(testAmbientSession, locals)
 }
 
 func (f *FactPointTo) MarkFuncEndLocalsSess(s *Session, locals []*Variable) *FactPointTo {
@@ -1738,7 +1738,7 @@ func (f *FactPointTo) MarkFuncEndLocalsSess(s *Session, locals []*Variable) *Fac
 // stack pointees live because IsVarOnStack returned false past a hole).}
 
 func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
-	return f.MarkFuncEndSess(nil, fn, stParent)
+	return f.MarkFuncEndSess(testAmbientSession, fn, stParent)
 }
 
 func (f *FactPointTo) MarkFuncEndSess(s *Session, fn *Function, stParent *Block) *FactPointTo {
@@ -1810,7 +1810,7 @@ func (f *FactPointTo) MarkFuncEndSess(s *Session, fn *Function, stParent *Block)
 // facts slice always live; sticky (no invent soft-skip mark past hole).}
 
 func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
-	MarkFuncEndOnFactsSess(nil, facts, fn, stParent)
+	MarkFuncEndOnFactsSess(testAmbientSession, facts, fn, stParent)
 }
 
 func MarkFuncEndOnFactsSess(s *Session, facts *[]*FactPointTo, fn *Function, stParent *Block) {
@@ -1849,7 +1849,7 @@ func MarkFuncEndOnFactsSess(s *Session, facts *[]*FactPointTo, fn *Function, stP
 // Empty idx is complete not-used.}
 
 func indexExprUsesVar(idx string, indexVar *Variable) bool {
-	return indexExprUsesVarSess(nil, idx, indexVar)
+	return indexExprUsesVarSess(testAmbientSession, idx, indexVar)
 }
 
 func indexExprUsesVarSess(s *Session, idx string, indexVar *Variable) bool {
@@ -1892,7 +1892,7 @@ func isIdentChar(c byte) bool {
 // Returns this fact if unchanged, or a new fact with rewritten pointees.
 // Fact + indexVar always live; sticky nil (no invent identity soft-skip past hole).
 func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
-	return f.UpdateWithModifiedIndexSess(nil, indexVar)
+	return f.UpdateWithModifiedIndexSess(testAmbientSession, indexVar)
 }
 
 func (f *FactPointTo) UpdateWithModifiedIndexSess(s *Session, indexVar *Variable) *FactPointTo {
@@ -1978,7 +1978,7 @@ func (f *FactPointTo) UpdateWithModifiedIndexSess(s *Session, indexVar *Variable
 // Fact* always live; nil hole or failed rewrite fails closed sticky (facts incomplete).
 // facts + indexVar always live; sticky (no invent soft-skip update past hole).
 func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
-	UpdateFactsWithModifiedIndexSess(nil, facts, indexVar)
+	UpdateFactsWithModifiedIndexSess(testAmbientSession, facts, indexVar)
 }
 
 func UpdateFactsWithModifiedIndexSess(s *Session, facts *[]*FactPointTo, indexVar *Variable) {
@@ -2011,7 +2011,7 @@ func UpdateFactsWithModifiedIndexSess(s *Session, facts *[]*FactPointTo, indexVa
 // IncompleteVariables (not bare nil — VariablesComplete(nil)/len==0 invent empty skip).
 // Complete empty (specials-only / no pointees) returns non-nil empty slice.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
-	return MergePointeesOfPointersSess(nil, ptrs, facts)
+	return MergePointeesOfPointersSess(testAmbientSession, ptrs, facts)
 }
 
 func MergePointeesOfPointersSess(s *Session, ptrs []*Variable, facts []*FactPointTo) []*Variable {
@@ -2066,7 +2066,7 @@ func MergePointeesOfPointersSess(s *Session, ptrs []*Variable, facts []*FactPoin
 // Missing fact / incomplete map stays non-sticky IncompleteVariables (soft re-pick).}
 
 func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
-	return MergePointeesOfPointerSess(nil, ptr, indirect, facts)
+	return MergePointeesOfPointerSess(testAmbientSession, ptr, indirect, facts)
 }
 
 func MergePointeesOfPointerSess(s *Session, ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
@@ -2096,7 +2096,7 @@ func MergePointeesOfPointerSess(s *Session, ptr *Variable, indirect int, facts [
 // MergePointees incomplete stays non-sticky true (fact-map soft re-pick).}
 
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
-	return IsPointingToLocalsSess(nil, v, b, indirection, facts)
+	return IsPointingToLocalsSess(testAmbientSession, v, b, indirection, facts)
 }
 
 func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
@@ -2260,7 +2260,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 // ClearPointToAggregates resets all_ptrs / all_aliases (generation start).}
 
 func ClearPointToAggregates() {
-	ClearPointToAggregatesSess(nil)
+	ClearPointToAggregatesSess(testAmbientSession)
 }
 
 // ClearPointToAggregatesSess clears pointer aggregates on an explicit session bag.
@@ -2276,7 +2276,7 @@ func ClearPointToAggregatesSess(s *Session) {
 // Fact* always live; nil hole fails closed sticky (false — no invent skip partial
 // alias / soft re-pick past holes). Returns false on incomplete maps; true when done.
 func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) bool {
-	return UpdatePtrAliasesSess(nil, facts, ptrs, aliases)
+	return UpdatePtrAliasesSess(testAmbientSession, facts, ptrs, aliases)
 }
 
 func UpdatePtrAliasesSess(s *Session, facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) bool {
@@ -2355,7 +2355,7 @@ func IncompleteFunctions() []*Function {
 // FactPointTo.cpp:803 — assert(all_ptrs.size() == all_aliases.size()); kept by UpdatePtrAliases.
 // Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial AllPtrs).
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
-	AggregateAllPointToSetsSess(nil, funcs, fms)
+	AggregateAllPointToSetsSess(testAmbientSession, funcs, fms)
 }
 
 // AggregateAllPointToSetsSess is AggregateAllPointToSets on an explicit session bag.
@@ -2430,7 +2430,7 @@ func CombineFacts(facts *[]*FactPointTo, facts2 []*FactPointTo) {
 // PrintFacts mirrors print_facts — concatenate OutputAssertion lines.
 // Fact.cpp:263–268.
 func PrintFacts(facts []*FactPointTo, stParent *Block) string {
-	return PrintFactsSess(nil, facts, stParent)
+	return PrintFactsSess(testAmbientSession, facts, stParent)
 }
 
 func PrintFactsSess(s *Session, facts []*FactPointTo, stParent *Block) string {
@@ -2448,7 +2448,7 @@ func PrintFactsSess(s *Session, facts []*FactPointTo, stParent *Block) string {
 // PrintVarFact mirrors print_var_fact — assertions for one variable name.
 // Fact.cpp:270–277.
 func PrintVarFact(facts []*FactPointTo, vname string, stParent *Block) string {
-	return PrintVarFactSess(nil, facts, vname, stParent)
+	return PrintVarFactSess(testAmbientSession, facts, vname, stParent)
 }
 
 func PrintVarFactSess(s *Session, facts []*FactPointTo, vname string, stParent *Block) string {
@@ -2472,7 +2472,7 @@ func PrintVarFactSess(s *Session, facts []*FactPointTo, vname string, stParent *
 // AbstractFactForReturn mirrors Fact::abstract_fact_for_return.
 // Fact.cpp:76–83 — abstract_fact_for_assign(facts, Lhs(func.rv), expr).
 func AbstractFactForReturn(facts []*FactPointTo, expr *Expression, fn *Function) []*FactPointTo {
-	return AbstractFactForReturnSess(nil, facts, expr, fn)
+	return AbstractFactForReturnSess(testAmbientSession, facts, expr, fn)
 }
 
 // AbstractFactForReturnSess is AbstractFactForReturn with sticky on run bag.
@@ -2493,7 +2493,7 @@ func AbstractFactForReturnSess(s *Session, facts []*FactPointTo, expr *Expressio
 // FactDoFinalization mirrors Fact::doFinalization.
 // Fact.cpp:110–115 — clear Fact::facts_ registry; Go uses ClearPointToAggregates.
 func FactDoFinalization() {
-	FactDoFinalizationSess(nil)
+	FactDoFinalizationSess(testAmbientSession)
 }
 
 // FactDoFinalizationSess clears Fact aggregates on an explicit session bag.

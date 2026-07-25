@@ -55,7 +55,7 @@ func buildStatementThresholdTable(opts Options) *ThresholdTable {
 // builds a library one-off from opts (tests that pass an explicit table).
 // Generation should prefer ProcessStmtTab / probs.StatementThresholdTable().
 func NewStatementThresholdTable(opts Options) *ThresholdTable {
-	return NewStatementThresholdTableSess(nil, opts)
+	return NewStatementThresholdTableSess(testAmbientSession, opts)
 }
 
 // NewStatementThresholdTableSess prefers session Probabilities statement table.
@@ -72,7 +72,7 @@ func NewStatementThresholdTableSess(s *Session, opts Options) *ThresholdTable {
 // NumberToType mirrors Statement::number_to_type(value) for value in [0,100).
 // Statement.cpp:141–147.
 func NumberToType(table *ThresholdTable, value uint32) StatementType {
-	return NumberToTypeSess(nil, table, value)
+	return NumberToTypeSess(testAmbientSession, table, value)
 }
 
 // NumberToTypeSess is NumberToType with explicit session residual sticky.
@@ -94,7 +94,7 @@ func NumberToTypeSess(s *Session, table *ThresholdTable, value uint32) Statement
 // Statement.cpp:230–235 — rnd_upto(100); number_to_type.
 // Callers that need filter pass reject via RndUptoFilter.
 func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
-	return StatementProbabilitySess(nil, r, table)
+	return StatementProbabilitySess(testAmbientSession, r, table)
 }
 
 // StatementProbabilitySess is StatementProbability with explicit session residual sticky.
@@ -112,7 +112,7 @@ func StatementProbabilitySess(s *Session, r *Rng, table *ThresholdTable) Stateme
 // StatementProbabilityFilter mirrors StatementProbability with a Filter
 // (e.g. reject compound when at max depth — filter implemented by caller).
 func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) StatementType {
-	return StatementProbabilityFilterSess(nil, r, table, f)
+	return StatementProbabilityFilterSess(testAmbientSession, r, table, f)
 }
 
 // StatementProbabilityFilterSess is StatementProbabilityFilter with explicit session residual sticky.
@@ -147,7 +147,7 @@ func InitProbabilityTable(opts Options) *ThresholdTable {
 // GetType mirrors Statement::get_type — returns the eStatementType kind.
 // Incomplete Stmt sticky MaxStatementType.
 func (st *Stmt) GetType() StatementType {
-	return st.GetTypeSess(nil)
+	return st.GetTypeSess(testAmbientSession)
 }
 
 // GetTypeSess is GetType with explicit session residual sticky.
@@ -162,7 +162,7 @@ func (st *Stmt) GetTypeSess(s *Session) StatementType {
 // GetCurrentSID mirrors Statement::get_current_sid process counter.
 // Statement uses Session.NextStmID (ambient bag when no Sess).
 func GetCurrentSID() int {
-	return GetCurrentSIDSess(nil)
+	return GetCurrentSIDSess(testAmbientSession)
 }
 
 // GetCurrentSIDSess returns NextStmID on an explicit session bag.

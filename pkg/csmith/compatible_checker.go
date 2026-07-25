@@ -8,7 +8,7 @@ package csmith
 // EnableCompatibleCheck mirrors CompatibleChecker::enable_compatible_check.
 // CompatibleChecker.cpp:68–70; CGOptions.cpp:416–417 (resolve_exhaustive_options).
 func EnableCompatibleCheck() {
-	EnableCompatibleCheckSess(nil)
+	EnableCompatibleCheckSess(testAmbientSession)
 }
 
 // EnableCompatibleCheckSess enables the checker on an explicit session bag.
@@ -18,7 +18,7 @@ func EnableCompatibleCheckSess(s *Session) {
 
 // ResetCompatibleCheck clears the process static (tests / finalization).
 func ResetCompatibleCheck() {
-	ResetCompatibleCheckSess(nil)
+	ResetCompatibleCheckSess(testAmbientSession)
 }
 
 // ResetCompatibleCheckSess clears the checker flag on an explicit session bag.
@@ -28,7 +28,7 @@ func ResetCompatibleCheckSess(s *Session) {
 
 // compatibleCheckOn is true when option or session static requests the checker.
 func compatibleCheckOn(opts Options) bool {
-	return compatibleCheckOnSess(nil, opts)
+	return compatibleCheckOnSess(testAmbientSession, opts)
 }
 
 // compatibleCheckOnSess is compatibleCheckOn with an explicit session bag.
@@ -43,7 +43,7 @@ func compatibleCheckOnSess(s *Session, opts Options) bool {
 // CompatibleChecker.cpp:43–53 — when disabled always false.
 // Returns true when assignment should be rejected (COMPATIBLE_CHECK_ERROR).
 func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
-	return CompatibleCheckExprVarSess(nil, opts, v, exp)
+	return CompatibleCheckExprVarSess(testAmbientSession, opts, v, exp)
 }
 
 // CompatibleCheckExprVarSess is CompatibleCheckExprVar on bag s.
@@ -66,7 +66,7 @@ func CompatibleCheckExprVarSess(s *Session, opts Options, v *Variable, exp *Expr
 // CompatibleCheckExprs mirrors CompatibleChecker::compatible_check(Expression*, Expression*).
 // CompatibleChecker.cpp:58–65 — when disabled false; else bidirectional compatible.
 func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
-	return CompatibleCheckExprsSess(nil, opts, a, b)
+	return CompatibleCheckExprsSess(testAmbientSession, opts, a, b)
 }
 
 // CompatibleCheckExprsSess is CompatibleCheckExprs on bag s.

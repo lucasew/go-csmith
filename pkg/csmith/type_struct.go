@@ -12,7 +12,7 @@ import (
 // MoreTypesProbability mirrors Type.cpp MoreTypesProbability.
 // Always true while AllTypes-like count < 10; else 50% MoreStructUnionProb.
 func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
-	return MoreTypesProbabilitySess(nil, r, probs, typeCount)
+	return MoreTypesProbabilitySess(testAmbientSession, r, probs, typeCount)
 }
 
 // MoreTypesProbabilitySess is MoreTypesProbability with explicit session residual sticky.
@@ -72,7 +72,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 // MakeOneBitfield mirrors Type::make_one_bitfield.
 // Type.cpp:638–668 — signed flip, int/uint type, field qfer, length rnd_upto(int_size*8).
 func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
-	return MakeOneBitfieldSess(nil, r, opts, probs, fieldIdx, prevZero)
+	return MakeOneBitfieldSess(testAmbientSession, r, opts, probs, fieldIdx, prevZero)
 }
 
 func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
@@ -253,7 +253,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 // Type* always live on Fields; nil hole sticky true (no invent no-nontrivial /
 // soft re-pick past incomplete field Type that would skip C++ assign-op bans).
 func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
-	return CheckImplicitNontrivialAssignOpsSess(nil, opts, fields)
+	return CheckImplicitNontrivialAssignOpsSess(testAmbientSession, opts, fields)
 }
 
 // CheckImplicitNontrivialAssignOpsSess is CheckImplicitNontrivialAssignOps with
@@ -318,7 +318,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputStructDecl emits a C struct definition.
 func (t *Type) OutputStructDecl() string {
-	return t.OutputStructDeclSess(nil, nil, nil)
+	return t.OutputStructDeclSess(testAmbientSession, nil, nil)
 }
 
 // OutputStructDeclSess is OutputStructDecl with Options/sticky from an explicit bag.
@@ -329,12 +329,12 @@ func (t *Type) OutputStructDeclSess(s *Session, r *Rng, attrs *AttributeGenerato
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	return t.OutputStructDeclSess(nil, r, attrs)
+	return t.OutputStructDeclSess(testAmbientSession, r, attrs)
 }
 
 // OutputStructDeclWith is OutputStructDeclOpts with explicit session Options (ccomp pack).
 func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
-	return t.OutputStructDeclWithSess(nil, r, attrs, opts)
+	return t.OutputStructDeclWithSess(testAmbientSession, r, attrs, opts)
 }
 
 func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
@@ -489,7 +489,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 // GenerateRandomConstantInRange mirrors GenerateRandomConstantInRange for bitfields.
 // Constant.cpp:225–250 — small random value within ~2^(bound/2).
 func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) string {
-	return GenerateRandomConstantInRangeSess(nil, typ, bound, opts, r)
+	return GenerateRandomConstantInRangeSess(testAmbientSession, typ, bound, opts, r)
 }
 
 func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Options, r *Rng) string {
@@ -564,7 +564,7 @@ func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Op
 // Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.}
 
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
-	return MakeStructConstantSess(nil, r, opts, probs, st)
+	return MakeStructConstantSess(testAmbientSession, r, opts, probs, st)
 }
 
 func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
@@ -875,7 +875,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputUnionDecl emits a C union definition.
 func (t *Type) OutputUnionDecl() string {
-	return t.OutputUnionDeclSess(nil, nil, nil)
+	return t.OutputUnionDeclSess(testAmbientSession, nil, nil)
 }
 
 // OutputUnionDeclSess is OutputUnionDecl with Options/sticky from an explicit bag.
@@ -886,12 +886,12 @@ func (t *Type) OutputUnionDeclSess(s *Session, r *Rng, attrs *AttributeGenerator
 // OutputUnionDeclOpts optionally emits type attributes.
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	return t.OutputUnionDeclSess(nil, r, attrs)
+	return t.OutputUnionDeclSess(testAmbientSession, r, attrs)
 }
 
 // OutputUnionDeclWith is OutputUnionDeclOpts with explicit session Options.
 func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
-	return t.OutputUnionDeclWithSess(nil, r, attrs, opts)
+	return t.OutputUnionDeclWithSess(testAmbientSession, r, attrs, opts)
 }
 
 func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
@@ -1016,7 +1016,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 // MakeUnionConstant mirrors GenerateRandomUnionConstant — initialize first field only.
 // Constant.cpp:288–294.
 func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
-	return MakeUnionConstantSess(nil, r, opts, probs, ut)
+	return MakeUnionConstantSess(testAmbientSession, r, opts, probs, ut)
 }
 
 func MakeUnionConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {

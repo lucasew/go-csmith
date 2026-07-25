@@ -30,7 +30,7 @@ func NewAssignOpsTable(opts Options) *DistributionTable {
 // AssignOpsProbability mirrors StatementAssign::AssignOpsProbability.
 // StatementAssign.cpp:84–106.
 func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *Type) AssignOp {
-	return AssignOpsProbabilitySess(nil, r, opts, table, typ)
+	return AssignOpsProbabilitySess(testAmbientSession, r, opts, table, typ)
 }
 
 func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *DistributionTable, typ *Type) AssignOp {
@@ -661,7 +661,7 @@ func makePossibleCompoundAssign(
 // StatementAssign.h:109; FactMgr::update_fact_for_assign(sa) uses get_rhs().
 // Incomplete Statement sticky nil (no invent soft-skip assign without RHS past hole).
 func (st *Stmt) GetAssignRhs() *Expression {
-	return st.GetAssignRhsSess(nil)
+	return st.GetAssignRhsSess(testAmbientSession)
 }
 
 // GetAssignRhsSess is GetAssignRhs with explicit session residual sticky.
@@ -690,7 +690,7 @@ func gensymFromVS(vs *VariableSelector) *GenSym {
 // StatementAssign.cpp:515–537 — lhs op rhs or pre/post incr forms.
 // Incomplete Statement sticky empty (no invent empty assign shell past hole).
 func OutputAssignSimple(st *Stmt, wrapVol bool) string {
-	return OutputAssignSimpleSess(nil, st, wrapVol)
+	return OutputAssignSimpleSess(testAmbientSession, st, wrapVol)
 }
 
 func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
@@ -729,7 +729,7 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 // Statement always live at assign emit; sticky empty (no invent bare RHS past hole).}
 
 func assignLhsText(st *Stmt, wrapVol bool) string {
-	return assignLhsTextSess(nil, st, wrapVol)
+	return assignLhsTextSess(testAmbientSession, st, wrapVol)
 }
 
 func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
@@ -765,7 +765,7 @@ func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 // Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).}
 
 func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
-	return OutputAssignAsExprSess(nil, st, wrapVol)
+	return OutputAssignAsExprSess(testAmbientSession, st, wrapVol)
 }
 
 // OutputAssignAsExprSess is OutputAssignAsExpr with Options/sticky from an explicit bag.
@@ -775,7 +775,7 @@ func OutputAssignAsExprSess(s *Session, st *Stmt, wrapVol bool) string {
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.
 func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
-	return OutputAssignAsExprOptsSess(nil, st, wrapVol, opts)
+	return OutputAssignAsExprOptsSess(testAmbientSession, st, wrapVol, opts)
 }
 
 func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options) string {
@@ -901,7 +901,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 // StatementAssign.cpp:552 — lhs.is_volatile().
 // Statement always live; sticky true (no invent non-vol soft-skip ccomp path past hole).
 func assignLhsIsVolatile(st *Stmt) bool {
-	return assignLhsIsVolatileSess(nil, st)
+	return assignLhsIsVolatileSess(testAmbientSession, st)
 }
 
 func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
@@ -933,7 +933,7 @@ func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 // Expression always live at qfer seed; sticky nil (no invent empty seed past hole).
 
 func expressionQualifiers(e *Expression) *CVQualifiers {
-	return expressionQualifiersSess(nil, e)
+	return expressionQualifiersSess(testAmbientSession, e)
 }
 
 // expressionQualifiersSess is expressionQualifiers with explicit session residual sticky.

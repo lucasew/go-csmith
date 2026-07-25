@@ -23,12 +23,13 @@ type VariableSelector struct {
 	Arrays []*ArrayVariable
 }
 
-// vsSess is nil-safe Sess for *VariableSelector methods.
+// vsSess returns vs.Sess when set; else the quarantined unit-test ambient bag.
+// Generate always installs VS.Sess; unit tests often construct VS without a bag.
 func vsSess(vs *VariableSelector) *Session {
-	if vs == nil {
-		return nil
+	if vs != nil && vs.Sess != nil {
+		return vs.Sess
 	}
-	return vs.Sess
+	return testAmbientSession
 }
 
 // NewVariableSelector constructs an empty selector sharing process Probabilities
@@ -85,7 +86,7 @@ func ChooseVisibleReadVar(
 	typ *Type,
 	unionFacts []*FactUnion,
 ) *Variable {
-	return ChooseVisibleReadVarSess(nil, r, b, readVars, typ, unionFacts)
+	return ChooseVisibleReadVarSess(testAmbientSession, r, b, readVars, typ, unionFacts)
 }
 
 // ChooseVisibleReadVarSess is ChooseVisibleReadVar with Options/sticky from bag s.
@@ -110,7 +111,7 @@ func ChooseVisibleReadVarOpts(
 	unionFacts []*FactUnion,
 	opts Options,
 ) *Variable {
-	return ChooseVisibleReadVarOptsSess(nil, r, b, readVars, typ, unionFacts, opts)
+	return ChooseVisibleReadVarOptsSess(testAmbientSession, r, b, readVars, typ, unionFacts, opts)
 }
 
 func ChooseVisibleReadVarOptsSess(s *Session, 
@@ -506,7 +507,7 @@ func cgHasSignedCharIndex(vs *VariableSelector) bool {
 // ChooseOKVar picks one eligible variable (optionally itemizing arrays).
 // Incomplete candidate list fails closed sticky (nil pick — no invent skip hole).
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
-	return ChooseOKVarSess(nil, r, vars)
+	return ChooseOKVarSess(testAmbientSession, r, vars)
 }
 
 func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
@@ -601,7 +602,7 @@ func rootBlock(b *Block) *Block {
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findParentOfStmIDInTree(root *Block, stmID int) *Block {
-	return findParentOfStmIDInTreeSess(nil, root, stmID)
+	return findParentOfStmIDInTreeSess(testAmbientSession, root, stmID)
 }
 
 // findParentOfStmIDInTreeSess is findParentOfStmIDInTree with explicit session residual sticky.
@@ -644,7 +645,7 @@ func findParentOfStmIDInTreeSess(s *Session, root *Block, stmID int) *Block {
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findStmtByIDInTree(root *Block, stmID int) *Stmt {
-	return findStmtByIDInTreeSess(nil, root, stmID)
+	return findStmtByIDInTreeSess(testAmbientSession, root, stmID)
 }
 
 // findStmtByIDInTreeSess is findStmtByIDInTree with explicit session residual sticky.
@@ -692,7 +693,7 @@ func findStmtByIDInTreeSess(s *Session, root *Block, stmID int) *Stmt {
 // and spuriously treated live gotos as orphans; seed-62 locals on then vs parent).
 // Block always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmID(b *Block, stmID int) bool {
-	return BlockContainsStmIDSess(nil, b, stmID)
+	return BlockContainsStmIDSess(testAmbientSession, b, stmID)
 }
 
 func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
@@ -857,7 +858,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 // Block*/Variable* always live; nil hole or incomplete LocalVars fails closed
 // (nil blk, IncompleteVariables remaining — no invent empty remaining past hole).
 func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
-	return LowerBlockForVarsSess(nil, blks, vars)
+	return LowerBlockForVarsSess(testAmbientSession, blks, vars)
 }
 
 // LowerBlockForVarsSess is LowerBlockForVars with explicit session residual sticky.
@@ -952,7 +953,7 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 // Variable* always live on LocalVars; nil hole fails closed IncompleteVariables
 // (not bare nil invent empty-complete local pool).
 func GetAllLocalVars(b *Block) []*Variable {
-	return GetAllLocalVarsSess(nil, b)
+	return GetAllLocalVarsSess(testAmbientSession, b)
 }
 
 // GetAllLocalVarsSess is GetAllLocalVars with explicit session residual sticky.
@@ -1901,7 +1902,7 @@ func ChooseVarFull(
 // chooseVarFromOK biases among already-filtered candidates.
 // Variable* always live in ok; nil hole fails closed (nil pick).
 func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
-	return chooseVarFromOKSess(nil, r, want, ok, opts)
+	return chooseVarFromOKSess(testAmbientSession, r, want, ok, opts)
 }
 
 func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
@@ -1973,7 +1974,7 @@ func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Op
 // IncompleteVariables (not bare nil invent empty-complete expand pool).}
 
 func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
-	return ExpandStructUnionVarsSess(nil, vars, want)
+	return ExpandStructUnionVarsSess(testAmbientSession, vars, want)
 }
 
 func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Variable {
@@ -2039,7 +2040,7 @@ func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Vari
 // Ambient ProcessOptions bridge; generation prefers ChooseOKVarMatchOpts.}
 
 func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
-	return ChooseOKVarMatchSess(nil, r, vars, want, mt, skipConst)
+	return ChooseOKVarMatchSess(testAmbientSession, r, vars, want, mt, skipConst)
 }
 
 // ChooseOKVarMatchSess is ChooseOKVarMatch with Options/sticky from bag s.
@@ -2049,7 +2050,7 @@ func ChooseOKVarMatchSess(s *Session, r *Rng, vars []*Variable, want *Type, mt M
 
 // ChooseOKVarMatchOpts is ChooseOKVarMatch with explicit session Options.
 func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
-	return ChooseOKVarMatchOptsSess(nil, r, vars, want, mt, skipConst, opts)
+	return ChooseOKVarMatchOptsSess(testAmbientSession, r, vars, want, mt, skipConst, opts)
 }
 
 func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
@@ -2103,7 +2104,7 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 }
 
 func typesMatchExact(a, b *Type) bool {
-	return typesMatchExactSess(nil, a, b)
+	return typesMatchExactSess(testAmbientSession, a, b)
 }
 
 // typesMatchExactSess is typesMatchExact with explicit session residual sticky.
@@ -2125,7 +2126,7 @@ func typesMatchExactSess(s *Session, a, b *Type) bool {
 // Variable always live; sticky (no invent soft-skip init bind past hole).
 // Nil init is complete no-op (nothing to store).
 func applyInitExpr(v *Variable, init *Expression) {
-	applyInitExprSess(nil, v, init)
+	applyInitExprSess(testAmbientSession, v, init)
 }
 
 // applyInitExprSess is applyInitExpr with explicit session residual sticky.
@@ -2256,7 +2257,7 @@ func (vs *VariableSelector) createAndInitialize(
 // varCollective returns get_collective() for FM (itemized array → parent collective).
 // Variable always live; sticky nil (no invent soft-skip collective past hole).
 func varCollective(v *Variable) *Variable {
-	return varCollectiveSess(nil, v)
+	return varCollectiveSess(testAmbientSession, v)
 }
 
 // varCollectiveSess is varCollective with explicit session residual sticky.
@@ -3506,7 +3507,7 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 // VariableCreationProbability mirrors VariableCreationProbability.
 // VariableSelector.cpp:1063–1070 — flipcoin(10) global if allowed else local.
 func VariableCreationProbability(r *Rng, opts Options) VariableScope {
-	return VariableCreationProbabilitySess(nil, r, opts)
+	return VariableCreationProbabilitySess(testAmbientSession, r, opts)
 }
 
 // VariableCreationProbabilitySess is VariableCreationProbability with explicit session residual sticky.

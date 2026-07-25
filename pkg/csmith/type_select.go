@@ -209,7 +209,7 @@ func IncompleteTypes() []*Type {
 // Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
 // Type* always live on ok_types; nil hole fails closed (nil — no invent pick past hole).
 func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
-	return ChooseRandomStructUnionTypeSess(nil, r, ok)
+	return ChooseRandomStructUnionTypeSess(testAmbientSession, r, ok)
 }
 
 // ChooseRandomStructUnionTypeSess is ChooseRandomStructUnionType with bitfield

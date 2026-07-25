@@ -39,7 +39,7 @@ func (s *LinearSequence) InitSequence() {}
 // LinearSequence.cpp:58–60 — seq_map_[k] = v (bound ignored).
 // LinearSequence always live; sticky incomplete no invent silent drop.
 func (s *LinearSequence) AddNumber(v, bound, k int) {
-	s.AddNumberSess(nil, v, bound, k)
+	s.AddNumberSess(testAmbientSession, v, bound, k)
 }
 
 // AddNumberSess is AddNumber with explicit session residual sticky.
@@ -58,7 +58,7 @@ func (s *LinearSequence) AddNumberSess(sess *Session, v, bound, k int) {
 // GetNumber mirrors LinearSequence::get_number — always -1.
 // LinearSequence.cpp:62.
 func (s *LinearSequence) GetNumber(bound int) int {
-	return s.GetNumberSess(nil, bound)
+	return s.GetNumberSess(testAmbientSession, bound)
 }
 
 // GetNumberSess is GetNumber with explicit session residual sticky.
@@ -75,7 +75,7 @@ func (s *LinearSequence) GetNumberSess(sess *Session, bound int) int {
 // LinearSequence.cpp:64–68 — map[pos]; C++ asserts rv >= 0.
 // Missing key sticky -1 (no invent 0 for unset pos).
 func (s *LinearSequence) GetNumberByPos(pos int) int {
-	return s.GetNumberByPosSess(nil, pos)
+	return s.GetNumberByPosSess(testAmbientSession, pos)
 }
 
 // GetNumberByPosSess is GetNumberByPos with explicit session residual sticky.
@@ -100,7 +100,7 @@ func (s *LinearSequence) GetNumberByPosSess(sess *Session, pos int) int {
 // Clear mirrors LinearSequence::clear.
 // LinearSequence.cpp:70.
 func (s *LinearSequence) Clear() {
-	s.ClearSess(nil)
+	s.ClearSess(testAmbientSession)
 }
 
 // ClearSess is Clear with explicit session residual sticky.
@@ -116,7 +116,7 @@ func (s *LinearSequence) ClearSess(sess *Session) {
 // LinearSequence.cpp:72–79 — join map[0..size-1] with sep; empty map asserts in C++.
 // Empty sticky "" (no invent bare sep shell).
 func (s *LinearSequence) GetSequence() string {
-	return s.GetSequenceSess(nil)
+	return s.GetSequenceSess(testAmbientSession)
 }
 
 // GetSequenceSess is GetSequence with explicit session residual sticky.
@@ -149,7 +149,7 @@ func (s *LinearSequence) GetSequenceSess(sess *Session) string {
 // SequenceLength mirrors LinearSequence::sequence_length.
 // LinearSequence.cpp:81.
 func (s *LinearSequence) SequenceLength() int {
-	return s.SequenceLengthSess(nil)
+	return s.SequenceLengthSess(testAmbientSession)
 }
 
 // SequenceLengthSess is SequenceLength with explicit session residual sticky.
@@ -163,7 +163,7 @@ func (s *LinearSequence) SequenceLengthSess(sess *Session) int {
 
 // SepChar mirrors LinearSequence::get_sep_char.
 func (s *LinearSequence) SepChar() byte {
-	return s.SepCharSess(nil)
+	return s.SepCharSess(testAmbientSession)
 }
 
 // SepCharSess is SepChar with explicit session residual sticky.
@@ -184,7 +184,7 @@ func (s *LinearSequence) SepCharSess(sess *Session) byte {
 // MakeSequence mirrors SequenceFactory::make_sequence.
 // SequenceFactory.cpp:44–52 — always LinearSequence with default_sep_char.
 func MakeSequence() *LinearSequence {
-	return MakeSequenceSess(nil)
+	return MakeSequenceSess(testAmbientSession)
 }
 
 // MakeSequenceSess is MakeSequence on an explicit session bag.
@@ -199,7 +199,7 @@ func MakeSequenceSess(s *Session) *LinearSequence {
 // DestroySequences mirrors SequenceFactory::destroy_sequences.
 // SequenceFactory.cpp:54–59.
 func DestroySequences() {
-	DestroySequencesSess(nil)
+	DestroySequencesSess(testAmbientSession)
 }
 
 // DestroySequencesSess clears live sequences on an explicit session bag.
@@ -208,7 +208,7 @@ func DestroySequencesSess(s *Session) {
 }
 
 // CurrentSepChar mirrors SequenceFactory::current_sep_char.
-func CurrentSepChar() byte { return CurrentSepCharSess(nil) }
+func CurrentSepChar() byte { return CurrentSepCharSess(testAmbientSession) }
 
 // CurrentSepCharSess returns the separator on an explicit session bag.
 func CurrentSepCharSess(s *Session) byte { return sessOrAmbient(s).SequenceFactorySep }

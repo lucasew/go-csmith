@@ -19,7 +19,7 @@ type ExtensionValue struct {
 // NewExtensionValue mirrors ExtensionValue::ExtensionValue(type, name).
 // ExtensionValue.cpp:42–52 — qfer non-const non-vol at depth 0.
 func NewExtensionValue(typ *Type, name string) *ExtensionValue {
-	return NewExtensionValueSess(nil, typ, name)
+	return NewExtensionValueSess(testAmbientSession, typ, name)
 }
 
 // NewExtensionValueSess is NewExtensionValue with explicit session residual sticky.
@@ -54,7 +54,7 @@ const AbsExtensionBaseName = "x"
 // AbsExtension.cpp:52–62 — num simple types named x0..x{n-1}.
 // Incomplete num or RNG/probs sticky nil (no invent empty values as success).
 func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionValue {
-	return AbsExtensionInitializeSess(nil, num, r, probs)
+	return AbsExtensionInitializeSess(testAmbientSession, num, r, probs)
 }
 
 func AbsExtensionInitializeSess(s *Session, num int, r *Rng, probs *Probabilities) []*ExtensionValue {
@@ -95,7 +95,7 @@ func AbsExtensionInitializeSess(s *Session, num int, r *Rng, probs *Probabilitie
 // Incomplete values sticky "" (no invent partial definitions section).}
 
 func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag bool) string {
-	return AbsExtensionDefaultOutputDefinitionsSess(nil, values, initFlag)
+	return AbsExtensionDefaultOutputDefinitionsSess(testAmbientSession, values, initFlag)
 }
 
 func AbsExtensionDefaultOutputDefinitionsSess(s *Session, values []*ExtensionValue, initFlag bool) string {
@@ -134,7 +134,7 @@ func AbsExtensionDefaultOutputDefinitionsSess(s *Session, values []*ExtensionVal
 // Incomplete invoke string sticky "" (no invent bare ";" call).
 
 func AbsExtensionOutputFirstFunInvocation(invokeOut string) string {
-	return AbsExtensionOutputFirstFunInvocationSess(nil, invokeOut)
+	return AbsExtensionOutputFirstFunInvocationSess(testAmbientSession, invokeOut)
 }
 
 // AbsExtensionOutputFirstFunInvocationSess is AbsExtensionOutputFirstFunInvocation
@@ -186,7 +186,7 @@ func AbsExtensionGenerateFirstParameterListSess(s *Session, f *Function, values 
 // AbsExtension.cpp:64–78 — FunctionInvocationUser with ExpressionVariable params.
 // Incomplete sticky nil.
 func AbsExtensionMakeFuncInvocation(f *Function, values []*ExtensionValue) *Invocation {
-	return AbsExtensionMakeFuncInvocationSess(nil, f, values)
+	return AbsExtensionMakeFuncInvocationSess(testAmbientSession, f, values)
 }
 
 // AbsExtensionMakeFuncInvocationSess is AbsExtensionMakeFuncInvocation on bag s.
@@ -237,7 +237,7 @@ func extensionValuesComplete(values []*ExtensionValue) bool {
 // ExtensionMgr.cpp:48–64 — klee/crest/coverage_test construct; else leave null.
 // Uses process RNG/probs when live; incomplete → sticky fail closed.
 func CreateExtension(opts Options) {
-	CreateExtensionSess(nil, opts)
+	CreateExtensionSess(testAmbientSession, opts)
 }
 
 // CreateExtensionSess is CreateExtension on an explicit session bag.
@@ -263,7 +263,7 @@ func CreateExtensionSess(s *Session, opts Options) {
 // DestroyExtension// DestroyExtension mirrors ExtensionMgr::DestroyExtension.
 // ExtensionMgr.cpp:66–69.
 func DestroyExtension() {
-	DestroyExtensionSess(nil)
+	DestroyExtensionSess(testAmbientSession)
 }
 
 // DestroyExtensionSess clears ExtensionMgr state on an explicit session bag.
@@ -277,14 +277,14 @@ func DestroyExtensionSess(s *Session) {
 }
 
 // ExtensionActive is true when a non-null AbsExtension is installed.
-func ExtensionActive() bool { return ExtensionActiveSess(nil) }
+func ExtensionActive() bool { return ExtensionActiveSess(testAmbientSession) }
 
 // ExtensionActiveSess reports ExtensionActive on an explicit session bag.
 func ExtensionActiveSess(s *Session) bool { return sessOrAmbient(s).ExtensionActive }
 
 // ExtensionMgrGenerateValues mirrors ExtensionMgr::GenerateValues.
 // ExtensionMgr.cpp:84–88 — null → no-op; Klee/Crest empty; Coverage already built.
-func ExtensionMgrGenerateValues() { ExtensionMgrGenerateValuesSess(nil) }
+func ExtensionMgrGenerateValues() { ExtensionMgrGenerateValuesSess(testAmbientSession) }
 
 // ExtensionMgrGenerateValuesSess is ExtensionMgrGenerateValues on an explicit bag.
 func ExtensionMgrGenerateValuesSess(s *Session) {
@@ -297,7 +297,7 @@ func ExtensionMgrGenerateValuesSess(s *Session) {
 // ExtensionMgrGenerateFirstParameterList mirrors GenerateFirstParameterList.
 // ExtensionMgr.cpp:77–82 — null → no-op.
 func ExtensionMgrGenerateFirstParameterList(f *Function, vs *VariableSelector) {
-	ExtensionMgrGenerateFirstParameterListSess(nil, f, vs)
+	ExtensionMgrGenerateFirstParameterListSess(testAmbientSession, f, vs)
 }
 
 // ExtensionMgrGenerateFirstParameterListSess is GenerateFirstParameterList on bag s.
@@ -315,7 +315,7 @@ func ExtensionMgrGenerateFirstParameterListSess(s *Session, f *Function, vs *Var
 
 // ExtensionMgrOutputHeader mirrors OutputHeader — null → empty.
 // ExtensionMgr.cpp:101–107.
-func ExtensionMgrOutputHeader() string { return ExtensionMgrOutputHeaderSess(nil) }
+func ExtensionMgrOutputHeader() string { return ExtensionMgrOutputHeaderSess(testAmbientSession) }
 
 // ExtensionMgrOutputHeaderSess is ExtensionMgrOutputHeader on an explicit bag.
 func ExtensionMgrOutputHeaderSess(s *Session) string {
@@ -338,7 +338,7 @@ func ExtensionMgrOutputHeaderSess(s *Session) string {
 
 // ExtensionMgrOutputTail mirrors OutputTail.
 // ExtensionMgr.cpp:109–115 — null → "    return 0;\n".
-func ExtensionMgrOutputTail() string { return ExtensionMgrOutputTailSess(nil) }
+func ExtensionMgrOutputTail() string { return ExtensionMgrOutputTailSess(testAmbientSession) }
 
 // ExtensionMgrOutputTailSess is ExtensionMgrOutputTail on an explicit bag.
 func ExtensionMgrOutputTailSess(s *Session) string {
@@ -362,7 +362,7 @@ func ExtensionMgrOutputTailSess(s *Session) string {
 // ExtensionMgrOutputInit mirrors OutputInit.
 // ExtensionMgr.cpp:117–129 — null → main signature + "{".
 func ExtensionMgrOutputInit(acceptArgc bool) string {
-	return ExtensionMgrOutputInitSess(nil, acceptArgc)
+	return ExtensionMgrOutputInitSess(testAmbientSession, acceptArgc)
 }
 
 // ExtensionMgrOutputInitSess is ExtensionMgrOutputInit on an explicit bag.
@@ -394,7 +394,7 @@ func ExtensionMgrOutputInitSess(s *Session, acceptArgc bool) string {
 // ExtensionMgrOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 // ExtensionMgr.cpp:131–141 — null path same as AbsExtension default.
 func ExtensionMgrOutputFirstFunInvocation(invokeOut string) string {
-	return ExtensionMgrOutputFirstFunInvocationSess(nil, invokeOut)
+	return ExtensionMgrOutputFirstFunInvocationSess(testAmbientSession, invokeOut)
 }
 
 // ExtensionMgrOutputFirstFunInvocationSess is OutputFirstFunInvocation on bag s.
@@ -415,13 +415,13 @@ func ExtensionMgrOutputFirstFunInvocationSess(s *Session, invokeOut string) stri
 }
 
 // ExtensionValues returns active extension values_ (may be nil).
-func ExtensionValues() []*ExtensionValue { return ExtensionValuesSess(nil) }
+func ExtensionValues() []*ExtensionValue { return ExtensionValuesSess(testAmbientSession) }
 
 // ExtensionValuesSess returns ExtValues on an explicit session bag.
 func ExtensionValuesSess(s *Session) []*ExtensionValue { return sessOrAmbient(s).ExtValues }
 
 // ExtensionKind returns "klee"|"crest"|"coverage"|"" .
-func ExtensionKind() string { return ExtensionKindSess(nil) }
+func ExtensionKind() string { return ExtensionKindSess(testAmbientSession) }
 
 // ExtensionKindSess returns ExtKind on an explicit session bag.
 func ExtensionKindSess(s *Session) string { return sessOrAmbient(s).ExtKind }

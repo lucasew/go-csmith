@@ -70,12 +70,13 @@ func (c CGContext) WithSession(s *Session) CGContext {
 	return c
 }
 
-// cgSess is nil-safe Sess for *CGContext (pointer methods may be called on nil).
+// cgSess returns c.Sess when set; else the quarantined unit-test ambient bag.
+// Generate always installs cg.Sess; unit tests often build CGContext without a bag.
 func cgSess(c *CGContext) *Session {
-	if c == nil {
-		return nil
+	if c != nil && c.Sess != nil {
+		return c.Sess
 	}
-	return c.Sess
+	return testAmbientSession
 }
 
 // EffectContext mirrors CGContext::get_effect_context.
@@ -554,7 +555,7 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 // IsArray without AsArray sticky fails closed (no invent soft-skip broken array
 // as absent then complete empty must-use pool / soft re-pick past hole).
 func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
-	return rw.FindMustUseArraysSess(nil)
+	return rw.FindMustUseArraysSess(testAmbientSession)
 }
 
 // FindMustUseArraysSess is FindMustUseArrays with explicit session residual sticky.

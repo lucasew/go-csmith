@@ -33,7 +33,7 @@ var builtinFunctionStrings = []string{
 // TypeFromString mirrors Type::get_type_from_string.
 // Type.cpp:370–402 — assert(0 && "Unsupported type string!") on default.
 func TypeFromString(s string) *Type {
-	return TypeFromStringSess(nil, s)
+	return TypeFromStringSess(testAmbientSession, s)
 }
 
 // TypeFromStringSess is TypeFromString with explicit session residual sticky.
@@ -128,7 +128,7 @@ func EnabledBuiltin(opts Options, kinds string) bool {
 // Prefer MakeDummyBlockCG when CGContext is available (fact_in + post_creation).
 // Block.cpp:95–110 — empty block, stack push/pop, fact_in, post_creation_analysis.
 func MakeDummyBlock(f *Function) *Block {
-	return MakeDummyBlockSess(nil, f)
+	return MakeDummyBlockSess(testAmbientSession, f)
 }
 
 // MakeDummyBlockSess is MakeDummyBlock allocating StmID on bag s.
@@ -150,7 +150,7 @@ func MakeDummyBlockSess(s *Session, f *Function) *Block {
 // Fail wipes Param to IncompleteVariables sticky (not bare nil invent empty-complete
 // void-param list after partial append / soft re-pick past VariablesComplete(nil)).
 func GenerateParameterListFromString(f *Function, params string) bool {
-	return GenerateParameterListFromStringSess(nil, f, params)
+	return GenerateParameterListFromStringSess(testAmbientSession, f, params)
 }
 
 // GenerateParameterListFromStringSess is GenerateParameterListFromString with
@@ -204,7 +204,7 @@ func GenerateParameterListFromStringSess(s *Session, f *Function, params string)
 // MakeBuiltinFunction mirrors Function::make_builtin_function.
 // Function.cpp:734–771.
 func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap, line string) *Function {
-	return MakeBuiltinFunctionSess(nil, opts, probs, r, list, fmMap, line)
+	return MakeBuiltinFunctionSess(testAmbientSession, opts, probs, r, list, fmMap, line)
 }
 
 // MakeBuiltinFunctionSess is MakeBuiltinFunction with StmID / sticky on bag s.
@@ -290,7 +290,7 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 // InitializeBuiltinFunctions mirrors Function::initialize_builtin_functions.
 // Function.cpp:700–732.
 func InitializeBuiltinFunctions(opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap) int {
-	return InitializeBuiltinFunctionsSess(nil, opts, probs, r, list, fmMap)
+	return InitializeBuiltinFunctionsSess(testAmbientSession, opts, probs, r, list, fmMap)
 }
 
 // InitializeBuiltinFunctionsSess is InitializeBuiltinFunctions on bag s.

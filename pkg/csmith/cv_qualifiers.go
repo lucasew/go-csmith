@@ -18,7 +18,7 @@ type CVQualifiers struct {
 // CVQualifiers.cpp:96 — assert(is_consts.size() == is_volatiles.size()) when both non-empty.
 // Mismatched depths sticky empty (no invent truncated paired qfer / soft re-pick past hole).
 func NewCVQualifiers(consts, vols []bool) CVQualifiers {
-	return NewCVQualifiersSess(nil, consts, vols)
+	return NewCVQualifiersSess(testAmbientSession, consts, vols)
 }
 
 func NewCVQualifiersSess(s *Session, consts, vols []bool) CVQualifiers {
@@ -66,7 +66,7 @@ func (q CVQualifiers) IsStorageVolatile() bool {
 
 // IsConst mirrors CVQualifiers::is_const → is_const_after_deref(0).
 func (q CVQualifiers) IsConst() bool {
-	return q.IsConstSess(nil)
+	return q.IsConstSess(testAmbientSession)
 }
 
 func (q CVQualifiers) IsConstSess(s *Session) bool {
@@ -76,7 +76,7 @@ func (q CVQualifiers) IsConstSess(s *Session) bool {
 // IsVolatile mirrors CVQualifiers::is_volatile → is_volatile_after_deref(0).}
 
 func (q CVQualifiers) IsVolatile() bool {
-	return q.IsVolatileSess(nil)
+	return q.IsVolatileSess(testAmbientSession)
 }
 
 func (q CVQualifiers) IsVolatileSess(s *Session) bool {
@@ -209,7 +209,7 @@ func (q CVQualifiers) Clone() CVQualifiers {
 // Unpaired const/vol depths sticky false (no invent not-stricter soft-skip past hole).
 // Depth mismatch between sides is complete false (different pointer depth).
 func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
-	return q.StricterThanSess(nil, other)
+	return q.StricterThanSess(testAmbientSession, other)
 }
 
 func (q CVQualifiers) StricterThanSess(s *Session, other CVQualifiers) bool {
@@ -252,7 +252,7 @@ func (q CVQualifiers) StricterThanSess(s *Session, other CVQualifiers) bool {
 // Match mirrors CVQualifiers::match (ambient ProcessOptions for CGOptions bit).
 // Prefer MatchSess / MatchOpts with session Options when available.
 func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
-	return q.MatchSess(nil, other, matchExact)
+	return q.MatchSess(testAmbientSession, other, matchExact)
 }
 
 // MatchSess is Match with Options/sticky from an explicit session bag.
@@ -264,7 +264,7 @@ func (q CVQualifiers) MatchSess(s *Session, other CVQualifiers, matchExact bool)
 // CVQualifiers.cpp:137–152 — matchExact ORs opts.MatchExactQualifiers (StatementAssign
 // forces that bit on the run bag; ChooseVarFull passes sessOpts(cg.Sess)).
 func (q CVQualifiers) MatchOpts(other CVQualifiers, matchExact bool, opts Options) bool {
-	return q.MatchOptsSess(nil, other, matchExact, opts)
+	return q.MatchOptsSess(testAmbientSession, other, matchExact, opts)
 }
 
 func (q CVQualifiers) MatchOptsSess(s *Session, other CVQualifiers, matchExact bool, opts Options) bool {
@@ -306,7 +306,7 @@ func (q CVQualifiers) MatchOptsSess(s *Session, other CVQualifiers, matchExact b
 // CVQualifiers always live; sticky (no invent soft-skip add past hole).}
 
 func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
-	q.AddQualifiersSess(nil, isConst, isVolatile)
+	q.AddQualifiersSess(testAmbientSession, isConst, isVolatile)
 }
 
 func (q *CVQualifiers) AddQualifiersSess(s *Session, isConst, isVolatile bool) {
@@ -323,7 +323,7 @@ func (q *CVQualifiers) AddQualifiersSess(s *Session, isConst, isVolatile bool) {
 // CVQualifiers always live; sticky (no invent soft-skip remove past hole).
 // length<=0 is complete no-op. Over-pop sticky (no invent partial truncate success).
 func (q *CVQualifiers) RemoveQualifiers(length int) {
-	q.RemoveQualifiersSess(nil, length)
+	q.RemoveQualifiersSess(testAmbientSession, length)
 }
 
 func (q *CVQualifiers) RemoveQualifiersSess(s *Session, length int) {
@@ -352,7 +352,7 @@ func (q *CVQualifiers) RemoveQualifiersSess(s *Session, length int) {
 // C++ returns a value copy (owning vectors). Always Clone so Restrict/set_* on the
 // result cannot mutate the source Variable.qfer via shared slice backing.
 func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
-	return q.IndirectQualifiersSess(nil, level)
+	return q.IndirectQualifiersSess(testAmbientSession, level)
 }
 
 func (q CVQualifiers) IndirectQualifiersSess(s *Session, level int) CVQualifiers {
@@ -401,7 +401,7 @@ func (q CVQualifiers) IndirectQualifiersSess(s *Session, level int) CVQualifiers
 // SanityCheck mirrors CVQualifiers::sanity_check.
 // CVQualifiers.cpp:526–531 — assert(t); assert(level>=0); depth == indirect+1.
 func (q CVQualifiers) SanityCheck(t *Type) bool {
-	return q.SanityCheckSess(nil, t)
+	return q.SanityCheckSess(testAmbientSession, t)
 }
 
 func (q CVQualifiers) SanityCheckSess(s *Session, t *Type) bool {
@@ -435,7 +435,7 @@ func (q CVQualifiers) SanityCheckSess(s *Session, t *Type) bool {
 // these random_* helpers must too (seed-2 e9060: choose exact-miss then
 // RandomLooserConsts F50 while UP skipped flips under match_exact).
 func processMatchExactQualifiers(opts Options) bool {
-	return processMatchExactQualifiersSess(nil, opts)
+	return processMatchExactQualifiersSess(testAmbientSession, opts)
 }
 
 // processMatchExactQualifiersSess ORs bag opts with explicit opts (StatementAssign
@@ -453,7 +453,7 @@ func processMatchExactQualifiersSess(s *Session, opts Options) bool {
 // C++ always has process RNG + Probabilities; nil r fails closed nil (no invent
 // identity bits without draw). Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabilities) []bool {
-	return q.RandomStricterConstsSess(nil, r, opts, probs)
+	return q.RandomStricterConstsSess(testAmbientSession, r, opts, probs)
 }
 
 func (q CVQualifiers) RandomStricterConstsSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
@@ -499,7 +499,7 @@ func (q CVQualifiers) RandomStricterConstsSess(s *Session, r *Rng, opts Options,
 // C++ always has process RNG + Probabilities; nil r sticky fail closed nil.
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
-	return q.RandomStricterVolatilesSess(nil, r, opts, probs)
+	return q.RandomStricterVolatilesSess(testAmbientSession, r, opts, probs)
 }
 
 func (q CVQualifiers) RandomStricterVolatilesSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
@@ -545,7 +545,7 @@ func (q CVQualifiers) RandomStricterVolatilesSess(s *Session, r *Rng, opts Optio
 // C++ always has process RNG + Probabilities; nil r sticky fail closed nil.
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilities) []bool {
-	return q.RandomLooserConstsSess(nil, r, opts, probs)
+	return q.RandomLooserConstsSess(testAmbientSession, r, opts, probs)
 }
 
 func (q CVQualifiers) RandomLooserConstsSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
@@ -584,7 +584,7 @@ func (q CVQualifiers) RandomLooserConstsSess(s *Session, r *Rng, opts Options, p
 // C++ always has process RNG + Probabilities; nil r sticky fail closed nil.
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
-	return q.RandomLooserVolatilesSess(nil, r, opts, probs)
+	return q.RandomLooserVolatilesSess(testAmbientSession, r, opts, probs)
 }
 
 func (q CVQualifiers) RandomLooserVolatilesSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
@@ -753,7 +753,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 // RandomAddQualifiers mirrors CVQualifiers::random_add_qualifiers.
 // CVQualifiers.cpp:467–494 — append one pointer level with const/volatile probs.
 func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabilities, noVolatile bool) CVQualifiers {
-	return q.RandomAddQualifiersSess(nil, r, opts, probs, noVolatile)
+	return q.RandomAddQualifiersSess(testAmbientSession, r, opts, probs, noVolatile)
 }
 
 func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, probs *Probabilities, noVolatile bool) CVQualifiers {
@@ -807,7 +807,7 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 // CVQualifiers.cpp:639–650 — leading const/volatile of level 0.
 // assert(0) if const/vol bit set when option disabled — emit nothing for that bit.
 func (q CVQualifiers) OutputFirstQuals() string {
-	return q.OutputFirstQualsSess(nil)
+	return q.OutputFirstQualsSess(testAmbientSession)
 }
 
 // OutputFirstQualsSess is OutputFirstQuals with Options/sticky from an explicit bag.
@@ -817,7 +817,7 @@ func (q CVQualifiers) OutputFirstQualsSess(s *Session) string {
 
 // OutputFirstQualsOpts is OutputFirstQuals with explicit session Options.
 func (q CVQualifiers) OutputFirstQualsOpts(opts Options) string {
-	return q.OutputFirstQualsOptsSess(nil, opts)
+	return q.OutputFirstQualsOptsSess(testAmbientSession, opts)
 }
 
 func (q CVQualifiers) OutputFirstQualsOptsSess(s *Session, opts Options) string {
@@ -863,7 +863,7 @@ func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 
 // MatchIndirect mirrors CVQualifiers::match_indirect (ambient Options for exact bit).
 func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
-	return q.MatchIndirectSess(nil, other, matchExact)
+	return q.MatchIndirectSess(testAmbientSession, other, matchExact)
 }
 
 // MatchIndirectSess is MatchIndirect with Options/sticky from an explicit bag.
@@ -876,7 +876,7 @@ func (q CVQualifiers) MatchIndirectSess(s *Session, other CVQualifiers, matchExa
 // Unpaired const/vol depths sticky false (no invent match soft-skip past hole).
 // Multi-level address gap (deref < -1) is complete false (C++ returns false, no assert).
 func (q CVQualifiers) MatchIndirectOpts(other CVQualifiers, matchExact bool, opts Options) bool {
-	return q.MatchIndirectOptsSess(nil, other, matchExact, opts)
+	return q.MatchIndirectOptsSess(testAmbientSession, other, matchExact, opts)
 }
 
 func (q CVQualifiers) MatchIndirectOptsSess(s *Session, other CVQualifiers, matchExact bool, opts Options) bool {
@@ -920,7 +920,7 @@ func (q CVQualifiers) MatchIndirectOptsSess(s *Session, other CVQualifiers, matc
 // CVQualifiers always live; sticky (no invent soft-skip set past hole).}
 
 func (q *CVQualifiers) SetConst(isConst bool, pos int) {
-	q.SetConstSess(nil, isConst, pos)
+	q.SetConstSess(testAmbientSession, isConst, pos)
 }
 
 func (q *CVQualifiers) SetConstSess(s *Session, isConst bool, pos int) {
@@ -946,7 +946,7 @@ func (q *CVQualifiers) SetConstSess(s *Session, isConst bool, pos int) {
 // CVQualifiers.cpp:595–600 — is_volatiles[len - pos - 1]; no invent grow.
 // CVQualifiers always live; sticky (no invent soft-skip set past hole).
 func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
-	q.SetVolatileSess(nil, isVol, pos)
+	q.SetVolatileSess(testAmbientSession, isVol, pos)
 }
 
 func (q *CVQualifiers) SetVolatileSess(s *Session, isVol bool, pos int) {
@@ -1003,7 +1003,7 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 // CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
 // Uses session Options for CGOptions::consts/volatiles (assert when bit set but option off).
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
-	return q.OutputQualifiedTypeSess(nil, t)
+	return q.OutputQualifiedTypeSess(testAmbientSession, t)
 }
 
 // OutputQualifiedTypeSess is OutputQualifiedType with Options/sticky from an explicit bag.
@@ -1013,7 +1013,7 @@ func (q CVQualifiers) OutputQualifiedTypeSess(s *Session, t *Type) string {
 
 // OutputQualifiedTypeOpts is OutputQualifiedType with explicit session Options.
 func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
-	return q.OutputQualifiedTypeOptsSess(nil, t, opts)
+	return q.OutputQualifiedTypeOptsSess(testAmbientSession, t, opts)
 }
 
 func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Options) string {
@@ -1182,7 +1182,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 // union with struct field (or nested bad union) forbids volatile.}
 
 func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
-	return isVolatileOKOnOneLevelSess(nil, opts, t)
+	return isVolatileOKOnOneLevelSess(testAmbientSession, opts, t)
 }
 
 func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
@@ -1409,7 +1409,7 @@ func RandomQualifiersDefaultProbs(
 // RandomQualifiersNoContextNoVolatile mirrors CVQualifiers::random_qualifiers(const Type *t)
 // → READ, empty context, no_volatile=true.
 func RandomQualifiersNoContextNoVolatile(t *Type, opts Options, probs *Probabilities, r *Rng) CVQualifiers {
-	return RandomQualifiersNoContextNoVolatileSess(nil, t, opts, probs, r)
+	return RandomQualifiersNoContextNoVolatileSess(testAmbientSession, t, opts, probs, r)
 }
 
 // RandomQualifiersNoContextNoVolatileSess is RandomQualifiersNoContextNoVolatile with bag sticky.

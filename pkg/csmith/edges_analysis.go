@@ -10,7 +10,7 @@ package csmith
 // Incomplete / mid-join failure clears *facts and returns false (same as no-change);
 // callers that need to distinguish use tryMergeJumpFacts.
 func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
-	return MergeJumpFactsSess(nil, facts, jumpFacts)
+	return MergeJumpFactsSess(testAmbientSession, facts, jumpFacts)
 }
 
 func MergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
@@ -24,7 +24,7 @@ func MergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPoin
 // leave partial join as ok success).}
 
 func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
-	return tryMergeJumpFactsSess(nil, facts, jumpFacts)
+	return tryMergeJumpFactsSess(testAmbientSession, facts, jumpFacts)
 }
 
 func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
@@ -112,7 +112,7 @@ func isReturnVar(v *Variable) bool {
 // mergeJumpUnionFacts is the eUnionWrite half of FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact; missing → BOTTOM.
 func mergeJumpUnionFacts(facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
-	return mergeJumpUnionFactsSess(nil, facts, jumpFacts)
+	return mergeJumpUnionFactsSess(testAmbientSession, facts, jumpFacts)
 }
 
 func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactUnion) bool {

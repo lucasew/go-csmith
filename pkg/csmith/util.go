@@ -15,7 +15,7 @@ type GenSym struct {
 
 // Gensym mirrors util.cpp gensym(basename) on the session counter.
 func Gensym(basename string) string {
-	return GensymSess(nil, basename)
+	return GensymSess(testAmbientSession, basename)
 }
 
 // GensymSess is Gensym on an explicit session bag.
@@ -25,7 +25,7 @@ func GensymSess(s *Session, basename string) string {
 
 // ResetDefaultGensym mirrors reset_gensym on the session counter.
 func ResetDefaultGensym() {
-	ResetDefaultGensymSess(nil)
+	ResetDefaultGensymSess(testAmbientSession)
 }
 
 // ResetDefaultGensymSess resets gensym on an explicit session bag.
@@ -45,7 +45,7 @@ func (g *GenSym) Reset() {
 // Nil receiver uses session GenSym (not a one-shot local counter).
 // empty basename is broken IR sticky — no invent bare "1"/"2" numeric names
 func (g *GenSym) Next(basename string) string {
-	return g.NextSess(nil, basename)
+	return g.NextSess(testAmbientSession, basename)
 }
 
 // NextSess is Next with explicit session residual sticky.
@@ -64,7 +64,7 @@ func (g *GenSym) NextSess(s *Session, basename string) string {
 // LogAnalysisFail mirrors util.cpp log_analysis_fail.
 // util.cpp:76–79 — append to errlog; always returns false.
 func LogAnalysisFail(msg string) bool {
-	return LogAnalysisFailSess(nil, msg)
+	return LogAnalysisFailSess(testAmbientSession, msg)
 }
 
 // LogAnalysisFailSess logs analysis failure on an explicit session bag.
@@ -77,7 +77,7 @@ func LogAnalysisFailSess(s *Session, msg string) bool {
 }
 
 // AnalysisErrLog returns the accumulated analysis-fail log (tests / debug).
-func AnalysisErrLog() string { return AnalysisErrLogSess(nil) }
+func AnalysisErrLog() string { return AnalysisErrLogSess(testAmbientSession) }
 
 // AnalysisErrLogSess returns analysis errlog on an explicit session bag.
 func AnalysisErrLogSess(s *Session) string {
@@ -85,7 +85,7 @@ func AnalysisErrLogSess(s *Session) string {
 }
 
 // ClearAnalysisErrLog resets util errlog (finalization / tests).
-func ClearAnalysisErrLog() { ClearAnalysisErrLogSess(nil) }
+func ClearAnalysisErrLog() { ClearAnalysisErrLogSess(testAmbientSession) }
 
 // ClearAnalysisErrLogSess clears errlog on an explicit session bag.
 func ClearAnalysisErrLogSess(s *Session) { sessOrAmbient(s).AnalysisErrLog.Reset() }
@@ -116,7 +116,7 @@ func OutputOpenEncloser(symbol string, indent int) (out string, newIndent int) {
 // OutputCloseEncloser mirrors util.cpp output_close_encloser.
 // util.cpp:166–174 — optional newline, indent--, tab + symbol.
 func OutputCloseEncloser(symbol string, indent int, noNewline bool) (out string, newIndent int) {
-	return OutputCloseEncloserSess(nil, symbol, indent, noNewline)
+	return OutputCloseEncloserSess(testAmbientSession, symbol, indent, noNewline)
 }
 
 // OutputCloseEncloserSess is OutputCloseEncloser with explicit session residual sticky.

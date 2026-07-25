@@ -76,7 +76,7 @@ func init() {
 // GetSName mirrors Probabilities::get_sname.
 // Incomplete/unknown pname sticky "" (no invent empty token success).
 func GetSName(pname ProbName) string {
-	return GetSNameSess(nil, pname)
+	return GetSNameSess(testAmbientSession, pname)
 }
 
 // GetSNameSess is GetSName with explicit session residual sticky.
@@ -92,7 +92,7 @@ func GetSNameSess(s *Session, pname ProbName) string {
 // GetPName mirrors Probabilities::get_pname.
 // Unknown sname sticky Max-like fail closed (returns -1).
 func GetPName(sname string) (ProbName, bool) {
-	return GetPNameSess(nil, sname)
+	return GetPNameSess(testAmbientSession, sname)
 }
 
 // GetPNameSess is GetPName with explicit session residual sticky.
@@ -108,7 +108,7 @@ func GetPNameSess(s *Session, sname string) (ProbName, bool) {
 // DestroyProcessProbabilities mirrors Probabilities::DestroyInstance.
 // Clears process singleton handle.
 func DestroyProcessProbabilities() {
-	DestroyProcessProbabilitiesSess(nil)
+	DestroyProcessProbabilitiesSess(testAmbientSession)
 }
 
 // DestroyProcessProbabilitiesSess clears probabilities on an explicit session bag.
@@ -130,7 +130,7 @@ func DumpSingleVal(sname string, val int) string {
 // Fair subset: all known single probs from this *Probabilities.
 // Empty fname sticky (no invent stdout dump as success file write).
 func (p *Probabilities) DumpDefaultProbabilities() string {
-	return p.DumpDefaultProbabilitiesSess(nil)
+	return p.DumpDefaultProbabilitiesSess(testAmbientSession)
 }
 
 // DumpDefaultProbabilitiesSess is DumpDefaultProbabilities with explicit session residual sticky.
@@ -146,7 +146,7 @@ func (p *Probabilities) DumpDefaultProbabilitiesSess(s *Session) string {
 
 // DumpActualProbabilities mirrors dump_actual_probabilities content (with seed header).
 func (p *Probabilities) DumpActualProbabilities(seed uint64) string {
-	return p.DumpActualProbabilitiesSess(nil, seed)
+	return p.DumpActualProbabilitiesSess(testAmbientSession, seed)
 }
 
 // DumpActualProbabilitiesSess is DumpActualProbabilities with explicit session residual sticky.
@@ -196,7 +196,7 @@ func (p *Probabilities) dumpSingles(actual bool) string {
 
 // WriteDumpDefaultProbabilities writes dump to file (C++ ofstream path).
 func WriteDumpDefaultProbabilities(fname string) error {
-	return WriteDumpDefaultProbabilitiesSess(nil, fname)
+	return WriteDumpDefaultProbabilitiesSess(testAmbientSession, fname)
 }
 
 // WriteDumpDefaultProbabilitiesSess is WriteDumpDefaultProbabilities with explicit session residual sticky.
@@ -214,7 +214,7 @@ func WriteDumpDefaultProbabilitiesSess(s *Session, fname string) error {
 
 // WriteDumpActualProbabilities writes actual vals + seed header.
 func WriteDumpActualProbabilities(fname string, seed uint64) error {
-	return WriteDumpActualProbabilitiesSess(nil, fname, seed)
+	return WriteDumpActualProbabilitiesSess(testAmbientSession, fname, seed)
 }
 
 // WriteDumpActualProbabilitiesSess is WriteDumpActualProbabilities with explicit session residual sticky.
@@ -235,7 +235,7 @@ func WriteDumpActualProbabilitiesSess(s *Session, fname string, seed uint64) err
 // Supports single-line "sname=val" and # comments for the fair single-prob subset.
 // Group lines for equal/unequal groups fail closed with error_msg (no invent skip).
 func (p *Probabilities) ParseConfiguration(fname string) (errMsg string, ok bool) {
-	return p.ParseConfigurationSess(nil, fname)
+	return p.ParseConfigurationSess(testAmbientSession, fname)
 }
 
 // ParseConfigurationSess is ParseConfiguration with explicit session residual sticky.
@@ -270,7 +270,7 @@ func (p *Probabilities) ParseConfigurationSess(s *Session, fname string) (errMsg
 
 // ParseLine mirrors Probabilities::parse_line.
 func (p *Probabilities) ParseLine(line string) (errMsg string, ok bool) {
-	return p.ParseLineSess(nil, line)
+	return p.ParseLineSess(testAmbientSession, line)
 }
 
 // ParseLineSess is ParseLine with explicit session residual sticky.
@@ -297,7 +297,7 @@ func (p *Probabilities) ParseLineSess(s *Session, line string) (errMsg string, o
 
 // parseSingleProbability mirrors parse_single_probability.
 func (p *Probabilities) parseSingleProbability(line string) (string, bool) {
-	return p.parseSingleProbabilitySess(nil, line)
+	return p.parseSingleProbabilitySess(testAmbientSession, line)
 }
 
 // parseSingleProbabilitySess is parseSingleProbability with explicit session residual sticky.

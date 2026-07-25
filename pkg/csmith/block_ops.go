@@ -354,7 +354,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 // Uses kind-gated get_blocks; sticky false on incomplete Block* hole
 // (no invent partial typed list past missing if-arm as complete).
 func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool {
-	return collectTypedStmIDsSess(nil, st, kinds, ids)
+	return collectTypedStmIDsSess(testAmbientSession, st, kinds, ids)
 }
 
 func collectTypedStmIDsSess(s *Session, st *Stmt, kinds []StatementType, ids map[int]bool) bool {
@@ -384,7 +384,7 @@ func collectTypedStmIDsSess(s *Session, st *Stmt, kinds []StatementType, ids map
 // Incomplete get_blocks hole sticky true (no invent "not under" while soft-skipping
 // a nil if-arm — scrub aggressively / treat as contained for remove_stmt).
 func blockUnderStmt(st *Stmt, blk *Block) bool {
-	return blockUnderStmtSess(nil, st, blk)
+	return blockUnderStmtSess(testAmbientSession, st, blk)
 }
 
 func blockUnderStmtSess(s *Session, st *Stmt, blk *Block) bool {
@@ -431,7 +431,7 @@ func blockUnderStmtSess(s *Session, st *Stmt, blk *Block) bool {
 // blocks that still have Parent pointing into the removed tree but were never
 // linked as StmtBlock children — left them on Func.Blocks for goto pool.
 func stmtContainsBlock(st *Stmt, blk *Block) bool {
-	return stmtContainsBlockSess(nil, st, blk)
+	return stmtContainsBlockSess(testAmbientSession, st, blk)
 }
 
 func stmtContainsBlockSess(s *Session, st *Stmt, blk *Block) bool {
@@ -470,7 +470,7 @@ func stmtContainsBlockSess(s *Session, st *Stmt, blk *Block) bool {
 // blockIsSelfOrAncestor mirrors Block-as-eBlock Statement::contains_stmt(candidate).
 // Statement.cpp:684–694 — this==s or candidate's parent chain includes this.
 func blockIsSelfOrAncestor(ancestor, blk *Block) bool {
-	return blockIsSelfOrAncestorSess(nil, ancestor, blk)
+	return blockIsSelfOrAncestorSess(testAmbientSession, ancestor, blk)
 }
 
 func blockIsSelfOrAncestorSess(s *Session, ancestor, blk *Block) bool {
@@ -492,7 +492,7 @@ func blockIsSelfOrAncestorSess(s *Session, ancestor, blk *Block) bool {
 // stmtTreeContainsID reports whether id appears under st via get_blocks.
 // Incomplete arm sticky false (no invent membership past holes).
 func stmtTreeContainsID(st *Stmt, id int) bool {
-	return stmtTreeContainsIDSess(nil, st, id)
+	return stmtTreeContainsIDSess(testAmbientSession, st, id)
 }
 
 func stmtTreeContainsIDSess(s *Session, st *Stmt, id int) bool {
@@ -568,7 +568,7 @@ func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 // collectTreeStmAndBlockIDs records st's StmID and nested get_blocks Block/Stmt ids.
 // Sticky false on incomplete Block* hole (no invent partial tree as complete).
 func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
-	return collectTreeStmAndBlockIDsSess(nil, st, ids)
+	return collectTreeStmAndBlockIDsSess(testAmbientSession, st, ids)
 }
 
 func collectTreeStmAndBlockIDsSess(s *Session, st *Stmt, ids map[int]bool) bool {
@@ -596,7 +596,7 @@ func collectTreeStmAndBlockIDsSess(s *Session, st *Stmt, ids map[int]bool) bool 
 // collectBlockStmIDs records b.StmID and nested get_blocks trees.
 // Sticky false on incomplete hole.
 func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
-	return collectBlockStmIDsSess(nil, b, ids)
+	return collectBlockStmIDsSess(testAmbientSession, b, ids)
 }
 
 func collectBlockStmIDsSess(s *Session, b *Block, ids map[int]bool) bool {
@@ -703,7 +703,7 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 	}
 	// stm_labels registry when edge/func incomplete
 	// no invent empty label token from registry
-	if lab := lookupStmLabelSess(nil, destStmID); lab != "" {
+	if lab := lookupStmLabelSess(testAmbientSession, destStmID); lab != "" {
 		return lab
 	}
 	return ""
@@ -997,7 +997,7 @@ func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
 // blockHasStmtID reports whether b directly contains stm_id (no nest).
 // Block always live; sticky false (no invent not-found soft-skip past hole).
 func blockHasStmtID(b *Block, id int) bool {
-	return blockHasStmtIDSess(nil, b, id)
+	return blockHasStmtIDSess(testAmbientSession, b, id)
 }
 
 func blockHasStmtIDSess(s *Session, b *Block, id int) bool {
@@ -1096,7 +1096,7 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 // FactMgr.cpp:118–131 / Block.cpp:546–549 — abstract_fact_for_var_init only.
 // No invent NewFactPointTo garbage when init abstract fails or InitExpr is the RHS.
 func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
-	AddNewVarFactToSess(nil, v, facts)
+	AddNewVarFactToSess(testAmbientSession, v, facts)
 }
 
 // AddNewVarFactToSess is AddNewVarFactTo with explicit session residual sticky.

@@ -5,7 +5,7 @@ package csmith
 // DoFinalization mirrors Finalization::doFinalization.
 // Finalization.cpp:45–55 — clear session bag pools between runs (ambient when s==nil).
 func DoFinalization() {
-	DoFinalizationSess(nil)
+	DoFinalizationSess(testAmbientSession)
 }
 
 // DoFinalizationSess clears generation pools on an explicit session bag.

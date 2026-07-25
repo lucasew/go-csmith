@@ -58,7 +58,7 @@ const (
 // DepthSpec.cpp atomic and composed depths (flag ignored except documented cases).
 // Used when dfs_exhaustive; random mode guards ignore the value.
 func MinimalDepth(dType string, flag int) int {
-	return MinimalDepthSess(nil, dType, flag)
+	return MinimalDepthSess(testAmbientSession, dType, flag)
 }
 
 // MinimalDepthSess is MinimalDepth with explicit session residual sticky.
@@ -149,7 +149,7 @@ func MinimalDepthSess(s *Session, dType string, flag int) int {
 
 // knownDepthType reports whether dType is a handled DepthSpec case.
 func knownDepthType(dType string) bool {
-	return knownDepthTypeSess(nil, dType)
+	return knownDepthTypeSess(testAmbientSession, dType)
 }
 
 // knownDepthTypeSess is knownDepthType with explicit session residual sticky.
@@ -167,7 +167,7 @@ func knownDepthTypeSess(s *Session, dType string) bool {
 // DepthSpec.cpp:330–335 — always GOOD_DEPTH when !dfs_exhaustive (random mode).
 // DFS: DFSRndNumGenerator::eager_backtracking → BAD_DEPTH when true.
 func DepthGuardByDepth(opts Options, depthNeeded int) int {
-	return DepthGuardByDepthSess(nil, opts, depthNeeded)
+	return DepthGuardByDepthSess(testAmbientSession, opts, depthNeeded)
 }
 
 // DepthGuardByDepthSess is DepthGuardByDepth using an explicit session RNG bag.
@@ -190,7 +190,7 @@ func DepthGuardByDepthSess(s *Session, opts Options, depthNeeded int) int {
 // DepthGuardByType mirrors DepthSpec::depth_guard_by_type.
 // DepthSpec.cpp:337+ — always GOOD when !dfs_exhaustive; else backtracking(minimal).
 func DepthGuardByType(opts Options, dType string) int {
-	return DepthGuardByTypeSess(nil, opts, dType)
+	return DepthGuardByTypeSess(testAmbientSession, opts, dType)
 }
 
 // DepthGuardByTypeSess is DepthGuardByType with an explicit session RNG bag.
@@ -200,7 +200,7 @@ func DepthGuardByTypeSess(s *Session, opts Options, dType string) int {
 
 // DepthGuardByTypeFlag is depth_guard_by_type with extra_flag for MAX_* cases.
 func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
-	return DepthGuardByTypeFlagSess(nil, opts, dType, flag)
+	return DepthGuardByTypeFlagSess(testAmbientSession, opts, dType, flag)
 }
 
 // DepthGuardByTypeFlagSess is DepthGuardByTypeFlag on bag s (DFS RNG / sticky).

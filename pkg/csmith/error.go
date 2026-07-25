@@ -14,48 +14,47 @@ const (
 )
 
 // GetError mirrors Error::get_error (session-local).
-func GetError() int { return GetErrorSess(nil) }
+func GetError() int { return GetErrorSess(testAmbientSession) }
 
 // GetErrorSess returns GenError on an explicit session bag.
 func GetErrorSess(s *Session) int { return sessOrAmbient(s).GenError }
 
 // SetError mirrors Error::set_error.
-func SetError(code int) { SetErrorSess(nil, code) }
+func SetError(code int) { SetErrorSess(testAmbientSession, code) }
 
 // SetErrorSess sets GenError on an explicit session bag.
 func SetErrorSess(s *Session, code int) { sessOrAmbient(s).GenError = code }
 
 // ClearError mirrors resetting to SUCCESS.
-func ClearError() { ClearErrorSess(nil) }
+func ClearError() { ClearErrorSess(testAmbientSession) }
 
 // ClearErrorSess clears GenError on an explicit session bag.
 func ClearErrorSess(s *Session) { sessOrAmbient(s).GenError = ErrSuccess }
 
 // HasError is true when get_error() != SUCCESS.
-func HasError() bool { return HasErrorSess(nil) }
+func HasError() bool { return HasErrorSess(testAmbientSession) }
 
 // HasErrorSess reports sticky error on an explicit session bag.
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
-// sessNoteError writes GenError on s when non-nil; nil s targets the quarantined
-// unit-test ambient bag (testAmbientSession) for residual hang-prevention on
-// Filter loops. Prefer explicit s so pure Generate paths never touch ambient.
+// sessNoteError writes GenError on s when non-nil; nil s writes the quarantined
+// unit-test ambient bag for residual hang-prevention on Filter loops (unit tests
+// without an explicit bag). Prefer explicit s so pure Generate never touches ambient.
 func sessNoteError(s *Session, code int) {
 	if s != nil {
 		s.GenError = code
 		return
 	}
-	sessOrAmbient(nil).GenError = code
+	testAmbientSession.GenError = code
 }
 
 // sessHasError reports sticky error on s when non-nil, else unit-test ambient.
-// Prefer explicit s for pure-session ERROR_GUARD; ambient nil path is for unit
-// tests (SetError/HasError) and residual Filter hang-prevention only.
+// Prefer explicit s for pure-session ERROR_GUARD; ambient nil path is unit-test only.
 func sessHasError(s *Session) bool {
 	if s != nil {
 		return s.GenError != ErrSuccess
 	}
-	return sessOrAmbient(nil).GenError != ErrSuccess
+	return testAmbientSession.GenError != ErrSuccess
 }
 
 // sessClearError clears sticky error on s when non-nil; nil s clears ambient.
@@ -64,7 +63,7 @@ func sessClearError(s *Session) {
 		s.GenError = ErrSuccess
 		return
 	}
-	sessOrAmbient(nil).GenError = ErrSuccess
+	testAmbientSession.GenError = ErrSuccess
 }
 
 // sessErrorCode returns sticky code on s when non-nil; nil s reads ambient.
@@ -72,5 +71,5 @@ func sessErrorCode(s *Session) int {
 	if s != nil {
 		return s.GenError
 	}
-	return sessOrAmbient(nil).GenError
+	return testAmbientSession.GenError
 }

@@ -31,7 +31,7 @@ func (f *Function) StackScanComplete(stParent *Block) bool {
 // Incomplete Function/Variable/Param/LocalVars sticky false (no invent not-on-stack
 // / soft re-pick past holes).
 func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
-	return f.IsVarOnStackSess(nil, v, stParent)
+	return f.IsVarOnStackSess(testAmbientSession, v, stParent)
 }
 
 func (f *Function) IsVarOnStackSess(s *Session, v *Variable, stParent *Block) bool {
@@ -100,7 +100,7 @@ func (f *Function) IsVarOnStackSess(s *Session, v *Variable, stParent *Block) bo
 // Incomplete Variable sticky false; incomplete stack via IsVarOnStack sticky.
 
 func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
-	return f.IsVarVisibleSess(nil, v, stParent)
+	return f.IsVarVisibleSess(testAmbientSession, v, stParent)
 }
 
 // IsVarVisibleSess is IsVarVisible with explicit session residual sticky.
@@ -139,7 +139,7 @@ func (f *Function) IsVarVisibleSess(s *Session, v *Variable, stParent *Block) bo
 // Incomplete Function/Variable/stack/Blocks sticky true OOS (no invent not-OOS
 // / soft re-pick past holes).
 func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
-	return f.IsVarOOSSess(nil, v, stParent)
+	return f.IsVarOOSSess(testAmbientSession, v, stParent)
 }
 
 func (f *Function) IsVarOOSSess(s *Session, v *Variable, stParent *Block) bool {
@@ -351,7 +351,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 // (seed-7 for 640: l_1402 in map_in + body LocalVars, missing from break out).
 // FactMgr.cpp:257–262 remove_loop_local + 575–579 invent-garbage path.
 func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPointTo {
-	return DropFactSubjectsByVarsSess(nil, facts, vars)
+	return DropFactSubjectsByVarsSess(testAmbientSession, facts, vars)
 }
 
 func DropFactSubjectsByVarsSess(s *Session, facts []*FactPointTo, vars []*Variable) []*FactPointTo {
@@ -390,7 +390,7 @@ func DropFactSubjectsByVarsSess(s *Session, facts []*FactPointTo, vars []*Variab
 // DropUnionSubjectsByVars removes eUnionWrite facts whose subject is in vars.}
 
 func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion {
-	return DropUnionSubjectsByVarsSess(nil, facts, vars)
+	return DropUnionSubjectsByVarsSess(testAmbientSession, facts, vars)
 }
 
 func DropUnionSubjectsByVarsSess(s *Session, facts []*FactUnion, vars []*Variable) []*FactUnion {
@@ -426,7 +426,7 @@ func DropUnionSubjectsByVarsSess(s *Session, facts []*FactUnion, vars []*Variabl
 }
 
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
-	UpdateFactsForOOSVarsSess(nil, vars, facts)
+	UpdateFactsForOOSVarsSess(testAmbientSession, vars, facts)
 }
 
 func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPointTo) {
@@ -502,7 +502,7 @@ func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPoint
 // empty comment is incomplete IR — no invent "/*  */" shell (still emits "\n" when quiet/concise).
 
 func OutputCommentLine(comment string, quiet, concise bool) string {
-	return OutputCommentLineSess(nil, comment, quiet, concise)
+	return OutputCommentLineSess(testAmbientSession, comment, quiet, concise)
 }
 
 // OutputCommentLineSess is OutputCommentLine with explicit session residual sticky.

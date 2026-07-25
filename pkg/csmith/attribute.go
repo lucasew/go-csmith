@@ -38,7 +38,7 @@ type BooleanAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *BooleanAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(nil, r)
+	return a.MakeRandomSess(testAmbientSession, r)
 }
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
@@ -74,7 +74,7 @@ type MultiChoiceAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(nil, r)
+	return a.MakeRandomSess(testAmbientSession, r)
 }
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
@@ -117,7 +117,7 @@ type AlignedAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *AlignedAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(nil, r)
+	return a.MakeRandomSess(testAmbientSession, r)
 }
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
@@ -166,7 +166,7 @@ type SectionAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *SectionAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(nil, r)
+	return a.MakeRandomSess(testAmbientSession, r)
 }
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
@@ -204,7 +204,7 @@ type AttributeGenerator struct {
 // AttributeGenerator always live at emit; sticky empty (no invent soft-skip past hole).
 // Empty Attributes is complete empty (not incomplete IR).
 func (g *AttributeGenerator) Output(r *Rng) string {
-	return g.OutputSess(nil, r)
+	return g.OutputSess(testAmbientSession, r)
 }
 
 // OutputSess is Output with explicit session residual sticky.
@@ -369,7 +369,7 @@ func NewUnionTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGen
 // Mirrors InitializeVariableAttributes / InitializeAttributes / InitializeLabelAttributes /
 // InitializeTypeAttributes when flags are on.
 func InitAttrGenerators(opts Options, probs *Probabilities) {
-	InitAttrGeneratorsSess(nil, opts, probs)
+	InitAttrGeneratorsSess(testAmbientSession, opts, probs)
 }
 
 // InitAttrGeneratorsSess installs attribute generators on an explicit session bag.
@@ -388,7 +388,7 @@ func InitAttrGeneratorsSess(s *Session, opts Options, probs *Probabilities) {
 // No soft invent NewVarAttrGenerator with zero opts when init was skipped
 // (C++ InitializeVariableAttributes runs from CreateVariable / generation start).
 func EnsureVarAttrGenerator() *AttributeGenerator {
-	return EnsureVarAttrGeneratorSess(nil)
+	return EnsureVarAttrGeneratorSess(testAmbientSession)
 }
 
 // EnsureVarAttrGeneratorSess returns the generator on an explicit session bag.
@@ -399,7 +399,7 @@ func EnsureVarAttrGeneratorSess(s *Session) *AttributeGenerator {
 // EnsureFuncAttrGenerator returns function attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureFuncAttrGenerator() *AttributeGenerator {
-	return EnsureFuncAttrGeneratorSess(nil)
+	return EnsureFuncAttrGeneratorSess(testAmbientSession)
 }
 
 // EnsureFuncAttrGeneratorSess returns the generator on an explicit session bag.
@@ -410,7 +410,7 @@ func EnsureFuncAttrGeneratorSess(s *Session) *AttributeGenerator {
 // EnsureLabelAttrGenerator returns label attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureLabelAttrGenerator() *AttributeGenerator {
-	return EnsureLabelAttrGeneratorSess(nil)
+	return EnsureLabelAttrGeneratorSess(testAmbientSession)
 }
 
 // EnsureLabelAttrGeneratorSess returns the generator on an explicit session bag.
@@ -421,7 +421,7 @@ func EnsureLabelAttrGeneratorSess(s *Session) *AttributeGenerator {
 // EnsureStructTypeAttrGenerator returns struct type attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureStructTypeAttrGenerator() *AttributeGenerator {
-	return EnsureStructTypeAttrGeneratorSess(nil)
+	return EnsureStructTypeAttrGeneratorSess(testAmbientSession)
 }
 
 // EnsureStructTypeAttrGeneratorSess returns the generator on an explicit session bag.
@@ -432,7 +432,7 @@ func EnsureStructTypeAttrGeneratorSess(s *Session) *AttributeGenerator {
 // EnsureUnionTypeAttrGenerator returns union type attributes after InitAttrGenerators.
 // No soft invent generator when process init skipped.
 func EnsureUnionTypeAttrGenerator() *AttributeGenerator {
-	return EnsureUnionTypeAttrGeneratorSess(nil)
+	return EnsureUnionTypeAttrGeneratorSess(testAmbientSession)
 }
 
 // EnsureUnionTypeAttrGeneratorSess returns the generator on an explicit session bag.
@@ -442,7 +442,7 @@ func EnsureUnionTypeAttrGeneratorSess(s *Session) *AttributeGenerator {
 
 // ClearAttrGenerators for Finalization between runs.
 func ClearAttrGenerators() {
-	ClearAttrGeneratorsSess(nil)
+	ClearAttrGeneratorsSess(testAmbientSession)
 }
 
 // ClearAttrGeneratorsSess clears attribute generators on an explicit session bag.

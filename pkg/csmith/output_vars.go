@@ -11,12 +11,12 @@ import (
 // then for non-global lists OutputArrayInitializers (ctrl decl even when all brace-init).
 // Incomplete Variable* list fails closed sticky empty (no invent skip holes / partial section).
 func OutputVariableList(vars []*Variable, indent string, forceStatic bool) string {
-	return OutputVariableListSess(nil, vars, indent, forceStatic, sessOpts(nil))
+	return OutputVariableListSess(testAmbientSession, vars, indent, forceStatic, sessOpts(nil))
 }
 
 // OutputVariableListOpts is OutputVariableList with explicit session Options.
 func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, opts Options) string {
-	return OutputVariableListSess(nil, vars, indent, forceStatic, opts)
+	return OutputVariableListSess(testAmbientSession, vars, indent, forceStatic, opts)
 }
 
 func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceStatic bool, opts Options) string {
@@ -87,12 +87,12 @@ func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceSt
 // VariableSelector.cpp:1594–1601 — comment header + list (no access_once toggle).
 // no invent section header without any live global defs
 func OutputGlobalVariables(vars []*Variable) string {
-	return OutputGlobalVariablesSess(nil, vars, sessOpts(nil))
+	return OutputGlobalVariablesSess(testAmbientSession, vars, sessOpts(nil))
 }
 
 // OutputGlobalVariablesOpts is OutputGlobalVariables with explicit session Options.
 func OutputGlobalVariablesOpts(vars []*Variable, opts Options) string {
-	return OutputGlobalVariablesSess(nil, vars, opts)
+	return OutputGlobalVariablesSess(testAmbientSession, vars, opts)
 }
 
 func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) string {
@@ -119,12 +119,12 @@ func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) strin
 // VariableSelector.cpp:1604–1612.
 // no invent section header without any live decls
 func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
-	return OutputGlobalVariablesDeclsSess(nil, vars, prefix, sessOpts(nil))
+	return OutputGlobalVariablesDeclsSess(testAmbientSession, vars, prefix, sessOpts(nil))
 }
 
 // OutputGlobalVariablesDeclsOpts is OutputGlobalVariablesDecls with explicit Options.
 func OutputGlobalVariablesDeclsOpts(vars []*Variable, prefix string, opts Options) string {
-	return OutputGlobalVariablesDeclsSess(nil, vars, prefix, opts)
+	return OutputGlobalVariablesDeclsSess(testAmbientSession, vars, prefix, opts)
 }
 
 func OutputGlobalVariablesDeclsSess(s *Session, vars []*Variable, prefix string, opts Options) string {

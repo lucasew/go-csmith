@@ -13,7 +13,7 @@ type DistributionTable struct {
 // Probabilities.cpp:1025–1029 — always push key/prob (including weight 0).
 // Incomplete table sticky no-op (no invent soft grow past missing shell).
 func (d *DistributionTable) AddEntry(key, prob int) {
-	d.AddEntrySess(nil, key, prob)
+	d.AddEntrySess(testAmbientSession, key, prob)
 }
 
 // AddEntrySess is AddEntry with explicit session residual sticky.
@@ -31,7 +31,7 @@ func (d *DistributionTable) AddEntrySess(s *Session, key, prob int) {
 // Max mirrors get_max.
 // Incomplete table sticky 0 (no invent default domain soft-skip past hole).
 func (d *DistributionTable) Max() int {
-	return d.MaxSess(nil)
+	return d.MaxSess(testAmbientSession)
 }
 
 // MaxSess is Max with explicit session residual sticky.
@@ -47,7 +47,7 @@ func (d *DistributionTable) MaxSess(s *Session) int {
 // KeyToProb mirrors DistributionTable::key_to_prob.
 // Probabilities.cpp:1031–1038 — first matching key's weight; 0 if missing.
 func (d *DistributionTable) KeyToProb(key int) int {
-	return d.KeyToProbSess(nil, key)
+	return d.KeyToProbSess(testAmbientSession, key)
 }
 
 // KeyToProbSess is KeyToProb with explicit session residual sticky.
@@ -68,7 +68,7 @@ func (d *DistributionTable) KeyToProbSess(s *Session, key int) int {
 // Incomplete table sticky -1 (no invent identity key soft-skip past hole).
 // OOB rnd (not in [0,max)) returns -1; C++ asserts.
 func (d *DistributionTable) RndNumToKey(rnd int) int {
-	return d.RndNumToKeySess(nil, rnd)
+	return d.RndNumToKeySess(testAmbientSession, rnd)
 }
 
 // RndNumToKeySess is RndNumToKey with explicit session residual sticky.
@@ -102,7 +102,7 @@ type ThresholdTable struct {
 // Add mirrors sorted insert of (threshold, value).
 // Incomplete table sticky no-op (no invent grow past missing table shell).
 func (t *ThresholdTable) Add(key, value int) {
-	t.AddSess(nil, key, value)
+	t.AddSess(testAmbientSession, key, value)
 }
 
 // AddSess is Add with explicit session residual sticky.
@@ -131,7 +131,7 @@ func (t *ThresholdTable) AddSess(s *Session, key, value int) {
 // GetValue mirrors ProbabilityTable::get_value — first key > k.
 // Incomplete table sticky -1 (no invent miss soft-success past missing table shell).
 func (t *ThresholdTable) GetValue(k int) int {
-	return t.GetValueSess(nil, k)
+	return t.GetValueSess(testAmbientSession, k)
 }
 
 // GetValueSess is GetValue with explicit session residual sticky.

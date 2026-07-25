@@ -41,7 +41,7 @@ type Invocation struct {
 // setOutOpts snapshots CGOptions bits needed by Output (no live Options at emit).
 // Invocation always live; sticky (no invent soft-skip out-opts past hole).
 func (fi *Invocation) setOutOpts(opts Options) {
-	fi.setOutOptsSess(nil, opts)
+	fi.setOutOptsSess(testAmbientSession, opts)
 }
 
 // setOutOptsSess is setOutOpts with explicit session residual sticky.
@@ -67,7 +67,7 @@ func (fi *Invocation) wrapperOpts() Options {
 // safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
 // Ambient ProcessOptions bridge; emit prefers OutputSess / OutputOptsSess.
 func (fi *Invocation) Output() string {
-	return fi.OutputSess(nil)
+	return fi.OutputSess(testAmbientSession)
 }
 
 // OutputSess is Output with Options/sticky from an explicit session bag.
@@ -77,7 +77,7 @@ func (fi *Invocation) OutputSess(s *Session) string {
 
 // OutputOpts is Output with explicit session Options (arg / wrapper emit).
 func (fi *Invocation) OutputOpts(opts Options) string {
-	return fi.OutputOptsSess(nil, opts)
+	return fi.OutputOptsSess(testAmbientSession, opts)
 }
 
 func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
@@ -198,7 +198,7 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 // outputUnary mirrors FunctionInvocationUnary::Output.
 // FunctionInvocationUnary.cpp:192–243.
 func (fi *Invocation) outputUnary(a0 string) string {
-	return fi.outputUnarySess(nil, a0)
+	return fi.outputUnarySess(testAmbientSession, a0)
 }
 
 // outputUnarySess is outputUnary registering wrapper names on bag s.
@@ -258,7 +258,7 @@ func (fi *Invocation) outputUnarySess(s *Session, a0 string) string {
 
 // unaryCastMinus is (-(size)arg); empty size token sticky fail closed (no invent "(-()x)").
 func unaryCastMinus(cast, a0 string) string {
-	return unaryCastMinusSess(nil, cast, a0)
+	return unaryCastMinusSess(testAmbientSession, cast, a0)
 }
 
 func unaryCastMinusSess(s *Session, cast, a0 string) string {
@@ -272,7 +272,7 @@ func unaryCastMinusSess(s *Session, cast, a0 string) string {
 // outputBinary mirrors FunctionInvocationBinary::Output.
 // FunctionInvocationBinary.cpp:350–426.
 func (fi *Invocation) outputBinary(a0, a1 string) string {
-	return fi.outputBinarySess(nil, a0, a1)
+	return fi.outputBinarySess(testAmbientSession, a0, a1)
 }
 
 // outputBinarySess is outputBinary registering wrapper names on bag s.
@@ -322,7 +322,7 @@ func (fi *Invocation) outputBinarySess(s *Session, a0, a1 string) string {
 
 // binaryCastOp is ((cast)a0 op (cast)a1); empty cast sticky fail closed (no invent "(()a + ()b)").
 func binaryCastOp(cast, a0, op, a1 string) string {
-	return binaryCastOpSess(nil, cast, a0, op, a1)
+	return binaryCastOpSess(testAmbientSession, cast, a0, op, a1)
 }
 
 func binaryCastOpSess(s *Session, cast, a0, op, a1 string) string {
@@ -497,7 +497,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 // getOneFunction mirrors Function::get_one_function — random pick.
 // Function.cpp:262–276.
 func getOneFunction(r *Rng, funcs []*Function) *Function {
-	return getOneFunctionSess(nil, r, funcs)
+	return getOneFunctionSess(testAmbientSession, r, funcs)
 }
 
 // getOneFunctionSess is getOneFunction with explicit session residual sticky.
@@ -538,7 +538,7 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 // BuildUserInvocation may pass nil list as "no first-function identity").
 // Function* always live at [0]; nil hole sticky (no invent scan later).
 func GetFirstFunction(list *FunctionList) *Function {
-	return GetFirstFunctionSess(nil, list)
+	return GetFirstFunctionSess(testAmbientSession, list)
 }
 
 // GetFirstFunctionSess is GetFirstFunction with explicit session residual sticky.

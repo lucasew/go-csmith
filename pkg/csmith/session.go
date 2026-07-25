@@ -5,11 +5,15 @@
 //	out, err := NewSession(opts).Generate(ctx)
 //
 // Rule: generation mutables live only on *Session. Generate is bag-local
-// (g.Sess / cg.Sess); it never installs or writes the unit-test ambient bag.
+// (g.Sess / cg.Sess); it never installs the unit-test ambient bag and does
+// not toggle any package meta lock (pureGenStrict deleted).
 //
 // Quarantined ambient (unit tests only):
-//   - testAmbientSession + Process*/SetError(nil) bridges for legacy unit tests
-//   - pureGenStrict package flag (meta lock toggled by Generate for residual panic)
+//   - testAmbientSession + Process*/SetError bridges for legacy unit tests
+//   - non-Sess wrappers pass testAmbientSession into *Sess helpers explicitly
+//   - sessOrAmbient(nil) falls back to testAmbientSession for unit-test sticky
+//     paths; Generate mid-run must pass s / g.Sess / cg.Sess (marker probes
+//     fail if residual writes ambient GenError / NextStmID)
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
 // (note: simpleTypes[].Used is still process-static like C++ and reset in
@@ -157,8 +161,9 @@ type bookkeeperState struct {
 }
 
 // testAmbientSession is the quarantined Process* bag for unit tests outside
-// Generate. Generate never installs or writes this object (pureGenStrict panics
-// on residual sessOrAmbient(nil)). Delete once unit tests pass explicit *Session.
+// Generate. Generate never installs or writes this object. Non-Sess Process*
+// wrappers pass it explicitly into *Sess helpers. Delete once unit tests pass
+// explicit *Session and non-Sess bridges are removed.
 var testAmbientSession = newSession()
 
 func newSession() *Session {
@@ -182,26 +187,19 @@ func currentSession() *Session {
 	return testAmbientSession
 }
 
-// pureGenStrict is package meta state: when true, sessOrAmbient(nil) panics so
-// residual Process* sites cannot write testAmbientSession mid-Generate.
-// Generate toggles this for the run (still a process-global write — impure).
-// Next purity step: remove the toggle by deleting ambient Process* entirely.
-var pureGenStrict bool
-
 // sessOrAmbient returns s when non-nil, else the quarantined unit-test bag.
-// Prefer explicit *Session from Generate / cg.Sess / g.Sess; nil is test-only.
+// Prefer explicit *Session from Generate / cg.Sess / g.Sess. Nil is the unit-test
+// bridge (non-Sess wrappers pass testAmbientSession explicitly when possible).
+// No package pureGenStrict lock — residual mid-Generate is caught by ambient
+// marker probes (NextStmID / GenError) and multi-seed isolation tests.
 func sessOrAmbient(s *Session) *Session {
 	if s != nil {
 		return s
 	}
-	// pureGenStrict: panic on residual Process*/sessHasError(nil) mid-Generate.
-	if pureGenStrict {
-		panic("residual ambient sessOrAmbient(nil)")
-	}
-	return currentSession()
+	return testAmbientSession
 }
 
-// firstSess returns the first non-nil session among a, b (else nil for ambient).
+// firstSess returns the first non-nil session among a, b (else nil).
 func firstSess(a, b *Session) *Session {
 	if a != nil {
 		return a

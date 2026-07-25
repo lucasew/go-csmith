@@ -289,7 +289,7 @@ func SplitIntString(str, seps string) []int {
 // StringUtils.cpp:214–227 — "a=1; b=2" → vars/values pairs (split on ';' then '=').
 // StringUtils.cpp:222 — assert(pair.size() == 2); malformed stmt fails whole parse.
 func BreakupAssigns(assigns string) (vars, values []string) {
-	return BreakupAssignsSess(nil, assigns)
+	return BreakupAssignsSess(testAmbientSession, assigns)
 }
 
 // BreakupAssignsSess is BreakupAssigns with explicit session residual sticky.

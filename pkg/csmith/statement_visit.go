@@ -1000,7 +1000,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 }
 
 func findArrayOpInnermost(st *Stmt) *Stmt {
-	return findArrayOpInnermostSess(nil, st)
+	return findArrayOpInnermostSess(testAmbientSession, st)
 }
 
 // findArrayOpInnermostSess is findArrayOpInnermost with explicit session residual sticky.
@@ -1018,7 +1018,7 @@ func findArrayOpInnermostSess(s *Session, st *Stmt) *Stmt {
 }
 
 func isArrayInitBody(b *Block) bool {
-	return isArrayInitBodySess(nil, b)
+	return isArrayInitBodySess(testAmbientSession, b)
 }
 
 // isArrayInitBodySess is isArrayInitBody with explicit session residual sticky.

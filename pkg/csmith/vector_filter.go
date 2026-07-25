@@ -46,7 +46,7 @@ type VectorFilter struct {
 // NewVectorFilter mirrors VectorFilter(DistributionTable*) — FilterOut, empty set.
 // Filter.cpp:40 — kinds_.set() all true.
 func NewVectorFilter(table *DistributionTable) *VectorFilter {
-	return NewVectorFilterSess(nil, table)
+	return NewVectorFilterSess(testAmbientSession, table)
 }
 
 // NewVectorFilterSess is NewVectorFilter with current_kind snapshotted from bag opts.
@@ -61,7 +61,7 @@ func NewVectorFilterSess(s *Session, table *DistributionTable) *VectorFilter {
 
 // NewVectorFilterItems mirrors VectorFilter(vector&, Mode).
 func NewVectorFilterItems(items []int, mode FilterMode) *VectorFilter {
-	return NewVectorFilterItemsSess(nil, items, mode)
+	return NewVectorFilterItemsSess(testAmbientSession, items, mode)
 }
 
 // NewVectorFilterItemsSess is NewVectorFilterItems with current_kind snapshotted from bag opts.
@@ -87,7 +87,7 @@ func (f *VectorFilter) snapModeKind(s *Session) {
 
 // Enable mirrors Filter::enable.
 func (f *VectorFilter) Enable(kind FilterKind) {
-	f.EnableSess(nil, kind)
+	f.EnableSess(testAmbientSession, kind)
 }
 
 // EnableSess is Enable with explicit session residual sticky.
@@ -104,7 +104,7 @@ func (f *VectorFilter) EnableSess(s *Session, kind FilterKind) {
 
 // Disable mirrors Filter::disable.
 func (f *VectorFilter) Disable(kind FilterKind) {
-	f.DisableSess(nil, kind)
+	f.DisableSess(testAmbientSession, kind)
 }
 
 // DisableSess is Disable with explicit session residual sticky.
@@ -122,7 +122,7 @@ func (f *VectorFilter) DisableSess(s *Session, kind FilterKind) {
 // CurrentKind mirrors Filter::current_kind.
 // Filter.cpp:63–68 — random_based → fDefault; dfs_exhaustive → fDFS; else MAX.
 func (f *VectorFilter) CurrentKind() FilterKind {
-	return f.CurrentKindSess(nil)
+	return f.CurrentKindSess(testAmbientSession)
 }
 
 // CurrentKindSess is CurrentKind with explicit session residual sticky.
@@ -144,7 +144,7 @@ func (f *VectorFilter) CurrentKindOpts(o Options) FilterKind {
 // ValidFilter mirrors Filter::valid_filter.
 // Filter.cpp:74–79 — kinds_.test(current_kind); false if kind is MAX or disabled.
 func (f *VectorFilter) ValidFilter() bool {
-	return f.ValidFilterSess(nil)
+	return f.ValidFilterSess(testAmbientSession)
 }
 
 // ValidFilterSess is ValidFilter with explicit session residual sticky.
@@ -166,7 +166,7 @@ func (f *VectorFilter) ValidFilterSess(s *Session) bool {
 
 // Add mirrors VectorFilter::add — push item if not already present.
 func (f *VectorFilter) Add(item int) *VectorFilter {
-	return f.AddSess(nil, item)
+	return f.AddSess(testAmbientSession, item)
 }
 
 // AddSess is Add with explicit session residual sticky.
@@ -188,7 +188,7 @@ func (f *VectorFilter) AddSess(s *Session, item int) *VectorFilter {
 // VectorFilter.cpp:75–77 — ptable ? ptable->get_max() : 100.
 // Nil receiver is a Go hole (C++ would not call through null); fail closed 0.
 func (f *VectorFilter) MaxProb() int {
-	return f.MaxProbSess(nil)
+	return f.MaxProbSess(testAmbientSession)
 }
 
 // MaxProbSess is MaxProb with explicit session residual sticky.
@@ -207,7 +207,7 @@ func (f *VectorFilter) MaxProbSess(s *Session) int {
 // VectorFilter.cpp:79–83 — if !valid_filter() || ptable==nullptr return v;
 // else ptable->rnd_num_to_key(v).
 func (f *VectorFilter) Lookup(v int) int {
-	return f.LookupSess(nil, v)
+	return f.LookupSess(testAmbientSession, v)
 }
 
 // LookupSess is Lookup with explicit session residual sticky.
@@ -226,7 +226,7 @@ func (f *VectorFilter) LookupSess(s *Session, v int) int {
 // VectorFilter.cpp:58–66.
 // Nil receiver: Go hole fail-closed reject (C++ null would crash).
 func (f *VectorFilter) Filter(v uint32) bool {
-	return f.FilterSess(nil, v)
+	return f.FilterSess(testAmbientSession, v)
 }
 
 // FilterSess is Filter with explicit session residual sticky.
