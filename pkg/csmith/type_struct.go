@@ -348,7 +348,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 	b.WriteString("struct ")
 	b.WriteString(t.StructName)
 	if attrs != nil && r != nil {
-		b.WriteString(attrs.Output(r))
+		b.WriteString(attrs.OutputSess(s, r))
 		// residual ERROR sticky — no invent soft-continue fields past attr residual
 		if sessHasError(s) {
 			return ""
@@ -887,7 +887,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 	b.WriteString("union ")
 	b.WriteString(t.StructName)
 	if attrs != nil && r != nil {
-		b.WriteString(attrs.Output(r))
+		b.WriteString(attrs.OutputSess(s, r))
 		// residual ERROR sticky — no invent soft-continue fields past attr residual
 		if sessHasError(s) {
 			return ""

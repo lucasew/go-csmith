@@ -1200,7 +1200,7 @@ func (f *Function) OutputForwardDeclWithSess(sess *Session, forceStatic bool, r 
 	}
 	if withAttrs && r != nil {
 		if ag := EnsureFuncAttrGeneratorSess(sess); ag != nil {
-			s += ag.Output(r)
+			s += ag.OutputSess(sess, r)
 		}
 		// residual ERROR sticky — no invent soft-continue ";" past attr residual
 		if sessHasError(sess) {
@@ -1338,7 +1338,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 	s += hdr
 	if withAttrs && r != nil {
 		if ag := EnsureFuncAttrGeneratorSess(sess); ag != nil {
-			s += ag.Output(r)
+			s += ag.OutputSess(sess, r)
 		}
 		// residual ERROR sticky — no invent soft-continue body past attr residual
 		if sessHasError(sess) {

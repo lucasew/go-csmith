@@ -15,6 +15,8 @@ import (
 type Attribute interface {
 	// MakeRandom returns attribute text or "" if not selected.
 	MakeRandom(r *Rng) string
+	// MakeRandomSess is MakeRandom with explicit session residual sticky.
+	MakeRandomSess(s *Session, r *Rng) string
 }
 
 func clampProb(p int) int {
@@ -36,19 +38,24 @@ type BooleanAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *BooleanAttribute) MakeRandom(r *Rng) string {
+	return a.MakeRandomSess(nil, r)
+}
+
+// MakeRandomSess implements Attribute with explicit session residual sticky.
+func (a *BooleanAttribute) MakeRandomSess(s *Session, r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent empty __attribute__ token
 	if a.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -67,19 +74,24 @@ type MultiChoiceAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
+	return a.MakeRandomSess(nil, r)
+}
+
+// MakeRandomSess implements Attribute with explicit session residual sticky.
+func (a *MultiChoiceAttribute) MakeRandomSess(s *Session, r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG + non-empty choices; sticky no invent without them
 	if r == nil || len(a.Choices) == 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent ("choice") without name
 	if a.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -89,7 +101,7 @@ func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 	// Attribute.cpp:66 — name + "(\"" + choice + "\")"; choice always live string
 	// sticky no invent name("") for empty choice slot
 	if a.Choices[i] == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return a.Name + "(\"" + a.Choices[i] + "\")"
@@ -105,19 +117,24 @@ type AlignedAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *AlignedAttribute) MakeRandom(r *Rng) string {
+	return a.MakeRandomSess(nil, r)
+}
+
+// MakeRandomSess implements Attribute with explicit session residual sticky.
+func (a *AlignedAttribute) MakeRandomSess(s *Session, r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent bare "(N)" without name
 	if a.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -127,7 +144,7 @@ func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	n := a.Alignment
 	if n < 1 {
 		// broken Attribute IR sticky — emit nothing (no soft invent alignment=1)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	exp := int(r.RndUpto(uint32(n)))
@@ -149,14 +166,19 @@ type SectionAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *SectionAttribute) MakeRandom(r *Rng) string {
+	return a.MakeRandomSess(nil, r)
+}
+
+// MakeRandomSess implements Attribute with explicit session residual sticky.
+func (a *SectionAttribute) MakeRandomSess(s *Session, r *Rng) string {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -164,7 +186,7 @@ func (a *SectionAttribute) MakeRandom(r *Rng) string {
 	}
 	// Attribute.cpp:97–99 — rnd_upto(10); name from ctor sticky (no invent "section")
 	if a.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	n := int(r.RndUpto(10))
@@ -182,8 +204,13 @@ type AttributeGenerator struct {
 // AttributeGenerator always live at emit; sticky empty (no invent soft-skip past hole).
 // Empty Attributes is complete empty (not incomplete IR).
 func (g *AttributeGenerator) Output(r *Rng) string {
+	return g.OutputSess(nil, r)
+}
+
+// OutputSess is Output with explicit session residual sticky.
+func (g *AttributeGenerator) OutputSess(s *Session, r *Rng) string {
 	if g == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if len(g.Attributes) == 0 {
@@ -191,23 +218,23 @@ func (g *AttributeGenerator) Output(r *Rng) string {
 	}
 	// AttributeGenerator always has process RNG when attributes exist; sticky no invent skip
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var parts []string
 	for _, a := range g.Attributes {
 		// Attribute* always live in C++; sticky no invent skip nil holes
 		if a == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		s := a.MakeRandom(r)
+		part := a.MakeRandomSess(s, r)
 		// residual ERROR sticky — no invent soft-continue later attrs past MakeRandom residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
-		if s != "" {
-			parts = append(parts, s)
+		if part != "" {
+			parts = append(parts, part)
 		}
 	}
 	if len(parts) == 0 {

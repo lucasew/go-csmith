@@ -211,7 +211,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	// Variable.cpp:655 — var_attr_generator.Output when attributes enabled
 	if withAttrs && r != nil {
 		if ag := EnsureVarAttrGeneratorSess(s); ag != nil {
-			b.WriteString(ag.Output(r))
+			b.WriteString(ag.OutputSess(s, r))
 		}
 		// residual ERROR sticky — no invent soft-continue def past attr residual
 		if sessHasError(s) {
