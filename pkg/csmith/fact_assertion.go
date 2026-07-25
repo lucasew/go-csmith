@@ -11,9 +11,14 @@ import (
 // FactPointTo.h:93.
 // Incomplete Fact shell sticky false (no invent TOP / soft re-pick past hole).
 func (f *FactPointTo) IsTop() bool {
+	return f.IsTopSess(nil)
+}
+
+// IsTopSess is IsTop with explicit session residual sticky.
+func (f *FactPointTo) IsTopSess(s *Session) bool {
 	// Fact always live; sticky incomplete no invent empty-complete TOP
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return len(f.PointTo) == 0
@@ -22,8 +27,13 @@ func (f *FactPointTo) IsTop() bool {
 // IsBottom mirrors FactPointTo::is_bottom — always false (no bottom lattice).
 // FactPointTo.h:94–96.
 func (f *FactPointTo) IsBottom() bool {
+	return f.IsBottomSess(nil)
+}
+
+// IsBottomSess is IsBottom with explicit session residual sticky.
+func (f *FactPointTo) IsBottomSess(s *Session) bool {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return false
@@ -32,8 +42,13 @@ func (f *FactPointTo) IsBottom() bool {
 // SetTop mirrors FactPointTo::set_top — clear points-to set.
 // FactPointTo.h:97.
 func (f *FactPointTo) SetTop() {
+	f.SetTopSess(nil)
+}
+
+// SetTopSess is SetTop with explicit session residual sticky.
+func (f *FactPointTo) SetTopSess(s *Session) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	f.PointTo = nil
@@ -42,8 +57,13 @@ func (f *FactPointTo) SetTop() {
 // SetBottom mirrors FactPointTo::set_bottom — no-op.
 // FactPointTo.h:98.
 func (f *FactPointTo) SetBottom() {
+	f.SetBottomSess(nil)
+}
+
+// SetBottomSess is SetBottom with explicit session residual sticky.
+func (f *FactPointTo) SetBottomSess(s *Session) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 }
@@ -51,8 +71,13 @@ func (f *FactPointTo) SetBottom() {
 // GetVar mirrors Fact::get_var / FactPointTo::get_var.
 // FactPointTo.h:64.
 func (f *FactPointTo) GetVar() *Variable {
+	return f.GetVarSess(nil)
+}
+
+// GetVarSess is GetVar with explicit session residual sticky.
+func (f *FactPointTo) GetVarSess(s *Session) *Variable {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return f.Var
@@ -61,12 +86,17 @@ func (f *FactPointTo) GetVar() *Variable {
 // Output mirrors FactPointTo::Output — pointee set diagnostic.
 // FactPointTo.cpp Output — subject and pointees by name.
 func (f *FactPointTo) Output() string {
+	return f.OutputSess(nil)
+}
+
+// OutputSess is Output with explicit session residual sticky.
+func (f *FactPointTo) OutputSess(s *Session) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if f.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -74,7 +104,7 @@ func (f *FactPointTo) Output() string {
 	b.WriteString(" => {")
 	for i, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -144,19 +174,24 @@ func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 // / soft re-pick past hole via IsVariableInSet false membership).}
 
 func (f *FactPointTo) IsAssertable(stParent *Block) bool {
+	return f.IsAssertableSess(nil, stParent)
+}
+
+// IsAssertableSess is IsAssertable with explicit session residual sticky.
+func (f *FactPointTo) IsAssertableSess(s *Session, stParent *Block) bool {
 	if f == nil || f.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// incomplete fact sticky (no invent assertable via partial PointTo scan)
 	if !FactsComplete([]*FactPointTo{f}) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky not-assertable
 	// (no invent complete not-array assertable past broken shell)
 	if f.Var.IsArray && f.Var.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// get_array != null → not assertable
@@ -166,9 +201,9 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	if IsVariableInSet(f.PointTo, GarbagePtr) || IsVariableInSet(f.PointTo, TBDPtr) {
 		return false
 	}
-	inv := f.HasInvisible(stParent)
+	inv := f.HasInvisibleSess(s, stParent)
 	// residual ERROR sticky — no invent assertable true past HasInvisible residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return !inv
@@ -309,7 +344,7 @@ func (f *FactPointTo) OutputAssertionSess(s *Session, stParent *Block, indent st
 		return ""
 	}
 	// TOP fact: no assert condition (complete empty success)
-	isTop := f.IsTop()
+	isTop := f.IsTopSess(s)
 	// residual ERROR sticky — no invent soft-empty assert past IsTop residual
 	if sessHasError(s) {
 		return ""
@@ -326,7 +361,7 @@ func (f *FactPointTo) OutputAssertionSess(s *Session, stParent *Block, indent st
 		return ""
 	}
 	prefix := ""
-	if !f.IsAssertable(stParent) {
+	if !f.IsAssertableSess(s, stParent) {
 		// residual ERROR sticky — no invent assert line past IsAssertable residual hole
 		if sessHasError(s) {
 			return ""

@@ -207,12 +207,22 @@ func (f *FactPointTo) GetPointToVarsSess(s *Session) []*Variable {
 
 // Clear mirrors FactPointTo::clear / empty point-to set (set_top lattice).
 func (f *FactPointTo) Clear() {
-	f.SetTop()
+	f.ClearSess(nil)
+}
+
+// ClearSess is Clear with explicit session residual sticky.
+func (f *FactPointTo) ClearSess(s *Session) {
+	f.SetTopSess(s)
 }
 
 // Empty mirrors FactPointTo::empty — no pointees (same as is_top).
 func (f *FactPointTo) Empty() bool {
-	return f.IsTop()
+	return f.EmptySess(nil)
+}
+
+// EmptySess is Empty with explicit session residual sticky.
+func (f *FactPointTo) EmptySess(s *Session) bool {
+	return f.IsTopSess(s)
 }
 
 // IsRelated mirrors Fact::is_related for PointTo — same category + same subject var.
