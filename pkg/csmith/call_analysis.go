@@ -637,7 +637,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		cl := CloneUnionFactSliceDeep(*preUnion)
+		cl := CloneUnionFactSliceDeepSess(fmSess(fm), *preUnion)
 		if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -659,7 +659,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		cl := CloneUnionFactSliceDeep(elseOutU)
+		cl := CloneUnionFactSliceDeepSess(fmSess(fm), elseOutU)
 		if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -681,7 +681,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
-		cl := CloneUnionFactSliceDeep(thenOutU)
+		cl := CloneUnionFactSliceDeepSess(fmSess(fm), thenOutU)
 		if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()

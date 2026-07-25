@@ -421,7 +421,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
 				return ""
 			}
-			if f.Qfer.IsVolatile() {
+			if f.Qfer.IsVolatileSess(s) {
 				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
 				if sessHasError(s) {
 					return ""
@@ -451,7 +451,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 			return ""
 		}
 		// Type.cpp:1879–1880 — output_qualified_type always live; sticky no invent " fN;"
-		ty := f.Qfer.OutputQualifiedTypeOpts(f.Type, opts)
+		ty := f.Qfer.OutputQualifiedTypeOptsSess(s, f.Type, opts)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
 		if sessHasError(s) {
 			return ""
@@ -826,7 +826,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		if f.Type == nil || sessHasError(envSess(env)) {
 			return nil
 		}
-		if f.Type.HasBitfields() {
+		if f.Type.HasBitfieldsSess(envSess(env)) {
 			// residual ERROR sticky — no invent soft-skip assert fail past incomplete field Type
 			if !sessHasError(envSess(env)) {
 				// C++ assert(!fields.back()->has_bitfields()) — complete bitfields still fail closed
@@ -966,7 +966,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
 				return ""
 			}
-			if f.Qfer.IsVolatile() {
+			if f.Qfer.IsVolatileSess(s) {
 				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
 				if sessHasError(s) {
 					return ""
@@ -990,7 +990,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 			return ""
 		}
 		// output_qualified_type always live sticky; no invent " fN;" without type
-		ty := f.Qfer.OutputQualifiedTypeOpts(f.Type, opts)
+		ty := f.Qfer.OutputQualifiedTypeOptsSess(s, f.Type, opts)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
 		if sessHasError(s) {
 			return ""

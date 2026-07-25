@@ -173,7 +173,7 @@ func (t *Type) GetIntSubfieldNamesSess(s *Session, prefix string, excluded []int
 	if sessHasError(s) {
 		return nil
 	}
-	if !t.IsAggregate() {
+	if !t.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-empty past IsAggregate residual
 		if sessHasError(s) {
 			return nil
@@ -211,7 +211,7 @@ func (t *Type) GetIntSubfieldNamesSess(s *Session, prefix string, excluded []int
 		// Type.cpp:1631–1634 — prefix+".f"+j; recurse with empty excluded
 		subPrefix := prefix + ".f" + itoa(j)
 		j++
-		nested := f.Type.GetIntSubfieldNames(subPrefix, nil)
+		nested := f.Type.GetIntSubfieldNamesSess(s, subPrefix, nil)
 		if sessHasError(s) {
 			return nil
 		}

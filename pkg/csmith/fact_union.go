@@ -654,7 +654,7 @@ func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) b
 		}
 		return false
 	}
-	fu := FindRelatedUnion(facts, v)
+	fu := FindRelatedUnionSess(s, facts, v)
 	// residual ERROR sticky — no invent readable/not-readable soft-skip past FindRelated hole
 	if sessHasError(s) {
 		return false
@@ -662,7 +662,7 @@ func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) b
 	if fu == nil {
 		return false
 	}
-	ok := tmp.Imply(fu)
+	ok := tmp.ImplySess(s, fu)
 	// residual ERROR sticky — no invent readable true past Imply hole
 	if sessHasError(s) {
 		return false

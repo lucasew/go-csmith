@@ -1259,17 +1259,19 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 }
 
 func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelector) *ArrayVariable {
+	// Prefer explicit s; fall back to vs.Sess (unit tests that only pass VS).
+	s = firstSess(s, vsSess(vs))
 	// ArrayVariable::itemize (void) — ArrayVariable.cpp:249–278
 	if av == nil || r == nil {
 		// nil receiver/RNG incomplete sticky (no invent itemize without live array/rng)
 		if av != nil && r == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}
 	// ArrayVariable.cpp:250 — assert(collective == 0); sticky no soft invent re-itemize self
 	if av.Collective != nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	item := &ArrayVariable{
@@ -1305,15 +1307,21 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 	// ArrayVariable.cpp:261–264 — type always live; only expand aggregate itemized
 	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
 	if item.Type == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	if item.Type.IsAggregate() {
-		item.CreateFieldVarsSess(vsSess(vs))
-		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
-		if sessHasError(vsSess(vs)) {
+	if item.Type.IsAggregateSess(s) {
+		// residual ERROR sticky — no invent soft-itemize past IsAggregate residual
+		if sessHasError(s) {
 			return nil
 		}
+		item.CreateFieldVarsSess(s)
+		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
+		if sessHasError(s) {
+			return nil
+		}
+	} else if sessHasError(s) {
+		return nil
 	}
 	if vs != nil {
 		vs.AllVars = append(vs.AllVars, &item.Variable)

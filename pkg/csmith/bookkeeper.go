@@ -154,7 +154,7 @@ func RecordAddressTakenSess(s *Session, v *Variable) {
 	}
 	v.IsAddrTaken = true
 	sessBK(s).addressTakenCnt++
-	if v.Type.HasBitfields() {
+	if v.Type.HasBitfieldsSess(s) {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
 		if sessHasError(s) {
 			return
@@ -226,7 +226,7 @@ func RecordBitfieldsReadsSess(s *Session, v *Variable) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if v.Type.HasBitfields() {
+	if v.Type.HasBitfieldsSess(s) {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
 		if sessHasError(s) {
 			return
@@ -253,7 +253,7 @@ func RecordBitfieldsWritesSess(s *Session, v *Variable) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if v.Type.HasBitfields() {
+	if v.Type.HasBitfieldsSess(s) {
 		// residual ERROR sticky — no invent soft-count past HasBitfields hole
 		if sessHasError(s) {
 			return
@@ -342,7 +342,7 @@ func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !t.HasBitfields() {
+	if !t.HasBitfieldsSess(s) {
 		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
 		if sessHasError(s) {
 			return
@@ -377,7 +377,7 @@ func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !t.IsAggregate() {
+	if !t.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-skip count past IsAggregate residual false
 		if sessHasError(s) {
 			return
@@ -389,7 +389,7 @@ func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 		return
 	}
 	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
-	if !t.HasBitfields() {
+	if !t.HasBitfieldsSess(s) {
 		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
 		if sessHasError(s) {
 			return
@@ -419,7 +419,7 @@ func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 			sessBK(s).unamedBitfieldsInTotal++
 		}
 		// Bookkeeper.cpp:491–495 — qfers_[i] const/volatile
-		if f.Qfer.IsConst() {
+		if f.Qfer.IsConstSess(s) {
 			// residual ERROR sticky — no invent soft-count past IsConst residual hole
 			if sessHasError(s) {
 				return
@@ -429,7 +429,7 @@ func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 			// residual ERROR sticky — no invent soft-continue stats past IsConst residual false
 			return
 		}
-		if f.Qfer.IsVolatile() {
+		if f.Qfer.IsVolatileSess(s) {
 			// residual ERROR sticky — no invent soft-count past IsVolatile residual hole
 			if sessHasError(s) {
 				return

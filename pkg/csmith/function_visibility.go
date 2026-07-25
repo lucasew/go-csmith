@@ -110,7 +110,7 @@ func (f *Function) IsVarVisibleSess(s *Session, v *Variable, stParent *Block) bo
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if v.IsGlobal() {
+	if v.IsGlobalSess(s) {
 		// residual ERROR sticky — no invent visible-true past IsGlobal hole
 		if sessHasError(s) {
 			return false

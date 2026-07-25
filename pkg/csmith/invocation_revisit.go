@@ -877,7 +877,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		retUF := GlobalUnionFactsOnly(fm.UnionFacts)
+		retUF := GlobalUnionFactsOnlySess(cgSess(cg), fm.UnionFacts)
 		if !UnionFactsComplete(retUF) {
 			restore()
 			if !sessHasError(cgSess(cg)) {

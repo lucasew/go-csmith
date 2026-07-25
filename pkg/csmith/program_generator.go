@@ -544,7 +544,7 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 		if f.Type == nil {
 			continue
 		}
-		if f.Type.IsAggregate() {
+		if f.Type.IsAggregateSess(g.Sess) {
 			if !g.outputStructUnion(f.Type, b, structAttr, unionAttr) {
 				return false
 			}
@@ -553,7 +553,7 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 		}
 	}
 	var decl string
-	if t.IsStruct() {
+	if t.IsStructSess(g.Sess) {
 		if structAttr != nil {
 			decl = t.OutputStructDeclWithSess(g.Sess, g.Rng, structAttr, g.Opts)
 		} else {

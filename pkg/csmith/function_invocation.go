@@ -1028,7 +1028,7 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
-		retUF := GlobalUnionFactsOnly(retUnions)
+		retUF := GlobalUnionFactsOnlySess(cgSess(cg), retUnions)
 		if !UnionFactsComplete(retUF) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)

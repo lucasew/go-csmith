@@ -1268,7 +1268,7 @@ func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 				sessNoteError(s, ErrGeneric)
 				return true
 			}
-			if f.Type.HasBitfields() {
+			if f.Type.HasBitfieldsSess(s) {
 				// residual ERROR sticky — no invent packed-true past HasBitfields hole
 				if sessHasError(s) {
 					return true
@@ -2434,7 +2434,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !v.Type.IsAggregate() {
+	if !v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-skip create past IsAggregate residual
 		if sessHasError(s) {
 			return
@@ -2453,13 +2453,13 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 	// Do NOT use Variable::is_volatile() (after_deref ORs is_volatile_struct_union):
 	// that would force all fields vol when parent has any vol field (seed2 e848:
 	// g_44.f1/f2/f4 wrongly vol → filtered under non-SE-free; UP n=11 vs Go n=8).
-	isVol := v.Qfer.IsVolatile()
+	isVol := v.Qfer.IsVolatileSess(s)
 	// residual ERROR sticky — no invent soft-create fields past qfer IsVolatile residual
 	if sessHasError(s) {
 		v.FieldVars = IncompleteVariables()
 		return
 	}
-	isConst := v.Qfer.IsConst()
+	isConst := v.Qfer.IsConstSess(s)
 	// residual ERROR sticky — no invent soft-create fields past qfer IsConst residual
 	if sessHasError(s) {
 		v.FieldVars = IncompleteVariables()
@@ -3114,7 +3114,16 @@ func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
 }
 
 func hashArrayUnionExcludedFieldsSess(s *Session, v *Variable, unionFacts []*FactUnion) []int {
-	if v == nil || v.Type == nil || !v.Type.IsUnion() || unionFacts == nil {
+	if v == nil || v.Type == nil || unionFacts == nil {
+		return nil
+	}
+	if !v.Type.IsUnionSess(s) {
+		if sessHasError(s) {
+			return nil
+		}
+		return nil
+	}
+	if sessHasError(s) {
 		return nil
 	}
 	var excluded []int
@@ -3124,7 +3133,7 @@ func hashArrayUnionExcludedFieldsSess(s *Session, v *Variable, unionFacts []*Fac
 		if f.BitWidth == 0 {
 			continue
 		}
-		if !IsFieldReadable(v, i, unionFacts) {
+		if !IsFieldReadableSess(s, v, i, unionFacts) {
 			// residual ERROR sticky — no invent soft-skip then partial array hash past hole
 			if sessHasError(s) {
 				return nil
@@ -3193,13 +3202,13 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if v.Type.IsSimple() {
+	if v.Type.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent soft-payload past IsSimple residual true
 		if sessHasError(s) {
 			return ""
 		}
 		useSimple = true
-	} else if v.Type.IsAggregate() {
+	} else if v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if sessHasError(s) {
 			return ""
@@ -3209,7 +3218,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			return ""
 		}
 		// Type.cpp:1615–1636 — flatten nested simple leaves
-		subs = v.Type.GetIntSubfieldNames("", excluded)
+		subs = v.Type.GetIntSubfieldNamesSess(s, "", excluded)
 		if sessHasError(s) {
 			return ""
 		}
@@ -3217,6 +3226,8 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		if len(subs) == 0 {
 			return ""
 		}
+	} else if sessHasError(s) {
+		return ""
 	} else {
 		// ePointer etc. — get_int_subfield_names yields empty → give up
 		return ""
