@@ -460,14 +460,14 @@ func RecordVarCreatedSess(s *Session, v *Variable) {
 	if sessHasError(s) {
 		return
 	}
-	d := v.Type.StructDepth()
+	d := v.Type.StructDepthSess(s)
 	// residual ERROR sticky — no invent soft-count depth past StructDepth residual
 	if sessHasError(s) {
 		return
 	}
 	bk := sessBK(s)
 	IncrCounterSess(s, &bk.structDepthCnts, d)
-	if v.Type.IsUnion() {
+	if v.Type.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-count union past IsUnion residual hole
 		if sessHasError(s) {
 			return

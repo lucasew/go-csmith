@@ -693,7 +693,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		return inputs, nil, -1, false
 	}
 	fm := cg.FM
-	currentInputs := CloneFactSlice(inputs)
+	currentInputs := CloneFactSliceSess(cgSess(cg), inputs)
 	// currentUnions is the eUnionWrite half of C++ current_inputs (FactVec).
 	// Only back-edge merge_facts grow it — not sequential stmt analyze (Block.cpp:520–536).
 	// Soft invent reused post-analyze live UnionFacts as entry → same_facts / map_in skew.
@@ -857,7 +857,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
-			work := CloneFactSlice(currentInputs)
+			work := CloneFactSliceSess(cgSess(cg), currentInputs)
 			sc := ShortcutAnalysisBlock(b, &work, cg)
 			switch sc {
 			case ShortcutOK:
@@ -897,7 +897,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return currentInputs, nil, -1, false
 			}
 		}
-		outputs := CloneFactSlice(currentInputs)
+		outputs := CloneFactSliceSess(cgSess(cg), currentInputs)
 		// Block.cpp:546–549 — facts for locals (full FactVec: ePointTo + eUnionWrite)
 		// Variable* always live on LocalVars; nil hole fails closed (no invent skip)
 		workUnions := entryUnions
@@ -1019,7 +1019,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return outputs, nil, -1, false
 		}
-		lastPreOOS = CloneFactSlice(outputs)
+		lastPreOOS = CloneFactSliceSess(cgSess(cg), outputs)
 		if sessHasError(cgSess(cg)) || !FactsComplete(lastPreOOS) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -1048,7 +1048,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// fm.UpdateFactsForOOSVars on a GlobalFacts temp swap, which also
 		// OOS-stripped live UnionFacts permanently. PT-only OOS on outCopy;
 		// SetMapFactsOutForBlock clones+OOS live unions for map_union_out.
-		outCopy := CloneFactSlice(outputs)
+		outCopy := CloneFactSliceSess(cgSess(cg), outputs)
 		if len(b.LocalVars) > 0 {
 			UpdateFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &outCopy)
 			if !FactsComplete(outCopy) {

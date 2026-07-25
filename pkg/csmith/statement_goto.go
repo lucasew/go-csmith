@@ -739,7 +739,7 @@ func MakeRandomGoto(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return makeGotoFailed()
 		}
-		gotoIn = CloneFactSlice(srcFacts)
+		gotoIn = CloneFactSliceSess(cgSess(cg), srcFacts)
 		gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), srcUnions)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(gotoInU) {
 			if !sessHasError(cgSess(cg)) {
@@ -790,7 +790,7 @@ func MakeRandomGoto(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return makeGotoFailed()
 		}
-		stmInMerged = CloneFactSlice(destIn)
+		stmInMerged = CloneFactSliceSess(cgSess(cg), destIn)
 		stmInMergedU = CloneUnionFactSliceDeepSess(cgSess(cg), destInU)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmInMergedU) {
 			if !sessHasError(cgSess(cg)) {
@@ -837,7 +837,7 @@ func MakeRandomGoto(
 			}
 		}
 		if changed || unionChanged {
-			stmOut = CloneFactSlice(stmInMerged)
+			stmOut = CloneFactSliceSess(cgSess(cg), stmInMerged)
 			stmOutU = CloneUnionFactSliceDeepSess(cgSess(cg), stmInMergedU)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmOutU) {
 				if !sessHasError(cgSess(cg)) {
@@ -869,7 +869,7 @@ func MakeRandomGoto(
 			// fail → extra Select). MakeupNewVarFacts restores those locals
 			// from the live GlobalFacts into the visit inputs (FactMgr.cpp:494–508).
 			// Keep post–merge_jump lattice (e.g. BOTTOM) — do not reload map_in.
-			liveSaved := CloneFactSlice(fm.GlobalFacts)
+			liveSaved := CloneFactSliceSess(cgSess(cg), fm.GlobalFacts)
 			liveSavedU := CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
 			if !FactsComplete(liveSaved) || !UnionFactsComplete(liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
@@ -930,7 +930,7 @@ func MakeRandomGoto(
 			// gen IV read g_77 first vs UP visit order g_16 g_22 g_77).
 			// Do not SetGlobalFacts(work) here: StmVisitFacts captures live
 			// GlobalFacts as restore target then loads *facts as the working set.
-			work := CloneFactSlice(stmInMerged)
+			work := CloneFactSliceSess(cgSess(cg), stmInMerged)
 			if sessHasError(cgSess(cg)) || !FactsComplete(work) {
 				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
@@ -987,10 +987,10 @@ func MakeRandomGoto(
 			// Func.Blocks n=37 vs UP n=3 at FindGoodJumpBlock).
 			if ContainsStmt(dest, other) {
 				if IsCtrlStmt(other) {
-					gotoIn = CloneFactSlice(fm.GetMapFactsIn(other.StmID))
+					gotoIn = CloneFactSliceSess(cgSess(cg), fm.GetMapFactsIn(other.StmID))
 					gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.GetMapUnionFactsIn(other.StmID))
 				} else {
-					gotoIn = CloneFactSlice(fm.GetMapFactsOut(other.StmID))
+					gotoIn = CloneFactSliceSess(cgSess(cg), fm.GetMapFactsOut(other.StmID))
 					gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.GetMapUnionFactsOut(other.StmID))
 				}
 				if sessHasError(cgSess(cg)) || !FactsComplete(gotoIn) || !UnionFactsComplete(gotoInU) {

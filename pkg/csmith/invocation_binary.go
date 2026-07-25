@@ -478,7 +478,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		afterLeftPT = CloneFactSlice(cg.FM.GlobalFacts)
+		afterLeftPT = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-continue past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false

@@ -230,7 +230,7 @@ func (t *Type) IsConstStructUnion() bool {
 
 func (t *Type) IsConstStructUnionSess(s *Session) bool {
 	// non-aggregate / nil Type is complete false (not const-struct)
-	if t == nil || !t.IsAggregate() {
+	if t == nil || !t.IsAggregateSess(s) {
 		return false
 	}
 	for _, f := range t.Fields {
@@ -275,7 +275,7 @@ func (t *Type) IsVolatileStructUnion() bool {
 
 func (t *Type) IsVolatileStructUnionSess(s *Session) bool {
 	// non-aggregate / nil Type is complete false (not vol-struct)
-	if t == nil || !t.IsAggregate() {
+	if t == nil || !t.IsAggregateSess(s) {
 		return false
 	}
 	for _, f := range t.Fields {
@@ -336,7 +336,7 @@ func (t *Type) StructDepthSess(s *Session) int {
 			sessNoteError(s, ErrGeneric)
 			return incompleteStructDepth
 		}
-		d := f.Type.StructDepth()
+		d := f.Type.StructDepthSess(s)
 		// residual ERROR sticky — no invent soft-continue later fields past nested StructDepth hole
 		if sessHasError(s) {
 			return incompleteStructDepth

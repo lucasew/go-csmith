@@ -472,7 +472,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
-	inputsCopy := CloneFactSlice(*facts)
+	inputsCopy := CloneFactSliceSess(cgSess(cg), *facts)
 	orders := fi.PermuteParamOrdersSess(cgSess(cg))
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
 	if len(orders) == 0 {
@@ -481,7 +481,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 	}
 	var merged []*FactPointTo
 	for i, order := range orders {
-		cur := CloneFactSlice(inputsCopy)
+		cur := CloneFactSliceSess(cgSess(cg), inputsCopy)
 		for _, paramID := range order {
 			if paramID < 0 || paramID >= len(fi.Args) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -508,7 +508,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 					}
 					return false
 				}
-				cur = CloneFactSlice(cg.FM.GlobalFacts)
+				cur = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 			}
 		}
 		if i == 0 {
@@ -635,12 +635,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// FunctionInvocationUser.cpp:315 — inputs_copy = inputs (pre-handover caller lattice).
 	// Deep-clone so handover/body cannot orphan mid-gen may-null on the live *facts slice
 	// when *facts aliases caller GlobalFacts (build_invocation passes global_facts by ref).
-	inputsCopy := CloneFactSlice(*facts)
+	inputsCopy := CloneFactSliceSess(cgSess(cg), *facts)
 	// Working lattice for handover + body visit. C++ mutates `inputs` in place for the
 	// visit_facts walk; we keep a separate work slice so callee FactMgr.GlobalFacts is
 	// never aliased to the caller's GlobalFacts slice (that alias polluted callee FM
 	// and could leave caller on a post-handover slice without frame locals).
-	work := CloneFactSlice(*facts)
+	work := CloneFactSliceSess(cgSess(cg), *facts)
 
 	restore := func() {
 		fm.MapFactsIn = inCopy
@@ -740,7 +740,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	work = CloneFactSlice(fm.GlobalFacts)
+	work = CloneFactSliceSess(cgSess(cg), fm.GlobalFacts)
 	// Restore callee GlobalFacts immediately — do not leave caller lattice installed.
 	fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_531")
 	// body Block::stm_id always live; StmID 0 sticky

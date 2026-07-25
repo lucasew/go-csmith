@@ -220,7 +220,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		inputs = CloneFactSlice(cg.FM.GlobalFacts)
+		inputs = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-fixed-point past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -253,7 +253,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 				return false
 			}
 		} else if FactsComplete(out) {
-			cl := CloneFactSlice(out)
+			cl := CloneFactSliceSess(cgSess(cg), out)
 			if sessHasError(cgSess(cg)) || !FactsComplete(cl) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -288,7 +288,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		inputsCopy = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if visit past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -325,7 +325,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		postCond = CloneFactSlice(cg.FM.GlobalFacts)
+		postCond = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-if arms past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -362,7 +362,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		thenFacts = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-then facts past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -379,7 +379,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		// Soft invent was SetGlobalFacts(PT-only) → else kept then-exit last-writes
 		// (seed-7 nested loop FP over-strip of back-edge gotos).
 		// effect_accum is NOT reset (C++ continues growing through false arm).
-		cg.FM.SetGlobalFacts(CloneFactSlice(postCond), "auto_statement_visit_317")
+		cg.FM.SetGlobalFacts(CloneFactSliceSess(cgSess(cg), postCond), "auto_statement_visit_317")
 		// residual ERROR sticky — no invent soft-else start past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -412,7 +412,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		elseFacts = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-else facts past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -545,7 +545,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.SetGlobalFacts(CloneFactSlice(inputsCopy), "auto_statement_visit_419")
+			cg.FM.SetGlobalFacts(CloneFactSliceSess(cgSess(cg), inputsCopy), "auto_statement_visit_419")
 			if sessHasError(cgSess(cg)) || !installU(inputsCopyU) {
 				return false
 			}
@@ -640,7 +640,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		factsCopy = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-for visit past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -714,7 +714,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.SetGlobalFacts(CloneFactSlice(factsCopy), "auto_statement_visit_559")
+			cg.FM.SetGlobalFacts(CloneFactSliceSess(cgSess(cg), factsCopy), "auto_statement_visit_559")
 			if sessHasError(cgSess(cg)) {
 				return false
 			}
@@ -921,7 +921,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
-	preFacts := CloneFactSlice(ptFacts)
+	preFacts := CloneFactSliceSess(cgSess(cg), ptFacts)
 	// residual ERROR sticky — no invent soft-arrayop visit past CloneFactSlice residual
 	if sessHasError(cgSess(cg)) {
 		return false
@@ -962,7 +962,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_visit_784")
+			cg.FM.SetGlobalFacts(CloneFactSliceSess(cgSess(cg), in), "auto_statement_visit_784")
 		}
 		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
 		// nil FindEdgesIn sticky incomplete CFG

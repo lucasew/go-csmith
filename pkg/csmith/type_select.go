@@ -389,13 +389,13 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 			return true
 		}
 		// Type.cpp ChooseRandomTypeFilter has no return_unions gate (unlike arg_unions on NonVoidNonVolatile)
-		if forFieldVar && t.IsStruct() {
+		if forFieldVar && t.IsStructSess(envSess(env)) {
 			// residual ERROR sticky — no invent soft-continue depth filter past IsStruct residual
 			if sessHasError(envSess(env)) {
 				return true
 			}
 			// Type.cpp:240–242 — reject when depth >= max_nested_struct_level
-			d := t.StructDepth()
+			d := t.StructDepthSess(envSess(env))
 			// residual ERROR sticky — no invent soft-continue filter past StructDepth hole
 			// (RndUptoFilter also fails closed on residual; reject candidate immediately)
 			if sessHasError(envSess(env)) {

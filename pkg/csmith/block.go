@@ -891,7 +891,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		// liveSaved — OOS on GlobalFacts before FP poisons re-analysis with body-local
 		// garbage pointees (seed-2 l_260). Build post-OOS map_out on a clone; keep
 		// GlobalFacts pre-OOS during FP; install map_out / OOS at end.
-		postFacts = CloneFactSlice(fm.GlobalFacts)
+		postFacts = CloneFactSliceSess(fmSess(fm), fm.GlobalFacts)
 		// residual ERROR sticky — no invent soft-post past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -925,7 +925,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		if postUnion == nil {
 			postUnion = []*FactUnion{}
 		}
-		outPost := CloneFactSlice(fm.GlobalFacts)
+		outPost := CloneFactSliceSess(fmSess(fm), fm.GlobalFacts)
 		if sessHasError(cgSess(cg)) || !FactsComplete(outPost) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -1014,7 +1014,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			} else {
-				factsCopy := CloneFactSlice(in0)
+				factsCopy := CloneFactSliceSess(cgSess(cg), in0)
 				// residual ERROR sticky — no invent soft-fixed-point past CloneFactSlice residual
 				if sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
@@ -1206,7 +1206,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							}
 							fm.SetMapFactsIn(b.StmID, factsCopy)
 							// pre-OOS outputs = entry + local facts (Block.cpp:558)
-							preOOS := CloneFactSlice(factsCopy)
+							preOOS := CloneFactSliceSess(cgSess(cg), factsCopy)
 							for _, v := range b.LocalVars {
 								if v == nil {
 									fm.GlobalFacts = IncompleteFactSlice()
@@ -1228,7 +1228,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 							// PT-only OOS on outCopy; SetMapFactsOutForBlock OOS-clones
 							// live unions for map_union_out (do not mutate live via
 							// fm.UpdateFactsForOOSVars — that also strips UnionFacts).
-							outCopy := CloneFactSlice(preOOS)
+							outCopy := CloneFactSliceSess(cgSess(cg), preOOS)
 							if len(b.LocalVars) > 0 {
 								UpdateFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &outCopy)
 								if !FactsComplete(outCopy) {
@@ -1291,7 +1291,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
-			fm.SetGlobalFacts(CloneFactSlice(outPost), "auto_block_oos_no_fp")
+			fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), outPost), "auto_block_oos_no_fp")
 			if sessHasError(cgSess(cg)) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()

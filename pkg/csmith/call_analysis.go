@@ -631,7 +631,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	switch {
 	case trueMust && falseMust:
 		// StatementIf.cpp:217–218 — outputs = pre_facts (full)
-		fm.SetGlobalFacts(CloneFactSlice(*preFacts), "auto_call_analysis_596")
+		fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), *preFacts), "auto_call_analysis_596")
 		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -653,7 +653,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		}
 	case trueMust:
 		// StatementIf.cpp:219–222 — outputs = map_facts_out[if_false]
-		fm.SetGlobalFacts(CloneFactSlice(elseOut), "auto_call_analysis_603")
+		fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), elseOut), "auto_call_analysis_603")
 		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -675,7 +675,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		}
 	case falseMust:
 		// StatementIf.cpp:223–227 — outputs = map_facts_out[if_true] + makeup from if_false in
-		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_610")
+		fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), thenOut), "auto_call_analysis_610")
 		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -722,7 +722,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		}
 	default:
 		// StatementIf.cpp:228–230 — outputs = then_out; merge_facts(outputs, else_out)
-		fm.SetGlobalFacts(CloneFactSlice(thenOut), "auto_call_analysis_632")
+		fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), thenOut), "auto_call_analysis_632")
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()

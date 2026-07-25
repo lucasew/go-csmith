@@ -1499,7 +1499,7 @@ func (c CGContext) AcceptType(t *Type) bool {
 	if sessHasError(c.Sess) {
 		return false
 	}
-	vol := t.IsVolatileStructUnion()
+	vol := t.IsVolatileStructUnionSess(c.Sess)
 	// residual ERROR sticky — no invent accept true past IsVolatileStructUnion residual
 	if sessHasError(c.Sess) {
 		return false

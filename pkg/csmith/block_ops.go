@@ -857,7 +857,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
-		preFacts = CloneFactSlice(fm.GlobalFacts)
+		preFacts = CloneFactSliceSess(cgSess(cg), fm.GlobalFacts)
 		preUnion = CloneUnionFactSlice(fm.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnion) {
 			if !sessHasError(cgSess(cg)) {

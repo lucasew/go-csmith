@@ -1991,7 +1991,7 @@ func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Vari
 			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
-		virt := v.IsVirtual()
+		virt := v.IsVirtualSess(s)
 		// residual ERROR sticky — no invent soft-continue keep shell past IsVirtual hole
 		// (FieldVarOf ancestry IsArray-without-AsArray residual ERROR+false soft-continues)
 		if sessHasError(s) {
@@ -2011,13 +2011,13 @@ func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Vari
 			return IncompleteVariables()
 		}
 		// don't break up a struct if it matches the given type
-		if v.Type.IsAggregate() && v.Type != want {
+		if v.Type.IsAggregateSess(s) && v.Type != want {
 			// residual ERROR sticky — no invent soft-expand past IsAggregate residual true
 			if sessHasError(s) {
 				return IncompleteVariables()
 			}
 			// FieldVars always live; incomplete fails closed sticky
-			if !v.FieldVarsComplete() {
+			if !v.FieldVarsCompleteSess(s) {
 				sessNoteError(s, ErrGeneric)
 				return IncompleteVariables()
 			}
@@ -2992,13 +2992,13 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	isAgg := t.IsAggregate()
+	isAgg := t.IsAggregateSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-local past IsAggregate residual
 	if sessHasError(vsSess(vs)) {
 		return nil
 	}
 	if isAgg {
-		volSU := t.IsVolatileStructUnion()
+		volSU := t.IsVolatileStructUnionSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-global past IsVolatileStructUnion residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -3328,7 +3328,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if elem == nil {
 			continue
 		}
-		if elem.IsConstStructUnion() {
+		if elem.IsConstStructUnionSess(vsSess(vs)) {
 			// residual ERROR sticky — no invent soft-continue then create later past field-Type hole
 			if sessHasError(vsSess(vs)) {
 				return nil

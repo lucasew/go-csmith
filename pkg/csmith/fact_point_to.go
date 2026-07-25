@@ -2416,6 +2416,11 @@ func CopyFacts(facts []*FactPointTo) []*FactPointTo {
 	return CloneFactSlice(facts)
 }
 
+// CopyFactsSess is CopyFacts on an explicit session bag.
+func CopyFactsSess(s *Session, facts []*FactPointTo) []*FactPointTo {
+	return CloneFactSliceSess(s, facts)
+}
+
 // CombineFacts mirrors combine_facts — join_visits across revisits.
 // Fact.cpp:225–235. Alias for JoinVisitsInto.
 func CombineFacts(facts *[]*FactPointTo, facts2 []*FactPointTo) {

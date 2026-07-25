@@ -1046,12 +1046,12 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 	}
 	// Expression.cpp:166–175 — struct/union cannot be constant subexpr; func gated by return flags
 	if typ != nil {
-		isSt := typ.IsStruct()
+		isSt := typ.IsStructSess(s)
 		// residual ERROR sticky — no invent soft-filter term past IsStruct residual
 		if sessHasError(s) {
 			return MaxTermTypes
 		}
-		isUn := typ.IsUnion()
+		isUn := typ.IsUnionSess(s)
 		// residual ERROR sticky — no invent soft-filter term past IsUnion residual
 		if sessHasError(s) {
 			return MaxTermTypes
@@ -1064,12 +1064,12 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 			if isUn && !opts.ReturnUnions {
 				f.Add(int(TermFunction))
 			}
-			isCSU := typ.IsConstStructUnion()
+			isCSU := typ.IsConstStructUnionSess(s)
 			// residual ERROR sticky — no invent soft-filter term past IsConstStructUnion residual
 			if sessHasError(s) {
 				return MaxTermTypes
 			}
-			isVSU := typ.IsVolatileStructUnion()
+			isVSU := typ.IsVolatileStructUnionSess(s)
 			// residual ERROR sticky — no invent soft-filter term past IsVolatileStructUnion residual
 			if sessHasError(s) {
 				return MaxTermTypes
@@ -1108,13 +1108,13 @@ func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options,
 	// don't call functions with constant parameters
 	f.Add(int(TermConstant))
 	if typ != nil {
-		if typ.IsStruct() && !opts.ReturnStructs {
+		if typ.IsStructSess(s) && !opts.ReturnStructs {
 			f.Add(int(TermFunction))
 		}
-		if typ.IsUnion() && !opts.ReturnUnions {
+		if typ.IsUnionSess(s) && !opts.ReturnUnions {
 			f.Add(int(TermFunction))
 		}
-		isCSU := typ.IsConstStructUnion()
+		isCSU := typ.IsConstStructUnionSess(s)
 		// residual ERROR sticky — no invent soft-filter param term past IsConstStructUnion residual
 		if sessHasError(s) {
 			return MaxTermTypes

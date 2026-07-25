@@ -1666,7 +1666,7 @@ func (v *Variable) IsConstAfterDerefSess(s *Session, derefLevel int) bool {
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
-		t = t.PtrType()
+		t = t.PtrTypeSess(s)
 		// residual ERROR sticky — no invent soft-peel past PtrType residual
 		if sessHasError(s) {
 			return true
@@ -1677,7 +1677,7 @@ func (v *Variable) IsConstAfterDerefSess(s *Session, derefLevel int) bool {
 			return true
 		}
 	}
-	ok := t.IsConstStructUnion()
+	ok := t.IsConstStructUnionSess(s)
 	// residual ERROR sticky — no invent non-const soft-skip past IsConstStructUnion hole
 	if sessHasError(s) {
 		return true
@@ -2541,7 +2541,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 			return
 		}
 		var init *Constant
-		isUn := top.Type.IsUnion()
+		isUn := top.Type.IsUnionSess(s)
 		// residual ERROR sticky — no invent soft-init path past IsUnion residual
 		if sessHasError(s) {
 			fail()
@@ -2551,7 +2551,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 			// Variable.cpp:395 — Constant::make_random via session CGOptions +
 			// Probabilities + DefaultRndNumGenerator; no invent NewProbabilities /
 			// separate NewRng stream
-			init = MakeRandom(f.Type, sessOpts(s), sessProbs(s), createVarRngSess(s))
+			init = MakeRandomSess(s, f.Type, sessOpts(s), sessProbs(s), createVarRngSess(s))
 			// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random nullptr
 			if sessHasError(s) || init == nil {
 				fail()
@@ -2565,7 +2565,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 		}
 		qfer := NewCVQualifiers(consts, vols)
 		// Variable.cpp:363 — assert(var->qfer.sanity_check(var->type))
-		if !qfer.SanityCheck(f.Type) {
+		if !qfer.SanityCheckSess(s, f.Type) {
 			// residual ERROR sticky — no invent soft-field past SanityCheck residual
 			if sessHasError(s) {
 				fail()

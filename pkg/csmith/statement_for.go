@@ -560,7 +560,7 @@ func MakeRandomFor(
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
-	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
+	preFacts := CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 	// residual ERROR sticky — no invent soft-for past CloneFactSlice residual
 	if sessHasError(cgSess(cg)) {
 		return nil

@@ -231,7 +231,7 @@ func MakeRandomAssignQfer(
 	} else if opts.StrictVolatileRule {
 		// StatementAssign.cpp:145–167
 		if typ != nil {
-			isVSU := typ.IsVolatileStructUnion()
+			isVSU := typ.IsVolatileStructUnionSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-continue RHS past IsVolatileStructUnion residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
@@ -1039,7 +1039,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
-			facts = CloneFactSlice(cg.FM.GlobalFacts)
+			facts = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 			// residual ERROR sticky — no invent soft-visit past CloneFactSlice residual
 			if sessHasError(cgSess(cg)) {
 				return false
