@@ -121,7 +121,7 @@ func TestCreateDFSOutputMgr(t *testing.T) {
 
 func TestGetCountPrefix(t *testing.T) {
 	ClearError()
-	g := &ProgramGenerator{OutputKind: OutputMgrKindDefault, GoodCount: 3}
+	g := &ProgramGenerator{Sess: testAmbientSession, OutputKind: OutputMgrKindDefault, GoodCount: 3}
 	if g.GetCountPrefix("x") != "" || !HasError() {
 		t.Fatal("default assert sticky")
 	}

@@ -54,7 +54,7 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 
 func TestGetCountPrefixDFSAfterGood(t *testing.T) {
 	ClearError()
-	g := &ProgramGenerator{OutputKind: OutputMgrKindDFS, GoodCount: 0}
+	g := &ProgramGenerator{Sess: testAmbientSession, OutputKind: OutputMgrKindDFS, GoodCount: 0}
 	if g.GetCountPrefix("n") != "p_0_n" {
 		t.Fatal(g.GetCountPrefix("n"))
 	}

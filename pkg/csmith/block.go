@@ -2226,16 +2226,10 @@ func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 	}
 	// Block.cpp:235–241 OutputStatementList
 	// Only fail closed on residuals raised during stmt emit (not pre-existing sticky).
-	// Prefer explicit bag; unit-test ambient only when s is nil (HasError bridge).
-	bagErr := func() bool {
-		if s != nil {
-			return sessHasError(s)
-		}
-		return HasError()
-	}
-	hadErr := bagErr()
+	// Explicit bag only (no ambient HasError dual-path).
+	hadErr := sessHasError(s)
 	stmtsOut := b.outputStmtsOnlySess(s, indent+1, false, opts)
-	if stmtsOut == "" && bagErr() && !hadErr {
+	if stmtsOut == "" && sessHasError(s) && !hadErr {
 		// residual during stmt list — no invent braces-only success past hole
 		return ""
 	}

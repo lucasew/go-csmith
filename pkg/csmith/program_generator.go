@@ -65,30 +65,35 @@ func ClearProcessProgramGenerator() { ClearProcessProgramGeneratorSess(testAmbie
 // ClearProcessProgramGeneratorSess clears ProgramGen on an explicit session bag.
 func ClearProcessProgramGeneratorSess(s *Session) { sessOrAmbient(s).ProgramGen = nil }
 
-// gSess returns g.Sess when set; else the quarantined unit-test ambient bag.
+// gSess returns g.Sess. Nil g → unit-test ambient.
+// Non-nil g must have Sess set (NewProgramGenerator / set g.Sess);
+// unset Sess panics — no silent dual-fill on a half-built ProgramGenerator.
 func gSess(g *ProgramGenerator) *Session {
-	if g != nil && g.Sess != nil {
-		return g.Sess
+	if g == nil {
+		return testAmbientSession
 	}
-	return testAmbientSession
+	if g.Sess == nil {
+		panic("gSess: Sess unset (use NewProgramGenerator or set g.Sess)")
+	}
+	return g.Sess
 }
 
-// noteErr records ERROR on g.Sess (or unit-test ambient when unset).
+// noteErr records ERROR on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) noteErr(code int) {
 	sessNoteError(gSess(g), code)
 }
 
-// hasErr reports ERROR on g.Sess when set, else unit-test ambient.
+// hasErr reports ERROR on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) hasErr() bool {
 	return sessHasError(gSess(g))
 }
 
-// clearErr clears ERROR on g.Sess when set, else unit-test ambient.
+// clearErr clears ERROR on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) clearErr() {
 	sessClearError(gSess(g))
 }
 
-// errCode returns sticky code preferring g.Sess, else unit-test ambient.
+// errCode returns sticky code on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) errCode() int {
 	return sessErrorCode(gSess(g))
 }
