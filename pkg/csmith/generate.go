@@ -66,13 +66,13 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 	defer ClearAttrGeneratorsSess(s)
 
 	if opts.DumpDefaultProbabilities != "" {
-		if err := WriteDumpDefaultProbabilities(opts.DumpDefaultProbabilities); err != nil {
+		if err := WriteDumpDefaultProbabilitiesSess(s, opts.DumpDefaultProbabilities); err != nil {
 			return "", err
 		}
 		return "", nil
 	}
 	if opts.DumpRandomProbabilities != "" {
-		if err := WriteDumpActualProbabilities(opts.DumpRandomProbabilities, opts.Seed); err != nil {
+		if err := WriteDumpActualProbabilitiesSess(s, opts.DumpRandomProbabilities, opts.Seed); err != nil {
 			return "", err
 		}
 		return "", nil
@@ -82,7 +82,7 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		if p == nil {
 			return "", fmt.Errorf("probabilities not initialized")
 		}
-		if msg, ok := p.ParseConfiguration(opts.ProbabilityConfiguration); !ok {
+		if msg, ok := p.ParseConfigurationSess(s, opts.ProbabilityConfiguration); !ok {
 			return "", fmt.Errorf("parsing configuration file error: %s", msg)
 		}
 	}

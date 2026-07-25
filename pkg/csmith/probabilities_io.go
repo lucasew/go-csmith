@@ -76,20 +76,30 @@ func init() {
 // GetSName mirrors Probabilities::get_sname.
 // Incomplete/unknown pname sticky "" (no invent empty token success).
 func GetSName(pname ProbName) string {
-	s, ok := probSName[pname]
+	return GetSNameSess(nil, pname)
+}
+
+// GetSNameSess is GetSName with explicit session residual sticky.
+func GetSNameSess(s *Session, pname ProbName) string {
+	name, ok := probSName[pname]
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return s
+	return name
 }
 
 // GetPName mirrors Probabilities::get_pname.
 // Unknown sname sticky Max-like fail closed (returns -1).
 func GetPName(sname string) (ProbName, bool) {
+	return GetPNameSess(nil, sname)
+}
+
+// GetPNameSess is GetPName with explicit session residual sticky.
+func GetPNameSess(s *Session, sname string) (ProbName, bool) {
 	p, ok := snameToPname[sname]
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	return p, true
@@ -98,7 +108,12 @@ func GetPName(sname string) (ProbName, bool) {
 // DestroyProcessProbabilities mirrors Probabilities::DestroyInstance.
 // Clears process singleton handle.
 func DestroyProcessProbabilities() {
-	SetProcessProbabilities(nil)
+	DestroyProcessProbabilitiesSess(nil)
+}
+
+// DestroyProcessProbabilitiesSess clears probabilities on an explicit session bag.
+func DestroyProcessProbabilitiesSess(s *Session) {
+	SetProcessProbabilitiesSess(s, nil)
 }
 
 // DumpSingleDefault mirrors SingleProbElem::dump_default — "sname=val".
@@ -115,8 +130,13 @@ func DumpSingleVal(sname string, val int) string {
 // Fair subset: all known single probs from this *Probabilities.
 // Empty fname sticky (no invent stdout dump as success file write).
 func (p *Probabilities) DumpDefaultProbabilities() string {
+	return p.DumpDefaultProbabilitiesSess(nil)
+}
+
+// DumpDefaultProbabilitiesSess is DumpDefaultProbabilities with explicit session residual sticky.
+func (p *Probabilities) DumpDefaultProbabilitiesSess(s *Session) string {
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Defaults from a fresh Defaults() table for "default" dump semantics
@@ -126,8 +146,13 @@ func (p *Probabilities) DumpDefaultProbabilities() string {
 
 // DumpActualProbabilities mirrors dump_actual_probabilities content (with seed header).
 func (p *Probabilities) DumpActualProbabilities(seed uint64) string {
+	return p.DumpActualProbabilitiesSess(nil, seed)
+}
+
+// DumpActualProbabilitiesSess is DumpActualProbabilities with explicit session residual sticky.
+func (p *Probabilities) DumpActualProbabilitiesSess(s *Session, seed uint64) string {
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -171,37 +196,52 @@ func (p *Probabilities) dumpSingles(actual bool) string {
 
 // WriteDumpDefaultProbabilities writes dump to file (C++ ofstream path).
 func WriteDumpDefaultProbabilities(fname string) error {
+	return WriteDumpDefaultProbabilitiesSess(nil, fname)
+}
+
+// WriteDumpDefaultProbabilitiesSess is WriteDumpDefaultProbabilities with explicit session residual sticky.
+func WriteDumpDefaultProbabilitiesSess(s *Session, fname string) error {
 	if fname == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return fmt.Errorf("empty dump path")
 	}
-	p := sessProbs(nil)
+	p := sessProbs(s)
 	if p == nil {
 		p = NewProbabilities(Defaults())
 	}
-	return os.WriteFile(fname, []byte(p.DumpDefaultProbabilities()), 0o644)
+	return os.WriteFile(fname, []byte(p.DumpDefaultProbabilitiesSess(s)), 0o644)
 }
 
 // WriteDumpActualProbabilities writes actual vals + seed header.
 func WriteDumpActualProbabilities(fname string, seed uint64) error {
+	return WriteDumpActualProbabilitiesSess(nil, fname, seed)
+}
+
+// WriteDumpActualProbabilitiesSess is WriteDumpActualProbabilities with explicit session residual sticky.
+func WriteDumpActualProbabilitiesSess(s *Session, fname string, seed uint64) error {
 	if fname == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return fmt.Errorf("empty dump path")
 	}
-	p := sessProbs(nil)
+	p := sessProbs(s)
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return fmt.Errorf("probabilities not initialized")
 	}
-	return os.WriteFile(fname, []byte(p.DumpActualProbabilities(seed)), 0o644)
+	return os.WriteFile(fname, []byte(p.DumpActualProbabilitiesSess(s, seed)), 0o644)
 }
 
 // ParseConfiguration mirrors Probabilities::parse_configuration.
 // Supports single-line "sname=val" and # comments for the fair single-prob subset.
 // Group lines for equal/unequal groups fail closed with error_msg (no invent skip).
 func (p *Probabilities) ParseConfiguration(fname string) (errMsg string, ok bool) {
+	return p.ParseConfigurationSess(nil, fname)
+}
+
+// ParseConfigurationSess is ParseConfiguration with explicit session residual sticky.
+func (p *Probabilities) ParseConfigurationSess(s *Session, fname string) (errMsg string, ok bool) {
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return "nil probabilities", false
 	}
 	if fname == "" {
@@ -218,7 +258,7 @@ func (p *Probabilities) ParseConfiguration(fname string) (errMsg string, ok bool
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		if msg, ok := p.ParseLine(line); !ok {
+		if msg, ok := p.ParseLineSess(s, line); !ok {
 			return msg, false
 		}
 	}
@@ -230,8 +270,13 @@ func (p *Probabilities) ParseConfiguration(fname string) (errMsg string, ok bool
 
 // ParseLine mirrors Probabilities::parse_line.
 func (p *Probabilities) ParseLine(line string) (errMsg string, ok bool) {
+	return p.ParseLineSess(nil, line)
+}
+
+// ParseLineSess is ParseLine with explicit session residual sticky.
+func (p *Probabilities) ParseLineSess(s *Session, line string) (errMsg string, ok bool) {
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return "nil probabilities", false
 	}
 	trim := strings.TrimSpace(line)
@@ -246,12 +291,17 @@ func (p *Probabilities) ParseLine(line string) (errMsg string, ok bool) {
 		// Group probability configuration not fully wired on fair spine tables.
 		return "group probabilities not supported in fair parse subset", false
 	default:
-		return p.parseSingleProbability(trim)
+		return p.parseSingleProbabilitySess(s, trim)
 	}
 }
 
 // parseSingleProbability mirrors parse_single_probability.
 func (p *Probabilities) parseSingleProbability(line string) (string, bool) {
+	return p.parseSingleProbabilitySess(nil, line)
+}
+
+// parseSingleProbabilitySess is parseSingleProbability with explicit session residual sticky.
+func (p *Probabilities) parseSingleProbabilitySess(s *Session, line string) (string, bool) {
 	parts := strings.SplitN(line, string(singleElemSep), 2)
 	if len(parts) != 2 {
 		return "invalid single probability format", false
@@ -262,9 +312,9 @@ func (p *Probabilities) parseSingleProbability(line string) (string, bool) {
 	if err != nil || val < 0 || val > 100 {
 		return "invalid probability value", false
 	}
-	pn, ok := GetPName(sname)
+	pn, ok := GetPNameSess(s, sname)
 	if !ok {
-		ClearError() // GetPName stickied; surface as config error
+		ClearErrorSess(s) // GetPName stickied; surface as config error
 		return "invalid string in the configuration file: " + sname, false
 	}
 	if p.single == nil {
