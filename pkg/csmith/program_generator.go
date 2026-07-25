@@ -1399,7 +1399,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	// Route Process* to g.Sess for this call (tests may call GoGenerator without outer Generate).
+	// Route residual Process* to g.Sess (tests may call GoGenerator without outer Generate).
 	if g.Sess != nil {
 		restore := activateSession(g.Sess)
 		defer restore()
@@ -1583,6 +1583,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
+	// Route residual Process* to g.Sess (tests may call DFS loop without outer Generate).
 	if g.Sess != nil {
 		restore := activateSession(g.Sess)
 		defer restore()

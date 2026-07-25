@@ -523,8 +523,8 @@ func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
 		v = vars[0]
 	} else {
 		// VariableSelector.cpp:324 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
-		// random mode always GOOD; still call for fair wiring (process CGOptions)
-		if DepthGuardByDepthSess(nil, sessOpts(nil), 1) == BadDepth {
+		// random mode always GOOD; still call for fair wiring (session CGOptions)
+		if DepthGuardByDepthSess(s, sessOpts(s), 1) == BadDepth {
 			return nil
 		}
 		// VariableSelector.cpp:326–329 — rnd_upto(len); sticky no invent vars[0] without RNG

@@ -1782,7 +1782,7 @@ func makeExpressionVariableFlags(
 		deref, _ := ev.IndirectLevelComplete()
 		if deref > 0 {
 			bk := sessBK(cgSess(cg))
-			IncrCounter(&bk.readDereferenceCnts, deref)
+			IncrCounterSess(cgSess(cg), &bk.readDereferenceCnts, deref)
 		} else if deref < 0 {
 			RecordAddressTakenSess(cgSess(cg), v)
 		}

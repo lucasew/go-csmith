@@ -2216,7 +2216,8 @@ func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 	// for non-global lists (Variable.cpp:861–863). Do not invent a loopInits-only gate:
 	// C++ still emits "int i, j, k;" when every array is brace-init (seed-2 func_67).
 	if len(b.LocalVars) > 0 {
-		listOut := OutputVariableListOpts(b.LocalVars, inner, false, opts)
+		// bag-local ArrayInitSeed / sticky — no ambient OutputVariableListOpts residual
+		listOut := OutputVariableListSess(s, b.LocalVars, inner, false, opts)
 		// residual ERROR sticky — no invent soft-continue stmts past OutputVariableList residual
 		if sessHasError(s) {
 			return ""

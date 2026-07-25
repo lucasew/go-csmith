@@ -435,12 +435,17 @@ func (q CVQualifiers) SanityCheckSess(s *Session, t *Type) bool {
 // these random_* helpers must too (seed-2 e9060: choose exact-miss then
 // RandomLooserConsts F50 while UP skipped flips under match_exact).
 func processMatchExactQualifiers(opts Options) bool {
+	return processMatchExactQualifiersSess(nil, opts)
+}
+
+// processMatchExactQualifiersSess ORs bag opts with explicit opts (StatementAssign
+// forces MatchExactQualifiers on the run bag; ambient only when s is nil).
+func processMatchExactQualifiersSess(s *Session, opts Options) bool {
 	// Prefer explicit opts (StatementAssign forces opts + cg.Sess.Opts).
-	// Ambient OR only when opts false — unit tests that SetProcessOptions alone.
 	if opts.MatchExactQualifiers {
 		return true
 	}
-	return sessOpts(nil).MatchExactQualifiers
+	return sessOpts(s).MatchExactQualifiers
 }
 
 // RandomStricterConsts mirrors CVQualifiers::random_stricter_consts.
@@ -453,7 +458,7 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 
 func (q CVQualifiers) RandomStricterConstsSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
-	if processMatchExactQualifiers(opts) {
+	if processMatchExactQualifiersSess(s, opts) {
 		return append([]bool(nil), q.IsConsts...)
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent identity without draw
@@ -499,7 +504,7 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 
 func (q CVQualifiers) RandomStricterVolatilesSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
-	if processMatchExactQualifiers(opts) {
+	if processMatchExactQualifiersSess(s, opts) {
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
@@ -545,7 +550,7 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 
 func (q CVQualifiers) RandomLooserConstsSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
-	if processMatchExactQualifiers(opts) {
+	if processMatchExactQualifiersSess(s, opts) {
 		return append([]bool(nil), q.IsConsts...)
 	}
 	if r == nil {
@@ -584,7 +589,7 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 
 func (q CVQualifiers) RandomLooserVolatilesSess(s *Session, r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
-	if processMatchExactQualifiers(opts) {
+	if processMatchExactQualifiersSess(s, opts) {
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
@@ -755,7 +760,7 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 	out := q
 	out.IsConsts = append([]bool(nil), q.IsConsts...)
 	out.IsVolatiles = append([]bool(nil), q.IsVolatiles...)
-	if processMatchExactQualifiers(opts) {
+	if processMatchExactQualifiersSess(s, opts) {
 		out.AddQualifiersSess(s, false, false)
 		return out
 	}

@@ -491,12 +491,12 @@ func RandomOutputVarDefsOptsSess(s *Session, globals []*Variable, nFiles int, fo
 		}
 		var def string
 		if v.IsArray && v.AsArray != nil {
-			def = v.AsArray.OutputDefOpts(opts)
+			def = v.AsArray.OutputDefSess(s, opts)
 		} else if v.IsArray {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		} else {
-			def = v.OutputDef(forceStatic)
+			def = v.OutputDefFullSess(s, forceStatic, false, false, nil)
 		}
 		if sessHasError(s) || def == "" {
 			if !sessHasError(s) {
@@ -548,7 +548,7 @@ func RandomOutputFuncDefsOptsSess(s *Session, funcs []*Function, nFiles int, for
 		if idx < 0 || sessHasError(s) {
 			return nil
 		}
-		body := f.OutputOptsWith(forceStatic, funcAttr, rng, opts)
+		body := f.OutputOptsWithSess(s, forceStatic, funcAttr, rng, opts)
 		if sessHasError(s) || body == "" {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)

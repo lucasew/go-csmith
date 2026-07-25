@@ -854,7 +854,7 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 	deref, _ := lhs.IndirectLevelComplete()
 	if deref > 0 {
 		bk := sessBK(cgSess(cg))
-		IncrCounter(&bk.writeDereferenceCnts, deref)
+		IncrCounterSess(cgSess(cg), &bk.writeDereferenceCnts, deref)
 	}
 	RecordVolatileAccessSess(cgSess(cg), v, deref, true)
 	// wrap volatiles for OutputLhsC path on Variable
@@ -1119,9 +1119,9 @@ func selectDerefPointerInv(
 	}
 	var ptrType *Type
 	if vs != nil && vs.Types != nil {
-		ptrType = vs.Types.FindPointerType(typ, true)
+		ptrType = vs.Types.FindPointerTypeSess(cg.Sess, typ, true)
 	} else {
-		ptrType = PointerTo(typ)
+		ptrType = PointerToSess(cg.Sess, typ)
 	}
 	if ptrType == nil {
 		return nil

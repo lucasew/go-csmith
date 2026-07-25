@@ -23,8 +23,8 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 }
 
 // Generate runs one generation using s as the only mutable bag for the run.
-// Activates s for Process* helpers for the duration of the call, then clears
-// the ambient pointer so nothing is left global.
+// Still activates s for residual Process* / sessOpts(nil) paths until those
+// readers are fully bag-local; clears activeSession on return.
 func (s *Session) Generate(ctx context.Context) (string, error) {
 	if s == nil {
 		return "", fmt.Errorf("nil session")
@@ -33,7 +33,7 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	// Bridge: install this session for Process*/SetError for this call only.
+	// Bridge: residual Process* / sessOpts(nil) still require activeSession.
 	restore := activateSession(s)
 	defer restore()
 

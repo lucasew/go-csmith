@@ -842,9 +842,16 @@ func TypeDoFinalization() {
 	TypeDoFinalizationSess(nil)
 }
 
-// TypeDoFinalizationSess clears PointerCache on an explicit session bag.
+// TypeDoFinalizationSess clears PointerCache on an explicit session bag and
+// resets package simpleTypes.Used so multi-Generate reuses a clean used mark
+// (C++ simple_types[] is process-static; library multi-Generate needs reset).
 func TypeDoFinalizationSess(s *Session) {
 	sessOrAmbient(s).PointerCache = map[*Type]*Type{}
+	for _, t := range simpleTypes {
+		if t != nil {
+			t.Used = false
+		}
+	}
 }
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).

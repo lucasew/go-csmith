@@ -486,10 +486,7 @@ func MakeFirst(
 	if env != nil {
 		cg.Types = env
 	}
-	// Bridge: ambient only when no VS/FMList session (unit tests).
-	if cg.Sess == nil {
-		cg.Sess = currentSession()
-	}
+	// No ambient currentSession fill-in: pure bags leave Sess nil when no VS/FMList.
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
 	// sticky error / null body / Unbuilt — do not invent success first function
 	if sessHasError(runSess) || f.Body == nil || f.BuildState != BuildBuilt {
