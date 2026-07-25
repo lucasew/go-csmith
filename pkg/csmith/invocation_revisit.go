@@ -624,8 +624,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	}
 	// backup maps — FactVec partitions (ePointTo + eUnionWrite) + effects
 	// FactMgr.cpp map_facts_in/out are full FactVec; Go splits PT/union maps.
-	inCopy := cloneFactMap(fm.MapFactsIn)
-	outCopy := cloneFactMap(fm.MapFactsOut)
+	inCopy := cloneFactMapSess(cgSess(cg), fm.MapFactsIn)
+	outCopy := cloneFactMapSess(cgSess(cg), fm.MapFactsOut)
 	unionInCopy := cloneUnionFactMapSess(cgSess(cg), fm.MapUnionFactsIn)
 	unionOutCopy := cloneUnionFactMapSess(cgSess(cg), fm.MapUnionFactsOut)
 	effCopy := cloneEffectMapSess(cgSess(cg), fm.MapStmEffect)
@@ -898,13 +898,17 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 }
 
 func cloneFactMap(m map[int][]*FactPointTo) map[int][]*FactPointTo {
+	return cloneFactMapSess(nil, m)
+}
+
+func cloneFactMapSess(s *Session, m map[int][]*FactPointTo) map[int][]*FactPointTo {
 	if m == nil {
 		return make(map[int][]*FactPointTo)
 	}
 	out := make(map[int][]*FactPointTo, len(m))
 	for k, v := range m {
 		// incomplete → hole marker (not bare nil invent empty complete)
-		out[k] = storeFactMapEntry(v)
+		out[k] = storeFactMapEntrySess(s, v)
 	}
 	return out
 }

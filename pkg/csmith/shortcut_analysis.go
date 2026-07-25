@@ -740,7 +740,7 @@ func ShortcutAnalysisSess(s *Session, st *Stmt, facts *[]*FactPointTo, cg *CGCon
 	if !UnionFactsComplete(outU) {
 		return ShortcutNone
 	}
-	*facts = CloneFactSlice(out)
+	*facts = CloneFactSliceSess(s, out)
 	clU := CloneUnionFactSliceDeepSess(s, outU)
 	if !UnionFactsComplete(clU) {
 		return ShortcutNone
@@ -815,7 +815,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	haveLive := false
 	if cg.FM != nil {
 		if FactsComplete(cg.FM.GlobalFacts) {
-			liveSaved = CloneFactSlice(cg.FM.GlobalFacts)
+			liveSaved = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 			if liveSaved == nil {
 				liveSaved = []*FactPointTo{}
 			}
@@ -823,7 +823,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 				haveLive = true
 			}
 		}
-		cl := CloneFactSlice(*facts)
+		cl := CloneFactSliceSess(cgSess(cg), *facts)
 		if sessHasError(cgSess(cg)) || !FactsComplete(cl) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -846,7 +846,7 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 			ok = false
 		} else {
-			*facts = CloneFactSlice(cg.FM.GlobalFacts)
+			*facts = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 			if sessHasError(cgSess(cg)) || !FactsComplete(*facts) {
 				// residual visit HasError with complete empty work: still harvest
 				if !FactsComplete(*facts) {
@@ -950,8 +950,8 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	// inputs_copy is full FactVec (ePointTo + eUnionWrite). Soft invent was PT-only
 	// clone then SetMapFactsIn pairing live (post-visit) UnionFacts → map_facts_in held
 	// post last-writes while point-to was pre (same_facts / IsNonreadableField skew).
-	inputsCopy := CloneFactSlice(*facts)
-	// incomplete pre-visit clone sticky (CloneFactSlice already sticks on holes)
+	inputsCopy := CloneFactSliceSess(cgSess(cg), *facts)
+	// incomplete pre-visit clone sticky (CloneFactSliceSess already sticks on holes)
 	if !FactsComplete(inputsCopy) {
 		if !sessHasError(cgSess(cg)) {
 			sessNoteError(cgSess(cg), ErrGeneric)
