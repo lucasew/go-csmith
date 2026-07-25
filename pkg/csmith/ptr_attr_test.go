@@ -78,11 +78,11 @@ func TestArrayOutputInitNoPostIncr(t *testing.T) {
 	}
 	// force not NoLoopInitializer — local non-const
 	av.Init = MakeInt(0)
-	out := av.OutputInitOpts("    ", []string{"i"}, false)
+	out := av.OutputInitOptsSess(testAmbientSession, "    ", []string{"i"}, false)
 	if !strings.Contains(out, "i = i + 1") {
 		t.Fatal(out)
 	}
-	out2 := av.OutputInitOpts("    ", []string{"i"}, true)
+	out2 := av.OutputInitOptsSess(testAmbientSession, "    ", []string{"i"}, true)
 	if !strings.Contains(out2, "i++") {
 		t.Fatal(out2)
 	}

@@ -119,7 +119,7 @@ func TestItemizeArrayWithIV(t *testing.T) {
 	if !strings.Contains(item.Indices[0], "i") {
 		t.Fatal(item.Indices[0])
 	}
-	out := item.OutputAccess()
+	out := item.OutputAccessSess(testAmbientSession)
 	if !strings.Contains(out, "g_a[") {
 		t.Fatal(out)
 	}

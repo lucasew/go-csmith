@@ -45,7 +45,7 @@ func TestArrayNoLoopInitializer(t *testing.T) {
 	opts := Defaults()
 	// global → true
 	g := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
-	if g == nil || !g.NoLoopInitializer() {
+	if g == nil || !g.NoLoopInitializerSess(testAmbientSession) {
 		t.Fatal("global must no-loop")
 	}
 	// local with no multi inits: force empty InitValues
@@ -56,11 +56,11 @@ func TestArrayNoLoopInitializer(t *testing.T) {
 	}
 	loc.InitValues = nil
 	loc.ArrayInits = nil
-	if loc.NoLoopInitializer() {
+	if loc.NoLoopInitializerSess(testAmbientSession) {
 		// local non-const simple without multi inits → false
 		t.Fatal("local should allow loop init")
 	}
-	out := loc.OutputInit("    ", []string{"i"})
+	out := loc.OutputInitOptsSess(testAmbientSession, "    ", []string{"i"}, true)
 	if out == "" || !contains(out, "for") || !contains(out, "for (i = 0") {
 		t.Fatal(out)
 	}

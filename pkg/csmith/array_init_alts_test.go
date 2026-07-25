@@ -77,7 +77,7 @@ func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
 		InitValues: []string{"B", "C"},
 	}
 	av.AsArray = av
-	def := av.OutputDef()
+	def := av.OutputDefSess(testAmbientSession, Defaults())
 	if def == "" || HasErrorSess(testAmbientSession) {
 		t.Fatalf("OutputDef fail err=%v", GetErrorSess(testAmbientSession))
 	}

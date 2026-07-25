@@ -15,20 +15,20 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 	}
 	r2 := NewRngSess(testAmbientSession, 5)
 	before := r2.RandDepth()
-	item := av.Itemize(r2)
+	item := av.ItemizeIntoSess(testAmbientSession, r2, nil)
 	if item == nil || item.Collective != av {
 		t.Fatal(item)
 	}
-	if len(item.Indices) != av.Dimension() {
-		t.Fatalf("indices %v dims %d", item.Indices, av.Dimension())
+	if len(item.Indices) != av.DimensionSess(testAmbientSession) {
+		t.Fatalf("indices %v dims %d", item.Indices, av.DimensionSess(testAmbientSession))
 	}
-	if r2.RandDepth() != before+uint64(av.Dimension()) {
+	if r2.RandDepth() != before+uint64(av.DimensionSess(testAmbientSession)) {
 		// each dim one RndUpto
 		if r2.RandDepth() < before {
 			t.Fatal("depth")
 		}
 	}
-	acc := item.OutputAccess()
+	acc := item.OutputAccessSess(testAmbientSession)
 	if !strings.HasPrefix(acc, "g_a[") {
 		t.Fatal(acc)
 	}

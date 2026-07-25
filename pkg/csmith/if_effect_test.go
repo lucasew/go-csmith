@@ -114,20 +114,20 @@ func TestArrayBuildInitRecursive(t *testing.T) {
 	av.ArraySizes = av.Sizes
 	av.InitValues = []string{"1", "2", "3"}
 	av.ArrayInits = av.InitValues
-	out := av.OutputDef()
+	out := av.OutputDefSess(testAmbientSession, Defaults())
 	if !strings.Contains(out, "{{") {
 		t.Fatal("want nested braces", out)
 	}
 	// empty init_strings list is broken IR sticky
 	ClearErrorSess(testAmbientSession)
-	if av.buildInitRecursive(0, nil) != "" {
+	if av.buildInitRecursiveSess(testAmbientSession, 0, nil) != "" {
 		t.Fatal("empty init list must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty init list must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if av.buildInitRecursive(0, []string{""}) != "" {
+	if av.buildInitRecursiveSess(testAmbientSession, 0, []string{""}) != "" {
 		t.Fatal("empty hole string must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

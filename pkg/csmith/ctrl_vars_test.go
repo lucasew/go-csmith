@@ -106,8 +106,8 @@ func TestOutputLowerBoundArray(t *testing.T) {
 	if av.OutputLowerBoundSess(testAmbientSession) != "g_a[0][0]" {
 		t.Fatal(av.OutputLowerBoundSess(testAmbientSession))
 	}
-	if av.OutputWithIndices([]string{"i", "j"}) != "g_a[i][j]" {
-		t.Fatal(av.OutputWithIndices([]string{"i", "j"}))
+	if av.OutputWithIndicesSess(testAmbientSession, []string{"i", "j"}) != "g_a[i][j]" {
+		t.Fatal(av.OutputWithIndicesSess(testAmbientSession, []string{"i", "j"}))
 	}
 }
 
@@ -238,7 +238,7 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 		Block:      &Block{}, // non-nil → not global
 	}
 	av.AsArray = av
-	if !av.NoLoopInitializer() {
+	if !av.NoLoopInitializerSess(testAmbientSession) {
 		t.Fatal("brace-init local must NoLoopInitializer")
 	}
 	out := OutputArrayInitializersSess(testAmbientSession, []*Variable{&av.Variable}, opts, "    ")

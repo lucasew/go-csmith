@@ -166,7 +166,7 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 	if !parent.IsVirtualSess(testAmbientSession) {
 		t.Fatal("parent collective must be virtual")
 	}
-	item := parent.Itemize(NewRngSess(testAmbientSession, 1))
+	item := parent.ItemizeIntoSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil)
 	if item == nil || item.IsVirtualSess(testAmbientSession) {
 		t.Fatal("itemized member must not be virtual")
 	}

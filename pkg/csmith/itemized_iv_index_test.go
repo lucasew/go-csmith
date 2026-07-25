@@ -55,7 +55,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 	if got1 == nil {
 		t.Fatalf("ItemizeArray 1d: %v", GetErrorSess(testAmbientSession))
 	}
-	out1 := got1.OutputAccess()
+	out1 := got1.OutputAccessSess(testAmbientSession)
 	if !strings.Contains(out1, "g_106[4]") {
 		t.Fatalf("got %q must contain g_106[4] (not bare g_106); Indices=%v", out1, got1.Indices)
 	}

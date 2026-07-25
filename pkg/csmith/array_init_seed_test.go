@@ -16,7 +16,7 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 		Variable: Variable{Name: "a1", Type: GetIntType(), IsArray: true, ArraySizes: []int{1}},
 		Sizes:    []int{1},
 	}
-	s1 := a1.buildInitRecursive(0, []string{"A"})
+	s1 := a1.buildInitRecursiveSess(testAmbientSession, 0, []string{"A"})
 	if s1 != "{A}" {
 		t.Fatalf("a1: got %q", s1)
 	}
@@ -29,7 +29,7 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 		Variable: Variable{Name: "a2", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
-	s2 := a2.buildInitRecursive(0, []string{"X", "Y"})
+	s2 := a2.buildInitRecursiveSess(testAmbientSession, 0, []string{"X", "Y"})
 	// C++ size_t width after unsigned seed*seed wrap
 	pick := func(seed uint32, i int, n int) int {
 		ss := uint64(seed * seed)
@@ -60,7 +60,7 @@ func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 		Sizes:    []int{2, 2},
 	}
 	// four leaves with pool of 3
-	out := av.buildInitializerStr([]string{"0", "1", "2"})
+	out := av.buildInitializerStrSess(testAmbientSession, []string{"0", "1", "2"}, Defaults())
 	if !strings.HasPrefix(out, "{{") || strings.Count(out, "{") != 3 {
 		// 1 outer + 2 mid for 2d? actually {{a,b},{c,d}} → braces 1+2+0? {{ }} 3 open
 		t.Log(out)
@@ -71,7 +71,7 @@ func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 	}
 	// second call continues seed
 	seedAfter := currentSession().ArrayInitSeed
-	_ = av.buildInitializerStr([]string{"0", "1", "2"})
+	_ = av.buildInitializerStrSess(testAmbientSession, []string{"0", "1", "2"}, Defaults())
 	if currentSession().ArrayInitSeed <= seedAfter {
 		t.Fatal("static seed must advance across arrays")
 	}

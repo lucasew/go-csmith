@@ -175,7 +175,7 @@ func TestArrayIsVariant(t *testing.T) {
 		Indices:    []string{"i"},
 	}
 	b.AsArray = b
-	if !a.IsVariant(&b.Variable) {
+	if !a.IsVariantSess(testAmbientSession, &b.Variable) {
 		t.Fatal("same keys")
 	}
 	c := &ArrayVariable{
@@ -185,7 +185,7 @@ func TestArrayIsVariant(t *testing.T) {
 		Indices:    []string{"j"},
 	}
 	c.AsArray = c
-	if a.IsVariant(&c.Variable) {
+	if a.IsVariantSess(testAmbientSession, &c.Variable) {
 		t.Fatal("different keys")
 	}
 	// collective must match
@@ -196,7 +196,7 @@ func TestArrayIsVariant(t *testing.T) {
 		Indices:    []string{"i"},
 	}
 	d.AsArray = d
-	if a.IsVariant(&d.Variable) {
+	if a.IsVariantSess(testAmbientSession, &d.Variable) {
 		t.Fatal("diff collective")
 	}
 	// incomplete IndexExprs must not invent variant via string Indices soft-skip
@@ -205,7 +205,7 @@ func TestArrayIsVariant(t *testing.T) {
 	a.Indices = []string{"i"}
 	b.IndexExprs = []*Expression{nil}
 	b.Indices = []string{"i"}
-	if a.IsVariant(&b.Variable) {
+	if a.IsVariantSess(testAmbientSession, &b.Variable) {
 		t.Fatal("IndexExprs hole must fail closed not invent string match")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -216,7 +216,7 @@ func TestArrayIsVariant(t *testing.T) {
 	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false), ExprType: GetIntType()}}
 	b.IndexExprs = nil
 	b.Indices = []string{"i"}
-	if a.IsVariant(&b.Variable) {
+	if a.IsVariantSess(testAmbientSession, &b.Variable) {
 		t.Fatal("mixed IndexExprs/Indices must fail closed")
 	}
 	ClearErrorSess(testAmbientSession)

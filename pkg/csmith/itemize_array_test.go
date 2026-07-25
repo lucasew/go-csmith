@@ -50,7 +50,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 		ie := item.IndexExprs[0]
 		if ie.Term == TermFunction && ie.Invoke != nil && ie.Invoke.Binary == "+" {
 			foundOff = true
-			out := item.OutputAccess()
+			out := item.OutputAccessSess(testAmbientSession)
 			if !strings.Contains(out, "+") {
 				t.Fatal(out)
 			}
@@ -307,7 +307,7 @@ func TestItemizeIndexOutputResidualSticky(t *testing.T) {
 	}
 	item.AsArray = item
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual Output
-	item.SetIndexExpr(0, hole)
+	item.SetIndexExprSess(testAmbientSession, 0, hole)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("index Output residual SetIndexExpr must SetError sticky")
 	}
@@ -316,7 +316,7 @@ func TestItemizeIndexOutputResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// AddIndexExpr residual same
-	item.AddIndexExpr(hole)
+	item.AddIndexExprSess(testAmbientSession, hole)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("index Output residual AddIndexExpr must SetError sticky")
 	}
@@ -353,7 +353,7 @@ func TestItemizeIsAggregateResidualSticky(t *testing.T) {
 	}
 	parent.AsArray = parent
 	// Itemize may CreateFieldVars residual on nil field Type
-	item := parent.Itemize(NewRngSess(testAmbientSession, 1))
+	item := parent.ItemizeIntoSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil)
 	if item != nil && !HasErrorSess(testAmbientSession) {
 		// if itemize succeeded without expand hole, CreateFieldVars may not run on non-aggregate wait - Type is struct aggregate
 		// CreateFieldVars on nil field Type should sticky

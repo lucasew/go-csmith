@@ -324,7 +324,7 @@ func (v *Variable) OutputLhsCOptsSess(s *Session, prefixName bool) string {
 		return ""
 	}
 	if v.AsArray != nil && v.AsArray.Collective != nil {
-		out := v.AsArray.OutputAccess()
+		out := v.AsArray.OutputAccessSess(s)
 		// residual ERROR sticky — no invent soft-empty access past OutputAccess residual
 		if sessHasError(s) {
 			return ""
@@ -429,7 +429,7 @@ func (v *Variable) OutputUpperBoundSess(s *Session, prefixName bool) string {
 		return ""
 	}
 	if v.AsArray != nil && len(v.AsArray.Sizes) > 0 {
-		out := v.AsArray.OutputUpperBoundArray()
+		out := v.AsArray.OutputUpperBoundArraySess(s)
 		// residual ERROR sticky — no invent soft-empty upper past OutputUpperBoundArray residual
 		if sessHasError(s) {
 			return ""
@@ -1272,7 +1272,7 @@ func (v *Variable) MatchVarNameSess(s *Session, vname string) *Variable {
 		}
 		// itemized with indices
 		if v.AsArray != nil && len(v.AsArray.Indices) > 0 {
-			acc := v.AsArray.OutputAccess()
+			acc := v.AsArray.OutputAccessSess(s)
 			// residual ERROR sticky — no invent soft-match name past OutputAccess residual
 			if sessHasError(s) {
 				return nil
