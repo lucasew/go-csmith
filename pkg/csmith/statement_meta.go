@@ -30,9 +30,13 @@ func StmtInBlock(stParent, b *Block) bool {
 // nil arms are incomplete IR so walkers fail closed (no invent soft-skip missing arm).
 // StatementFor always pushes body; ArrayOp/Block push Then when non-nil (C++ if(body)).
 func GetBlocksStmt(st *Stmt) []*Block {
+	return GetBlocksStmtSess(nil, st)
+}
+
+func GetBlocksStmtSess(s *Session, st *Stmt) []*Block {
 	// Statement always live; sticky incomplete IncompleteBlocks (no invent empty-complete)
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteBlocks()
 	}
 	switch st.Kind {
@@ -41,7 +45,7 @@ func GetBlocksStmt(st *Stmt) []*Block {
 		// both arms always live in C++; nil arm sticky IncompleteBlocks
 		// (no invent []*Block{Then,nil} soft list for walkers to soft-continue past)
 		if st.Then == nil || st.Else == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteBlocks()
 		}
 		return []*Block{st.Then, st.Else}
@@ -49,7 +53,7 @@ func GetBlocksStmt(st *Stmt) []*Block {
 		// StatementFor.h — blks.push_back(&body); body always live
 		// sticky IncompleteBlocks (no invent []*Block{nil} soft for-body hole)
 		if st.Then == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteBlocks()
 		}
 		return []*Block{st.Then}
@@ -83,7 +87,8 @@ func GetBlocksStmt(st *Stmt) []*Block {
 // StmtsComplete reports every Stmt* is live (no nil holes).
 // Note: StmtsComplete(nil)==true (complete empty). Fail-closed incomplete
 // wipes must use IncompleteStmtsSlice() so len(nil)==0 cannot invent
-// empty-complete typed-stmt list success.
+// empty-complete typed-stmt list success.}
+
 func StmtsComplete(stms []*Stmt) bool {
 	for _, s := range stms {
 		if s == nil {

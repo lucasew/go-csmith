@@ -415,7 +415,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// StatementFor.cpp:236–239 — not MakeRandomBinary (sOpBinary/BinAdd soft invent)
 	incrBop, _ := incrOp.CompoundToBinaryOps()
 	// when no compound map, incrBop is MaxBinaryOp (C++ MAX_BINARY_OP)
-	flags1 := MakeRandomBinaryKind(r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
+	flags1 := MakeRandomBinaryKindSess(cgSess(cg), r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
 	if flags1 == nil || sessHasError(cgSess(cg)) {
 		return nil
 	}
@@ -655,8 +655,8 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// (FactMgr.cpp:575–579) because remove_loop_local already dropped them
 	// (seed-7 for 640 / l_1402). Drop subjects only — match entry semantics.
 	if len(body.LocalVars) > 0 {
-		fm.GlobalFacts = DropFactSubjectsByVars(fm.GlobalFacts, body.LocalVars)
-		fm.UnionFacts = DropUnionSubjectsByVars(fm.UnionFacts, body.LocalVars)
+		fm.GlobalFacts = DropFactSubjectsByVarsSess(cgSess(cg), fm.GlobalFacts, body.LocalVars)
+		fm.UnionFacts = DropUnionSubjectsByVarsSess(cgSess(cg), fm.UnionFacts, body.LocalVars)
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -790,21 +790,25 @@ func forHeaderOutputSess(s *Session, lc *LoopControl) string {
 // (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).}
 
 func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
+	return arrayOpHeaderOutputSess(nil, lc, opts)
+}
+
+func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 	// StatementArrayOp always has live LoopControl + IV sticky
 	if lc == nil || lc.IV == nil {
 		if lc != nil && lc.IV == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
 	// StatementArrayOp.cpp:194–220 — cv->Output always live; sticky no invent for ( = 0; …)
 	iv := lc.IV.OutputC()
 	// residual ERROR sticky — no invent soft-continue header past OutputC residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if iv == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder

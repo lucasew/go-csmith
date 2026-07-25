@@ -95,8 +95,12 @@ func FindUnionFactSess(s *Session, facts []*FactUnion, want *FactUnion) int {
 // Fact.cpp:237–246 — total size must match; each fact finds an equal in the other env.}
 
 func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
+	return SameFactVecSess(nil, ptA, uA, ptB, uB)
+}
+
+func SameFactVecSess(s *Session, ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
 	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(ptA)+len(uA) != len(ptB)+len(uB) {
@@ -105,18 +109,19 @@ func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*
 	if !SameFacts(ptA, ptB) {
 		return false
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if !SameUnionFacts(uA, uB) {
 		return false
 	}
-	return !sessHasError(nil)
+	return !sessHasError(s)
 }
 
 // FindFact mirrors find_fact — equal fact in vector, or -1.
 // Fact.cpp find_fact by equal().
-// Incomplete map fails closed sticky -1 (no invent soft-skip hole and match later).
+// Incomplete map fails closed sticky -1 (no invent soft-skip hole and match later).}
+
 func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 	return FindFactSess(nil, facts, want)
 }
@@ -230,28 +235,33 @@ func SubsetUnionFactsSess(s *Session, a, b []*FactUnion) bool {
 // Fact.cpp:249–260 — total size match; each fact implied by related in other env.}
 
 func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
+	return SubsetFactVecSess(nil, ptA, uA, ptB, uB)
+}
+
+func SubsetFactVecSess(s *Session, ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
 	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(ptA)+len(uA) != len(ptB)+len(uB) {
 		return false
 	}
-	if !SubsetFacts(ptA, ptB) {
+	if !SubsetFactsSess(s, ptA, ptB) {
 		return false
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
-	if !SubsetUnionFacts(uA, uB) {
+	if !SubsetUnionFactsSess(s, uA, uB) {
 		return false
 	}
-	return !sessHasError(nil)
+	return !sessHasError(s)
 }
 
 // IsCtrlStmt mirrors Statement::is_ctrl_stmt — break/continue/goto only.
 // Statement.h:164–167 — eContinue | eBreak | eGoto (not eReturn; return may pure-shortcut).
-// Statement always live; sticky false (no invent not-ctrl soft-skip past hole).
+// Statement always live; sticky false (no invent not-ctrl soft-skip past hole).}
+
 func IsCtrlStmt(st *Stmt) bool {
 	if st == nil {
 		sessNoteError(nil, ErrGeneric)

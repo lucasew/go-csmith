@@ -707,7 +707,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
-			vars := MergePointeesOfPointer(coll, indirect, facts)
+			vars := MergePointeesOfPointerSess(s, coll, indirect, facts)
 			// residual ERROR sticky — no invent soft-merge past MergePointees residual
 			if sessHasError(s) {
 				return IncompleteFactSlice()
@@ -735,7 +735,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 					n = len(ptrs)
 				}
 				for j := 0; j < n; j++ {
-					set := MergePointeesOfPointer(ptrs[j], 1, facts)
+					set := MergePointeesOfPointerSess(s, ptrs[j], 1, facts)
 					// incomplete set — non-sticky abstract hole (fact-map soft re-pick)
 					if !VariablesComplete(set) {
 						return IncompleteFactSlice()
@@ -758,7 +758,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
-		set := MergePointeesOfPointer(coll, indirect+1, facts)
+		set := MergePointeesOfPointerSess(s, coll, indirect+1, facts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual
 		if sessHasError(s) {
 			return IncompleteFactSlice()
@@ -899,7 +899,7 @@ func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable
 	if sessHasError(s) {
 		return IncompleteFactSlice(), 0
 	}
-	lvars := MergePointeesOfPointer(coll, lhsIndir, factsIn)
+	lvars := MergePointeesOfPointerSess(s, coll, lhsIndir, factsIn)
 	// residual ERROR sticky — no invent soft-abstract past MergePointees residual
 	if sessHasError(s) {
 		return IncompleteFactSlice(), 0
@@ -1019,7 +1019,7 @@ func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable
 		if isPtr && lhsIndir > 0 {
 			// assigning *p = rhs: also update pointer pointees
 			// incomplete more — non-sticky abstract (fact-map soft re-pick)
-			more := MergePointeesOfPointer(v, 1, factsIn)
+			more := MergePointeesOfPointerSess(s, v, 1, factsIn)
 			// residual ERROR sticky — no invent soft-abstract past MergePointees residual
 			if sessHasError(s) {
 				return IncompleteFactSlice(), 0
@@ -1904,13 +1904,17 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 // IncompleteVariables (not bare nil — VariablesComplete(nil)/len==0 invent empty skip).
 // Complete empty (specials-only / no pointees) returns non-nil empty slice.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
+	return MergePointeesOfPointersSess(nil, ptrs, facts)
+}
+
+func MergePointeesOfPointersSess(s *Session, ptrs []*Variable, facts []*FactPointTo) []*Variable {
 	// incomplete fact map fails closed non-sticky (fact-map soft re-pick factories)
 	if !FactsComplete(facts) {
 		return IncompleteVariables()
 	}
 	// Variable* always live; sticky IncompleteVariables (no invent soft-skip ptr hole)
 	if !VariablesComplete(ptrs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
@@ -1921,7 +1925,7 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 		}
 		ft := FindRelatedPointTo(facts, p)
 		// residual ERROR sticky — no invent soft-merge pointees past FindRelated residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		// FactPointTo.cpp:691–696 — assert(exist_fact); if (exist_fact) merge.
@@ -1935,7 +1939,7 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 		for _, pointee := range ft.PointTo {
 			// PointTo Variable* always live; sticky (no invent soft-skip pointee hole)
 			if pointee == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteVariables()
 			}
 			if seen[pointee] {
@@ -1952,15 +1956,20 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 // FactPointTo.cpp:669–676 — start from ptr, indirect steps of merge_pointees.
 // Incomplete merge → IncompleteVariables (not bare nil invent empty complete).
 // Variable always live; sticky IncompleteVariables (no invent soft-skip past hole).
-// Missing fact / incomplete map stays non-sticky IncompleteVariables (soft re-pick).
+// Missing fact / incomplete map stays non-sticky IncompleteVariables (soft re-pick).}
+
 func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
+	return MergePointeesOfPointerSess(nil, ptr, indirect, facts)
+}
+
+func MergePointeesOfPointerSess(s *Session, ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
 	if ptr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	tmp := []*Variable{ptr}
 	for indirect > 0 {
-		tmp = MergePointeesOfPointers(tmp, facts)
+		tmp = MergePointeesOfPointersSess(s, tmp, facts)
 		// incomplete merge (missing fact / holes) — stop, do not invent empty
 		if !VariablesComplete(tmp) {
 			return IncompleteVariables()
@@ -1977,7 +1986,8 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 // (no invent "not pointing to locals" / soft re-pick past holes).
 // Type* always live for non-special subjects/pointees; Type-nil sticky true
 // (IsPointer residual ERROR+false invents not-pointing-to-locals past shell).
-// MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
+// MergePointees incomplete stays non-sticky true (fact-map soft re-pick).}
+
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	return IsPointingToLocalsSess(nil, v, b, indirection, facts)
 }

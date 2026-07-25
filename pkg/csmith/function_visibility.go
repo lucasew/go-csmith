@@ -336,17 +336,21 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 // (seed-7 for 640: l_1402 in map_in + body LocalVars, missing from break out).
 // FactMgr.cpp:257–262 remove_loop_local + 575–579 invent-garbage path.
 func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPointTo {
+	return DropFactSubjectsByVarsSess(nil, facts, vars)
+}
+
+func DropFactSubjectsByVarsSess(s *Session, facts []*FactPointTo, vars []*Variable) []*FactPointTo {
 	if len(vars) == 0 {
 		return facts
 	}
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// incomplete vars list fail closed
 	for _, v := range vars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 	}
@@ -357,7 +361,7 @@ func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPoint
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if f.Var != nil && drop[f.Var] {
@@ -368,18 +372,23 @@ func DropFactSubjectsByVars(facts []*FactPointTo, vars []*Variable) []*FactPoint
 	return out
 }
 
-// DropUnionSubjectsByVars removes eUnionWrite facts whose subject is in vars.
+// DropUnionSubjectsByVars removes eUnionWrite facts whose subject is in vars.}
+
 func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion {
+	return DropUnionSubjectsByVarsSess(nil, facts, vars)
+}
+
+func DropUnionSubjectsByVarsSess(s *Session, facts []*FactUnion, vars []*Variable) []*FactUnion {
 	if len(vars) == 0 {
 		return facts
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	for _, v := range vars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 	}
@@ -390,7 +399,7 @@ func DropUnionSubjectsByVars(facts []*FactUnion, vars []*Variable) []*FactUnion 
 	out := make([]*FactUnion, 0, len(facts))
 	for _, f := range facts {
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		if f.Var != nil && drop[f.Var] {

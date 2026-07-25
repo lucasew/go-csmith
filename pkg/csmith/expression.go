@@ -61,47 +61,51 @@ func IncompleteExpressions() []*Expression {
 // ExpressionFuncall.cpp:206–207 — invoke.compatible(v) (unary operand only);
 // default / other terms false.
 func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
+	return e.CompatibleWithVarSess(nil, v, expandStruct)
+}
+
+func (e *Expression) CompatibleWithVarSess(s *Session, v *Variable, expandStruct bool) bool {
 	// Constant.cpp:489 / ExpressionVariable.cpp:289 — assert(v)
 	// Expression always live; sticky incomplete — fail closed false
 	// (no invent soft-skip compatibility / soft re-pick past hole)
 	if e == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*; incomplete sticky reject
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Var.Compatible(v, expandStruct)
 		// residual ERROR sticky — no invent compatible true past Compatible residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermFunction:
 		// ExpressionFuncall.cpp:206–207 — invoke always live
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Invoke.CompatibleVar(v, expandStruct)
 		// residual ERROR sticky — no invent compatible true past CompatibleVar residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermLhs:
 		// Lhs shell always has live Variable*
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Var.Compatible(v, expandStruct)
 		// residual ERROR sticky — no invent compatible true past Compatible residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -109,7 +113,7 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 		// Constant.cpp:488–493 — assert(v); expand_struct → true; else false
 		// incomplete Constant shell sticky (no invent expand_struct success past hole)
 		if e.Con == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		return expandStruct
@@ -121,20 +125,25 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 // CompatibleWithExpr mirrors Expression::compatible(Expression*).
 // ExpressionVariable.cpp:276–282 — exp.compatible(&var);
 // ExpressionFuncall.cpp:210–212 — always false for Expression*.
-// Incomplete Variable/Lhs shells fail closed sticky false (no invent soft-skip nil Var).
+// Incomplete Variable/Lhs shells fail closed sticky false (no invent soft-skip nil Var).}
+
 func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
+	return e.CompatibleWithExprSess(nil, other, expandStruct)
+}
+
+func (e *Expression) CompatibleWithExprSess(s *Session, other *Expression, expandStruct bool) bool {
 	// ExpressionVariable.cpp:277 — assert(exp); nil is broken IR sticky
 	if e == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// incomplete ExpressionVariable / Lhs — assert(var) path sticky reject
 	if (e.Term == TermVariable || e.Term == TermLhs) && e.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if (other.Term == TermVariable || other.Term == TermLhs) && other.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// Variable / Lhs → other.compatible(this.var)
@@ -142,15 +151,15 @@ func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bo
 	if e.Term == TermVariable || e.Term == TermLhs {
 		ok := other.CompatibleWithVar(e.Var, expandStruct)
 		// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	}
 	if other.Term == TermVariable || other.Term == TermLhs {
-		ok := e.CompatibleWithVar(other.Var, expandStruct)
+		ok := e.CompatibleWithVarSess(s, other.Var, expandStruct)
 		// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -160,7 +169,8 @@ func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bo
 }
 
 // GetComplexity mirrors Expression::get_complexity via ExpressionComplexity.
-// Incomplete IR sticky -1 (no invent leaf 0 past holes).
+// Incomplete IR sticky -1 (no invent leaf 0 past holes).}
+
 func (e *Expression) GetComplexity() int {
 	return ExpressionComplexity(e)
 }
@@ -184,14 +194,18 @@ func (e *Expression) GetInvoke() *Invocation {
 // Clone mirrors Expression::clone for Constant / Variable / Lhs leaves.
 // Compound terms fail closed sticky nil (no invent shallow shell without deep copy).
 func (e *Expression) Clone() *Expression {
+	return e.CloneSess(nil)
+}
+
+func (e *Expression) CloneSess(s *Session) *Expression {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	switch e.Term {
 	case TermConstant:
 		if e.Con == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		c := e.Con.Clone()
@@ -201,12 +215,12 @@ func (e *Expression) Clone() *Expression {
 		return &Expression{Term: TermConstant, Con: c, CastType: e.CastType}
 	case TermVariable, TermLhs:
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		return &Expression{Term: e.Term, Var: e.Var, ExprType: e.ExprType, CastType: e.CastType}
 	default:
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 }
@@ -215,7 +229,8 @@ func (e *Expression) Clone() *Expression {
 // Expression.cpp:222–226 — lang_cpp or needs_cast; we apply when desired type needs cast.
 // CheckAndSetCast mirrors Expression::check_and_set_cast without lang_cpp gate
 // (tests / call sites that already decided a cast may be needed).
-// Expression.cpp:221–225 — get_type().needs_cast(desired) → cast_type = desired.
+// Expression.cpp:221–225 — get_type().needs_cast(desired) → cast_type = desired.}
+
 func (e *Expression) CheckAndSetCast(desired *Type) {
 	e.checkAndSetCastCore(desired)
 }
@@ -266,9 +281,13 @@ func (e *Expression) checkAndSetCastCore(desired *Type) {
 // GetTypeUncast is get_type ignoring cast_type (for check_and_set_cast).
 // Incomplete IR fails closed nil (no invent ExprType shell without live invoke/assign/rhs).
 func (e *Expression) GetTypeUncast() *Type {
+	return e.GetTypeUncastSess(nil)
+}
+
+func (e *Expression) GetTypeUncastSess(s *Session) *Type {
 	// Expression always live for get_type; sticky no invent type shell without it
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	switch e.Term {
@@ -276,7 +295,7 @@ func (e *Expression) GetTypeUncast() *Type {
 		// Constant always has live Type*; incomplete Con/Type sticky (no invent
 		// untyped constant soft-miss / soft re-pick past hole)
 		if e.Con == nil || e.Con.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		return e.Con.Type
@@ -284,7 +303,7 @@ func (e *Expression) GetTypeUncast() *Type {
 		// ExpressionVariable always has live Variable*; incomplete sticky
 		// (no invent type shell from ExprType alone without live Var)
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		// ExprType preferred (desired type after indirection) then Var.Type
@@ -295,66 +314,67 @@ func (e *Expression) GetTypeUncast() *Type {
 			return e.Var.Type
 		}
 		// incomplete Variable type IR sticky — no invent untyped variable
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	case TermFunction:
 		// ExpressionFuncall.cpp:122–124 — invoke.get_type(); sticky no invent without invoke
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		ty := e.Invoke.GetType()
 		// residual ERROR sticky — no invent invoke type past GetType residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		return ty
 	case TermCommaExpr:
 		// value type is RHS; sticky incomplete without CommaRHS
 		if e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		ty := e.CommaRHS.GetTypeUncast()
 		// residual ERROR sticky — no invent comma type past RHS GetType residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		return ty
 	case TermAssignment:
 		// ExpressionAssign::get_type — LHS type only; sticky no invent without Assign
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if e.Assign.Lhs != nil {
 			t := e.Assign.Lhs.GetType()
 			// residual ERROR sticky — no invent assign type past Lhs GetType residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			if t != nil {
 				return t
 			}
 			// Lhs.GetType sticky incomplete already; re-assert sticky
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if e.Assign.LhsVar != nil && e.Assign.LhsVar.Type != nil {
 			return e.Assign.LhsVar.Type
 		}
 		// incomplete assign LHS sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// unknown term sticky incomplete
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return nil
 }
 
 // IndirectLevel mirrors ExpressionVariable::get_indirect_level.
 // Incomplete expr IR returns 0 for the bit; callers that must not invent bare
-// level-0 / non-address-of use IndirectLevelComplete.
+// level-0 / non-address-of use IndirectLevelComplete.}
+
 func (e *Expression) IndirectLevel() int {
 	n, ok := e.IndirectLevelComplete()
 	if !ok {
@@ -367,9 +387,13 @@ func (e *Expression) IndirectLevel() int {
 // (no invent treat broken Variable/type as level 0 for transfer/visit/overlap).
 // Incomplete shell sticky (callers that only use IndirectLevel still surface ERROR).
 func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
+	return e.IndirectLevelCompleteSess(nil)
+}
+
+func (e *Expression) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 	// Expression Variable/Lhs always live with type; sticky incomplete no invent level 0
 	if e == nil || e.Var == nil || e.Var.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	want := e.ExprType
@@ -377,17 +401,17 @@ func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
 		want = e.Var.Type
 	}
 	if want == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	lv := e.Var.Type.IndirectLevel()
 	// residual ERROR sticky — no invent level-0 past subject IndirectLevel residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0, false
 	}
 	lw := want.IndirectLevel()
 	// residual ERROR sticky — no invent level-0 past desired IndirectLevel residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0, false
 	}
 	return lv - lw, true
@@ -396,19 +420,24 @@ func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
 // GetType mirrors Expression::get_type.
 // ExpressionFuncall.cpp:122–124 — invoke.get_type();
 // ExpressionAssign — LHS type; Constant / Variable as typed.
-// Incomplete IR fails closed nil (no invent type shell / panic on nil CommaRHS).
+// Incomplete IR fails closed nil (no invent type shell / panic on nil CommaRHS).}
+
 func (e *Expression) GetType() *Type {
+	return e.GetTypeSess(nil)
+}
+
+func (e *Expression) GetTypeSess(s *Session) *Type {
 	// Expression always live for get_type; sticky no invent type shell without it
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if e.CastType != nil {
 		return e.CastType
 	}
-	ty := e.GetTypeUncast()
+	ty := e.GetTypeUncastSess(s)
 	// residual ERROR sticky — no invent type past GetTypeUncast residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	return ty
@@ -416,42 +445,47 @@ func (e *Expression) GetType() *Type {
 
 // GetQualifiers mirrors Expression::get_qualifiers.
 // ExpressionVariable.cpp:194–196; ExpressionAssign.cpp:85–86;
-// ExpressionFuncall.cpp:187–188; ExpressionComma / Constant default empty.
+// ExpressionFuncall.cpp:187–188; ExpressionComma / Constant default empty.}
+
 func (e *Expression) GetQualifiers() CVQualifiers {
+	return e.GetQualifiersSess(nil)
+}
+
+func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 	// Expression always live; sticky no invent empty quals shell without it
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	}
 	switch e.Term {
 	case TermVariable:
 		if e.Var == nil {
 			// incomplete Variable IR sticky — no invent empty storage quals
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		// ExpressionVariable::get_qualifiers — qfer.indirect_qualifiers(indirect)
 		// incomplete type IR must not invent storage-level quals via level 0
-		n, ok := e.IndirectLevelComplete()
+		n, ok := e.IndirectLevelCompleteSess(s)
 		if !ok {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		q := e.Var.Qfer.IndirectQualifiers(n)
 		// residual ERROR sticky — no invent soft-quals past IndirectQualifiers residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return CVQualifiers{}
 		}
 		return q
 	case TermAssignment:
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		if e.Assign.Lhs != nil {
 			q := e.Assign.Lhs.GetQualifiers()
 			// residual ERROR sticky — no invent assign quals past Lhs GetQualifiers residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return CVQualifiers{}
 			}
 			return q
@@ -460,29 +494,29 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 			return e.Assign.LhsVar.Qfer
 		}
 		// incomplete assign LHS sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	case TermFunction:
 		if e.Invoke == nil {
 			// incomplete Funcall IR sticky — no invent empty invoke quals
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		q := e.Invoke.GetQualifiers()
 		// residual ERROR sticky — no invent invoke quals past nested residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return CVQualifiers{}
 		}
 		return q
 	case TermCommaExpr:
 		// ExpressionComma value is RHS — sticky incomplete without RHS
 		if e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		q := e.CommaRHS.GetQualifiers()
 		// residual ERROR sticky — no invent comma quals past RHS residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return CVQualifiers{}
 		}
 		return q
@@ -490,23 +524,28 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 		// Constant default empty quals when Con live; incomplete shell sticky
 		// (no invent complete empty-qfer success past missing Constant IR)
 		if e.Con == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
 		return CVQualifiers{}
 	}
 	// unknown term sticky incomplete
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return CVQualifiers{}
 }
 
 // EqualsInt mirrors Expression::equals(int).
 // Expression.h: equals default false; Constant; ExpressionFuncall via invoke.
-// Incomplete IR fails closed false (no invent fold / panic on nil CommaRHS/Assign.Expr).
+// Incomplete IR fails closed false (no invent fold / panic on nil CommaRHS/Assign.Expr).}
+
 func (e *Expression) EqualsInt(num int) bool {
+	return e.EqualsIntSess(nil, num)
+}
+
+func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 	// Expression always live for fold; sticky no invent "not equal" past missing shell
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	switch e.Term {
@@ -514,43 +553,43 @@ func (e *Expression) EqualsInt(num int) bool {
 		// Constant always has live Type* + Value; incomplete shell sticky
 		// (no invent fold soft-success past Type-nil / empty-value via Con path alone)
 		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Con.Equals(num)
 		// residual ERROR sticky — no invent equal-true past Con.Equals residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermFunction:
 		// ExpressionFuncall always has live invoke for fold
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Invoke.EqualsInt(num)
 		// residual ERROR sticky — no invent equal-true past nested EqualsInt residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermCommaExpr:
 		// comma value is RHS; sticky incomplete without RHS
 		if e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.CommaRHS.EqualsInt(num)
 		// residual ERROR sticky — no invent equal-true past RHS EqualsInt residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermAssignment:
 		// ExpressionAssign::equals — simple assign && expr.equals(num)
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if e.Assign.AssignOp != AssignSimple {
@@ -558,12 +597,12 @@ func (e *Expression) EqualsInt(num int) bool {
 		}
 		if e.Assign.Expr == nil {
 			// incomplete assign RHS sticky — no invent not-equal fold
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Assign.Expr.EqualsInt(num)
 		// residual ERROR sticky — no invent equal-true past assign RHS residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -573,11 +612,16 @@ func (e *Expression) EqualsInt(num int) bool {
 
 // NotEquals mirrors Expression::not_equals(int).
 // Expression.h:139 — default false; Constant: !equals(num).
-// Incomplete Expression / Constant shell sticky false (no invent fold past holes).
+// Incomplete Expression / Constant shell sticky false (no invent fold past holes).}
+
 func (e *Expression) NotEquals(num int) bool {
+	return e.NotEqualsSess(nil, num)
+}
+
+func (e *Expression) NotEqualsSess(s *Session, num int) bool {
 	// Expression always live for fold; sticky no invent "equals" past missing shell
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if e.Term != TermConstant {
@@ -586,12 +630,12 @@ func (e *Expression) NotEquals(num int) bool {
 	}
 	// Constant Type* + Value always live; incomplete sticky (no invent fold past hole)
 	if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	ok := e.Con.NotEquals(num)
 	// residual ERROR sticky — no invent not-equal true past Con.NotEquals residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -599,11 +643,16 @@ func (e *Expression) NotEquals(num int) bool {
 
 // LessThan mirrors Expression::less_than(int).
 // Expression.h default false; Constant.cpp:501–502.
-// Incomplete Expression / Constant shell sticky false (no invent fold past holes).
+// Incomplete Expression / Constant shell sticky false (no invent fold past holes).}
+
 func (e *Expression) LessThan(num int) bool {
+	return e.LessThanSess(nil, num)
+}
+
+func (e *Expression) LessThanSess(s *Session, num int) bool {
 	// Expression always live for fold; sticky no invent compare past missing shell
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if e.Term != TermConstant {
@@ -612,12 +661,12 @@ func (e *Expression) LessThan(num int) bool {
 	}
 	// Constant Type* + Value always live; incomplete sticky (no invent fold past hole)
 	if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	ok := e.Con.LessThan(num)
 	// residual ERROR sticky — no invent less-true past Con.LessThan residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -625,42 +674,47 @@ func (e *Expression) LessThan(num int) bool {
 
 // Is0Or1 mirrors Expression::is_0_or_1.
 // ExpressionFuncall → invoke; ExpressionComma → rhs; ExpressionAssign → simple+rhs.
-// Incomplete IR sticky false (no invent 0/1 fold / soft re-pick past holes).
+// Incomplete IR sticky false (no invent 0/1 fold / soft re-pick past holes).}
+
 func (e *Expression) Is0Or1() bool {
+	return e.Is0Or1Sess(nil)
+}
+
+func (e *Expression) Is0Or1Sess(s *Session) bool {
 	// Expression always live for fold; sticky no invent "not 0or1" past missing shell
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermFunction:
 		// ExpressionFuncall always has live invoke for fold
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Invoke.Is0Or1()
 		// residual ERROR sticky — no invent 0or1 true past nested Is0Or1 residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermCommaExpr:
 		// comma value is RHS; sticky incomplete without RHS
 		if e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.CommaRHS.Is0Or1()
 		// residual ERROR sticky — no invent 0or1 true past RHS Is0Or1 residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case TermAssignment:
 		// ExpressionAssign.cpp:103–104
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if e.Assign.AssignOp != AssignSimple {
@@ -668,12 +722,12 @@ func (e *Expression) Is0Or1() bool {
 		}
 		if e.Assign.Expr == nil {
 			// incomplete assign RHS sticky — no invent not-0or1 fold
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := e.Assign.Expr.Is0Or1()
 		// residual ERROR sticky — no invent 0or1 true past assign RHS residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -685,19 +739,24 @@ func (e *Expression) Is0Or1() bool {
 // UseVar mirrors Expression::use_var.
 // Expression.h:143 default false; Variable/Funcall/Comma/Assign overrides.
 // Incomplete IR fails closed sticky true (uses v) — no invent conflict-free non-use
-// / soft re-pick past holes.
+// / soft re-pick past holes.}
+
 func (e *Expression) UseVar(v *Variable) bool {
+	return e.UseVarSess(nil, v)
+}
+
+func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 	// Expression + subject always live; sticky incomplete — fail closed as uses
 	// (no invent conflict-free non-use / soft re-pick past hole)
 	if e == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	switch e.Term {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.Var == v {
@@ -705,31 +764,31 @@ func (e *Expression) UseVar(v *Variable) bool {
 		}
 		matched := e.Var.Match(v)
 		// residual ERROR sticky — no invent not-use soft-skip past Match hole (restrictive uses)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return matched
 	case TermFunction:
 		// ExpressionFuncall always has live invoke + args after ERROR_GUARD
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		for _, a := range e.Invoke.Args {
 			if a == nil {
 				// incomplete arg IR sticky — no invent skip hole as non-use
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
 			if a.UseVar(v) {
 				// residual ERROR sticky — no invent use-true past nested UseVar hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later args past nested UseVar residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
@@ -737,34 +796,34 @@ func (e *Expression) UseVar(v *Variable) bool {
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			// incomplete comma sides sticky — no invent non-use past hole
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.CommaLHS.UseVar(v) {
 			// residual ERROR sticky — no invent use-true past LHS UseVar hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue RHS past LHS UseVar residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if e.CommaRHS.UseVar(v) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	case TermAssignment:
 		if e.Assign == nil {
 			// incomplete Assign shell sticky — no invent non-use
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.Assign.LhsVar != nil {
@@ -773,20 +832,20 @@ func (e *Expression) UseVar(v *Variable) bool {
 			}
 			if e.Assign.LhsVar.Match(v) {
 				// residual ERROR sticky — no invent use-true past Match hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue RHS past LhsVar Match residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
 		if e.Assign.Lhs != nil {
 			if e.Assign.Lhs.Var == nil {
 				// incomplete Lhs.Var sticky
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
 			if e.Assign.Lhs.Var == v {
@@ -794,35 +853,35 @@ func (e *Expression) UseVar(v *Variable) bool {
 			}
 			if e.Assign.Lhs.Var.Match(v) {
 				// residual ERROR sticky — no invent use-true past Match hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue RHS past Lhs Match residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		} else if e.Assign.LhsVar == nil {
 			// C++ ExpressionAssign always has live lhs; neither side → incomplete
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.Assign.Expr == nil {
 			// incomplete assign RHS sticky — no invent non-use past hole
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		ok := e.Assign.Expr.UseVar(v)
 		// residual ERROR sticky — no invent not-use soft-skip past RHS UseVar hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
 	case TermLhs:
 		// Lhs as expression term if ever used
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.Var == v {
@@ -830,7 +889,7 @@ func (e *Expression) UseVar(v *Variable) bool {
 		}
 		matched := e.Var.Match(v)
 		// residual ERROR sticky — no invent not-use soft-skip past Match hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return matched
@@ -839,14 +898,15 @@ func (e *Expression) UseVar(v *Variable) bool {
 		return false
 	default:
 		// unknown term sticky incomplete (no invent default non-use)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 }
 
 // ToString mirrors Expression::to_string — Output without stream.
 // Expression.cpp:120–124.
-// Expression always live; sticky empty via Output (no invent soft-skip past hole).
+// Expression always live; sticky empty via Output (no invent soft-skip past hole).}
+
 func (e *Expression) ToString() string {
 	out := e.Output()
 	// residual ERROR sticky — no invent soft-empty string past Output residual

@@ -819,14 +819,14 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// already OOS-drops locals (FactMgr.cpp:601–611 / block post-OOS). Go's Drop
 		// at set_fact_in must be paired with Drop before shortcut for a stable lattice.
 		if len(b.LocalVars) > 0 {
-			currentInputs = DropFactSubjectsByVars(currentInputs, b.LocalVars)
+			currentInputs = DropFactSubjectsByVarsSess(cgSess(cg), currentInputs, b.LocalVars)
 			if !FactsComplete(currentInputs) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
-			currentUnions = DropUnionSubjectsByVars(currentUnions, b.LocalVars)
+			currentUnions = DropUnionSubjectsByVarsSess(cgSess(cg), currentUnions, b.LocalVars)
 			if !UnionFactsComplete(currentUnions) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -987,14 +987,14 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Strip this block's LocalVars subjects if back-edge merge reintroduced them
 		// (see DropFactSubjectsByVars). Entry must not list body locals.
 		if len(b.LocalVars) > 0 {
-			currentInputs = DropFactSubjectsByVars(currentInputs, b.LocalVars)
+			currentInputs = DropFactSubjectsByVarsSess(cgSess(cg), currentInputs, b.LocalVars)
 			if !FactsComplete(currentInputs) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
-			entryUnions = DropUnionSubjectsByVars(entryUnions, b.LocalVars)
+			entryUnions = DropUnionSubjectsByVarsSess(cgSess(cg), entryUnions, b.LocalVars)
 			if !UnionFactsComplete(entryUnions) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)

@@ -1586,7 +1586,7 @@ func (fm *FactMgr) BackupStmFactMaps(
 		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
-	blks := GetBlocksStmt(st)
+	blks := GetBlocksStmtSess(fmSess(fm), st)
 	incomplete := false
 	for _, b := range blks {
 		if b == nil {
@@ -1685,7 +1685,7 @@ func (fm *FactMgr) RestoreStmFactMaps(
 	if fm.MapUnionFactsOut == nil {
 		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
-	blks := GetBlocksStmt(st)
+	blks := GetBlocksStmtSess(fmSess(fm), st)
 	incomplete := false
 	for _, b := range blks {
 		if b == nil {
@@ -3158,7 +3158,7 @@ func lhsAssignPointeesSess(s *Session, facts []*FactPointTo, lhs *Variable, lhsI
 		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
-	lvars := MergePointeesOfPointer(coll, lhsIndir, facts)
+	lvars := MergePointeesOfPointerSess(s, coll, lhsIndir, facts)
 	// residual ERROR sticky — no invent soft-lvars past MergePointees residual
 	if sessHasError(s) {
 		return IncompleteVariables()

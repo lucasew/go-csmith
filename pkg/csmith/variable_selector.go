@@ -670,8 +670,12 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 // and spuriously treated live gotos as orphans; seed-62 locals on then vs parent).
 // Block always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmID(b *Block, stmID int) bool {
+	return BlockContainsStmIDSess(nil, b, stmID)
+}
+
+func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
 	if b == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if b.StmID == stmID {
@@ -680,13 +684,13 @@ func BlockContainsStmID(b *Block, stmID int) bool {
 	// Resolve owning parent of stmID (C++ s->parent).
 	// 1) Under b only — works when dest is in current then-arm mid-gen.
 	owner := findParentOfStmIDInTree(b, stmID)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	// 2) Func.Blocks scan — finds stmts on sibling/parent blocks not yet in root tree.
 	if owner == nil && b.Func != nil {
 		owner = FindParentBlockOfStmID(b.Func, stmID)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 	}
@@ -713,7 +717,8 @@ func BlockContainsStmID(b *Block, stmID int) bool {
 // Do not require findParentOfStmIDInTree(rootBlock(b), src): mid-gen then-arms
 // are unlinked from the root GetBlocksStmt tree, so live parent-block gotos
 // looked "orphan" and Expand left locals on the then-arm (seed-62 l_806 int32
-// on blk 322 vs upstream int16 after empty-block choose_random_simple on climb).
+// on blk 322 vs upstream int16 after empty-block choose_random_simple on climb).}
+
 func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if b == nil {
 		sessNoteError(cg.Sess, ErrGeneric)

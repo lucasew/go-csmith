@@ -724,8 +724,12 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 // Statement always live at assign emit; sticky empty (no invent bare RHS past hole).}
 
 func assignLhsText(st *Stmt, wrapVol bool) string {
+	return assignLhsTextSess(nil, st, wrapVol)
+}
+
+func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if st.ArrayAccess != "" {
@@ -734,7 +738,7 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 	if st.Lhs != nil {
 		out := st.Lhs.Output(wrapVol)
 		// residual ERROR sticky — no invent soft-empty LHS past Lhs.Output residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return out
@@ -742,7 +746,7 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 	if st.LhsVar != nil {
 		out := st.LhsVar.OutputLhsC()
 		// residual ERROR sticky — no invent soft-empty LHS past OutputLhsC residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return out
@@ -753,7 +757,8 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 // OutputAssignAsExpr mirrors StatementAssign::OutputAsExpr.
 // StatementAssign.cpp:542–625 — safe math rewrite for +=/-= when SafeFlags set.
 // Uses process CGOptions (identify_wrappers); no soft invent Defaults().
-// Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).
+// Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).}
+
 func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
 	return OutputAssignAsExprOpts(st, wrapVol, ProcessOptions())
 }
@@ -886,14 +891,18 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 // StatementAssign.cpp:552 — lhs.is_volatile().
 // Statement always live; sticky true (no invent non-vol soft-skip ccomp path past hole).
 func assignLhsIsVolatile(st *Stmt) bool {
+	return assignLhsIsVolatileSess(nil, st)
+}
+
+func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if st.Lhs != nil {
 		vol := st.Lhs.IsVolatile()
 		// residual ERROR sticky — no invent non-vol soft-skip past Lhs IsVolatile residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return vol
@@ -903,7 +912,7 @@ func assignLhsIsVolatile(st *Stmt) bool {
 	}
 	vol := st.LhsVar.IsVolatile()
 	// residual ERROR sticky — no invent non-vol soft-skip past LhsVar IsVolatile residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return vol
@@ -911,7 +920,8 @@ func assignLhsIsVolatile(st *Stmt) bool {
 
 // expressionQualifiers mirrors Expression::get_qualifiers for qfer seed.
 // Uses Expression.GetQualifiers (ExpressionVariable/Assign/Funcall/Comma).
-// Expression always live at qfer seed; sticky nil (no invent empty seed past hole).
+// Expression always live at qfer seed; sticky nil (no invent empty seed past hole).}
+
 func expressionQualifiers(e *Expression) *CVQualifiers {
 	if e == nil {
 		sessNoteError(nil, ErrGeneric)

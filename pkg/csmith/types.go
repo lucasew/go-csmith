@@ -1502,21 +1502,25 @@ func (t *Type) SizeofString() string {
 // Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick
 // past incomplete field Type that would soft-skip ccomp packing bans).
 func HasAggregateField(fields []StructField) bool {
+	return HasAggregateFieldSess(nil, fields)
+}
+
+func HasAggregateFieldSess(s *Session, fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
 			// incomplete field Type sticky has-aggregate (restrictive)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if f.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft has-aggregate past IsAggregate residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue past IsAggregate residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -1525,7 +1529,8 @@ func HasAggregateField(fields []StructField) bool {
 
 // HasLongLongField mirrors Type::has_longlong_field.
 // Type.cpp:1066–1073.
-// Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick).
+// Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick).}
+
 func HasLongLongField(fields []StructField) bool {
 	return HasLongLongFieldSess(nil, fields)
 }

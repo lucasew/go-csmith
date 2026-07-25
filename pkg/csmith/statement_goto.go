@@ -183,18 +183,22 @@ func MarkNeedRevisitLCAParent(curr *Block, dest *Stmt, destParent *Block) {
 // (no invent none / soft re-pick past hole).
 // Incomplete LocalVars fails closed sticky as has-skipped (no invent none / soft re-pick).
 func HasInitSkippedVars(src *Block, destParent *Block) bool {
+	return HasInitSkippedVarsSess(nil, src, destParent)
+}
+
+func HasInitSkippedVarsSess(s *Session, src *Block, destParent *Block) bool {
 	if destParent == nil {
 		return false
 	}
 	if src == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	skipped := CollectInitSkippedVars(src, destParent)
 	if !VariablesComplete(skipped) {
 		// CollectInitSkippedVars already SetError sticky
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
@@ -207,7 +211,8 @@ func HasInitSkippedVars(src *Block, destParent *Block) bool {
 // VariablesComplete(nil)/len==0 invent empty-complete skip list success).
 // Complete scan with no skipped vars → empty non-nil slice.
 // destParent nil → complete empty (no dest chain).
-// Incomplete LocalVars fails closed sticky IncompleteVariables (no soft re-pick past hole).
+// Incomplete LocalVars fails closed sticky IncompleteVariables (no soft re-pick past hole).}
+
 func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	return CollectInitSkippedVarsSess(nil, src, destParent)
 }

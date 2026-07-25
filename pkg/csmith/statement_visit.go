@@ -140,8 +140,8 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			curU := fm.UnionFacts
 			if !visitedThis && !visitedDest &&
-				!SameFactVec(cur, curU, prevOut, prevOutU) &&
-				SubsetFactVec(cur, curU, prevOut, prevOutU) {
+				!SameFactVecSess(cgSess(cg), cur, curU, prevOut, prevOutU) &&
+				SubsetFactVecSess(cgSess(cg), cur, curU, prevOut, prevOutU) {
 				if sessHasError(cgSess(cg)) {
 					return false
 				}
@@ -433,8 +433,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		// subjects (seed-58: pure-shortcut same_facts size skew on for 1169 wiped
 		// nested make_iteration IV reads from feffect).
 		if len(st.Else.LocalVars) > 0 {
-			thenFacts = DropFactSubjectsByVars(thenFacts, st.Else.LocalVars)
-			thenUnions = DropUnionSubjectsByVars(thenUnions, st.Else.LocalVars)
+			thenFacts = DropFactSubjectsByVarsSess(cgSess(cg), thenFacts, st.Else.LocalVars)
+			thenUnions = DropUnionSubjectsByVarsSess(cgSess(cg), thenUnions, st.Else.LocalVars)
 			if !FactsComplete(thenFacts) || !UnionFactsComplete(thenUnions) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -443,8 +443,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 		}
 		if len(st.Then.LocalVars) > 0 {
-			elseFacts = DropFactSubjectsByVars(elseFacts, st.Then.LocalVars)
-			elseUnions = DropUnionSubjectsByVars(elseUnions, st.Then.LocalVars)
+			elseFacts = DropFactSubjectsByVarsSess(cgSess(cg), elseFacts, st.Then.LocalVars)
+			elseUnions = DropUnionSubjectsByVarsSess(cgSess(cg), elseUnions, st.Then.LocalVars)
 			if !FactsComplete(elseFacts) || !UnionFactsComplete(elseUnions) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -742,8 +742,8 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			// Drop body LocalVars from restored entry (see post_loop / DropFactSubjectsByVars).
 			if len(st.Then.LocalVars) > 0 {
-				cg.FM.GlobalFacts = DropFactSubjectsByVars(cg.FM.GlobalFacts, st.Then.LocalVars)
-				cg.FM.UnionFacts = DropUnionSubjectsByVars(cg.FM.UnionFacts, st.Then.LocalVars)
+				cg.FM.GlobalFacts = DropFactSubjectsByVarsSess(cgSess(cg), cg.FM.GlobalFacts, st.Then.LocalVars)
+				cg.FM.UnionFacts = DropUnionSubjectsByVarsSess(cgSess(cg), cg.FM.UnionFacts, st.Then.LocalVars)
 				if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
 					if !sessHasError(cgSess(cg)) {
 						sessNoteError(cgSess(cg), ErrGeneric)

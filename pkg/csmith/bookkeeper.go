@@ -623,9 +623,13 @@ func ExpressionComplexitySess(s *Session, e *Expression) int {
 // Returns false on incomplete IR sticky (no invent partial expr list / soft re-pick past holes).}
 
 func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
+	return collectStmtExprsSess(nil, st, out)
+}
+
+func collectStmtExprsSess(s *Session, st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
 		if out != nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return false
 	}
@@ -637,7 +641,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	switch st.Kind {
 	case StmtFor:
 		if st.Loop == nil || st.Loop.TestExpr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		*out = append(*out, st.Loop.TestExpr)
@@ -650,7 +654,7 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 		// C++ get_exprs always yields live Expression* for these kinds
 		// incomplete nil Expr fails closed sticky (no invent empty get_exprs success)
 		if st.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		*out = append(*out, st.Expr)
@@ -660,13 +664,13 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 		}
 	}
 	// get_blocks → recurse (Block* always live; nil hole fails closed sticky)
-	for _, b := range GetBlocksStmt(st) {
+	for _, b := range GetBlocksStmtSess(s, st) {
 		if b == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		for i := range b.Stmts {
-			if !collectStmtExprs(&b.Stmts[i], out) {
+			if !collectStmtExprsSess(s, &b.Stmts[i], out) {
 				return false
 			}
 		}
@@ -678,7 +682,8 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 // Bookkeeper.cpp:224–230.
 // Function* always live; incomplete Funcs list sticky clears counts.
 // Builtins without body skip. Incomplete expressions / stmt IR sticky clear counts —
-// no invent counting broken IR as leaf depth 0 / soft re-pick past holes.
+// no invent counting broken IR as leaf depth 0 / soft re-pick past holes.}
+
 func StatExprDepths(funcs []*Function) {
 	StatExprDepthsSess(nil, funcs)
 }
@@ -702,7 +707,7 @@ func StatExprDepthsSess(s *Session, funcs []*Function) {
 		}
 		for i := range f.Body.Stmts {
 			var exprs []*Expression
-			if !collectStmtExprs(&f.Body.Stmts[i], &exprs) {
+			if !collectStmtExprsSess(s, &f.Body.Stmts[i], &exprs) {
 				// collectStmtExprs may already sticky
 				sessBK(s).exprDepthCnts = nil
 				if !sessHasError(s) {
@@ -760,7 +765,7 @@ func StatBlkDepthsSess(s *Session, funcs []*Function) int {
 		cnt++
 		// get_blocks → recurse into Then/Else stmts with that block as parent
 		// Block* always live; nil hole sticky clear counts
-		for _, blk := range GetBlocksStmt(st) {
+		for _, blk := range GetBlocksStmtSess(s, st) {
 			if blk == nil {
 				incomplete = true
 				sessBK(s).blkDepthCnts = nil

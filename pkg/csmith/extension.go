@@ -90,8 +90,12 @@ func AbsExtensionInitializeSess(s *Session, num int, r *Rng, probs *Probabilitie
 // Incomplete values sticky "" (no invent partial definitions section).}
 
 func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag bool) string {
+	return AbsExtensionDefaultOutputDefinitionsSess(nil, values, initFlag)
+}
+
+func AbsExtensionDefaultOutputDefinitionsSess(s *Session, values []*ExtensionValue, initFlag bool) string {
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if len(values) == 0 {
@@ -102,9 +106,9 @@ func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag boo
 		b.WriteString(AbsExtensionTab)
 		// Type::Output
 		cn := v.Type.CName()
-		if sessHasError(nil) || cn == "" {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(s) || cn == "" {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
@@ -122,7 +126,8 @@ func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag boo
 
 // AbsExtensionOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 // AbsExtension.cpp:107–113 — "    " + invoke.Output + ";\n".
-// Incomplete invoke string sticky "" (no invent bare ";" call).
+// Incomplete invoke string sticky "" (no invent bare ";" call).}
+
 func AbsExtensionOutputFirstFunInvocation(invokeOut string) string {
 	if invokeOut == "" {
 		sessNoteError(nil, ErrGeneric)

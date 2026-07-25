@@ -106,14 +106,18 @@ func MakeIntOpts(v int, opts Options) *Constant {
 // Constant.cpp:436–446 — regenerate until str2int(value) != 0.
 // Incomplete type/rng sticky nil; bounded retries fail closed (no invent hang).
 func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
+	return MakeRandomNonzeroSess(nil, typ, opts, probs, r)
+}
+
+func MakeRandomNonzeroSess(s *Session, typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
 	if typ == nil || r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Cap retries — C++ loops unbounded; library fail closed if stuck on zero.
 	for tries := 0; tries < 64; tries++ {
-		c := MakeRandom(typ, opts, probs, r)
-		if c == nil || sessHasError(nil) {
+		c := MakeRandomSess(s, typ, opts, probs, r)
+		if c == nil || sessHasError(s) {
 			return nil
 		}
 		// Constant.cpp:439 — StringUtils::str2int(v) == 0 → retry
@@ -121,17 +125,18 @@ func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *C
 			return c
 		}
 		// residual ERROR sticky — no invent soft-retry past NotEqualsZero residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 	}
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return nil
 }
 
 // Clone mirrors Constant::clone → new Constant(*this).
 // Constant.cpp:82.
-// Incomplete Constant sticky nil (no invent zero Constant shell).
+// Incomplete Constant sticky nil (no invent zero Constant shell).}
+
 func (c *Constant) Clone() *Constant {
 	if c == nil || c.Type == nil {
 		sessNoteError(nil, ErrGeneric)

@@ -247,19 +247,23 @@ func (f *FactPointTo) OutputCondition() string {
 }
 
 func outputFactVar(v *Variable) string {
+	return outputFactVarSess(nil, v)
+}
+
+func outputFactVarSess(s *Session, v *Variable) string {
 	// Variable always live at fact emit; sticky no invent empty lhs token
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	s := v.GetActualName(false)
+	name := v.GetActualName(false)
 	// residual ERROR sticky — no invent soft-empty fact-var past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// sticky no invent "[0]" indices without identifier
-	if s == "" {
-		sessNoteError(nil, ErrGeneric)
+	if name == "" {
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()
@@ -267,7 +271,7 @@ func outputFactVar(v *Variable) string {
 	// C++ isArray always ArrayVariable*; missing AsArray sticky empty
 	// (no invent [0] indices from ArraySizes alone past broken shell)
 	if v.IsArray && v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.IsArray || v.AsArray != nil {
@@ -276,14 +280,15 @@ func outputFactVar(v *Variable) string {
 			dim = len(v.AsArray.Sizes)
 		}
 		for i := 0; i < dim; i++ {
-			s += "[0]"
+			name += "[0]"
 		}
 	}
-	return s
+	return name
 }
 
 // OutputAssertion mirrors Fact::OutputAssertion.
-// Fact.cpp:64–73 — assert(cond); comment-out if not assertable.
+// Fact.cpp:64–73 — assert(cond); comment-out if not assertable.}
+
 func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 	// Fact* always live at assert emit; sticky no invent empty assert without it
 	if f == nil {

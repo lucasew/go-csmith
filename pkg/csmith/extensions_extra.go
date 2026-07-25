@@ -175,13 +175,17 @@ func CoverageGenerateValuesSess(s *Session, values []*ExtensionValue, inputsSize
 // CoverageOutputArrayInit mirrors output_array_init for one value's row.
 // count is the value index; tests layout is [v0_t0, v0_t1, ..., v1_t0, ...].
 func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
+	return CoverageOutputArrayInitSess(nil, tests, count, inputsSize)
+}
+
+func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSize int) string {
 	if inputsSize <= 0 || count < 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	base := count * inputsSize
 	if base+inputsSize > len(tests) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if inputsSize == 1 {
@@ -197,7 +201,7 @@ func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 			b.WriteString(AbsExtensionTab)
 		}
 		o := tests[i].Output()
-		if sessHasError(nil) || o == "" {
+		if sessHasError(s) || o == "" {
 			return ""
 		}
 		b.WriteString(o)
@@ -210,14 +214,15 @@ func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 		b.WriteString(AbsExtensionTab)
 	}
 	o := tests[last].Output()
-	if sessHasError(nil) || o == "" {
+	if sessHasError(s) || o == "" {
 		return ""
 	}
 	b.WriteString(o)
 	return b.String()
 }
 
-// CoverageOutputDecls mirrors CoverageTestExtension::output_decls.
+// CoverageOutputDecls mirrors CoverageTestExtension::output_decls.}
+
 func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize int) string {
 	return CoverageOutputDeclsSess(nil, values, tests, inputsSize)
 }

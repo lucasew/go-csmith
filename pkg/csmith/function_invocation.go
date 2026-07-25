@@ -1183,7 +1183,7 @@ func MakeRandomBinaryInvocation(
 	var flags *SafeOpFlags
 	lhsTy, rhsTy := typ, typ
 	// C++ always builds flags; CreateFunctionInvocationBinary only allocates tmps for safe_ops
-	flags = MakeRandomBinaryKind(r, opts, probs, typ, typ, typ, SafeOpBinary, op)
+	flags = MakeRandomBinaryKindSess(cgSess(cg), r, opts, probs, typ, typ, typ, SafeOpBinary, op)
 	if flags == nil {
 		// SafeOpFlags DEPTH_GUARD / ERROR_GUARD
 		return nil
@@ -1482,7 +1482,7 @@ func MakeRandomBinaryPtrComparison(
 	// nullptr, nullptr, sOpBinary, op) BEFORE choose_random_pointer_type.
 	// Output for ptr_cmp still uses standard ==/!= (not safe_* wrappers), but the
 	// RNG draws for signedness + size still run (seed-2 e129 was F50 from flags).
-	flags := MakeRandomBinaryKind(r, opts, probs, GetIntType(), nil, nil, SafeOpBinary, op)
+	flags := MakeRandomBinaryKindSess(cgSess(cg), r, opts, probs, GetIntType(), nil, nil, SafeOpBinary, op)
 	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison
 	if flags == nil || sessHasError(cgSess(cg)) {
 		return nil
@@ -1727,7 +1727,7 @@ func MakeRandomUnaryInvocation(
 	if vs != nil {
 		probs = vs.Probs
 	}
-	flags := MakeRandomUnary(r, opts, probs, typ, nil, uop)
+	flags := MakeRandomUnarySess(cgSess(cg), r, opts, probs, typ, nil, uop)
 	// FunctionInvocation.cpp:152–154 — ERROR_GUARD; type = flags->get_lhs_type(); assert(type) sticky
 	if flags == nil {
 		return nil

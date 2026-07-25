@@ -251,15 +251,19 @@ func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *Sa
 // MakeRandomUnary mirrors SafeOpFlags::make_random_unary.
 // SafeOpFlags.cpp:139–167 — float always signed + SafeFloat; else signed coin + int size.
 func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
+	return MakeRandomUnarySess(nil, r, opts, probs, rvType, op1Type, uop)
+}
+
+func MakeRandomUnarySess(s *Session, r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
 	// SafeOpFlags.cpp:139–167 — always uses rnd_* sticky; no soft invent fixed flags
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true}
-	rvFloat := ReturnFloatTypeUnary(opts, rvType, op1Type, uop)
+	rvFloat := ReturnFloatTypeUnarySess(s, opts, rvType, op1Type, uop)
 	// residual ERROR sticky — no invent soft-flags past ReturnFloatTypeUnary residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
@@ -279,9 +283,9 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 	if rvFloat {
 		f.Size = SafeFloat
 	} else {
-		sz, ok := pickSafeOpSize(r, probs)
+		sz, ok := pickSafeOpSizeSess(s, r, probs)
 		// residual ERROR sticky — no invent soft-flags past pickSafeOpSize residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if !ok {
@@ -293,8 +297,20 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 }
 
 // MakeRandomBinaryKind mirrors SafeOpFlags::make_random_binary full signature.
-// SafeOpFlags.cpp:169–215.
+// SafeOpFlags.cpp:169–215.}
+
 func MakeRandomBinaryKind(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	rvType, op1Type, op2Type *Type,
+	opKind SafeOpKind,
+	bop BinaryOp,
+) *SafeOpFlags {
+	return MakeRandomBinaryKindSess(nil, r, opts, probs, rvType, op1Type, op2Type, opKind, bop)
+}
+
+func MakeRandomBinaryKindSess(s *Session, 
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
@@ -308,13 +324,13 @@ func MakeRandomBinaryKind(
 	}
 	// SafeOpFlags.cpp:176+ — always uses rnd_* sticky; no soft invent fixed flags
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true} // ISSUE upstream: always true
-	rvFloat := ReturnFloatTypeBinary(opts, rvType, op1Type, op2Type, bop)
+	rvFloat := ReturnFloatTypeBinarySess(s, opts, rvType, op1Type, op2Type, bop)
 	// residual ERROR sticky — no invent soft-flags past ReturnFloatTypeBinary residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 
@@ -347,9 +363,9 @@ func MakeRandomBinaryKind(
 	if rvFloat {
 		f.Size = SafeFloat
 	} else {
-		sz, ok := pickSafeOpSize(r, probs)
+		sz, ok := pickSafeOpSizeSess(s, r, probs)
 		// residual ERROR sticky — no invent soft-flags past pickSafeOpSize residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if !ok {
@@ -362,10 +378,15 @@ func MakeRandomBinaryKind(
 
 // pickSafeOpSize mirrors rnd_upto(MAX_SAFE_OP_SIZE-1, SAFE_OPS_SIZE_PROB_FILTER).
 // SafeOpFlags.cpp:164 / 212 — filter from Probabilities pSafeOpsSizeProb.
-// No invent opts-only weight table when probs missing.
+// No invent opts-only weight table when probs missing.}
+
 func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
+	return pickSafeOpSizeSess(nil, r, probs)
+}
+
+func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	if probs == nil {
@@ -373,11 +394,11 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 	}
 	if probs == nil {
 		// Probabilities singleton always live in C++; sticky fail closed
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	v := r.RndUptoFilter(uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0, false
 	}
 	sz := SafeOpSize(v)
@@ -388,7 +409,8 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 }
 
 // OutputFuncOrMacro mirrors SafeOpFlags::OutputFuncOrMacro.
-// SafeOpFlags.cpp:245–247 — "func_" or "macro_".
+// SafeOpFlags.cpp:245–247 — "func_" or "macro_".}
+
 func (f *SafeOpFlags) OutputFuncOrMacro() string {
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)
