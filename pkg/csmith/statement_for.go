@@ -762,17 +762,17 @@ func forHeaderOutputSess(s *Session, lc *LoopControl) string {
 		}
 		return ""
 	}
-	init := forInitOutput(lc)
+	init := forInitOutputSess(s, lc)
 	// residual ERROR sticky — no invent soft-continue test/incr past init residual
 	if sessHasError(s) {
 		return ""
 	}
-	test := forTestOutput(lc)
+	test := forTestOutputSess(s, lc)
 	// residual ERROR sticky — no invent soft-continue incr past test residual
 	if sessHasError(s) {
 		return ""
 	}
-	incr := forIncrOutput(lc)
+	incr := forIncrOutputSess(s, lc)
 	// residual ERROR sticky — no invent soft-continue header past incr residual
 	if sessHasError(s) {
 		return ""
@@ -842,33 +842,43 @@ func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 }
 
 func forInitOutput(lc *LoopControl) string {
+	return forInitOutputSess(nil, lc)
+}
+
+// forInitOutputSess is forInitOutput with explicit session residual sticky.
+func forInitOutputSess(s *Session, lc *LoopControl) string {
 	// StatementFor.cpp:408–410 — init->OutputAsExpr; always live StatementAssign
 	// sticky no invent "iv = InitN" when InitStmt missing
 	if lc == nil || lc.InitStmt == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	wrap := false
 	if lc.IV != nil {
 		wrap = lc.IV.UseVolRVal
 	}
-	out := OutputAssignAsExpr(lc.InitStmt, wrap)
+	out := OutputAssignAsExprOptsSess(s, lc.InitStmt, wrap, sessOpts(s))
 	// residual ERROR sticky — no invent soft-empty init past OutputAssign residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return out
 }
 
 func forTestOutput(lc *LoopControl) string {
+	return forTestOutputSess(nil, lc)
+}
+
+// forTestOutputSess is forTestOutput with explicit session residual sticky.
+func forTestOutputSess(s *Session, lc *LoopControl) string {
 	// StatementFor.cpp:412 — test.Output; sticky no invent "iv < LimitN" for missing test
 	if lc == nil || lc.TestExpr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	out := lc.TestExpr.Output()
+	out := lc.TestExpr.OutputOptsSess(s, sessOpts(s))
 	// residual ERROR sticky — no invent soft-empty test past Output residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return out
@@ -878,17 +888,22 @@ func forTestOutput(lc *LoopControl) string {
 // StatementFor.cpp:414 — incr->OutputAsExpr; always live StatementAssign.
 // sticky no invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
 func forIncrOutput(lc *LoopControl) string {
+	return forIncrOutputSess(nil, lc)
+}
+
+// forIncrOutputSess is forIncrOutput with explicit session residual sticky.
+func forIncrOutputSess(s *Session, lc *LoopControl) string {
 	if lc == nil || lc.IncrStmt == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	wrap := false
 	if lc.IV != nil {
 		wrap = lc.IV.UseVolRVal
 	}
-	out := OutputAssignAsExpr(lc.IncrStmt, wrap)
+	out := OutputAssignAsExprOptsSess(s, lc.IncrStmt, wrap, sessOpts(s))
 	// residual ERROR sticky — no invent soft-empty incr past OutputAssign residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return out
