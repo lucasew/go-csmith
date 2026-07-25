@@ -149,7 +149,7 @@ func (e *Expression) CompatibleWithExprSess(s *Session, other *Expression, expan
 	// Variable / Lhs → other.compatible(this.var)
 	// ExpressionVariable.cpp:289 — assert(v) on Variable* overload via CompatibleWithVar
 	if e.Term == TermVariable || e.Term == TermLhs {
-		ok := other.CompatibleWithVar(e.Var, expandStruct)
+		ok := other.CompatibleWithVarSess(s, e.Var, expandStruct)
 		// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
 		if sessHasError(s) {
 			return false
@@ -177,15 +177,20 @@ func (e *Expression) GetComplexity() int {
 
 // GetInvoke mirrors Expression::get_invoke — non-nil only for TermFunction.
 func (e *Expression) GetInvoke() *Invocation {
+	return e.GetInvokeSess(nil)
+}
+
+// GetInvokeSess is GetInvoke with explicit session residual sticky.
+func (e *Expression) GetInvokeSess(s *Session) *Invocation {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if e.Term != TermFunction {
 		return nil
 	}
 	if e.Invoke == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return e.Invoke
@@ -208,7 +213,7 @@ func (e *Expression) CloneSess(s *Session) *Expression {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		c := e.Con.Clone()
+		c := e.Con.CloneSess(s)
 		if c == nil {
 			return nil
 		}
@@ -232,48 +237,62 @@ func (e *Expression) CloneSess(s *Session) *Expression {
 // Expression.cpp:221–225 — get_type().needs_cast(desired) → cast_type = desired.}
 
 func (e *Expression) CheckAndSetCast(desired *Type) {
-	e.checkAndSetCastCore(desired)
+	e.CheckAndSetCastSess(nil, desired)
+}
+
+// CheckAndSetCastSess is CheckAndSetCast with explicit session residual sticky.
+func (e *Expression) CheckAndSetCastSess(s *Session, desired *Type) {
+	e.checkAndSetCastCoreSess(s, desired)
 }
 
 // CheckAndSetCastOpts mirrors Expression::check_and_set_cast fully.
 // Expression.cpp:221–225 — only when CGOptions::lang_cpp().
 func (e *Expression) CheckAndSetCastOpts(desired *Type, opts Options) {
+	e.CheckAndSetCastOptsSess(nil, desired, opts)
+}
+
+// CheckAndSetCastOptsSess is CheckAndSetCastOpts with explicit session residual sticky.
+func (e *Expression) CheckAndSetCastOptsSess(s *Session, desired *Type, opts Options) {
 	if !opts.LangCPP {
 		return
 	}
-	e.checkAndSetCastCore(desired)
+	e.checkAndSetCastCoreSess(s, desired)
 }
 
 func (e *Expression) checkAndSetCastCore(desired *Type) {
+	e.checkAndSetCastCoreSess(nil, desired)
+}
+
+func (e *Expression) checkAndSetCastCoreSess(s *Session, desired *Type) {
 	// Expression + desired Type always live at check_and_set_cast; sticky no invent
 	// skip-cast soft-success past hole.
 	if e == nil || desired == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// Expression.cpp:222 — get_type() before cast is applied; incomplete type sticky
 	// (no invent soft-skip cast decision past Type-nil shell as no-cast success)
-	src := e.GetTypeUncast()
+	src := e.GetTypeUncastSess(s)
 	if src == nil {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue NeedsCast past GetTypeUncast residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	if src.NeedsCast(desired) {
 		// residual ERROR sticky — no invent CastType past NeedsCast residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		e.CastType = desired
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue no-cast past NeedsCast residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 }
@@ -334,7 +353,7 @@ func (e *Expression) GetTypeUncastSess(s *Session) *Type {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		ty := e.CommaRHS.GetTypeUncast()
+		ty := e.CommaRHS.GetTypeUncastSess(s)
 		// residual ERROR sticky — no invent comma type past RHS GetType residual hole
 		if sessHasError(s) {
 			return nil
@@ -908,9 +927,14 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 // Expression always live; sticky empty via Output (no invent soft-skip past hole).}
 
 func (e *Expression) ToString() string {
-	out := e.Output()
+	return e.ToStringSess(nil)
+}
+
+// ToStringSess is ToString with explicit session residual sticky.
+func (e *Expression) ToStringSess(s *Session) string {
+	out := e.OutputOptsSess(s, sessOpts(s))
 	// residual ERROR sticky — no invent soft-empty string past Output residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return out
@@ -978,16 +1002,21 @@ func InitParamProbabilityTable(opts Options) DistributionTable {
 // Expression.cpp:103–112 — PartialExpander force eFunction when invoke expand;
 // else rnd_upto(filter.max, filter); lookup → eTermType.
 func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
+	return ExpressionTypeProbabilitySess(nil, r, filter)
+}
+
+// ExpressionTypeProbabilitySess is ExpressionTypeProbability with explicit session residual sticky.
+func ExpressionTypeProbabilitySess(s *Session, r *Rng, filter *VectorFilter) TermType {
 	// Expression.cpp:104–105 — PartialExpander::direct_expand_check(eInvoke)
-	if DirectExpandCheck(StmtInvoke) {
+	if DirectExpandCheckSess(s, StmtInvoke) {
 		return TermFunction
 	}
 	// Expression.cpp:107–111 — assert(filter); ERROR_GUARD(MAX_TERM_TYPES) sticky; no soft invent eVariable
 	if r == nil || filter == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxTermTypes
 	}
-	i := r.RndUptoFilter(uint32(filter.MaxProb()), filter)
+	i := r.RndUptoFilterSess(s, uint32(filter.MaxProb()), filter)
 	return TermType(filter.Lookup(int(i)))
 }
 
@@ -1000,7 +1029,7 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
 	// Expression::InitProbabilityTables always live; ambient tables if arg nil
 	if tables == nil {
-		tables = sessExprTables(nil)
+		tables = sessExprTables(s)
 	}
 	// tables always live after InitProbabilityTables; sticky MaxTermTypes
 	// (no invent soft term pick without session tables)
@@ -1054,7 +1083,7 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 	if exprDepth+2 > opts.MaxExprComplexity {
 		f.Add(int(TermFunction)).Add(int(TermAssignment)).Add(int(TermCommaExpr))
 	}
-	return ExpressionTypeProbability(r, f)
+	return ExpressionTypeProbabilitySess(s, r, f)
 }
 
 // PickParamTermType mirrors Expression::make_random_param term selection.
@@ -1067,7 +1096,7 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
 	// Expression::InitProbabilityTables always live; ambient tables if arg nil
 	if tables == nil {
-		tables = sessExprTables(nil)
+		tables = sessExprTables(s)
 	}
 	// tables always live after InitProbabilityTables; sticky MaxTermTypes
 	// (no invent soft param term pick without session tables)
@@ -1097,7 +1126,7 @@ func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options,
 	if exprDepth+2 > opts.MaxExprComplexity {
 		f.Add(int(TermFunction)).Add(int(TermAssignment)).Add(int(TermCommaExpr))
 	}
-	return ExpressionTypeProbability(r, f)
+	return ExpressionTypeProbabilitySess(s, r, f)
 }
 
 // MakeRandomParam mirrors Expression::make_random_param.
