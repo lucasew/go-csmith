@@ -182,7 +182,7 @@ func TestVectorFilterNilTableMatchesCPP(t *testing.T) {
 		t.Fatalf("nil ptable Lookup: got %d want identity 5", f.Lookup(5))
 	}
 	// empty FilterOut set → never rejects
-	if f.Filter(0) {
+	if f.FilterSess(testAmbientSession, 0) {
 		t.Fatal("empty FilterOut must not reject")
 	}
 }
@@ -383,7 +383,7 @@ func TestVectorFilterNilSticky(t *testing.T) {
 		t.Fatal("nil MaxProb must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*VectorFilter)(nil).Filter(0) {
+	if !(*VectorFilter)(nil).FilterSess(testAmbientSession, 0) {
 		t.Fatal("nil Filter must reject-all true")
 	}
 	if !HasErrorSess(testAmbientSession) {

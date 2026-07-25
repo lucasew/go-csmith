@@ -245,14 +245,14 @@ func (g *AttributeGenerator) OutputSess(s *Session, r *Rng) string {
 
 // NewVarAttrGenerator mirrors Variable::InitializeVariableAttributes.
 // Variable.cpp:83–99 — gated by VariableAttributes; uses VarAttrProb.
-func NewVarAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator {
+func NewVarAttrGenerator(s *Session, opts Options, probs *Probabilities) *AttributeGenerator {
 	if !opts.VariableAttributes {
 		return &AttributeGenerator{}
 	}
 	// nil probs → 0% (no invent default 30 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PVarAttrProb)
+		p = probs.SingleSess(s, PVarAttrProb)
 	}
 	return &AttributeGenerator{Attributes: []Attribute{
 		&MultiChoiceAttribute{
@@ -270,14 +270,14 @@ func NewVarAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator
 
 // NewFuncAttrGenerator mirrors Function::InitializeAttributes.
 // Function.cpp:82–124 — common booleans + visibility/no_sanitize/optimize + aligned/section.
-func NewFuncAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator {
+func NewFuncAttrGenerator(s *Session, opts Options, probs *Probabilities) *AttributeGenerator {
 	if !opts.FunctionAttributes {
 		return &AttributeGenerator{}
 	}
 	// nil probs → 0% (no invent default 30 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PFuncAttrProb)
+		p = probs.SingleSess(s, PFuncAttrProb)
 	}
 	attrs := make([]Attribute, 0, 40)
 	for _, name := range []string{
@@ -313,14 +313,14 @@ func NewFuncAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerato
 
 // NewLabelAttrGenerator mirrors InitializeLabelAttributes.
 // Statement.cpp:95–100 — hot/cold with TypeAttrProb when LabelAttributes.
-func NewLabelAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator {
+func NewLabelAttrGenerator(s *Session, opts Options, probs *Probabilities) *AttributeGenerator {
 	if !opts.LabelAttributes {
 		return &AttributeGenerator{}
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PTypeAttrProb)
+		p = probs.SingleSess(s, PTypeAttrProb)
 	}
 	return &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "hot", Prob: p},
@@ -330,14 +330,14 @@ func NewLabelAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerat
 
 // NewStructTypeAttrGenerator mirrors InitializeTypeAttributes for structs.
 // Type.cpp:78–87.
-func NewStructTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator {
+func NewStructTypeAttrGenerator(s *Session, opts Options, probs *Probabilities) *AttributeGenerator {
 	if !opts.TypeAttributes {
 		return &AttributeGenerator{}
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PTypeAttrProb)
+		p = probs.SingleSess(s, PTypeAttrProb)
 	}
 	return &AttributeGenerator{Attributes: []Attribute{
 		&AlignedAttribute{Name: "aligned", Prob: p, Alignment: 8},
@@ -349,15 +349,15 @@ func NewStructTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGe
 
 // NewUnionTypeAttrGenerator mirrors InitializeTypeAttributes for unions.
 // Type.cpp:88–97 — + transparent_union.
-func NewUnionTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator {
-	g := NewStructTypeAttrGenerator(opts, probs)
+func NewUnionTypeAttrGenerator(s *Session, opts Options, probs *Probabilities) *AttributeGenerator {
+	g := NewStructTypeAttrGenerator(s, opts, probs)
 	if !opts.TypeAttributes {
 		return g
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PTypeAttrProb)
+		p = probs.SingleSess(s, PTypeAttrProb)
 	}
 	g.Attributes = append(g.Attributes, &BooleanAttribute{Name: "transparent_union", Prob: p})
 	return g
@@ -373,11 +373,11 @@ func InitAttrGeneratorsSess(s *Session, opts Options, probs *Probabilities) {
 	s = sessOrAmbient(s)
 	s.Opts = opts
 	s.Probs = probs
-	s.VarAttrGenerator = NewVarAttrGenerator(opts, probs)
-	s.FuncAttrGenerator = NewFuncAttrGenerator(opts, probs)
-	s.LabelAttrGenerator = NewLabelAttrGenerator(opts, probs)
-	s.StructTypeAttrGen = NewStructTypeAttrGenerator(opts, probs)
-	s.UnionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
+	s.VarAttrGenerator = NewVarAttrGenerator(s, opts, probs)
+	s.FuncAttrGenerator = NewFuncAttrGenerator(s, opts, probs)
+	s.LabelAttrGenerator = NewLabelAttrGenerator(s, opts, probs)
+	s.StructTypeAttrGen = NewStructTypeAttrGenerator(s, opts, probs)
+	s.UnionTypeAttrGen = NewUnionTypeAttrGenerator(s, opts, probs)
 }
 
 // EnsureVarAttrGeneratorSess returns Variable::var_attr_generator after InitAttrGenerators.

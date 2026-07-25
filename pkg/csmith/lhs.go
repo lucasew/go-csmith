@@ -644,7 +644,7 @@ func MakeRandomLhs(
 		if v == nil {
 			derefProb := 0
 			if probs != nil {
-				derefProb = probs.Single(PSelectDerefPointerProb)
+				derefProb = probs.SingleSess(sessFromCG(cg), PSelectDerefPointerProb)
 			}
 			if derefProb < 0 {
 				derefProb = 0

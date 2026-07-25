@@ -241,7 +241,7 @@ func MakeRandomUnarySess(s *Session, r *Rng, opts Options, probs *Probabilities,
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
 	sigProb := uint32(0)
 	if probs != nil {
-		if p := probs.Single(PSafeOpsSignedProb); p >= 0 {
+		if p := probs.SingleSess(s, PSafeOpsSignedProb); p >= 0 {
 			sigProb = uint32(p)
 		}
 	}
@@ -299,7 +299,7 @@ func MakeRandomBinaryKindSess(s *Session,
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
 	sigProb := uint32(0)
 	if probs != nil {
-		if p := probs.Single(PSafeOpsSignedProb); p >= 0 {
+		if p := probs.SingleSess(s, PSafeOpsSignedProb); p >= 0 {
 			sigProb = uint32(p)
 		}
 	}
@@ -354,12 +354,12 @@ func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, b
 		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
-	v := r.RndUptoFilterSess(s, uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())
+	v := r.RndUptoFilterSess(s, uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilterSess(s))
 	if sessHasError(s) {
 		return 0, false
 	}
 	sz := SafeOpSize(v)
-	if int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat || probs.SafeOpsSizeWeight(int(sz)) == 0 {
+	if int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat || probs.SafeOpsSizeWeightSess(s, int(sz)) == 0 {
 		return 0, false
 	}
 	return sz, true

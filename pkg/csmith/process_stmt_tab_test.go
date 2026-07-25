@@ -167,7 +167,7 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 	opts.Jumps = false
 	opts.Arrays = false
 	p := NewProbabilities(opts)
-	tab := p.StatementThresholdTable()
+	tab := p.StatementThresholdTableSess(testAmbientSession)
 	if tab == nil {
 		t.Fatal("want statement table on Probabilities")
 	}
@@ -188,7 +188,7 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 	}()
 	s := NewSession(opts)
 	g := NewProgramGenerator(s)
-	if g.StmtTab != g.Probs.StatementThresholdTable() {
+	if g.StmtTab != g.Probs.StatementThresholdTableSess(testAmbientSession) {
 		t.Fatal("generator StmtTab must be probs statement table")
 	}
 	// Table lives on the session bag (ambient ProcessStmtTab is only live while activated).

@@ -386,7 +386,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		}
 		oob := 0
 		if probs != nil {
-			oob = probs.Single(PArrayOOBProb)
+			oob = probs.SingleSess(sessFromCG(cg), PArrayOOBProb)
 		} else {
 			oob = opts.ArrayOOBProb
 		}

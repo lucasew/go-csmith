@@ -94,11 +94,14 @@ func newProbabilityFilterOwned(p *Probabilities, pname ProbName) *ProbabilityFil
 }
 
 // Filter implements Filter — true means reject candidate v.
+// Interface entry for non-Sess RndUptoFilter duals; residual via unit-test ambient.
+// Generation prefers type-assert FilterSess in RndUptoFilterSess.
 // Probabilities.cpp:59–81.
 func (f *ProbabilityFilter) Filter(v uint32) bool {
 	return f.FilterSess(testAmbientSession, v)
 }
 
+// FilterSess is Filter with explicit session residual sticky.
 func (f *ProbabilityFilter) FilterSess(s *Session, v uint32) bool {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -138,19 +141,16 @@ func NewProbabilities(opts Options) *Probabilities {
 	p.initSafeOpsSize(opts)
 	p.initStatementProbs(opts)
 	// set_prob_filter for each equal group after set_default_*
-	p.setProbFilter(PSimpleTypesProb)
-	p.setProbFilter(PBinaryOpsProb)
-	p.setProbFilter(PUnaryOpsProb)
-	p.setProbFilter(PSafeOpsSizeProb)
+	// Construction has no residual bag yet; install filters on this Probabilities owner.
+	p.probFilters[PSimpleTypesProb] = newProbabilityFilterOwned(p, PSimpleTypesProb)
+	p.probFilters[PBinaryOpsProb] = newProbabilityFilterOwned(p, PBinaryOpsProb)
+	p.probFilters[PUnaryOpsProb] = newProbabilityFilterOwned(p, PUnaryOpsProb)
+	p.probFilters[PSafeOpsSizeProb] = newProbabilityFilterOwned(p, PSafeOpsSizeProb)
 	return p
 }
 
 // equalGroupWeight returns weight for equal-group root pname at index v.
 // ProbabilityFilter walks GroupProbElem; Go weight slices are pre-indexed.
-func (p *Probabilities) equalGroupWeight(pname ProbName, v int) int {
-	return p.equalGroupWeightSess(testAmbientSession, pname, v)
-}
-
 func (p *Probabilities) equalGroupWeightSess(s *Session, pname ProbName, v int) int {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -174,10 +174,6 @@ func (p *Probabilities) equalGroupWeightSess(s *Session, pname ProbName, v int) 
 
 // setProbFilter mirrors Probabilities::set_prob_filter.
 // Probabilities.cpp:787–789.
-func (p *Probabilities) setProbFilter(pname ProbName) {
-	p.setProbFilterSess(testAmbientSession, pname)
-}
-
 func (p *Probabilities) setProbFilterSess(s *Session, pname ProbName) {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -188,10 +184,6 @@ func (p *Probabilities) setProbFilterSess(s *Session, pname ProbName) {
 
 // GetProbFilter mirrors Probabilities::get_prob_filter (static via process).
 // Probabilities.cpp:777–785 — prob_filters_ then extra_filters_; missing → sticky nil.
-func GetProbFilter(pname ProbName) Filter {
-	return GetProbFilterSess(testAmbientSession, pname)
-}
-
 // GetProbFilterSess is GetProbFilter on an explicit session bag.
 func GetProbFilterSess(s *Session, pname ProbName) Filter {
 	p := sessProbs(s)
@@ -212,10 +204,6 @@ func GetProbFilterSess(s *Session, pname ProbName) Filter {
 
 // RegisterExtraFilter mirrors Probabilities::register_extra_filter.
 // Probabilities.cpp:791–796.
-func RegisterExtraFilter(pname ProbName, filter Filter) {
-	RegisterExtraFilterSess(testAmbientSession, pname, filter)
-}
-
 // RegisterExtraFilterSess is RegisterExtraFilter on an explicit session bag.
 func RegisterExtraFilterSess(s *Session, pname ProbName, filter Filter) {
 	p := sessProbs(s)
@@ -229,10 +217,6 @@ func RegisterExtraFilterSess(s *Session, pname ProbName, filter Filter) {
 // UnregisterExtraFilter mirrors Probabilities::unregister_extra_filter.
 // Probabilities.cpp:798–804 — pointer identity; Go requires comparable Filter
 // values (pointer/struct receivers). Function-typed Filters are not comparable.
-func UnregisterExtraFilter(pname ProbName, filter Filter) {
-	UnregisterExtraFilterSess(testAmbientSession, pname, filter)
-}
-
 // UnregisterExtraFilterSess is UnregisterExtraFilter on an explicit session bag.
 func UnregisterExtraFilterSess(s *Session, pname ProbName, filter Filter) {
 	p := sessProbs(s)
@@ -260,10 +244,6 @@ func filterPtrEqual(a, b Filter) (eq bool) {
 
 // CheckExtraFilter mirrors Probabilities::check_extra_filter.
 // Probabilities.cpp:806–813 — true when extra filter rejects v.
-func (p *Probabilities) CheckExtraFilter(pname ProbName, v int) bool {
-	return p.CheckExtraFilterSess(testAmbientSession, pname, v)
-}
-
 func (p *Probabilities) CheckExtraFilterSess(s *Session, pname ProbName, v int) bool {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -276,14 +256,17 @@ func (p *Probabilities) CheckExtraFilterSess(s *Session, pname ProbName, v int) 
 	if !ok || f == nil {
 		return false
 	}
-	return f.Filter(uint32(v))
+	switch ff := f.(type) {
+	case *VectorFilter:
+		return ff.FilterSess(s, uint32(v))
+	case *ProbabilityFilter:
+		return ff.FilterSess(s, uint32(v))
+	default:
+		return f.Filter(uint32(v))
+	}
 }
 
 // ClearFilters mirrors Probabilities::clear_filter on both maps (destructor path).
-func (p *Probabilities) ClearFilters() {
-	p.ClearFiltersSess(testAmbientSession)
-}
-
 func (p *Probabilities) ClearFiltersSess(s *Session) {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -295,10 +278,6 @@ func (p *Probabilities) ClearFiltersSess(s *Session) {
 
 // StatementThresholdTable returns Statement::stmtTable_ built from pStatementProb.
 // Incomplete Probabilities sticky nil (no invent empty table soft-skip past hole).
-func (p *Probabilities) StatementThresholdTable() *ThresholdTable {
-	return p.StatementThresholdTableSess(testAmbientSession)
-}
-
 func (p *Probabilities) StatementThresholdTableSess(s *Session) *ThresholdTable {
 	// Probabilities always live in C++ singleton; sticky incomplete no invent nil table
 	if p == nil {
@@ -311,10 +290,6 @@ func (p *Probabilities) StatementThresholdTableSess(s *Session) *ThresholdTable 
 // Single returns a single probability in [0,100].
 // SingleProbElem::get_prob_direct.
 // Incomplete Probabilities sticky 0 (no invent default 50 / soft re-pick past hole).
-func (p *Probabilities) Single(name ProbName) int {
-	return p.SingleSess(testAmbientSession, name)
-}
-
 func (p *Probabilities) SingleSess(s *Session, name ProbName) int {
 	// Probabilities always live; sticky incomplete no invent 0% without table
 	if p == nil {
@@ -326,10 +301,6 @@ func (p *Probabilities) SingleSess(s *Session, name ProbName) int {
 
 // SimpleTypeWeight returns equal-group weight (0 or 1) for eSimpleType index.
 // Incomplete Probabilities sticky 0 (no invent weight 1 soft-skip past hole).
-func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
-	return p.SimpleTypeWeightSess(testAmbientSession, simpleIdx)
-}
-
 func (p *Probabilities) SimpleTypeWeightSess(s *Session, simpleIdx int) int {
 	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
 	if p == nil {
@@ -346,10 +317,6 @@ func (p *Probabilities) SimpleTypeWeightSess(s *Session, simpleIdx int) int {
 // ProbabilityFilter for pSimpleTypesProb (equal group): filter(v) when weight==0.
 // Uses live ProbabilityFilter when p is the process singleton; otherwise a
 // bound filter against this *Probabilities (library/test paths without SetProcess).
-func (p *Probabilities) SimpleTypesFilter() Filter {
-	return p.SimpleTypesFilterSess(testAmbientSession)
-}
-
 func (p *Probabilities) SimpleTypesFilterSess(s *Session) Filter {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -370,10 +337,6 @@ func (p *Probabilities) SimpleTypesFilterSess(s *Session) Filter {
 
 // BinaryOpWeight returns equal-group weight for eBinaryOps index.
 // Incomplete Probabilities sticky 0 (no invent weight soft-skip past hole).
-func (p *Probabilities) BinaryOpWeight(opIdx int) int {
-	return p.BinaryOpWeightSess(testAmbientSession, opIdx)
-}
-
 func (p *Probabilities) BinaryOpWeightSess(s *Session, opIdx int) int {
 	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
 	if p == nil {
@@ -388,10 +351,6 @@ func (p *Probabilities) BinaryOpWeightSess(s *Session, opIdx int) int {
 
 // BinaryOpsFilter rejects eBinaryOps with weight 0 (BINARY_OPS_PROB_FILTER).
 // Probabilities.cpp set_default_binary_ops_prob + set_prob_filter.
-func (p *Probabilities) BinaryOpsFilter() Filter {
-	return p.BinaryOpsFilterSess(testAmbientSession)
-}
-
 func (p *Probabilities) BinaryOpsFilterSess(s *Session) Filter {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -412,10 +371,6 @@ func (p *Probabilities) BinaryOpsFilterSess(s *Session) Filter {
 
 // UnaryOpWeight returns equal-group weight for eUnaryOps index.
 // Incomplete Probabilities sticky 0 (no invent weight soft-skip past hole).
-func (p *Probabilities) UnaryOpWeight(opIdx int) int {
-	return p.UnaryOpWeightSess(testAmbientSession, opIdx)
-}
-
 func (p *Probabilities) UnaryOpWeightSess(s *Session, opIdx int) int {
 	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
 	if p == nil {
@@ -430,10 +385,6 @@ func (p *Probabilities) UnaryOpWeightSess(s *Session, opIdx int) int {
 
 // UnaryOpsFilter rejects eUnaryOps with weight 0 (UNARY_OPS_PROB_FILTER).
 // Probabilities.cpp set_default_unary_ops_prob + set_prob_filter.
-func (p *Probabilities) UnaryOpsFilter() Filter {
-	return p.UnaryOpsFilterSess(testAmbientSession)
-}
-
 func (p *Probabilities) UnaryOpsFilterSess(s *Session) Filter {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -610,10 +561,6 @@ func (p *Probabilities) initStatementProbs(opts Options) {
 // SafeOpsSizeWeight returns equal-group weight for SafeOpSize index (int sizes only).
 // Probabilities always live at weight query; sticky 0 (no invent zero-weight soft-skip past hole).
 // OOB sizeIdx is complete miss weight 0 (not incomplete IR).
-func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
-	return p.SafeOpsSizeWeightSess(testAmbientSession, sizeIdx)
-}
-
 func (p *Probabilities) SafeOpsSizeWeightSess(s *Session, sizeIdx int) int {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)
@@ -627,10 +574,6 @@ func (p *Probabilities) SafeOpsSizeWeightSess(s *Session, sizeIdx int) int {
 
 // SafeOpsSizeFilter rejects SafeOpSize indices with weight 0 (SAFE_OPS_SIZE_PROB_FILTER).
 // Probabilities.cpp set_default_safe_ops_size_prob + set_prob_filter.
-func (p *Probabilities) SafeOpsSizeFilter() Filter {
-	return p.SafeOpsSizeFilterSess(testAmbientSession)
-}
-
 func (p *Probabilities) SafeOpsSizeFilterSess(s *Session) Filter {
 	if p == nil {
 		sessNoteError(s, ErrGeneric)

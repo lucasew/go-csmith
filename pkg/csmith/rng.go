@@ -288,13 +288,23 @@ func (r *Rng) RndFlipcoinFilterSess(s *Session, p uint32, f Filter) bool {
 	localDepth := r.randDepth
 	r.randDepth++
 	if f != nil {
-		if f.Filter(0) {
+		filterAt := func(x uint32) bool {
+			switch ff := f.(type) {
+			case *VectorFilter:
+				return ff.FilterSess(s, x)
+			case *ProbabilityFilter:
+				return ff.FilterSess(s, x)
+			default:
+				return f.Filter(x)
+			}
+		}
+		if filterAt(0) {
 			if r.trace && r.traceTo != nil {
 				_, _ = fmt.Fprintf(r.traceTo, "F depth=%d p=%d v=1\n", localDepth, p)
 			}
 			return true
 		}
-		if f.Filter(1) {
+		if filterAt(1) {
 			if r.trace && r.traceTo != nil {
 				_, _ = fmt.Fprintf(r.traceTo, "F depth=%d p=%d v=0\n", localDepth, p)
 			}

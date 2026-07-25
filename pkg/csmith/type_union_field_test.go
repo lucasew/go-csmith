@@ -79,7 +79,7 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 		env.AllTypes = append(env.AllTypes, GetSimpleTypeSess(testAmbientSession, st))
 	}
 	// float must have weight 0 under defaults
-	if probs.SimpleTypeWeight(int(EFloat)) != 0 {
+	if probs.SimpleTypeWeightSess(testAmbientSession, int(EFloat)) != 0 {
 		t.Fatal("expected float weight 0 when EnableFloat false")
 	}
 	// Must successfully pick a weight>0 simple without inventing trimmed pool (no hang / nil)
@@ -93,7 +93,7 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 		if !f.Type.IsSimpleSess(testAmbientSession) || f.Type.SimpleSess(testAmbientSession) == EVoid {
 			t.Fatalf("unexpected field type %v seed %d", f.Type, seed)
 		}
-		if probs.SimpleTypeWeight(int(f.Type.SimpleSess(testAmbientSession))) == 0 {
+		if probs.SimpleTypeWeightSess(testAmbientSession, int(f.Type.SimpleSess(testAmbientSession))) == 0 {
 			t.Fatalf("picked weight-0 simple %v seed %d", f.Type.SimpleSess(testAmbientSession), seed)
 		}
 		ok++

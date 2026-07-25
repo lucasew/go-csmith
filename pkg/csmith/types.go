@@ -1308,7 +1308,7 @@ func ChooseRandomNonvoidSimpleSess(s *Session, r *Rng, probs *Probabilities) ESi
 		sessNoteError(s, ErrGeneric)
 		return EVoid
 	}
-	v := r.RndUptoFilterSess(s, uint32(MaxSimpleTypes), probs.SimpleTypesFilter())
+	v := r.RndUptoFilterSess(s, uint32(MaxSimpleTypes), probs.SimpleTypesFilterSess(s))
 	return ESimpleType(v)
 }
 
@@ -1680,7 +1680,7 @@ func IfStructWillHaveAssignOpsSess(s *Session, r *Rng, opts Options, probs *Prob
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PRegularVolatileProb)
+		p = probs.SingleSess(s, PRegularVolatileProb)
 	}
 	return r.RndFlipcoin(uint32(p))
 }

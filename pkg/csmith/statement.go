@@ -53,7 +53,7 @@ func buildStatementThresholdTable(opts Options) *ThresholdTable {
 // NewStatementThresholdTable returns the session statement table when process
 // Probabilities is live (Statement::stmtTable_ from pStatementProb); otherwise
 // builds a library one-off from opts (tests that pass an explicit table).
-// Generation should prefer ProcessStmtTab / probs.StatementThresholdTable().
+// Generation should prefer ProcessStmtTab / probs.StatementThresholdTableSess(s).
 func NewStatementThresholdTable(opts Options) *ThresholdTable {
 	return NewStatementThresholdTableSess(testAmbientSession, opts)
 }
@@ -61,7 +61,7 @@ func NewStatementThresholdTable(opts Options) *ThresholdTable {
 // NewStatementThresholdTableSess prefers session Probabilities statement table.
 func NewStatementThresholdTableSess(s *Session, opts Options) *ThresholdTable {
 	if p := sessProbs(s); p != nil {
-		if t := p.StatementThresholdTable(); t != nil {
+		if t := p.StatementThresholdTableSess(s); t != nil {
 			return t
 		}
 	}

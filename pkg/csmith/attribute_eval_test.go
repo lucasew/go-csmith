@@ -241,12 +241,12 @@ func TestAttributeNilRNGSticky(t *testing.T) {
 func TestNewVarAttrGeneratorGated(t *testing.T) {
 	opts := Defaults()
 	opts.VariableAttributes = false
-	g := NewVarAttrGenerator(opts, NewProbabilities(opts))
+	g := NewVarAttrGenerator(testAmbientSession, opts, NewProbabilities(opts))
 	if len(g.Attributes) != 0 {
 		t.Fatal("off")
 	}
 	opts.VariableAttributes = true
-	g = NewVarAttrGenerator(opts, NewProbabilities(opts))
+	g = NewVarAttrGenerator(testAmbientSession, opts, NewProbabilities(opts))
 	if len(g.Attributes) < 6 {
 		t.Fatal(len(g.Attributes))
 	}
@@ -258,7 +258,7 @@ func TestNewVarAttrGeneratorGated(t *testing.T) {
 		t.Fatalf("%T", g.Attributes[1])
 	}
 	// nil probs → 0% (no invent default 30)
-	g0 := NewVarAttrGenerator(opts, nil)
+	g0 := NewVarAttrGenerator(testAmbientSession, opts, nil)
 	if len(g0.Attributes) == 0 {
 		t.Fatal("attrs present at 0%")
 	}
@@ -270,7 +270,7 @@ func TestNewVarAttrGeneratorGated(t *testing.T) {
 func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
 	opts := Defaults()
 	opts.FunctionAttributes = true
-	g := NewFuncAttrGenerator(opts, NewProbabilities(opts))
+	g := NewFuncAttrGenerator(testAmbientSession, opts, NewProbabilities(opts))
 	foundSec, foundAlign := false, false
 	for _, a := range g.Attributes {
 		if _, ok := a.(*SectionAttribute); ok {
@@ -284,7 +284,7 @@ func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
 		t.Fatal("section/aligned", foundSec, foundAlign)
 	}
 	// nil probs → 0% (no invent default 30)
-	g0 := NewFuncAttrGenerator(opts, nil)
+	g0 := NewFuncAttrGenerator(testAmbientSession, opts, nil)
 	for _, a := range g0.Attributes {
 		if ba, ok := a.(*BooleanAttribute); ok && ba.Prob != 0 {
 			t.Fatalf("nil probs must not invent Prob=30, got %s=%d", ba.Name, ba.Prob)

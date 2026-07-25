@@ -145,7 +145,7 @@ func InitSessionProbabilityTablesSess(s *Session, opts Options) {
 	s.ExprTables = NewExprTables(opts)
 	// Statement::InitProbabilityTable — share session probs statement table
 	if p := s.Probs; p != nil {
-		s.StmtTab = p.StatementThresholdTable()
+		s.StmtTab = p.StatementThresholdTableSess(s)
 	}
 }
 

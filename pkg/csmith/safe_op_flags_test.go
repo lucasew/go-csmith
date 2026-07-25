@@ -205,7 +205,7 @@ func TestSafeOpFlagsCloneNilSticky(t *testing.T) {
 func TestSafeOpsSizeWeightNilSticky(t *testing.T) {
 	// Probabilities always live at weight query; sticky 0 (no invent zero-weight soft-skip)
 	ClearErrorSess(testAmbientSession)
-	if (*Probabilities)(nil).SafeOpsSizeWeight(0) != 0 {
+	if (*Probabilities)(nil).SafeOpsSizeWeightSess(testAmbientSession, 0) != 0 {
 		t.Fatal("nil SafeOpsSizeWeight must fail closed 0")
 	}
 	if !HasErrorSess(testAmbientSession) {

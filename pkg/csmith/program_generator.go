@@ -168,7 +168,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	vs := NewVariableSelectorProbs(opts, probs)
 	vs.Sess = s
 	// Statement.cpp:133–139 — InitProbabilityTable from pStatementProb (session probs)
-	stmtTab := probs.StatementThresholdTable()
+	stmtTab := probs.StatementThresholdTableSess(s)
 	s.StmtTab = stmtTab
 	// VariableSelector::InitScopeTable — scopeTable_ once per generation
 	InitScopeTableSess(s, opts)

@@ -610,7 +610,7 @@ func HexToBinarySess(s *Session, val string) string {
 // binaryConstProbSess is binaryConstProb on an explicit session bag.
 func binaryConstProbSess(s *Session) uint32 {
 	if p := sessProbs(s); p != nil {
-		if v := p.Single(PBinaryConstProb); v >= 0 {
+		if v := p.SingleSess(s, PBinaryConstProb); v >= 0 {
 			return uint32(v)
 		}
 	}

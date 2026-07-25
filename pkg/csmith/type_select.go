@@ -364,7 +364,7 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 				return true
 			}
 			// SIMPLE_TYPES_PROB_FILTER (Type.cpp:226–228)
-			return probs != nil && probs.SimpleTypeWeight(int(t.SimpleSess(sessFromEnv(env)))) == 0
+			return probs != nil && probs.SimpleTypeWeightSess(sessFromEnv(env), int(t.SimpleSess(sessFromEnv(env)))) == 0
 		}
 		// residual ERROR sticky — no invent soft-continue filter past IsSimple residual false
 		if hasErrEnv(env) {
@@ -538,7 +538,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		if simple && t.SimpleSess(sessFromEnv(env)) == EVoid {
 			return true
 		}
-		if simple && probs != nil && probs.SimpleTypeWeight(int(t.SimpleSess(sessFromEnv(env)))) == 0 {
+		if simple && probs != nil && probs.SimpleTypeWeightSess(sessFromEnv(env), int(t.SimpleSess(sessFromEnv(env)))) == 0 {
 			return true
 		}
 		if noVolatileAgg && t.IsAggregateSess(sessFromEnv(env)) && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
@@ -684,7 +684,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	}
 	var typ *Type
 	// Type.cpp:1609–1614 — pointer as LType (simple assign only); ERROR_GUARD after flip + make
-	if op == AssignSimple && probs != nil && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
+	if op == AssignSimple && probs != nil && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PPointerAsLTypeProb))) {
 		// Type.cpp:1610 — ERROR_GUARD(nullptr) after flipcoin
 		if hasErrEnv(env) {
 			return nil
@@ -708,7 +708,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
-		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PStructAsLTypeProb))) {
 			if hasErrEnv(env) {
 				return nil
 			}
@@ -723,7 +723,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 
 	// Type.cpp:1628–1633 — float as LType
 	if typ == nil && AssignOpWorksForFloat(op) && probs != nil &&
-		r.RndFlipcoin(uint32(probs.Single(PFloatAsLTypeProb))) {
+		r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PFloatAsLTypeProb))) {
 		if hasErrEnv(env) {
 			return nil
 		}

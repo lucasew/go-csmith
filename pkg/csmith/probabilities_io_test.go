@@ -9,14 +9,14 @@ import (
 
 func TestGetSNamePName(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if GetSName(PMoreStructUnionProb) != "more_struct_union_type_prob" {
-		t.Fatal(GetSName(PMoreStructUnionProb))
+	if GetSNameSess(testAmbientSession, PMoreStructUnionProb) != "more_struct_union_type_prob" {
+		t.Fatal(GetSNameSess(testAmbientSession, PMoreStructUnionProb))
 	}
-	pn, ok := GetPName("inline_function_prob")
+	pn, ok := GetPNameSess(testAmbientSession, "inline_function_prob")
 	if !ok || pn != PInlineFunctionProb {
 		t.Fatal(pn, ok)
 	}
-	if _, ok := GetPName("nope"); ok || !HasErrorSess(testAmbientSession) {
+	if _, ok := GetPNameSess(testAmbientSession, "nope"); ok || !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -25,11 +25,11 @@ func TestGetSNamePName(t *testing.T) {
 func TestDumpAndParseSingle(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := NewProbabilities(Defaults())
-	dump := p.DumpDefaultProbabilities()
+	dump := p.DumpDefaultProbabilitiesSess(testAmbientSession)
 	if !strings.Contains(dump, "more_struct_union_type_prob=50") {
 		t.Fatal(dump[:200])
 	}
-	act := p.DumpActualProbabilities(42)
+	act := p.DumpActualProbabilitiesSess(testAmbientSession, 42)
 	if !strings.Contains(act, "# Seed: 42") {
 		t.Fatal(act[:80])
 	}
@@ -39,14 +39,14 @@ func TestDumpAndParseSingle(t *testing.T) {
 		t.Fatal(err)
 	}
 	p2 := NewProbabilities(Defaults())
-	if msg, ok := p2.ParseConfiguration(path); !ok {
+	if msg, ok := p2.ParseConfigurationSess(testAmbientSession, path); !ok {
 		t.Fatal(msg)
 	}
-	if p2.Single(PInlineFunctionProb) != 77 {
-		t.Fatal(p2.Single(PInlineFunctionProb))
+	if p2.SingleSess(testAmbientSession, PInlineFunctionProb) != 77 {
+		t.Fatal(p2.SingleSess(testAmbientSession, PInlineFunctionProb))
 	}
 	// group line fail closed
-	if _, ok := p2.ParseLine("[statement_prob,x=1]"); ok {
+	if _, ok := p2.ParseLineSess(testAmbientSession, "[statement_prob,x=1]"); ok {
 		t.Fatal("group must fail")
 	}
 	DestroyProcessProbabilitiesSess(testAmbientSession)

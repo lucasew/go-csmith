@@ -1304,9 +1304,9 @@ func MakeRandomBinaryInvocation(
 			// C++ Probabilities singleton; nil session → 0% (no invent hard-coded 50)
 			shiftNonConst := 0
 			if probs != nil {
-				shiftNonConst = probs.Single(PShiftByNonConstantProb)
+				shiftNonConst = probs.SingleSess(sessFromCG(cg), PShiftByNonConstantProb)
 			} else if p := sessProbs(sessFromCG(cg)); p != nil {
-				shiftNonConst = p.Single(PShiftByNonConstantProb)
+				shiftNonConst = p.SingleSess(sessFromCG(cg), PShiftByNonConstantProb)
 			}
 			// not_constant = flip; constant path when !not_constant
 			if !r.RndFlipcoin(uint32(shiftNonConst)) {
@@ -1995,7 +1995,7 @@ func MakeRandomInvocation(
 			noteErrCG(cg, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
-		stdUnary := r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb)))
+		stdUnary := r.RndFlipcoin(uint32(probs.SingleSess(sessFromCG(cg), PStdUnaryFuncProb)))
 		// FunctionInvocation.cpp ERROR_GUARD after flipcoin
 		if hasErrCG(cg) {
 			return &Invocation{Failed: true}

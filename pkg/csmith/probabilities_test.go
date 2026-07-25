@@ -38,7 +38,7 @@ func TestSingleProbsDefaults(t *testing.T) {
 		PArrayOOBProb:                   0,
 	}
 	for name, w := range want {
-		if got := p.Single(name); got != w {
+		if got := p.SingleSess(testAmbientSession, name); got != w {
 			t.Errorf("single %v: got %d want %d", name, got, w)
 		}
 	}
@@ -51,13 +51,13 @@ func TestSingleProbsRespectFlags(t *testing.T) {
 	o.Volatiles = false
 	o.Consts = false
 	p := NewProbabilities(o)
-	if p.Single(PPointerAsLTypeProb) != 0 || p.Single(PSelectDerefPointerProb) != 0 {
+	if p.SingleSess(testAmbientSession, PPointerAsLTypeProb) != 0 || p.SingleSess(testAmbientSession, PSelectDerefPointerProb) != 0 {
 		t.Fatal("pointers off → pointer probs 0")
 	}
-	if p.Single(PNewArrayVariableProb) != 0 {
+	if p.SingleSess(testAmbientSession, PNewArrayVariableProb) != 0 {
 		t.Fatal("arrays off → new array prob 0")
 	}
-	if p.Single(PRegularVolatileProb) != 0 || p.Single(PRegularConstProb) != 0 {
+	if p.SingleSess(testAmbientSession, PRegularVolatileProb) != 0 || p.SingleSess(testAmbientSession, PRegularConstProb) != 0 {
 		t.Fatal("vol/const off → regular probs 0")
 	}
 }
@@ -65,19 +65,19 @@ func TestSingleProbsRespectFlags(t *testing.T) {
 func TestSimpleTypeWeightsDefaults(t *testing.T) {
 	// set_default_simple_types_prob under defaults
 	p := NewProbabilities(Defaults())
-	if p.SimpleTypeWeight(int(EVoid)) != 0 {
+	if p.SimpleTypeWeightSess(testAmbientSession, int(EVoid)) != 0 {
 		t.Fatal("void weight must be 0")
 	}
 	enabled := []ESimpleType{EChar, EInt, EShort, ELong, ELongLong, EUChar, EUInt, EUShort, EULong, EULongLong}
 	for _, st := range enabled {
-		if p.SimpleTypeWeight(int(st)) != 1 {
-			t.Errorf("%v weight want 1 got %d", st, p.SimpleTypeWeight(int(st)))
+		if p.SimpleTypeWeightSess(testAmbientSession, int(st)) != 1 {
+			t.Errorf("%v weight want 1 got %d", st, p.SimpleTypeWeightSess(testAmbientSession, int(st)))
 		}
 	}
 	disabled := []ESimpleType{EFloat, EInt128, EUInt128}
 	for _, st := range disabled {
-		if p.SimpleTypeWeight(int(st)) != 0 {
-			t.Errorf("%v weight want 0 got %d", st, p.SimpleTypeWeight(int(st)))
+		if p.SimpleTypeWeightSess(testAmbientSession, int(st)) != 0 {
+			t.Errorf("%v weight want 0 got %d", st, p.SimpleTypeWeightSess(testAmbientSession, int(st)))
 		}
 	}
 }
@@ -86,7 +86,7 @@ func TestSimpleTypeWeightsNoInt64(t *testing.T) {
 	o := Defaults()
 	o.LongLong = false
 	p := NewProbabilities(o)
-	if p.SimpleTypeWeight(int(ELongLong)) != 0 || p.SimpleTypeWeight(int(EULongLong)) != 0 {
+	if p.SimpleTypeWeightSess(testAmbientSession, int(ELongLong)) != 0 || p.SimpleTypeWeightSess(testAmbientSession, int(EULongLong)) != 0 {
 		t.Fatal("longlong off → long long weights 0")
 	}
 }
@@ -101,7 +101,7 @@ func TestChooseRandomNonvoidSimpleNeverVoid(t *testing.T) {
 		if st == EVoid {
 			t.Fatalf("iter %d: void chosen", i)
 		}
-		if p.SimpleTypeWeight(int(st)) == 0 {
+		if p.SimpleTypeWeightSess(testAmbientSession, int(st)) == 0 {
 			t.Fatalf("iter %d: zero-weight type %v", i, st)
 		}
 		seen[st]++
@@ -121,7 +121,7 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	r2 := NewRngSess(testAmbientSession, 2)
 	raw := r2.Genrand()
 	v := raw % 14
-	for p.SimpleTypeWeight(int(v)) == 0 {
+	for p.SimpleTypeWeightSess(testAmbientSession, int(v)) == 0 {
 		raw = r2.Genrand()
 		v = raw % 14
 	}
@@ -148,21 +148,21 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 
 func TestProbabilitiesNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Probabilities)(nil).Single(PMoreStructUnionProb) != 0 {
+	if (*Probabilities)(nil).SingleSess(testAmbientSession, PMoreStructUnionProb) != 0 {
 		t.Fatal("nil Single must return 0")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Single must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Probabilities)(nil).BinaryOpWeight(0) != 0 {
+	if (*Probabilities)(nil).BinaryOpWeightSess(testAmbientSession, 0) != 0 {
 		t.Fatal("nil BinaryOpWeight must return 0")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BinaryOpWeight must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Probabilities)(nil).StatementThresholdTable() != nil {
+	if (*Probabilities)(nil).StatementThresholdTableSess(testAmbientSession) != nil {
 		t.Fatal("nil StatementThresholdTable must return nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -174,7 +174,7 @@ func TestProbabilitiesNilSticky(t *testing.T) {
 func TestSimpleTypesFilterNilProbsResidualSticky(t *testing.T) {
 	// SimpleTypeWeight residual soft invent was invent keep candidate past nil probs.
 	ClearErrorSess(testAmbientSession)
-	f := (*Probabilities)(nil).SimpleTypesFilter()
+	f := (*Probabilities)(nil).SimpleTypesFilterSess(testAmbientSession)
 	if !f.Filter(0) {
 		t.Fatal("nil probs filter must reject (filter true) fail closed")
 	}
@@ -191,7 +191,7 @@ func TestProbabilityFilterEqualGroup(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, p)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 
-	f := GetProbFilter(PSimpleTypesProb)
+	f := GetProbFilterSess(testAmbientSession, PSimpleTypesProb)
 	// void weight 0 → reject
 	if !f.Filter(uint32(EVoid)) {
 		t.Fatal("void must be filtered")
@@ -205,7 +205,7 @@ func TestProbabilityFilterEqualGroup(t *testing.T) {
 	o.Muls = false
 	p2 := NewProbabilities(o)
 	SetProcessProbabilitiesSess(testAmbientSession, p2)
-	bf := GetProbFilter(PBinaryOpsProb)
+	bf := GetProbFilterSess(testAmbientSession, PBinaryOpsProb)
 	if !bf.Filter(uint32(BinMul)) {
 		t.Fatal("mul disabled must filter")
 	}
@@ -229,8 +229,8 @@ func TestRegisterExtraFilter(t *testing.T) {
 	// Reject eInt via extra filter even though weight is 1 (pointer Filter for identity)
 	rej := rejectSimple(EInt)
 	extra := &rej
-	RegisterExtraFilter(PSimpleTypesProb, extra)
-	f := GetProbFilter(PSimpleTypesProb)
+	RegisterExtraFilterSess(testAmbientSession, PSimpleTypesProb, extra)
+	f := GetProbFilterSess(testAmbientSession, PSimpleTypesProb)
 	if !f.Filter(uint32(EInt)) {
 		t.Fatal("extra filter must reject eInt before weight check")
 	}
@@ -238,7 +238,7 @@ func TestRegisterExtraFilter(t *testing.T) {
 	if f.Filter(uint32(EShort)) {
 		t.Fatal("eShort must still pass")
 	}
-	UnregisterExtraFilter(PSimpleTypesProb, extra)
+	UnregisterExtraFilterSess(testAmbientSession, PSimpleTypesProb, extra)
 	if f.Filter(uint32(EInt)) {
 		t.Fatal("after unregister, eInt weight 1 must pass")
 	}
@@ -250,7 +250,7 @@ func TestGetProbFilterMissingSticky(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearErrorSess(testAmbientSession)
-	f := GetProbFilter(PSimpleTypesProb)
+	f := GetProbFilterSess(testAmbientSession, PSimpleTypesProb)
 	if !f.Filter(0) {
 		t.Fatal("missing process probs filter must reject")
 	}

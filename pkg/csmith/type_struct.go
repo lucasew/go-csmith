@@ -28,7 +28,7 @@ func MoreTypesProbabilitySess(s *Session, r *Rng, probs *Probabilities, typeCoun
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PMoreStructUnionProb)
+		p = probs.SingleSess(s, PMoreStructUnionProb)
 	}
 	return r.RndFlipcoinSess(s, uint32(p))
 }
@@ -54,8 +54,8 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 		return StructField{}
 	}
 	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
-	constP := uint32(probs.Single(PFieldConstProb))
-	volP := uint32(probs.Single(PFieldVolatileProb))
+	constP := uint32(probs.SingleSess(sessFromEnv(env), PFieldConstProb))
+	volP := uint32(probs.SingleSess(sessFromEnv(env), PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext().WithSession(sessFromEnv(env)), false, constP, volP, opts, r)
 	// Type.cpp:694 ERROR_RETURN after random_qualifiers
 	if hasErrEnv(env) {
@@ -89,7 +89,7 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 		sessNoteError(s, ErrGeneric)
 		return fail
 	}
-	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
+	sign := r.RndFlipcoin(uint32(probs.SingleSess(s, PBitFieldsSignedProb)))
 	if sessHasError(s) {
 		return fail
 	}
@@ -99,8 +99,8 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 	} else {
 		ft = GetSimpleTypeSess(s, EUInt)
 	}
-	constP := uint32(probs.Single(PFieldConstProb))
-	volP := uint32(probs.Single(PFieldVolatileProb))
+	constP := uint32(probs.SingleSess(s, PFieldConstProb))
+	volP := uint32(probs.SingleSess(s, PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext().WithSession(s), false, constP, volP, opts, r)
 	if sessHasError(s) {
 		return fail
@@ -158,7 +158,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	}
 	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
 	// Type.cpp:1086–1088 — ERROR_GUARD after flip
-	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldsCreationProb)))
+	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PBitFieldsCreationProb)))
 	if hasErrEnv(env) {
 		return nil
 	}
@@ -168,7 +168,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		var f StructField
 		if fullBitfields {
 			// make_full_bitfields_struct_fields: ScalarFieldInFullBitFieldsProb → normal else bitfield
-			if r.RndFlipcoin(uint32(probs.Single(PScalarFieldInFullBitFieldsProb))) {
+			if r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PScalarFieldInFullBitFieldsProb))) {
 				if hasErrEnv(env) {
 					return nil
 				}
@@ -181,7 +181,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 				f = MakeOneBitfieldSess(sessFromEnv(env), r, opts, probs, i, prevZero)
 				prevZero = f.Type != nil && f.BitWidth == 0
 			}
-		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
+		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PBitFieldInNormalStructProb))) {
 			// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
 			if hasErrEnv(env) {
 				return nil
@@ -672,7 +672,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	}
 	// Type.cpp:677–680 — bitfield when bitfields && !ccomp && flipcoin(BitFieldInNormalStructProb)
 	// bitfield path uses traced rnd_flipcoin (not pure_rnd)
-	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
+	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PBitFieldInNormalStructProb))) {
 		if hasErrEnv(env) {
 			return StructField{}
 		}
@@ -768,7 +768,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			if hasErrEnv(env) {
 				return StructField{}
 			}
-			if probs.SimpleTypeWeight(int(cand.SimpleSess(sessFromEnv(env)))) == 0 {
+			if probs.SimpleTypeWeightSess(sessFromEnv(env), int(cand.SimpleSess(sessFromEnv(env)))) == 0 {
 				if hasErrEnv(env) {
 					return StructField{}
 				}
@@ -788,8 +788,8 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		return StructField{}
 	}
 	// Type.cpp:733–735 — FieldConstProb / FieldVolatileProb (traced random_qualifiers)
-	constP := uint32(probs.Single(PFieldConstProb))
-	volP := uint32(probs.Single(PFieldVolatileProb))
+	constP := uint32(probs.SingleSess(sessFromEnv(env), PFieldConstProb))
+	volP := uint32(probs.SingleSess(sessFromEnv(env), PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext().WithSession(sessFromEnv(env)), false, constP, volP, opts, r)
 	if hasErrEnv(env) {
 		return StructField{}

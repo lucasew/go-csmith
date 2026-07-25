@@ -2196,7 +2196,7 @@ func (vs *VariableSelector) createAndInitialize(
 	// force p=0 while keeping the draw so stream stays aligned with C++ always-flip.
 	arrProb := uint32(0)
 	if vs.Probs != nil {
-		arrProb = uint32(vs.Probs.Single(PNewArrayVariableProb))
+		arrProb = uint32(vs.Probs.SingleSess(sessFromVS(vs), PNewArrayVariableProb))
 	}
 	if !vs.Opts.Arrays {
 		arrProb = 0
@@ -2496,7 +2496,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		return nil
 	}
 	if !volQ {
-		if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
+		if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.SingleSess(sessFromVS(vs), PAccessOnceVariableProb))) {
 			v.IsAccessOnce = true
 		}
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)

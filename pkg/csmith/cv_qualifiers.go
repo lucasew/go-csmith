@@ -429,7 +429,7 @@ func (q CVQualifiers) RandomStricterConstsSess(s *Session, r *Rng, opts Options,
 	// nil probs → 0% (no invent NewProbabilities / hard-coded 50)
 	p := 0
 	if probs != nil {
-		p = probs.Single(PStricterConstProb)
+		p = probs.SingleSess(s, PStricterConstProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -469,7 +469,7 @@ func (q CVQualifiers) RandomStricterVolatilesSess(s *Session, r *Rng, opts Optio
 	}
 	p := 0
 	if probs != nil {
-		p = probs.Single(PRegularVolatileProb)
+		p = probs.SingleSess(s, PRegularVolatileProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -511,7 +511,7 @@ func (q CVQualifiers) RandomLooserConstsSess(s *Session, r *Rng, opts Options, p
 	}
 	p := 0
 	if probs != nil {
-		p = probs.Single(PLooserConstProb)
+		p = probs.SingleSess(s, PLooserConstProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -546,7 +546,7 @@ func (q CVQualifiers) RandomLooserVolatilesSess(s *Session, r *Rng, opts Options
 	}
 	p := 0
 	if probs != nil {
-		p = probs.Single(PRegularVolatileProb)
+		p = probs.SingleSess(s, PRegularVolatileProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -723,7 +723,7 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 	}
 	isConst := false
 	if opts.ConstPointers && probs != nil {
-		p := probs.Single(PRegularConstProb)
+		p := probs.SingleSess(s, PRegularConstProb)
 		// residual ERROR sticky — no invent soft-const past Single residual hole
 		if sessHasError(s) {
 			return q
@@ -732,7 +732,7 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 	}
 	isVol := false
 	if !noVolatile && opts.VolatilePointers && probs != nil {
-		p := probs.Single(PRegularVolatileProb)
+		p := probs.SingleSess(s, PRegularVolatileProb)
 		// residual ERROR sticky — no invent soft-vol past Single residual hole
 		if sessHasError(s) {
 			return q
@@ -1307,8 +1307,8 @@ func RandomQualifiersDefaultProbs(
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent NewProbabilities)
 	constP, volP := uint32(0), uint32(0)
 	if probs != nil {
-		constP = uint32(probs.Single(PRegularConstProb))
-		volP = uint32(probs.Single(PRegularVolatileProb))
+		constP = uint32(probs.SingleSess(sessFromCG(&cg), PRegularConstProb))
+		volP = uint32(probs.SingleSess(sessFromCG(&cg), PRegularVolatileProb))
 	}
 	// RegularConstProb() / RegularVolatileProb() → single probs
 	return RandomQualifiersForType(

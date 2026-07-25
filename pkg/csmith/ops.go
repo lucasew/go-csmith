@@ -134,7 +134,16 @@ func BinaryOpsFilterSess(s *Session, opts Options) Filter {
 func BinaryOpsFilterProbs(opts Options, probs *Probabilities) Filter {
 	_ = opts
 	if probs != nil {
-		return probs.BinaryOpsFilter()
+		// Prefer bag-bound ProbabilityFilter (implements Filter interface).
+		if f, ok := probs.probFilters[PBinaryOpsProb]; ok && f != nil {
+			return f
+		}
+		return filterFunc(func(v uint32) bool {
+			if v < 0 || int(v) >= len(probs.binaryOpWeight) {
+				return true
+			}
+			return probs.binaryOpWeight[v] == 0
+		})
 	}
 	// C++ GetInstance always live; fail closed reject every op
 	return filterFunc(func(v uint32) bool { return true })
@@ -171,7 +180,7 @@ func PickBinaryOpProbsSess(s *Session, r *Rng, opts Options, probs *Probabilitie
 		_ = opts
 		return BinaryOp(MaxBinaryOp)
 	}
-	return BinaryOp(r.RndUptoFilterSess(s, uint32(MaxBinaryOp), probs.BinaryOpsFilter()))
+	return BinaryOp(r.RndUptoFilterSess(s, uint32(MaxBinaryOp), probs.BinaryOpsFilterSess(s)))
 }
 
 // IsOrderedBinary mirrors FunctionInvocation::IsOrderedStandardFunc (&& / ||).
@@ -252,7 +261,15 @@ func UnaryOpsFilterSess(s *Session, opts Options) Filter {
 func UnaryOpsFilterProbs(opts Options, probs *Probabilities) Filter {
 	_ = opts
 	if probs != nil {
-		return probs.UnaryOpsFilter()
+		if f, ok := probs.probFilters[PUnaryOpsProb]; ok && f != nil {
+			return f
+		}
+		return filterFunc(func(v uint32) bool {
+			if int(v) < 0 || int(v) >= len(probs.unaryOpWeight) {
+				return true
+			}
+			return probs.unaryOpWeight[v] == 0
+		})
 	}
 	return filterFunc(func(v uint32) bool { return true })
 }
@@ -286,7 +303,7 @@ func PickUnaryOpProbsSess(s *Session, r *Rng, opts Options, probs *Probabilities
 		_ = opts
 		return UnaryOp(MaxUnaryOp)
 	}
-	return UnaryOp(r.RndUptoFilterSess(s, uint32(MaxUnaryOp), probs.UnaryOpsFilter()))
+	return UnaryOp(r.RndUptoFilterSess(s, uint32(MaxUnaryOp), probs.UnaryOpsFilterSess(s)))
 }
 
 // NeedNoRHS mirrors StatementAssign::need_no_rhs.

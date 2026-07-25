@@ -292,7 +292,7 @@ func MakeRandomSignature(
 	// Function.cpp:422 — FMList.push_back(new FactMgr(f)); always at signature
 	f.ensurePairedFactMgrSess(sessFromCG(&cg))
 	// inline flip if enabled
-	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
+	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.SingleSess(sessFromCG(&cg), PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
 	if sessHasError(s) {
@@ -494,7 +494,7 @@ func MakeFirst(
 	}
 
 	// Function.cpp:464–465 — inline flip after body
-	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
+	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.SingleSess(sessFromVS(vs), PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
 	if sessHasError(runSess) {
