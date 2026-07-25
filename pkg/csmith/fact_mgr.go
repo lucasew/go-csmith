@@ -2316,26 +2316,30 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 // invent empty init success past broken IR. Incomplete abstract transfer results
 // remain non-sticky hole markers (AddNewVarFact sticks after abstract).
 func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
+	return AbstractFactForVarInitSess(nil, v)
+}
+
+func AbstractFactForVarInitSess(s *Session, v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if v == nil || v.Type == nil {
 		// incomplete var IR sticky (not “non-pointer complete empty”)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	if !v.IsPointer() && !v.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-skip empty-init past IsPointer residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
 		}
 		// complete empty — not a point-to/union subject
 		return nil, nil
 	}
 	// residual ERROR sticky — no invent soft-continue pointer/union path past IsPointer residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	// Fact.cpp:96–109 — primary Variable::init, then ArrayVariable more_init_values.
 	// CreateArrayVariable stores alts only in InitExprs; createAndInitialize sets
-	// InitExpr primary. Soft invent used nil primary + first AbstractFactForAssign(nil)
+	// InitExpr primary. Soft invent used nil primary + first AbstractFactForAssignSess(s, nil)
 	// → GarbagePtr then merge alts still IsDead (seed-10054 IsValidPtr on local
 	// pointer arrays during nested revisit). When InitExpr is unset, use InitExprs[0]
 	// as primary and remaining as more (no invent garbage-first past empty primary).
@@ -2351,12 +2355,12 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	}
 	if v.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-continue union abstract past IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
 		}
-		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, nil, rhs)
+		un, _ = AbstractFactUnionForAssignSess(s, nil, nil, v, 0, nil, rhs)
 		// residual ERROR sticky — no invent soft-empty init past AbstractFactUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), IncompleteUnionFactSlice()
 		}
 		// incomplete union abstract is hole marker (not bare nil invent empty)
@@ -2367,14 +2371,14 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		return nil, un
 	}
 	// residual ERROR sticky — no invent soft-continue pointer path past IsUnion residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	// pointer (Fact.cpp:94–95)
 	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
-	pt, _ = AbstractFactForAssign(nil, v, 0, rhs)
+	pt, _ = AbstractFactForAssignSess(s, nil, v, 0, rhs)
 	// residual ERROR sticky — no invent soft-empty init past AbstractFact residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	// incomplete / multi / zero — hole marker (no invent empty init for AddNewVarFact)
@@ -2386,7 +2390,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	// Fact.cpp:99 — assert(av) when isArray (AsArray set)
 	if v.IsArray && v.AsArray == nil {
 		// hard IR: isArray without AsArray sticky (no invent skip more-inits)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice(), nil
 	}
 	if av := v.AsArray; av != nil {
@@ -2396,29 +2400,29 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		for _, e := range av.InitExprs[moreStart:] {
 			// Expression* always live in C++; nil hole is broken IR — sticky
 			if e == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice(), nil
 			}
-			more, _ := AbstractFactForAssign(nil, v, 0, e)
+			more, _ := AbstractFactForAssignSess(s, nil, v, 0, e)
 			// live Expression* alt path: incomplete abstract sticky
 			// (no invent soft-skip incomplete init alt / soft re-pick past hole)
 			if !FactsComplete(more) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return IncompleteFactSlice(), nil
 			}
 			for _, f := range more {
 				// Fact* always live; nil hole sticky (no invent skip merge hole)
 				if f == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return IncompleteFactSlice(), nil
 				}
 				merged := MergeFactInto(pt, f)
 				// incomplete merge after live alt sticky (no invent partial init facts)
 				if !FactsComplete(merged) {
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					if !sessHasError(s) {
+						sessNoteError(s, ErrGeneric)
 					}
 					return IncompleteFactSlice(), nil
 				}
@@ -2437,7 +2441,8 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 // Type* always live for non-special subjects; Type-nil sticky clear (no invent
 // empty-FieldVars aggregate complete / field walk past Type-nil shell).
 // Fact* from abstract always live; nil hole fails closed (GlobalFacts cleared).
-// FactMgr + Variable always live; sticky (no invent soft-skip makeup past hole).
+// FactMgr + Variable always live; sticky (no invent soft-skip makeup past hole).}
+
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
 		sessNoteError(fmSess(fm), ErrGeneric)
@@ -2523,7 +2528,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 			return
 		}
 	}
-	pt, un := AbstractFactForVarInit(v)
+	pt, un := AbstractFactForVarInitSess(fmSess(fm), v)
 	if wantPT {
 		// incomplete abstract must not invent skip (no fact to add) — sticky ERROR
 		if !FactsComplete(pt) {
@@ -2631,7 +2636,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	// results for maps, never the existing related GlobalFacts entry).
 	// Soft invent returned early on nil ptInit (union-only subjects) before the
 	// eUnionWrite map push below — mid-gen union globals never entered map_facts_in.
-	ptInit, unInitEarly := AbstractFactForVarInit(v)
+	ptInit, unInitEarly := AbstractFactForVarInitSess(fmSess(fm), v)
 	// residual ERROR sticky — no invent soft-skip map push past Abstract residual
 	if sessHasError(fmSess(fm)) {
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -2808,7 +2813,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	// Prefer first abstract's eUnionWrite (same call as PT); re-abstract only if nil.
 	unInit := unInitEarly
 	if unInit == nil {
-		_, unInit = AbstractFactForVarInit(v)
+		_, unInit = AbstractFactForVarInitSess(fmSess(fm), v)
 		if sessHasError(fmSess(fm)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -3229,7 +3234,7 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 		return false
 	}
 	changed := false
-	newFacts, lvarCnt := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
+	newFacts, lvarCnt := AbstractFactForAssignSess(fmSess(fm), fm.GlobalFacts, lhs, lhsIndir, rhs)
 	// incomplete abstract must not invent empty apply success then union merge
 	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
@@ -3250,7 +3255,7 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
 	// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
 	// lhsWant = Lhs::get_type(); nil → Variable.Type
-	ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, lhsWant, rhs)
+	ufacts, lvarCnt := AbstractFactUnionForAssignSess(fmSess(fm), fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, lhsWant, rhs)
 	// incomplete abstract must not invent empty union merge success; leave prior
 	// complete UnionFacts for factory re-pick (do not poison)
 	if !UnionFactsComplete(ufacts) {
@@ -3464,14 +3469,18 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // empty-FieldVars aggregate complete / field walk past Type-nil shell via IsPointer residual).
 // facts always live; sticky (no invent soft-skip makeup past hole).
 func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
+	AddNewVarFactIntoSess(nil, v, facts)
+}
+
+func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// Variable* always live; nil v hole fails closed sticky (clear — no invent skip as absent)
 	if v == nil {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// Type* always live for non-special subjects; specials Type-nil by design
@@ -3479,7 +3488,7 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	if v.Type == nil {
 		if !IsSpecialPtr(v) {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return
 	}
@@ -3490,13 +3499,13 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	// recurse into aggregate fields (pointer members) like AddNewVarFact
 	isPtr := v.IsPointer()
 	// residual ERROR sticky — no invent soft-skip field walk past IsPointer residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*facts = IncompleteFactSlice()
 		return
 	}
 	isUn := v.Type.IsUnion()
 	// residual ERROR sticky — no invent soft-skip field walk past IsUnion residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*facts = IncompleteFactSlice()
 		return
 	}
@@ -3504,15 +3513,15 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		for _, f := range v.FieldVars {
 			if f == nil {
 				*facts = IncompleteFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return
 			}
-			AddNewVarFactInto(f, facts)
+			AddNewVarFactIntoSess(s, f, facts)
 			// incomplete hole marker is non-nil; FactsComplete false
 			if !FactsComplete(*facts) {
 				*facts = IncompleteFactSlice()
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return
 			}
@@ -3524,28 +3533,28 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue makeup past IsPointer residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*facts = IncompleteFactSlice()
 		return
 	}
 	if FindRelatedPointTo(*facts, v) != nil {
 		// residual ERROR sticky — no invent soft-skip found past FindRelated residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue not-found past FindRelated residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*facts = IncompleteFactSlice()
 		return
 	}
-	pt, _ := AbstractFactForVarInit(v)
+	pt, _ := AbstractFactForVarInitSess(s, v)
 	// incomplete abstract must not invent skip (no fact to add) sticky
 	if !FactsComplete(pt) {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// Fact.cpp:94–95 assert(lvar_cnt==1) — no invent garbage shell when empty
@@ -3553,28 +3562,28 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	for _, f := range pt {
 		if f == nil {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		cl := f.Clone()
 		// residual ERROR sticky — no invent soft-makeup past Clone residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return
 		}
 		if cl == nil {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		if FindRelatedPointTo(*facts, f.Var) == nil {
 			// residual ERROR sticky — no invent soft-append past FindRelated residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return
 			}
 			*facts = append(*facts, cl)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return
 		}
@@ -3593,7 +3602,8 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 // FactMgr.cpp:688–700 — non-const global pointers that are dead at function exit.
 // Incomplete GlobalFacts fails closed IncompleteVariables DeadGlobals
 // (not bare empty invent "no dangling" via VariablesComplete(nil)/len==0).
-// FactMgr + Function always live; sticky (no invent soft-skip dangling scan past hole).
+// FactMgr + Function always live; sticky (no invent soft-skip dangling scan past hole).}
+
 func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	if fm == nil || f == nil {
 		sessNoteError(fmSess(fm), ErrGeneric)
@@ -3854,7 +3864,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 		return false
 	}
 	changed := false
-	newFacts, lvarCnt := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
+	newFacts, lvarCnt := AbstractFactForAssignSess(fmSess(fm), *facts, lhs, lhsIndir, rhs)
 	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// only wipe union when *facts was incomplete (wiped); incomplete abstract alone
@@ -3869,7 +3879,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 	}
 	if fm != nil {
 		// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
-		ufacts, lvarCnt := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, lhsWant, rhs)
+		ufacts, lvarCnt := AbstractFactUnionForAssignSess(fmSess(fm), fm.UnionFacts, *facts, lhs, lhsIndir, lhsWant, rhs)
 		// incomplete abstract: fail closed without poisoning prior complete UnionFacts
 		if !UnionFactsComplete(ufacts) {
 			return false

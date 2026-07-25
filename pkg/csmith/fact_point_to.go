@@ -486,6 +486,10 @@ func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
 // re-pick cannot invent empty transfer success. Incomplete MergePointees /
 // FindPointerFields / fact-map holes stay non-sticky hole markers.
 func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
+	return RhsToLhsTransferSess(nil, facts, lvars, rhs)
+}
+
+func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
 	if len(lvars) == 0 {
 		// complete empty transfer targets (not incomplete)
 		return nil
@@ -493,20 +497,20 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	// FactPointTo.cpp:164–167 — assert all possible LHS are pointers
 	for _, v := range lvars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if !v.IsPointer() {
 			// residual ERROR sticky — no invent soft-skip transfer past IsPointer residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			// hard IR sticky — no invent empty transfer / soft re-pick past assert
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// residual ERROR sticky — no invent soft-continue later LHS past IsPointer residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 	}
@@ -523,35 +527,35 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	default:
 		rt0 := rhs.GetType()
 		// residual ERROR sticky — no invent soft-continue transfer past GetType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		// incomplete type sticky Incomplete (no invent GarbagePtr complete success)
 		if rt0 == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// non-pointer, non-union RHS (FactPointTo.cpp:172–178)
 		isPtrLike := rt0.IsPointerLike()
 		// residual ERROR sticky — no invent soft-continue past IsPointerLike residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		isUn := rt0.IsUnion()
 		// residual ERROR sticky — no invent soft-continue past IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		if !isPtrLike && !isUn {
 			// equals(0) and size >= 8 → null else garbage
 			eq0 := rhs.EqualsInt(0)
 			// residual ERROR sticky — no invent null/garbage past EqualsInt residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			sz := rt0.SizeInBytes()
 			// residual ERROR sticky — no invent null/garbage past SizeInBytes residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			if eq0 && sz >= 8 {
@@ -562,23 +566,23 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	}
 	rt := rhs.GetType()
 	// residual ERROR sticky — no invent soft-continue transfer past GetType residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteFactSlice()
 	}
 	switch rhs.Term {
 	case TermConstant:
 		if rt == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if rt.IsPointerLike() {
 			// residual ERROR sticky — no invent soft-continue past IsPointerLike residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			eq0 := rhs.EqualsInt(0)
 			// residual ERROR sticky — no invent null/garbage past EqualsInt residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			if eq0 {
@@ -587,13 +591,13 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
 		// residual ERROR sticky — no invent soft-continue past IsPointerLike residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		// FactPointTo.cpp:186–193 — union constant field0 "0" → null on field0 pointers
 		if rt.IsUnion() {
 			// residual ERROR sticky — no invent soft-continue past IsUnion residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			lv0 := lvars[0]
@@ -602,35 +606,35 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				// complete soft-skip past incomplete union-parent shell)
 				if lv0.FieldVarOf.Type == nil {
 					if !IsSpecialPtr(lv0.FieldVarOf) {
-						sessNoteError(nil, ErrGeneric)
+						sessNoteError(s, ErrGeneric)
 						return IncompleteFactSlice()
 					}
 				} else if lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
 					// residual ERROR sticky — no invent soft-continue past IsUnion/GetFieldID residual
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return IncompleteFactSlice()
 					}
 					// Constant::get_field(0) == "0"
 					if rhs.Con != nil && rhs.Con.GetField(0) == "0" {
 						// residual ERROR sticky — no invent null past GetField residual
-						if sessHasError(nil) {
+						if sessHasError(s) {
 							return IncompleteFactSlice()
 						}
 						return MakeFactsPointTo(lvars, NullPtr)
 					}
 					// residual ERROR sticky — no invent soft-continue past GetField residual false
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return IncompleteFactSlice()
 					}
 					eq0 := rhs.EqualsInt(0)
 					// residual ERROR sticky — no invent null past EqualsInt residual
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return IncompleteFactSlice()
 					}
 					if eq0 {
 						return MakeFactsPointTo(lvars, NullPtr)
 					}
-				} else if sessHasError(nil) {
+				} else if sessHasError(s) {
 					// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 					return IncompleteFactSlice()
 				}
@@ -638,39 +642,39 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
 		// residual ERROR sticky — no invent soft-continue past IsUnion residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		// FactPointTo.cpp:195–196 — assert(0); hard IR sticky (no soft invent garbage)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	case TermVariable:
 		// C++ always has ExpressionVariable; nil var is broken IR sticky
 		if rhs.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// incomplete type IR sticky (no invent level-0 transfer / false address-of)
 		indirect, iok := rhs.IndirectLevelComplete()
 		if !iok {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if indirect < 0 {
 			// FactPointTo.cpp:202–207 — taking address; multi-level & not allowed
 			// assert(indirect == -1); hard IR sticky (no soft invent for indirect < -1)
 			if indirect != -1 {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
 			// GetCollective always live for address-of; nil is broken IR sticky
 			coll := rhs.Var.GetCollective()
 			// residual ERROR sticky — no invent soft-address past GetCollective residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			if coll == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
 			return MakeFactsPointTo(lvars, coll)
@@ -680,12 +684,12 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			// incomplete collective / pointees — non-sticky abstract hole marker
 			coll := rhs.Var.GetCollective()
 			// residual ERROR sticky — no invent soft-merge aggregate past GetCollective residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			vars := MergePointeesOfPointer(coll, indirect, facts)
 			// residual ERROR sticky — no invent soft-merge past MergePointees residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			if !VariablesComplete(vars) {
@@ -695,12 +699,12 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			for _, vv := range vars {
 				ptrs := vv.FindPointerFields()
 				// residual ERROR sticky — no invent soft-merge past FindPointerFields residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return IncompleteFactSlice()
 				}
 				// incomplete FieldVars — hard IR sticky (no invent skip field hole)
 				if !VariablesComplete(ptrs) {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return IncompleteFactSlice()
 				}
 				// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
@@ -719,7 +723,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 					fp := MakeFactPointToSet(lvars[j], set)
 					if fp == nil {
 						// broken make fact IR sticky
-						sessNoteError(nil, ErrGeneric)
+						sessNoteError(s, ErrGeneric)
 						return IncompleteFactSlice()
 					}
 					ret = append(ret, fp)
@@ -731,12 +735,12 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// empty set is valid (no soft invent GarbagePtr); incomplete set non-sticky
 		coll := rhs.Var.GetCollective()
 		// residual ERROR sticky — no invent soft-merge pointees past GetCollective residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		set := MergePointeesOfPointer(coll, indirect+1, facts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		if !VariablesComplete(set) {
@@ -746,7 +750,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	case TermFunction:
 		// FactPointTo.cpp:230–231 — assert(fi); hard IR sticky when Invoke nil
 		if rhs.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		fi := rhs.Invoke
@@ -765,27 +769,27 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// Special null/garbage/tbd have Type nil by design — complete non-aggregate path.
 		if fn.RV.Type == nil {
 			if !IsSpecialPtr(fn.RV) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
 		} else if fn.RV.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft-transfer past IsAggregate residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			ptrs := fn.RV.FindPointerFields()
 			// residual ERROR sticky — no invent soft-transfer past FindPointerFields residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			if !VariablesComplete(ptrs) {
 				// FieldVars hole sticky
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
 			// pairwise like aggregate path; length mismatch is broken IR sticky
 			if len(lvars) != len(ptrs) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
 			var ret []*FactPointTo
@@ -802,13 +806,13 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				}
 				fp := MakeFactPointToSet(lvars[i], set)
 				if fp == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return IncompleteFactSlice()
 				}
 				ret = append(ret, fp)
 			}
 			return ret
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-scalar rv transfer past IsAggregate residual false
 			return IncompleteFactSlice()
 		}
@@ -827,22 +831,22 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// FactPointTo.cpp:256–258 — peel embedded assign RHS
 		// incomplete Assign/Expr sticky — no invent GarbagePtr via nil-rhs peel soft path
 		if rhs.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if rhs.Assign.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
-		return RhsToLhsTransfer(facts, lvars, rhs.Assign.Expr)
+		return RhsToLhsTransferSess(s, facts, lvars, rhs.Assign.Expr)
 	case TermCommaExpr:
 		// FactPointTo.cpp:259–261 — peel comma RHS
 		// incomplete CommaRHS sticky — no invent GarbagePtr via nil-rhs peel soft path
 		if rhs.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
-		return RhsToLhsTransfer(facts, lvars, rhs.CommaRHS)
+		return RhsToLhsTransferSess(s, facts, lvars, rhs.CommaRHS)
 	default:
 		// unknown term — non-sticky hole (soft re-pick factories)
 		return IncompleteFactSlice()
@@ -856,23 +860,28 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 // FactMgr.cpp:376–388 uses that count for renew (cnt==1) vs merge (may-point-to).
 // lhsIndir peels Lhs::get_type() (var type after deref) for the pointer-typed branch.
 // Hard IR (nil lhs/Type, broken union container, FieldVars holes) sticky; incomplete
-// MergePointees / abstract transfer results stay non-sticky hole markers.
+// MergePointees / abstract transfer results stay non-sticky hole markers.}
+
 func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) ([]*FactPointTo, int) {
+	return AbstractFactForAssignSess(nil, factsIn, lhs, lhsIndir, rhs)
+}
+
+func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) ([]*FactPointTo, int) {
 	if lhs == nil || lhs.Type == nil {
 		// incomplete LHS IR sticky (no invent empty abstract / soft re-pick past hole)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice(), 0
 	}
 	// find all pointed variables on LHS (merge_pointees of collective)
 	// incomplete pointees — non-sticky abstract hole (fact-map soft re-pick)
 	coll := lhs.GetCollective()
 	// residual ERROR sticky — no invent soft-abstract past GetCollective residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteFactSlice(), 0
 	}
 	lvars := MergePointeesOfPointer(coll, lhsIndir, factsIn)
 	// residual ERROR sticky — no invent soft-abstract past MergePointees residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteFactSlice(), 0
 	}
 	if !VariablesComplete(lvars) {
@@ -885,20 +894,20 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	for i := 0; i < lhsIndir && lhsTy != nil; i++ {
 		lhsTy = lhsTy.PtrType()
 		// residual ERROR sticky — no invent soft-peel past PtrType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), 0
 		}
 	}
 	if lhsTy != nil {
 		pt := lhsTy.PtrType()
 		// residual ERROR sticky — no invent soft-store path past PtrType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), 0
 		}
 		if pt != nil {
 			// pointer-valued store (possibly *p when p is multi-level pointer)
 			// FactPointTo.cpp:277–278 — transfer; return lvars.size() for renew/merge
-			return RhsToLhsTransfer(factsIn, lvars, rhs), lvarCnt
+			return RhsToLhsTransferSess(s, factsIn, lvars, rhs), lvarCnt
 		}
 	}
 	// when assigning through *p (indir>0) or to aggregate, transfer to pointer fields
@@ -911,18 +920,18 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		u := v
 		if u.IsInsideUnionField() {
 			// residual ERROR sticky — no invent soft-continue transfer past IsInsideUnionField hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice(), 0
 			}
 			if cu := u.GetContainerUnion(); cu != nil {
 				// residual ERROR sticky — no invent container true past GetContainerUnion hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return IncompleteFactSlice(), 0
 				}
 				u = cu
 			} else {
 				// residual ERROR sticky — no invent soft-continue walk past GetContainerUnion residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return IncompleteFactSlice(), 0
 				}
 				// walk FieldVarOf until Type is union
@@ -931,60 +940,60 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 				for cur := u; cur != nil; cur = cur.FieldVarOf {
 					if cur.Type == nil {
 						if !IsSpecialPtr(cur) {
-							sessNoteError(nil, ErrGeneric)
+							sessNoteError(s, ErrGeneric)
 							return IncompleteFactSlice(), 0
 						}
 						continue
 					}
 					if cur.Type.IsUnion() {
 						// residual ERROR sticky — no invent soft-container past IsUnion residual true
-						if sessHasError(nil) {
+						if sessHasError(s) {
 							return IncompleteFactSlice(), 0
 						}
 						u = cur
 						break
 					}
 					// residual ERROR sticky — no invent soft-continue walk past IsUnion residual false
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return IncompleteFactSlice(), 0
 					}
 				}
 			}
 			// FactPointTo.cpp:288 — assert(v && v->type->eType == eUnion) hard sticky
 			if u == nil || u.Type == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice(), 0
 			}
 			if !u.Type.IsUnion() {
 				// residual ERROR sticky — no invent soft-assert past IsUnion residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return IncompleteFactSlice(), 0
 				}
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice(), 0
 			}
 			// residual ERROR sticky — no invent soft-continue past IsUnion residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice(), 0
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-skip not-inside past IsInside residual false
 			return IncompleteFactSlice(), 0
 		}
 		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
 		ptrs := u.FindPointerFields()
 		// residual ERROR sticky — no invent soft-transfer past FindPointerFields residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), 0
 		}
 		if !VariablesComplete(ptrs) {
 			// FieldVars hole sticky
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice(), 0
 		}
 		isPtr := v.IsPointer()
 		// residual ERROR sticky — no invent soft-skip *p path past IsPointer residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), 0
 		}
 		if isPtr && lhsIndir > 0 {
@@ -992,7 +1001,7 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 			// incomplete more — non-sticky abstract (fact-map soft re-pick)
 			more := MergePointeesOfPointer(v, 1, factsIn)
 			// residual ERROR sticky — no invent soft-abstract past MergePointees residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice(), 0
 			}
 			if !VariablesComplete(more) {
@@ -1004,16 +1013,16 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 				// (IsPointer residual ERROR+false soft-skips then invents partial
 				// transfer past Type-nil shell without pairing that pointee)
 				if p.Type == nil && !IsSpecialPtr(p) {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return IncompleteFactSlice(), 0
 				}
 				if p.IsPointer() {
 					// residual ERROR sticky — no invent soft-skip then partial transfer past hole
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return IncompleteFactSlice(), 0
 					}
 					ptrs = append(ptrs, p)
-				} else if sessHasError(nil) {
+				} else if sessHasError(s) {
 					return IncompleteFactSlice(), 0
 				}
 			}
@@ -1021,17 +1030,17 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		if len(ptrs) == 0 {
 			continue
 		}
-		part := RhsToLhsTransfer(factsIn, ptrs, rhs)
+		part := RhsToLhsTransferSess(s, factsIn, ptrs, rhs)
 		// incomplete transfer must not invent partial field abstract
 		// (sticky only if RhsToLhsTransfer hard path already SetError)
 		if !FactsComplete(part) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return IncompleteFactSlice(), 0
 		}
 		// residual ERROR sticky — no invent soft-append partial transfer past hard IR hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice(), 0
 		}
 		out = append(out, part...)
@@ -1041,7 +1050,8 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 }
 
 // Equal reports same var and same points-to set.
-// Incomplete PointTo nil hole fails closed sticky as unequal (no invent equal / soft re-pick).
+// Incomplete PointTo nil hole fails closed sticky as unequal (no invent equal / soft re-pick).}
+
 func (f *FactPointTo) Equal(other *FactPointTo) bool {
 	// both Fact* always live; sticky incomplete no invent not-equal soft-skip
 	if f == nil || other == nil {
@@ -1929,22 +1939,26 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 // (IsPointer residual ERROR+false invents not-pointing-to-locals past shell).
 // MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
+	return IsPointingToLocalsSess(nil, v, b, indirection, facts)
+}
+
+func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// incomplete LocalVars/Param sticky (membership short-circuit invents not-local)
 	if b != nil && !b.StackScanComplete() {
 		// residual ERROR sticky — no invent soft not-local past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
 	if indirection == -1 {
 		ok := v.IsVisibleLocal(b)
 		// residual ERROR sticky — no invent not-local soft-skip past IsVisibleLocal hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
@@ -1952,30 +1966,30 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	// Type* always live for non-special subjects; Type-nil sticky true
 	// (no invent IsPointer residual false as not-pointing-to-locals past shell)
 	if !IsSpecialPtr(v) && v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if !v.IsPointer() {
 		// residual ERROR sticky — no invent not-pointer soft-skip past IsPointer hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue pointees past IsPointer residual true path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	// FactPointTo.cpp:506–508 — array / array-field subjects use collective for fact lookup
 	// (itemized members share the collective's points-to; without this, FindRelatedPointTo
 	// misses and as_return/no_return_dead_ptr wrongly allows local-pointing array elems).
 	isAF := v.IsArrayField()
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if v.IsArray || isAF {
 		coll := varCollective(v)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if coll != nil {
@@ -1984,14 +1998,14 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	}
 	// incomplete fact maps sticky true
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	var pointees []*Variable
 	if indirection == 0 {
 		ft := FindRelatedPointTo(facts, v)
 		// residual ERROR sticky — no invent not-pointing soft-skip past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if ft == nil {
@@ -2005,14 +2019,14 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue past MergePointees residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
 	for _, p := range pointees {
 		if p == nil {
 			// PointTo nil hole sticky
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if IsSpecialPtr(p) {
@@ -2020,35 +2034,35 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		}
 		// Type-nil non-special pointee sticky true before IsPointer residual false skip
 		if p.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if p.IsVisibleLocal(b) {
 			// residual ERROR sticky — no invent pointing-true past IsVisibleLocal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue not-local past IsVisibleLocal residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		// recurse one level of pointees that are pointers
 		if p.IsPointer() {
 			// residual ERROR sticky — no invent soft-skip recurse past IsPointer residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			il := p.Type.IndirectLevel()
 			// residual ERROR sticky — no invent soft-recurse past IndirectLevel residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			for j := 0; j < il; j++ {
 				nested := MergePointeesOfPointer(p, j+1, facts)
 				// residual ERROR sticky — no invent soft-recurse past MergePointees residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				if !VariablesComplete(nested) {
@@ -2057,7 +2071,7 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 				}
 				for _, n := range nested {
 					if n == nil {
-						sessNoteError(nil, ErrGeneric)
+						sessNoteError(s, ErrGeneric)
 						return true
 					}
 					if IsSpecialPtr(n) {
@@ -2065,18 +2079,18 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 					}
 					if n.IsVisibleLocal(b) {
 						// residual ERROR sticky — no invent pointing-true past nested IsVisibleLocal hole
-						if sessHasError(nil) {
+						if sessHasError(s) {
 							return true
 						}
 						return true
 					}
 					// residual ERROR sticky — no invent soft-continue nested not-local past residual
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return true
 					}
 				}
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-skip non-pointer past IsPointer residual false path
 			return true
 		}
@@ -2086,7 +2100,8 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 
 // Session AllPtrs / AllAliases mirror FactPointTo.cpp:67–68 aggregates.
 
-// ClearPointToAggregates resets all_ptrs / all_aliases (generation start).
+// ClearPointToAggregates resets all_ptrs / all_aliases (generation start).}
+
 func ClearPointToAggregates() {
 	ClearPointToAggregatesSess(nil)
 }
@@ -2282,16 +2297,21 @@ func PrintVarFact(facts []*FactPointTo, vname string, stParent *Block) string {
 // AbstractFactForReturn mirrors Fact::abstract_fact_for_return.
 // Fact.cpp:76–83 — abstract_fact_for_assign(facts, Lhs(func.rv), expr).
 func AbstractFactForReturn(facts []*FactPointTo, expr *Expression, fn *Function) []*FactPointTo {
+	return AbstractFactForReturnSess(nil, facts, expr, fn)
+}
+
+// AbstractFactForReturnSess is AbstractFactForReturn with sticky on run bag.
+func AbstractFactForReturnSess(s *Session, facts []*FactPointTo, expr *Expression, fn *Function) []*FactPointTo {
 	if fn == nil || fn.RV == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// Expression* always live on return; sticky fail closed
 	if expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	out, _ := AbstractFactForAssign(facts, fn.RV, 0, expr)
+	out, _ := AbstractFactForAssignSess(s, facts, fn.RV, 0, expr)
 	return out
 }
 

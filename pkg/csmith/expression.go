@@ -1603,7 +1603,7 @@ func makeExpressionVariableFlags(
 				}
 				facts = cg.FM.GlobalFacts
 			}
-			if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
+			if IsPointingToLocalsSess(cgSess(cg), v, cg.CurrentBlock(), indirection, facts) {
 				// residual ERROR sticky — no invent soft-continue past local-ptr hole
 				if sessHasError(cgSess(cg)) {
 					if cg.EffectAccum != nil {

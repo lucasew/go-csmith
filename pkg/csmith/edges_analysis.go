@@ -908,7 +908,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 			// FactMgr.cpp:118–131 add_new_var_fact — eUnionWrite half into outputs FactVec
 			if fm != nil && MetaFactUnionEnabled() {
-				_, unInit := AbstractFactForVarInit(v)
+				_, unInit := AbstractFactForVarInitSess(fmSess(fm), v)
 				if sessHasError(cgSess(cg)) || !UnionFactsComplete(unInit) {
 					if !sessHasError(cgSess(cg)) {
 						sessNoteError(cgSess(cg), ErrGeneric)

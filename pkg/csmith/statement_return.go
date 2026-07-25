@@ -33,7 +33,7 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		facts := cg.pointToFacts()
-		if IsPointingToLocals(v, b, ind, facts) {
+		if IsPointingToLocalsSess(cgSess(cg), v, b, ind, facts) {
 			// residual ERROR sticky — no invent policy soft-reject past residual hole
 			if sessHasError(cgSess(cg)) {
 				return false
