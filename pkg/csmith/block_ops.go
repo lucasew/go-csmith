@@ -129,7 +129,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	if idx < 0 {
 		// search nested get_blocks only (kind-gated; no invent Then on assign)
 		for i := range b.Stmts {
-			blks := GetBlocksStmt(&b.Stmts[i])
+			blks := GetBlocksStmtSess(fmSess(fm), &b.Stmts[i])
 			// pre-validate complete arms — nil hole fails closed sticky (no invent
 			// soft-skip missing arm then search sibling arm as complete tree)
 			for _, blk := range blks {
@@ -149,11 +149,11 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	ids := map[int]bool{}
 	// get_blocks tree of stm+nested block ids; incomplete → partial known only
 	// (no invent ids via stray Then/Else on non-compound kinds)
-	_ = collectTreeStmAndBlockIDs(removed, ids)
+	_ = collectTreeStmAndBlockIDsSess(fmSess(fm), removed, ids)
 
 	// Statement.cpp find_typed_stmts: continue/break/goto inside s
 	cfgIDs := map[int]bool{}
-	if !collectTypedStmIDs(removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs) {
+	if !collectTypedStmIDsSess(fmSess(fm), removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs) {
 		// incomplete IR under removed — fail closed sticky wipe CFG with hole marker
 		// (not bare nil — CFGEdgesComplete(nil) invents empty-complete edge set)
 		if fm != nil {
@@ -208,7 +208,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 				destIn := !StmIDUnset(e.DestStmID) && ids[e.DestStmID]
 				if !destIn && e.DestBlock != nil {
 					// Block* dest: parent-chain contains_stmt (not Stmts walk)
-					destIn = stmtContainsBlock(removed, e.DestBlock)
+					destIn = stmtContainsBlockSess(fmSess(fm), removed, e.DestBlock)
 					// residual ERROR sticky — no invent dest-in scan past contains residual
 					if sessHasError(fmSess(fm)) {
 						scrubIncomplete = true
@@ -221,7 +221,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 					// StmID was never in the Stmts tree (orphan after failed arm).
 					for _, blk := range fm.Func.Blocks {
 						if blk != nil && blk.StmID == e.DestStmID {
-							destIn = stmtContainsBlock(removed, blk)
+							destIn = stmtContainsBlockSess(fmSess(fm), removed, blk)
 							if sessHasError(fmSess(fm)) {
 								scrubIncomplete = true
 							}
@@ -292,7 +292,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		} else {
 			nb := make([]*Block, 0, len(f.Blocks))
 			for _, blk := range f.Blocks {
-				if stmtContainsBlock(removed, blk) {
+				if stmtContainsBlockSess(fmSess(fm), removed, blk) {
 					// residual ERROR sticky — no invent keep-block past contains residual
 					if sessHasError(fmSess(fm)) {
 						f.Blocks = IncompleteBlocks()
@@ -353,22 +353,26 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 // Uses kind-gated get_blocks; sticky false on incomplete Block* hole
 // (no invent partial typed list past missing if-arm as complete).
 func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool {
+	return collectTypedStmIDsSess(nil, st, kinds, ids)
+}
+
+func collectTypedStmIDsSess(s *Session, st *Stmt, kinds []StatementType, ids map[int]bool) bool {
 	// Statement + id set always live; sticky incomplete no invent empty typed list
 	if st == nil || ids == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	var stms []*Stmt
-	if FindTypedStmts(st, &stms, kinds) < 0 {
+	if FindTypedStmtsSess(s, st, &stms, kinds) < 0 {
 		// FindTypedStmts may already sticky IncompleteStmtsSlice
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return false
 	}
-	for _, s := range stms {
-		if s != nil && !StmIDUnset(s.StmID) {
-			ids[s.StmID] = true
+	for _, stt := range stms {
+		if stt != nil && !StmIDUnset(stt.StmID) {
+			ids[stt.StmID] = true
 		}
 	}
 	return true
@@ -379,27 +383,31 @@ func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool 
 // Incomplete get_blocks hole sticky true (no invent "not under" while soft-skipping
 // a nil if-arm — scrub aggressively / treat as contained for remove_stmt).
 func blockUnderStmt(st *Stmt, blk *Block) bool {
+	return blockUnderStmtSess(nil, st, blk)
+}
+
+func blockUnderStmtSess(s *Session, st *Stmt, blk *Block) bool {
 	// Statement + Block always live; sticky incomplete no invent not-under soft-skip
 	if st == nil || blk == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	for _, b := range GetBlocksStmt(st) {
+	for _, b := range GetBlocksStmtSess(s, st) {
 		if b == nil {
 			// incomplete arm sticky contained (restrictive scrub)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if b == blk {
 			return true
 		}
 		for i := range b.Stmts {
-			if blockUnderStmt(&b.Stmts[i], blk) {
+			if blockUnderStmtSess(s, &b.Stmts[i], blk) {
 				// residual ERROR sticky — no invent soft-continue under-scan past hole
 				return true
 			}
 			// residual ERROR sticky — no invent soft-skip not-under past recursive hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
@@ -422,9 +430,13 @@ func blockUnderStmt(st *Stmt, blk *Block) bool {
 // blocks that still have Parent pointing into the removed tree but were never
 // linked as StmtBlock children — left them on Func.Blocks for goto pool.
 func stmtContainsBlock(st *Stmt, blk *Block) bool {
+	return stmtContainsBlockSess(nil, st, blk)
+}
+
+func stmtContainsBlockSess(s *Session, st *Stmt, blk *Block) bool {
 	// Statement + Block always live; sticky incomplete no invent not-contain soft-skip
 	if st == nil || blk == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// C++ this == s: StmtBlock statement object is not the Block*; Then is.
@@ -432,22 +444,22 @@ func stmtContainsBlock(st *Stmt, blk *Block) bool {
 		// Statement.cpp:689–694 — eBlock: identity or candidate parent chain
 		if st.Then == nil {
 			// incomplete nested block sticky (no invent not-contain past hole)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		return blockIsSelfOrAncestor(st.Then, blk)
+		return blockIsSelfOrAncestorSess(s, st.Then, blk)
 	}
 	// Non-eBlock: get_blocks then each as eBlock contains_stmt
-	blks := GetBlocksStmt(st)
+	blks := GetBlocksStmtSess(s, st)
 	// pre-validate complete get_blocks (if always both arms; for body always live)
 	for _, b := range blks {
 		if b == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 	}
 	for _, b := range blks {
-		if blockIsSelfOrAncestor(b, blk) {
+		if blockIsSelfOrAncestorSess(s, b, blk) {
 			return true
 		}
 	}
@@ -457,8 +469,12 @@ func stmtContainsBlock(st *Stmt, blk *Block) bool {
 // blockIsSelfOrAncestor mirrors Block-as-eBlock Statement::contains_stmt(candidate).
 // Statement.cpp:684–694 — this==s or candidate's parent chain includes this.
 func blockIsSelfOrAncestor(ancestor, blk *Block) bool {
+	return blockIsSelfOrAncestorSess(nil, ancestor, blk)
+}
+
+func blockIsSelfOrAncestorSess(s *Session, ancestor, blk *Block) bool {
 	if ancestor == nil || blk == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if ancestor == blk {
@@ -475,9 +491,13 @@ func blockIsSelfOrAncestor(ancestor, blk *Block) bool {
 // stmtTreeContainsID reports whether id appears under st via get_blocks.
 // Incomplete arm sticky false (no invent membership past holes).
 func stmtTreeContainsID(st *Stmt, id int) bool {
+	return stmtTreeContainsIDSess(nil, st, id)
+}
+
+func stmtTreeContainsIDSess(s *Session, st *Stmt, id int) bool {
 	// Statement always live; sticky incomplete no invent not-contain soft-skip
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if id <= 0 {
@@ -486,11 +506,11 @@ func stmtTreeContainsID(st *Stmt, id int) bool {
 	if st.StmID == id {
 		return true
 	}
-	blks := GetBlocksStmt(st)
+	blks := GetBlocksStmtSess(s, st)
 	for _, b := range blks {
 		if b == nil {
 			// incomplete arm sticky not-contain
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 	}
@@ -499,7 +519,7 @@ func stmtTreeContainsID(st *Stmt, id int) bool {
 			return true
 		}
 		for i := range b.Stmts {
-			if stmtTreeContainsID(&b.Stmts[i], id) {
+			if stmtTreeContainsIDSess(s, &b.Stmts[i], id) {
 				return true
 			}
 		}
@@ -517,7 +537,7 @@ func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 		return
 	}
 	ids := map[int]bool{}
-	_ = collectTreeStmAndBlockIDs(st, ids)
+	_ = collectTreeStmAndBlockIDsSess(fmSess(fm), st, ids)
 	for id := range ids {
 		delete(fm.MapFactsIn, id)
 		delete(fm.MapFactsOut, id)
@@ -535,7 +555,7 @@ func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 		return
 	}
 	ids := map[int]bool{}
-	_ = collectBlockStmIDs(b, ids)
+	_ = collectBlockStmIDsSess(fmSess(fm), b, ids)
 	for id := range ids {
 		delete(fm.MapFactsIn, id)
 		delete(fm.MapFactsOut, id)
@@ -547,21 +567,25 @@ func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 // collectTreeStmAndBlockIDs records st's StmID and nested get_blocks Block/Stmt ids.
 // Sticky false on incomplete Block* hole (no invent partial tree as complete).
 func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
+	return collectTreeStmAndBlockIDsSess(nil, st, ids)
+}
+
+func collectTreeStmAndBlockIDsSess(s *Session, st *Stmt, ids map[int]bool) bool {
 	// Statement + id set always live; sticky incomplete no invent empty tree
 	if st == nil || ids == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !StmIDUnset(st.StmID) {
 		ids[st.StmID] = true
 	}
-	for _, b := range GetBlocksStmt(st) {
+	for _, b := range GetBlocksStmtSess(s, st) {
 		if b == nil {
 			// incomplete arm sticky fail closed
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if !collectBlockStmIDs(b, ids) {
+		if !collectBlockStmIDsSess(s, b, ids) {
 			return false
 		}
 	}
@@ -571,16 +595,20 @@ func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
 // collectBlockStmIDs records b.StmID and nested get_blocks trees.
 // Sticky false on incomplete hole.
 func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
+	return collectBlockStmIDsSess(nil, b, ids)
+}
+
+func collectBlockStmIDsSess(s *Session, b *Block, ids map[int]bool) bool {
 	// Block + id set always live; sticky incomplete no invent empty block tree
 	if b == nil || ids == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !StmIDUnset(b.StmID) {
 		ids[b.StmID] = true
 	}
 	for i := range b.Stmts {
-		if !collectTreeStmAndBlockIDs(&b.Stmts[i], ids) {
+		if !collectTreeStmAndBlockIDsSess(s, &b.Stmts[i], ids) {
 			return false
 		}
 	}
@@ -968,8 +996,12 @@ func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
 // blockHasStmtID reports whether b directly contains stm_id (no nest).
 // Block always live; sticky false (no invent not-found soft-skip past hole).
 func blockHasStmtID(b *Block, id int) bool {
+	return blockHasStmtIDSess(nil, b, id)
+}
+
+func blockHasStmtIDSess(s *Session, b *Block, id int) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {
