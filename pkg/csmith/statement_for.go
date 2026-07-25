@@ -391,7 +391,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			oob = opts.ArrayOOBProb
 		}
 		var outBound int
-		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControlSess(cg.Sess, r, b, signed, oob)
+		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControlSess(cgSess(cg), r, b, signed, oob)
 		// C++ replaces bound with adjusted return value for IV bounds
 		bound = outBound
 	} else {

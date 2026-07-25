@@ -1627,37 +1627,37 @@ func MakeBinary(
 	// FunctionInvocation.cpp:565+ — always has RNG + live operands sticky
 	// (no invent binary shell without them / soft re-pick past holes)
 	if r == nil || lhs == nil || rhs == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent binary shell / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:565 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationBinary, nullptr)
-	if DepthGuardByTypeSess(cg.Sess, opts, DtFunctionInvocationBinary) == BadDepth {
+	if DepthGuardByTypeSess(cgSess(&cg), opts, DtFunctionInvocationBinary) == BadDepth {
 		return nil
 	}
 	// invalid / MAX op — sticky no invent empty Binary token shell
-	opStr := op.BinaryOpCSess(cg.Sess)
+	opStr := op.BinaryOpCSess(cgSess(&cg))
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
-	lt, rt := lhs.GetTypeSess(cg.Sess), rhs.GetTypeSess(cg.Sess)
+	lt, rt := lhs.GetTypeSess(cgSess(&cg)), rhs.GetTypeSess(cgSess(&cg))
 	// residual ERROR sticky — no invent binary shell past GetType residual hole
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return nil
 	}
 	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
-	flags := MakeRandomBinaryKindSess(cg.Sess, r, opts, probs, nil, lt, rt, SafeOpBinary, op)
+	flags := MakeRandomBinaryKindSess(cgSess(&cg), r, opts, probs, nil, lt, rt, SafeOpBinary, op)
 	// FunctionInvocation.cpp:568 — ERROR_GUARD; no soft invent binary without flags
 	if flags == nil {
 		return nil
@@ -1668,7 +1668,7 @@ func MakeBinary(
 		Args:   []*Expression{lhs, rhs},
 		Safe:   flags,
 	}
-	inv.setOutOptsSess(cg.Sess, opts)
+	inv.setOutOptsSess(cgSess(&cg), opts)
 	// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(cg, nil, flags, op)
 	if flags != nil && SafeOpsBinary(opStr) && inv.Tmp1 == "" {
@@ -1779,7 +1779,7 @@ func MakeRandomUnaryInvocation(
 // temp allocation. FunctionInvocationBinary.cpp:59–75 — always when flags && safe_ops;
 // no soft invent skip on !MathNoTmp or float size.
 func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags, op BinaryOp) (tmp1, tmp2 string) {
-	if flags == nil || !SafeOpsBinary(op.BinaryOpCSess(cg.Sess)) {
+	if flags == nil || !SafeOpsBinary(op.BinaryOpCSess(cgSess(&cg))) {
 		return "", ""
 	}
 	// FunctionInvocationBinary.cpp:59–75 — no EffectComplete/FactsComplete gate before
@@ -1794,25 +1794,25 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield simple type sticky
 	ty1 := flags.LHSType()
 	if ty1 == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return "", ""
 	}
 	if !ty1.IsSimple() {
 		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return "", ""
 		}
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return "", ""
 	}
 	// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return "", ""
 	}
 	st := ty1.Simple()
-	tmp1 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cg.Sess), st)
+	tmp1 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cgSess(&cg)), st)
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return "", ""
 	}
 	st2 := st
@@ -1821,22 +1821,22 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	if op == BinLShift || op == BinRShift {
 		ty := flags.RHSType()
 		if ty == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return "", ""
 		}
 		if !ty.IsSimple() {
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return "", ""
 			}
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return "", ""
 		}
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return "", ""
 		}
 		st2 = ty.Simple()
 	}
-	tmp2 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cg.Sess), st2)
+	tmp2 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cgSess(&cg)), st2)
 	return tmp1, tmp2
 }
 
@@ -1856,24 +1856,24 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 	// flags_to_type must yield simple type sticky
 	ty := flags.LHSType()
 	if ty == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return ""
 	}
 	if !ty.IsSimple() {
 		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return ""
 		}
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return ""
 	}
-	tmp := blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cg.Sess), ty.Simple())
+	tmp := blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cgSess(&cg)), ty.Simple())
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return ""
 	}
 	return tmp

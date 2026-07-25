@@ -229,18 +229,18 @@ func MakeRandomArrayLoop(
 func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGContext) []*ArrayVariable {
 	// StatementFor array-loop setup always has RNG + VS; sticky no invent empty pool without them
 	if r == nil || vs == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent array-loop setup past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	maxN := opts.MaxArrayNumInLoop
@@ -252,13 +252,13 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, cg)
 		// StatementFor.cpp:319–328 — no soft invent fewer arrays by skipping nil
-		if sessHasError(cg.Sess) || av == nil {
+		if sessHasError(cgSess(&cg)) || av == nil {
 			return nil
 		}
 		out = append(out, av)
 		// access choice 0/1/2 burns RNG (must_read / must_write / both)
 		_ = r.RndUpto(3)
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return nil
 		}
 	}

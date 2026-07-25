@@ -8,9 +8,18 @@ import (
 )
 
 // TestPureGenStrictResidual asserts bag-local Generate does not write the
-// quarantined testAmbientSession (no package pureGenStrict meta lock).
+// quarantined testAmbientSession, and residual sessOrAmbient(nil) panics.
 // Opt-in multi-seed battery: PURE_GEN_STRICT=1.
 func TestPureGenStrictResidual(t *testing.T) {
+	// Residual *Sess(nil) must not dual-fill ambient.
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("sessOrAmbient(nil) must panic")
+			}
+		}()
+		_ = sessOrAmbient(nil)
+	}()
 	seeds := []uint64{2}
 	if os.Getenv("PURE_GEN_STRICT") != "" {
 		seeds = []uint64{1, 2, 3, 7, 65, 123, 353}

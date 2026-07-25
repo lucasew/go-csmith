@@ -34,11 +34,7 @@ func envSess(env *TypeEnv) *Session {
 // Incomplete DerivedTypes fails closed nil when add (no invent soft-skip hole
 // then match/append as if the pool were complete).
 func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
-	var s *Session
-	if env != nil {
-		s = env.Sess
-	}
-	return env.FindPointerTypeSess(s, t, add)
+	return env.FindPointerTypeSess(envSess(env), t, add)
 }
 
 // FindPointerTypeSess is FindPointerType with explicit PointerCache bag.
@@ -246,11 +242,7 @@ func ChooseRandomStructUnionTypeSess(s *Session, r *Rng, ok []*Type) *Type {
 // ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
 // Type.cpp:570–586 — if type is struct return it; else random from env.
 func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
-	var s *Session
-	if env != nil {
-		s = env.Sess
-	}
-	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, sessOpts(s))
+	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, sessOpts(envSess(env)))
 }
 
 // ChooseRandomStructFromTypeOpts is ChooseRandomStructFromType with explicit Options.
@@ -293,11 +285,7 @@ func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile
 			return nil
 		}
 	}
-	var s *Session
-	if env != nil {
-		s = env.Sess
-	}
-	return ChooseRandomStructUnionTypeSess(s, r, ok)
+	return ChooseRandomStructUnionTypeSess(envSess(env), r, ok)
 }
 
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
@@ -719,10 +707,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			if sessHasError(envSess(env)) {
 				return nil
 			}
-			var s *Session
-			if env != nil {
-				s = env.Sess
-			}
+			s := envSess(env)
 			typ = ChooseRandomStructUnionTypeSess(s, r, cands)
 			// Type.cpp:526 ERROR_GUARD inside choose_random_struct_union_type
 			if sessHasError(s) {

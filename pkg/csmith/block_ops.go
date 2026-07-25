@@ -43,19 +43,19 @@ func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	// Block + Rng always live; sticky incomplete no invent not-nested soft-skip
 	if b == nil || r == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	if !b.Looping {
 		return false
 	}
-	s := b.GetLastStmSess(cg.Sess)
-	if s != nil && s.MustJumpSess(cg.Sess) {
+	s := b.GetLastStmSess(cgSess(&cg))
+	if s != nil && s.MustJumpSess(cgSess(&cg)) {
 		return false
 	}
 	// residual ERROR sticky — no invent not-must-jump soft-skip past MustJump hole
 	// incomplete last jump sticky restrictive need nested (no invent "no nested" past hole)
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return true
 	}
 	if cg.RW == nil {
@@ -64,7 +64,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	// incomplete must-use lists fail closed sticky true (no invent "no nested loop"
 	// by soft-skipping holes as absent must-use / soft re-pick past incomplete RW)
 	if !VariablesComplete(cg.RW.MustReadVars) || !VariablesComplete(cg.RW.MustWriteVars) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return true
 	}
 	ivDepth := 0
@@ -77,7 +77,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 		dimen := v.GetDimension()
 		// incomplete array IR (IsArray without AsArray) stickies via GetDimension
 		// sticky need nested (restrictive — no invent "no nested" past broken dim)
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return true
 		}
 		if dimen == 0 {

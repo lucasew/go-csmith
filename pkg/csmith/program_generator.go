@@ -783,8 +783,8 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return ""
 	}
-	note := func(code int) { sessNoteError(vs.Sess, code) }
-	has := func() bool { return sessHasError(vs.Sess) }
+	note := func(code int) { sessNoteError(vsSess(vs), code) }
+	has := func() bool { return sessHasError(vsSess(vs)) }
 	// incomplete GlobalList fails closed sticky (no invent empty hash past nil hole)
 	if !VariablesComplete(vs.GlobalList) {
 		note(ErrGeneric)
@@ -795,12 +795,12 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 		note(ErrGeneric)
 		return ""
 	}
-	ctrl := GetLastCtrlVarsSess(vs.Sess)
+	ctrl := GetLastCtrlVarsSess(vsSess(vs))
 	var b strings.Builder
 	for _, v := range vs.GlobalList {
 		// pre-validated VariablesComplete
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
-		part := v.hashOutputOptsSess(vs.Sess, ctrl, unionFacts, sessOpts(vs.Sess))
+		part := v.hashOutputOptsSess(vsSess(vs), ctrl, unionFacts, sessOpts(vsSess(vs)))
 		// residual ERROR sticky — no invent soft-continue later globals past hash residual hole
 		if has() {
 			return ""

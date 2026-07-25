@@ -71,7 +71,8 @@ func (c CGContext) WithSession(s *Session) CGContext {
 }
 
 // cgSess returns c.Sess when set; else the quarantined unit-test ambient bag.
-// Generate always installs cg.Sess; unit tests often build CGContext without a bag.
+// Pass &cg for by-value CGContext params. Generate always installs cg.Sess;
+// unit tests often build CGContext without a bag.
 func cgSess(c *CGContext) *Session {
 	if c != nil && c.Sess != nil {
 		return c.Sess

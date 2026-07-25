@@ -209,7 +209,7 @@ func MakeRandomSignature(
 	if cg.Sess == nil {
 		cg.Sess = vsSess(vs)
 	}
-	s := cg.Sess
+	s := cgSess(&cg)
 	// Function.cpp:401+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
 		sessNoteError(s, ErrGeneric)
@@ -322,7 +322,7 @@ func MakeRandomFunction(
 	if cg.Sess == nil {
 		cg.Sess = vsSess(vs)
 	}
-	s := cg.Sess
+	s := cgSess(&cg)
 	f := MakeRandomSignature(r, opts, probs, vs, sym, cg, retType, qfer, list)
 	// Function.cpp:434 ERROR_GUARD after signature
 	if f == nil || sessHasError(s) {

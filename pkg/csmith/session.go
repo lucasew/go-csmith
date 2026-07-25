@@ -11,9 +11,9 @@
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession + Process*/SetError bridges for legacy unit tests
 //   - non-Sess wrappers pass testAmbientSession into *Sess helpers explicitly
-//   - sessOrAmbient(nil) falls back to testAmbientSession for unit-test sticky
-//     paths; Generate mid-run must pass s / g.Sess / cg.Sess (marker probes
-//     fail if residual writes ambient GenError / NextStmID)
+//   - vsSess/cgSess/fmSess/envSess fall back to testAmbientSession when unset
+//   - sessOrAmbient(nil) panics (no silent ambient dual-fill mid-Generate)
+//   - sessNoteError(nil) still writes ambient GenError for unit-test sticky
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
 // (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not
@@ -191,24 +191,25 @@ func currentSession() *Session {
 	return testAmbientSession
 }
 
-// sessOrAmbient returns s when non-nil, else the quarantined unit-test bag.
-// Prefer explicit *Session from Generate / cg.Sess / g.Sess. Nil is the unit-test
-// bridge (non-Sess wrappers pass testAmbientSession explicitly when possible).
-// No package pureGenStrict lock — residual mid-Generate is caught by ambient
-// marker probes (NextStmID / GenError) and multi-seed isolation tests.
+// sessOrAmbient returns s when non-nil; panics on nil.
+// Unit-test bridges must pass testAmbientSession (or vsSess/cgSess/fmSess/envSess)
+// explicitly — no silent ambient dual-fill from residual *Sess(nil).
 func sessOrAmbient(s *Session) *Session {
 	if s != nil {
 		return s
 	}
-	return testAmbientSession
+	panic("residual ambient sessOrAmbient(nil)")
 }
 
-// firstSess returns the first non-nil session among a, b (else nil).
+// firstSess returns the first non-nil session among a, b; else testAmbientSession.
 func firstSess(a, b *Session) *Session {
 	if a != nil {
 		return a
 	}
-	return b
+	if b != nil {
+		return b
+	}
+	return testAmbientSession
 }
 
 // NewSession constructs a pure run bag with the given options (no ambient write).

@@ -744,7 +744,7 @@ func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
 
 func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if b == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	fm := cg.FM
@@ -758,7 +758,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 		for _, e := range fm.CFGEdges {
 			if e == nil {
 				// incomplete CFG list hole — sticky (no invent soft-skip edge)
-				sessNoteError(cg.Sess, ErrGeneric)
+				sessNoteError(cgSess(&cg), ErrGeneric)
 				return nil
 			}
 			// Statement.cpp / fair sid: stm_id 0 is valid; only IncompleteStmID is unset
@@ -766,15 +766,15 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				continue
 			}
 			// VariableSelector.cpp:773 — edge->src->eType == eGoto
-			src := FindStmtByIDSess(cg.Sess, fm.Func, e.SrcID)
+			src := FindStmtByIDSess(cgSess(&cg), fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue expand past FindStmt residual hole
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return nil
 			}
 			if src == nil {
-				src = findStmtByIDInTreeSess(cg.Sess, rootBlock(b), e.SrcID)
+				src = findStmtByIDInTreeSess(cgSess(&cg), rootBlock(b), e.SrcID)
 				// residual ERROR sticky — no invent soft-continue expand past tree FindStmt hole
-				if sessHasError(cg.Sess) {
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 			}
@@ -785,14 +785,14 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			// C++ edge->src is a live Statement* with parent; no root-tree membership.
 			srcParent := (*Block)(nil)
 			if b.Func != nil {
-				srcParent = FindParentBlockOfStmIDSess(cg.Sess, b.Func, e.SrcID)
-				if sessHasError(cg.Sess) {
+				srcParent = FindParentBlockOfStmIDSess(cgSess(&cg), b.Func, e.SrcID)
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 			}
 			if srcParent == nil {
-				srcParent = findParentOfStmIDInTreeSess(cg.Sess, rootBlock(b), e.SrcID)
-				if sessHasError(cg.Sess) {
+				srcParent = findParentOfStmIDInTreeSess(cgSess(&cg), rootBlock(b), e.SrcID)
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 			}
@@ -814,25 +814,25 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			// VariableSelector.cpp:773–779
 			// b->contains_stmt(edge->dest) && !b->contains_stmt(edge->src)
-			if !BlockContainsStmIDSess(cg.Sess, b, destID) {
-				if sessHasError(cg.Sess) {
+			if !BlockContainsStmIDSess(cgSess(&cg), b, destID) {
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 				continue
 			}
-			if BlockContainsStmIDSess(cg.Sess, b, e.SrcID) {
-				if sessHasError(cg.Sess) {
+			if BlockContainsStmIDSess(cgSess(&cg), b, e.SrcID) {
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 				continue
 			}
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return nil
 			}
 			// climb until block contains goto src (C++ while (!b->contains_stmt(src)))
 			cur := b
-			for cur != nil && !BlockContainsStmIDSess(cg.Sess, cur, e.SrcID) {
-				if sessHasError(cg.Sess) {
+			for cur != nil && !BlockContainsStmIDSess(cgSess(&cg), cur, e.SrcID) {
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 				cur = cur.Parent
@@ -1161,7 +1161,7 @@ func (vs *VariableSelector) MakeInitValue(
 		}
 		noVolatile := false
 		if vs.Opts.StrictVolatileRule {
-			seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
+			seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg))
 			// residual ERROR sticky — no invent soft-no-vol past IsSideEffectFree residual
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -1172,12 +1172,12 @@ func (vs *VariableSelector) MakeInitValue(
 		qferDeref.RemoveQualifiers(1)
 		qferDeref.AcceptStricter = false
 		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
-		isPtrLike := pointee.IsPointerLikeSess(firstSess(vsSess(vs), cg.Sess))
+		isPtrLike := pointee.IsPointerLikeSess(firstSess(vsSess(vs), cgSess(&cg)))
 		// residual ERROR sticky — no invent soft-useLocal past IsPointerLike residual
 		if sessHasError(vsSess(vs)) {
 			return nil
 		}
-		isVol := qferDeref.IsVolatileSess(firstSess(vsSess(vs), cg.Sess))
+		isVol := qferDeref.IsVolatileSess(firstSess(vsSess(vs), cgSess(&cg)))
 		// residual ERROR sticky — no invent soft-useLocal past IsVolatile residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -1265,23 +1265,23 @@ func (vs *VariableSelector) MakeInitValue(
 func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) bool {
 	// Variable always live; sticky incomplete no invent not-eligible soft-skip
 	if v == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	// incomplete ambient fails closed sticky (no invent eligible / soft-skip as absent re-pick)
 	if !EffectComplete(cg.EffectContext()) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
 	// Incomplete GetCollective fails closed sticky (no invent not-eligible past hole)
-	coll := v.GetCollectiveSess(cg.Sess)
+	coll := v.GetCollectiveSess(cgSess(&cg))
 	// residual ERROR sticky — no invent soft not-eligible past GetCollective residual
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	if coll == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	if coll != v {
@@ -1290,7 +1290,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		if cg.FM != nil {
 			// incomplete GlobalFacts fail closed sticky (no invent ReadIndices past holes)
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				sessNoteError(cg.Sess, ErrGeneric)
+				sessNoteError(cgSess(&cg), ErrGeneric)
 				return false
 			}
 			facts = cg.FM.GlobalFacts
@@ -1303,26 +1303,26 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 
 	// VariableSelector.cpp:232–234 — partial volatile through pointer
-	if derefLevel > 0 && v.IsPartialVolatileAfterDerefSess(cg.Sess, derefLevel) {
+	if derefLevel > 0 && v.IsPartialVolatileAfterDerefSess(cgSess(&cg), derefLevel) {
 		// residual ERROR sticky — no invent eligible past partial-vol hole
 		return false
 	}
 	// residual ERROR sticky — no invent eligible true past Type-nil peel / probe hole
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	eff := cg.EffectContext()
-	isConst := v.IsConstAfterDerefSess(cg.Sess, derefLevel)
-	isVol := v.IsVolatileAfterDerefSess(cg.Sess, derefLevel) || v.IsVolatileSess(cg.Sess)
+	isConst := v.IsConstAfterDerefSess(cgSess(&cg), derefLevel)
+	isVol := v.IsVolatileAfterDerefSess(cgSess(&cg), derefLevel) || v.IsVolatileSess(cgSess(&cg))
 	// residual ERROR sticky — no invent eligible true past IsConst/IsVolatileAfterDeref hole
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 
 	// volatile + non-SE-free context → reject
-	seFree := eff.IsSideEffectFreeSess(cg.Sess)
+	seFree := eff.IsSideEffectFreeSess(cgSess(&cg))
 	// residual ERROR sticky — no invent soft-eligible past IsSideEffectFree residual
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	if isVol && !seFree {
@@ -1330,26 +1330,26 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 	// cannot read/write a var being written in context
 	if access == AccessRead || access == AccessWrite {
-		if eff.IsWrittenPartiallySess(cg.Sess, v) {
+		if eff.IsWrittenPartiallySess(cgSess(&cg), v) {
 			// residual ERROR sticky — no invent eligible past partial-write hole
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
 			return false
 		}
 	}
 	// residual ERROR sticky from IsWrittenPartially false path
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	// cannot write a var being read (deref_level==0)
-	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartiallySess(cg.Sess, v) {
-		if sessHasError(cg.Sess) {
+	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartiallySess(cgSess(&cg), v) {
+		if sessHasError(cgSess(&cg)) {
 			return false
 		}
 		return false
 	}
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	// cannot write const
@@ -1359,38 +1359,38 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	// VariableSelector.cpp:277–287 — nonreadable / nonwritable from context
 	if access == AccessRead && cg.IsNonReadable(v) {
 		// residual ERROR sticky — no invent eligible past IsNonReadable hole
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return false
 		}
 		return false
 	}
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	if access == AccessWrite && cg.IsNonWritable(v) {
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return false
 		}
 		return false
 	}
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	// FactUnion::is_nonreadable_field on READ (VariableSelector.cpp:279–280)
 	if access == AccessRead && cg.FM != nil {
-		if IsNonreadableFieldSess(cg.Sess, v, cg.FM.UnionFacts) {
-			if sessHasError(cg.Sess) {
+		if IsNonreadableFieldSess(cgSess(&cg), v, cg.FM.UnionFacts) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent eligible past IsNonreadableField hole
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return false
 		}
 	}
 	// never invent eligible-complete success with residual ERROR set
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return false
 	}
 	return true
@@ -1411,32 +1411,32 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
 	// incomplete candidate list fails closed sticky (no invent skip hole as absent)
 	if !VariablesComplete(vars) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	for _, v := range vars {
 		// incomplete type IR fails closed sticky (no invent filter past hole)
 		if v.Type == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return false
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return false
 		}
-		if typ != nil && !typ.MatchOptsSess(cg.Sess, v.Type, MatchFlexible, sessOpts(cg.Sess)) {
+		if typ != nil && !typ.MatchOptsSess(cgSess(&cg), v.Type, MatchFlexible, sessOpts(cgSess(&cg))) {
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
 			continue
 		}
 		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirectOptsSess(cg.Sess, v.Qfer, false, sessOpts(cg.Sess)) {
+			if !qfer.MatchIndirectOptsSess(cgSess(&cg), v.Qfer, false, sessOpts(cgSess(&cg))) {
 				// residual ERROR sticky — no invent soft-continue past MatchIndirect hole
-				if sessHasError(cg.Sess) {
+				if sessHasError(cgSess(&cg)) {
 					return false
 				}
 				continue
@@ -1445,40 +1445,40 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		deref := 0
 		if typ != nil {
 			if v.Type == nil {
-				sessNoteError(cg.Sess, ErrGeneric)
+				sessNoteError(cgSess(&cg), ErrGeneric)
 				return false
 			}
-			lv := v.Type.IndirectLevelSess(cg.Sess)
+			lv := v.Type.IndirectLevelSess(cgSess(&cg))
 			// residual ERROR sticky — no invent soft-vol-avail past subject IndirectLevel residual
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
-			lw := typ.IndirectLevelSess(cg.Sess)
+			lw := typ.IndirectLevelSess(cgSess(&cg))
 			// residual ERROR sticky — no invent soft-vol-avail past desired IndirectLevel residual
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
 			deref = lv - lw
 		}
 		if !IsEligibleVar(v, deref, access, cg) {
 			// hard IR residual from IsEligible sticky — no invent soft-continue then true later
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-vol-avail past IsEligible residual true
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return false
 		}
-		vol := v.IsVolatileSess(cg.Sess)
+		vol := v.IsVolatileSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-vol-avail past IsVolatile residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return false
 		}
 		if vol {
 			// VariableSelector.cpp:311 — Bookkeeper::volatile_avail++
-			RecordVolatileAvailSess(cg.Sess)
+			RecordVolatileAvailSess(cgSess(&cg))
 			return true
 		}
 	}
@@ -1491,50 +1491,50 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 // Incomplete candidate list fails closed sticky false (no invent skip hole).
 func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
 	if typ == nil {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	// incomplete candidate list fails closed sticky (no invent skip hole)
 	if !VariablesComplete(vars) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return false
 	}
 	var facts []*FactPointTo
 	if cg.FM != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent is_valid_ptr past holes)
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return false
 		}
 		facts = cg.FM.GlobalFacts
 	}
 	for _, v := range vars {
 		if v.Type == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return false
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return false
 		}
 		if typ.IsDereferencedFrom(v.Type) {
 			// residual ERROR sticky — no invent soft-continue then true later past IsDereferencedFrom hole
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
-			if IsValidPtrSess(cg.Sess, v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+			if IsValidPtrSess(cgSess(&cg), v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 				// residual ERROR sticky — no invent eligible-true past IsValidPtr hole
-				if sessHasError(cg.Sess) {
+				if sessHasError(cgSess(&cg)) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later vars past IsValidPtr residual false
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return false
 			}
-		} else if sessHasError(cg.Sess) {
+		} else if sessHasError(cgSess(&cg)) {
 			// residual ERROR sticky — no invent soft-continue later vars past IsDereferencedFrom residual false
 			return false
 		}
@@ -1624,7 +1624,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		sMatch := firstSess(vsSess(vs), cg.Sess)
+		sMatch := firstSess(vsSess(vs), cgSess(&cg))
 		if !typ.MatchOptsSess(sMatch, v.Type, mt, sessOpts(sMatch)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
 			if sessHasError(vsSess(vs)) {
@@ -1735,16 +1735,16 @@ func ChooseVarFull(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	// incomplete candidate / invalid lists — fail closed sticky (no invent choose past hole)
 	if !VariablesComplete(vars) || !VariablesComplete(invalidVars) {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return nil
 	}
 	if want == nil {
@@ -1753,13 +1753,13 @@ func ChooseVarFull(
 			// Variable::type always live; Type-nil fails closed sticky (no invent eligible
 			// without type IR via soft-skip)
 			if v.Type == nil {
-				sessNoteError(cg.Sess, ErrGeneric)
+				sessNoteError(cgSess(&cg), ErrGeneric)
 				return nil
 			}
 			// C++ isArray always ArrayVariable*; missing AsArray sticky
 			// (no invent IsEligible soft-false then pick later past broken shell)
 			if v.IsArray && v.AsArray == nil {
-				sessNoteError(cg.Sess, ErrGeneric)
+				sessNoteError(cgSess(&cg), ErrGeneric)
 				return nil
 			}
 			if IsVariableInSet(invalidVars, v) {
@@ -1768,40 +1768,40 @@ func ChooseVarFull(
 			if noBitfield && v.IsBitfield {
 				continue
 			}
-			if noUnion && v.IsInsideUnionFieldSess(cg.Sess) {
+			if noUnion && v.IsInsideUnionFieldSess(cgSess(&cg)) {
 				// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
-				if sessHasError(cg.Sess) {
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 				continue
 			}
 			if IsEligibleVar(v, 0, access, cg) {
 				ok = append(ok, v)
-			} else if sessHasError(cg.Sess) {
+			} else if sessHasError(cgSess(&cg)) {
 				// hard IR residual (GetCollective/IsArray shell/etc.) sticky
 				// (no invent soft-skip not-eligible then pick a later candidate)
 				return nil
 			}
 		}
-		return ChooseOKVarSess(cg.Sess, r, ok)
+		return ChooseOKVarSess(cgSess(&cg), r, ok)
 	}
 	cands := vars
 	// VariableSelector.cpp:405–410 — expand when type simple/aggregate
 	if !noExpandStructUnion {
-		simple := want.IsSimpleSess(cg.Sess)
+		simple := want.IsSimpleSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-expand past IsSimple residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return nil
 		}
-		agg := want.IsAggregateSess(cg.Sess)
+		agg := want.IsAggregateSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-expand past IsAggregate residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return nil
 		}
 		if simple || agg {
-			cands = ExpandStructUnionVarsSess(cg.Sess, vars, want)
+			cands = ExpandStructUnionVarsSess(cgSess(&cg), vars, want)
 			if !VariablesComplete(cands) {
-				sessNoteError(cg.Sess, ErrGeneric)
+				sessNoteError(cgSess(&cg), ErrGeneric)
 				return nil
 			}
 		}
@@ -1809,17 +1809,17 @@ func ChooseVarFull(
 	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
 	_ = HasEligibleVolatileVarQfer(cands, want, qfer, access, cg)
 	// residual ERROR sticky — no invent soft-continue choose past HasEligible residual hole
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return nil
 	}
 	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
 	// FactPointTo::is_valid_ptr reads session CGOptions null/dead deref probs
-	opts := sessOpts(cg.Sess)
+	opts := sessOpts(cgSess(&cg))
 	if HasDereferenceableVar(cands, want, cg, opts) {
-		RecordPointerAvailForDerefSess(cg.Sess)
+		RecordPointerAvailForDerefSess(cgSess(&cg))
 	}
 	// residual ERROR sticky — no invent soft-continue choose past HasDereferenceable residual
-	if sessHasError(cg.Sess) {
+	if sessHasError(cgSess(&cg)) {
 		return nil
 	}
 	// CVQualifiers::match_indirect → match → CGOptions::match_exact_qualifiers()
@@ -1829,37 +1829,37 @@ func ChooseVarFull(
 	for _, x := range cands {
 		if x.Type == nil {
 			// incomplete type IR — fail closed sticky (no invent skip candidate)
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent IsEligible soft-false then pick later past broken shell)
 		if x.IsArray && x.AsArray == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return nil
 		}
 		// VariableSelector.cpp:424–429
 		if noBitfield && x.IsBitfield {
 			continue
 		}
-		if noUnion && x.IsInsideUnionFieldSess(cg.Sess) {
+		if noUnion && x.IsInsideUnionFieldSess(cgSess(&cg)) {
 			// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return nil
 			}
 			continue
 		}
-		if !want.MatchOptsSess(cg.Sess, x.Type, mt, opts) {
+		if !want.MatchOptsSess(cgSess(&cg), x.Type, mt, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return nil
 			}
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirectOptsSess(cg.Sess, x.Qfer, matchExact, opts) {
+			if !qfer.MatchIndirectOptsSess(cgSess(&cg), x.Qfer, matchExact, opts) {
 				// residual ERROR from MatchIndirect OOB/sticky — no invent soft-continue
-				if sessHasError(cg.Sess) {
+				if sessHasError(cgSess(&cg)) {
 					return nil
 				}
 				continue
@@ -1869,30 +1869,30 @@ func ChooseVarFull(
 			continue
 		}
 		if x.Type == nil || want == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return nil
 		}
-		lv := x.Type.IndirectLevelSess(cg.Sess)
+		lv := x.Type.IndirectLevelSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-pick past subject IndirectLevel residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return nil
 		}
-		lw := want.IndirectLevelSess(cg.Sess)
+		lw := want.IndirectLevelSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-pick past desired IndirectLevel residual
-		if sessHasError(cg.Sess) {
+		if sessHasError(cgSess(&cg)) {
 			return nil
 		}
 		deref := lv - lw
 		if !IsEligibleVar(x, deref, access, cg) {
 			// hard IR residual sticky (no invent soft-skip not-eligible then pick later)
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return nil
 			}
 			continue
 		}
 		ok = append(ok, x)
 	}
-	return chooseVarFromOKSess(cg.Sess, r, want, ok, opts)
+	return chooseVarFromOKSess(cgSess(&cg), r, want, ok, opts)
 }
 
 // chooseVarFromOK mirrors VariableSelector::choose_var post-filter bias.
@@ -3126,7 +3126,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return true
 		}
 		// VariableSelector.cpp:1393–1412
-		sBag := firstSess(vsSess(vs), cg.Sess)
+		sBag := firstSess(vsSess(vs), cgSess(&cg))
 		if cg.EffectContext().IsReadPartiallySess(sBag, &av.Variable) ||
 			cg.EffectContext().IsWrittenPartiallySess(sBag, &av.Variable) {
 			// residual ERROR sticky — no invent soft-skip past partial-RW hole then pick another
@@ -3617,7 +3617,7 @@ func (vs *VariableSelector) SelectWithInvalid(
 	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
 	// non-sticky null soft re-pick (sticky poisons generation when vol slips through filter)
 	if v != nil {
-		seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
+		seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-skip vol assert past IsSideEffectFree residual
 		if sessHasError(vsSess(vs)) {
 			return nil

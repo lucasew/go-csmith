@@ -151,11 +151,7 @@ func AbsExtensionOutputFirstFunInvocationSess(s *Session, invokeOut string) stri
 // AbsExtension.cpp:81–90 — GenerateParameterVariable per value into func.Params.
 // Incomplete func/values/VS sticky false.
 func AbsExtensionGenerateFirstParameterList(f *Function, values []*ExtensionValue, vs *VariableSelector) bool {
-	var s *Session
-	if vs != nil {
-		s = vs.Sess
-	}
-	return AbsExtensionGenerateFirstParameterListSess(s, f, values, vs)
+	return AbsExtensionGenerateFirstParameterListSess(vsSess(vs), f, values, vs)
 }
 
 // AbsExtensionGenerateFirstParameterListSess is AbsExtensionGenerateFirstParameterList on bag s.

@@ -376,12 +376,12 @@ func MakeRandomAssignQfer(
 	var prevProc Options
 	usedAmbientExact := false
 	if cg.Sess != nil {
-		prevSessExact = cg.Sess.Opts.MatchExactQualifiers
+		prevSessExact = cgSess(cg).Opts.MatchExactQualifiers
 	}
 	if callerQf {
 		opts.MatchExactQualifiers = true
 		if cg.Sess != nil {
-			cg.Sess.Opts.MatchExactQualifiers = true
+			cgSess(cg).Opts.MatchExactQualifiers = true
 		} else {
 			prevProc = ProcessOptions()
 			po := prevProc
@@ -392,7 +392,7 @@ func MakeRandomAssignQfer(
 		defer func() {
 			opts.MatchExactQualifiers = prevExact
 			if cg.Sess != nil {
-				cg.Sess.Opts.MatchExactQualifiers = prevSessExact
+				cgSess(cg).Opts.MatchExactQualifiers = prevSessExact
 			}
 			if usedAmbientExact {
 				SetProcessOptions(prevProc)
@@ -548,7 +548,7 @@ func makePossibleCompoundAssign(
 	sym *GenSym,
 ) Stmt {
 	// Statement base ctor always assigns stm_id (Statement.cpp:364–367)
-	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs, Rhs: rhs, StmID: AllocStmIDSess(cg.Sess)}
+	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs, Rhs: rhs, StmID: AllocStmIDSess(cgSess(&cg))}
 	if lhs != nil {
 		st.LhsVar = lhs.Var
 	}
@@ -558,20 +558,20 @@ func makePossibleCompoundAssign(
 		return st
 	}
 	// compound always maps to a live binary token; sticky no invent empty Binary shell
-	opStr := bop.BinaryOpCSess(cg.Sess)
+	opStr := bop.BinaryOpCSess(cgSess(&cg))
 	if int(bop) < 0 || int(bop) >= MaxBinaryOp || opStr == "" {
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return Stmt{}
 	}
 	lt := typ
 	if lhs != nil {
-		if t := lhs.GetTypeSess(cg.Sess); t != nil {
+		if t := lhs.GetTypeSess(cgSess(&cg)); t != nil {
 			// residual ERROR sticky — no invent compound binary past GetType residual
-			if sessHasError(cg.Sess) {
+			if sessHasError(cgSess(&cg)) {
 				return Stmt{}
 			}
 			lt = t
-		} else if sessHasError(cg.Sess) {
+		} else if sessHasError(cgSess(&cg)) {
 			// residual ERROR sticky — no invent compound binary past GetType residual nil
 			return Stmt{}
 		}
@@ -582,22 +582,22 @@ func makePossibleCompoundAssign(
 		// StatementAssign.cpp:256–259 — dummy flags + FunctionInvocationBinary(bop, local_fs)
 		flags = MakeDummyFlags()
 		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
-		inv.setOutOptsSess(cg.Sess, opts)
+		inv.setOutOptsSess(cgSess(&cg), opts)
 	} else {
 		// StatementAssign.cpp:260–266 — make_random_binary + CreateFunctionInvocationBinary
 		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
 		// always has RNG for non-safe compounds; sticky no invent nil-flags shell
 		if r == nil {
-			sessNoteError(cg.Sess, ErrGeneric)
+			sessNoteError(cgSess(&cg), ErrGeneric)
 			return Stmt{}
 		}
-		flags = MakeRandomBinaryKindSess(cg.Sess, r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
+		flags = MakeRandomBinaryKindSess(cgSess(&cg), r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
-		if flags == nil || sessHasError(cg.Sess) {
+		if flags == nil || sessHasError(cgSess(&cg)) {
 			return Stmt{}
 		}
 		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
-		inv.setOutOptsSess(cg.Sess, opts)
+		inv.setOutOptsSess(cgSess(&cg), opts)
 		// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 		// assert(blk) when safe_ops — no soft invent compound without temps
 		if SafeOpsBinary(opStr) {
@@ -610,11 +610,11 @@ func makePossibleCompoundAssign(
 			if t := flags.LHSType(); t != nil {
 				if t.IsSimple() {
 					// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
-					if sessHasError(cg.Sess) {
+					if sessHasError(cgSess(&cg)) {
 						return Stmt{}
 					}
 					st1 = t.Simple()
-				} else if sessHasError(cg.Sess) {
+				} else if sessHasError(cgSess(&cg)) {
 					// residual ERROR sticky — no invent soft-tmp past IsSimple residual false
 					return Stmt{}
 				}
@@ -623,17 +623,17 @@ func makePossibleCompoundAssign(
 			if bop == BinLShift || bop == BinRShift {
 				if t := flags.RHSType(); t != nil {
 					if t.IsSimple() {
-						if sessHasError(cg.Sess) {
+						if sessHasError(cgSess(&cg)) {
 							return Stmt{}
 						}
 						st2 = t.Simple()
-					} else if sessHasError(cg.Sess) {
+					} else if sessHasError(cgSess(&cg)) {
 						return Stmt{}
 					}
 				}
 			}
-			st.Tmp1 = blk.CreateNewTmpVarSess(cg.Sess, st1)
-			st.Tmp2 = blk.CreateNewTmpVarSess(cg.Sess, st2)
+			st.Tmp1 = blk.CreateNewTmpVarSess(cgSess(&cg), st1)
+			st.Tmp2 = blk.CreateNewTmpVarSess(cgSess(&cg), st2)
 			inv.Tmp1, inv.Tmp2 = st.Tmp1, st.Tmp2
 		}
 	}
@@ -642,7 +642,7 @@ func makePossibleCompoundAssign(
 	lhsExpr := LhsAsExpression(lhs)
 	if lhsExpr == nil {
 		// C++ always has live Lhs; incomplete IR sticky empty assign
-		sessNoteError(cg.Sess, ErrGeneric)
+		sessNoteError(cgSess(&cg), ErrGeneric)
 		return Stmt{}
 	}
 	// e.clone() — Expression is value-like; shallow copy of the root is enough
