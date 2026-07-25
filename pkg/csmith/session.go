@@ -185,9 +185,16 @@ func currentSession() *Session {
 
 // sessOrAmbient returns s when non-nil, else the ambient Process* bag.
 // Prefer explicit *Session from Generate / cg.Sess / g.Sess; nil is the bridge.
+var pureGenStrict bool
+
 func sessOrAmbient(s *Session) *Session {
 	if s != nil {
 		return s
+	}
+	// pureGenStrict: panic on any nil bag even under activateSession so residual
+	// Process*/sessHasError(nil) call sites remain visible during probe tests.
+	if pureGenStrict {
+		panic("residual ambient sessOrAmbient(nil)")
 	}
 	return currentSession()
 }

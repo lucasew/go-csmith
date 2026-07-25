@@ -699,8 +699,8 @@ func MakeRandomLhs(
 		}
 		// Lhs.cpp:85–86 / 97–99 — assert(!qfer.is_const_after_deref(deref_level))
 		// select+restrict should exclude const WRITE; reject if violated
-		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
-		if v.IsConstAfterDeref(deref) {
+		deref := v.Type.IndirectLevelSess(cgSess(cg)) - typ.IndirectLevelSess(cgSess(cg))
+		if v.IsConstAfterDerefSess(cgSess(cg), deref) {
 			// residual ERROR sticky — no invent soft-continue past incomplete const peel
 			if sessHasError(cgSess(cg)) {
 				restore()
@@ -727,7 +727,7 @@ func MakeRandomLhs(
 			}
 		}
 		// Lhs.cpp:105 — !effect_stm.is_written(var)
-		if valid && cg.EffectStm.IsWritten(v) {
+		if valid && cg.EffectStm.IsWrittenSess(cgSess(cg), v) {
 			valid = false
 		}
 		// residual ERROR sticky — no invent soft-continue past IsWritten hole
@@ -736,7 +736,7 @@ func MakeRandomLhs(
 			return nil
 		}
 		// Lhs.cpp:110–113 — no_signed_overflow rejects signed base / bitfield for ++/--
-		if valid && typ.IsSimple() && noSignedOverflow {
+		if valid && typ.IsSimpleSess(cgSess(cg)) && noSignedOverflow {
 			// residual ERROR sticky — no invent soft-continue past IsSimple residual
 			if sessHasError(cgSess(cg)) {
 				restore()
@@ -744,7 +744,7 @@ func MakeRandomLhs(
 			}
 			base := v.Type
 			if base != nil {
-				base = base.BaseType()
+				base = base.BaseTypeSess(cgSess(cg))
 			}
 			// residual ERROR sticky — no invent soft-continue past BaseType residual
 			if sessHasError(cgSess(cg)) {
@@ -752,7 +752,7 @@ func MakeRandomLhs(
 				return nil
 			}
 			if base != nil {
-				if base.IsSigned() {
+				if base.IsSignedSess(cgSess(cg)) {
 					// residual ERROR sticky — no invent soft-continue past IsSigned residual true
 					if sessHasError(cgSess(cg)) {
 						restore()
@@ -774,13 +774,13 @@ func MakeRandomLhs(
 			return nil
 		}
 		// Lhs.cpp:114–116 — ccomp forbids bitfield assigned as long long
-		if valid && opts.CComp && v.IsBitfield && typ.IsSimple() {
+		if valid && opts.CComp && v.IsBitfield && typ.IsSimpleSess(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue past IsSimple residual
 			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
-			switch typ.Simple() {
+			switch typ.SimpleSess(cgSess(cg)) {
 			case ELongLong, EULongLong:
 				valid = false
 			}
@@ -790,7 +790,7 @@ func MakeRandomLhs(
 		}
 		// Lhs.cpp:117–121 — float filters
 		if valid && typ != nil && v.Type != nil {
-			if !typ.IsFloat() && v.Type.IsFloat() {
+			if !typ.IsFloatSess(cgSess(cg)) && v.Type.IsFloatSess(cgSess(cg)) {
 				// residual ERROR sticky — no invent soft-continue past IsFloat residual
 				if sessHasError(cgSess(cg)) {
 					restore()
@@ -801,7 +801,7 @@ func MakeRandomLhs(
 				restore()
 				return nil
 			}
-			if valid && opts.StrictFloat && typ.IsFloat() && !v.Type.IsFloat() {
+			if valid && opts.StrictFloat && typ.IsFloatSess(cgSess(cg)) && !v.Type.IsFloatSess(cgSess(cg)) {
 				if sessHasError(cgSess(cg)) {
 					restore()
 					return nil
@@ -856,7 +856,7 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 	}
 	// Lhs.cpp:132–140 — bookkeeping on successful make
 	// VisitFactsLhs already required complete Lhs; still use Complete for safety
-	deref, _ := lhs.IndirectLevelComplete()
+	deref, _ := lhs.IndirectLevelCompleteSess(cgSess(cg))
 	if deref > 0 {
 		bk := sessBK(cgSess(cg))
 		IncrCounterSess(cgSess(cg), &bk.writeDereferenceCnts, deref)
@@ -1058,7 +1058,7 @@ func selectDerefPointerInv(
 		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
-	if !qfer.SanityCheck(typ) {
+	if !qfer.SanityCheckSess(cg.Sess, typ) {
 		if !sessHasError(cg.Sess) {
 			sessNoteError(cg.Sess, ErrGeneric)
 		}

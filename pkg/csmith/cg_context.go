@@ -178,7 +178,7 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		sessNoteError(c.Sess, ErrGeneric)
 		return ScopeInactive
 	}
-	if v.IsGlobal() {
+	if v.IsGlobalSess(c.Sess) {
 		// residual ERROR sticky — no invent global-scope past IsGlobal residual hole
 		if sessHasError(c.Sess) {
 			return ScopeInactive
@@ -504,7 +504,7 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 		return
 	}
 	if c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.AddEffectOpts(e, includeLHS)
+		*c.EffectAccum = c.EffectAccum.AddEffectOptsSess(cgSess(c), e, includeLHS)
 		// residual ERROR sticky — no invent soft-continue stm past accum AddEffect residual
 		if sessHasError(cgSess(c)) {
 			return
@@ -515,7 +515,7 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 		}
 	}
 	// CGContext.cpp:386 — effect_stm.add_effect(e) always default include_lhs=false
-	c.EffectStm = c.EffectStm.AddEffectOpts(e, false)
+	c.EffectStm = c.EffectStm.AddEffectOptsSess(cgSess(c), e, false)
 	// residual ERROR sticky — no invent soft-complete merge past stm AddEffect residual
 	if sessHasError(cgSess(c)) {
 		return
@@ -837,7 +837,7 @@ func (c *CGContext) ReadVar(v *Variable) {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
-	v = v.GetCollective()
+	v = v.GetCollectiveSess(cgSess(c))
 	// residual ERROR sticky — no invent soft-continue read past GetCollective residual
 	if sessHasError(cgSess(c)) {
 		return
@@ -894,7 +894,7 @@ func (c *CGContext) WriteVar(v *Variable) {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return
 	}
-	v = v.GetCollective()
+	v = v.GetCollectiveSess(cgSess(c))
 	// residual ERROR sticky — no invent soft-continue write past GetCollective residual
 	if sessHasError(cgSess(c)) {
 		return
@@ -1038,7 +1038,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		// ReadIndices hard IR already sticky; visit fail may not be
 		return false
 	}
-	v = v.GetCollective()
+	v = v.GetCollectiveSess(cgSess(c))
 	if v == nil {
 		// GetCollective already SetError sticky
 		if !sessHasError(cgSess(c)) {
@@ -1089,7 +1089,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
 	// CGOptions::dead_pointer_dereference_prob only (no dual residual knob)
-	if v.IsPointer() && IsDanglingPtrSess(cgSess(c), v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
+	if v.IsPointerSess(cgSess(c)) && IsDanglingPtrSess(cgSess(c), v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
 		// residual ERROR sticky — no invent read-ok past IsPointer/dangling hole
 		if sessHasError(cgSess(c)) {
 			return false
@@ -1131,7 +1131,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if !c.ReadIndices(v, facts) {
 		return false
 	}
-	v = v.GetCollective()
+	v = v.GetCollectiveSess(cgSess(c))
 	if v == nil {
 		if !sessHasError(cgSess(c)) {
 			sessNoteError(cgSess(c), ErrGeneric)
@@ -1174,7 +1174,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob
-	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtrSess(cgSess(c), v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
+	if c.NoDanglingPtr() && v.IsPointerSess(cgSess(c)) && IsDanglingPtrSess(cgSess(c), v, facts, sessOpts(cgSess(c)).DeadPointerDerefProb) {
 		if sessHasError(cgSess(c)) {
 			return false
 		}
@@ -1221,7 +1221,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		}
 		accumCopy = &cp
 	}
-	IncrCounter(&sessBK(cgSess(c)).dereferenceLevelCnts, indirect)
+	IncrCounterSess(cgSess(c), &sessBK(cgSess(c)).dereferenceLevelCnts, indirect)
 	allowNull := opts.NullPointerDerefProb > 0
 	allowDead := opts.DeadPointerDerefProb > 0
 	if !c.ReadIndices(v, facts) {
@@ -1232,7 +1232,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 		return false
 	}
 	// incomplete collective sticky via GetCollective
-	coll := v.GetCollective()
+	coll := v.GetCollectiveSess(cgSess(c))
 	if coll == nil {
 		if accumCopy != nil && c.EffectAccum != nil {
 			*c.EffectAccum = *accumCopy
@@ -1245,7 +1245,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	tmp := []*Variable{coll}
 	for indirect > 0 {
 		indirect--
-		tmp = MergePointeesOfPointers(tmp, facts)
+		tmp = MergePointeesOfPointersSess(cgSess(c), tmp, facts)
 		// incomplete pointees non-sticky hole; empty/null/dead policy non-sticky
 		if !VariablesComplete(tmp) {
 			if accumCopy != nil && c.EffectAccum != nil {
@@ -1301,7 +1301,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 		return false
 	}
 	// incomplete Lhs type IR sticky (no invent non-deref write-pointed)
-	indirect, ok := lhs.IndirectLevelComplete()
+	indirect, ok := lhs.IndirectLevelCompleteSess(cgSess(c))
 	if !ok {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return false
@@ -1324,12 +1324,12 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 		}
 		accumCopy = &cp
 	}
-	IncrCounter(&sessBK(cgSess(c)).dereferenceLevelCnts, indirect)
+	IncrCounterSess(cgSess(c), &sessBK(cgSess(c)).dereferenceLevelCnts, indirect)
 	if !c.ReadIndices(lhs.Var, facts) {
 		return false
 	}
 	// incomplete collective sticky via GetCollective
-	coll := lhs.Var.GetCollective()
+	coll := lhs.Var.GetCollectiveSess(cgSess(c))
 	if coll == nil {
 		if accumCopy != nil && c.EffectAccum != nil {
 			*c.EffectAccum = *accumCopy
@@ -1344,7 +1344,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	allowDead := opts.DeadPointerDerefProb > 0
 	for indirect > 0 {
 		indirect--
-		tmp = MergePointeesOfPointers(tmp, facts)
+		tmp = MergePointeesOfPointersSess(cgSess(c), tmp, facts)
 		if !VariablesComplete(tmp) {
 			if accumCopy != nil && c.EffectAccum != nil {
 				*c.EffectAccum = *accumCopy
@@ -1399,7 +1399,7 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 	}
 	facts := c.pointToFacts()
 	// incomplete type IR sticky (no invent non-deref level-0 visit success)
-	deref, ok := e.IndirectLevelComplete()
+	deref, ok := e.IndirectLevelCompleteSess(cgSess(c))
 	if !ok {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return false
@@ -1731,7 +1731,7 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		if v == nil {
 			return false
 		}
-		isG := v.IsGlobal()
+		isG := v.IsGlobalSess(c.Sess)
 		// residual ERROR sticky — no invent soft-frame past IsGlobal residual
 		if sessHasError(c.Sess) {
 			return false
@@ -1860,7 +1860,7 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 		return false
 	}
 	// incomplete Lhs type IR sticky as modified (no invent non-deref path)
-	indirect, ok := lhs.IndirectLevelComplete()
+	indirect, ok := lhs.IndirectLevelCompleteSess(cgSess(c))
 	if !ok {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return true
@@ -1870,7 +1870,7 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 		return false
 	}
 	// if the pointer variable itself was written by RHS
-	if c.EffectStm.IsWritten(lhs.Var) {
+	if c.EffectStm.IsWrittenSess(cgSess(c), lhs.Var) {
 		// residual ERROR sticky — no invent modified true past IsWritten hole
 		if sessHasError(cgSess(c)) {
 			return true
@@ -1882,7 +1882,7 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 		return true
 	}
 	// incomplete collective sticky as modified (GetCollective already SetError)
-	coll := lhs.Var.GetCollective()
+	coll := lhs.Var.GetCollectiveSess(cgSess(c))
 	if coll == nil {
 		if !sessHasError(cgSess(c)) {
 			sessNoteError(cgSess(c), ErrGeneric)
@@ -1893,13 +1893,13 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	// only intermediate pointer levels (not ultimate pointees)
 	for indirect > 1 {
 		indirect--
-		tmp = MergePointeesOfPointers(tmp, facts)
+		tmp = MergePointeesOfPointersSess(cgSess(c), tmp, facts)
 		// incomplete pointees non-sticky true (fact-map soft re-pick)
 		if !VariablesComplete(tmp) {
 			return true
 		}
 		for _, v := range tmp {
-			if c.EffectStm.IsWritten(v) {
+			if c.EffectStm.IsWrittenSess(cgSess(c), v) {
 				// residual ERROR sticky — no invent modified true past IsWritten hole
 				if sessHasError(cgSess(c)) {
 					return true
@@ -1979,7 +1979,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		}
 	}
 	// incomplete Lhs type IR sticky (no invent non-deref level-0 visit success)
-	deref, ok := lhs.IndirectLevelComplete()
+	deref, ok := lhs.IndirectLevelCompleteSess(cgSess(c))
 	if !ok {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return false

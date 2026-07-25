@@ -415,7 +415,7 @@ func (t *Type) HasIntFieldSess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if f.Type.HasIntField() {
+		if f.Type.HasIntFieldSess(s) {
 			// residual ERROR sticky — no invent has-int true past nested HasIntField hole
 			if sessHasError(s) {
 				return false

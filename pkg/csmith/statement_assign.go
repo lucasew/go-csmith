@@ -439,7 +439,7 @@ func MakeRandomAssignQfer(
 	}
 	// StatementAssign.cpp:211–216 — float base forces simple op
 	if lhsVar != nil && lhsVar.Type != nil {
-		if bt := lhsVar.Type.BaseType(); bt != nil && bt.IsFloatSess(cgSess(cg)) && !AssignOpWorksForFloat(op) {
+		if bt := lhsVar.Type.BaseTypeSess(cgSess(cg)); bt != nil && bt.IsFloatSess(cgSess(cg)) && !AssignOpWorksForFloat(op) {
 			// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
@@ -451,12 +451,12 @@ func MakeRandomAssignQfer(
 		}
 	}
 	if rhs != nil {
-		if rt := rhs.GetType(); rt != nil {
+		if rt := rhs.GetTypeSess(cgSess(cg)); rt != nil {
 			// residual ERROR sticky — no invent float-op soft-continue past GetType residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
-			if bt := rt.BaseType(); bt != nil && bt.IsFloatSess(cgSess(cg)) && !AssignOpWorksForFloat(op) {
+			if bt := rt.BaseTypeSess(cgSess(cg)); bt != nil && bt.IsFloatSess(cgSess(cg)) && !AssignOpWorksForFloat(op) {
 				// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
 				if sessHasError(cgSess(cg)) {
 					return Stmt{}

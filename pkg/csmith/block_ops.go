@@ -1095,8 +1095,13 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 // FactMgr.cpp:118–131 / Block.cpp:546–549 — abstract_fact_for_var_init only.
 // No invent NewFactPointTo garbage when init abstract fails or InitExpr is the RHS.
 func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
+	AddNewVarFactToSess(nil, v, facts)
+}
+
+// AddNewVarFactToSess is AddNewVarFactTo with explicit session residual sticky.
+func AddNewVarFactToSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 	// same path as MakeupNewVarFacts / AddNewVarFactInto
-	AddNewVarFactInto(v, facts)
+	AddNewVarFactIntoSess(s, v, facts)
 }
 
 // ShortcutAnalysisBlock mirrors Statement::shortcut_analysis for a Block.

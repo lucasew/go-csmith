@@ -687,7 +687,7 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !v.IsInsideUnionField() {
+	if !v.IsInsideUnionFieldSess(s) {
 		// residual ERROR sticky — no invent not-nonreadable soft-skip past IsInsideUnionField hole
 		if sessHasError(s) {
 			return true
@@ -1008,12 +1008,12 @@ func AbstractFactUnionForAssignSess(s *Session,
 	if !UnionFactsComplete(unionFacts) || !FactsComplete(ptFacts) {
 		return IncompleteUnionFactSlice(), 0
 	}
-	coll := lhs.GetCollective()
+	coll := lhs.GetCollectiveSess(s)
 	// residual ERROR sticky — no invent soft-abstract union past GetCollective residual
 	if sessHasError(s) {
 		return IncompleteUnionFactSlice(), 0
 	}
-	lvars := MergePointeesOfPointer(coll, lhsIndir, ptFacts)
+	lvars := MergePointeesOfPointerSess(s, coll, lhsIndir, ptFacts)
 	// residual ERROR sticky — no invent soft-abstract union past MergePointees residual
 	if sessHasError(s) {
 		return IncompleteUnionFactSlice(), 0
@@ -1037,7 +1037,7 @@ func AbstractFactUnionForAssignSess(s *Session,
 			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
-	} else if want.IsUnion() {
+	} else if want.IsUnionSess(s) {
 		// residual ERROR sticky — no invent union transfer past IsUnion residual hole
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice(), lvarCnt
@@ -1063,13 +1063,13 @@ func AbstractFactUnionForAssignSess(s *Session,
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		var fu *FactUnion
-		if v.IsUnionField() {
+		if v.IsUnionFieldSess(s) {
 			// residual ERROR sticky — no invent soft-continue transfer past IsUnionField hole
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 			// FactUnion.cpp:141–143
-			fid := v.GetFieldID()
+			fid := v.GetFieldIDSess(s)
 			// residual ERROR sticky — no invent soft-union fact past GetFieldID residual
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice(), lvarCnt
@@ -1087,7 +1087,7 @@ func AbstractFactUnionForAssignSess(s *Session,
 		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue IsInside path past IsUnionField residual false
 			return IncompleteUnionFactSlice(), lvarCnt
-		} else if v.IsInsideUnionField() {
+		} else if v.IsInsideUnionFieldSess(s) {
 			// residual ERROR sticky — no invent soft-continue transfer past IsInsideUnionField hole
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice(), lvarCnt
@@ -1100,12 +1100,12 @@ func AbstractFactUnionForAssignSess(s *Session,
 					sessNoteError(s, ErrGeneric)
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
-			} else if typ.HasPadding() || v.IsPackedAfterBitfield() {
+			} else if typ.HasPaddingSess(s) || v.IsPackedAfterBitfieldSess(s) {
 				// residual ERROR sticky — no invent soft-continue padding path past IsPacked residual
 				if sessHasError(s) {
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
-				cu := v.GetContainerUnion()
+				cu := v.GetContainerUnionSess(s)
 				// residual ERROR sticky — no invent soft-skip container past GetContainerUnion residual
 				if sessHasError(s) {
 					return IncompleteUnionFactSlice(), lvarCnt

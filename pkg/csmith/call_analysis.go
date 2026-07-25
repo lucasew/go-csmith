@@ -704,7 +704,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			sessNoteError(fmSess(fm), ErrGeneric)
 			return
 		}
-		if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
+		if !MakeupNewVarFactsSess(fmSess(fm), &fm.GlobalFacts, in) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !sessHasError(fmSess(fm)) {

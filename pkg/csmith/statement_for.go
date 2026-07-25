@@ -274,7 +274,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			return nil
 		}
 		// reject volatile IVs (infinite-loop / SE issues)
-		if iv.IsVolatile() {
+		if iv.IsVolatileSess(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile hole
 			if sessHasError(cgSess(cg)) {
 				return nil

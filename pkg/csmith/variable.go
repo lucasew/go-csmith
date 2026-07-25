@@ -295,7 +295,7 @@ func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options
 		}
 		return out
 	}
-	name := v.GetActualName(prefixName)
+	name := v.GetActualNameSess(s, prefixName)
 	// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
 	if sessHasError(s) {
 		return ""
@@ -305,7 +305,7 @@ func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if v.UseVolRVal && v.IsVolatile() {
+	if v.UseVolRVal && v.IsVolatileSess(s) {
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
 		if sessHasError(s) {
 			return ""

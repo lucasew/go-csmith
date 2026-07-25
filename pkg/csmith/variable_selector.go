@@ -1302,7 +1302,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 
 	// VariableSelector.cpp:232–234 — partial volatile through pointer
-	if derefLevel > 0 && v.IsPartialVolatileAfterDeref(derefLevel) {
+	if derefLevel > 0 && v.IsPartialVolatileAfterDerefSess(cg.Sess, derefLevel) {
 		// residual ERROR sticky — no invent eligible past partial-vol hole
 		return false
 	}
@@ -1311,8 +1311,8 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		return false
 	}
 	eff := cg.EffectContext()
-	isConst := v.IsConstAfterDeref(derefLevel)
-	isVol := v.IsVolatileAfterDeref(derefLevel) || v.IsVolatile()
+	isConst := v.IsConstAfterDerefSess(cg.Sess, derefLevel)
+	isVol := v.IsVolatileAfterDerefSess(cg.Sess, derefLevel) || v.IsVolatileSess(cg.Sess)
 	// residual ERROR sticky — no invent eligible true past IsConst/IsVolatileAfterDeref hole
 	if sessHasError(cg.Sess) {
 		return false
@@ -1329,7 +1329,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 	// cannot read/write a var being written in context
 	if access == AccessRead || access == AccessWrite {
-		if eff.IsWrittenPartially(v) {
+		if eff.IsWrittenPartiallySess(cg.Sess, v) {
 			// residual ERROR sticky — no invent eligible past partial-write hole
 			if sessHasError(cg.Sess) {
 				return false
@@ -1342,7 +1342,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		return false
 	}
 	// cannot write a var being read (deref_level==0)
-	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartially(v) {
+	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartiallySess(cg.Sess, v) {
 		if sessHasError(cg.Sess) {
 			return false
 		}
@@ -1377,7 +1377,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 	// FactUnion::is_nonreadable_field on READ (VariableSelector.cpp:279–280)
 	if access == AccessRead && cg.FM != nil {
-		if IsNonreadableField(v, cg.FM.UnionFacts) {
+		if IsNonreadableFieldSess(cg.Sess, v, cg.FM.UnionFacts) {
 			if sessHasError(cg.Sess) {
 				return false
 			}
@@ -1447,12 +1447,12 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 				sessNoteError(cg.Sess, ErrGeneric)
 				return false
 			}
-			lv := v.Type.IndirectLevel()
+			lv := v.Type.IndirectLevelSess(cg.Sess)
 			// residual ERROR sticky — no invent soft-vol-avail past subject IndirectLevel residual
 			if sessHasError(cg.Sess) {
 				return false
 			}
-			lw := typ.IndirectLevel()
+			lw := typ.IndirectLevelSess(cg.Sess)
 			// residual ERROR sticky — no invent soft-vol-avail past desired IndirectLevel residual
 			if sessHasError(cg.Sess) {
 				return false
@@ -1470,7 +1470,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		if sessHasError(cg.Sess) {
 			return false
 		}
-		vol := v.IsVolatile()
+		vol := v.IsVolatileSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-vol-avail past IsVolatile residual
 		if sessHasError(cg.Sess) {
 			return false
@@ -1798,7 +1798,7 @@ func ChooseVarFull(
 			return nil
 		}
 		if simple || agg {
-			cands = ExpandStructUnionVars(vars, want)
+			cands = ExpandStructUnionVarsSess(cg.Sess, vars, want)
 			if !VariablesComplete(cands) {
 				sessNoteError(cg.Sess, ErrGeneric)
 				return nil
@@ -2912,14 +2912,14 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 			invalidSlice = append(invalidSlice, v)
 			continue
 		}
-		if !v.Type.HasIntField() {
+		if !v.Type.HasIntFieldSess(vsSess(vs)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past HasIntField hole
 			if sessHasError(vsSess(vs)) {
 				return nil
 			}
 			continue
 		}
-		if v.Type.IsUnion() && v.Type.ContainPointerField() {
+		if v.Type.IsUnionSess(vsSess(vs)) && v.Type.ContainPointerFieldSess(vsSess(vs)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past ContainPointer hole
 			if sessHasError(vsSess(vs)) {
 				return nil

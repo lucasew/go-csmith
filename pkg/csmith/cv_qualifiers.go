@@ -901,7 +901,7 @@ func (q CVQualifiers) MatchIndirectOptsSess(s *Session, other CVQualifiers, matc
 	if deref < -1 {
 		return false
 	}
-	ind := other.IndirectQualifiers(deref)
+	ind := other.IndirectQualifiersSess(s, deref)
 	// residual ERROR sticky — no invent soft-match past IndirectQualifiers residual
 	if sessHasError(s) {
 		return false

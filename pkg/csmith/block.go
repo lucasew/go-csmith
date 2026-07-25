@@ -1215,7 +1215,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 									sessNoteError(cgSess(cg), ErrGeneric)
 									return
 								}
-								AddNewVarFactTo(v, &preOOS)
+								AddNewVarFactToSess(cgSess(cg), v, &preOOS)
 								if !FactsComplete(preOOS) {
 									fm.GlobalFacts = IncompleteFactSlice()
 									postFacts = IncompleteFactSlice()

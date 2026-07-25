@@ -187,7 +187,7 @@ func RecordVolatileAccessSess(s *Session, v *Variable, derefLevel int, write boo
 	}
 	bk := sessBK(s)
 	for i := 0; i <= derefLevel; i++ {
-		vol := v.IsVolatileAfterDeref(i)
+		vol := v.IsVolatileAfterDerefSess(s, i)
 		// residual ERROR sticky — no invent soft-continue peel stats past IsVolatileAfterDeref hole
 		if sessHasError(s) {
 			return

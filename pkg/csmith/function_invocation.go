@@ -852,7 +852,7 @@ func BuildInvocationAndFunction(
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
-		running = running.AddEffect(paramAccum)
+		running = running.AddEffectSess(cgSess(cg), paramAccum)
 		// residual ERROR sticky — no invent soft-continue later params past AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			fi.Failed = true
@@ -893,7 +893,7 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
-		facts = CloneFactSlice(callerFM.GlobalFacts)
+		facts = CloneFactSliceSess(cgSess(cg), callerFM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-handover past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			fi.Failed = true
@@ -907,7 +907,7 @@ func BuildInvocationAndFunction(
 			fi.Failed = true
 			return fi
 		}
-		calFM.UnionFacts = CloneUnionFactSlice(callerFM.UnionFacts)
+		calFM.UnionFacts = CloneUnionFactSliceSess(cgSess(cg), callerFM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(calFM.UnionFacts) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -977,7 +977,7 @@ func BuildInvocationAndFunction(
 		fi.Failed = true
 		return fi
 	}
-	retFacts = CloneFactSlice(out)
+	retFacts = CloneFactSliceSess(cgSess(cg), out)
 	retUnions = CloneUnionFactSliceDeepSess(cgSess(cg), outU)
 	if sessHasError(cgSess(cg)) || !FactsComplete(retFacts) || !UnionFactsComplete(retUnions) {
 		if !sessHasError(cgSess(cg)) {
@@ -1265,12 +1265,12 @@ func MakeRandomBinaryInvocation(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
-		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		factsCopy = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-binary past CloneFactSlice residual
 		if sessHasError(cgSess(cg)) {
 			return nil
 		}
-		unionCopy = CloneUnionFactSlice(cg.FM.UnionFacts)
+		unionCopy = CloneUnionFactSliceSess(cgSess(cg), cg.FM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(unionCopy) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -1289,7 +1289,7 @@ func MakeRandomBinaryInvocation(
 		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 		rhsAccum := EmptyEffect()
 		rhsCG := cg.CloneSubcontext()
-		rhsCtx := cg.EffectContext().AddEffectOpts(lhsAccum, true)
+		rhsCtx := cg.EffectContext().AddEffectOptsSess(cgSess(cg), lhsAccum, true)
 		if !EffectComplete(rhsCtx) {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil

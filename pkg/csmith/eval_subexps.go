@@ -137,17 +137,17 @@ func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*V
 			return IncompleteVariables()
 		}
 		// incomplete type IR must not invent level-0 merge as empty unions
-		ind, iok := e.IndirectLevelComplete()
+		ind, iok := e.IndirectLevelCompleteSess(s)
 		if !iok {
 			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
-		coll := e.Var.GetCollective()
+		coll := e.Var.GetCollectiveSess(s)
 		// residual ERROR sticky — no invent soft-merge past GetCollective residual hole
 		if sessHasError(s) {
 			return IncompleteVariables()
 		}
-		vars = MergePointeesOfPointer(coll, ind, facts)
+		vars = MergePointeesOfPointerSess(s, coll, ind, facts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual hole
 		if sessHasError(s) {
 			return IncompleteVariables()
@@ -167,7 +167,7 @@ func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*V
 			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
-		u := v.GetContainerUnion()
+		u := v.GetContainerUnionSess(s)
 		// residual ERROR sticky — no invent soft-continue later pointees past GetContainerUnion residual
 		if sessHasError(s) {
 			return IncompleteVariables()
@@ -295,7 +295,7 @@ func GetDereferencedPtrs(e *Expression) []*Expression {
 }
 
 func GetDereferencedPtrsSess(s *Session, e *Expression) []*Expression {
-	out, ok := collectDereferencedPtrs(e)
+	out, ok := collectDereferencedPtrs(s, e)
 	if !ok {
 		sessNoteError(s, ErrGeneric)
 		return IncompleteExpressions()
@@ -303,7 +303,7 @@ func GetDereferencedPtrsSess(s *Session, e *Expression) []*Expression {
 	return out
 }
 
-func collectDereferencedPtrs(e *Expression) (out []*Expression, ok bool) {
+func collectDereferencedPtrs(s *Session, e *Expression) (out []*Expression, ok bool) {
 	if e == nil {
 		return nil, false
 	}
@@ -312,7 +312,7 @@ func collectDereferencedPtrs(e *Expression) (out []*Expression, ok bool) {
 		return []*Expression{}, true
 	case TermVariable, TermLhs:
 		// Variable* always live; incomplete type IR fails closed
-		ind, iok := e.IndirectLevelComplete()
+		ind, iok := e.IndirectLevelCompleteSess(s)
 		if !iok {
 			return nil, false
 		}
@@ -325,11 +325,11 @@ func collectDereferencedPtrs(e *Expression) (out []*Expression, ok bool) {
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			return nil, false
 		}
-		left, ok1 := collectDereferencedPtrs(e.CommaLHS)
+		left, ok1 := collectDereferencedPtrs(s, e.CommaLHS)
 		if !ok1 {
 			return nil, false
 		}
-		right, ok2 := collectDereferencedPtrs(e.CommaRHS)
+		right, ok2 := collectDereferencedPtrs(s, e.CommaRHS)
 		if !ok2 {
 			return nil, false
 		}
@@ -342,7 +342,7 @@ func collectDereferencedPtrs(e *Expression) (out []*Expression, ok bool) {
 		if e.Assign.Expr == nil {
 			return nil, false
 		}
-		return collectDereferencedPtrs(e.Assign.Expr)
+		return collectDereferencedPtrs(s, e.Assign.Expr)
 	case TermFunction:
 		// ExpressionFuncall.cpp:149–159 — param_value[i] always live
 		if e.Invoke == nil {
@@ -353,7 +353,7 @@ func collectDereferencedPtrs(e *Expression) (out []*Expression, ok bool) {
 			if a == nil {
 				return nil, false
 			}
-			part, okp := collectDereferencedPtrs(a)
+			part, okp := collectDereferencedPtrs(s, a)
 			if !okp {
 				return nil, false
 			}

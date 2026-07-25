@@ -915,14 +915,14 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return nil, nil, -1, false
 			}
-			AddNewVarFactTo(v, &outputs)
+			AddNewVarFactToSess(cgSess(cg), v, &outputs)
 			// AddNewVarFactInto may clear on field/abstract holes
 			if !FactsComplete(outputs) {
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return nil, nil, -1, false
 			}
 			// FactMgr.cpp:118–131 add_new_var_fact — eUnionWrite half into outputs FactVec
-			if fm != nil && MetaFactUnionEnabled() {
+			if fm != nil && MetaFactUnionEnabledSess(cgSess(cg)) {
 				_, unInit := AbstractFactForVarInitSess(fmSess(fm), v)
 				if sessHasError(cgSess(cg)) || !UnionFactsComplete(unInit) {
 					if !sessHasError(cgSess(cg)) {

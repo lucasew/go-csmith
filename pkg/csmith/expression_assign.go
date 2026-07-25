@@ -61,7 +61,7 @@ func MakeExpressionAssign(
 	if st.LhsVar != nil {
 		indir := 0
 		if st.Lhs != nil {
-			indir = st.Lhs.IndirectLevel()
+			indir = st.Lhs.IndirectLevelSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-continue UpdateFact past IndirectLevel residual
 			if sessHasError(cgSess(cg)) {
 				return nil
@@ -75,7 +75,7 @@ func MakeExpressionAssign(
 		// FactUnion.cpp:133 — Lhs::get_type() for eUnionWrite abstract (not Variable.Type).
 		var lhsWant *Type
 		if st.Lhs != nil {
-			lhsWant = st.Lhs.GetType()
+			lhsWant = st.Lhs.GetTypeSess(cgSess(cg))
 			if sessHasError(cgSess(cg)) {
 				return nil
 			}

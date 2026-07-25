@@ -715,7 +715,7 @@ func (e Effect) IsReadSess(s *Session, v *Variable) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if v.FieldVarOf.Type.IsStruct() {
+		if v.FieldVarOf.Type.IsStructSess(s) {
 			// residual ERROR sticky — no invent soft-continue struct-read past IsStruct residual
 			if sessHasError(s) {
 				return true
@@ -757,7 +757,7 @@ func (e Effect) FieldIsReadSess(s *Session, v *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !v.IsAggregate() {
+	if !v.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent no-field-read soft-skip past IsAggregate residual
 		if sessHasError(s) {
 			return true
@@ -827,7 +827,7 @@ func (e Effect) FieldIsWrittenSess(s *Session, v *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !v.IsAggregate() {
+	if !v.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent no-field-write soft-skip past IsAggregate residual
 		if sessHasError(s) {
 			return true
@@ -908,7 +908,7 @@ func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	youColl := v.GetCollective()
+	youColl := v.GetCollectiveSess(s)
 	// residual ERROR sticky — no invent soft no-sibling past GetCollective residual
 	if sessHasError(s) {
 		return true
@@ -917,7 +917,7 @@ func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	you := youColl.GetContainerUnion()
+	you := youColl.GetContainerUnionSess(s)
 	// residual ERROR sticky — no invent soft no-sibling past GetContainerUnion residual
 	if sessHasError(s) {
 		return true
@@ -942,7 +942,7 @@ func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 		if !e.read[r] {
 			continue
 		}
-		rColl := r.GetCollective()
+		rColl := r.GetCollectiveSess(s)
 		// residual ERROR sticky — no invent soft-continue later reads past GetCollective residual
 		if sessHasError(s) {
 			return true
@@ -951,7 +951,7 @@ func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		me := rColl.GetContainerUnion()
+		me := rColl.GetContainerUnionSess(s)
 		// residual ERROR sticky — no invent soft-continue no-sibling past GetContainerUnion hole
 		if sessHasError(s) {
 			return true
@@ -983,7 +983,7 @@ func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	youColl := v.GetCollective()
+	youColl := v.GetCollectiveSess(s)
 	// residual ERROR sticky — no invent soft no-sibling past GetCollective residual
 	if sessHasError(s) {
 		return true
@@ -992,7 +992,7 @@ func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	you := youColl.GetContainerUnion()
+	you := youColl.GetContainerUnionSess(s)
 	// residual ERROR sticky — no invent soft no-sibling past GetContainerUnion residual
 	if sessHasError(s) {
 		return true
@@ -1017,7 +1017,7 @@ func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 		if !e.written[w] {
 			continue
 		}
-		wColl := w.GetCollective()
+		wColl := w.GetCollectiveSess(s)
 		// residual ERROR sticky — no invent soft-continue later writes past GetCollective residual
 		if sessHasError(s) {
 			return true
@@ -1026,7 +1026,7 @@ func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		me := wColl.GetContainerUnion()
+		me := wColl.GetContainerUnionSess(s)
 		// residual ERROR sticky — no invent soft-continue no-sibling past GetContainerUnion hole
 		if sessHasError(s) {
 			return true

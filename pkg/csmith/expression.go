@@ -423,12 +423,12 @@ func (e *Expression) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
-	lv := e.Var.Type.IndirectLevel()
+	lv := e.Var.Type.IndirectLevelSess(s)
 	// residual ERROR sticky — no invent level-0 past subject IndirectLevel residual
 	if sessHasError(s) {
 		return 0, false
 	}
-	lw := want.IndirectLevel()
+	lw := want.IndirectLevelSess(s)
 	// residual ERROR sticky — no invent level-0 past desired IndirectLevel residual
 	if sessHasError(s) {
 		return 0, false
@@ -1775,11 +1775,11 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:122–123
 		// VisitFactsExpressionVariable already required complete probe type
 		ev := probe
-		if ind0, iok := probe.IndirectLevelComplete(); iok && ind0 == 0 {
+		if ind0, iok := probe.IndirectLevelCompleteSess(cgSess(cg)); iok && ind0 == 0 {
 			ev = &Expression{Term: TermVariable, Var: v, ExprType: v.Type}
 		}
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
-		deref, _ := ev.IndirectLevelComplete()
+		deref, _ := ev.IndirectLevelCompleteSess(cgSess(cg))
 		if deref > 0 {
 			bk := sessBK(cgSess(cg))
 			IncrCounterSess(cgSess(cg), &bk.readDereferenceCnts, deref)
