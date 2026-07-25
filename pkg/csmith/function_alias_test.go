@@ -52,7 +52,7 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	probs := NewProbabilities(opts)
 	// deep struct: S with nested already at depth 1+
 	// StructDepth of plain S0 with no nested fields is 1 → >= max 1 → rejected
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	deep := &Type{isStruct: true, StructName: "Sdeep", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}

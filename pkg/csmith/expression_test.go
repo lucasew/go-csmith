@@ -780,7 +780,7 @@ func TestMakeRandomExpressionUsesCGExprDepthNotStaleArg(t *testing.T) {
 func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	// Expression.cpp:147–152 — nil type from choose_random_nonvoid when SE-free
 	opts := Defaults()
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort)}
 	cg := EmptyCGContext()
 	cg.Types = env
@@ -797,7 +797,7 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	// later choose retries may still SetError when typ remains nil after tries
 	ClearError()
 	cg2 := EmptyCGContext()
-	cg2.Types = &TypeEnv{}
+	cg2.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg2, nil, nil, true, false, TermConstant, 0) != nil {
 		t.Fatal("empty Type env must not invent simple type")
 	}
@@ -882,7 +882,7 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	env := &TypeEnv{AllTypes: []*Type{st, GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st, GetIntType()}}
 	vs.Types = env
 	list := &FunctionList{Types: env}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1033,7 +1033,7 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
 	broken.Type = nil
 	good := CreateVariableScalars("g_good", GetIntType(), true, false)

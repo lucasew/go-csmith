@@ -7,7 +7,7 @@ func TestEagerCreateGlobalStruct(t *testing.T) {
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
@@ -31,7 +31,7 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(3), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
@@ -86,7 +86,7 @@ func TestFactMgrForFunc(t *testing.T) {
 func TestExpandStructUnionVars(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -164,7 +164,7 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(4), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
@@ -192,7 +192,7 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
@@ -236,7 +236,7 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(6), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
@@ -256,7 +256,7 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	// VariableSelector.cpp:991–1003 — empty stack assert; ERROR_GUARD after rnd_upto
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// empty stack → fail closed (no soft invent param/global)

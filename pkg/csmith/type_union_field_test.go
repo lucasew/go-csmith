@@ -48,7 +48,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 			t.Fatal("ptr type")
 		}
 	}
-	env := &TypeEnv{
+	env := &TypeEnv{Sess: testAmbientSession, 
 		StructTypes: []*Type{withPtr},
 		AllTypes:    []*Type{GetIntType(), withPtr},
 	}
@@ -74,7 +74,7 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	opts.Bitfields = false // always non-bitfield path
 	probs := NewProbabilities(opts)
 	// AllTypes like GenerateSimpleTypes: eChar.. (includes float with weight 0)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	for st := EChar; int(st) < MaxSimpleTypes; st++ {
 		env.AllTypes = append(env.AllTypes, GetSimpleType(st))
 	}
@@ -113,7 +113,7 @@ func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	env := &TypeEnv{AllTypes: []*Type{broken, GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, GetIntType()}}
 	// disable bitfield path so we always hit type-pool filter
 	opts.Bitfields = false
 	f := MakeOneUnionField(NewRng(1), opts, probs, env, 0, true)
@@ -132,7 +132,7 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 	plain := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	env := &TypeEnv{
+	env := &TypeEnv{Sess: testAmbientSession, 
 		StructTypes: []*Type{plain},
 		AllTypes:    []*Type{GetIntType(), plain},
 	}
@@ -176,7 +176,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort)}}
 	// After normal field: prevZero false — length 0 must be keepable when drawn.
 	// Search seeds that draw bitfield with length 0 under prevZero=false.
 	foundPad := false
@@ -201,7 +201,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	// MakeRandomUnionType: after first non-bitfield, second field bitfield with
 	// prevZero=false can keep length 0 (Type.cpp:640 back()!=0 → no force).
 	ClearError()
-	env2 := &TypeEnv{AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort), GetSimpleType(EUShort)}}
+	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort), GetSimpleType(EUShort)}}
 	// Craft: first field normal (BitWidth -1) → prevZero becomes false;
 	// second call with prevZero=false can return pad.
 	f0 := MakeOneUnionField(NewRng(1), opts, probs, env2, 0, true)

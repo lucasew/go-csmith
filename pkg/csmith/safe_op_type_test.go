@@ -50,7 +50,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 func TestMakeRandomPointerTypeMayBeIntStar(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	p := env.MakeRandomPointerType(NewRng(3), opts, probs)
 	if p == nil || p.PtrType() == nil {

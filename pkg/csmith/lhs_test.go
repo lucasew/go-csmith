@@ -9,7 +9,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRng(3)
 	cg := EmptyCGContext()
 	lhs := MakeRandomLhs(r, opts, probs, vs, &cg, GetIntType(), false, false, nil)
@@ -28,7 +28,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	vs.Types = env
 	// seed an int* global — qfer depth must be indirect+1 (pointer: 2 levels)
 	p := env.FindPointerType(GetIntType(), true)
@@ -61,7 +61,7 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
 	broken.Type = nil
 	vs.GlobalList = []*Variable{broken}
@@ -87,7 +87,7 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	// must_use Type-nil stickies SelectMustUseVar residual; must not invent soft select Lhs
 	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
 	broken.Type = nil
@@ -277,7 +277,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	vs.Types = env
 	p := env.FindPointerType(GetIntType(), true)
 	// pointer type needs two-level qfer for SanityCheck / MakeInitValue

@@ -125,7 +125,7 @@ func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())

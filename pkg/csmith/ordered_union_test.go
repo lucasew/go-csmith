@@ -35,7 +35,7 @@ func TestIsOrderedBinary(t *testing.T) {
 func TestUnionFieldHelpers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "U0")
 	if ut == nil {
@@ -96,7 +96,7 @@ func TestIsNonreadableField(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
@@ -160,7 +160,7 @@ func TestIsNonreadableField(t *testing.T) {
 func TestUpdateAssignUnionFact(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 1 {

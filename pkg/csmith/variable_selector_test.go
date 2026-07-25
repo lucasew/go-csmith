@@ -179,7 +179,7 @@ func TestMaxGlobalsFailClosed(t *testing.T) {
 	opts2.GlobalVariables = true
 	vs2 := NewVariableSelector(opts2)
 	vs2.GlobalList = []*Variable{v}
-	vs2.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs2.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	// force asGlobal by only allowing global path — stack empty + GlobalVariables
 	// CreateRandomArray: asGlobal = GlobalVariables && flipcoin(25); may pick local
 	// empty stack + GlobalVariables false for local fail; with GlobalVariables and at max
@@ -421,7 +421,7 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	vs := NewVariableSelectorProbs(opts, probs)
-	vs.Types = &TypeEnv{AllTypes: []*Type{st}, StructTypes: []*Type{st}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st}, StructTypes: []*Type{st}}
 	vs.Probs = nil // MakeRandom(struct) fails closed
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}

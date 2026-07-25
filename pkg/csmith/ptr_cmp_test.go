@@ -6,7 +6,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	pt := env.FindPointerType(GetIntType(), true)
 	if pt == nil || !env.HasPointerType() {
 		t.Fatal("pointer type")
@@ -58,7 +58,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	if env.FindPointerType(GetIntType(), true) == nil {
 		t.Fatal("pointer type")
 	}
@@ -120,7 +120,7 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	_ = env.FindPointerType(GetIntType(), true)
 	vs.Types = env
 	cg := EmptyCGContext()

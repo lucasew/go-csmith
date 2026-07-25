@@ -8,7 +8,7 @@ import (
 func TestGetContainerUnion(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	// force a union if possible
 	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "U0")
 	if ut == nil {
@@ -49,7 +49,7 @@ func TestGetContainerUnion(t *testing.T) {
 func TestSiblingUnionPartial(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
@@ -196,7 +196,7 @@ func TestStepHashBody(t *testing.T) {
 func TestLooseMatchUnion(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {

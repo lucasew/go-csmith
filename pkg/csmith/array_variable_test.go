@@ -80,7 +80,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
 	ClearError()
 	opts := Defaults()
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	probs := NewProbabilities(opts)
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")

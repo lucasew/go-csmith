@@ -17,7 +17,7 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 		StructName: "S0",
 		Fields:     []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}},
 	}
-	vs.Types = &TypeEnv{
+	vs.Types = &TypeEnv{Sess: testAmbientSession, 
 		AllTypes:    []*Type{st, GetIntType()},
 		StructTypes: []*Type{st},
 	}
@@ -42,7 +42,7 @@ func TestGenerateParameterVariablePointerChoice(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	pt := PointerTo(GetIntType())
-	vs.Types = &TypeEnv{DerivedTypes: []*Type{pt}, AllTypes: []*Type{GetIntType(), pt}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{pt}, AllTypes: []*Type{GetIntType(), pt}}
 	foundPtr := false
 	for seed := uint64(1); seed < 50; seed++ {
 		ClearError()
@@ -65,7 +65,7 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	// HasPointerType true via DerivedTypes but ChooseRandomPointerType needs non-empty
 	// empty Derived after flip: HasPointerType false → nonvoid path
-	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	f := &Function{Name: "f"}
 	v := vs.GenerateParameterVariable(f, NewRng(1))
 	if v == nil || v.Type == nil {

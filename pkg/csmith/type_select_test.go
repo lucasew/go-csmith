@@ -7,7 +7,7 @@ import (
 
 func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 	ClearError()
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	p1 := env.FindPointerType(GetIntType(), true)
 	p2 := env.FindPointerType(GetIntType(), true)
 	if p1 != p2 {
@@ -58,7 +58,7 @@ func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 func TestChooseRandomNilRNGSticky(t *testing.T) {
 	// Type.cpp always has process RNG; sticky no invent AllTypes[0] / derived pick
 	ClearError()
-	env := &TypeEnv{AllTypes: []*Type{GetIntType()}, DerivedTypes: []*Type{PointerTo(GetIntType())}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}, DerivedTypes: []*Type{PointerTo(GetIntType())}}
 	if env.ChooseRandom(nil, Defaults(), NewProbabilities(Defaults()), false) != nil {
 		t.Fatal("nil RNG ChooseRandom must fail closed")
 	}
@@ -93,7 +93,7 @@ func TestMakeRandomPointerTypeIntStar(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// Type.cpp GenerateSimpleTypes seeds AllTypes before make_random_pointer_type
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	// Force non-20% path often; result should be int* when simple base consolidated
 	r := NewRng(2)
@@ -120,7 +120,7 @@ func TestMakeRandomPointerTypeConsolidatesAllSimple(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetSimpleType(EFloat)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleType(EFloat)}}
 	// avoid 20% derived path (empty derived)
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
@@ -140,7 +140,7 @@ func TestSelectLTypeDefaultInt(t *testing.T) {
 	probs := NewProbabilities(opts)
 	// Force no pointer: use op that isn't simple assign... still pointer only on simple assign
 	// With PointerAsLTypeProb=50, may get pointer. Use many seeds with compound op.
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	r := NewRng(2)
 	ty := SelectLType(r, opts, probs, &env, false, AssignBitAnd)
 	if ty != GetIntType() {
@@ -155,7 +155,7 @@ func TestSelectLTypeIncompleteStructPoolFailClosed(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// force struct-as-LType path eligible: simple assign + AllTypes with hole
-	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil}}
 	// plant high struct prob so we would enter branch if complete
 	probs.single[PStructAsLTypeProb] = 100
 	probs.single[PPointerAsLTypeProb] = 0
@@ -174,7 +174,7 @@ func TestSelectLTypeErrorGuard(t *testing.T) {
 	// Type.cpp:1613 — ERROR_GUARD after pointer branch always; no soft invent get_int_type
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	ClearError()
 	SetError(ErrGeneric)
@@ -192,7 +192,7 @@ func TestChooseRandomErrorGuard(t *testing.T) {
 	// Type.cpp:1208 — ERROR_GUARD after rnd_upto(AllTypes)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetIntType(), GetSimpleType(EShort)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EShort)}}
 	ClearError()
 	SetError(ErrGeneric)
 	defer ClearError()
@@ -206,7 +206,7 @@ func TestChooseRandomNilTypeHole(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil, GetSimpleType(EShort)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil, GetSimpleType(EShort)}}
 	if env.ChooseRandom(NewRng(1), opts, probs, false) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandom")
 	}
@@ -234,7 +234,7 @@ func TestChooseRandomPointerTypeNilHole(t *testing.T) {
 	// Type* always live on derived_types; no invent pick past hole
 	ClearError()
 	intStar := PointerTo(GetIntType())
-	env := &TypeEnv{DerivedTypes: []*Type{intStar, nil}}
+	env := &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{intStar, nil}}
 	if env.ChooseRandomPointerType(NewRng(1)) != nil {
 		t.Fatal("nil DerivedTypes hole must fail closed")
 	}
@@ -263,7 +263,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	intStar := PointerTo(GetIntType())
-	envBad := &TypeEnv{
+	envBad := &TypeEnv{Sess: testAmbientSession, 
 		AllTypes:     []*Type{GetIntType(), nil},
 		DerivedTypes: []*Type{intStar, nil},
 	}
@@ -278,7 +278,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	}
 	ClearError()
 	// incomplete derived only: when 20% path hits, fail closed (nil); never soft-skip hole
-	envDerived := &TypeEnv{
+	envDerived := &TypeEnv{Sess: testAmbientSession, 
 		AllTypes:     []*Type{GetIntType()},
 		DerivedTypes: []*Type{intStar, nil},
 	}
@@ -310,7 +310,7 @@ func TestSelectLTypeCanBePointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// Type.cpp always has AllTypes after GenerateSimpleTypes / GenerateAllTypes
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
@@ -360,7 +360,7 @@ func TestAssignOpWorksForFloat(t *testing.T) {
 
 func TestFindPointerTypeNilSticky(t *testing.T) {
 	ClearError()
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	if env.FindPointerType(nil, true) != nil {
 		t.Fatal("nil pointee FindPointerType must fail closed")
 	}
@@ -380,7 +380,7 @@ func TestFindPointerTypeNilSticky(t *testing.T) {
 func TestGetAllOKStructUnionTypesFieldTypeResidualSticky(t *testing.T) {
 	// IsConstStructUnion residual soft invent was invent keep incomplete struct in ok pool.
 	ClearError()
-	env := &TypeEnv{AllTypes: []*Type{
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{
 		{isStruct: true, StructName: "S0", Fields: []StructField{
 			{Name: "f0", Type: nil, BitWidth: -1}, // residual via IsConstStructUnion
 		}},
@@ -400,7 +400,7 @@ func TestGetAllOKStructUnionTypesFieldTypeResidualSticky(t *testing.T) {
 func TestChooseRandomStructFromTypeIsVolatileResidualSticky(t *testing.T) {
 	// IsVolatileStructUnion residual soft invent was invent return typ past hole.
 	ClearError()
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	// Type with nil field Type → IsVolatileStructUnion residual when noVolatile
 	typ := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
@@ -437,7 +437,7 @@ func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	// empty DerivedTypes; AllTypes has simples for choose_random fallthrough
 	env.AllTypes = []*Type{
 		GetSimpleType(EChar), GetSimpleType(EInt), GetSimpleType(EShort),

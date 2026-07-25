@@ -9,7 +9,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || !ut.IsUnion() {
@@ -57,7 +57,7 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U0")
 	if ut == nil {
@@ -90,7 +90,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(9), opts, probs, &env, "U0")
 	if ut == nil {
@@ -259,7 +259,7 @@ func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(13), opts, probs, &env, "U0")
 	if ut == nil {

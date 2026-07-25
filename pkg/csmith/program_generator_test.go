@@ -119,7 +119,7 @@ func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 	g2.Initialize()
 	g2.GenerateAllTypes()
 	// empty types after GenerateAllTypes wiped
-	g2.Types = TypeEnv{}
+	g2.Types = TypeEnv{Sess: testAmbientSession}
 	g2.VS.Types = &g2.Types
 	g2.Funcs.Types = &g2.Types
 	g2.GenerateFunctions()

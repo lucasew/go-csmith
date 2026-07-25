@@ -490,7 +490,7 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	defer ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(9), opts, probs, &env, "U2")
 	if ut == nil {

@@ -6,7 +6,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	vs.Types = env
 	vs.Probs = probs
@@ -38,7 +38,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 func TestChooseRandomNonvoidNonvolatile(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(3), opts, probs, env)
 	// inject volatile struct
 	volt := &Type{isStruct: true, StructName: "SV", Fields: []StructField{
@@ -113,7 +113,7 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	opts := Defaults()
 	opts.GlobalVariables = true
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Types = env
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -492,7 +492,7 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	// make struct look volatile for AcceptType path
-	vs.Types = &TypeEnv{AllTypes: []*Type{st, GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st, GetIntType()}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// non-SE-free context
 	cg := WithFunc(f, EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), true, false)))
@@ -507,7 +507,7 @@ func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.GlobalVariables = false
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.Stack = []*Block{nil}
 	cg := WithFunc(f, EmptyEffect())
@@ -536,7 +536,7 @@ func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
 	// only broken type so Choose always hits residual IsConstStructUnion
-	vs.Types = &TypeEnv{AllTypes: []*Type{broken}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	cg.Types = vs.Types

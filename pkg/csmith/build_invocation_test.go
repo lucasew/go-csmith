@@ -465,7 +465,7 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxFuncs = 5
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	list := &FunctionList{Types: vs.Types}
 	// plant incomplete ambient on caller before build
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}

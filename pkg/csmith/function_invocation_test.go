@@ -139,7 +139,7 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.DerivedTypes = IncompleteTypes()
 	vs.Types = &env
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -292,7 +292,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	_ = env.FindPointerType(GetIntType(), true)
 	vs.Types = env

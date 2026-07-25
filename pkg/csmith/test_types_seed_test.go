@@ -15,7 +15,7 @@ func seedTypesForTest(r *Rng, opts Options, probs *Probabilities, vs *VariableSe
 	} else if vs != nil && vs.Types != nil {
 		env = vs.Types
 	} else {
-		env = &TypeEnv{}
+		env = &TypeEnv{Sess: testAmbientSession}
 	}
 	if len(env.AllTypes) == 0 {
 		GenerateAllTypesEnv(r, opts, probs, env)

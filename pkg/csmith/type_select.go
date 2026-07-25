@@ -20,15 +20,14 @@ type TypeEnv struct {
 	AggregateSeq int
 }
 
-// envSess returns env.Sess. Nil env → unit-test ambient (SelectLType etc. unit paths).
-// Non-nil env with unset Sess lazy-installs ambient on the env object.
-// Generate always installs Types.Sess on the run bag first.
+// envSess returns env.Sess. Nil env → unit-test ambient (SelectLType unit paths).
+// Non-nil env must have Sess set (TypeEnv{Sess: …} / GenerateAllTypesEnv / Types.Sess).
 func envSess(env *TypeEnv) *Session {
 	if env == nil {
 		return testAmbientSession
 	}
 	if env.Sess == nil {
-		env.Sess = testAmbientSession
+		panic("envSess: Sess unset (set TypeEnv.Sess or use GenerateAllTypesEnv)")
 	}
 	return env.Sess
 }

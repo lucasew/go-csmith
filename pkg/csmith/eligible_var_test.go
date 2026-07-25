@@ -6,7 +6,7 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	if st == nil {

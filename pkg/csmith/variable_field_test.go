@@ -10,7 +10,7 @@ func TestCreateFieldVars(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// Type.cpp GenerateSimpleTypes before make_random_struct_type / field choose
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	if st == nil {
@@ -156,7 +156,7 @@ func TestCollectExpandable(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(5), opts, probs, env, "S0")
 	v := CreateVariableQfer("g_2", st, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -209,7 +209,7 @@ func TestCollectExpandable(t *testing.T) {
 func TestFieldVolatileOrFromParent(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	// parent volatile

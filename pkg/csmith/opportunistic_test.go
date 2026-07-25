@@ -272,7 +272,7 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	// pointer to volatile struct/union field type
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	// force a volatile field if possible — check method on non-vol struct pointer

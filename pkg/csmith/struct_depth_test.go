@@ -61,7 +61,7 @@ func TestChooseRandomTypeFilterNoReturnUnionsGate(t *testing.T) {
 	opts.ReturnUnions = false
 	opts.ReturnStructs = true
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	// only union + void-weight simple so choose must accept union
 	u := &Type{isUnion: true, StructName: "U0", Used: false}
 	env.AllTypes = []*Type{u}
@@ -84,7 +84,7 @@ func TestChooseRandomTypeFilterNoReturnUnionsGate(t *testing.T) {
 func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	// suite hygiene: prior sticky tests leave residual ERROR; clear before complete filter
 	ClearError()
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	okt := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
 	}}

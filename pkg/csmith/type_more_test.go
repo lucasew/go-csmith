@@ -453,7 +453,7 @@ func TestIsUnnamedPadding(t *testing.T) {
 
 func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 	ClearError()
-	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil}}
 	if typesComplete(env.GetAllOKStructUnionTypes(false, false, false, true)) {
 		t.Fatal("nil type hole must fail closed incomplete, not invent empty complete")
 	}
@@ -462,7 +462,7 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 	}
 	ClearError()
 	// complete empty filter (no structs) is complete empty non-nil
-	env2 := &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	ok := env2.GetAllOKStructUnionTypes(false, false, false, true)
 	if !typesComplete(ok) || len(ok) != 0 {
 		t.Fatal("no structs must be complete empty", ok)
@@ -505,7 +505,7 @@ func TestFindTypeNilHole(t *testing.T) {
 	// Type* always live on AllTypes; no invent soft-skip hole then match later
 	ClearError()
 	intT := GetIntType()
-	env := &TypeEnv{AllTypes: []*Type{nil, intT}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{nil, intT}}
 	if env.FindType(intT) != nil {
 		t.Fatal("nil AllTypes hole must fail closed FindType (not soft-skip to match)")
 	}
@@ -514,7 +514,7 @@ func TestFindTypeNilHole(t *testing.T) {
 	}
 	ClearError()
 	// complete pool still finds
-	envOK := &TypeEnv{AllTypes: []*Type{GetSimpleType(EShort), intT}}
+	envOK := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleType(EShort), intT}}
 	if envOK.FindType(intT) != intT {
 		t.Fatal("complete pool must find type")
 	}
@@ -530,7 +530,7 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 	good := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType()},
 	}}
-	env := &TypeEnv{AllTypes: []*Type{broken, good}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, good}}
 	if typesComplete(env.GetAllOKStructUnionTypes(true, false, false, true)) {
 		t.Fatal("IsConstStructUnion residual must fail closed incomplete")
 	}
@@ -539,7 +539,7 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 	}
 	ClearError()
 	// needIntField HasIntField residual
-	env2 := &TypeEnv{AllTypes: []*Type{broken, good}}
+	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, good}}
 	if typesComplete(env2.GetAllOKStructUnionTypes(false, false, true, true)) {
 		t.Fatal("HasIntField residual must fail closed incomplete")
 	}
@@ -548,7 +548,7 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 	}
 	ClearError()
 	// okStructUnionLTypes noVolatile residual
-	env3 := &TypeEnv{StructTypes: []*Type{broken, good}}
+	env3 := &TypeEnv{Sess: testAmbientSession, StructTypes: []*Type{broken, good}}
 	if typesComplete(okStructUnionLTypes(env3, true, true, false)) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed incomplete")
 	}
@@ -559,7 +559,7 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 }
 
 func TestGetAllOKStructUnionTypes(t *testing.T) {
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType()},
 	}}
@@ -584,7 +584,7 @@ func TestGetAllOKStructUnionTypes(t *testing.T) {
 }
 
 func TestChooseRandomStructFromType(t *testing.T) {
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	st := &Type{isStruct: true, StructName: "S0"}
 	env.AllTypes = []*Type{st}
 	if env.ChooseRandomStructFromType(NewRng(1), st, false) != st {

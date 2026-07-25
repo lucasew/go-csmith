@@ -304,7 +304,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	opts.MaxFuncs = 3
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	list := &FunctionList{Types: &TypeEnv{}}
+	list := &FunctionList{Types: &TypeEnv{Sess: testAmbientSession}}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
 	fm := NewFactMgr(caller)

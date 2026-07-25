@@ -8,7 +8,7 @@ import (
 func TestRandomTypeFromTypeNil(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, false, false)
 	if ty == nil || (ty.IsSimple() && ty.Simple() == EVoid) {
@@ -57,7 +57,7 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	}
 	// nil type / simple re-roll need RNG sticky; no invent pick/keep-simple shells
 	ClearError()
-	if RandomTypeFromType(nil, &TypeEnv{AllTypes: []*Type{GetIntType()}}, opts, probs, nil, false, false) != nil {
+	if RandomTypeFromType(nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil RNG + nil type must fail closed")
 	}
 	if !HasError() {
@@ -84,7 +84,7 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 		t.Fatal("nil env RandomTypeFromType must SetError sticky")
 	}
 	ClearError()
-	if RandomTypeFromType(NewRng(1), &TypeEnv{}, opts, probs, nil, false, false) != nil {
+	if RandomTypeFromType(NewRng(1), &TypeEnv{Sess: testAmbientSession}, opts, probs, nil, false, false) != nil {
 		t.Fatal("empty AllTypes + nil type must fail closed")
 	}
 	if !HasError() {

@@ -9,7 +9,7 @@ func TestMakeRandomUnionType(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	// Type.cpp shared sid: after any prior aggregates, next union is U{seq} not always U0
 	env.AllTypes = []*Type{GetIntType()}
 	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "")

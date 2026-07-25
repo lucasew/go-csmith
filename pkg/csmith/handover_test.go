@@ -112,7 +112,7 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	// global union — must survive handover filter
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 1 {
@@ -186,7 +186,7 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	defer ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil {
@@ -221,7 +221,7 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	defer ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U1")
 	if ut == nil {

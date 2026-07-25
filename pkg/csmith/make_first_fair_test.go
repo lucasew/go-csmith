@@ -174,7 +174,7 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	// empty Types → RandomReturnType nil
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	list := &FunctionList{Types: vs.Types}
 	if MakeFirst(NewRng(1), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("empty AllTypes must fail closed")

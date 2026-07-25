@@ -39,7 +39,7 @@ func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// create_random_array uses Type env (C++ GenerateSimpleTypes always live)
-	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	r := NewRng(2)
 	av := vs.SelectArray(r, EmptyCGContext())
 	if av == nil || len(vs.Arrays) < 1 {
@@ -123,7 +123,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	// force multi-dim array
@@ -231,7 +231,7 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Create without vs/blk registration (orphan array)
 	orphan := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntType(), MakeInt(0), q)

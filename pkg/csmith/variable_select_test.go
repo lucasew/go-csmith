@@ -111,7 +111,7 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 	InitScopeTable(opts)
 	defer SetProcessScopeTab(nil)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRng(3)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -174,7 +174,7 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}

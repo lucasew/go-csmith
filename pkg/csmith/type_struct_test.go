@@ -6,9 +6,10 @@ import (
 )
 
 func TestMakeRandomStructType(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	// Type.cpp GenerateSimpleTypes before make_random_struct_type
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	r := NewRng(2)
@@ -46,7 +47,7 @@ func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	// Seed AllTypes with simples + one unused prior struct.
 	s0 := &Type{
 		isStruct: true, StructName: "S0", SID: 0, Used: false,
@@ -88,7 +89,7 @@ func TestAggregateSharedSIDSequence(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType()}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "")
 	if st == nil || st.StructName != "S0" {
@@ -161,7 +162,7 @@ func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType()}
 	if MakeRandomStructType(nil, opts, probs, &env, "S0") != nil {
 		t.Fatal("nil RNG struct must fail closed")
@@ -191,7 +192,7 @@ func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
 func TestGenerateAllTypesEnvCreatesStructs(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, &env)
 	if len(env.StructTypes) < 1 {
 		t.Fatal("expected structs under MoreTypesProbability")
@@ -204,7 +205,7 @@ func TestGenerateSimpleTypesSeedsAllNonVoid(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = false
 	opts.LongLong = false // AllowInt64 may still depend on math64
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, NewProbabilities(opts), &env)
 	// At least the 13 non-void simple slots before any struct/union.
 	// (structs may append further under MoreTypesProbability.)
@@ -235,28 +236,28 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 		t.Fatal("nil RNG MoreTypesProbability must SetError sticky")
 	}
 	ClearError()
-	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
 		t.Fatal("nil RNG MakeOneStructField must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("nil RNG MakeOneStructField must SetError sticky")
 	}
 	ClearError()
-	if f := MakeOneStructField(NewRng(1), opts, nil, &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+	if f := MakeOneStructField(NewRng(1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
 		t.Fatal("nil probs MakeOneStructField must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("nil probs MakeOneStructField must SetError sticky")
 	}
 	ClearError()
-	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0, true); f.Type != nil {
+	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0, true); f.Type != nil {
 		t.Fatal("nil RNG MakeOneUnionField must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("nil RNG MakeOneUnionField must SetError sticky")
 	}
 	ClearError()
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	opts.Structs = true
 	opts.Unions = true
 	GenerateAllTypesEnv(nil, opts, NewProbabilities(opts), &env)
@@ -294,7 +295,7 @@ func TestGenerateEmitsStructDecl(t *testing.T) {
 func TestMakeStructConstant(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(3), opts, probs, &env, "S0")
 	if st == nil {

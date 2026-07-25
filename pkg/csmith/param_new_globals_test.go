@@ -140,7 +140,7 @@ func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
 	// Function.cpp:419–420 — CreateVariable ERROR_GUARD; sticky error aborts signature
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Types = env
 	cg := EmptyCGContext()
 	cg.Types = env

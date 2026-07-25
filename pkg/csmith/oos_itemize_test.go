@@ -75,7 +75,7 @@ func TestChooseOKVarItemizesArray(t *testing.T) {
 func TestRandomTypeFromTypeNoVolatile(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	// should not panic; with noVolatile prefer nonvol path
 	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, true, false)
@@ -87,7 +87,7 @@ func TestRandomTypeFromTypeNoVolatile(t *testing.T) {
 func TestVariableMatchAggregate(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))

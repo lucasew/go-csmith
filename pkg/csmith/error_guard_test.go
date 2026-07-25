@@ -78,7 +78,7 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
-	cg.Types = &TypeEnv{}
+	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	tab := &ThresholdTable{}
 	tab.Add(100, int(StmtAssign))
 	ClearError()
@@ -102,7 +102,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	cg.Types = &TypeEnv{}
+	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBlock")
 	}
@@ -117,7 +117,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	fm2 := NewFactMgr(f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f2, EmptyEffect()).WithFactMgr(fm2)
-	cg2.Types = &TypeEnv{}
+	cg2.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomBlock(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, false) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBlock")
 	}
@@ -140,7 +140,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgr(f3))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
-	cg3.Types = &TypeEnv{}
+	cg3.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg3, false) != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomBlock")
 	}

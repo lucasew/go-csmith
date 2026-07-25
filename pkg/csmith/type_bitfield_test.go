@@ -28,7 +28,7 @@ func TestMakeRandomStructTypeCanHaveBitfields(t *testing.T) {
 	probs := NewProbabilities(opts)
 	found := false
 	for seed := uint64(1); seed < 60; seed++ {
-		var env TypeEnv
+		env := TypeEnv{Sess: testAmbientSession}
 		// Type.cpp AllTypes has simples before make_random_struct_type
 		env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
 		st := MakeRandomStructType(NewRng(seed), opts, probs, &env, "S0")
@@ -58,7 +58,7 @@ func TestMakeRandomStructTypeFailClosedEmptyEnv(t *testing.T) {
 	probs := NewProbabilities(opts)
 	ClearError()
 	// empty AllTypes → MakeOneStructField fails; whole struct abort
-	st := MakeRandomStructType(NewRng(1), opts, probs, &TypeEnv{}, "Sempty")
+	st := MakeRandomStructType(NewRng(1), opts, probs, &TypeEnv{Sess: testAmbientSession}, "Sempty")
 	if st != nil {
 		// only succeeds if full-bitfields path never needs ChooseRandom
 		for _, f := range st.Fields {
@@ -220,7 +220,7 @@ func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
 	opts.FixedStructFields = true
 	opts.Bitfields = false
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	if st := MakeRandomStructType(NewRng(1), opts, probs, env, "S0"); st != nil {
 		t.Fatalf("fixed max 0 must not invent struct, got %d fields", len(st.Fields))
 	}

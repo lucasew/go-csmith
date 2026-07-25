@@ -999,7 +999,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {

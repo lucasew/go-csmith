@@ -17,7 +17,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	opts.MaxBlockSize = 2
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
-	cg.Types = &TypeEnv{}
+	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// plant a known global
@@ -417,7 +417,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	cg.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	st := MakeRandomIf(NewRng(1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
@@ -490,7 +490,7 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
-	cg.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc

@@ -9,7 +9,7 @@ func TestChooseRandomFromAllTypes(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	if len(env.AllTypes) < 5 {
 		t.Fatalf("AllTypes %d", len(env.AllTypes))
@@ -37,7 +37,7 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{}
+	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(5), opts, probs, env)
 	ty := RandomReturnType(NewRng(7), probs, env, opts)
 	if ty == nil {

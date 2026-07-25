@@ -104,14 +104,14 @@ type FactMgr struct {
 	MapVisited map[int]bool
 }
 
-// fmSess returns fm.Sess. Nil fm → unit-test ambient. Non-nil fm with unset
-// Sess lazy-installs ambient on the object. NewFactMgrSess always installs a bag.
+// fmSess returns fm.Sess. Nil fm → unit-test ambient.
+// Non-nil fm must have Sess set (NewFactMgr / NewFactMgrSess always installs).
 func fmSess(fm *FactMgr) *Session {
 	if fm == nil {
 		return testAmbientSession
 	}
 	if fm.Sess == nil {
-		fm.Sess = testAmbientSession
+		panic("fmSess: Sess unset (use NewFactMgr or NewFactMgrSess)")
 	}
 	return fm.Sess
 }
