@@ -109,20 +109,35 @@ func upstreamGenerate(tb testing.TB, opts csmith.Options) string {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		tb.Fatalf("upstream csmith opts=%v: timeout after %s (%s)", args, upstreamGenTimeout, bin)
+		// Upstream too slow/hang for this config — not a Go body mismatch to fix here.
+		tb.Skipf("upstream csmith hang/timeout after %s args=%v (%s)", upstreamGenTimeout, args, bin)
 	}
+	// Upstream often prints "error: options conflict …" on stdout (not stderr).
+	combined := strings.TrimSpace(stderr.String() + "\n" + stdout.String())
 	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := combined
 		if msg == "" {
 			msg = err.Error()
 		}
 		// Shared invalid config: skip rather than fail the corpus entry.
 		if isUpstreamConflict(msg) {
-			tb.Skipf("upstream rejects config %v: %s", args, msg)
+			tb.Skipf("upstream rejects config %v: %s", args, firstLine(msg))
 		}
-		tb.Fatalf("upstream csmith %v (%s): %s", args, bin, msg)
+		tb.Fatalf("upstream csmith %v (%s): %s", args, bin, firstLine(msg))
+	}
+	// Some instrumented builds exit 0 after printing a conflict line.
+	if isUpstreamConflict(combined) && !strings.Contains(stdout.String(), "int main") {
+		tb.Skipf("upstream rejects config %v: %s", args, firstLine(combined))
 	}
 	return stdout.String()
+}
+
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return s
 }
 
 func isUpstreamConflict(msg string) bool {
@@ -133,6 +148,12 @@ func isUpstreamConflict(msg string) bool {
 		strings.Contains(low, "invalid")
 }
 
+// goGenTimeout bounds one Go Generate in bodyparity. Larger than typical cases;
+// true hangs fail as Fatal (not go-fuzz worker EOF). go-fuzz workers still have
+// ~10s internal budget — slow-but-correct seeds (~7s gen) can false-hang there;
+// re-run corpus entries alone to confirm (hangs are bugs only if reproducible).
+const goGenTimeout = 90 * time.Second
+
 func goGenerate(tb testing.TB, opts csmith.Options) string {
 	tb.Helper()
 	if err := opts.Validate(); err != nil {
@@ -140,8 +161,13 @@ func goGenerate(tb testing.TB, opts csmith.Options) string {
 	}
 	// Header Options: line should list the same argv we pass upstream.
 	opts.Argv = opts.CLIArgs()
-	out, err := csmith.Generate(opts)
+	ctx, cancel := context.WithTimeout(tb.Context(), goGenTimeout)
+	defer cancel()
+	out, err := csmith.GenerateContext(ctx, opts)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			tb.Fatalf("go csmith hang/timeout after %s args=%v", goGenTimeout, opts.CLIArgs())
+		}
 		// Match upstream soft reject: skip invalid / failed generation under exotic flags.
 		if strings.Contains(err.Error(), "conflict") || strings.Contains(err.Error(), "generation error") {
 			tb.Skipf("go generate skipped: %v (args=%v)", err, opts.CLIArgs())

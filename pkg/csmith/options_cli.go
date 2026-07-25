@@ -599,6 +599,8 @@ func dropInPlanes() (bools, ints, strs []optionsField) {
 
 // SanitizeForBodyParityFuzz clears modes that cannot produce a single-stdout
 // program body for comparison (dump-and-exit, delta tools, multi-file split).
+// Also collapses golden-CLI mutual exclusions so drop-in fuzz spends less time
+// on shared skip cases (upstream prints "error: options conflict" then exits).
 func SanitizeForBodyParityFuzz(o Options) Options {
 	o.DumpDefaultProbabilities = ""
 	o.DumpRandomProbabilities = ""
@@ -615,6 +617,63 @@ func SanitizeForBodyParityFuzz(o Options) Options {
 	if o.PlatformInfoPath == "" {
 		o.PlatformInfoPath = defaultPlatformInfoPath
 	}
+	// Upstream: only one of --klee / --crest / --coverage-test.
+	nExt := 0
+	if o.Klee {
+		nExt++
+	}
+	if o.Crest {
+		nExt++
+	}
+	if o.CoverageTest {
+		nExt++
+	}
+	if nExt > 1 {
+		// Keep the first in priority order; drop the rest.
+		if o.Klee {
+			o.Crest, o.CoverageTest = false, false
+		} else if o.Crest {
+			o.CoverageTest = false
+		}
+	}
+	// Upstream: exhaustive mode doesn't support klee|crest|coverage-test.
+	if o.DFSExhaustive {
+		o.Klee, o.Crest, o.CoverageTest = false, false, false
+		// Sequence prefix is DFS-only.
+	} else {
+		o.SequenceNamePrefix = false
+	}
+	// Cap DFS so drop-in fuzz stays finite (full exhaustive can hang for minutes+).
+	if o.DFSExhaustive {
+		if o.MaxExhaustiveDepth < 0 {
+			o.MaxExhaustiveDepth = 0
+		}
+		if o.MaxExhaustiveDepth > 8 {
+			o.MaxExhaustiveDepth = 8
+		}
+		if o.MaxFuncs > 4 {
+			o.MaxFuncs = 4
+		}
+		if o.MaxBlockSize > 4 {
+			o.MaxBlockSize = 4
+		}
+	}
+	// Platform sizes: only 2/4/8 (int) or 4/8 (ptr); else leave Defaults (4).
+	switch o.IntSize {
+	case 2, 4, 8:
+		// ok
+	default:
+		o.IntSize = Defaults().IntSize
+		o.IntSizeExplicit = false
+	}
+	switch o.PointerSize {
+	case 4, 8:
+		// ok
+	default:
+		o.PointerSize = Defaults().PointerSize
+	}
+	// Partial-expand free-form strings often conflict; bodyparity drop-in leaves it off.
+	o.PartialExpand = ""
 	return o
 }
 

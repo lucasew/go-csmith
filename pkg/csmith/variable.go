@@ -2844,6 +2844,10 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
+		// Variable.cpp:902–919 — compute_hash → transparent_crc*; else csmith_sink_ =
+		if !opts.ComputeHash {
+			return "    csmith_sink_ = " + name + ";\n"
+		}
 		if v.Type.IsFloatSess(s) {
 			// residual ERROR sticky — no invent crc_bytes past IsFloat residual hole
 			if sessHasError(s) {
@@ -3037,7 +3041,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		access += "[" + iv + "]"
 		nameStr += "[" + iv + "]"
 	}
-	// ArrayVariable.cpp:770–784 — transparent_crc each precomputed leaf
+	// ArrayVariable.cpp:770–794 — transparent_crc* when compute_hash, else csmith_sink_ =
 	// (nested struct fields expand: .f0.f0 not top-level .f0 only — seed-51 g_359).
 	if useSimple {
 		isF := v.Type.IsFloatSess(s)
@@ -3045,7 +3049,9 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		if sessHasError(s) {
 			return ""
 		}
-		if isF {
+		if !opts.ComputeHash {
+			b.WriteString(indent + "csmith_sink_ = " + access + ";\n")
+		} else if isF {
 			b.WriteString(indent + "transparent_crc_bytes (&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
 		} else {
 			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
@@ -3062,7 +3068,9 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 				return ""
 			}
 			fn := sub.Name
-			if isF {
+			if !opts.ComputeHash {
+				b.WriteString(indent + "csmith_sink_ = " + access + fn + ";\n")
+			} else if isF {
 				b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
 			} else {
 				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
@@ -3070,12 +3078,16 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		}
 	}
 	// ArrayVariable.cpp:786–788 — if (hash_value_printf) if (print_hash_value) printf(index…)
-	if opts.HashValuePrintf {
+	// Only meaningful with compute_hash (transparent_crc path).
+	if opts.ComputeHash && opts.HashValuePrintf {
 		b.WriteString(indent + "if (print_hash_value) " + makePrintIndexStr(names) + "\n")
 	}
-	// ArrayVariable.cpp:799–801 — first output_close_encloser does outputln (blank
-	// after body) then "}"; subsequent closes only newline between braces.
-	b.WriteString("\n")
+	// ArrayVariable.cpp:799–804 — output_close_encloser: if body ended with endl
+	// (crc path), first close inserts a blank line; sink path has no endl after ';'
+	// so the first close's outputln only finishes the sink line (no blank).
+	if opts.ComputeHash {
+		b.WriteString("\n")
+	}
 	for range v.ArraySizes {
 		indent = indent[:len(indent)-4]
 		b.WriteString(indent + "}\n")

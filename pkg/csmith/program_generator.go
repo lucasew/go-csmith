@@ -966,22 +966,22 @@ func (g *ProgramGenerator) OutputMain() string {
 			b.WriteString(resets)
 		}
 	}
-	// OutputMgr.cpp:141–145 — step_hash path invokes csmith_compute_hash; else inline HashGlobalVariables
-	// (guarded by compute_hash so crc_* are defined)
+	// OutputMgr.cpp:139–149 — always HashGlobalVariables (or step-hash invoke);
+	// compute_hash only switches transparent_crc vs csmith_sink_ and platform_main_end form.
 	// no invent csmith_compute_hash() call when hashFuncDefReady is false (missing def)
-	if g.Opts.ComputeHash {
-		if g.hashFuncDefReady() {
-			b.WriteString("    csmith_compute_hash();\n")
-		} else {
-			// OutputMgr.cpp:142 — HashGlobalVariables after OutputArrayInitializers
-			// (ctrl vars from that path via get_last_ctrl_vars; no soft GetNew here)
-			// also used when step-hash helpers fail closed incomplete ctrl IR
-			b.WriteString(g.hashGlobals())
-			// residual ERROR sticky — no invent main past hashGlobals residual hole
-			if g.hasErr() {
-				return ""
-			}
+	if g.hashFuncDefReady() {
+		// step_hash_by_stmt + helpers ready → csmith_compute_hash(); body still sink/crc per flag
+		b.WriteString("    csmith_compute_hash();\n")
+	} else {
+		// OutputMgr.cpp:141–142 — HashGlobalVariables after OutputArrayInitializers
+		// (ctrl vars from that path via get_last_ctrl_vars; no soft GetNew here)
+		b.WriteString(g.hashGlobals())
+		// residual ERROR sticky — no invent main past hashGlobals residual hole
+		if g.hasErr() {
+			return ""
 		}
+	}
+	if g.Opts.ComputeHash {
 		b.WriteString("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
 	} else {
 		b.WriteString("    platform_main_end(0,0);\n")
