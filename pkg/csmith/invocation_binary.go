@@ -412,11 +412,11 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	// incomplete IR sticky (no soft invent visit success / soft re-pick)
 	// param_value[0/1] always live Expression* after ERROR_GUARD
 	if fi == nil || cg == nil || len(fi.Args) < 2 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if fi.Args[0] == nil || fi.Args[1] == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// left
@@ -424,7 +424,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue right/merge past left visit residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	// FunctionInvocationBinary.cpp:494 — inputs_copy = inputs (full FactVec)
@@ -433,14 +433,14 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	var afterLeftUnion []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		afterLeftPT = CloneFactSlice(cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-continue past CloneFactSlice residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		// Shallow clone of union pointers: RenewUnionFact replaces live slice
@@ -448,9 +448,9 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		// Fact* vector copy). Deep clone would freeze post-left at post-left
 		// values but is not required for merge_facts semantics.
 		afterLeftUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(afterLeftUnion) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(afterLeftUnion) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -460,7 +460,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue merge past right visit residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	// FunctionInvocationBinary.cpp:499 — merge_facts(inputs, inputs_copy)
@@ -468,32 +468,32 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeftPT) ||
 			!UnionFactsComplete(cg.FM.UnionFacts) || !UnionFactsComplete(afterLeftUnion) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeftPT)
 		// residual ERROR sticky — no invent visit success past MergeFacts residual hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		// eUnionWrite half of merge_facts (mirror make_random ordered path)
 		for _, f := range afterLeftUnion {
 			if f == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			cg.FM.UnionFacts = MergeUnionFactInto(cg.FM.UnionFacts, f)
-			if sessHasError(nil) || !UnionFactsComplete(cg.FM.UnionFacts) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+			if sessHasError(cgSess(cg)) || !UnionFactsComplete(cg.FM.UnionFacts) {
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}

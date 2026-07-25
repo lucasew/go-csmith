@@ -506,7 +506,7 @@ func MakeRandomFor(
 	// StatementFor.cpp nullptr factory sticky — nil (no invent Kind-only shell)
 	// always has RNG + CGContext sticky
 	if r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:288–289 — assert(fm); non-sticky soft re-pick without FactMgr
@@ -517,11 +517,11 @@ func MakeRandomFor(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:290 — clear per-statement effect before building for
@@ -529,7 +529,7 @@ func MakeRandomFor(
 
 	lc := MakeIteration(r, opts, probs, vs, cg)
 	// StatementFor.cpp:296 make_iteration null / ERROR paths → nullptr
-	if lc == nil || sessHasError(nil) {
+	if lc == nil || sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// when SafeMath and compound add/sub incr, attach dummy flags for emit
@@ -543,35 +543,35 @@ func MakeRandomFor(
 	// StatementFor.cpp:299–300 — record effect and facts before loop body
 	// incomplete GlobalFacts fail closed (no invent cleaned pre-loop snapshot)
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	preEffect := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-for past EffectStm Clone residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	if !EffectComplete(preEffect) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
 	// residual ERROR sticky — no invent soft-for past CloneFactSlice residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// FactMgr.cpp set_fact_in / StatementFor.cpp:299–300 — pre_facts is full FactVec
 	// including eUnionWrite; snapshot UnionFacts with point-to for post_loop restore.
 	if !UnionFactsComplete(cg.FM.UnionFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// Deep: pre_facts eUnionWrite must not alias live FactUnion objects that
 	// body generation renews/joins (StatementFor.cpp:299–300 snapshot).
 	preUnion := CloneUnionFactSliceDeep(cg.FM.UnionFacts)
-	if sessHasError(nil) || !UnionFactsComplete(preUnion) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnion) {
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return nil
 	}
@@ -580,7 +580,7 @@ func MakeRandomFor(
 	// empty effect_stm, shared effect_accum, iv_bounds[iv]=bound.
 	// Incomplete parent accum fails closed (no invent body under incomplete shell)
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	var iv *Variable
@@ -594,7 +594,7 @@ func MakeRandomFor(
 	// bodyCG.EffectAccum aliases cg.EffectAccum (CGContext.cpp:101)
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
-	if sessHasError(nil) || body == nil {
+	if sessHasError(cgSess(cg)) || body == nil {
 		if lc.IV != nil {
 			bodyCG.RemoveIVBound(lc.IV)
 		}
@@ -610,7 +610,7 @@ func MakeRandomFor(
 	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
 	if !FactsComplete(cg.FM.GlobalFacts) ||
 		!EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// no MergeEffects: body writes already hit the shared parent EffectAccum

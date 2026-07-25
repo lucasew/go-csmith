@@ -21,18 +21,18 @@ func MakeExpressionComma(
 ) *Expression {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell without them
 	if r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent comma / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// ExpressionComma.cpp:58–61 — same CGContext&; make_random bumps expr_depth for siblings
@@ -41,14 +41,14 @@ func MakeExpressionComma(
 	// ExpressionComma.cpp:60–61 — rhs type/qfer, no_func=false, no_const=false
 	rhs := MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, false, MaxTermTypes, cg.ExprDepth)
 	// no soft TermVariable/TermConstant retries (C++ uses results directly)
-	if lhs == nil || rhs == nil || sessHasError(nil) {
+	if lhs == nil || rhs == nil || sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// ExpressionComma.cpp:62–64 — cast_if_needed when lang_cpp (optional for C null ptrs)
 	if opts.LangCPP {
-		castIfNeeded(rhs)
+		castIfNeeded(cgSess(cg), rhs)
 		// residual ERROR sticky — no invent complete comma past cast/GetType residual hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 	}
@@ -64,9 +64,10 @@ func MakeExpressionComma(
 // ExpressionComma.cpp:48–53 — nullptr constant of pointer type → cast_type.
 // Expression always live when cast path runs; sticky (no invent soft-skip cast past hole).
 // Non-constant / empty Con is complete no-op (nothing to cast).
-func castIfNeeded(exp *Expression) {
+// s is the run bag (cg.Sess); nil falls back to ambient Process* bridge.
+func castIfNeeded(s *Session, exp *Expression) {
 	if exp == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if exp.Term != TermConstant || exp.Con == nil {
@@ -74,7 +75,7 @@ func castIfNeeded(exp *Expression) {
 	}
 	ty := exp.GetType()
 	// residual ERROR sticky — no invent soft-skip cast past GetType residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	if ty == nil {
@@ -82,19 +83,19 @@ func castIfNeeded(exp *Expression) {
 	}
 	isPtr := ty.IsPointerLike()
 	// residual ERROR sticky — no invent soft-continue cast past IsPointerLike residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	if isPtr && exp.EqualsInt(0) {
 		// residual ERROR sticky — no invent cast-true past EqualsInt residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		exp.CastType = ty
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue cast no-op past EqualsInt residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 }

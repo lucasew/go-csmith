@@ -50,16 +50,16 @@ func CreateArrayVariable(
 	// ArrayVariable.cpp:127–129 — assert(type); assert simple != eVoid sticky
 	// name always live from gensym; sticky no invent empty-name array shell
 	if r == nil || elem == nil || name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	simple := elem.IsSimple()
 	// residual ERROR sticky — no invent soft-array past IsSimple residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	if simple && elem.Simple() == EVoid {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky when CG is live (make_init_value path)
@@ -68,11 +68,11 @@ func CreateArrayVariable(
 		if !EffectComplete(cg.EffectContext()) ||
 			(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 			!EffectComplete(cg.EffectStm) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 	}
@@ -80,7 +80,7 @@ func CreateArrayVariable(
 	// ArrayVariable.cpp:131–144
 	num := int(r.RndUpto(99)) + 1
 	// ArrayVariable.cpp:133 — ERROR_GUARD(nullptr)
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	dimension := 0
@@ -104,7 +104,7 @@ func CreateArrayVariable(
 	for i := 0; i < dimension; i++ {
 		dimen := int(r.RndUpto(uint32(opts.MaxArrayLenPerDim))) + 1
 		// ArrayVariable.cpp:149–150 — rnd_upto(max_len_per_dim)+1; ERROR_GUARD
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		if opts.MaxArrayLength > 0 && total*dimen > opts.MaxArrayLength {
@@ -130,7 +130,7 @@ func CreateArrayVariable(
 		Block: blk,
 	}
 	// ArrayVariable.cpp:161 — ERROR_GUARD_AND_DEL1 after new ArrayVariable
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// self-link for ChooseOKVar itemize (VariableSelector.cpp:332–337)
@@ -139,7 +139,7 @@ func CreateArrayVariable(
 	if elem.IsAggregate() {
 		av.CreateFieldVars()
 	}
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// ArrayVariable.cpp:165–186 — pure_rnd_upto(total_size/2) then alt inits.
@@ -159,12 +159,12 @@ func CreateArrayVariable(
 		// else VariableSelector::make_init_value
 		var e *Expression
 		ptrLike := elem.IsPointerLike()
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		if !ptrLike || opts.StrictConstArrays {
 			c := MakeRandom(elem, opts, probs, r)
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return nil
 			}
 			if c != nil {
@@ -172,12 +172,12 @@ func CreateArrayVariable(
 			}
 		} else {
 			if vs == nil || cg == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return nil
 			}
 			qf := qfer
 			e = vs.MakeInitValue(AccessRead, *cg, elem, &qf, blk, r)
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return nil
 			}
 		}
@@ -188,14 +188,14 @@ func CreateArrayVariable(
 		av.InitExprs = append(av.InitExprs, e)
 		// Keep InitValues for legacy tests / Fact paths that read strings
 		val := e.Output()
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		if val != "" {
 			av.InitValues = append(av.InitValues, val)
 			av.ArrayInits = append(av.ArrayInits, val)
 		} else {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 	}
