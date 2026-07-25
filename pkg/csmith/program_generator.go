@@ -1399,11 +1399,8 @@ func (g *ProgramGenerator) GoGenerator() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	// Residual Process* bridge for tests that call GoGenerator without Session.Generate.
-	if g.Sess != nil {
-		restore := activateSession(g.Sess)
-		defer restore()
-	}
+	// Bag-local: g.Sess / cg.Sess on mid-gen paths; no activateSession dual-install.
+	// Unit tests that still call Process* ambient must install their own bag.
 	g.Initialize()
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
@@ -1583,10 +1580,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	if g.Sess != nil {
-		restore := activateSession(g.Sess)
-		defer restore()
-	}
+	// Bag-local: g.Sess on mid-gen paths; no activateSession dual-install.
 	if g.OutputKind != OutputMgrKindDFS && !g.Opts.DFSExhaustive {
 		g.noteErr(ErrGeneric)
 		return ""

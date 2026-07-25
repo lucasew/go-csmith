@@ -23,8 +23,9 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 }
 
 // Generate runs one generation using s as the only mutable bag for the run.
-// Still activates s for residual Process* / sessOpts(nil) paths until those
-// readers are fully bag-local; clears activeSession on return.
+// Bag-local: mid-gen paths pass s / g.Sess / cg.Sess; no activateSession dual-install.
+// Package-level activeSession/defaultSession remain only for residual Process*
+// helpers used by unit tests outside Generate.
 func (s *Session) Generate(ctx context.Context) (string, error) {
 	if s == nil {
 		return "", fmt.Errorf("nil session")
@@ -32,9 +33,6 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-
-	restore := activateSession(s)
-	defer restore()
 
 	opts := s.Opts
 	// Platform resolve when sizes needed later
