@@ -116,7 +116,7 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Types = env
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed meta so AddNewVarFact creates point-to when pointer; int array still registers
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.Types = env
@@ -141,7 +141,7 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	// FactMgr.cpp:69–110 — assert global when blk nil; push into map_facts_in/out
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed map slots for a statement
 	sid := 42
 	fm.MapFactsIn[sid] = nil
@@ -190,7 +190,7 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	// g_87→g_64 is appended so for-body map_in restore can re-surface g_64).
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	tgt := CreateVariableScalars("g_tgt", GetIntType(), false, false)
 	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// init &g_tgt for abstract_fact_for_var_init
@@ -258,7 +258,7 @@ func pointToNames(f *FactPointTo) []string {
 func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// Declaring loop body (no parent needed for in_block of nested stmts)
 	body := &Block{StmID: 90, Func: f}
 	// Nested assign inside body — Statement::in_block(body) walks parent to body
@@ -295,7 +295,7 @@ func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) 
 func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_11", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// body owns parent-locals; then arm is a nested Block with its own StmID key
 	body := &Block{StmID: 10, Func: f}
 	thenB := &Block{StmID: 20, Func: f, Parent: body}
@@ -339,7 +339,7 @@ func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
 func TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_11", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// Function body (declaring blk for parent-local) — if not yet linked in Stmts
 	body := &Block{StmID: 514, Func: f}
 	// Else arm mid-construction: Parent set, not yet reachable via body.Stmts
@@ -416,7 +416,7 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 		t.Fatal("incomplete array-field path must yield nil collective")
 	}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	before := len(fm.GlobalFacts)
 	ClearErrorSess(testAmbientSession)
 	// mirror GenerateNew* fail-closed: coll nil with FM set → sticky error, no invent facts
@@ -448,7 +448,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts.Arrays = false
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
@@ -459,7 +459,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// NonArray path same
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntType(), nil, NewRng(2)) != nil {
@@ -472,7 +472,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// ParentLocal path
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm3 := NewFactMgr(f)
+	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm3)
 	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
@@ -563,7 +563,7 @@ func TestAddNewVarFactAndUpdateFillsUnionMapFromPTKeys(t *testing.T) {
 	// Soft invent iterated only MapUnionFactsIn keys → PT-only slots missed union init.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// PT map key without union map key (historical dual-map hole)
 	sid := 42
 	fm.MapFactsIn = map[int][]*FactPointTo{sid: {}}

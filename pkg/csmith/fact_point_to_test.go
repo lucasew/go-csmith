@@ -291,7 +291,7 @@ func TestIsValidPtr(t *testing.T) {
 
 func TestFactMgrGlobalFacts(t *testing.T) {
 	f := &Function{Name: "func_1"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", GetIntType(), false, false)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(p, NullPtr))
 	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {

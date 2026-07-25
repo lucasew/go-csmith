@@ -59,7 +59,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	list := &FunctionList{}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
-	fm := NewFactMgr(caller)
+	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
 	// force globals enabled so body can create

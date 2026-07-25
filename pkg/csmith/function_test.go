@@ -249,7 +249,7 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}

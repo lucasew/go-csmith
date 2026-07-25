@@ -269,7 +269,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, LocalVars: []*Variable{fieldIV, goodIV}}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// force SelectArray to pick av; force IV pool to hit field first via only field+good
 	// SelectLoopCtrlVar uses FindAllNonArrayVisibleVars — both fieldIV and goodIV present

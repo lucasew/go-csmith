@@ -468,7 +468,7 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
 	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, loc)}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	st := Stmt{

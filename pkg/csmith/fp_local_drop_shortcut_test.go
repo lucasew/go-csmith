@@ -14,7 +14,7 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_fp_local_drop"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_pt", GetIntType(), false, false)
 	loc := CreateVariableScalars("l_body", GetIntType(), false, false)
 	// Point-to facts: g and local both point to g

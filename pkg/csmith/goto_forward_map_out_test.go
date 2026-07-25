@@ -16,7 +16,7 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	body := &Block{StmID: 1, Func: f, Parent: nil}
 	f.Body = body
 	f.Blocks = []*Block{body}

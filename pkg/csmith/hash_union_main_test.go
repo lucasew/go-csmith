@@ -142,7 +142,7 @@ func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	e := MakeExpressionAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil)
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {

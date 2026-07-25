@@ -225,7 +225,7 @@ func TestHasDereferenceableVar(t *testing.T) {
 	opts := Defaults()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	cg := EmptyCGContext().WithFactMgr(fm)
 	if !HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
@@ -322,7 +322,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	for seed := uint64(1); seed < 10; seed++ {
 		ClearErrorSess(testAmbientSession) // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
-			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+			c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 			return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
 		}()
 		if st.Kind != StmtAssign {

@@ -17,7 +17,7 @@ func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 	arr.AsArray = arr
 	// l_236: int16_t *** pointing at l_233 collective
 	p := CreateVariableScalars("l_236", PointerTo(elem), false, false)
-	fm := NewFactMgr(&Function{Name: "f"})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(&arr.Variable, g),
 		MakeFactPointTo(p, &arr.Variable),

@@ -116,7 +116,7 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -130,7 +130,7 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("must not invent GlobalList registration past ambient hole")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if vs.GenerateNewGlobal(AccessRead, cg2, GetIntType(), &q, NewRng(2)) != nil {
@@ -140,7 +140,7 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.GenerateNewGlobal(AccessRead, cg3, GetIntType(), &q, NewRng(3)) != nil {
@@ -231,7 +231,7 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -243,7 +243,7 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
@@ -364,6 +364,7 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	probs := NewProbabilities(opts)
 	probs.single[PNewArrayVariableProb] = 100
 	vs := NewVariableSelectorProbs(opts, probs)
+	vs.Sess = testAmbientSession
 	// void → MakeRandom nil on array path → fail closed (no invent array shell)
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_x", NewRng(1)) != nil {
 		t.Fatal("void must fail closed")
@@ -399,7 +400,7 @@ func TestCreateRandomArrayIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if vs.CreateRandomArray(NewRng(2), cg2) != nil {
@@ -421,6 +422,7 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	vs := NewVariableSelectorProbs(opts, probs)
+	vs.Sess = testAmbientSession
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st}, StructTypes: []*Type{st}}
 	vs.Probs = nil // MakeRandom(struct) fails closed
 	f := &Function{Name: "f"}
@@ -611,7 +613,7 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky SelectWithInvalid")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg4 := EmptyCGContext().WithFactMgr(fm)
 	if vs.SelectWithInvalid(AccessRead, cg4, GetIntType(), nil, NewRng(5), MatchFlexible, nil) != nil {

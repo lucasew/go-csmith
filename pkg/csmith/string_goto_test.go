@@ -286,7 +286,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 	}}
 	f.Blocks = []*Block{outer, inner}
 	f.Stack = []*Block{outer, inner}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// need read vars for cond
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	fm.GlobalFacts = []*FactPointTo{}

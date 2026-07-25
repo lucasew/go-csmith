@@ -83,7 +83,7 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 }
 
 func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
@@ -140,7 +140,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
 	// pointer to f1 so *p = … renews union last=f1
 	p := CreateVariableQfer("l_p", PointerTo(f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// post-left lattice: last written f0
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	// p points to f1
@@ -227,7 +227,7 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 	opts := Defaults()
 	opts.CompoundAssignment = false
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+	c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType())
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
@@ -300,7 +300,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts must fail closed before operand gen
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if fi := MakeRandomUnaryInvocation(NewRng(3), opts, vs, NewExprTables(opts), &cg3, GetIntType()); fi != nil {
@@ -373,7 +373,7 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	foundShift := false
 	for seed := uint64(1); seed < 200; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi == nil || !fi.IsStd {
 			continue
@@ -397,7 +397,7 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, nil, vs, tables, &cg, GetIntType())
 		if fi == nil || (fi.Binary != "<<" && fi.Binary != ">>") {
 			continue
@@ -430,7 +430,7 @@ func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
 	found := 0
 	for seed := uint64(1); seed < 400; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg.ExprDepth = 0
 		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi == nil || !fi.IsStd {
@@ -497,7 +497,7 @@ func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {
 	// incomplete GlobalFacts before left snapshot sticky
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -856,7 +856,7 @@ func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	list := &FunctionList{Funcs: []*Function{f}}
 	r := NewRng(1)
 	// stdFunc=true, typ=nil → must draw StdUnary (100% true) then fail closed
@@ -900,7 +900,7 @@ func TestBinarySubcontextClearsCurrRHS(t *testing.T) {
 	f.Stack = []*Block{blk}
 	// seed a global so Select can succeed
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// plant outer CurrRHS as if mid ExpressionAssign Lhs
 	outerRHS := &Expression{Term: TermConstant, Con: MakeInt(42)}
 	cg.CurrRHS = outerRHS

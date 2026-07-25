@@ -172,7 +172,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	}}
 	f.Blocks = []*Block{b1}
 	f.Stack = []*Block{b1}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))

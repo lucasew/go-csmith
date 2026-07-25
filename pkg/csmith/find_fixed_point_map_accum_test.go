@@ -17,7 +17,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_map_accum_prog"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	early := CreateVariableScalars("g_early", GetIntType(), false, false)
 	late := CreateVariableScalars("g_late", GetIntType(), false, false)
 

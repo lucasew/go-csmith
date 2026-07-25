@@ -115,7 +115,7 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	}
 	// return always has Expression*; sticky fail closed before garbage invent
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
 	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, nil) {
 		t.Fatal("nil return expr must fail closed")
@@ -177,7 +177,7 @@ func TestUpdateFactForAssign(t *testing.T) {
 		t.Fatal("nil FM UpdateFactForAssign must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	if fm.UpdateFactForAssign(nil, 0, nil) {
 		t.Fatal("nil lhs must fail closed")
 	}

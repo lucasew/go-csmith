@@ -61,7 +61,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	loop := &Block{Func: f, Looping: true}
 	inner := &Block{Func: f, Parent: loop, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	f.Stack = []*Block{loop, inner}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// need globals for break test expr
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -83,7 +83,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 		}
 	}
 	// continue still creates edge at make (StatementContinue.cpp:83)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	inner.Stmts = []Stmt{{Kind: StmtAssign}}
 	f.Stack = []*Block{loop, inner}

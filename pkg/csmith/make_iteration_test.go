@@ -39,7 +39,7 @@ func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{iv}
 	vs.AllVars = []*Variable{iv}
@@ -68,7 +68,7 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// no must-use arrays → free loop control
 	var lc *LoopControl
 	for seed := uint64(1); seed < 30; seed++ {
@@ -95,8 +95,8 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	// seed an int global as potential IV
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), &q, NewRng(1))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), &q, NewRng(1))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil || lc.IV == nil {
 		t.Fatal("nil iteration")
@@ -135,8 +135,8 @@ func TestMakeIterationArrayBoundPath(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(3))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(3))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// StatementFor.cpp:204–208 — find_must_use_arrays from rw_directive only
 	cg.RW = &RWDirective{MustReadVars: []*Variable{&av.Variable}}
 	lc := MakeIteration(NewRng(11), opts, NewProbabilities(opts), vs, &cg)
@@ -161,8 +161,8 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(2))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(2))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := MakeRandomFor(NewRng(9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")
@@ -182,7 +182,7 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f, StmID: AllocStmID()}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
 	lc := MakeIteration(NewRng(4), opts, NewProbabilities(opts), vs, &cg)
@@ -206,7 +206,7 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed a loop-ctrl candidate so we reach must-use hole (not fail earlier on nil IV)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
@@ -233,7 +233,7 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -244,7 +244,7 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	eff := EmptyEffect()

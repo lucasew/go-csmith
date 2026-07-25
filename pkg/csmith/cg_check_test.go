@@ -194,7 +194,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	lhsPtr := &Lhs{Var: p, Type: GetIntType()} // *p
 	cgPtr := EmptyCGContext()
 	cgPtr.EffectStm = EmptyEffect()
-	cgPtr.FM = NewFactMgr(nil)
+	cgPtr.FM = NewFactMgrSess(testAmbientSession, nil)
 	cgPtr.FM.GlobalFacts = []*FactPointTo{nil} // incomplete
 	if cgPtr.VisitFactsLhs(lhsPtr, Defaults()) {
 		t.Fatal("IsValidPtr residual VisitFactsLhs must fail closed false")
@@ -207,7 +207,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	// Fair: sticky false via incomplete EffectStm IsWritten residual true (modified).
 	cgMod := EmptyCGContext()
 	cgMod.EffectStm = IncompleteEffect()
-	cgMod.FM = NewFactMgr(nil)
+	cgMod.FM = NewFactMgrSess(testAmbientSession, nil)
 	cgMod.FM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_t", GetIntType(), false, false))}
 	if cgMod.VisitFactsLhs(lhsPtr, Defaults()) {
 		t.Fatal("PtrModified residual VisitFactsLhs must fail closed false")
@@ -246,7 +246,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 	opts.NullPointerDerefProb = 0
 	opts.DeadPointerDerefProb = 0
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -261,7 +261,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 	// CheckReadVar residual soft invent was soft-continue later pointees invent success.
 	// Fair: sticky false. pointee with incomplete EffectStm stickies CheckReadVar residual.
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	cg2 := EmptyCGContext().WithFactMgr(fm2)
 	cg2.EffectStm = IncompleteEffect()

@@ -12,7 +12,7 @@ func TestShortcutAnalysisBlockMissingMapInIsEmpty(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	b := &Block{Func: f, StmID: AllocStmID(), Looping: true, Stmts: []Stmt{}}
 	f.Body = b
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// no MapFactsIn entry for b — C++ empty
 	// set map_out + map_stm so later steps can succeed when same_facts holds
 	fm.SetMapFactsOut(b.StmID, []*FactPointTo{})

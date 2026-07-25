@@ -57,7 +57,7 @@ func TestMergeEffectsMergesReads(t *testing.T) {
 
 func TestFactMgrForFunc(t *testing.T) {
 	f := &Function{Name: "func_1"}
-	m := NewFactMgrMap()
+	m := NewFactMgrMapSess(testAmbientSession)
 	fm := m.ForFunc(f)
 	if fm == nil || fm.Func != f {
 		t.Fatal(fm)

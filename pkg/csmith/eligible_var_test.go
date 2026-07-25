@@ -228,7 +228,7 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// non-empty union facts so IsNonreadableField walks IsInsideUnionField (stickies residual)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	parent.Type = ut
@@ -308,7 +308,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg := EmptyCGContext().WithFactMgr(fm)
 	if ChooseVarFull(NewRng(2), vars, AccessRead, cg, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
@@ -370,7 +370,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if vs.MakeInitValue(AccessRead, cg2, GetIntType(), &q, nil, NewRng(2)) != nil {

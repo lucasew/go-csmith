@@ -20,7 +20,7 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 		t.Fatal("create")
 	}
 	av.InitExpr = ie
-	fm := NewFactMgr(&Function{Name: "f"})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.AddNewVarFact(&av.Variable)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("add %v", HasErrorSess(testAmbientSession))
@@ -37,7 +37,7 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	if fp2 == nil || fp2.IsNull() || fp2.IsDead() {
 		t.Fatalf("after arrayop want pure live: %+v", fp2)
 	}
-	fm2 := NewFactMgr(&Function{Name: "f2"})
+	fm2 := NewFactMgrSess(testAmbientSession, &Function{Name: "f2"})
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(&av.Variable, NullPtr)}
 	if !fm2.UpdateFactForAssign(&av.Variable, 0, rhs) {
 		t.Fatal("merge null")

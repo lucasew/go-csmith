@@ -9,6 +9,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelectorProbs(opts, probs)
+	vs.Sess = testAmbientSession
 	for i := 0; i < 8; i++ {
 		g := CreateVariableScalars("g_"+string(rune('a'+i)), GetIntType(), false, false)
 		if g != nil {
@@ -17,7 +18,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 		}
 	}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	for _, g := range vs.GlobalList {
 		fm.AddNewVarFact(g)
 	}

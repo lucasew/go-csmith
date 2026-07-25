@@ -6,7 +6,7 @@ import (
 )
 
 func TestRemoveStmtScrubsCFGAndBreaks(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	loop := &Block{Looping: true, StmID: 100, BreakStmIDs: []int{1, 2, 3}}
 	b := &Block{
 		Parent: loop,
@@ -46,7 +46,7 @@ func TestRemoveStmtScrubsCFGAndBreaks(t *testing.T) {
 }
 
 func TestResetBlockFactMaps(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	b := &Block{StmID: 9, Stmts: []Stmt{{StmID: 1}, {StmID: 2}}}
 	fm.SetMapFactsIn(1, nil)
 	fm.SetMapFactsOut(2, nil)
@@ -86,7 +86,7 @@ func TestResetBlockFactMaps(t *testing.T) {
 }
 
 func TestFindJumpSources(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.CFGEdges = []*CFGEdge{
 		{SrcID: 10, DestStmID: 5},
 		{SrcID: 11, DestStmID: 5},
@@ -220,7 +220,7 @@ func TestNeedNestedLoopMustJumpResidualSticky(t *testing.T) {
 }
 
 func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	b := &Block{
 		StmID: 50,
 		Stmts: []Stmt{{
@@ -308,7 +308,7 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -346,7 +346,7 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 
 func TestContainsBackEdge(t *testing.T) {
 	// Block.cpp:491 — edge->back_link && edge->dest->parent == this
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	b := &Block{StmID: 10, Stmts: []Stmt{{StmID: 1}, {StmID: 2}}}
 	if b.ContainsBackEdge(fm) {
 		t.Fatal("empty")
@@ -374,7 +374,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	opts := Defaults()
 	// void: no append_return_stmt during post_creation
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -423,7 +423,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -438,7 +438,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
-	fm2 := NewFactMgr(f2)
+	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f2, EmptyEffect()).WithFactMgr(fm2)
 	if MakeDummyBlockCG(&cg2, opts) != nil {
@@ -449,7 +449,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
-	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgr(f3))
+	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f3))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if MakeDummyBlockCG(&cg3, opts) != nil {
@@ -467,7 +467,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	b := &Block{StmID: AllocStmID(), Func: f}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	b.PostCreationAnalysis(&cg, Defaults(), IncompleteEffect(), nil, nil)
@@ -550,7 +550,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	// PreOutput residual soft invent was soft-continue then emit later stmts.
 	// Fair: sticky fail closed whole Block.Output (StmID 0 under FM stickies PreOutput).
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	good := CreateVariableScalars("g_1", GetIntType(), false, false)
 	b4 := &Block{
 		Func:   f,
@@ -669,7 +669,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// AddNewVarFact same Type-nil sticky clear GlobalFacts
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	if fm == nil {
 		t.Fatal("NewFactMgr")
 	}
@@ -694,7 +694,7 @@ func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {
 		LocalVars: []*Variable{nil},
 		Stmts:     []Stmt{},
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -714,7 +714,7 @@ func TestFindFixedPointShortcut(t *testing.T) {
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
 		}},
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	in := []*FactPointTo{}
 	fm.SetMapFactsIn(50, in)
 	fm.SetMapFactsOut(50, in)
@@ -795,7 +795,7 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 		Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	inner.Stmts = []Stmt{st}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// mid-gen may-null
 	live := MakeFactPointToSet(p, []*Variable{NullPtr})
@@ -838,7 +838,7 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	b := &Block{StmID: 70, Func: f, Parent: parent, Looping: true, NeedRevisit: true,
 		Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}},
 	}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	prior := MakeFactPointTo(p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
@@ -880,7 +880,7 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	b.Stmts[0].LhsVar = v
 	b.Stmts[0].Lhs = &Lhs{Var: v, Type: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	// plant hole in MapFactsIn (bypass SetMapFactsIn which stores nil for incomplete)
@@ -905,7 +905,7 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	opts.MaxBlockSize = 1
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -931,7 +931,7 @@ func TestFindJumpSourcesFindStmtResidualSticky(t *testing.T) {
 		{Kind: StmtAssign, StmID: 10},
 	}}
 	f.Blocks = []*Block{outer}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	if fm.FindJumpSources(10) != nil {
 		t.Fatal("FindStmt residual must fail closed nil sources, not invent complete list")
@@ -954,7 +954,7 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 	}}
 	f.Blocks = []*Block{body}
 	f.Body = body
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// break edge into for (DestStmID=50) and goto edge into assign
 	fm.CFGEdges = []*CFGEdge{
 		{SrcID: 40, DestStmID: 50, PostDest: true}, // break
@@ -999,7 +999,7 @@ func TestFindJumpLabel(t *testing.T) {
 		{Kind: StmtGoto, StmID: 8, Label: "lbl_from_goto", GotoDestStmID: 7},
 	}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 8, DestStmID: 7}}
 	if got := FindJumpLabel(fm, 7); got != "lbl_from_goto" {
 		t.Fatal(got)
@@ -1107,7 +1107,7 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	loc.Name = "l_1"
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(loc, NullPtr),
 		MakeFactPointTo(f.RV, NullPtr),
@@ -1132,7 +1132,7 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 func TestRemoveStmtCascadesGotoSource(t *testing.T) {
 	// Block.cpp:641–646 — removing dest also removes goto that jumps to it
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// outer has goto → dest assign; dest will be removed
 	destID := 10
 	gotoID := 20
@@ -1172,7 +1172,7 @@ func TestRemoveStmtFindStmtResidualNoInventGotoCascade(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	destID := 10
 	// missing src stmt id — FindStmt returns nil complete miss
 	body := &Block{Func: f, StmID: 1, Stmts: []Stmt{
@@ -1195,7 +1195,7 @@ func TestRemoveStmtFindStmtResidualNoInventGotoCascade(t *testing.T) {
 func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 	// Block.cpp:655–663 — nested Then block dropped from Function.Blocks
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inner := &Block{Func: f, StmID: 5, Stmts: []Stmt{{Kind: StmtAssign, StmID: 6}}}
 	// StatementIf always has live if_true/if_false
 	ifSt := Stmt{Kind: StmtIfElse, StmID: 4, Then: inner, Else: &Block{Func: f, StmID: 8}}
@@ -1226,7 +1226,7 @@ func TestRemoveStmtScrubsParentChainOrphanBlocks(t *testing.T) {
 	// (seed 11466719812903307384 first_div: Go n=37 vs UP n=3).
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	body := &Block{Func: f, StmID: 10}
 	// orphan: Parent=body but never a StmtBlock child of body
 	orphan := &Block{Func: f, StmID: 11, Parent: body}
@@ -1258,7 +1258,7 @@ func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
 	// nested blocks with only Parent set → edge kept, goto cascade skipped.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	body := &Block{Func: f, StmID: 10}
 	orphan := &Block{Func: f, StmID: 11, Parent: body}
 	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, Label: "lbl"}
@@ -1293,7 +1293,7 @@ func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
 func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	// incomplete CFG scrub must wipe IncompleteCFGEdges sticky (not bare nil invent empty complete)
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	b := &Block{
 		StmID: 10,
 		Stmts: []Stmt{
@@ -1315,7 +1315,7 @@ func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete Function.Blocks hole → IncompleteBlocks sticky
 	f := &Function{Name: "f"}
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
 	f.Blocks = []*Block{outer, nil}
 	f.Body = outer
@@ -1373,7 +1373,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	cg.BlkDepth = 2
 	cg.Flags |= FlagInLoop
 	// FM required by MakeRandomFor
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 
 	pre := cg.BlkDepth
 	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
@@ -1405,7 +1405,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	cg.BlkDepth = 2
 	cg.Flags |= FlagInLoop
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	cg.ExprDepth = 7 // leftover from prior sibling assign
 
 	preBlk := cg.BlkDepth
@@ -1470,7 +1470,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 		t.Fatal("fixture not const struct")
 	}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	got := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, st)
 	if stmtOK(got) {
 		t.Fatal("const struct assign must fail closed")
@@ -1515,7 +1515,7 @@ func TestMakeDummyBlockCGFactIn(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "builtin_x", ReturnType: GetIntType(), IsBuiltin: true}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -1542,7 +1542,7 @@ func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
 	b := &Block{Func: f, Parent: nil}
 	f.Body = b
 	f.Stack = []*Block{b}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// MakeRandomReturn with empty selector may still invent globals via select
 	// Force error by sticky error before append path visit
@@ -1570,7 +1570,7 @@ func TestFindJumpLabelNilFMSticky(t *testing.T) {
 
 func TestContainsBackEdgeIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).ContainsBackEdge(NewFactMgr(nil)) {
+	if (*Block)(nil).ContainsBackEdge(NewFactMgrSess(testAmbientSession, nil)) {
 		t.Fatal("nil Block ContainsBackEdge must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1590,7 +1590,7 @@ func TestContainsBackEdgeIncompleteSticky(t *testing.T) {
 func TestContainsBackEdgeNilResidualSticky(t *testing.T) {
 	// ContainsBackEdge residual soft invent was invent no-back soft-skip past nil Block.
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).ContainsBackEdge(NewFactMgr(nil)) {
+	if (*Block)(nil).ContainsBackEdge(NewFactMgrSess(testAmbientSession, nil)) {
 		t.Fatal("nil Block ContainsBackEdge must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1628,7 +1628,7 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	if polluted == nil {
 		t.Fatal("make fact")
 	}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{polluted}
 	b := &Block{StmID: 100, Func: f, Looping: false, LocalVars: nil}
 	fm.SetMapFactsIn(100, entry)
@@ -1673,7 +1673,7 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{live}
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -1774,7 +1774,7 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 		t.Fatal("mid")
 	}
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)} // pre-block entry non-null only
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{mid}
 	b := &Block{StmID: 50, Func: f, Looping: true, LocalVars: nil}
 	// pre-FP set_fact_out from mid-gen global (Block.cpp:693)
@@ -1815,7 +1815,7 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	if entryU == nil || outU == nil {
 		t.Fatal("union facts")
 	}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	pt := []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{entryU}
 	b := &Block{StmID: 60, Func: f, Looping: true}
@@ -1872,7 +1872,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = CloneFactSlice(entry)
 	fm.SetMapFactsIn(1, entry)
 	fm.MapVisited = map[int]bool{1: true}
@@ -1912,7 +1912,7 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{mid}
 	fm.SetMapFactsIn(1, entry)
 	fm.SetMapFactsOut(1, []*FactPointTo{mid})
@@ -1960,7 +1960,7 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	}
 	// Empty stmts + visitOnce: single full visit path without shortcut pressure.
 	body := &Block{StmID: 1, Func: f, Looping: false, Parent: nil, Stmts: nil, LocalVars: []*Variable{loc, lu}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{mid}
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0)}
 	fm.SetMapFactsInPair(1, entry, []*FactUnion{MakeFactUnion(gu, 0)})
@@ -2034,7 +2034,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	pt := PointerTo(GetIntType())
 	outer := CreateVariableScalars("l_outer", pt, false, false)
 	bodyLoc := CreateVariableScalars("l_body", GetIntType(), false, false)
@@ -2094,7 +2094,7 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
 	base := CreateVariableScalars("l_233", elem, false, false)
@@ -2217,7 +2217,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 		LocalVars: []*Variable{lu},
 		Stmts:     []Stmt{asg},
 	}
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(param, NullPtr),
 		MakeFactPointTo(gp, param),
@@ -2263,7 +2263,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 		Stmts:     []Stmt{bodyAsg},
 	}
 	fn.Body = body
-	fm2 := NewFactMgr(fn)
+	fm2 := NewFactMgrSess(testAmbientSession, fn)
 	fm2.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(param, NullPtr),
 		MakeFactPointTo(gp, param),
@@ -2321,7 +2321,7 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 		Looping: true, NeedRevisit: false,
 		Stmts: []Stmt{ret},
 	}
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.UnionFacts = []*FactUnion{}

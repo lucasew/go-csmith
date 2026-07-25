@@ -337,7 +337,7 @@ func TestFindContainedLabels(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// FM + StmID 0 — no invent complete child labels while soft-skipping self id
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	if LabelsComplete(FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: IncompleteStmID, SourceLabel: "x"}, fm)) {
 		t.Fatal("StmID 0 under FM must fail closed incomplete")
 	}
@@ -348,7 +348,7 @@ func TestFindContainedLabels(t *testing.T) {
 }
 
 func TestCombineBranchFacts(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	preU := []*FactUnion{}
@@ -388,7 +388,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	// nil hole in branch outs fails closed sticky — no invent partial combine
 	// bypass SetMapFactsOut (CloneFactSlice strips holes → nil) to plant a hole
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
 		10: {MakeFactPointTo(p, GarbagePtr), nil},
 		11: {MakeFactPointTo(p, NullPtr)},
@@ -410,7 +410,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// missing Then/Else arm — no invent empty branch via FactsComplete(nil)
-	fm3 := NewFactMgr(nil)
+	fm3 := NewFactMgrSess(testAmbientSession, nil)
 	fm3.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st3 := &Stmt{Kind: StmtIfElse, Then: &Block{StmID: 10}, Else: nil}
 	fm3.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
@@ -425,7 +425,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// arm Block StmID 0 — no invent empty outs via FactsComplete(nil)
-	fm4 := NewFactMgr(nil)
+	fm4 := NewFactMgrSess(testAmbientSession, nil)
 	fm4.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st4 := &Stmt{
 		Kind: StmtIfElse,
@@ -445,7 +445,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// MustReturn residual soft invent was soft-continue branch-merge invent complete GlobalFacts.
 	// Then last is If with nil arm → MustReturn residual sticky false.
-	fm5 := NewFactMgr(nil)
+	fm5 := NewFactMgrSess(testAmbientSession, nil)
 	fm5.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	fm5.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm5.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -488,7 +488,7 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 	if thenU == nil || elseU == nil {
 		t.Fatal("MakeFactUnion")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// empty PT maps; union partitions differ by arm
 	fm.SetMapFactsOutPair(10, []*FactPointTo{}, []*FactUnion{thenU})
 	fm.SetMapFactsOutPair(11, []*FactPointTo{}, []*FactUnion{elseU})
@@ -553,7 +553,7 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 
 func TestPostCreationAssignFacts(t *testing.T) {
 	f := &Function{Name: "func_2", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -584,7 +584,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -625,7 +625,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	gExtra := CreateVariableScalars("g_extra", GetIntType(), true, false)
 	gKeep := CreateVariableScalars("g_keep", GetIntType(), true, false)
 	// Gen-time effect_stm already includes a global read from a nested call.
@@ -675,7 +675,7 @@ func TestFindContainedLabelsFM(t *testing.T) {
 	// StatementIf always has both arms
 	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB, Else: &Block{}}
 	f.Blocks = []*Block{thenB}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 3, DestStmID: 2}}
 	labs := FindContainedLabelsFM(st, fm)
 	found := false

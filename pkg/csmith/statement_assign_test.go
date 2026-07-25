@@ -36,7 +36,7 @@ func TestMakeRandomAssignAllocatesStmID(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	for seed := uint64(1); seed < 40; seed++ {
-		c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		st := MakeRandomAssign(NewRng(seed), opts, probs, vs, NewExprTables(opts), &c, GetIntType())
 		if !stmtOK(st) {
 			continue
@@ -61,7 +61,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRng(seed)
 		st := func() Stmt {
-			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+			c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 			return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType())
 		}()
 		// StmtAssign is iota 0 — empty nullptr and success share Kind; use stmtOK
@@ -120,7 +120,7 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	// volatile-only WRITE qfer
 	q := NewCVQualifiers([]bool{false}, []bool{true})
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// should not panic; may fail to find var and return empty assign
 	st := MakeRandomAssignQfer(NewRng(3), opts, probs, vs, NewExprTables(opts), &cg, GetIntType(), &q)
 	// global option restored conceptually (opts is by-value); package default unchanged
@@ -151,7 +151,7 @@ func TestMakeRandomAssignUpdatesIndirectFacts(t *testing.T) {
 	ppT := PointerTo(PointerTo(GetIntType()))
 	p := CreateVariableScalars("g_p", ppT, false, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())}
 	fm.UpdateFactForAssign(p, 1, rhs)
@@ -305,7 +305,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// Use path: set exact, then StrictFloat+rhs GetType residual early return.
 	// Incomplete Expression type triggers GetType residual under StrictFloat.
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// Force early return after exact set: MakeRandomAssignQfer with qf non-nil,
 	// StrictFloat, and an RHS path is after RHS is built — use incomplete type

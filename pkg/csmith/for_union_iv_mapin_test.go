@@ -31,7 +31,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	}
 	// pre-init last_write f0 (abstract init of union)
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(g88, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}

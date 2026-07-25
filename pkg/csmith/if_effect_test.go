@@ -147,7 +147,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}
@@ -172,7 +172,7 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	// StatementIf.cpp:97 — global_facts = map_facts_in[if_true]
 	// missing then-in must not invent pre-branch GlobalFacts for else
 	// Unit: plant missing MapFactsIn after then would have set it — contract of assign
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	prior := MakeFactPointTo(p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
@@ -228,7 +228,7 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	if entryU == nil || exitU == nil {
 		t.Fatal("MakeFactUnion")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// Live env after then-branch: advanced union write
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{exitU}
@@ -269,7 +269,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
 	inner := CreateVariableScalars("g_inner", GetIntType(), false, false)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	// then: read g_inner via return expr (visit records CheckReadVar)
 	thenRet := Stmt{
 		Kind: StmtReturn, StmID: AllocStmID(),
@@ -338,7 +338,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 		t.Fatal("MakeFactUnion")
 	}
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{entryU}
 	thenBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{}}
@@ -413,7 +413,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -445,7 +445,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	pre := CreateVariableScalars("pre_if_rd", GetIntType(), true, false)
 	g1 := CreateVariableScalars("g_if_arm", GetIntType(), true, false)
 	vs.GlobalList = append(vs.GlobalList, g1)
@@ -488,7 +488,7 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	// seed globals so MakeIteration can succeed; fail closed is on incomplete EffectAccum after
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))

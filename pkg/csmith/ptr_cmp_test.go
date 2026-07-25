@@ -88,7 +88,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	foundEq, foundNe := false, false
 	for seed := uint64(1); seed < 200 && !(foundEq && foundNe); seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+		cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		cg.Types = env
 		fi := MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, env)
 		if fi == nil {

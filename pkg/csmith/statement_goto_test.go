@@ -41,7 +41,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	f.Body = blk
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect().ReadVar(g)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -84,7 +84,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	f.Body = blk
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// accum already has g as read (choose pool); EffectStm empty before make
 	eff := EmptyEffect().ReadVar(g)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -190,7 +190,7 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_68", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	pollute := CreateVariableScalars("g_77", GetIntType(), false, false)
 	bodyRead := CreateVariableScalars("g_16", GetIntType(), false, false)
@@ -398,7 +398,7 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg := EmptyCGContext().WithFactMgr(fm)
 	if fi := MakeBinary(NewRng(2), opts, NewProbabilities(opts), cg, BinAdd, lhs, rhs); fi != nil {
@@ -492,7 +492,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	}}
 	f.Blocks = []*Block{src, curr}
 	f.Body = curr
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed map facts so merge can run
 	for _, b := range f.Blocks {
 		for i := range b.Stmts {
@@ -595,7 +595,7 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 	)
 	f.Blocks = []*Block{blk}
 	f.Body = blk
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_c", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, g)
 	eff := EmptyEffect().ReadVar(g)
@@ -747,7 +747,7 @@ func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.Blocks = []*Block{nil}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -769,7 +769,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Blocks = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -781,7 +781,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
 	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg2, blk)
@@ -793,7 +793,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts must fail closed before jump-block scan
-	fm3 := NewFactMgr(f)
+	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm3)
 	st3 := MakeRandomGoto(NewRng(6), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg3, blk)
@@ -809,7 +809,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	// incomplete working facts or prev outs sticky fail closed
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, GotoDestStmID: 20}
@@ -904,7 +904,7 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	f.Stack = []*Block{curr}
 	cg := EmptyCGContext()
 	cg.CurrentFunc = f
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	cg.EffectAccum = &Effect{}
 	r := NewRng(1)
 	// Force goto: may still fail soft if no good block; ensure we don't panic
@@ -953,7 +953,7 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	blk := &Block{Func: f, StmID: 1}
 	f.Blocks = []*Block{blk}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 
 	// earlier local pointer with fact (simulates l_432)
 	lp := CreateVariableScalars("l_early", PointerTo(GetIntType()), false, false)
@@ -1043,7 +1043,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	}}
 	fn.Blocks = []*Block{src, curr}
 	fn.Body = curr
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.UnionFacts = liveUF // live would block f0
 	eff := EmptyEffect().ReadVar(f0)
 	for i := range src.Stmts {

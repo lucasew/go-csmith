@@ -37,7 +37,7 @@ func TestMergeJumpFactsMissingIsGarbage(t *testing.T) {
 }
 
 func TestFindEdgesIn(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	blk := &Block{}
 	fm.CreateCFGEdgeTo(10, blk, 20, false, true)
 	fm.CreateCFGEdgeTo(11, blk, 20, false, false)
@@ -81,7 +81,7 @@ func TestFindEdgesIn(t *testing.T) {
 }
 
 func TestFindEdgesInNilHoleFailClosed(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.CFGEdges = []*CFGEdge{
 		{SrcID: 10, DestStmID: 20, BackLink: true},
 		nil,
@@ -193,7 +193,7 @@ func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
 	// incomplete GlobalFacts after return update must not invent visit success
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -218,7 +218,7 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -247,7 +247,7 @@ func TestAnalyzeWithEdgesInNilCFGFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.CFGEdges = []*CFGEdge{nil}
 	facts := []*FactPointTo{}
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -268,7 +268,7 @@ func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// prior goto edge from 10 → 20 with facts
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.CreateCFGEdgeTo(10, &Block{}, 20, false, false)
@@ -296,7 +296,7 @@ func TestAnalyzeWithEdgesInIncompleteOutFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.CreateCFGEdgeTo(10, &Block{}, 20, false, false)
 	fm.MapVisited = map[int]bool{10: true}
@@ -322,7 +322,7 @@ func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	b := &Block{StmID: 50, Func: f, Looping: true, Stmts: nil}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// mark visited so fixed-point enters back-edge merge path
 	fm.MapVisited = map[int]bool{50: true}
@@ -351,7 +351,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 		Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
 	}}}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -393,7 +393,7 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
@@ -430,7 +430,7 @@ func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
 	w := CreateVariableScalars("g_w", GetIntType(), false, false)
 	// empty body: full visit after conflict is trivial success
 	b := &Block{StmID: 1, Looping: true, Stmts: nil}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	entry := []*FactPointTo{}
 	fm.SetMapFactsIn(1, entry)
 	fm.SetMapFactsOut(1, entry)
@@ -456,7 +456,7 @@ func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
 func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtIfElse, StmID: 7}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
@@ -544,7 +544,7 @@ func TestFindEdgesInNilFMSticky(t *testing.T) {
 // (no invent DestStmID 0 + FindEdgesInToBlock second pass).
 func TestCreateCFGEdgeBlockDestUsesStmID(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	b := &Block{StmID: 42}
 	fm.CreateCFGEdge(7, b, false, true)
 	if len(fm.CFGEdges) != 1 {
@@ -575,7 +575,7 @@ func TestAnalyzeWithEdgesInMergesJumpUnions(t *testing.T) {
 	}}
 	parent := CreateVariableScalars("g_uj", ut, false, false)
 	parent.CreateFieldVars()
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// dest stmt already visited so back-edge merge runs
 	dest := &Stmt{Kind: StmtAssign, StmID: 20}
 	// live entry: field 0 last-write

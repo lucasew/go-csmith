@@ -29,7 +29,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	}
 	p := CreateVariableScalars("g_p", GetIntType(), true, false)
 	pt := MakeFactPointTo(p, NullPtr)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{pt}
 	fm.UnionFacts = []*FactUnion{entryU}
 	// block entry set_fact_in (pairs live UnionFacts)
@@ -71,7 +71,7 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	liveU := MakeFactUnion(uv, FactUnionBottom)
 	p := CreateVariableScalars("g_p", GetIntType(), true, false)
 	prePT := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.RestoreFactsPair(prePT, []*FactUnion{preU})
@@ -140,7 +140,7 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 		t.Fatalf("dest last=0 ⊕ missing goto_out must BOTTOM, got %#v", got)
 	}
 	// set_fact_out pairs then AssignGlobalFactsFromMapOut rewinds live
-	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
 	// live still last=0 (as before fix)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
@@ -221,7 +221,7 @@ func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	fn.Body = body
 	fn.Blocks = []*Block{body, thenArm}
 	// Live unions include both global and then-local
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(g, 0), MakeFactUnion(loc, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	// Goto in then-arm jumping to a dest in body (local OOS at dest)
@@ -267,7 +267,7 @@ func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	}
 	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	fu := MakeFactUnion(uv, 0)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{fu}
 	fm.SetMapFactsOut(7, fm.GlobalFacts)

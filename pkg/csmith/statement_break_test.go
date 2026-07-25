@@ -112,8 +112,8 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(2))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(2))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// force non-init path: flipcoin(5) false — seed until we get array loop (for) not array_init
 	var got *Stmt
 	for seed := uint64(1); seed < 80; seed++ {
@@ -246,7 +246,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts fails closed sticky
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	eff3 := EmptyEffect()
@@ -393,7 +393,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 		{Kind: StmtAssign, StmID: 1, LhsVar: g, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
 	}}
 	f.Stack = []*Block{loop, inner}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.Types = vs.Types
 	// force variable term with existing global

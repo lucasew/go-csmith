@@ -42,7 +42,7 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// for body with local l_body
 	body := &Block{StmID: 10, Func: f, Looping: true, BreakStmIDs: []int{20}}
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)

@@ -20,7 +20,7 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	if av == nil || HasErrorSess(testAmbientSession) {
 		t.Fatalf("create err=%v", HasErrorSess(testAmbientSession))
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.AddNewVarFact(&av.Variable)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(HasErrorSess(testAmbientSession))
@@ -49,7 +49,7 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	entryMay := MakeFactPointToSet(&arr.Variable, []*Variable{g, NullPtr})
 	outDef := MakeFactPointTo(&arr.Variable, g)
 	body := &Block{StmID: 25, Func: f, Looping: true}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(25, []*FactPointTo{entryMay})
 	fm.SetMapFactsOut(25, []*FactPointTo{outDef})
 	fm.GlobalFacts = []*FactPointTo{outDef}
@@ -83,7 +83,7 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 		AssignOp: AssignSimple,
 	}
 	b := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(1, entry)
 	fm.MapVisited = map[int]bool{1: true}
 	fm.ResetBlockFactMaps(b)

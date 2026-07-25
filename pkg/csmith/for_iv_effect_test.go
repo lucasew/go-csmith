@@ -36,7 +36,7 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	blk := &Block{Func: fn}
 	fn.Body = blk
 	fn.Blocks = []*Block{blk}
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{}
 	vs := NewVariableSelector(opts)

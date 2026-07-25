@@ -560,7 +560,7 @@ func TestMakeExpressionVariableIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if makeExpressionVariableFlags(NewRng(2), vs, &cg2, GetIntType(), nil, false, false) != nil {
@@ -605,7 +605,7 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -886,7 +886,7 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	vs.Types = env
 	list := &FunctionList{Types: env}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = env
 	cg.Funcs = list
 	// many tries: result if any should not be pure std binary/unary alone when type is struct
@@ -917,7 +917,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -928,7 +928,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(nil, IncompleteEffect()).WithFactMgr(NewFactMgr(nil))
+	cg2 := WithFunc(nil, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
 	if makeExpressionFuncall(NewRng(2), opts, vs, NewExprTables(opts), &cg2, GetIntType(), nil, nil) != nil {
@@ -938,7 +938,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm3 := NewFactMgr(nil)
+	fm3 := NewFactMgrSess(testAmbientSession, nil)
 	fm3.GlobalFacts = IncompleteFactSlice()
 	cg3 := EmptyCGContext().WithFactMgr(fm3)
 	if makeExpressionFuncall(NewRng(3), opts, vs, NewExprTables(opts), &cg3, GetIntType(), nil, nil) != nil {
@@ -960,7 +960,7 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
@@ -1001,7 +1001,7 @@ func TestExpressionVariableAddrOfArgForbiddenAsParam(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType(), Param: []*Variable{arg}}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// only param available — select may create globals; disable globals to force param
 	opts.GlobalVariables = false
@@ -1096,7 +1096,7 @@ func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg3 := EmptyCGContext().WithFactMgr(fm)
 	if MakeRandomExpression(NewRng(3), opts, tables, nil, &cg3, GetIntType(), nil, false, false, TermConstant, 0) != nil {

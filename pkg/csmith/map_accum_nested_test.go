@@ -8,7 +8,7 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
 	g3 := CreateVariableScalars("g_3", GetIntType(), false, false)
@@ -65,7 +65,7 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
 
@@ -115,7 +115,7 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 // n=26 vs UP n=56 when effect_context seFree poisoned by shared write sets).
 func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
 	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
 	g3 := CreateVariableScalars("g_3", GetIntType(), false, false)

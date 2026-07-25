@@ -136,7 +136,7 @@ func TestFunctionIsVarOOS(t *testing.T) {
 func TestAddBackReturnFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	retFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st := Stmt{Kind: StmtReturn, StmID: 42}
@@ -167,7 +167,7 @@ func TestAddBackReturnFacts(t *testing.T) {
 func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
@@ -201,7 +201,7 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	// incomplete map_facts_out fails closed sticky — no invent merge of later returns
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
 	// first return incomplete out
@@ -227,7 +227,7 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nested if Then with incomplete return must stop before Else returns
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
 		30: {MakeFactPointTo(p, NullPtr), nil},
 		40: {MakeFactPointTo(q, NullPtr)},

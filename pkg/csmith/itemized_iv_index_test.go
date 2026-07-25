@@ -47,7 +47,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 		Sizes:    []int{5},
 	}
 	target1.AsArray = target1
-	fm := NewFactMgr(&Function{Name: "f"})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.GlobalFacts = []*FactPointTo{}
 	cg1 := EmptyCGContext().WithFactMgr(fm)
 	cg1.IVBounds = map[*Variable]int{&ivItem.Variable: 0}

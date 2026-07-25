@@ -73,7 +73,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
 	cg.ExprDepth = 0
@@ -82,7 +82,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
 		st = MakeRandomAssign(NewRng(seed), opts, probs, vs, tables, &cg2, GetIntType())
@@ -175,7 +175,7 @@ func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
 	ppT := PointerTo(PointerTo(GetIntType()))
 	p := CreateVariableScalars("g_p", ppT, false, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
 	rhs := &Expression{
 		Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
@@ -307,7 +307,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	list := &FunctionList{Types: &TypeEnv{Sess: testAmbientSession}}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
-	fm := NewFactMgr(caller)
+	fm := NewFactMgrSess(testAmbientSession, caller)
 	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
 	caller.Stack = []*Block{callerBlk}
 	// Nested stack frame that is NOT the statement parent
@@ -348,7 +348,7 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
 	ptr := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(ptr, pointee))
 	blk := &Block{Func: f, LocalVars: []*Variable{ptr}}
 	f.Stack = []*Block{blk}
@@ -386,7 +386,7 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	p.Init = &Constant{Type: p.Type, Value: "0"}
 	vs.GlobalList = append(vs.GlobalList, p)
 	vs.AllVars = append(vs.AllVars, p)
-	fm := NewFactMgr(&Function{Name: "f"})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.AddNewVarFact(p)
 	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
 		t.Fatal("want null init for p")
@@ -426,7 +426,7 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	mid := CreateVariableScalars("l_mid", PointerTo(GetIntType()), false, false)
 	ptr := CreateVariableScalars("l_p", PointerTo(PointerTo(GetIntType())), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(ptr, mid),
 		MakeFactPointTo(mid, pointee),

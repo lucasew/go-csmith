@@ -10,7 +10,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Body = body
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
 	fm.AddFactOut(st, body, MakeFactPointTo(loc, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
@@ -31,7 +31,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete fact PointTo → sticky hole marker
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	body2 := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Body = body2
 	st2 := &Stmt{Kind: StmtAssign, StmID: 4}
@@ -53,7 +53,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	body3 := &Block{Func: f3}
 	f3.Body = body3
 	f3.Blocks = []*Block{body3, nil}
-	fm3 := NewFactMgr(f3)
+	fm3 := NewFactMgrSess(testAmbientSession, f3)
 	stGoto := &Stmt{Kind: StmtGoto, StmID: 9, GotoDestStmID: 99}
 	// FindParentBlockOfStmID walks Blocks; nil hole stickies residual
 	fm3.AddFactOut(stGoto, body3, MakeFactPointTo(gp3, NullPtr))
@@ -72,7 +72,7 @@ func TestAddFactOutVisible(t *testing.T) {
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
 	fm.AddFactOut(st, body, MakeFactPointTo(
 		CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false),
@@ -118,7 +118,7 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 	loc.Name = "l_p"
 	inner.LocalVars = []*Variable{loc}
 	f.Blocks = []*Block{outer, inner}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// goto from inner to outer dest — local of inner not visible at outer
 	st := &Stmt{
 		Kind: StmtGoto, StmID: 9,
@@ -247,7 +247,7 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 	// point cont at slice element for AddFactOut
 	cont = &contParent.Stmts[0]
 	f.Blocks = []*Block{body, nested, contParent}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed map_out with empty complete (as after set_fact_out remove_loop_local)
 	fm.MapFactsOut = map[int][]*FactPointTo{39: {}}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{39: {}}
@@ -289,7 +289,7 @@ func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
 	contParent.Stmts = []Stmt{{Kind: StmtContinue, StmID: 39}}
 	f.Blocks = []*Block{body, nested, contParent}
 	f.Body = body
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// pre-seed continue map_out empty complete (post remove_loop_local)
 	fm.MapFactsOut = map[int][]*FactPointTo{39: {}}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{39: {}}

@@ -235,7 +235,7 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 
 func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	destParent := &Block{Stmts: []Stmt{{StmID: 5}}}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 5}}
 	if !IsJumpTargetFromOtherBlocks(5, destParent, fm, nil) {

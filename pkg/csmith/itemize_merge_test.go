@@ -26,7 +26,7 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 	item.AsArray = item
 	item.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(8), ExprType: GetIntType()}}
 
-	fm := NewFactMgr(&Function{Name: "f"})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	// entry: primary pointer-0 → null only
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(&coll.Variable, NullPtr)}
 	// RHS: &g_127 — ExpressionVariable(g) with desired type int16_t** (indir -1)

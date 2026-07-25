@@ -15,7 +15,7 @@ func TestAddParamFactsDoesNotSetFactChanged(t *testing.T) {
 	fn := &Function{Name: "func_param", ReturnType: GetIntType()}
 	p := CreateVariableScalars("p_0", PointerTo(GetIntType()), false, false)
 	fn.Param = []*Variable{p}
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	g := CreateVariableScalars("g_t", GetIntType(), false, false)
 	arg := &Expression{Term: TermVariable, Var: g}
 	// address-of style: pointer arg pointing at g via variable expression is fine;

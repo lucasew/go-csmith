@@ -11,10 +11,11 @@
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
 //   - non-Sess helpers still hardcode ambient (r.RndUpto, bookkeeper Record*,
-//     Ensure-style leftovers, PartialExpand DirectExpandCheck, …)
-//   - NewVariableSelector / NewFactMgr / EmptyCGContext install ambient
+//     EmptyCGContext/WithFunc install ambient, …)
+//   - NewVariableSelector (unit-test only) installs ambient; Generate uses
+//     NewVariableSelectorProbs without ambient install + vs.Sess = run bag
+//   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag (no ambient install)
 //   - vsSess/envSess/fmSess/cgSess/gSess panic if owner.Sess unset
-//     (constructors / NewProgramGenerator set it)
 //   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes

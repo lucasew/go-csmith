@@ -156,7 +156,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	blk.Stmts = []Stmt{prior}
 	f.Blocks = []*Block{blk}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// seed a read so choose_visible may work
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -217,7 +217,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	}}
 	f.Blocks = []*Block{b1, b2}
 	f.Stack = []*Block{b2}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// map accum effect for forward path cond
 	fm.MapAccumEffect = map[int]Effect{1: EmptyEffect().ReadVar(g)}
 	eff := EmptyEffect().ReadVar(g)

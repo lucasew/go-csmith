@@ -43,7 +43,7 @@ func TestExpandBlockForGotoClimbsParent(t *testing.T) {
 	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner, Else: &Block{}}, src}
 	f.Blocks = []*Block{outer}
 
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 
@@ -84,7 +84,7 @@ func TestExpandBlockForGotoAssertB(t *testing.T) {
 	elseB := &Block{Func: f, Parent: outer, StmID: 3, Stmts: []Stmt{{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}}
 	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: thenB, Else: elseB}}
 	f.Blocks = []*Block{outer}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	got := ExpandBlockForGoto(thenB, cg)
@@ -103,7 +103,7 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 10}}
 	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner, Else: &Block{}}, {Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}
 	f.Blocks = []*Block{outer}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{nil, {SrcID: 20, DestStmID: 10}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if ExpandBlockForGoto(inner, cg) != nil {
@@ -131,7 +131,7 @@ func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 		{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10},
 	}
 	f.Blocks = []*Block{outer}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if ExpandBlockForGoto(inner, cg) != nil {
@@ -163,7 +163,7 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	// Func.Blocks lists both; root tree under a fake body does not include thenArm
 	body := &Block{Func: f, StmID: 16, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 20, Then: parent, Else: &Block{Func: f, StmID: 21}}}}
 	f.Blocks = []*Block{body, parent, thenArm}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 324, DestStmID: 323, DestBlock: thenArm, BackLink: false}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 
@@ -212,7 +212,7 @@ func TestExpandBlockForGotoSkipsOrphanGotoEdges(t *testing.T) {
 	orphan := &Block{Func: f, StmID: 99}
 	orphan.Stmts = []Stmt{{Kind: StmtGoto, StmID: 210, GotoDestStmID: 153}}
 	f.Blocks = []*Block{body, orphan}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 210, DestStmID: 153}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// Without orphan skip, climb from body for src=210 fails (src not in live tree).
@@ -289,7 +289,7 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 	f.Blocks = []*Block{outer}
 	f.Stack = []*Block{outer, inner}
 
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: srcID, DestStmID: dest.StmID}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 

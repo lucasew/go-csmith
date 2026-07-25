@@ -284,9 +284,9 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		sessNoteError(testAmbientSession, ErrGeneric)
 		return
 	}
-	// Install bag when unset (unit tests); Generate overwrites Types.Sess on the run bag.
+	// No ambient install — unit tests set TypeEnv.Sess; Generate sets Types.Sess.
 	if env.Sess == nil {
-		env.Sess = testAmbientSession
+		panic("GenerateAllTypesEnv: Sess unset (set TypeEnv.Sess)")
 	}
 	// Type.cpp:1170–1176 GenerateSimpleTypes — push eChar..eUInt128 always.
 	// Float/int64/int128 gates are probability filters + ChooseRandomTypeFilter,

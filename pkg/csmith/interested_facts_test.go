@@ -9,7 +9,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	if !MetaFactPointToEnabled() || MetaFactUnionEnabled() {
 		t.Fatal("point only")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
 	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
@@ -25,7 +25,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 
 	// only union
 	AddInterestedFacts(FactCategoryUnionWrite)
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.AddNewVarFact(p)
 	if FindRelatedPointTo(fm2.GlobalFacts, p) != nil {
 		t.Fatal("pt disabled")

@@ -193,7 +193,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	blk := &Block{StmID: 1, Func: caller}
 	caller.Stack = []*Block{blk}
 	// caller FM for GlobalFacts work set; revisit uses callee.PairedFactMgr
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(caller))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -232,7 +232,7 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntType()}
 	blk := &Block{StmID: 1, Func: caller, LocalVars: nil}
 	caller.Stack = []*Block{blk}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(caller))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	// Outer assign-like pollution that must not reach nested Lhs visit.
 	outerEff := EmptyEffect().WriteVar(g)
@@ -266,7 +266,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntType()}
 	blk := &Block{StmID: 1, Func: caller}
 	caller.Stack = []*Block{blk}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(caller))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -279,7 +279,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 }
 
 func TestFactMgrMapStmEffect(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	eff := EmptyEffect().WriteVar(v)
 	fm.SetMapStmEffect(3, eff)
@@ -308,7 +308,7 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 	}
 	// Block::stm_id always live when FM bound
 	b := &Block{StmID: 5, Stmts: []Stmt{st}}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

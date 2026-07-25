@@ -22,7 +22,7 @@ func TestMarkDeadVar(t *testing.T) {
 }
 
 func TestUpdateFactsForOOSVars(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// fact for local pointer removed when oos
@@ -43,7 +43,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 	}
 	// nil fact hole fails closed sticky
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fm2.UpdateFactsForOOSVars([]*Variable{loc})
 	if FactsComplete(fm2.GlobalFacts) {

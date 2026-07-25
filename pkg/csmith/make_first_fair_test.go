@@ -6,7 +6,7 @@ func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 	// Function.cpp:469 — global_facts = map_facts_out[body]
 	// missing body out must not invent keep prior GlobalFacts
 	f := &Function{Name: "f", ReturnType: GetIntType(), Body: &Block{StmID: 10}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	prior := MakeFactPointTo(p, NullPtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
@@ -30,7 +30,7 @@ func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 func TestBodyOutAssignIncompleteFailClosed(t *testing.T) {
 	// incomplete map_facts_out[body] must not invent cleaned GlobalFacts
 	f := &Function{Name: "f", ReturnType: GetIntType(), Body: &Block{StmID: 11}}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	fm.MapFactsOut = map[int][]*FactPointTo{
@@ -51,7 +51,7 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	// FunctionInvocationUser.cpp:212 — ret_facts = map_facts_out[body]
 	// no invent GlobalFacts when body out missing
 	callee := &Function{Name: "g", ReturnType: GetIntType(), Body: &Block{StmID: 20}}
-	calFM := NewFactMgr(callee)
+	calFM := NewFactMgrSess(testAmbientSession, callee)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	calFM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	// no MapFactsOut[20]
@@ -113,7 +113,7 @@ func TestMakeFirstSetupInOutMaps(t *testing.T) {
 	opts.MaxBlockDepth = 2
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
-	fmMap := NewFactMgrMap()
+	fmMap := NewFactMgrMapSess(testAmbientSession)
 	seedTypesForTest(NewRng(5), opts, NewProbabilities(opts), vs, list)
 	f := MakeFirst(NewRng(5), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, fmMap)
 	if f == nil || f.Body == nil {

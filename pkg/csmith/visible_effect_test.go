@@ -193,8 +193,8 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(1))
-	fm := NewFactMgr(f)
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(1))
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -203,7 +203,7 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	var st *Stmt
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
 		st = MakeRandomIf(NewRng(seed), opts, probs, vs, NewExprTables(opts),

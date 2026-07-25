@@ -74,7 +74,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	list := &FunctionList{Types: &TypeEnv{Sess: testAmbientSession}}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
-	fm := NewFactMgr(caller)
+	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
 	fi := BuildInvocationAndFunction(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)

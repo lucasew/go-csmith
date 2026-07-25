@@ -10,7 +10,7 @@ func TestMakeFirstCreatesFactMgr(t *testing.T) {
 	opts.Seed = 2
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	m := NewFactMgrMap()
+	m := NewFactMgrMapSess(testAmbientSession)
 	list := FunctionList{}
 	seedTypesForTest(NewRng(2), opts, probs, vs, &list)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), &list, m)
@@ -24,7 +24,7 @@ func TestMakeFirstCreatesFactMgr(t *testing.T) {
 }
 
 func TestAddNewVarFactFromInitNull(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	p.Init = &Constant{Type: PointerTo(GetIntType()), Value: "0"}
 	fm.AddNewVarFact(p)
@@ -36,7 +36,7 @@ func TestAddNewVarFactFromInitNull(t *testing.T) {
 func TestUpdateFactForReturn(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: PointerTo(GetIntType())}
 	f.RV = CreateVariableScalars("func_1_rv", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
 	if !fm.UpdateFactForReturn(f.RV, rhs) {
 		t.Fatal("update")
@@ -58,7 +58,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	f1 := &Variable{Name: "g_u.f1", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0, f1}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// incomplete existing union map (nil hole)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0), nil}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
@@ -71,7 +71,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	// incomplete abstract alone must not invent success; soft re-pick keeps non-sticky
 	ClearErrorSess(testAmbientSession)
 	// complete map + MergeUnionFact incomplete subject sticky wipe
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
 	merged := MergeUnionFact(fm2.UnionFacts, nil)
 	if UnionFactsComplete(merged) {
@@ -181,7 +181,7 @@ func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a), nil}
 	fm.UnionFacts = []*FactUnion{}
 	rhs := &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()}
@@ -207,7 +207,7 @@ func TestUpdateFactForAssignRenewsDefinitive(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// start with multi-target set {a,b}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})}
 	// definitive p = &a via constant null then variable? use RhsToLhs via var expression
@@ -234,7 +234,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if len(un) != 1 || un[0].LastWrittenFID != 0 {
 		t.Fatalf("%+v", un)
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.AddNewVarFact(uv)
 	if FindRelatedUnion(fm.UnionFacts, uv) == nil || FindRelatedUnion(fm.UnionFacts, uv).LastWrittenFID != 0 {
 		t.Fatal(fm.UnionFacts)
@@ -319,7 +319,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		t.Fatal("union without init abstract must stay non-sticky for soft re-pick")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(
 		CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr)}
 	fm2.AddNewVarFact(uv2)
@@ -430,7 +430,7 @@ func TestUpdateFactForAssignUnionField(t *testing.T) {
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	f1 := &Variable{Name: "g_u.f1", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0, f1}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("update")
@@ -473,7 +473,7 @@ func TestUpdateFactForReturnSetsFactOut(t *testing.T) {
 	// FactMgr.cpp:418–420 — set_fact_out(sr, inputs) after abstract return
 	f := &Function{Name: "func_1", ReturnType: PointerTo(GetIntType())}
 	f.RV = CreateVariableScalars("func_1_rv", PointerTo(GetIntType()), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtReturn, StmID: 7,
 		Expr: &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
 			ExprType: PointerTo(GetIntType())}}
@@ -489,7 +489,7 @@ func TestUpdateFactForReturnSetsFactOut(t *testing.T) {
 func TestVisitFactsReturnSetsOut(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtReturn, StmID: 8,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -509,7 +509,7 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 
 func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// StmID 0 must IncompleteFactSlice sticky — not invent empty-complete map miss
 	if FactsComplete(fm.GetMapFactsIn(IncompleteStmID)) || FactsComplete(fm.GetMapFactsOut(IncompleteStmID)) {
 		t.Fatal("StmID 0 must IncompleteFactSlice")
@@ -732,7 +732,7 @@ func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
 	// IsGlobal residual soft invent was invent soft-skip makeup past FieldVarOf residual.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// FieldVarOf with Type-nil parent chain residual IsGlobal
 	parent := &Variable{Name: "x_bad"} // not g_ prefix, not global
 	hole := &Variable{Name: "f0", FieldVarOf: parent}
@@ -818,7 +818,7 @@ func TestGetProgramEndFacts(t *testing.T) {
 	f1 := &Function{Name: "func_1"}
 	f2 := &Function{Name: "func_2"}
 	list := &FunctionList{Funcs: []*Function{f1, f2}}
-	fms := NewFactMgrMap()
+	fms := NewFactMgrMapSess(testAmbientSession)
 	fm1 := fms.ForFunc(f1)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm1.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -839,7 +839,7 @@ func TestGetProgramEndFacts(t *testing.T) {
 
 func TestSanityCheckMap(t *testing.T) {
 	f := &Function{Name: "func_1"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// empty maps ok
 	ClearErrorSess(testAmbientSession)
 	fm.SanityCheckMap()
@@ -873,7 +873,7 @@ func TestStoreUnionFactMapEntryDeepIsolatesLive(t *testing.T) {
 	}
 	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	uv.CreateFieldVars()
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	live := MakeFactUnion(uv, 0)
 	fm.UnionFacts = []*FactUnion{live}
 	fm.SetMapFactsInPair(10, []*FactPointTo{}, fm.UnionFacts)

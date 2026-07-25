@@ -80,7 +80,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	list := &FunctionList{}
 	// max funcs 0 means ReachMaxFunctions may block creation
 	opts.MaxFuncs = 0
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	eff := EmptyEffect().WriteVar(p)
@@ -142,7 +142,7 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	if preU == nil {
 		t.Fatal("MakeFactUnion f0")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{preU}
 	// snapshot like StatementExpr / ExpressionFuncall (shallow vector copy)

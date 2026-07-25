@@ -36,22 +36,22 @@ func vsSess(vs *VariableSelector) *Session {
 	return vs.Sess
 }
 
-// NewVariableSelector constructs an empty selector sharing process Probabilities
-// (C++ Probabilities singleton). No invent second NewProbabilities(opts) when
-// process unset — Probs may be nil (fail closed on draws that need tables).
+// NewVariableSelector constructs an empty selector for unit tests on the ambient bag.
+// Probs from ReinstallTestProcessSingletons; Sess is testAmbientSession.
+// Generate uses NewVariableSelectorProbs + explicit vs.Sess = run bag (no ambient install).
 func NewVariableSelector(opts Options) *VariableSelector {
-	// Unit-test convenience: Probs from ambient Process* bag (ReinstallTestProcessSingletons).
-	return NewVariableSelectorProbs(opts, ProcessProbabilitiesSess(testAmbientSession))
+	vs := NewVariableSelectorProbs(opts, ProcessProbabilitiesSess(testAmbientSession))
+	vs.Sess = testAmbientSession
+	return vs
 }
 
 // NewVariableSelectorProbs constructs a selector sharing session Probabilities
 // (C++ process singleton). probs may be nil; callers that need tables pass live ones.
-// Sess defaults to the unit-test ambient bag; NewProgramGenerator overwrites for Generate.
+// Sess is left nil — NewProgramGenerator / tests must set vs.Sess (no ambient install).
 func NewVariableSelectorProbs(opts Options, probs *Probabilities) *VariableSelector {
 	return &VariableSelector{
 		Opts:  opts,
 		Probs: probs,
-		Sess:  testAmbientSession,
 	}
 }
 

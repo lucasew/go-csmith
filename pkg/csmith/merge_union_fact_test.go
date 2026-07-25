@@ -87,7 +87,7 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 		t.Fatal("field vars")
 	}
 	f3 := uv.FieldVars[1]
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	// definitive assign to union field f3 → renew last_written to field id of f3
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
@@ -147,7 +147,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	body := &Block{StmID: AllocStmID(), Func: f}
 	f.Body = body
 	f.Stack = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// init fact last=0 (constant init of union)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	fm.GlobalFacts = []*FactPointTo{}

@@ -145,7 +145,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "caller"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cgFacts := EmptyCGContext().WithFactMgr(fm)
 	if ChooseFuncContext(NewRng(4), []*Function{good}, GetIntType(), nil, &cgFacts, Defaults(), nil) != nil {

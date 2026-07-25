@@ -218,7 +218,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// missing body in must not invent keep prior GlobalFacts
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -242,7 +242,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 
 func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	body := &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -260,7 +260,7 @@ func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	// merge_jump_facts always; incomplete break out fails closed
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -278,7 +278,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	// via FactsComplete(nil)==true after wipe
 	c := CreateVariableScalars("g_c", GetIntType(), false, false)
 	body2 := &Block{StmID: 13, BreakStmIDs: []int{30, 31}, Stmts: []Stmt{{Kind: StmtAssign}}}
-	fm2 := NewFactMgr(nil)
+	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.SetMapFactsIn(13, pre)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
 		30: {MakeFactPointTo(p, NullPtr), nil},
@@ -294,7 +294,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	// incomplete map_facts_in[body] must not invent RestoreFacts(pre) on must_return
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -312,7 +312,7 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 
 func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -330,7 +330,7 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 	// MustReturn residual soft invent was soft-continue break-merge invent complete GlobalFacts.
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -353,7 +353,7 @@ func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 
 func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)

@@ -21,7 +21,7 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	// g points at param — after function exit must become garbage
 	body := &Block{Func: fn, Parent: nil, StmID: AllocStmID()}
 	fn.Body = body
-	fm := NewFactMgr(fn)
+	fm := NewFactMgrSess(testAmbientSession, fn)
 	facts := []*FactPointTo{
 		MakeFactPointTo(p, NullPtr),
 		MakeFactPointTo(g, p),
@@ -87,7 +87,7 @@ func TestSetMapFactsOutForBlockNilFailClosed(t *testing.T) {
 		t.Fatal("nil FM must sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(&Function{Name: "f"})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.SetMapFactsOutForBlock(nil, []*FactPointTo{})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block must sticky")

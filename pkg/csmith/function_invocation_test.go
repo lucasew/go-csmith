@@ -68,7 +68,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -85,7 +85,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts snapshot before RHS
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
@@ -106,7 +106,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	list := &FunctionList{Funcs: []*Function{f}}
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -119,7 +119,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
@@ -143,7 +143,7 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	env.DerivedTypes = IncompleteTypes()
 	vs.Types = &env
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -179,7 +179,7 @@ func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -298,7 +298,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	vs.Types = env
 	tables := NewExprTables(opts)
 	fi := func() *Invocation {
-		c := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = env
 		return MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, &c, env)
 	}()

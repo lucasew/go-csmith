@@ -365,7 +365,7 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -393,7 +393,7 @@ func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
@@ -416,7 +416,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -430,7 +430,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg2, GetIntType(), false, false, nil) != nil {
@@ -443,7 +443,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete GlobalList hole fails closed sticky via selectWritable pool scan
 	vs2 := NewVariableSelector(opts)
 	vs2.GlobalList = []*Variable{g, nil}
-	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if MakeRandomLhs(NewRng(3), opts, NewProbabilities(opts), vs2, &cg3, GetIntType(), false, false, nil) != nil {
@@ -616,7 +616,7 @@ func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// Type-nil Lhs + Type-nil Var → GetType residual
 	lhs := &Lhs{Var: &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, Type: nil, CompoundAssign: true}
 	if cg.VisitFactsLhs(lhs, opts) {
@@ -656,7 +656,7 @@ func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// incomplete EffectStm → AddEffect residual sticky before index visit
 	cg.EffectStm = IncompleteEffect()
 	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true}, Sizes: []int{2}}
@@ -756,7 +756,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	item.AsArray = item
 	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 
 	// Precondition: is_eligible on itemized writes g_iv into effect_accum.
 	acc := EmptyEffect()

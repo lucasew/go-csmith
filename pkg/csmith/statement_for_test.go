@@ -48,7 +48,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	// Paired FactMgr + function body on stack (generation context)
 	fm := f.PairedFactMgr()
 	if fm == nil {
-		fm = NewFactMgr(f)
+		fm = NewFactMgrSess(testAmbientSession, f)
 	}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if f.Body != nil {
@@ -78,7 +78,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	// StatementFor.cpp:172 assert(blk) — parent block on stack (MakeFirst pops body)
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		t.Fatalf("%+v", st)
@@ -168,7 +168,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// Plant a read on the parent accum before for-body generation.
 	pre := CreateVariableScalars("pre_rd", GetIntType(), true, false)
 	accum := EmptyEffect().ReadVar(pre)

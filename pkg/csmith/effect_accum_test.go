@@ -16,7 +16,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	tab.Add(100, int(StmtAssign))
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// StatementAssign.cpp:127 assert(fm) — assign needs FactMgr
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
 	eff := EmptyEffect()
@@ -127,7 +127,7 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 	tables := NewExprTables(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	cg.Types = env
 	e := MakeExpressionComma(NewRng(3), opts, probs, vs, tables, &cg, GetIntType(), nil)
 	if e == nil || e.Term != TermCommaExpr {

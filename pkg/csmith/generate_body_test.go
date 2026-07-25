@@ -393,7 +393,7 @@ func TestMakeExpressionCommaNilLHSType(t *testing.T) {
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	e := func() *Expression {
-		c := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = vs.Types
 		return MakeExpressionComma(NewRng(3), opts, probs, vs, NewExprTables(opts), &c, GetIntType(), nil)
 	}()

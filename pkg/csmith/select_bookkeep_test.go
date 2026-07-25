@@ -83,7 +83,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.EffectAccum = &inc
 	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed GenerateNewVariable")
@@ -92,7 +92,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if vs.GenerateNewVariable(AccessWrite, cg2, GetIntType(), nil, NewRng(2)) != nil {
@@ -102,7 +102,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.GenerateNewVariable(AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {

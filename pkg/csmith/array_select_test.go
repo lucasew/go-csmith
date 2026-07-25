@@ -77,7 +77,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	// StatementFor.cpp:172 assert(blk) — parent on stack for array_loop → for
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
@@ -142,7 +142,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// force array_init path by calling MakeRandomArrayInit directly
 	st := MakeRandomArrayInit(NewRng(9), opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtArrayOp || st.Loop == nil {
@@ -213,7 +213,7 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky SelectArray")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if vs.SelectArray(NewRng(4), cg2) != nil {

@@ -70,7 +70,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	st := MakeRandomArrayInit(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
@@ -93,7 +93,7 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	st := MakeRandomReturn(NewRng(3), opts, vs, &cg)
 	if st.Kind != StmtReturn || st.Expr == nil {

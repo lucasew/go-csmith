@@ -48,7 +48,7 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	}}
 	// Return with const may not need RV; still exercise CurrBlk assignment path
 	// via ValidateAndUpdateFacts which sets CurrBlk before StmVisitFacts.
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	f.ReturnType = GetIntType()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)

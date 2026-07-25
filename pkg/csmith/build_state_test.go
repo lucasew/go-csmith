@@ -45,7 +45,7 @@ func TestPointerParamTBD(t *testing.T) {
 	f2.RV = CreateVariableScalars("f2_rv", GetIntType(), false, false)
 	p2 := CreateVariableScalars("p_2", PointerTo(GetIntType()), false, false)
 	f2.Param = []*Variable{p2}
-	fm2 := NewFactMgr(f2)
+	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	// manually run param fact path: Building adds tbd before body
 	f2.BuildState = BuildBuilding
 	if FindRelatedPointTo(fm2.GlobalFacts, p2) == nil {

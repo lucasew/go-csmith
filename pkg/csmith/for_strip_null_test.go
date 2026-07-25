@@ -28,7 +28,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	tgt := CreateVariableScalars("g_18", i32, false, false)
 
 	f := &Function{Name: "f", ReturnType: i32}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 
 	// then: *g99 = (void*)0  — FactPointTo.cpp:275–278 + FactMgr renew
 	thenNull := Stmt{
@@ -113,7 +113,7 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	tgt := CreateVariableScalars("g_18", i32, false, false)
 
 	f := &Function{Name: "f", ReturnType: i32, RV: CreateVariableScalars("rv", i32, false, false)}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 
 	thenNull := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),

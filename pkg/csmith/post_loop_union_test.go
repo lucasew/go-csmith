@@ -7,7 +7,7 @@ import "testing"
 func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f4", Type: GetIntType(), BitWidth: -1},
@@ -72,7 +72,7 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 		t.Fatal("facts")
 	}
 	bottomU.SetBottom()
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// outer function body (non-looping) so post_creation does not append return
 	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
 	// looping for-body, empty stms → no self-back (FromTailToHead false when empty)

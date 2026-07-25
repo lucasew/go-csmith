@@ -56,7 +56,7 @@ func TestGetLastStmStopsAtReturn(t *testing.T) {
 }
 
 func TestSetAccumulatedEffect(t *testing.T) {
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	fm.SetMapStmEffect(1, EmptyEffect().WriteVar(v))
 	fm.SetMapStmEffect(2, EmptyEffect().ReadVar(v))
@@ -200,7 +200,7 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// make a small looping block
 	b := MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, true)
@@ -254,7 +254,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	}
 	// continue edge into block escapes — CreateCFGEdge(src, block) stores DestStmID=block.StmID
 	// (FactMgr.cpp:597–598 e->dest == Block*; Statement.cpp:453–467 find_edges_in).
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	b.EmitFM = fm
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestBlock: b, DestStmID: b.StmID, BackLink: true}}
 	if b.MustReturn() {
@@ -311,7 +311,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 		t.Fatal("nil MustJump must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).MustReturnWithFM(NewFactMgr(nil)) {
+	if (*Block)(nil).MustReturnWithFM(NewFactMgrSess(testAmbientSession, nil)) {
 		t.Fatal("nil MustReturnWithFM must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -7,7 +7,7 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -26,7 +26,7 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	b := &Block{StmID: 1, Func: f}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -41,7 +41,7 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete EffectContext fails closed sticky before EffectStm clear
-	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
 	if b.AppendReturnStmt(NewRng(3), opts, vs, &cg2) != nil {
@@ -58,7 +58,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -70,7 +70,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must SetError")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if stmtOK(MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType())) {
@@ -81,7 +81,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete EffectStm must not invent assign under hole shell
-	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg3.EffectStm = IncompleteEffect()
 	if stmtOK(MakeRandomAssign(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3, GetIntType())) {
 		t.Fatal("incomplete EffectStm must fail closed MakeRandomAssign")
@@ -94,7 +94,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 
 func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// after-left snapshot incomplete fails closed (no invent cleaned merge)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -115,7 +115,7 @@ func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 func TestVisitFactsBinaryOrderedVisitResidualSticky(t *testing.T) {
 	// Visit residual soft invent was soft-continue right/merge invent visit success.
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -148,7 +148,7 @@ func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -167,7 +167,7 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// StatementExpr.cpp:58–59 snapshot; incomplete must not invent cleaned rollback
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -212,7 +212,7 @@ func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 	// incomplete inputs fail closed (no invent cleaned fixed-point)
 	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 1, Stmts: nil}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -252,7 +252,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 3, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
@@ -320,7 +320,7 @@ func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -331,7 +331,7 @@ func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("MakeRandomIf must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg2.EffectAccum = &inc
 	if MakeRandomFor(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")

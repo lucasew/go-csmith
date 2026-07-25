@@ -153,7 +153,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 	f.Stack = []*Block{blk}
 	blk.Func = f
 	blk.LocalVars = []*Variable{loc, &collAV.Variable}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = facts
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// Force pool: only the array is choosable as int*
@@ -300,7 +300,7 @@ func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if vs.SelectLoopCtrlVar(NewRng(2), cg2, nil) != nil {
@@ -360,7 +360,7 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 
 func TestAddNewVarFactPointer(t *testing.T) {
 	f := &Function{Name: "f"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// Variable.cpp:395 — pointer init Constant::make_random → "0" → null fact
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
@@ -387,7 +387,7 @@ func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	// local pointer that points to local
 	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
 	blk.LocalVars = append(blk.LocalVars, lp)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(lp, loc))
 	// also a global pointer to global target (ok to return)
 	gt := CreateVariableScalars("g_t", GetIntType(), false, false)

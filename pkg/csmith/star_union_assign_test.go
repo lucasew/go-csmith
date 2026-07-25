@@ -23,7 +23,7 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	src.CreateFieldVars()
 
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// l_90 points to g_88
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(l90, g88)}
 	// g_88 currently BOTTOM (as after conflicting path merges)

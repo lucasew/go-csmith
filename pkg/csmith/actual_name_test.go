@@ -144,6 +144,7 @@ func TestNewVariableSelectorProbsShares(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelectorProbs(opts, probs)
+	vs.Sess = testAmbientSession
 	if vs.Probs != probs {
 		t.Fatal("must share, not invent")
 	}

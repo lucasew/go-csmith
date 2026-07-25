@@ -28,7 +28,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 		t.Fatal("live")
 	}
 	var unionCopy []*FactUnion // MISSING subject after LHS
-	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.GlobalFacts = []*FactPointTo{}
 
@@ -81,7 +81,7 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	// nil snapshots == Clone*(nil) after NewFactMgr zero-value maps
 	var factsCopy []*FactPointTo
 	var unionCopy []*FactUnion
-	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
 	// post-RHS live (g_u created during RHS of the outer &&)
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.GlobalFacts = []*FactPointTo{}

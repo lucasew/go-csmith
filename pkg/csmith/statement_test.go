@@ -54,7 +54,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := makeRandomStmtKind(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, MaxStatementType)
 	if stmtOK(st) {

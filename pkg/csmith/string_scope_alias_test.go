@@ -134,11 +134,11 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	// residual hygiene — Aggregate / OutputStatistics are complete-path emit
 	ClearErrorSess(testAmbientSession)
 	// Aggregate from FactMgr
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = facts[:1]
 	fm.SetMapFactsOut(1, facts)
 	f := &Function{Name: "f", BuildState: BuildBuilt, IsBuilt: true}
-	fms := NewFactMgrMap()
+	fms := NewFactMgrMapSess(testAmbientSession)
 	fms.byFunc = map[*Function]*FactMgr{f: fm}
 	AggregateAllPointToSets([]*Function{f}, fms)
 	if len(currentSession().AllPtrs) != 1 {
@@ -167,10 +167,10 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete map_facts_out / GlobalFacts sticky clear (UpdatePtrAliases SetError)
-	fmBad := NewFactMgr(nil)
+	fmBad := NewFactMgrSess(testAmbientSession, nil)
 	fmBad.GlobalFacts = []*FactPointTo{nil}
 	fBad := &Function{Name: "f_bad", BuildState: BuildBuilt, IsBuilt: true}
-	fmsBad := NewFactMgrMap()
+	fmsBad := NewFactMgrMapSess(testAmbientSession)
 	fmsBad.byFunc = map[*Function]*FactMgr{fBad: fmBad}
 	AggregateAllPointToSets([]*Function{fBad}, fmsBad)
 	if len(currentSession().AllPtrs) != 0 {

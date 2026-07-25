@@ -150,7 +150,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
 	av := CreateArrayVariable(NewRng(3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
 	if av == nil {
@@ -847,7 +847,7 @@ func TestContainsBackEdgeDestParentOnly(t *testing.T) {
 	// Block.cpp:491 — only dest->parent == this
 	b := &Block{StmID: 1}
 	other := &Block{StmID: 2}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.CFGEdges = []*CFGEdge{
 		{BackLink: true, DestBlock: other, DestStmID: 10},
 		{BackLink: true, DestBlock: b, DestStmID: 11},

@@ -105,26 +105,22 @@ type FactMgr struct {
 }
 
 // fmSess returns fm.Sess. Nil fm → unit-test ambient.
-// Non-nil fm must have Sess set (NewFactMgr / NewFactMgrSess always installs).
+// Non-nil fm must have Sess set (NewFactMgrSess always installs).
 func fmSess(fm *FactMgr) *Session {
 	if fm == nil {
 		return testAmbientSession
 	}
 	if fm.Sess == nil {
-		panic("fmSess: Sess unset (use NewFactMgr or NewFactMgrSess)")
+		panic("fmSess: Sess unset (use NewFactMgrSess)")
 	}
 	return fm.Sess
 }
 
-func NewFactMgr(f *Function) *FactMgr {
-	return NewFactMgrSess(testAmbientSession, f)
-}
-
 // NewFactMgrSess constructs a FactMgr on an explicit session bag.
-// Nil s uses the unit-test ambient bag (always stores a non-nil Sess).
+// Nil s panics — no silent ambient install (unit tests pass testAmbientSession).
 func NewFactMgrSess(s *Session, f *Function) *FactMgr {
 	if s == nil {
-		s = testAmbientSession
+		panic("NewFactMgrSess: nil Session (pass testAmbientSession or run bag)")
 	}
 	return &FactMgr{
 		Sess:             s,
@@ -2337,13 +2333,13 @@ type FactMgrMap struct {
 	byFunc map[*Function]*FactMgr
 }
 
-// NewFactMgrMap creates an empty FMList.
-func NewFactMgrMap() *FactMgrMap {
-	return NewFactMgrMapSess(testAmbientSession)
-}
-
 // NewFactMgrMapSess creates an FMList bound to an explicit session bag.
+// Non-Sess NewFactMgrMap deleted — unit tests pass testAmbientSession.
+// Nil s panics — no silent ambient install.
 func NewFactMgrMapSess(s *Session) *FactMgrMap {
+	if s == nil {
+		panic("NewFactMgrMapSess: nil Session (pass testAmbientSession or run bag)")
+	}
 	return &FactMgrMap{Sess: s, byFunc: make(map[*Function]*FactMgr)}
 }
 

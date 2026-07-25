@@ -174,7 +174,7 @@ func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 	if entryU == nil || liveU == nil {
 		t.Fatal("facts")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	pt := []*FactPointTo{}
 	fm.SetMapFactsInPair(11, pt, []*FactUnion{entryU})
 	fm.SetMapFactsOutPair(11, pt, []*FactUnion{entryU})
@@ -213,7 +213,7 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	if entryU == nil || outU == nil {
 		t.Fatal("facts")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	pt := []*FactPointTo{}
 	fm.SetMapFactsInPair(9, pt, []*FactUnion{entryU})
 	fm.SetMapFactsOutPair(9, pt, []*FactUnion{outU})
@@ -247,7 +247,7 @@ func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
 	parent := CreateVariableScalars("g_u_vin2", ut, false, false)
 	parent.CreateFieldVars()
 	pre := MakeFactUnion(parent, 0)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.UnionFacts = []*FactUnion{pre}
 	// deep snapshot then in-place mutate live (Join path)
 	snap := CloneUnionFactSliceDeep(fm.UnionFacts)
@@ -270,7 +270,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 		Kind: StmtAssign, StmID: 5, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(5, facts)
 	fm.SetMapFactsOut(5, facts)
@@ -356,7 +356,7 @@ func TestShortcutConflict(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(3, facts)
 	fm.SetMapFactsOut(3, facts)
@@ -379,7 +379,7 @@ func TestValidateAndUpdateFacts(t *testing.T) {
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -407,7 +407,7 @@ func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 		Then: &Block{Stmts: []Stmt{gotoSt}},
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	// seed maps so shortcut fires
 	fm.SetMapFactsIn(10, nil)
 	fm.SetMapFactsOut(10, nil)
@@ -434,7 +434,7 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
 	root := &Stmt{Kind: StmtFor, StmID: 10, Then: &Block{Stmts: []Stmt{gotoSt}}}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.MapVisited = map[int]bool{}
 	// hole after a valid edge that would mark goto 20
 	fm.CFGEdges = []*CFGEdge{
@@ -534,7 +534,7 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// inject foreign RV into working facts
 	facts := []*FactPointTo{
 		MakeFactPointTo(otherRV, GarbagePtr),
@@ -579,7 +579,7 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 		Kind: StmtAssign, StmID: 77, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -611,7 +611,7 @@ func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 		{Kind: StmtAssign, StmID: 10},
 	}}
 	f.Blocks = []*Block{outer}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	root := &Stmt{Kind: StmtBlock, Then: outer, StmID: 99}
 	if !ContainsUnfixedGoto(root, fm) {
@@ -623,7 +623,7 @@ func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// residual after containsUnfixedGotoIDs residual soft invent was invent fixed false.
 	// Fair: sticky unfixed true. incomplete CFG residual.
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.CFGEdges = []*CFGEdge{nil}
 	if !ContainsUnfixedGoto(root, fm2) {
 		t.Fatal("CFG residual ContainsUnfixedGoto must fail closed unfixed")
@@ -649,7 +649,7 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 		{Kind: StmtGoto, StmID: 20, Label: "lbl", GotoDestStmID: 10},
 	}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	fm.MapVisited = map[int]bool{20: true}
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
@@ -718,7 +718,7 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 		}}},
 	}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	fm.MapVisited = map[int]bool{20: true}
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
@@ -775,7 +775,7 @@ func TestContainsUnfixedGotoUnionImply(t *testing.T) {
 		{Kind: StmtGoto, StmID: 20, Label: "lbl", GotoDestStmID: 10},
 	}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	fm.MapVisited = map[int]bool{20: true}
 	// dest in: last-write field 0; jump src out: last-write field 1 — not imply
@@ -812,7 +812,7 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 		{Kind: StmtGoto, StmID: 52, Label: "elsewhere", GotoDestStmID: 99},
 	}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 52, DestStmID: 99}} // dest outside
 	// unvisited goto
 	fm.MapVisited = map[int]bool{}
@@ -836,7 +836,7 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 88, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -861,7 +861,7 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -886,7 +886,7 @@ func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(7, facts)
 	// no MapFactsOut[7] — empty complete (C++ map[])
@@ -911,7 +911,7 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 8, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.SetMapFactsIn(8, in)
 	// plant hole bypassing SetMapFactsOut (CloneFactSlice strips holes)
@@ -934,7 +934,7 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 
 func TestShortcutAnalysisBlockMissingOutIsEmpty(t *testing.T) {
 	body := &Block{StmID: 60, Stmts: []Stmt{{Kind: StmtAssign, StmID: 61}}}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(60, facts)
 	// no MapFactsOut[60] — empty complete (C++ map[])
@@ -950,7 +950,7 @@ func TestShortcutAnalysisBlockMissingOutIsEmpty(t *testing.T) {
 func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	body := &Block{StmID: 70, Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}}}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.SetMapFactsIn(70, in)
 	fm.MapFactsOut = map[int][]*FactPointTo{
@@ -974,7 +974,7 @@ func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
 	fm.SetMapFactsIn(9, facts)
 	fm.SetMapFactsOut(9, facts)
@@ -1003,7 +1003,7 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc

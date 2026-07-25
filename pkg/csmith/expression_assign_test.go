@@ -15,7 +15,7 @@ func TestMakeExpressionAssign(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
 	e := func() *Expression {
-		c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		return MakeExpressionAssign(r, opts, probs, vs, tables, &c, GetIntType(), nil)
 	}()
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {
@@ -47,7 +47,7 @@ func TestMakeExpressionAssignNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	if e := MakeExpressionAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil); e != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
@@ -94,7 +94,7 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
@@ -105,7 +105,7 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if MakeExpressionAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType(), nil) != nil {
@@ -129,7 +129,7 @@ func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())
-	cg.FM = NewFactMgr(f)
+	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// incomplete EffectStm sticky before MakeExpressionAssign
 	cg.EffectStm = IncompleteEffect()
 	if MakeExpressionAssign(NewRng(1), opts, probs, vs, tables, &cg, GetIntType(), nil) != nil {

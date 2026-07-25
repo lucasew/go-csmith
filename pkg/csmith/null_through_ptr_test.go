@@ -22,7 +22,7 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	g77 := CreateVariableScalars("g_77", pt, false, false)
 	g99 := CreateVariableScalars("g_99", ppt, false, false)
 	f := &Function{Name: "f", ReturnType: i32}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetGlobalFacts([]*FactPointTo{MakeFactPointTo(g99, g77)}, "t")
 	lhs := &Lhs{Var: g99, Type: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}

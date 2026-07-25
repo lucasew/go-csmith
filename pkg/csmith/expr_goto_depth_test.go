@@ -136,7 +136,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	// StatementGoto.cpp:390–398 — subset outs clear map_facts_in/out[dest] full FactVec
 	// (ePointTo + eUnionWrite). Soft invent was PT-only delete.
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
@@ -184,7 +184,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 	// fair sid: dest stm_id 0 is valid (StatementGoto.cpp no destID>0 invent)
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p0", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a0", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b0", GetIntType(), true, false)

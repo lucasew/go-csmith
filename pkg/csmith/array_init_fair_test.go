@@ -108,7 +108,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// force SelectArray to return our av by only having one
 	st := MakeRandomArrayInit(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
@@ -160,7 +160,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := MakeRandomArrayInit(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	// empty dims → fail (no soft invent size [1] or access[0])
 	if st.Loop != nil || st.Then != nil {
@@ -182,7 +182,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := MakeRandomArrayInit(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Loop == nil && st.Then == nil {
 		t.Fatal("empty")
@@ -204,7 +204,7 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
 	v := CreateVariableScalars("g_z", GetIntType(), false, false)
 	// FactMgr required when condition may build ExpressionAssign
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = vs.Types
 	cg.EffectStm = EmptyEffect().WriteVar(v)
 	st := MakeRandomIf(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)

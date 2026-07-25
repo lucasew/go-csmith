@@ -104,7 +104,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 
 func TestFindDanglingGlobalPtrs(t *testing.T) {
 	f := &Function{Name: "func_1"}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// dead global pointer
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(p)}

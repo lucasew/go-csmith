@@ -162,7 +162,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
 	// function reads/writes p so fact is printed
 	f.FEffect = EmptyEffect().ReadVar(p).WriteVar(p)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(5, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(5, []*FactPointTo{MakeFactPointTo(p, tgt)})
 	fm.SetupInOutMaps(true)
@@ -177,7 +177,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	// global fact neither read nor written → no invent comment-only shell
 	f2 := &Function{Name: "func_2", ReturnType: GetIntType()}
 	// empty effect: skip globals
-	fm2 := NewFactMgr(f2)
+	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.SetMapFactsIn(6, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm2.SetMapFactsOut(6, []*FactPointTo{MakeFactPointTo(p, tgt)})
 	fm2.SetupInOutMaps(true)
@@ -222,7 +222,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	shell := &Variable{Name: "g_arr", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
 	f3 := &Function{Name: "func_3", ReturnType: GetIntType()}
 	f3.FEffect = EmptyEffect().ReadVar(shell).WriteVar(shell).ReadVar(p).WriteVar(p)
-	fm3 := NewFactMgr(f3)
+	fm3 := NewFactMgrSess(testAmbientSession, f3)
 	// postCondition uses updated facts — in≠out so both appear; shell subject stickies emit
 	fm3.SetMapFactsIn(8, []*FactPointTo{MakeFactPointTo(shell, NullPtr), MakeFactPointTo(p, NullPtr)})
 	fm3.SetMapFactsOut(8, []*FactPointTo{MakeFactPointTo(shell, tgt), MakeFactPointTo(p, tgt)})
@@ -242,7 +242,7 @@ func TestPostOutputInBlock(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	tgt := CreateVariableScalars("g_2", GetIntType(), true, false)
 	f.FEffect = EmptyEffect().WriteVar(p).ReadVar(p)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(7, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(7, []*FactPointTo{MakeFactPointTo(p, tgt)})
 	fm.SetupInOutMaps(true)
@@ -319,7 +319,7 @@ func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
 	}
 	// FM + IncompleteStmID sticky — no invent SourceLabel / step_hash for unset id
 	// (valid StmID 0 is C++ first statement — must not fail closed)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	stBad := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID, SourceLabel: "lbl_invent"}
 	out0, tgt0 := PreOutput(stBad, fm, true, false, nil, "  ")
 	if out0 != "" || tgt0 {
@@ -346,7 +346,7 @@ func TestPreOutputFromCFGJumpSources(t *testing.T) {
 		{Kind: StmtGoto, StmID: 2, Label: "lbl_cfg", GotoDestStmID: 1},
 	}}
 	f.Blocks = []*Block{body}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 2, DestStmID: 1}}
 	st := &body.Stmts[0]
 	out, tgt := PreOutput(st, fm, true, false, nil, "")
@@ -417,7 +417,7 @@ func TestOutputAssertionsIsGlobalIsReadResidualSticky(t *testing.T) {
 	// Type-nil fact subject already sticky earlier; complete unused global soft-skip hygiene.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), FEffect: EmptyEffect()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	// unused global fact — IsGlobal true, not read/written → soft skip empty body
 	fm.GlobalFacts = []*FactPointTo{{Var: v, PointTo: []*Variable{NullPtr}}}
@@ -435,7 +435,7 @@ func TestPostOutputOutputAssertionsResidualSticky(t *testing.T) {
 	// postCondition path uses FindUpdatedFinalFacts (not GlobalFacts).
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	// incomplete final out map for st → FindUpdatedFinalFacts residual sticky
 	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: IncompleteFactSlice()}
 	st := &Stmt{Kind: StmtAssign, StmID: 1}

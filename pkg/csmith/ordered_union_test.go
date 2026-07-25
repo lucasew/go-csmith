@@ -170,7 +170,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 	if len(uv.FieldVars) == 0 {
 		t.Skip("fields")
 	}
-	fm := NewFactMgr(nil)
+	fm := NewFactMgrSess(testAmbientSession, nil)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	fm.UpdateFactForAssign(uv.FieldVars[0], 0, rhs)
 	fu := FindRelatedUnion(fm.UnionFacts, uv)

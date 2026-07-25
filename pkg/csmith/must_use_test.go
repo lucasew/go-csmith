@@ -113,7 +113,7 @@ func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw).WithFactMgr(fm)
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {

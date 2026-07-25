@@ -16,7 +16,7 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	// StatementReturn.cpp:58–59 assert(fm) — session FactMgr required
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	st := MakeRandomReturn(NewRng(5), opts, vs, &cg)
 	if st.Kind != StmtReturn {
@@ -40,7 +40,7 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// nil vs → ExpressionVariable soft nil (non-sticky) → empty return re-pick
 	ClearErrorSess(testAmbientSession)
@@ -81,7 +81,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 		t.Fatal("nil FM MakeRandomReturn must stay non-sticky soft re-pick")
 	}
 	// nil RV non-sticky soft re-pick
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	f.RV = nil
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	st2 := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(opts), &cg2)
@@ -99,7 +99,7 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	vs := NewVariableSelector(opts)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -112,7 +112,7 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fm2 := NewFactMgr(f)
+	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	st2 := MakeRandomReturn(NewRng(2), opts, vs, &cg2)
@@ -155,7 +155,7 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	opts := Defaults()
 	st := &Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
 	// no CurrentFunc
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	if VisitFactsStatementReturn(st, &cg, opts) {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
@@ -165,7 +165,7 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// CurrentFunc without RV
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	fm := NewFactMgr(f)
+	fm := NewFactMgrSess(testAmbientSession, f)
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("nil RV must fail closed")
