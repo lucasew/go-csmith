@@ -605,7 +605,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		}
 		return
 	}
-	if !makeupNewUnionFacts(preUnion, thenOutU) || !makeupNewUnionFacts(preUnion, elseOutU) {
+	if !makeupNewUnionFactsSess(fmSess(fm), preUnion, thenOutU) || !makeupNewUnionFactsSess(fmSess(fm), preUnion, elseOutU) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		if !sessHasError(fmSess(fm)) {
@@ -712,7 +712,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 			}
 			return
 		}
-		if !makeupNewUnionFacts(&fm.UnionFacts, inU) {
+		if !makeupNewUnionFactsSess(fmSess(fm), &fm.UnionFacts, inU) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !sessHasError(fmSess(fm)) {
@@ -746,7 +746,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		}
 		// eUnionWrite half of merge_facts (Fact.cpp:192–199 + FactUnion::join)
 		// Deep-clone then arm outs so merge_fact join cannot alias map_facts_out.
-		u := CloneUnionFactSliceDeep(thenOutU)
+		u := CloneUnionFactSliceDeepSess(fmSess(fm), thenOutU)
 		if sessHasError(fmSess(fm)) || !UnionFactsComplete(u) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -767,7 +767,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 				sessNoteError(fmSess(fm), ErrGeneric)
 				return
 			}
-			u = MergeUnionFact(u, nf)
+			u = MergeUnionFactSess(fmSess(fm), u, nf)
 			if !UnionFactsComplete(u) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()

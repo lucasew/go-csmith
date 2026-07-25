@@ -530,7 +530,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
-			cg.FM.UnionFacts = MergeUnionFactInto(cg.FM.UnionFacts, f)
+			cg.FM.UnionFacts = MergeUnionFactIntoSess(cgSess(cg), cg.FM.UnionFacts, f)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(cg.FM.UnionFacts) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)

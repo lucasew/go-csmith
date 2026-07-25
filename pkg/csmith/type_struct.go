@@ -690,17 +690,17 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 				return StructField{}
 			}
 			// Type.cpp:691–692 — contain_pointer_field rejected (pointers + aggregates with ptr fields)
-			if t.ContainPointerField() {
+			if t.ContainPointerFieldSess(envSess(env)) {
 				if sessHasError(envSess(env)) {
 					return StructField{}
 				}
 				continue
 			}
-			isSt := t.IsStruct()
+			isSt := t.IsStructSess(envSess(env))
 			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
-			isUn := t.IsUnion()
+			isUn := t.IsUnionSess(envSess(env))
 			if sessHasError(envSess(env)) {
 				return StructField{}
 			}
@@ -710,7 +710,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 				continue
 			}
 			// Type.cpp:701–702 — no bitfields in union members for now
-			if t.HasBitfields() {
+			if t.HasBitfieldsSess(envSess(env)) {
 				if sessHasError(envSess(env)) {
 					return StructField{}
 				}
@@ -720,8 +720,13 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			if t.HasImplicitNontrivialAssignOps {
 				continue
 			}
-			if t.IsStruct() {
+			if t.IsStructSess(envSess(env)) {
+				if sessHasError(envSess(env)) {
+					return StructField{}
+				}
 				structTypes = append(structTypes, t)
+			} else if sessHasError(envSess(env)) {
+				return StructField{}
 			}
 			// Type.cpp:710–712 — no union in union
 		}
@@ -754,7 +759,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			return StructField{}
 		}
 		// Type.cpp:723–727 — SIMPLE_TYPES_PROB_FILTER reject (weight 0), retry; pool stays full
-		if cand.IsSimple() {
+		if cand.IsSimpleSess(envSess(env)) {
 			if sessHasError(envSess(env)) {
 				return StructField{}
 			}

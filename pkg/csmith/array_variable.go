@@ -136,8 +136,13 @@ func CreateArrayVariable(
 	// self-link for ChooseOKVar itemize (VariableSelector.cpp:332–337)
 	av.AsArray = av
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
-	if elem.IsAggregate() {
+	if elem.IsAggregateSess(cgSess(cg)) {
+		if sessHasError(cgSess(cg)) {
+			return nil
+		}
 		av.CreateFieldVarsSess(cgSess(cg))
+	} else if sessHasError(cgSess(cg)) {
+		return nil
 	}
 	if sessHasError(cgSess(cg)) {
 		return nil

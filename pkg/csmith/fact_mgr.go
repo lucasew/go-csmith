@@ -1446,7 +1446,7 @@ func makeupNewUnionFactsSess(s *Session, oldFacts *[]*FactUnion, live []*FactUni
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if FindRelatedUnion(*oldFacts, f.Var) != nil {
+		if FindRelatedUnionSess(s, *oldFacts, f.Var) != nil {
 			if sessHasError(s) {
 				*oldFacts = IncompleteUnionFactSlice()
 				return false
@@ -1459,7 +1459,7 @@ func makeupNewUnionFactsSess(s *Session, oldFacts *[]*FactUnion, live []*FactUni
 		}
 		// FactMgr.cpp:503–504 — add_new_var_fact(v, old_facts) for missing subjects
 		v := f.Var
-		if !v.IsGlobal() && !v.IsLocal() {
+		if !v.IsGlobalSess(s) && !v.IsLocalSess(s) {
 			if sessHasError(s) {
 				*oldFacts = IncompleteUnionFactSlice()
 				return false
@@ -1859,7 +1859,7 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:676–677 — rv facts always listed (no pre-fact required)
-		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
+		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.MatchSess(fmSess(fm), f.Var) {
 			// residual ERROR sticky — no invent soft-continue past Match hole
 			if sessHasError(fmSess(fm)) {
 				return IncompleteFactSlice()
@@ -1872,7 +1872,7 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:679–682 — assert(prev_f); no soft invent missing prev as change
-		prev := FindRelatedPointTo(in, f.Var)
+		prev := FindRelatedPointToSess(fmSess(fm), in, f.Var)
 		// residual ERROR sticky — no invent soft-continue then partial updated past hole
 		if sessHasError(fmSess(fm)) {
 			return IncompleteFactSlice()
@@ -2162,7 +2162,7 @@ func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Func
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
-		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
+		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.MatchSess(s, fact.Var)) {
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
@@ -2171,7 +2171,7 @@ func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Func
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
-		cl := fact.Clone()
+		cl := fact.CloneSess(s)
 		if cl == nil || sessHasError(s) {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
@@ -3423,7 +3423,7 @@ func MergeUnionFactSess(s *Session, facts []*FactUnion, f *FactUnion) []*FactUni
 			continue
 		}
 		// Fact.cpp:155–163 — if old.imply(new) keep old; else copy=new.clone(); copy.join(old)
-		if old.Imply(f) {
+		if old.ImplySess(s, f) {
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
@@ -3432,14 +3432,14 @@ func MergeUnionFactSess(s *Session, facts []*FactUnion, f *FactUnion) []*FactUni
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
-		cp := f.Clone()
+		cp := f.CloneSess(s)
 		if cp == nil || sessHasError(s) {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
 			}
 			return IncompleteUnionFactSlice()
 		}
-		cp.Join(old)
+		cp.JoinSess(s, old)
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
@@ -3838,7 +3838,7 @@ func UpdateUnionFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*Fact
 	for _, f := range *facts {
 		drop := false
 		for _, v := range vars {
-			if v.Match(f.Var) {
+			if v.MatchSess(s, f.Var) {
 				if sessHasError(s) {
 					*facts = IncompleteUnionFactSlice()
 					return

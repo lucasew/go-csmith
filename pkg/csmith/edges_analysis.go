@@ -142,7 +142,7 @@ func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactU
 		}
 		if jumpF == nil {
 			// FactMgr.cpp:580–582 — jump over init → BOTTOM for eUnionWrite
-			jumpF = MakeFactUnion(f.Var, FactUnionBottom)
+			jumpF = MakeFactUnionSess(s, f.Var, FactUnionBottom)
 			if jumpF == nil || sessHasError(s) {
 				*facts = IncompleteUnionFactSlice()
 				if !sessHasError(s) {
@@ -151,7 +151,7 @@ func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactU
 				return false
 			}
 		}
-		merged := MergeUnionFact(*facts, jumpF)
+		merged := MergeUnionFactSess(s, *facts, jumpF)
 		if !UnionFactsComplete(merged) {
 			*facts = IncompleteUnionFactSlice()
 			sessNoteError(s, ErrGeneric)
@@ -442,7 +442,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			}
 			return
 		}
-		if !makeupNewUnionFacts(&workPreUnion, fm.UnionFacts) {
+		if !makeupNewUnionFactsSess(cgSess(cg), &workPreUnion, fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !sessHasError(cgSess(cg)) {
@@ -794,14 +794,14 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					}
 					// MergeUnionFact appends without clone on new subject; deep-clone
 					// so map_facts_out lattice is not aliased into current_inputs.
-					cp := uf.Clone()
+					cp := uf.CloneSess(cgSess(cg))
 					if cp == nil || sessHasError(cgSess(cg)) {
 						if !sessHasError(cgSess(cg)) {
 							sessNoteError(cgSess(cg), ErrGeneric)
 						}
 						return currentInputs, nil, -1, false
 					}
-					currentUnions = MergeUnionFact(currentUnions, cp)
+					currentUnions = MergeUnionFactSess(cgSess(cg), currentUnions, cp)
 					if !UnionFactsComplete(currentUnions) {
 						if !sessHasError(cgSess(cg)) {
 							sessNoteError(cgSess(cg), ErrGeneric)

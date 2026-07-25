@@ -813,7 +813,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, nf)
+		fm.UnionFacts = MergeUnionFactSess(cgSess(cg), fm.UnionFacts, nf)
 		if !UnionFactsComplete(fm.UnionFacts) {
 			restore()
 			if !sessHasError(cgSess(cg)) {

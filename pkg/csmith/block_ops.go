@@ -775,7 +775,7 @@ func (b *Block) AppendNestedLoop(
 		// preUnion without makeupNewUnionFacts — undid PostCreationAnalysis union
 		// makeup and left map_facts_in missing mid-for union subjects.
 		if !MakeupNewVarFactsSess(cgSess(cg), &preFacts, cg.FM.GlobalFacts) ||
-			!makeupNewUnionFacts(&preUnion, cg.FM.UnionFacts) ||
+			!makeupNewUnionFactsSess(cgSess(cg), &preUnion, cg.FM.UnionFacts) ||
 			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) ||
 			!UnionFactsComplete(preUnion) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
@@ -888,7 +888,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		// Block.cpp:383 — makeup_new_var_facts(pre_facts, global_facts) full FactVec
 		// Soft invent was PT-only MakeupNewVarFacts before set_fact_in.
 		if !MakeupNewVarFactsSess(cgSess(cg), &preFacts, fm.GlobalFacts) ||
-			!makeupNewUnionFacts(&preUnion, fm.UnionFacts) ||
+			!makeupNewUnionFactsSess(cgSess(cg), &preUnion, fm.UnionFacts) ||
 			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) ||
 			!UnionFactsComplete(preUnion) || !UnionFactsComplete(fm.UnionFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts

@@ -226,6 +226,11 @@ func (g *ProgramGenerator) Initialize() {
 	}
 	s := g.Sess
 	if s == nil {
+		// No ambient dual-install: callers (NewProgramGenerator / Generate) own the bag.
+		// Unit tests that need Process* ambient must pass g.Sess explicitly.
+		if pureGenStrict {
+			panic("ProgramGenerator.Initialize: nil Sess under pureGenStrict")
+		}
 		s = sessOrAmbient(nil)
 		g.Sess = s
 	}

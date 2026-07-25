@@ -1911,6 +1911,7 @@ func (v *Variable) IsAggregate() bool {
 	return v.IsAggregateSess(nil)
 }
 
+// IsAggregateSess is IsAggregate with explicit session residual sticky.
 func (v *Variable) IsAggregateSess(s *Session) bool {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -2388,12 +2389,12 @@ func (v *Variable) FindPointerFieldsSess(s *Session) []*Variable {
 		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue aggregate past IsPointer residual false
 			return IncompleteVariables()
-		} else if f.IsAggregate() {
+		} else if f.IsAggregateSess(s) {
 			// residual ERROR sticky — no invent soft-continue nest past IsAggregate residual true
 			if sessHasError(s) {
 				return IncompleteVariables()
 			}
-			nested := f.FindPointerFields()
+			nested := f.FindPointerFieldsSess(s)
 			// incomplete nested FieldVars (empty complete is non-nil [])
 			if !VariablesComplete(nested) {
 				// nested already SetError sticky
@@ -2489,7 +2490,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 				fail()
 				return
 			}
-			base = v.AsArray.OutputAccess()
+			base = v.AsArray.OutputAccessSess(s)
 			if sessHasError(s) || base == "" {
 				fail()
 				return
@@ -2504,7 +2505,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 		// CVQualifiers length = IndirectLevel+1 (pointer levels + storage).
 		// Empty field qfer → all-false at each level (no invent 1-bool then SanityCheck fail
 		// → IncompleteVariables soft shell without sticky ERROR_GUARD).
-		il := f.Type.IndirectLevel()
+		il := f.Type.IndirectLevelSess(s)
 		// residual ERROR sticky — no invent soft-create field past IndirectLevel residual
 		if sessHasError(s) {
 			fail()

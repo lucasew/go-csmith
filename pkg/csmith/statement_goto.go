@@ -887,7 +887,7 @@ func MakeRandomGoto(
 				}
 				return makeGotoFailed()
 			}
-			if !makeupNewUnionFacts(&stmInMergedU, liveSavedU) {
+			if !makeupNewUnionFactsSess(cgSess(cg), &stmInMergedU, liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				if !sessHasError(cgSess(cg)) {

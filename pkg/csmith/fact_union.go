@@ -35,7 +35,7 @@ func MakeFactUnionSess(s *Session, v *Variable, fid int) *FactUnion {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		if !v.Type.IsUnion() {
+		if !v.Type.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-nil FactUnion past IsUnion residual
 			if sessHasError(s) {
 				return nil
@@ -386,7 +386,7 @@ func (f *FactUnion) GetLastWrittenTypeSess(s *Session) *Type {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	if !f.Var.Type.IsUnion() {
+	if !f.Var.Type.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-nil type past IsUnion residual
 		if sessHasError(s) {
 			return nil
@@ -627,7 +627,7 @@ func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) b
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !v.Type.IsUnion() || fid < 0 {
+	if !v.Type.IsUnionSess(s) || fid < 0 {
 		// residual ERROR sticky — no invent not-readable soft-skip past IsUnion residual
 		if sessHasError(s) {
 			return false
@@ -734,7 +734,7 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 		}
 		return true
 	}
-	fu := FindRelatedUnion(facts, parent)
+	fu := FindRelatedUnionSess(s, facts, parent)
 	// residual ERROR sticky — no invent soft-continue readable past FindRelatedUnion hole
 	if sessHasError(s) {
 		return true
@@ -743,7 +743,7 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 		// no fact → nonreadable (complete analysis)
 		return true
 	}
-	ok := tmp.Imply(fu)
+	ok := tmp.ImplySess(s, fu)
 	// residual ERROR sticky — no invent soft-continue readable past Imply hole
 	if sessHasError(s) {
 		return true
@@ -809,7 +809,11 @@ func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *Fa
 // without imply short-circuit (see call_analysis comment at if-combine).}
 
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
-	return MergeUnionFact(facts, nf)
+	return MergeUnionFactIntoSess(nil, facts, nf)
+}
+
+func MergeUnionFactIntoSess(s *Session, facts []*FactUnion, nf *FactUnion) []*FactUnion {
+	return MergeUnionFactSess(s, facts, nf)
 }
 
 // RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.
@@ -854,7 +858,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		if !v.Type.IsUnion() {
+		if !v.Type.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-transfer past IsUnion residual
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
@@ -869,7 +873,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 	}
 	switch rhs.Term {
 	case TermConstant:
-		return MakeFactUnions(lvars, 0)
+		return MakeFactUnionsSess(s, lvars, 0)
 	case TermVariable:
 		if rhs.Var == nil {
 			sessNoteError(s, ErrGeneric)
@@ -917,7 +921,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 			// complete: no related RHS fact → empty transfer
 			return nil
 		}
-		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
+		return MakeFactUnionsSess(s, lvars, rhsFact.LastWrittenFID)
 	case TermFunction:
 		// FactUnion.cpp:99–109 — get_return_fact_for_invocation(…, eUnionWrite).
 		// Soft invent looked up ambient unionFacts by RV subject (missed registry).
@@ -937,7 +941,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 			return IncompleteUnionFactSlice()
 		}
 		if uf != nil {
-			return MakeFactUnions(lvars, uf.LastWrittenFID)
+			return MakeFactUnionsSess(s, lvars, uf.LastWrittenFID)
 		}
 		// FactUnion.cpp:107 assert(rv_fact) path — non-sticky generation hole
 		return IncompleteUnionFactSlice()
