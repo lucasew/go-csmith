@@ -471,7 +471,7 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 		return
 	}
 	for _, cb := range c.CallChain {
-		if cb == nil || !cb.StackScanComplete() {
+		if cb == nil || !cb.StackScanCompleteSess(cgSess(c)) {
 			// incomplete call_chain / stack lists — fail closed sticky (no invent skip merge)
 			// residual ERROR sticky — no invent soft-skip merge past StackScan residual
 			if !hasErrCG(c) {
@@ -480,7 +480,7 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 			return
 		}
 	}
-	if b != nil && !b.StackScanComplete() {
+	if b != nil && !b.StackScanCompleteSess(cgSess(c)) {
 		// residual ERROR sticky — no invent soft-skip merge past StackScan residual
 		if !hasErrCG(c) {
 			noteErrCG(c, ErrGeneric)
@@ -1630,7 +1630,7 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	if b == nil {
 		return false
 	}
-	if !b.StackScanComplete() {
+	if !b.StackScanCompleteSess(sessFromCG(&c)) {
 		// incomplete stack sticky (no invent not-frame / soft re-pick past hole)
 		// residual ERROR sticky — no invent soft not-frame past StackScan residual
 		if !hasErrCG(&c) {
@@ -1652,7 +1652,7 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	for _, cb := range c.CallChain {
 		// Block* always live on call_chain; nil / incomplete stack sticky fail closed
 		// (no invent skip hole and still match a later frame)
-		if cb == nil || !cb.StackScanComplete() {
+		if cb == nil || !cb.StackScanCompleteSess(sessFromCG(&c)) {
 			// residual ERROR sticky — no invent soft not-frame past StackScan residual
 			if !hasErrCG(&c) {
 				noteErrCG(&c, ErrGeneric)
@@ -1680,7 +1680,7 @@ func (c CGContext) frameStacksComplete() bool {
 	if b == nil {
 		return true
 	}
-	if !b.StackScanComplete() {
+	if !b.StackScanCompleteSess(sessFromCG(&c)) {
 		// residual ERROR sticky — no invent soft-complete frames past StackScan residual
 		if hasErrCG(&c) {
 			return false
@@ -1688,7 +1688,7 @@ func (c CGContext) frameStacksComplete() bool {
 		return false
 	}
 	for _, cb := range c.CallChain {
-		if cb == nil || !cb.StackScanComplete() {
+		if cb == nil || !cb.StackScanCompleteSess(sessFromCG(&c)) {
 			if hasErrCG(&c) {
 				return false
 			}

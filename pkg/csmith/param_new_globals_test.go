@@ -68,7 +68,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		list.Funcs = []*Function{caller}
 		caller.NewGlobals = nil
-		fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+		fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 		if fi != nil && !fi.Failed {
 			break
 		}

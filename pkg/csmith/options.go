@@ -99,7 +99,7 @@ func sessScopeTab(s *Session) *ThresholdTable {
 // VariableSelector.cpp:110–122 — create once from CGOptions::global_variables.
 // Non-Sess InitScopeTable deleted — pass testAmbientSession from unit tests.
 func InitScopeTableSess(s *Session, opts Options) {
-	SetProcessScopeTabSess(s, NewScopeThresholdTable(opts))
+	SetProcessScopeTabSess(s, NewScopeThresholdTableSess(s, opts))
 }
 
 // SetProcessAssignOpsTableSess installs AssignOpsTab on an explicit session bag.

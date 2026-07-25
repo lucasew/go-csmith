@@ -154,16 +154,16 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 func TestOutputPtrResets(t *testing.T) {
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	out := OutputPtrResets([]*Variable{p}, Defaults())
+	out := OutputPtrResetsSess(testAmbientSession, []*Variable{p}, Defaults())
 	if !strings.Contains(out, "g_p = 0") {
 		t.Fatal(out)
 	}
-	if OutputPtrResets(nil, Defaults()) != "" {
+	if OutputPtrResetsSess(testAmbientSession, nil, Defaults()) != "" {
 		t.Fatal("empty")
 	}
 	// incomplete list fails closed sticky (no invent soft-skip hole)
 	ClearErrorSess(testAmbientSession)
-	if OutputPtrResets([]*Variable{p, nil}, Defaults()) != "" {
+	if OutputPtrResetsSess(testAmbientSession, []*Variable{p, nil}, Defaults()) != "" {
 		t.Fatal("nil hole must fail closed whole resets")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -172,7 +172,7 @@ func TestOutputPtrResets(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable shell
 	shell := &Variable{Name: "g_a", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2}}
-	if OutputPtrResets([]*Variable{shell}, Defaults()) != "" {
+	if OutputPtrResetsSess(testAmbientSession, []*Variable{shell}, Defaults()) != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole resets")
 	}
 	if !HasErrorSess(testAmbientSession) {

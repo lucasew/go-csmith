@@ -155,7 +155,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 		Lhs:      &Lhs{Var: p, Type: f1.Type}, // indir = ptr - pointee = 1
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		AssignOp: AssignSimple,
-		StmID:    AllocStmID(),
+		StmID:    AllocStmIDSess(testAmbientSession),
 	}
 	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},

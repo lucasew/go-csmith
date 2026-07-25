@@ -77,19 +77,19 @@ func TestApplyInitExprOutputDef(t *testing.T) {
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false, false}, []bool{false, false}))
-	applyInitExpr(pv, &Expression{Term: TermVariable, Var: iv, ExprType: pt})
+	applyInitExprSess(testAmbientSession, pv, &Expression{Term: TermVariable, Var: iv, ExprType: pt})
 	def := pv.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if !strings.Contains(def, "g_p") || !strings.Contains(def, "&") {
 		t.Fatal(def)
 	}
 	// Variable always live; sticky (no invent soft-skip init bind past hole)
 	// Nil init complete no-op
-	applyInitExpr(nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)})
+	applyInitExprSess(testAmbientSession, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var applyInitExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	applyInitExpr(pv, nil)
+	applyInitExprSess(testAmbientSession, pv, nil)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil init applyInitExpr must complete no-op")
 	}

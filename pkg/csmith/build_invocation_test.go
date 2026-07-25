@@ -12,7 +12,7 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, nil, nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, list, nil, nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil return type must fail without soft invent")
 	}
@@ -37,7 +37,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
@@ -85,7 +85,7 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	list := &FunctionList{}
 	// seed globals for args / body
 	for i := 0; i < 3; i++ {
@@ -226,7 +226,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	}
 	// same-package clear paired FM (signature always pairs; strip for fail-closed path)
 	f.factMgr = nil
-	f.GenerateBody(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
+	f.GenerateBody(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil {
 		t.Fatal("nil paired FM must fail closed body")
 	}
@@ -238,7 +238,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectAccum = &inc
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete ambient BuildInvocationAndFunction must Failed")
 	}
@@ -287,7 +287,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 		Body:            &Block{StmID: 1, Stmts: []Stmt{}},
 	}
 	// ensure NeedsRevisit true
-	if !callee.NeedsRevisit() {
+	if !callee.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("need revisit")
 	}
 	caller := &Function{Name: "func_1"}
@@ -349,8 +349,8 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 		t.Fatal("create inner local")
 	}
 	innerLoc.Name = "l_inner"
-	outer := &Block{StmID: AllocStmID()}
-	inner := &Block{Parent: outer, LocalVars: []*Variable{innerLoc}, StmID: AllocStmID()}
+	outer := &Block{StmID: AllocStmIDSess(testAmbientSession)}
+	inner := &Block{Parent: outer, LocalVars: []*Variable{innerLoc}, StmID: AllocStmIDSess(testAmbientSession)}
 	caller := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Stack: []*Block{outer, inner}}
 	outer.Func = caller
 	inner.Func = caller
@@ -395,7 +395,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 		IsBuilt:         true,
 		FactChanged:     true,
 		AccumEffContext: EmptyEffect(),
-		Body:            &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
+		Body:            &Block{StmID: AllocStmIDSess(testAmbientSession), Stmts: []Stmt{}},
 	}
 	callee.ensurePairedFactMgrSess(testAmbientSession)
 	list.Funcs = []*Function{caller, callee}
@@ -474,7 +474,7 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	cg.Types = vs.Types
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg = cg.WithFactMgr(fm)
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi != nil && !fi.Failed {
 		// may return Failed or nil; must not invent clean success under incomplete ambient
 		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")
@@ -555,7 +555,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 		BuildState:  BuildBuilt,
 		IsBuilt:     true,
 		FactChanged: true,
-		Body:        &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
+		Body:        &Block{StmID: AllocStmIDSess(testAmbientSession), Stmts: []Stmt{}},
 		Param:       []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)},
 	}
 	callee.Body.Func = callee

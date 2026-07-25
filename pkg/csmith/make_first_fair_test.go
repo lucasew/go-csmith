@@ -115,14 +115,14 @@ func TestMakeFirstSetupInOutMaps(t *testing.T) {
 	list := &FunctionList{}
 	fmMap := NewFactMgrMapSess(testAmbientSession)
 	seedTypesForTest(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, list)
-	f := MakeFirst(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), list, fmMap)
+	f := MakeFirst(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), list, fmMap)
 	if f == nil || f.Body == nil {
 		t.Fatal("nil first")
 	}
 	if f.BuildState != BuildBuilt {
 		t.Fatal(f.BuildState)
 	}
-	fm := fmMap.ForFunc(f)
+	fm := fmMap.ForFuncSess(testAmbientSession, f)
 	if fm == nil {
 		t.Fatal("no fm")
 	}
@@ -146,10 +146,10 @@ func TestMakeRandomFunction(t *testing.T) {
 	list := &FunctionList{}
 	// seed first so list non-empty for choose
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, list)
-	_ = MakeFirst(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), list, nil)
+	_ = MakeFirst(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), list, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Funcs = list
-	f := MakeRandomFunction(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, list)
+	f := MakeRandomFunction(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), cg, GetIntTypeSess(testAmbientSession), nil, list)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -162,7 +162,7 @@ func TestMakeRandomFunction(t *testing.T) {
 		t.Log("params", len(f.Param))
 	}
 	// no invent unbuilt success when GenerateBody cannot run (nil RNG)
-	if MakeRandomFunction(nil, opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, list) != nil {
+	if MakeRandomFunction(nil, opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), cg, GetIntTypeSess(testAmbientSession), nil, list) != nil {
 		t.Fatal("nil RNG must not invent unbuilt function")
 	}
 }
@@ -176,18 +176,18 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 	// empty Types → RandomReturnType nil
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	list := &FunctionList{Types: vs.Types}
-	if MakeFirst(NewRngSess(testAmbientSession, 1), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 1), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), list, nil) != nil {
 		t.Fatal("empty AllTypes must fail closed")
 	}
 	// sticky error
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, list)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if MakeFirst(NewRngSess(testAmbientSession, 3), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 3), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), list, nil) != nil {
 		t.Fatal("sticky error")
 	}
 	ClearErrorSess(testAmbientSession)
 	// no invent Unbuilt success when body cannot generate
-	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), list, nil) != nil {
 		t.Fatal("nil RNG must not invent first")
 	}
 }
@@ -203,7 +203,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	seedTypesForTest(NewRngSess(testAmbientSession, 4), opts, probs, vs, list)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g, nil}
-	if MakeFirst(NewRngSess(testAmbientSession, 5), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), list, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 5), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), list, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -213,7 +213,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	seedTypesForTest(NewRngSess(testAmbientSession, 6), opts, probs, vs2, list2)
 	vs2.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list2)
-	if MakeRandomFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs2, &vs2.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, list2) != nil {
+	if MakeRandomFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs2, &vs2.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), cg, GetIntTypeSess(testAmbientSession), nil, list2) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
 	ClearErrorSess(testAmbientSession)

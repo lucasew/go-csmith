@@ -26,7 +26,7 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	entry := []*FactPointTo{ptG.CloneSess(testAmbientSession)}
 	// map_in is entry without body local (as after Drop)
 	b := &Block{
-		Func: f, StmID: AllocStmID(), Looping: true,
+		Func: f, StmID: AllocStmIDSess(testAmbientSession), Looping: true,
 		LocalVars: []*Variable{loc},
 		Stmts:     []Stmt{},
 	}
@@ -36,7 +36,7 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	// Self-back edge whose out still lists body local (goto/break-style pollution)
 	outWithLocal := []*FactPointTo{ptG.CloneSess(testAmbientSession), ptLoc.CloneSess(testAmbientSession)}
 	// Use a dummy src statement id that has out with local
-	srcID := AllocStmID()
+	srcID := AllocStmIDSess(testAmbientSession)
 	fm.SetMapFactsOut(srcID, outWithLocal)
 	fm.CreateCFGEdge(srcID, b, false, true)
 	fm.SetMapStmEffect(b.StmID, EmptyEffect())

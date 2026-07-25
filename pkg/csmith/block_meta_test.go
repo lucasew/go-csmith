@@ -10,7 +10,7 @@ func TestFromTailToHead(t *testing.T) {
 	b := &Block{Looping: true, Stmts: []Stmt{
 		{Kind: StmtAssign},
 	}}
-	if !b.FromTailToHead() {
+	if !b.FromTailToHeadSess(testAmbientSession) {
 		t.Fatal("fall through")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -18,7 +18,7 @@ func TestFromTailToHead(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	b.Stmts = []Stmt{{Kind: StmtReturn}}
-	if b.FromTailToHead() {
+	if b.FromTailToHeadSess(testAmbientSession) {
 		t.Fatal("return must_jump")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -26,7 +26,7 @@ func TestFromTailToHead(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	b.Looping = false
-	if b.FromTailToHead() {
+	if b.FromTailToHeadSess(testAmbientSession) {
 		t.Fatal("not looping")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -35,7 +35,7 @@ func TestFromTailToHead(t *testing.T) {
 	b2 := &Block{Looping: true, Stmts: []Stmt{
 		{Kind: StmtIfElse, Then: nil, Else: &Block{}},
 	}}
-	if b2.FromTailToHead() {
+	if b2.FromTailToHeadSess(testAmbientSession) {
 		t.Fatal("MustJump residual FromTailToHead must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -50,8 +50,8 @@ func TestGetLastStmStopsAtReturn(t *testing.T) {
 		{Kind: StmtReturn, StmID: 2},
 		{Kind: StmtAssign, StmID: 3},
 	}}
-	if b.GetLastStm() == nil || b.GetLastStm().StmID != 2 {
-		t.Fatal(b.GetLastStm())
+	if b.GetLastStmSess(testAmbientSession) == nil || b.GetLastStmSess(testAmbientSession).StmID != 2 {
+		t.Fatal(b.GetLastStmSess(testAmbientSession))
 	}
 }
 
@@ -103,7 +103,7 @@ func TestRandomParentBlock(t *testing.T) {
 	seen := map[*Block]bool{}
 	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 40; i++ {
-		seen[inner.RandomParentBlock(r, true)] = true
+		seen[inner.RandomParentBlockSess(testAmbientSession, r, true)] = true
 	}
 	// nil (global), outer, inner — three slots (Block.cpp:297–304)
 	if len(seen) < 2 {
@@ -112,13 +112,13 @@ func TestRandomParentBlock(t *testing.T) {
 	// with global_variables: domain size is 1 (nil) + chain length
 	rN := NewRngSess(testAmbientSession, 2)
 	d0 := rN.RandDepthSess(testAmbientSession)
-	_ = inner.RandomParentBlock(rN, true)
+	_ = inner.RandomParentBlockSess(testAmbientSession, rN, true)
 	// one U draw with n == 3 for [nil, inner, outer]
 	// (cannot read n from depth alone; polarity: without global never returns nil)
 	// without global
 	seen2 := map[*Block]bool{}
 	for i := 0; i < 20; i++ {
-		p := inner.RandomParentBlock(NewRngSess(testAmbientSession, uint64(i+2)), false)
+		p := inner.RandomParentBlockSess(testAmbientSession, NewRngSess(testAmbientSession, uint64(i+2)), false)
 		if p == nil {
 			t.Fatal("nil without global")
 		}
@@ -127,7 +127,7 @@ func TestRandomParentBlock(t *testing.T) {
 	// with global must be able to return nil
 	foundNil := false
 	for i := 0; i < 80; i++ {
-		if inner.RandomParentBlock(NewRngSess(testAmbientSession, uint64(i+1)), true) == nil {
+		if inner.RandomParentBlockSess(testAmbientSession, NewRngSess(testAmbientSession, uint64(i+1)), true) == nil {
 			foundNil = true
 			break
 		}
@@ -138,7 +138,7 @@ func TestRandomParentBlock(t *testing.T) {
 	_ = d0
 	// Block.cpp:306 — nil RNG sticky ERROR_GUARD
 	ClearErrorSess(testAmbientSession)
-	if inner.RandomParentBlock(nil, false) != nil {
+	if inner.RandomParentBlockSess(testAmbientSession, nil, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -159,14 +159,14 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 	// Manually mirror domain: [nil, inner, outer]
 	// After one RandomParentBlock(true), depth must advance by 1
 	d0 := r.RandDepthSess(testAmbientSession)
-	_ = inner.RandomParentBlock(r, true)
+	_ = inner.RandomParentBlockSess(testAmbientSession, r, true)
 	if r.RandDepthSess(testAmbientSession) != d0+1 {
 		t.Fatalf("one upto draw expected: %d → %d", d0, r.RandDepthSess(testAmbientSession))
 	}
 	// without global domain is 2
 	r2 := NewRngSess(testAmbientSession, 11)
 	d1 := r2.RandDepthSess(testAmbientSession)
-	_ = inner.RandomParentBlock(r2, false)
+	_ = inner.RandomParentBlockSess(testAmbientSession, r2, false)
 	if r2.RandDepthSess(testAmbientSession) != d1+1 {
 		t.Fatal("one upto")
 	}
@@ -203,12 +203,12 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// make a small looping block
-	b := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, true)
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, true)
 	if b == nil {
 		t.Fatal("nil")
 	}
 	// if fall-through possible, self back edge exists
-	if b.FromTailToHead() {
+	if b.FromTailToHeadSess(testAmbientSession) {
 		found := false
 		for _, e := range fm.CFGEdges {
 			if e != nil && e.BackLink && e.DestBlock == b {
@@ -311,7 +311,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 		t.Fatal("nil MustJump must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).MustReturnWithFM(NewFactMgrSess(testAmbientSession, nil)) {
+	if (*Block)(nil).MustReturnWithFMSess(testAmbientSession, NewFactMgrSess(testAmbientSession, nil)) {
 		t.Fatal("nil MustReturnWithFM must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -395,10 +395,10 @@ func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 func TestAllocStmIDMatchesCppSid(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	currentSession().NextStmID = 0
-	if AllocStmID() != 0 {
+	if AllocStmIDSess(testAmbientSession) != 0 {
 		t.Fatal("first stm_id must be 0")
 	}
-	if AllocStmID() != 1 || AllocStmID() != 2 {
+	if AllocStmIDSess(testAmbientSession) != 1 || AllocStmIDSess(testAmbientSession) != 2 {
 		t.Fatal("monotonic sid")
 	}
 	if StmIDUnset(0) {

@@ -9,9 +9,7 @@ package csmith
 // no invent skip holes or leave partial mid-join). Returns whether any fact changed.
 // Incomplete / mid-join failure clears *facts and returns false (same as no-change);
 // callers that need to distinguish use tryMergeJumpFacts.
-func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
-	return MergeJumpFactsSess(testAmbientSession, facts, jumpFacts)
-}
+// Non-Sess MergeJumpFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func MergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 	changed, ok := tryMergeJumpFactsSess(s, facts, jumpFacts)
@@ -23,9 +21,7 @@ func MergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPoin
 // (ok=true, changed=false). Mid-join MergeFactInto nil clears *facts (no invent
 // leave partial join as ok success).}
 
-func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
-	return tryMergeJumpFactsSess(testAmbientSession, facts, jumpFacts)
-}
+// Non-Sess tryMergeJumpFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
 	// facts out always live; sticky (no invent soft-skip jump merge past hole)
@@ -111,9 +107,7 @@ func isReturnVar(v *Variable) bool {
 
 // mergeJumpUnionFacts is the eUnionWrite half of FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact; missing → BOTTOM.
-func mergeJumpUnionFacts(facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
-	return mergeJumpUnionFactsSess(testAmbientSession, facts, jumpFacts)
-}
+// Non-Sess mergeJumpUnionFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactUnion) bool {
 	if facts == nil {

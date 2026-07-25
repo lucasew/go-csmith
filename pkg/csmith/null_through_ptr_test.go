@@ -60,7 +60,7 @@ func TestIfThenNullMergeMakesPointeeInvalid(t *testing.T) {
 	if n != 1 || len(nf) != 1 {
 		t.Fatalf("then abstract n=%d len=%d", n, len(nf))
 	}
-	_ = RenewFact(&thenWork, nf[0])
+	_ = RenewFactSess(testAmbientSession, &thenWork, nf[0])
 	elseWork := CloneFactSliceSess(testAmbientSession, pre)
 	merged := CloneFactSliceSess(testAmbientSession, thenWork)
 	_ = MergeFactsSess(testAmbientSession, &merged, elseWork)

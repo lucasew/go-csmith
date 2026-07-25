@@ -50,7 +50,7 @@ func TestAbsExtensionMakeInvocation(t *testing.T) {
 
 func TestExtensionMgrNullPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	DestroyExtensionSess(testAmbientSession, )
+	DestroyExtensionSess(testAmbientSession)
 	CreateExtensionSess(testAmbientSession, Defaults())
 	if ExtensionActiveSess(testAmbientSession) || HasErrorSess(testAmbientSession) {
 		t.Fatal("null extension")
@@ -80,14 +80,14 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	if !strings.Contains(ExtensionMgrOutputHeaderSess(testAmbientSession), "klee/klee.h") {
 		t.Fatal(ExtensionMgrOutputHeaderSess(testAmbientSession))
 	}
-	DestroyExtensionSess(testAmbientSession, )
+	DestroyExtensionSess(testAmbientSession)
 	ReinstallTestProcessSingletons()
 }
 
 func TestInitPartialExpanderEmptyFail(t *testing.T) {
 	// C++ parse_options("") fails
 	ClearPartialExpanderSess(testAmbientSession)
-	if InitPartialExpander("") {
+	if InitPartialExpanderSess(testAmbientSession, "") {
 		t.Fatal("empty must fail")
 	}
 	// FromOptions empty still clears (not init)

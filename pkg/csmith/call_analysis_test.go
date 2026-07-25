@@ -640,13 +640,13 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	rhs := &Expression{
 		Term: TermFunction,
 		Invoke: &Invocation{
-			User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, Body: &Block{StmID: AllocStmID()}},
+			User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, Body: &Block{StmID: AllocStmIDSess(testAmbientSession)}},
 			Args: []*Expression{a, b},
 		},
 	}
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	st := &Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: rhs, AssignOp: AssignSimple,
 	}

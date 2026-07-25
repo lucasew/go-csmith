@@ -13,9 +13,7 @@ package csmith
 // Incomplete PointTo fails closed (no invent registry of broken facts).
 // Incomplete invocation registry slots fail closed wipe (no invent soft-skip
 // nil inv and still match/re-seed a later parallel slot).
-func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
-	AddReturnFactForInvocationSess(testAmbientSession, fi, f)
-}
+// Non-Sess AddReturnFactForInvocation deleted — pass run bag or testAmbientSession explicitly.
 
 // AddReturnFactForInvocationSess is AddReturnFactForInvocation on an explicit session bag.
 func AddReturnFactForInvocationSess(s *Session, fi *Invocation, f *FactPointTo) {
@@ -51,9 +49,7 @@ func AddReturnFactForInvocationSess(s *Session, fi *Invocation, f *FactPointTo) 
 
 // AddReturnUnionFactForInvocation mirrors add_return_fact_for_invocation for eUnionWrite.
 // FunctionInvocationUser.cpp:91–102 — same registry, is_related by eUnionWrite + subject.
-func AddReturnUnionFactForInvocation(fi *Invocation, f *FactUnion) {
-	AddReturnUnionFactForInvocationSess(testAmbientSession, fi, f)
-}
+// Non-Sess AddReturnUnionFactForInvocation deleted — pass run bag or testAmbientSession explicitly.
 
 // AddReturnUnionFactForInvocationSess is AddReturnUnionFactForInvocation on an explicit session bag.
 func AddReturnUnionFactForInvocationSess(s *Session, fi *Invocation, f *FactUnion) {
@@ -88,9 +84,7 @@ func AddReturnUnionFactForInvocationSess(s *Session, fi *Invocation, f *FactUnio
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
 // FunctionInvocationUser.cpp:76–91 — assert parallel sizes; eCat == ePointTo.
 // Incomplete Invocation/Variable/registry sticky nil (no invent soft-skip hole to later match).
-func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
-	return GetReturnFactForInvocationSess(testAmbientSession, fi, v)
-}
+// Non-Sess GetReturnFactForInvocation deleted — pass run bag or testAmbientSession explicitly.
 
 // GetReturnFactForInvocationSess is GetReturnFactForInvocation on an explicit session bag.
 func GetReturnFactForInvocationSess(s *Session, fi *Invocation, v *Variable) *FactPointTo {
@@ -122,9 +116,7 @@ func GetReturnFactForInvocationSess(s *Session, fi *Invocation, v *Variable) *Fa
 
 // GetReturnUnionFactForInvocation mirrors get_return_fact_for_invocation(…, eUnionWrite).
 // FunctionInvocationUser.cpp:76–91; FactUnion.cpp:103–106.
-func GetReturnUnionFactForInvocation(fi *Invocation, v *Variable) *FactUnion {
-	return GetReturnUnionFactForInvocationSess(testAmbientSession, fi, v)
-}
+// Non-Sess GetReturnUnionFactForInvocation deleted — pass run bag or testAmbientSession explicitly.
 
 // GetReturnUnionFactForInvocationSess is GetReturnUnionFactForInvocation on an explicit session bag.
 func GetReturnUnionFactForInvocationSess(s *Session, fi *Invocation, v *Variable) *FactUnion {
@@ -154,9 +146,7 @@ func GetReturnUnionFactForInvocationSess(s *Session, fi *Invocation, v *Variable
 
 // InvocationReturnFactsDoFinalization mirrors FunctionInvocationUser::doFinalization.
 // FunctionInvocationUser.cpp:368–371.
-func InvocationReturnFactsDoFinalization() {
-	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
-}
+// Non-Sess InvocationReturnFactsDoFinalization deleted — pass run bag or testAmbientSession explicitly.
 
 // InvocationReturnFactsDoFinalizationSess clears return-fact registries on s.
 func InvocationReturnFactsDoFinalizationSess(s *Session) {
@@ -170,9 +160,7 @@ func InvocationReturnFactsDoFinalizationSess(s *Session) {
 // SaveReturnFacts mirrors FunctionInvocationUser::save_return_fact for ePointTo.
 // FunctionInvocationUser.cpp:358–365 — facts matching func.rv.
 // Incomplete maps fail closed (no invent soft-skip holes and still save later).
-func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
-	fi.SaveReturnFactsSess(testAmbientSession, facts)
-}
+// Non-Sess SaveReturnFacts deleted — pass run bag or testAmbientSession explicitly.
 
 // SaveReturnFactsSess is SaveReturnFacts with explicit session residual sticky.
 func (fi *Invocation) SaveReturnFactsSess(s *Session, facts []*FactPointTo) {
@@ -214,9 +202,7 @@ func (fi *Invocation) SaveReturnFactsSess(s *Session, facts []*FactPointTo) {
 
 // SaveReturnUnionFacts mirrors save_return_fact for eUnionWrite facts.
 // FunctionInvocationUser.cpp:358–365 — full FactVec includes FactUnion for union RV.
-func (fi *Invocation) SaveReturnUnionFacts(facts []*FactUnion) {
-	fi.SaveReturnUnionFactsSess(testAmbientSession, facts)
-}
+// Non-Sess SaveReturnUnionFacts deleted — pass run bag or testAmbientSession explicitly.
 
 // SaveReturnUnionFactsSess is SaveReturnUnionFacts with explicit session residual sticky.
 func (fi *Invocation) SaveReturnUnionFactsSess(s *Session, facts []*FactUnion) {
@@ -258,9 +244,7 @@ func (fi *Invocation) SaveReturnUnionFactsSess(s *Session, facts []*FactUnion) {
 // garbage fact in place (seed-7 l_1402: {garbage,g_1183} dangling on re-read).
 // Fact* always live; incomplete subject map or nf PointTo fails closed
 // (*facts IncompleteFactSlice, false — no invent renew / leave incomplete as no-op).
-func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
-	return RenewFactSess(testAmbientSession, facts, nf)
-}
+// Non-Sess RenewFact deleted — pass run bag or testAmbientSession explicitly.
 
 func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
@@ -323,9 +307,7 @@ func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 // Fact.cpp:203–210.
 // Incomplete maps fail closed (*facts nil, false — no invent partial renew).}
 
-func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
-	return RenewFactsSess(testAmbientSession, facts, newFacts)
-}
+// Non-Sess RenewFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func RenewFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
@@ -363,9 +345,7 @@ func RenewFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) 
 // Empty result matches C++ when n!=2 and no call-bearing params (permute empty base).
 // FunctionInvocation.cpp:462 — assert(orders.size() > 0) on visit_unordered path.}
 
-func (fi *Invocation) PermuteParamOrders() [][]int {
-	return fi.PermuteParamOrdersSess(testAmbientSession)
-}
+// Non-Sess PermuteParamOrders deleted — pass run bag or testAmbientSession explicitly.
 
 // PermuteParamOrdersSess is PermuteParamOrders with explicit session residual sticky.
 func (fi *Invocation) PermuteParamOrdersSess(s *Session) [][]int {
@@ -546,9 +526,7 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 // NeedsRevisit reports whether build_invocation would re-analyze the callee.
 // FunctionInvocationUser.cpp:274–276.
 // Incomplete Function sticky false (no invent not-revisit soft-skip past hole).
-func (f *Function) NeedsRevisit() bool {
-	return f.NeedsRevisitSess(testAmbientSession)
-}
+// Non-Sess NeedsRevisit deleted — pass run bag or testAmbientSession explicitly.
 
 // NeedsRevisitSess is NeedsRevisit with explicit session residual sticky.
 func (f *Function) NeedsRevisitSess(s *Session) bool {
@@ -573,9 +551,7 @@ func (f *Function) NeedsRevisitSess(s *Session) bool {
 // Function.h:110.
 // Incomplete ReferencedPtrs sticky true (NeedsRevisit — no invent
 // "no pointers" via VariablesComplete(nil)/len==0 empty-complete).
-func (f *Function) IsPointerReferenced() bool {
-	return f.IsPointerReferencedSess(testAmbientSession)
-}
+// Non-Sess IsPointerReferenced deleted — pass run bag or testAmbientSession explicitly.
 
 // IsPointerReferencedSess is IsPointerReferenced with explicit session residual sticky.
 func (f *Function) IsPointerReferencedSess(s *Session) bool {
@@ -897,9 +873,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	return true
 }
 
-func cloneFactMap(m map[int][]*FactPointTo) map[int][]*FactPointTo {
-	return cloneFactMapSess(testAmbientSession, m)
-}
+// Non-Sess cloneFactMap deleted — pass run bag or testAmbientSession explicitly.
 
 func cloneFactMapSess(s *Session, m map[int][]*FactPointTo) map[int][]*FactPointTo {
 	if m == nil {
@@ -915,9 +889,7 @@ func cloneFactMapSess(s *Session, m map[int][]*FactPointTo) map[int][]*FactPoint
 
 // cloneUnionFactMap deep-copies MapUnionFactsIn/Out for revisit restore
 // (FactMgr.cpp map_facts_in/out full FactVec backup includes eUnionWrite).
-func cloneUnionFactMap(m map[int][]*FactUnion) map[int][]*FactUnion {
-	return cloneUnionFactMapSess(testAmbientSession, m)
-}
+// Non-Sess cloneUnionFactMap deleted — pass run bag or testAmbientSession explicitly.
 
 func cloneUnionFactMapSess(s *Session, m map[int][]*FactUnion) map[int][]*FactUnion {
 	if m == nil {
@@ -930,9 +902,7 @@ func cloneUnionFactMapSess(s *Session, m map[int][]*FactUnion) map[int][]*FactUn
 	return out
 }
 
-func cloneEffectMap(m map[int]Effect) map[int]Effect {
-	return cloneEffectMapSess(testAmbientSession, m)
-}
+// Non-Sess cloneEffectMap deleted — pass run bag or testAmbientSession explicitly.
 
 func cloneEffectMapSess(s *Session, m map[int]Effect) map[int]Effect {
 	if m == nil {
@@ -954,9 +924,7 @@ func cloneEffectMapSess(s *Session, m map[int]Effect) map[int]Effect {
 // FunctionInvocation.cpp:482–498 — user rv qfer; else non-const non-vol.
 // Incomplete Invocation / user RV fails closed sticky empty (no invent
 // storage-level non-const non-vol shell / soft re-pick past holes).
-func (fi *Invocation) GetQualifiers() CVQualifiers {
-	return fi.GetQualifiersSess(testAmbientSession)
-}
+// Non-Sess GetQualifiers deleted — pass run bag or testAmbientSession explicitly.
 
 // GetQualifiersSess is GetQualifiers with explicit session residual sticky.
 func (fi *Invocation) GetQualifiersSess(s *Session) CVQualifiers {

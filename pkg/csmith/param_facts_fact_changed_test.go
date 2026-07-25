@@ -64,7 +64,7 @@ func TestSeed1048Func53NoSpuriousFactChanged(t *testing.T) {
 	if f53.FactChanged {
 		t.Fatal("func_53 FactChanged must stay false without body PT updates (params alone)")
 	}
-	if f53.NeedsRevisit() {
+	if f53.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("func_53 NeedsRevisit must be false so build_invocation uses static feffect")
 	}
 	has283 := false

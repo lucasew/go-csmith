@@ -10,7 +10,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
 	var list FunctionList
 	seedTypesForTest(r, opts, probs, vs, &list)
@@ -111,7 +111,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// force failed path: nil rng already handled; use list at max
 	// mutate during a call that fails by using Failed invocation manually
 	// Directly verify RestoreFacts + accum restore pattern used in MakeRandomExprStmt
-	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointToSess(testAmbientSession, 
+	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointToSess(testAmbientSession,
 		CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false), NullPtr))
 	cg.FM.RestoreFacts(preFacts)
 	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil || len(fm.GlobalFacts) < 1 {

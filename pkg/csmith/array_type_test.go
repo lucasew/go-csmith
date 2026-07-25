@@ -387,7 +387,7 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	// GenerateNew* FM path: varCollective nil → SetError, no silent invent success
 	// without facts (AddNewVarFactAndUpdate(nil,nil) no-ops).
 	ClearErrorSess(testAmbientSession)
-	if varCollective(nil) != nil {
+	if varCollectiveSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil varCollective must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -412,7 +412,7 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	}
 	fld := item.FieldVars[0]
 	item.FieldVars = append(item.FieldVars, nil)
-	if varCollective(fld) != nil {
+	if varCollectiveSess(testAmbientSession, fld) != nil {
 		t.Fatal("incomplete array-field path must yield nil collective")
 	}
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
@@ -420,7 +420,7 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	before := len(fm.GlobalFacts)
 	ClearErrorSess(testAmbientSession)
 	// mirror GenerateNew* fail-closed: coll nil with FM set → sticky error, no invent facts
-	coll := varCollective(fld)
+	coll := varCollectiveSess(testAmbientSession, fld)
 	if coll == nil {
 		SetErrorSess(testAmbientSession, ErrGeneric)
 	} else {

@@ -195,7 +195,7 @@ func TestIfMergesFacts(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	f.Stack = []*Block{{Func: f}}
 	// generate if — may or may not change facts; ensure no panic and FM restored/merged
-	st := MakeRandomIf(NewRngSess(testAmbientSession, 11), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 11), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal("if")
 	}

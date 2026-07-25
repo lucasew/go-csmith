@@ -308,10 +308,10 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
+	callerBlk := &Block{Func: caller, StmID: AllocStmIDSess(testAmbientSession)}
 	caller.Stack = []*Block{callerBlk}
 	// Nested stack frame that is NOT the statement parent
-	inner := &Block{Func: caller, Parent: callerBlk, StmID: AllocStmID()}
+	inner := &Block{Func: caller, Parent: callerBlk, StmID: AllocStmIDSess(testAmbientSession)}
 	caller.Stack = []*Block{callerBlk, inner}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	cg.CurrBlk = callerBlk // statement parent (stm_visit_facts)
@@ -319,7 +319,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	cg.EffectAccum = &eff
 	// Build a small callee and revisit via VisitFactsInvocation
 	callee := &Function{Name: "callee", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
-	callee.Body = &Block{Func: callee, StmID: AllocStmID()}
+	callee.Body = &Block{Func: callee, StmID: AllocStmIDSess(testAmbientSession)}
 	callee.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
 	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	fi := &Invocation{User: callee}

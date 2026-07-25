@@ -590,7 +590,7 @@ func TestChooseRandomStructFromType(t *testing.T) {
 	if env.ChooseRandomStructFromType(NewRngSess(testAmbientSession, 1), st, false) != st {
 		t.Fatal("same")
 	}
-	got := ChooseRandomStructUnionType(NewRngSess(testAmbientSession, 2), []*Type{st})
+	got := ChooseRandomStructUnionTypeSess(testAmbientSession, NewRngSess(testAmbientSession, 2), []*Type{st})
 	if got != st {
 		t.Fatal(got)
 	}

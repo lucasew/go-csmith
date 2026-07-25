@@ -111,7 +111,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// force SelectArray to return our av by only having one
-	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatalf("kind %v", st.Kind)
 	}
@@ -161,7 +161,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	// empty dims → fail (no soft invent size [1] or access[0])
 	if st.Loop != nil || st.Then != nil {
 		t.Fatal("empty sizes must not soft-succeed")
@@ -183,7 +183,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st.Loop == nil && st.Then == nil {
 		t.Fatal("empty")
 	}
@@ -207,7 +207,7 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = vs.Types
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
-	st := MakeRandomIf(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
 	}

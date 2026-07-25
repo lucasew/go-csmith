@@ -361,10 +361,10 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	if VariablesComplete(f.ReferencedPtrs) {
 		t.Fatal("incomplete for must IncompleteVariables ReferencedPtrs, not empty-complete")
 	}
-	if !f.IsPointerReferenced() {
+	if !f.IsPointerReferencedSess(testAmbientSession) {
 		t.Fatal("incomplete ReferencedPtrs must fail closed IsPointerReferenced true")
 	}
-	if !f.NeedsRevisit() {
+	if !f.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("incomplete summary must NeedsRevisit")
 	}
 	if !HasErrorSess(testAmbientSession) {

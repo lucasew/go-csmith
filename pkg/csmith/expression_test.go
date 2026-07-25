@@ -121,7 +121,7 @@ func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
 	// Fair: sticky reject true.
 	opts := Defaults()
 	opts.CompatibleCheck = true
-	if !CompatibleCheckExprs(opts, hole, live) {
+	if !CompatibleCheckExprsSess(testAmbientSession, opts, hole, live) {
 		t.Fatal("Compatible residual CompatibleCheckExprs must fail closed reject true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -459,7 +459,7 @@ func TestConstantGetField(t *testing.T) {
 func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
 	// Expression.cpp:104–105 — direct_expand_check(eInvoke) → eFunction
 	ClearPartialExpanderSess(testAmbientSession)
-	if !InitPartialExpander("invoke") {
+	if !InitPartialExpanderSess(testAmbientSession, "invoke") {
 		t.Fatal("init")
 	}
 	defer ClearPartialExpanderSess(testAmbientSession)

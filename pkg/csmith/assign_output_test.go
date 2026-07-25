@@ -150,7 +150,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// make block — should tend to returns when stop is low
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
-		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, false)
+		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil")
 	}
@@ -162,7 +162,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 			found = true
 		}
 	}
-	if !found && f.NeedReturnStmt() {
+	if !found && f.NeedReturnStmtSess(testAmbientSession) {
 		// post_creation may still add return
 		_ = b.MustReturn()
 	}

@@ -90,15 +90,15 @@ func TestBlockMustReturnLast(t *testing.T) {
 
 func TestNeedReturnStmt(t *testing.T) {
 	f := &Function{ReturnType: GetIntTypeSess(testAmbientSession)}
-	if !f.NeedReturnStmt() {
+	if !f.NeedReturnStmtSess(testAmbientSession) {
 		t.Fatal("int")
 	}
 	f.ReturnType = GetSimpleTypeSess(testAmbientSession, EVoid)
-	if f.NeedReturnStmt() {
+	if f.NeedReturnStmtSess(testAmbientSession) {
 		t.Fatal("void")
 	}
 	// incomplete without ReturnType — no invent "no return needed"
-	if !(&Function{}).NeedReturnStmt() {
+	if !(&Function{}).NeedReturnStmtSess(testAmbientSession) {
 		t.Fatal("nil ReturnType must fail closed need-return")
 	}
 }

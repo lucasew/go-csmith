@@ -10,7 +10,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
@@ -108,7 +108,7 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
@@ -334,7 +334,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
 	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)

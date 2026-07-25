@@ -30,9 +30,9 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	// after first random_choice consuming the single debug token.
 	// Drive manually: one RndUpto sets all_done when pos >= len-1
 	_ = g.Rng.RndUptoSess(testAmbientSession, 2)
-	if !g.Rng.DFSGetAllDone() {
+	if !g.Rng.DFSGetAllDoneSess(testAmbientSession) {
 		// with length 1 sequence, pos 0 >= 0 → all_done
-		t.Log("all_done", g.Rng.DFSGetAllDone(), "pos", g.Rng.DFSGetCurrentPos())
+		t.Log("all_done", g.Rng.DFSGetAllDoneSess(testAmbientSession), "pos", g.Rng.DFSGetCurrentPosSess(testAmbientSession))
 	}
 	// reset then loop should exit immediately if already all_done after one choice
 	// Rebuild with fresh generator for loop test

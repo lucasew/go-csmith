@@ -58,23 +58,23 @@ func TestMergeEffectsMergesReads(t *testing.T) {
 func TestFactMgrForFunc(t *testing.T) {
 	f := &Function{Name: "func_1"}
 	m := NewFactMgrMapSess(testAmbientSession)
-	fm := m.ForFunc(f)
+	fm := m.ForFuncSess(testAmbientSession, f)
 	if fm == nil || fm.Func != f {
 		t.Fatal(fm)
 	}
-	if m.ForFunc(f) != fm {
+	if m.ForFuncSess(testAmbientSession, f) != fm {
 		t.Fatal("reuse")
 	}
 	// FactMgrMap + Function always live; sticky nil
 	ClearErrorSess(testAmbientSession)
-	if (*FactMgrMap)(nil).ForFunc(f) != nil {
+	if (*FactMgrMap)(nil).ForFuncSess(testAmbientSession, f) != nil {
 		t.Fatal("nil map ForFunc must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil map ForFunc must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if m.ForFunc(nil) != nil {
+	if m.ForFuncSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil Function ForFunc must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -93,7 +93,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("no fields")
 	}
-	got := ExpandStructUnionVars([]*Variable{sv}, GetIntTypeSess(testAmbientSession))
+	got := ExpandStructUnionVarsSess(testAmbientSession, []*Variable{sv}, GetIntTypeSess(testAmbientSession))
 	// parent removed when want is not the struct type itself
 	for _, v := range got {
 		if v == sv {
@@ -104,13 +104,13 @@ func TestExpandStructUnionVars(t *testing.T) {
 		t.Fatal("empty after expand")
 	}
 	// want exact struct type → keep parent
-	keep := ExpandStructUnionVars([]*Variable{sv}, st)
+	keep := ExpandStructUnionVarsSess(testAmbientSession, []*Variable{sv}, st)
 	if len(keep) != 1 || keep[0] != sv {
 		t.Fatalf("keep aggregate: %+v", keep)
 	}
 	// nil candidate / field hole fails closed sticky incomplete (not invent empty complete)
 	ClearErrorSess(testAmbientSession)
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{nil}, GetIntTypeSess(testAmbientSession))) {
+	if VariablesComplete(ExpandStructUnionVarsSess(testAmbientSession, []*Variable{nil}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil var hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -118,7 +118,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	sv.FieldVars = append(sv.FieldVars, nil)
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{sv}, GetIntTypeSess(testAmbientSession))) {
+	if VariablesComplete(ExpandStructUnionVarsSess(testAmbientSession, []*Variable{sv}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -127,7 +127,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky incomplete (no invent keep shell as complete candidate)
 	hole := &Variable{Name: "g_hole", Type: nil}
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{hole}, GetIntTypeSess(testAmbientSession))) {
+	if VariablesComplete(ExpandStructUnionVarsSess(testAmbientSession, []*Variable{hole}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("Type-nil expand must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -137,7 +137,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	// IsArray without AsArray soft invent was IsVirtual residual false soft-continue
 	// fair: sticky IncompleteVariables
 	arrShell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{arrShell}, GetIntTypeSess(testAmbientSession))) {
+	if VariablesComplete(ExpandStructUnionVarsSess(testAmbientSession, []*Variable{arrShell}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("IsArray without AsArray expand must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -150,7 +150,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	shell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	child := &Variable{Name: "g_arr.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: shell}
 	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{child, good}, GetIntTypeSess(testAmbientSession))) {
+	if VariablesComplete(ExpandStructUnionVarsSess(testAmbientSession, []*Variable{child, good}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("IsVirtual ancestry residual must fail closed incomplete, not invent later good")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -278,11 +278,11 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 func TestExpandCheckUnregisteredKindFailClosed(t *testing.T) {
 	// PartialExpander.cpp:137 — kinds not in expands_ map fail closed under partial mode
 	ClearPartialExpanderSess(testAmbientSession)
-	if !InitPartialExpander("for") {
+	if !InitPartialExpanderSess(testAmbientSession, "for") {
 		t.Fatal("init")
 	}
 	// Goto/Break not in expands_ → ExpandCheck false (filter rejects)
-	if ExpandCheck(StmtGoto) || ExpandCheck(StmtBreak) {
+	if ExpandCheckSess(testAmbientSession, StmtGoto) || ExpandCheckSess(testAmbientSession, StmtBreak) {
 		t.Fatal("unregistered kinds must not soft invent allow")
 	}
 	ClearPartialExpanderSess(testAmbientSession)
@@ -294,7 +294,7 @@ func TestVariableCreationProbability10(t *testing.T) {
 	opts.GlobalVariables = true
 	var nG, nL int
 	for seed := uint64(1); seed <= 200; seed++ {
-		if VariableCreationProbability(NewRngSess(testAmbientSession, seed), opts) == ScopeGlobal {
+		if VariableCreationProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, seed), opts) == ScopeGlobal {
 			nG++
 		} else {
 			nL++

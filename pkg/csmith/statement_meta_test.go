@@ -417,21 +417,21 @@ func TestMustReturnIncompleteSticky(t *testing.T) {
 
 func TestNeedReturnStmtIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Function)(nil).NeedReturnStmt() {
+	if (*Function)(nil).NeedReturnStmtSess(testAmbientSession) {
 		t.Fatal("nil Function NeedReturnStmt must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function NeedReturnStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(&Function{Name: "f"}).NeedReturnStmt() {
+	if !(&Function{Name: "f"}).NeedReturnStmtSess(testAmbientSession) {
 		t.Fatal("nil ReturnType must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ReturnType NeedReturnStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}).NeedReturnStmt() {
+	if (&Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}).NeedReturnStmtSess(testAmbientSession) {
 		t.Fatal("void must not need return")
 	}
 	if HasErrorSess(testAmbientSession) {

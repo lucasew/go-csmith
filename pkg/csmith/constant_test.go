@@ -403,27 +403,27 @@ func TestConstantCloneOutputCompatible(t *testing.T) {
 func TestBlockDepthProtectAndFind(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 7, blockSize: 4}
-	if b.BlockSize() != 4 {
-		t.Fatal(b.BlockSize())
+	if b.BlockSizeSess(testAmbientSession) != 4 {
+		t.Fatal(b.BlockSizeSess(testAmbientSession))
 	}
-	if b.GetDepthProtect() {
+	if b.GetDepthProtectSess(testAmbientSession) {
 		t.Fatal("default false")
 	}
-	if !b.SetDepthProtect(true) || !b.GetDepthProtect() {
+	if !b.SetDepthProtectSess(testAmbientSession, true) || !b.GetDepthProtectSess(testAmbientSession) {
 		t.Fatal("set")
 	}
-	b.PushStmt(Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}})
+	b.PushStmtSess(testAmbientSession, Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}})
 	if len(b.Stmts) != 1 {
 		t.Fatal("push")
 	}
 	f := &Function{Name: "f", Blocks: []*Block{b}}
-	if FindBlockByID([]*Function{f}, 7) != b {
+	if FindBlockByIDSess(testAmbientSession, []*Function{f}, 7) != b {
 		t.Fatal("find")
 	}
-	if FindBlockByID([]*Function{f}, 99) != nil {
+	if FindBlockByIDSess(testAmbientSession, []*Function{f}, 99) != nil {
 		t.Fatal("miss")
 	}
-	if FindBlockByID([]*Function{f}, 0) != nil || !HasErrorSess(testAmbientSession) {
+	if FindBlockByIDSess(testAmbientSession, []*Function{f}, 0) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("id 0 sticky")
 	}
 	ClearErrorSess(testAmbientSession)

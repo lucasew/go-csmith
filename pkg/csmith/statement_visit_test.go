@@ -238,7 +238,7 @@ func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
 // StmID is always live after create — required when FM path records map_stm_effect.
 func testForInit(iv *Variable, n int) *Stmt {
 	return &Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(), LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession), LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, n), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
@@ -456,9 +456,9 @@ func TestVisitFactsStatementForSameContextNoInventInLoop(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
-	body := &Block{StmID: AllocStmID(), Func: f, Looping: true}
+	body := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Looping: true}
 	st := &Stmt{
-		Kind: StmtFor, StmID: AllocStmID(),
+		Kind: StmtFor, StmID: AllocStmIDSess(testAmbientSession),
 		Loop: &LoopControl{
 			IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
 			InitStmt: testForInit(iv, 0),

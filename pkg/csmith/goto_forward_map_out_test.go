@@ -44,7 +44,7 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 
 	// update_facts_for_dest at dest parent must keep function-visible pointees
 	var gotoOut []*FactPointTo
-	UpdateFactsForDest(gotoIn, &gotoOut, f, body)
+	UpdateFactsForDestSess(testAmbientSession, gotoIn, &gotoOut, f, body)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("UpdateFactsForDest sticky: %v", GetErrorSess(testAmbientSession))
 	}

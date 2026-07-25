@@ -25,7 +25,7 @@ func TestUnionWriteFactsForHashUsesLiveFirstFunc(t *testing.T) {
 	if first == nil {
 		t.Fatal("no first function")
 	}
-	fm := g.FactMgrs.ForFunc(first)
+	fm := g.FactMgrs.ForFuncSess(testAmbientSession, first)
 	if fm == nil || len(uf) != len(fm.UnionFacts) {
 		t.Fatalf("hash facts must come from first-func live lattice len uf=%d fm=%v", len(uf), fm)
 	}

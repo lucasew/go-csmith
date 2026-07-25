@@ -54,9 +54,7 @@ func buildStatementThresholdTable(s *Session, opts Options) *ThresholdTable {
 // Probabilities is live (Statement::stmtTable_ from pStatementProb); otherwise
 // builds a library one-off from opts (tests that pass an explicit table).
 // Generation should prefer ProcessStmtTab / probs.StatementThresholdTableSess(s).
-func NewStatementThresholdTable(opts Options) *ThresholdTable {
-	return NewStatementThresholdTableSess(testAmbientSession, opts)
-}
+// Non-Sess NewStatementThresholdTable deleted — pass run bag or testAmbientSession explicitly.
 
 // NewStatementThresholdTableSess prefers session Probabilities statement table.
 func NewStatementThresholdTableSess(s *Session, opts Options) *ThresholdTable {
@@ -71,9 +69,7 @@ func NewStatementThresholdTableSess(s *Session, opts Options) *ThresholdTable {
 
 // NumberToType mirrors Statement::number_to_type(value) for value in [0,100).
 // Statement.cpp:141–147.
-func NumberToType(table *ThresholdTable, value uint32) StatementType {
-	return NumberToTypeSess(testAmbientSession, table, value)
-}
+// Non-Sess NumberToType deleted — pass run bag or testAmbientSession explicitly.
 
 // NumberToTypeSess is NumberToType with explicit session residual sticky.
 func NumberToTypeSess(s *Session, table *ThresholdTable, value uint32) StatementType {
@@ -93,9 +89,7 @@ func NumberToTypeSess(s *Session, table *ThresholdTable, value uint32) Statement
 // StatementProbability mirrors StatementProbability without StatementFilter.
 // Statement.cpp:230–235 — rnd_upto(100); number_to_type.
 // Callers that need filter pass reject via RndUptoFilter.
-func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
-	return StatementProbabilitySess(testAmbientSession, r, table)
-}
+// Non-Sess StatementProbability deleted — pass run bag or testAmbientSession explicitly.
 
 // StatementProbabilitySess is StatementProbability with explicit session residual sticky.
 func StatementProbabilitySess(s *Session, r *Rng, table *ThresholdTable) StatementType {
@@ -111,9 +105,7 @@ func StatementProbabilitySess(s *Session, r *Rng, table *ThresholdTable) Stateme
 
 // StatementProbabilityFilter mirrors StatementProbability with a Filter
 // (e.g. reject compound when at max depth — filter implemented by caller).
-func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) StatementType {
-	return StatementProbabilityFilterSess(testAmbientSession, r, table, f)
-}
+// Non-Sess StatementProbabilityFilter deleted — pass run bag or testAmbientSession explicitly.
 
 // StatementProbabilityFilterSess is StatementProbabilityFilter with explicit session residual sticky.
 func StatementProbabilityFilterSess(s *Session, r *Rng, table *ThresholdTable, f Filter) StatementType {
@@ -152,9 +144,7 @@ func (st *Stmt) GetTypeSess(s *Session) StatementType {
 
 // GetCurrentSID mirrors Statement::get_current_sid process counter.
 // Statement uses Session.NextStmID (ambient bag when no Sess).
-func GetCurrentSID() int {
-	return GetCurrentSIDSess(testAmbientSession)
-}
+// Non-Sess GetCurrentSID deleted — pass run bag or testAmbientSession explicitly.
 
 // GetCurrentSIDSess returns NextStmID on an explicit session bag.
 func GetCurrentSIDSess(s *Session) int {

@@ -34,7 +34,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, g88, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
-	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
+	outer := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Looping: false}
 	f.Body = outer
 	f.Stack = []*Block{outer}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -49,7 +49,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	initSt := &Stmt{
 		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)},
-		AssignOp: AssignSimple, StmID: AllocStmID(),
+		AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession),
 	}
 	if !VisitFactsStatementAssign(initSt, &cg, opts) {
 		t.Fatal("init visit", GetErrorSess(testAmbientSession))

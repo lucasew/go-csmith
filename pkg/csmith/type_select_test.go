@@ -38,7 +38,7 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 	// Type.cpp:523 assert(sz > 0) — empty ok_types must not invent a type
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomStructUnionType(NewRngSess(testAmbientSession, 1), nil) != nil {
+	if ChooseRandomStructUnionTypeSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil) != nil {
 		t.Fatal("empty pool")
 	}
 	// empty pool non-sticky soft (no candidates)
@@ -46,7 +46,7 @@ func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 		t.Fatal("empty pool must stay non-sticky soft")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomStructUnionType(nil, []*Type{GetIntTypeSess(testAmbientSession)}) != nil {
+	if ChooseRandomStructUnionTypeSess(testAmbientSession, nil, []*Type{GetIntTypeSess(testAmbientSession)}) != nil {
 		t.Fatal("nil rng")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -247,7 +247,7 @@ func TestChooseRandomPointerTypeNilHole(t *testing.T) {
 func TestChooseRandomStructUnionTypeNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0"}
-	if ChooseRandomStructUnionType(NewRngSess(testAmbientSession, 1), []*Type{st, nil}) != nil {
+	if ChooseRandomStructUnionTypeSess(testAmbientSession, NewRngSess(testAmbientSession, 1), []*Type{st, nil}) != nil {
 		t.Fatal("nil ok_types hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -50,8 +50,8 @@ func TestLinearSequence(t *testing.T) {
 
 func TestSequenceFactory(t *testing.T) {
 	// SequenceFactory.cpp:44–59
-	DestroySequencesSess(testAmbientSession, )
-	s := MakeSequenceSess(testAmbientSession, )
+	DestroySequencesSess(testAmbientSession)
+	s := MakeSequenceSess(testAmbientSession)
 	if s == nil || s.SepCharSess(testAmbientSession) != '_' {
 		t.Fatal("default sep")
 	}
@@ -59,7 +59,7 @@ func TestSequenceFactory(t *testing.T) {
 		t.Fatal(CurrentSepCharSess(testAmbientSession))
 	}
 	s.AddNumberSess(testAmbientSession, 0, 1, 0)
-	DestroySequencesSess(testAmbientSession, )
+	DestroySequencesSess(testAmbientSession)
 }
 
 func TestParseSequenceLine(t *testing.T) {

@@ -8,9 +8,7 @@ package csmith
 // InitPartialExpander mirrors PartialExpander::init_partial_expander.
 // PartialExpander.cpp:59–67 — parse comma-separated kind names; enable MAX sentinel.
 // Empty options fail closed false (C++ parse_options("") → set_expand("") false).
-func InitPartialExpander(options string) bool {
-	return InitPartialExpanderSess(testAmbientSession, options)
-}
+// Non-Sess InitPartialExpander deleted — pass run bag or testAmbientSession explicitly.
 
 // InitPartialExpanderSess is InitPartialExpander on an explicit session bag.
 func InitPartialExpanderSess(s *Session, options string) bool {
@@ -50,9 +48,7 @@ func copyPartialMap(src map[StatementType]bool) map[StatementType]bool {
 	return dest
 }
 
-func parsePartialOptions(options string, sep byte) bool {
-	return parsePartialOptionsSess(testAmbientSession, options, sep)
-}
+// Non-Sess parsePartialOptions deleted — pass run bag or testAmbientSession explicitly.
 
 func parsePartialOptionsSess(s *Session, options string, sep byte) bool {
 	// PartialExpander.cpp:71–86 — empty string yields one empty token → set_expand fails
@@ -72,9 +68,7 @@ func parsePartialOptionsSess(s *Session, options string, sep byte) bool {
 	return true
 }
 
-func setPartialExpand(tok string) bool {
-	return setPartialExpandSess(testAmbientSession, tok)
-}
+// Non-Sess setPartialExpand deleted — pass run bag or testAmbientSession explicitly.
 
 func setPartialExpandSess(s *Session, tok string) bool {
 	s = sessOrAmbient(s)
@@ -100,9 +94,7 @@ func setPartialExpandSess(s *Session, tok string) bool {
 }
 
 // SetStmtExpand mirrors PartialExpander::set_stmt_expand.
-func SetStmtExpand(t StatementType, value bool) {
-	SetStmtExpandSess(testAmbientSession, t, value)
-}
+// Non-Sess SetStmtExpand deleted — pass run bag or testAmbientSession explicitly.
 
 // SetStmtExpandSess is SetStmtExpand on an explicit session bag.
 func SetStmtExpandSess(s *Session, t StatementType, value bool) {
@@ -135,9 +127,7 @@ func DirectExpandCheckSess(s *Session, t StatementType) bool {
 // ExpandCheck mirrors PartialExpander::expand_check.
 // PartialExpander.cpp:132–151 — if partial mode off, allow all; else allow listed
 // kinds (Assign also ok if Invoke listed); first success clears MAX sentinel.
-func ExpandCheck(t StatementType) bool {
-	return ExpandCheckSess(testAmbientSession, t)
-}
+// Non-Sess ExpandCheck deleted — pass run bag or testAmbientSession explicitly.
 
 // ExpandCheckSess is ExpandCheck on an explicit session bag.
 func ExpandCheckSess(s *Session, t StatementType) bool {

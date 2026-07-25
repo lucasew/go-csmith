@@ -65,9 +65,7 @@ const IncompleteStmID = -1
 
 // AllocStmID mirrors Statement ctor: stm_id = sid; sid++.
 // Statement.cpp:370–371 — first statement gets 0.
-func AllocStmID() int {
-	return AllocStmIDSess(testAmbientSession)
-}
+// Non-Sess AllocStmID deleted — pass run bag or testAmbientSession explicitly.
 
 // AllocStmIDSess allocates a statement id on an explicit session bag.
 func AllocStmIDSess(s *Session) int {
@@ -118,9 +116,7 @@ type Block struct {
 
 // BlockSize mirrors Block::block_size.
 // Block.h:85 — CGOptions::max_block_size captured at construction.
-func (b *Block) BlockSize() int {
-	return b.BlockSizeSess(testAmbientSession)
-}
+// Non-Sess BlockSize deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) BlockSizeSess(s *Session) int {
 	if b == nil {
@@ -133,9 +129,7 @@ func (b *Block) BlockSizeSess(s *Session) int {
 // GetDepthProtect mirrors Block::get_depth_protect.
 // Block.h:76.}
 
-func (b *Block) GetDepthProtect() bool {
-	return b.GetDepthProtectSess(testAmbientSession)
-}
+// Non-Sess GetDepthProtect deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) GetDepthProtectSess(s *Session) bool {
 	if b == nil {
@@ -148,9 +142,7 @@ func (b *Block) GetDepthProtectSess(s *Session) bool {
 // SetDepthProtect mirrors Block::set_depth_protect — returns new value.
 // Block.h:72–74.}
 
-func (b *Block) SetDepthProtect(v bool) bool {
-	return b.SetDepthProtectSess(testAmbientSession, v)
-}
+// Non-Sess SetDepthProtect deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) SetDepthProtectSess(s *Session, v bool) bool {
 	if b == nil {
@@ -164,9 +156,7 @@ func (b *Block) SetDepthProtectSess(s *Session, v bool) bool {
 // PushStmt mirrors stms.push_back for a complete Statement.
 // Incomplete Stmt Kind sticky (no invent append hole).}
 
-func (b *Block) PushStmt(st Stmt) {
-	b.PushStmtSess(testAmbientSession, st)
-}
+// Non-Sess PushStmt deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) PushStmtSess(s *Session, st Stmt) {
 	if b == nil {
@@ -180,9 +170,7 @@ func (b *Block) PushStmtSess(s *Session, st Stmt) {
 // Block.cpp:69–83 — scan non-builtin Function::blocks for stm_id.
 // Incomplete funcs sticky nil.
 
-func FindBlockByID(funcs []*Function, blkID int) *Block {
-	return FindBlockByIDSess(testAmbientSession, funcs, blkID)
-}
+// Non-Sess FindBlockByID deleted — pass run bag or testAmbientSession explicitly.
 
 // FindBlockByIDSess is FindBlockByID with explicit session residual sticky.
 func FindBlockByIDSess(s *Session, funcs []*Function, blkID int) *Block {
@@ -234,15 +222,17 @@ func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
 		tmp.EmitConcise = parent.EmitConcise
 		tmp.EmitDepthProtect = parent.EmitDepthProtect
 	}
-	return tmp.outputStmtsOnly(indent)
+	s := testAmbientSession
+	if parent != nil && parent.EmitFM != nil && parent.EmitFM.Sess != nil {
+		s = parent.EmitFM.Sess
+	}
+	return tmp.outputStmtsOnlySess(s, indent, false, sessOpts(s))
 }
 
 // GetLastStm mirrors Block::get_last_stm — last effective statement.
 // Block.cpp:336–346 — last stmt, but stop early if return encountered.
 // Incomplete Block sticky nil (no invent soft-skip empty last / soft re-pick past hole).
-func (b *Block) GetLastStm() *Stmt {
-	return b.GetLastStmSess(testAmbientSession)
-}
+// Non-Sess GetLastStm deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) GetLastStmSess(s *Session) *Stmt {
 	// Block always live; sticky incomplete no invent nil last soft-skip
@@ -267,9 +257,7 @@ func (b *Block) GetLastStmSess(s *Session) *Stmt {
 // Block.cpp:362–372 — looping body may fall through to head if last does not must_jump.
 // Incomplete Block/last sticky false (no invent fall-through / soft re-pick past holes).}
 
-func (b *Block) FromTailToHead() bool {
-	return b.FromTailToHeadSess(testAmbientSession)
-}
+// Non-Sess FromTailToHead deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) FromTailToHeadSess(s *Session) bool {
 	// Block always live; sticky incomplete no invent fall-through soft-skip
@@ -356,9 +344,7 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 // Block.cpp:295–308 — optional nil (global) first when allowGlobal; then self+ancestors;
 // rnd_upto(blks.size()). C++ uses CGOptions::global_variables() for the nil slot
 // (StatementArrayOp::make_random_array_init always hits this with defaults).
-func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
-	return b.RandomParentBlockSess(testAmbientSession, r, allowGlobal)
-}
+// Non-Sess RandomParentBlock deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) RandomParentBlockSess(s *Session, r *Rng, allowGlobal bool) *Block {
 	// Block.cpp:295–308 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
@@ -401,9 +387,7 @@ func (b *Block) MustBreakOrReturn() bool {
 // Incomplete lists must not invent not-on-stack membership for selection/mark paths.
 // Block always live at stack scan; nil shell sticky false (no invent incomplete-scan
 // soft-miss without ERROR so soft re-pick cannot treat hole as clean incomplete).
-func (b *Block) StackScanComplete() bool {
-	return b.StackScanCompleteSess(testAmbientSession)
-}
+// Non-Sess StackScanComplete deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) StackScanCompleteSess(s *Session) bool {
 	if b == nil {
@@ -437,9 +421,7 @@ func (b *Block) StackScanCompleteSess(s *Session) bool {
 // Incomplete Block/Variable/Param/LocalVars sticky false (no invent not-on-stack
 // / soft re-pick past holes).}
 
-func (b *Block) IsVarOnStack(v *Variable) bool {
-	return b.IsVarOnStackSess(testAmbientSession, v)
-}
+// Non-Sess IsVarOnStack deleted — pass run bag or testAmbientSession explicitly.
 
 func (b *Block) IsVarOnStackSess(s *Session, v *Variable) bool {
 	// Block + Variable always live; sticky incomplete no invent not-on-stack
@@ -509,9 +491,7 @@ func (b *Block) IsVarOnStackSess(s *Session, v *Variable) bool {
 // no invent VS.Sym private counter (that desynced t_ from g_/l_/func_).
 // sym is ignored; kept for call-site compatibility.}
 
-func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
-	return b.CreateNewTmpVarSess(testAmbientSession, st)
-}
+// Non-Sess CreateNewTmpVar deleted — pass run bag or testAmbientSession explicitly.
 
 // CreateNewTmpVarSess is CreateNewTmpVar on an explicit session bag.
 func (b *Block) CreateNewTmpVarSess(s *Session, st ESimpleType) string {
@@ -540,9 +520,7 @@ func (b *Block) CreateNewTmpVarSess(s *Session, st ESimpleType) string {
 // Block.cpp:87–93 — VectorFilter Keep on {block_size-1} then
 // filter.disable(fDefault). In random mode valid_filter() is false so
 // filter() never rejects → uniform rnd_upto(block_size) in [0, block_size).
-func BlockProbability(blockSize int, r *Rng) int {
-	return BlockProbabilitySess(testAmbientSession, blockSize, r)
-}
+// Non-Sess BlockProbability deleted — pass run bag or testAmbientSession explicitly.
 
 // BlockProbabilitySess is BlockProbability with explicit session residual sticky.
 func BlockProbabilitySess(s *Session, blockSize int, r *Rng) int {
@@ -780,9 +758,7 @@ func MakeRandomBlock(
 // Soft invent left live Stmts on aborted blocks → usable goto pool inflation
 // (seed 11466719812903307384).
 // Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
-func abortBlockMake(f *Function, b *Block) {
-	abortBlockMakeSess(testAmbientSession, f, b)
-}
+// Non-Sess abortBlockMake deleted — pass run bag or testAmbientSession explicitly.
 
 // abortBlockMakeSess is abortBlockMake with explicit session residual sticky.
 func abortBlockMakeSess(s *Session, f *Function, b *Block) {
@@ -1747,9 +1723,7 @@ func stmtOK(st Stmt) bool {
 
 // outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
 // indent is statement base indent (spaces/4); uses Emit* flags on b.
-func (b *Block) outputStmtsOnly(indent int) string {
-	return b.outputStmtsOnlySess(testAmbientSession, indent, false, sessOpts(testAmbientSession))
-}
+// Non-Sess outputStmtsOnly deleted — pass run bag or testAmbientSession explicitly.
 
 // outputStmtsOnlyOpts is outputStmtsOnly with optional PreOutput skip.
 // skipPre: multi-dim StatementArrayOp nests Output-only shells that share one
@@ -1757,9 +1731,7 @@ func (b *Block) outputStmtsOnly(indent int) string {
 // Statement; re-running PreOutput on nested shells re-emits the same lbl_N
 // (seed 86: UP one lbl_1132 vs GO three inside nested fors). Nested shells
 // still emit for-headers/body; only pre_output is suppressed.
-func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) string {
-	return b.outputStmtsOnlySess(testAmbientSession, indent, skipPre, opts)
-}
+// Non-Sess outputStmtsOnlyOpts deleted — pass run bag or testAmbientSession explicitly.
 
 // outputStmtsOnlySess is outputStmtsOnlyOpts with sticky errors on bag s.
 func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts Options) string {

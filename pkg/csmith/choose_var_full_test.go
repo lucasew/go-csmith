@@ -142,7 +142,7 @@ func TestChooseVarFromOKPreferDeref(t *testing.T) {
 	opts := Defaults()
 	// multiple seeds: always prefer pointer when both match want int
 	for seed := uint64(1); seed < 20; seed++ {
-		got := chooseVarFromOK(NewRngSess(testAmbientSession, seed), GetIntTypeSess(testAmbientSession), []*Variable{iv, pv}, opts)
+		got := chooseVarFromOKSess(testAmbientSession, NewRngSess(testAmbientSession, seed), GetIntTypeSess(testAmbientSession), []*Variable{iv, pv}, opts)
 		if got != pv {
 			t.Fatalf("seed %d: got %v want ptr", seed, got)
 		}
@@ -156,7 +156,7 @@ func TestChooseVarFromOKPreferAddressOf(t *testing.T) {
 	want := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	opts := Defaults()
 	for seed := uint64(1); seed < 20; seed++ {
-		got := chooseVarFromOK(NewRngSess(testAmbientSession, seed), want, []*Variable{iv, pv}, opts)
+		got := chooseVarFromOKSess(testAmbientSession, NewRngSess(testAmbientSession, seed), want, []*Variable{iv, pv}, opts)
 		if got != iv {
 			t.Fatalf("seed %d: got %v want addressable int", seed, got)
 		}
@@ -182,14 +182,14 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 	opts := Defaults()
 	opts.TakeUnionFieldAddr = false
 	// only union field is lower-indirection; bias empty → fall back to any ok
-	got := chooseVarFromOK(NewRngSess(testAmbientSession, 1), want, []*Variable{f0, pv}, opts)
+	got := chooseVarFromOKSess(testAmbientSession, NewRngSess(testAmbientSession, 1), want, []*Variable{f0, pv}, opts)
 	if got != f0 && got != pv {
 		t.Fatalf("unexpected %v", got)
 	}
 	// with take_union_field_addr on, bias prefers f0 every time
 	opts.TakeUnionFieldAddr = true
 	for seed := uint64(1); seed < 20; seed++ {
-		got = chooseVarFromOK(NewRngSess(testAmbientSession, seed), want, []*Variable{f0, pv}, opts)
+		got = chooseVarFromOKSess(testAmbientSession, NewRngSess(testAmbientSession, seed), want, []*Variable{f0, pv}, opts)
 		if got != f0 {
 			t.Fatalf("seed %d: want union field, got %v", seed, got)
 		}
@@ -199,7 +199,7 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 func TestChooseVarFromOKSingleNoBias(t *testing.T) {
 	// size==1 skips bias paths
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
-	got := chooseVarFromOK(NewRngSess(testAmbientSession, 1), GetIntTypeSess(testAmbientSession), []*Variable{iv}, Defaults())
+	got := chooseVarFromOKSess(testAmbientSession, NewRngSess(testAmbientSession, 1), GetIntTypeSess(testAmbientSession), []*Variable{iv}, Defaults())
 	if got != iv {
 		t.Fatal(got)
 	}
@@ -216,7 +216,7 @@ func TestChooseVarFromOKIsInsideUnionFieldResidualSticky(t *testing.T) {
 	want := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	opts := Defaults()
 	opts.TakeUnionFieldAddr = false
-	got := chooseVarFromOK(NewRngSess(testAmbientSession, 1), want, []*Variable{field, pv}, opts)
+	got := chooseVarFromOKSess(testAmbientSession, NewRngSess(testAmbientSession, 1), want, []*Variable{field, pv}, opts)
 	if got != nil {
 		t.Fatalf("Type-nil ancestry residual must fail closed nil, got %v", got)
 	}

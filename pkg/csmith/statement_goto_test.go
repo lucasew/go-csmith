@@ -36,8 +36,8 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	vs.GlobalList = []*Variable{g}
 	// target stmt for back-edge
-	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
-	blk := &Block{Func: f, Stmts: []Stmt{tgt, {Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}}}
+	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)}
+	blk := &Block{Func: f, Stmts: []Stmt{tgt, {Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)}}}
 	f.Blocks = []*Block{blk}
 	f.Body = blk
 	f.Stack = []*Block{blk}
@@ -79,8 +79,8 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntTypeSess(testAmbientSession), true, false)
 	vs.AllVars = []*Variable{g}
 	vs.GlobalList = []*Variable{g}
-	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
-	blk := &Block{Func: f, Stmts: []Stmt{tgt, {Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}}}
+	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)}
+	blk := &Block{Func: f, Stmts: []Stmt{tgt, {Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)}}}
 	f.Blocks = []*Block{blk}
 	f.Body = blk
 	f.Stack = []*Block{blk}
@@ -143,8 +143,8 @@ func TestGenerateCanEmitGoto(t *testing.T) {
 }
 
 func TestLabelForGotoDestReuses(t *testing.T) {
-	GotoLabelsDoFinalizationSess(testAmbientSession, )
-	defer GotoLabelsDoFinalizationSess(testAmbientSession, )
+	GotoLabelsDoFinalizationSess(testAmbientSession)
+	defer GotoLabelsDoFinalizationSess(testAmbientSession)
 	n := 0
 	next := func() string {
 		n++
@@ -160,7 +160,7 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 		t.Fatalf("%q %q", a, c)
 	}
 	// nil nextLabel → process gensym; no invent fixed "lbl_1"
-	GotoLabelsDoFinalizationSess(testAmbientSession, )
+	GotoLabelsDoFinalizationSess(testAmbientSession)
 	ResetDefaultGensym()
 	g1 := LabelForGotoDestSess(testAmbientSession, 7, nil)
 	g2 := LabelForGotoDestSess(testAmbientSession, 8, nil)
@@ -196,16 +196,16 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	bodyRead := CreateVariableScalarsSess(testAmbientSession, "g_16", GetIntTypeSess(testAmbientSession), false, false)
 	tmp := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	body := &Block{
-		StmID: AllocStmID(), Func: f, Looping: true,
+		StmID: AllocStmIDSess(testAmbientSession), Func: f, Looping: true,
 		Stmts: []Stmt{{
-			Kind: StmtAssign, StmID: AllocStmID(), LhsVar: tmp,
+			Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession), LhsVar: tmp,
 			Lhs:      &Lhs{Var: tmp, Type: GetIntTypeSess(testAmbientSession)},
 			Expr:     &Expression{Term: TermVariable, Var: bodyRead, ExprType: GetIntTypeSess(testAmbientSession)},
 			AssignOp: AssignSimple,
 		}},
 	}
 	forSt := &Stmt{
-		Kind: StmtFor, StmID: AllocStmID(),
+		Kind: StmtFor, StmID: AllocStmIDSess(testAmbientSession),
 		Loop: &LoopControl{
 			IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
 			InitStmt: testForInit(iv, 0),
@@ -462,7 +462,7 @@ func TestGotoLabelsClearedOnFinalization(t *testing.T) {
 		SetProcessRngSess(testAmbientSession, prevR)
 		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
-	GotoLabelsDoFinalizationSess(testAmbientSession, )
+	GotoLabelsDoFinalizationSess(testAmbientSession)
 	_ = LabelForGotoDestSess(testAmbientSession, 1, func() string { return "lbl_x" })
 	DoFinalizationSess(testAmbientSession)
 	// after finalization map empty → new gensym path
@@ -470,7 +470,7 @@ func TestGotoLabelsClearedOnFinalization(t *testing.T) {
 	if lab != "lbl_y" {
 		t.Fatal(lab)
 	}
-	GotoLabelsDoFinalizationSess(testAmbientSession, )
+	GotoLabelsDoFinalizationSess(testAmbientSession)
 }
 
 func TestMakeRandomGotoForwardInsert(t *testing.T) {
@@ -483,12 +483,12 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// source block (forward ok_blk) — two assigns so insert after first is possible
 	src := &Block{Func: f, Stmts: []Stmt{
-		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
-		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
 	}}
 	// current block with a dest last stmt
 	curr := &Block{Func: f, Stmts: []Stmt{
-		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
 	}}
 	f.Blocks = []*Block{src, curr}
 	f.Body = curr
@@ -517,8 +517,8 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		// reset src to two assigns (prior seeds may have inserted)
 		src.Stmts = []Stmt{
-			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
-			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
 		}
 		for i := range src.Stmts {
 			id := src.Stmts[i].StmID
@@ -584,9 +584,9 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// single block: other candidate + dest last (pre-sized capacity so insert
 	// shifts in place without always reallocating away from the bug)
-	otherID := AllocStmID()
-	destID := AllocStmID()
-	midID := AllocStmID()
+	otherID := AllocStmIDSess(testAmbientSession)
+	destID := AllocStmIDSess(testAmbientSession)
+	midID := AllocStmIDSess(testAmbientSession)
 	blk := &Block{Func: f, Stmts: make([]Stmt, 0, 8)}
 	blk.Stmts = append(blk.Stmts,
 		Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: otherID},
@@ -964,7 +964,7 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	dest := Stmt{Kind: StmtAssign, StmID: 10}
 	blk.Stmts = []Stmt{dest}
 	// map_in[dest] is incomplete relative to GlobalFacts (no l_early)
-	otherFact := MakeFactPointToSess(testAmbientSession, 
+	otherFact := MakeFactPointToSess(testAmbientSession,
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false),
 		NullPtr,
 	)
@@ -976,7 +976,7 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	if FindRelatedPointToSess(testAmbientSession, stmIn, lp) != nil {
 		t.Fatal("map_in should start without l_early")
 	}
-	if !MakeupNewVarFacts(&stmIn, fm.GlobalFacts) {
+	if !MakeupNewVarFactsSess(testAmbientSession, &stmIn, fm.GlobalFacts) {
 		t.Fatal("MakeupNewVarFacts", HasErrorSess(testAmbientSession))
 	}
 	if FindRelatedPointToSess(testAmbientSession, stmIn, lp) == nil {
@@ -1017,13 +1017,13 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 
 	// ChooseVisibleReadVar with live → NR skip → nil pool
 	ClearErrorSess(testAmbientSession)
-	gotLive := ChooseVisibleReadVar(NewRngSess(testAmbientSession, 1), nil, []*Variable{f0}, GetIntTypeSess(testAmbientSession), liveUF)
+	gotLive := ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil, []*Variable{f0}, GetIntTypeSess(testAmbientSession), liveUF)
 	if gotLive != nil {
 		t.Fatal("live last_write=f1 must make f0 nonreadable → no pick")
 	}
 	// With map out lattice → f0 ok
 	ClearErrorSess(testAmbientSession)
-	gotOut := ChooseVisibleReadVar(NewRngSess(testAmbientSession, 1), nil, []*Variable{f0}, GetIntTypeSess(testAmbientSession), outUF)
+	gotOut := ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil, []*Variable{f0}, GetIntTypeSess(testAmbientSession), outUF)
 	if gotOut != f0 {
 		t.Fatalf("map_facts_out last_write=f0 must allow f0, got %v err=%v", gotOut, HasErrorSess(testAmbientSession))
 	}
@@ -1035,11 +1035,11 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	tables := NewExprTablesSess(testAmbientSession, opts)
 	fn := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	src := &Block{Func: fn, Stmts: []Stmt{
-		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
-		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
 	}}
 	curr := &Block{Func: fn, Stmts: []Stmt{
-		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
 	}}
 	fn.Blocks = []*Block{src, curr}
 	fn.Body = curr
@@ -1067,8 +1067,8 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	ok := false
 	for seed := uint64(1); seed < 120; seed++ {
 		src.Stmts = []Stmt{
-			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
-			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)},
 		}
 		for i := range src.Stmts {
 			id := src.Stmts[i].StmID

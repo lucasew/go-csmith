@@ -13,11 +13,11 @@ func TestMakeFirstCreatesFactMgr(t *testing.T) {
 	m := NewFactMgrMapSess(testAmbientSession)
 	list := FunctionList{}
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, &list)
-	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &list, m)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &list, m)
 	if f == nil {
 		t.Fatal("nil")
 	}
-	fm := m.ForFunc(f)
+	fm := m.ForFuncSess(testAmbientSession, f)
 	if fm == nil || fm.Func != f {
 		t.Fatal("no fm")
 	}
@@ -73,7 +73,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	// complete map + MergeUnionFact incomplete subject sticky wipe
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}
-	merged := MergeUnionFact(fm2.UnionFacts, nil)
+	merged := MergeUnionFactSess(testAmbientSession, fm2.UnionFacts, nil)
 	if UnionFactsComplete(merged) {
 		t.Fatal("nil fact MergeUnionFact must fail closed incomplete")
 	}
@@ -91,7 +91,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	// nil hole in newFacts — fail closed, keep prior complete facts for factory re-pick
-	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}, 1); ok {
+	if _, ok := applyPointToAssignFactsSess(testAmbientSession, &facts, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}, 1); ok {
 		t.Fatal("nil newFact hole must fail closed ok=false")
 	}
 	if !FactsComplete(facts) || FindRelatedPointToSess(testAmbientSession, facts, p) == nil {
@@ -100,7 +100,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// incomplete subject map — wipe sticky
 	ClearErrorSess(testAmbientSession)
 	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
-	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); ok {
+	if _, ok := applyPointToAssignFactsSess(testAmbientSession, &facts, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); ok {
 		t.Fatal("nil subject map hole must fail closed ok=false")
 	}
 	if FactsComplete(facts) {
@@ -112,13 +112,13 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// empty newFacts is ok no-op (not incomplete)
 	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
-	ch, ok := applyPointToAssignFacts(&facts, p, 0, nil, 1)
+	ch, ok := applyPointToAssignFactsSess(testAmbientSession, &facts, p, 0, nil, 1)
 	if !ok || ch {
 		t.Fatal("empty newFacts must be ok with no change", ch, ok)
 	}
 	// IncompleteFactSlice newFacts must not invent empty-apply success
 	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
-	if _, ok := applyPointToAssignFacts(&facts, p, 0, IncompleteFactSlice(), 1); ok {
+	if _, ok := applyPointToAssignFactsSess(testAmbientSession, &facts, p, 0, IncompleteFactSlice(), 1); ok {
 		t.Fatal("IncompleteFactSlice newFacts must fail closed ok=false")
 	}
 	if !FactsComplete(facts) {
@@ -127,7 +127,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// incomplete lhs pointees must not invent lvar_cnt via len(IncompleteVariables)==1 renew
 	ClearErrorSess(testAmbientSession)
 	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
-	if VariablesComplete(lhsAssignPointees(facts, nil, 0)) {
+	if VariablesComplete(lhsAssignPointeesSess(testAmbientSession, facts, nil, 0)) {
 		t.Fatal("nil lhs must IncompleteVariables")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -136,7 +136,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky (no invent empty lvars soft-complete past hole)
 	hole := &Variable{Name: "g_hole", Type: nil}
-	if VariablesComplete(lhsAssignPointees(facts, hole, 0)) {
+	if VariablesComplete(lhsAssignPointeesSess(testAmbientSession, facts, hole, 0)) {
 		t.Fatal("Type-nil lhs must IncompleteVariables")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -144,7 +144,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil lhs: incomplete abstract path — lvarCnt still applied; fail closed on sticky
-	if _, ok := applyPointToAssignFacts(&facts, nil, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); ok {
+	if _, ok := applyPointToAssignFactsSess(testAmbientSession, &facts, nil, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); ok {
 		// nil lhs is unused for renew path when lvarCnt provided; renew may succeed
 		// C++ always has live Lhs*; sticky incomplete lhs only via abstract pre-step.
 		// Keep prior map when newFacts complete and lvarCnt==1 renews p.
@@ -152,7 +152,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// facts accumulator always live; sticky
-	if _, ok := applyPointToAssignFacts(nil, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); ok {
+	if _, ok := applyPointToAssignFactsSess(testAmbientSession, nil, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); ok {
 		t.Fatal("nil facts applyPointToAssignFacts must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -164,7 +164,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// Soft invent Match residual sticky-wipe is gone with is_related-only RenewFact.
 	brokenSubj := &Variable{Name: "g_broken"} // Type nil
 	factsR := []*FactPointTo{{Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
-	if _, ok := applyPointToAssignFacts(&factsR, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); !ok {
+	if _, ok := applyPointToAssignFactsSess(testAmbientSession, &factsR, p, 0, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}, 1); !ok {
 		t.Fatal("unrelated Type-nil subject must not block renew of p")
 	}
 	if FindRelatedPointToSess(testAmbientSession, factsR, p) == nil || !FindRelatedPointToSess(testAmbientSession, factsR, p).IsNullSess(testAmbientSession) {
@@ -227,7 +227,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	uv := &Variable{Name: "g_u", Type: ut, Init: MakeIntSess(testAmbientSession, 0)}
-	pt, un := AbstractFactForVarInit(uv)
+	pt, un := AbstractFactForVarInitSess(testAmbientSession, uv)
 	if len(pt) != 0 {
 		t.Fatal("no pt for union")
 	}
@@ -241,7 +241,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	}
 	// incomplete hard IR: nil var sticky (no invent empty init success / soft re-pick)
 	ClearErrorSess(testAmbientSession)
-	pt2, un2 := AbstractFactForVarInit(nil)
+	pt2, un2 := AbstractFactForVarInitSess(testAmbientSession, nil)
 	if FactsComplete(pt2) || UnionFactsComplete(un2) {
 		t.Fatal("nil var init must fail closed incomplete", pt2, un2)
 	}
@@ -250,7 +250,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// array without AsArray sticky (Fact.cpp:99 assert(av))
-	ptArr, _ := AbstractFactForVarInit(&Variable{
+	ptArr, _ := AbstractFactForVarInitSess(testAmbientSession, &Variable{
 		Name: "g_ap_bad", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2},
 		Init: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"},
 	})
@@ -271,7 +271,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		InitExprs: []*Expression{nil},
 	}
 	badInit.AsArray = badInit
-	ptNil, _ := AbstractFactForVarInit(&badInit.Variable)
+	ptNil, _ := AbstractFactForVarInitSess(testAmbientSession, &badInit.Variable)
 	if FactsComplete(ptNil) {
 		t.Fatal("nil InitExprs hole must fail closed incomplete", ptNil)
 	}
@@ -299,7 +299,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		t.Fatal("nil Invoke AbstractFactForAssign must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	ptBad, _ := AbstractFactForVarInit(&badAlt.Variable)
+	ptBad, _ := AbstractFactForVarInitSess(testAmbientSession, &badAlt.Variable)
 	if FactsComplete(ptBad) {
 		t.Fatalf("incomplete alt abstract must fail closed incomplete complete=%v err=%v n=%d", FactsComplete(ptBad), HasErrorSess(testAmbientSession), len(ptBad))
 	}
@@ -311,7 +311,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	// AddNewVarFact sticks after incomplete abstract (no invent skip no-fact)
 	ClearErrorSess(testAmbientSession)
 	uv2 := &Variable{Name: "g_u2", Type: ut}
-	_, un3 := AbstractFactForVarInit(uv2)
+	_, un3 := AbstractFactForVarInitSess(testAmbientSession, uv2)
 	if UnionFactsComplete(un3) {
 		t.Fatal("union without init must fail closed incomplete", un3)
 	}
@@ -320,7 +320,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
-	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, 
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession,
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr)}
 	fm2.AddNewVarFact(uv2)
 	if UnionFactsComplete(fm2.UnionFacts) {
@@ -346,7 +346,7 @@ func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {
 		InitExprs: []*Expression{nullAlt},
 	}
 	parent.AsArray = parent
-	pt, _ := AbstractFactForVarInit(&parent.Variable)
+	pt, _ := AbstractFactForVarInitSess(testAmbientSession, &parent.Variable)
 	if len(pt) == 0 {
 		t.Fatal("want facts")
 	}
@@ -370,7 +370,7 @@ func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {
 		InitValues: []string{"0"},
 	}
 	onlyStr.AsArray = onlyStr
-	pt2, _ := AbstractFactForVarInit(&onlyStr.Variable)
+	pt2, _ := AbstractFactForVarInitSess(testAmbientSession, &onlyStr.Variable)
 	// primary init still null; InitValues ignored
 	if len(pt2) == 0 {
 		t.Fatal("want primary init facts")
@@ -400,7 +400,7 @@ func TestAbstractFactForVarInitPointerArrayInitExprs(t *testing.T) {
 		InitValues: []string{"0"},
 	}
 	parent.AsArray = parent
-	facts, _ := AbstractFactForVarInit(&parent.Variable)
+	facts, _ := AbstractFactForVarInitSess(testAmbientSession, &parent.Variable)
 	if len(facts) == 0 {
 		t.Fatal("want facts")
 	}
@@ -454,7 +454,7 @@ func TestGenerateFunctionsWiresFactMgr(t *testing.T) {
 		t.Fatal("no funcs")
 	}
 	f := g.Funcs.Funcs[0]
-	fm := g.FactMgrs.ForFunc(f)
+	fm := g.FactMgrs.ForFuncSess(testAmbientSession, f)
 	if fm == nil {
 		t.Fatal("fm")
 	}
@@ -631,7 +631,7 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil Function FindDanglingGlobalPtrs must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*FactMgr)(nil).AddFactOut(&Stmt{StmID: 1}, nil, MakeFactPointToSess(testAmbientSession, 
+	(*FactMgr)(nil).AddFactOut(&Stmt{StmID: 1}, nil, MakeFactPointToSess(testAmbientSession,
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr))
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM AddFactOut must SetError sticky")
@@ -678,14 +678,14 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 
 func TestFindParentBlockNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if FindParentBlockOfStmID(nil, 1) != nil {
+	if FindParentBlockOfStmIDSess(testAmbientSession, nil, 1) != nil {
 		t.Fatal("nil Function FindParentBlockOfStmID must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function FindParentBlockOfStmID must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindParentBlockOfStmID(&Function{Name: "f"}, IncompleteStmID) != nil {
+	if FindParentBlockOfStmIDSess(testAmbientSession, &Function{Name: "f"}, IncompleteStmID) != nil {
 		t.Fatal("StmID 0 FindParentBlockOfStmID must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -694,7 +694,7 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Block* always live on Function.Blocks; nil hole sticky miss
 	f := &Function{Name: "f", Blocks: []*Block{nil}}
-	if FindParentBlockOfStmID(f, 1) != nil {
+	if FindParentBlockOfStmIDSess(testAmbientSession, f, 1) != nil {
 		t.Fatal("nil Blocks hole FindParentBlockOfStmID must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -706,7 +706,7 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner, Else: nil}}}
 	inner.Parent = outer
 	f.Blocks = []*Block{outer}
-	if FindParentBlockOfStmID(f, 3) != nil {
+	if FindParentBlockOfStmIDSess(testAmbientSession, f, 3) != nil {
 		t.Fatal("nil Else arm must fail closed FindParentBlockOfStmID")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -819,19 +819,19 @@ func TestGetProgramEndFacts(t *testing.T) {
 	f2 := &Function{Name: "func_2"}
 	list := &FunctionList{Funcs: []*Function{f1, f2}}
 	fms := NewFactMgrMapSess(testAmbientSession)
-	fm1 := fms.ForFunc(f1)
+	fm1 := fms.ForFuncSess(testAmbientSession, f1)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm1.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	got := GetProgramEndFacts(list, fms)
+	got := GetProgramEndFactsSess(testAmbientSession, list, fms)
 	if len(got) != 1 || FindRelatedPointToSess(testAmbientSession, got, p) == nil {
 		t.Fatal(got)
 	}
 	ClearErrorSess(testAmbientSession)
-	if GetProgramEndFacts(nil, fms) != nil {
+	if GetProgramEndFactsSess(testAmbientSession, nil, fms) != nil {
 		t.Fatal("empty list")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FactsComplete(GetProgramEndFacts(list, nil)) || !HasErrorSess(testAmbientSession) {
+	if FactsComplete(GetProgramEndFactsSess(testAmbientSession, list, nil)) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fms sticky")
 	}
 	ClearErrorSess(testAmbientSession)

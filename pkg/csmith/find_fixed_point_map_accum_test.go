@@ -24,13 +24,13 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	// Minimal body: two invokes so AnalyzeWithEdgesIn has something to walk.
 	// Use assign with constant RHS so visit_facts stays simple.
 	s0 := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		AssignOp: AssignSimple,
 		Lhs:      &Lhs{Var: early},
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	s1 := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		AssignOp: AssignSimple,
 		Lhs:      &Lhs{Var: late},
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
@@ -44,7 +44,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	fm.SetMapAccumEffect(s1.StmID, EmptyEffect().ReadVarSess(testAmbientSession, late).WriteVarSess(testAmbientSession, late))
 
 	b := &Block{
-		Func: f, StmID: AllocStmID(), Looping: true,
+		Func: f, StmID: AllocStmIDSess(testAmbientSession), Looping: true,
 		Stmts: []Stmt{s0, s1},
 	}
 	fm.SetMapStmEffect(b.StmID, EmptyEffect())

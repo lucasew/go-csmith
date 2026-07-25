@@ -135,14 +135,14 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.CompatibleCheck = true
 	// enabled + incomplete IR rejects sticky (no invent non-error)
-	if !CompatibleCheckExprVar(opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
+	if !CompatibleCheckExprVarSess(testAmbientSession, opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("nil var must reject when compatible-check on")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var CompatibleCheck must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !CompatibleCheckExprs(opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
+	if !CompatibleCheckExprsSess(testAmbientSession, opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("nil expr must reject when compatible-check on")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -150,7 +150,7 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	opts.CompatibleCheck = false
-	if CompatibleCheckExprVar(opts, nil, nil) {
+	if CompatibleCheckExprVarSess(testAmbientSession, opts, nil, nil) {
 		t.Fatal("disabled must not reject")
 	}
 	// disabled incomplete stays non-sticky (feature off, not broken IR path)
@@ -205,18 +205,18 @@ func TestCompatibleCheckerDisabled(t *testing.T) {
 	opts := Defaults()
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	e := &Expression{Term: TermVariable, Var: a}
-	if CompatibleCheckExprVar(opts, a, e) {
+	if CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
 		t.Fatal("disabled")
 	}
 	opts.CompatibleCheck = true
 	// CompatibleChecker.cpp:49 assert(0) — Variable* overload always rejects when enabled
-	if !CompatibleCheckExprVar(opts, a, e) {
+	if !CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
 		t.Fatal("enabled Variable* overload must fail closed reject")
 	}
 	// unrelated var still rejected (assert(0), not invent compatible)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	eb := &Expression{Term: TermVariable, Var: b}
-	if !CompatibleCheckExprVar(opts, a, eb) {
+	if !CompatibleCheckExprVarSess(testAmbientSession, opts, a, eb) {
 		t.Fatal("enabled Variable* overload always rejects")
 	}
 }
@@ -446,16 +446,16 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 
 func TestEnableCompatibleCheckProcess(t *testing.T) {
 	// CompatibleChecker.cpp:68–70 + CGOptions resolve_exhaustive
-	ResetCompatibleCheck()
-	defer ResetCompatibleCheck()
+	ResetCompatibleCheckSess(testAmbientSession)
+	defer ResetCompatibleCheckSess(testAmbientSession)
 	opts := Defaults()
 	opts.CompatibleCheck = false
-	if CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
+	if CompatibleCheckExprVarSess(testAmbientSession, opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("disabled must be false")
 	}
-	EnableCompatibleCheck()
+	EnableCompatibleCheckSess(testAmbientSession)
 	// process static on even when opts.CompatibleCheck false
-	if !CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
+	if !CompatibleCheckExprVarSess(testAmbientSession, opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("EnableCompatibleCheck must activate checker")
 	}
 }

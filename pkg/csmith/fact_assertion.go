@@ -101,7 +101,7 @@ func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if stParent != nil && !stParent.StackScanComplete() {
+	if stParent != nil && !stParent.StackScanCompleteSess(s) {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}

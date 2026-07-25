@@ -280,7 +280,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	vs.AllVars = []*Variable{&av.Variable, fieldIV}
 	blk.LocalVars = []*Variable{fieldIV}
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 5), opts, probs, vs, tables, stmtTab, &cg)
 	if stmtOK(st) {
 		t.Fatal("packed residual must fail closed MakeRandomArrayOp")

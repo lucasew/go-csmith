@@ -210,9 +210,7 @@ func IncompleteTypes() []*Type {
 // ChooseRandomStructUnionType mirrors Type::choose_random_struct_union_type.
 // Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
 // Type* always live on ok_types; nil hole fails closed (nil — no invent pick past hole).
-func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
-	return ChooseRandomStructUnionTypeSess(testAmbientSession, r, ok)
-}
+// Non-Sess ChooseRandomStructUnionType deleted — pass run bag or testAmbientSession explicitly.
 
 // ChooseRandomStructUnionTypeSess is ChooseRandomStructUnionType with bitfield
 // stats on bag s (or ambient when nil).

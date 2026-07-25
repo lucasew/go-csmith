@@ -74,7 +74,7 @@ func TestAddFactOutVisible(t *testing.T) {
 	f.Blocks = []*Block{body}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
-	fm.AddFactOut(st, body, MakeFactPointToSess(testAmbientSession, 
+	fm.AddFactOut(st, body, MakeFactPointToSess(testAmbientSession,
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false),
 		NullPtr,
 	))
@@ -89,7 +89,7 @@ func TestAddFactOutVisible(t *testing.T) {
 	}
 	// return drops non-global
 	ret := &Stmt{Kind: StmtReturn, StmID: 6}
-	fm.AddFactOut(ret, body, MakeFactPointToSess(testAmbientSession, 
+	fm.AddFactOut(ret, body, MakeFactPointToSess(testAmbientSession,
 		// local as subject — need pointer local
 		func() *Variable {
 			lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)

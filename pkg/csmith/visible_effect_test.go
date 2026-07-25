@@ -207,7 +207,7 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
 		st = MakeRandomIf(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts),
-			NewStatementThresholdTable(opts), &cg2)
+			NewStatementThresholdTableSess(testAmbientSession, opts), &cg2)
 		if st != nil && st.Kind == StmtIfElse {
 			break
 		}

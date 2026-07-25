@@ -70,7 +70,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
@@ -125,7 +125,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	// force multi-dim array
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)

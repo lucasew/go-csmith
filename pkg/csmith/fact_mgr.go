@@ -28,9 +28,7 @@ const (
 
 // AddInterestedFacts mirrors FactMgr::add_interested_facts.
 // FactMgr.cpp:475–486 — register meta fact kinds for DFA.
-func AddInterestedFacts(interests int) {
-	AddInterestedFactsSess(testAmbientSession, interests)
-}
+// Non-Sess AddInterestedFacts deleted — pass run bag or testAmbientSession explicitly.
 
 // AddInterestedFactsSess sets meta-fact interest flags on an explicit session bag.
 func AddInterestedFactsSess(s *Session, interests int) {
@@ -314,9 +312,7 @@ func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFact
 // complete empty. FactsComplete(nil)==true would invent empty success if incomplete
 // were stored as bare nil; incomplete uses a nil-hole slice (FactsComplete false).
 // Complete empty uses a non-nil empty slice (FactsComplete true).
-func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
-	return storeFactMapEntrySess(testAmbientSession, facts)
-}
+// Non-Sess storeFactMapEntry deleted — pass run bag or testAmbientSession explicitly.
 
 func storeFactMapEntrySess(s *Session, facts []*FactPointTo) []*FactPointTo {
 	if !FactsComplete(facts) {
@@ -338,9 +334,7 @@ func storeFactMapEntrySess(s *Session, facts []*FactPointTo) []*FactPointTo {
 // Join/SetBottom on the live lattice rewrote historical arm outs (seed-123:
 // combine_branch_facts then_fid=0 else_fid=1 bottomed g_721 while sibling
 // unions kept init f0 → choose_var ok pool 36 vs UP 37).
-func storeUnionFactMapEntry(facts []*FactUnion) []*FactUnion {
-	return storeUnionFactMapEntrySess(testAmbientSession, facts)
-}
+// Non-Sess storeUnionFactMapEntry deleted — pass run bag or testAmbientSession explicitly.
 
 func storeUnionFactMapEntrySess(s *Session, facts []*FactUnion) []*FactUnion {
 	if !UnionFactsComplete(facts) {
@@ -738,9 +732,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 // Nested walk uses get_blocks only; incomplete if-arm sticky whole miss
 // (no invent soft-continue past incomplete arm then miss a stmt in complete Then,
 // or invent soft-skip missing arm then find under sibling of same if).
-func FindParentBlockOfStmID(f *Function, stmID int) *Block {
-	return FindParentBlockOfStmIDSess(testAmbientSession, f, stmID)
-}
+// Non-Sess FindParentBlockOfStmID deleted — pass run bag or testAmbientSession explicitly.
 
 // FindParentBlockOfStmIDSess is FindParentBlockOfStmID with explicit session residual sticky.
 func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
@@ -792,9 +784,7 @@ func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
 // FindStmtByID returns the statement with stm_id in f's block tree.
 // Complements FindParentBlockOfStmID for CFG edge source resolution.
 // Function + live StmID always required; sticky nil (no invent miss soft-success past hole).
-func FindStmtByID(f *Function, stmID int) *Stmt {
-	return FindStmtByIDSess(testAmbientSession, f, stmID)
-}
+// Non-Sess FindStmtByID deleted — pass run bag or testAmbientSession explicitly.
 
 // FindStmtByIDSess is FindStmtByID with explicit session residual sticky.
 func FindStmtByIDSess(s *Session, f *Function, stmID int) *Stmt {
@@ -1146,9 +1136,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 // Incomplete inputs fail closed sticky via IncompleteFactSlice (not bare nil —
 // FactsComplete(nil)==true invents empty-complete dest facts / soft re-pick past wipe).
 // factsOut always live; sticky (no invent soft-skip dest update past hole).
-func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
-	UpdateFactsForDestSess(testAmbientSession, factsIn, factsOut, f, destParent)
-}
+// Non-Sess UpdateFactsForDest deleted — pass run bag or testAmbientSession explicitly.
 
 func UpdateFactsForDestSess(s *Session, factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
 	if factsOut == nil {
@@ -1237,9 +1225,7 @@ func UpdateFactsForDestSess(s *Session, factsIn []*FactPointTo, factsOut *[]*Fac
 // Used by StatementGoto forward path (full FactVec with UpdateFactsForDest).
 // Incomplete inputs fail closed sticky IncompleteUnionFactSlice.}
 
-func UpdateUnionFactsForDest(factsIn []*FactUnion, factsOut *[]*FactUnion, f *Function, destParent *Block) {
-	UpdateUnionFactsForDestSess(testAmbientSession, factsIn, factsOut, f, destParent)
-}
+// Non-Sess UpdateUnionFactsForDest deleted — pass run bag or testAmbientSession explicitly.
 
 func UpdateUnionFactsForDestSess(s *Session, factsIn []*FactUnion, factsOut *[]*FactUnion, f *Function, destParent *Block) {
 	if factsOut == nil {
@@ -1418,9 +1404,7 @@ func (fm *FactMgr) restoreFactsPT(oldFacts []*FactPointTo) {
 // makeupNewUnionFacts mirrors makeup_new_var_facts for the eUnionWrite partition.
 // FactMgr.cpp:494–508 — for each new_facts entry missing in old, add_new_var_fact.
 // Here we only re-add init FactUnion for union subjects present in live but not old.
-func makeupNewUnionFacts(oldFacts *[]*FactUnion, live []*FactUnion) bool {
-	return makeupNewUnionFactsSess(testAmbientSession, oldFacts, live)
-}
+// Non-Sess makeupNewUnionFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func makeupNewUnionFactsSess(s *Session, oldFacts *[]*FactUnion, live []*FactUnion) bool {
 	if oldFacts == nil {
@@ -1892,9 +1876,7 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 // (no invent complete keep-all-facts soft-success past missing parent / loop chain).
 // Incomplete facts/locals/clone fail closed sticky (no invent cleaned OOS filter
 // / soft re-pick past wiped break-continue out maps).
-func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
-	return RemoveLoopLocalFactsSess(testAmbientSession, facts, blk)
-}
+// Non-Sess RemoveLoopLocalFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func RemoveLoopLocalFactsSess(s *Session, facts []*FactPointTo, blk *Block) []*FactPointTo {
 	// Block* always live for loop-local OOS; sticky no invent passthrough keep locals
@@ -1932,9 +1914,7 @@ func RemoveLoopLocalFactsSess(s *Session, facts []*FactPointTo, blk *Block) []*F
 
 // RemoveLoopLocalFactsForStmt mirrors remove_loop_local_facts(Statement*).
 // FactMgr.cpp:603–605 — block stmt uses itself; else use parent.
-func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) []*FactPointTo {
-	return RemoveLoopLocalFactsForStmtSess(testAmbientSession, facts, st, parent)
-}
+// Non-Sess RemoveLoopLocalFactsForStmt deleted — pass run bag or testAmbientSession explicitly.
 
 // RemoveLoopLocalFactsForStmtSess is RemoveLoopLocalFactsForStmt on bag s.
 func RemoveLoopLocalFactsForStmtSess(s *Session, facts []*FactPointTo, st *Stmt, parent *Block) []*FactPointTo {
@@ -1949,9 +1929,7 @@ func RemoveLoopLocalFactsForStmtSess(s *Session, facts []*FactPointTo, st *Stmt,
 // FactMgr.cpp:629–639 — update_facts_for_oos_vars is category-agnostic (FactVec).
 // Soft invent left map_union_out[continue/break] with parent-block union subjects
 // that are OOS at the loop head (seed-30 l_810 via continue back-edge into for body).
-func RemoveLoopLocalUnionFacts(facts []*FactUnion, blk *Block) []*FactUnion {
-	return RemoveLoopLocalUnionFactsSess(testAmbientSession, facts, blk)
-}
+// Non-Sess RemoveLoopLocalUnionFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func RemoveLoopLocalUnionFactsSess(s *Session, facts []*FactUnion, blk *Block) []*FactUnion {
 	if blk == nil {
@@ -1991,9 +1969,7 @@ func RemoveLoopLocalUnionFactsSess(s *Session, facts []*FactUnion, blk *Block) [
 
 // RemoveLoopLocalUnionFactsForStmt is remove_loop_local_facts eUnionWrite for Statement*.
 // FactMgr.cpp:603–605 — block stmt uses itself; else use parent.
-func RemoveLoopLocalUnionFactsForStmt(facts []*FactUnion, st *Stmt, parent *Block) []*FactUnion {
-	return RemoveLoopLocalUnionFactsForStmtSess(testAmbientSession, facts, st, parent)
-}
+// Non-Sess RemoveLoopLocalUnionFactsForStmt deleted — pass run bag or testAmbientSession explicitly.
 
 // RemoveLoopLocalUnionFactsForStmtSess is RemoveLoopLocalUnionFactsForStmt on bag s.
 func RemoveLoopLocalUnionFactsForStmtSess(s *Session, facts []*FactUnion, st *Stmt, parent *Block) []*FactUnion {
@@ -2009,9 +1985,7 @@ func RemoveLoopLocalUnionFactsForStmtSess(s *Session, facts []*FactUnion, st *St
 // Variable* always live on LocalVars; nil hole fails closed sticky IncompleteVariables
 // (not bare nil invent empty-complete loop-local set / soft re-pick past hole).
 // Empty complete walk returns non-nil empty slice.
-func collectLoopLocalVars(blk *Block) []*Variable {
-	return collectLoopLocalVarsSess(testAmbientSession, blk)
-}
+// Non-Sess collectLoopLocalVars deleted — pass run bag or testAmbientSession explicitly.
 
 func collectLoopLocalVarsSess(s *Session, blk *Block) []*Variable {
 	locals := make([]*Variable, 0)
@@ -2032,13 +2006,7 @@ func collectLoopLocalVarsSess(s *Session, blk *Block) []*Variable {
 
 // RemoveFunctionLocalFacts mirrors FactMgr::remove_function_local_facts
 // with stParent=Body (function exit). FactMgr.cpp:179–205.
-func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo {
-	var parent *Block
-	if f != nil {
-		parent = f.Body
-	}
-	return RemoveFunctionLocalFactsAt(facts, f, parent)
-}
+// Non-Sess RemoveFunctionLocalFacts deleted — use RemoveFunctionLocalFactsAtSess.
 
 // RemoveFunctionLocalFactsAt mirrors FactMgr::remove_function_local_facts.
 // FactMgr.cpp:179–205 — drop stack/other-rv subjects; mark_func_end on remaining.
@@ -2048,9 +2016,7 @@ func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo 
 // Fact* always live; incomplete PointTo/fact holes or incomplete Param/LocalVars
 // stack lists fail closed sticky (no invent keep stack locals when IsVarOnStack
 // returns false past a hole, or soft re-pick past wiped return out maps).
-func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
-	return RemoveFunctionLocalFactsAtSess(testAmbientSession, facts, f, stParent)
-}
+// Non-Sess RemoveFunctionLocalFactsAt deleted — pass run bag or testAmbientSession explicitly.
 
 func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
 	if !FactsComplete(facts) {
@@ -2124,9 +2090,7 @@ func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Functio
 // Category-agnostic erase by is_var_on_stack / other-function RV; no mark_func_end
 // (ePointTo only). Incomplete maps fail closed IncompleteUnionFactSlice.}
 
-func RemoveFunctionLocalUnionFactsAt(facts []*FactUnion, f *Function, stParent *Block) []*FactUnion {
-	return RemoveFunctionLocalUnionFactsAtSess(testAmbientSession, facts, f, stParent)
-}
+// Non-Sess RemoveFunctionLocalUnionFactsAt deleted — pass run bag or testAmbientSession explicitly.
 
 func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Function, stParent *Block) []*FactUnion {
 	if !UnionFactsComplete(facts) {
@@ -2179,9 +2143,7 @@ func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Func
 // incomplete maps/pointees or incomplete drop list fail closed sticky
 // (no invent keep subjects that match only after a drop-list hole).}
 
-func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
-	return filterFactsNotInVarsSess(testAmbientSession, facts, drop)
-}
+// Non-Sess filterFactsNotInVars deleted — pass run bag or testAmbientSession explicitly.
 
 func filterFactsNotInVarsSess(s *Session, facts []*FactPointTo, drop []*Variable) []*FactPointTo {
 	if len(drop) == 0 {
@@ -2338,9 +2300,7 @@ func NewFactMgrMapSess(s *Session) *FactMgrMap {
 // only create when registering a function that has no paired entry yet.
 // get_fact_mgr_for_func itself only looks up — create happens at signature time.
 // FactMgrMap + Function always live; sticky nil (no invent miss soft-skip past hole).
-func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
-	return m.ForFuncSess(testAmbientSession, f)
-}
+// Non-Sess ForFunc deleted — pass run bag or testAmbientSession explicitly.
 
 // ForFuncSess is ForFunc with explicit session residual sticky.
 func (m *FactMgrMap) ForFuncSess(s *Session, f *Function) *FactMgr {
@@ -2384,9 +2344,7 @@ func (m *FactMgrMap) ForFuncSess(s *Session, f *Function) *FactMgr {
 // sticky IncompleteFactSlice / IncompleteUnionFactSlice so soft re-pick cannot
 // invent empty init success past broken IR. Incomplete abstract transfer results
 // remain non-sticky hole markers (AddNewVarFact sticks after abstract).
-func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
-	return AbstractFactForVarInitSess(testAmbientSession, v)
-}
+// Non-Sess AbstractFactForVarInit deleted — pass run bag or testAmbientSession explicitly.
 
 func AbstractFactForVarInitSess(s *Session, v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if v == nil || v.Type == nil {
@@ -3086,9 +3044,7 @@ func blockByStmID(f *Function, stmID int) *Block {
 // stmtIDInBlock reports Statement::in_block(blk) for a statement id under func.
 // Tree walk (BlockContainsStmID) for MapFactsOut — statement must already be
 // linked so FindStmtByID can resolve it.
-func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
-	return stmtIDInBlockSess(testAmbientSession, f, stmID, blk)
-}
+// Non-Sess stmtIDInBlock deleted — pass run bag or testAmbientSession explicitly.
 
 func stmtIDInBlockSess(s *Session, f *Function, stmID int, blk *Block) bool {
 	_ = f
@@ -3111,9 +3067,7 @@ func stmtIDInBlockSess(s *Session, f *Function, stmID int, blk *Block) bool {
 // map_facts_in[for-body]. Without that, post_loop Analysis wiped GlobalFacts and
 // Lhs opportunistic_validate rejected the still-live local (seed-2 e9003:
 // UP U120 vs Go F80 after SelectParentLocal l_138).
-func stmtIDInBlockMapIn(f *Function, stmID int, blk *Block) bool {
-	return stmtIDInBlockMapInSess(testAmbientSession, f, stmID, blk)
-}
+// Non-Sess stmtIDInBlockMapIn deleted — pass run bag or testAmbientSession explicitly.
 
 func stmtIDInBlockMapInSess(s *Session, f *Function, stmID int, blk *Block) bool {
 	if blk == nil || StmIDUnset(stmID) {
@@ -3172,9 +3126,7 @@ func blockParentChainContains(b, target *Block) bool {
 // lvar_cnt==0, and not IncompleteVariables len==1 invent definitive renew without check).
 // Variable always live; sticky IncompleteVariables (no invent soft-skip lhs past hole).
 // Incomplete fact map / merge result stays non-sticky IncompleteVariables (soft re-pick).
-func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
-	return lhsAssignPointeesSess(testAmbientSession, facts, lhs, lhsIndir)
-}
+// Non-Sess lhsAssignPointees deleted — pass run bag or testAmbientSession explicitly.
 
 func lhsAssignPointeesSess(s *Session, facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
 	if lhs == nil {
@@ -3227,9 +3179,7 @@ func lhsAssignPointeesSess(s *Session, facts []*FactPointTo, lhs *Variable, lhsI
 // closed without wiping prior complete *facts (factory re-pick must not poison FM).
 // empty complete newFacts is ok with changed=false.}
 
-func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo, lvarCnt int) (changed bool, ok bool) {
-	return applyPointToAssignFactsSess(testAmbientSession, facts, lhs, lhsIndir, newFacts, lvarCnt)
-}
+// Non-Sess applyPointToAssignFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func applyPointToAssignFactsSess(s *Session, facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo, lvarCnt int) (changed bool, ok bool) {
 	// facts accumulator always live; sticky (no invent soft-skip assign apply past hole)
@@ -3393,9 +3343,7 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 // Unrelated: append. Distinct from renew_fact / RenewUnionFact (strong replace).
 // FactUnion* always live; nil f or map hole fails closed sticky IncompleteUnionFactSlice
 // (no invent empty-complete via UnionFactsComplete(nil) / soft re-pick past wipe).
-func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
-	return MergeUnionFactSess(testAmbientSession, facts, f)
-}
+// Non-Sess MergeUnionFact deleted — pass run bag or testAmbientSession explicitly.
 
 func MergeUnionFactSess(s *Session, facts []*FactUnion, f *FactUnion) []*FactUnion {
 	if f == nil {
@@ -3491,9 +3439,7 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 // closed (nil oldFacts, false — no invent soft-skip holes as absent new var,
 // partial makeup, or re-accumulate later vars after *oldFacts was cleared).
 // Returns true when makeup completed with a complete *oldFacts accumulator.
-func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
-	return MakeupNewVarFactsSess(testAmbientSession, oldFacts, newFacts)
-}
+// Non-Sess MakeupNewVarFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func MakeupNewVarFactsSess(s *Session, oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	// FactMgr always has live old_facts accumulator; sticky no invent soft-skip makeup
@@ -3565,9 +3511,7 @@ func MakeupNewVarFactsSess(s *Session, oldFacts *[]*FactPointTo, newFacts []*Fac
 // empty-FieldVars aggregate complete / field walk past Type-nil shell via IsPointer residual).
 // facts always live; sticky (no invent soft-skip makeup past hole).}
 
-func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
-	AddNewVarFactIntoSess(testAmbientSession, v, facts)
-}
+// Non-Sess AddNewVarFactInto deleted — pass run bag or testAmbientSession explicitly.
 
 func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 	if facts == nil {
@@ -3802,9 +3746,7 @@ func (fm *FactMgr) UpdateFactsForOOSVarsSess(s *Session, vars []*Variable) {
 // UpdateUnionFactsForOOSVars drops FactUnion subjects matching OOS vars.
 // FactMgr.cpp:143–156 — match(f->get_var()) erase (category-agnostic).
 // Incomplete maps / vars fail closed sticky IncompleteUnionFactSlice.
-func UpdateUnionFactsForOOSVars(vars []*Variable, facts *[]*FactUnion) {
-	UpdateUnionFactsForOOSVarsSess(testAmbientSession, vars, facts)
-}
+// Non-Sess UpdateUnionFactsForOOSVars deleted — pass run bag or testAmbientSession explicitly.
 
 func UpdateUnionFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactUnion) {
 	if facts == nil {
@@ -4026,9 +3968,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 // PointsTo mirrors FactPointTo::point_to — loose_match against any pointee.
 // FactPointTo.cpp:398–405 — v->loose_match(pointee) || pointee->loose_match(v).
 // Incomplete PointTo (nil hole) fails closed true — no invent not-points-to past holes.
-func (f *FactPointTo) PointsTo(v *Variable) bool {
-	return f.PointsToSess(testAmbientSession, v)
-}
+// Non-Sess PointsTo deleted — use PointsToSess.
 
 // PointsToSess is PointsTo with explicit session residual sticky.
 func (f *FactPointTo) PointsToSess(s *Session, v *Variable) bool {
@@ -4292,9 +4232,7 @@ func (fm *FactMgr) SanityCheckMap() {
 // GetProgramEndFacts mirrors FactMgr::get_program_end_facts.
 // FactMgr.cpp:732–735 — global_facts of first function's FactMgr.
 // fms must hold session FMList; first is GetFirstFunction(list).
-func GetProgramEndFacts(list *FunctionList, fms *FactMgrMap) []*FactPointTo {
-	return GetProgramEndFactsSess(testAmbientSession, list, fms)
-}
+// Non-Sess GetProgramEndFacts deleted — pass run bag or testAmbientSession explicitly.
 
 func GetProgramEndFactsSess(s *Session, list *FunctionList, fms *FactMgrMap) []*FactPointTo {
 	first := GetFirstFunctionSess(s, list)

@@ -14,7 +14,7 @@ func MakeRandomContinue(
 ) Stmt {
 	// StatementContinue.cpp:63–66 — don't generate continue as first stmt (prev_stm==0)
 	// get_last_stm() empty → return nullptr (empty Stmt, not Kind shell)
-	if blk != nil && blk.GetLastStm() == nil {
+	if blk != nil && blk.GetLastStmSess(cgSess(cg)) == nil {
 		return Stmt{}
 	}
 	// StatementContinue always has RNG + CGContext; sticky no invent continue shell without them

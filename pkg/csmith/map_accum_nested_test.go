@@ -14,11 +14,11 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntTypeSess(testAmbientSession), false, false)
 
 	st := Stmt{
-		Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID(),
+		Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: g1,
 		Expr:   &Expression{Term: TermVariable, Var: g1, ExprType: GetIntTypeSess(testAmbientSession)},
 	}
-	blk := &Block{Func: f, StmID: AllocStmID(), Stmts: []Stmt{st}}
+	blk := &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession), Stmts: []Stmt{st}}
 	f.Blocks = []*Block{blk}
 	f.Body = blk
 
@@ -70,7 +70,7 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false)
 
 	// Assign with nil Lhs will fail visit — still must record map_accum
-	st := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
+	st := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmIDSess(testAmbientSession)}
 	fm.MapAccumEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVarSess(testAmbientSession, g1)}
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.MapUnionFactsIn = map[int][]*FactUnion{}
@@ -121,7 +121,7 @@ func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntTypeSess(testAmbientSession), false, false)
 
 	live := EmptyEffect().WriteVarSess(testAmbientSession, g1).WriteVarSess(testAmbientSession, g2)
-	id := AllocStmID()
+	id := AllocStmIDSess(testAmbientSession)
 	fm.SetMapStmEffect(id, live)
 	// grow live after store — must not appear in map snapshot
 	live = live.WriteVarSess(testAmbientSession, g3)
@@ -141,7 +141,7 @@ func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 		t.Fatal("GetMapStmEffect must return detached copy (map not mutated by caller WriteVar)")
 	}
 	// Block accum merge must not leave shared maps between statements
-	id2 := AllocStmID()
+	id2 := AllocStmIDSess(testAmbientSession)
 	fm.SetMapStmEffect(id2, EmptyEffect().WriteVarSess(testAmbientSession, g3))
 	merged := fm.GetMapStmEffect(id).AddEffectSess(testAmbientSession, fm.GetMapStmEffect(id2))
 	fm.SetMapStmEffect(id, EmptyEffect().WriteVarSess(testAmbientSession, g1)) // replace id entry

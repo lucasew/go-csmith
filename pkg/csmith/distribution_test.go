@@ -37,30 +37,30 @@ func TestDistributionTableRndNumToKey(t *testing.T) {
 
 func TestThresholdNumberToType(t *testing.T) {
 	// defaults: jumps+arrays
-	tab := NewStatementThresholdTable(Defaults())
+	tab := NewStatementThresholdTableSess(testAmbientSession, Defaults())
 	// 0..14 IfElse, 15..29 For, …
-	if NumberToType(tab, 0) != StmtIfElse || NumberToType(tab, 14) != StmtIfElse {
+	if NumberToTypeSess(testAmbientSession, tab, 0) != StmtIfElse || NumberToTypeSess(testAmbientSession, tab, 14) != StmtIfElse {
 		t.Fatal("ifelse")
 	}
-	if NumberToType(tab, 15) != StmtFor || NumberToType(tab, 29) != StmtFor {
+	if NumberToTypeSess(testAmbientSession, tab, 15) != StmtFor || NumberToTypeSess(testAmbientSession, tab, 29) != StmtFor {
 		t.Fatal("for")
 	}
-	if NumberToType(tab, 30) != StmtReturn {
+	if NumberToTypeSess(testAmbientSession, tab, 30) != StmtReturn {
 		t.Fatal("return")
 	}
-	if NumberToType(tab, 35) != StmtContinue {
+	if NumberToTypeSess(testAmbientSession, tab, 35) != StmtContinue {
 		t.Fatal("continue")
 	}
-	if NumberToType(tab, 40) != StmtBreak {
+	if NumberToTypeSess(testAmbientSession, tab, 40) != StmtBreak {
 		t.Fatal("break")
 	}
-	if NumberToType(tab, 45) != StmtGoto {
+	if NumberToTypeSess(testAmbientSession, tab, 45) != StmtGoto {
 		t.Fatal("goto")
 	}
-	if NumberToType(tab, 50) != StmtArrayOp || NumberToType(tab, 59) != StmtArrayOp {
+	if NumberToTypeSess(testAmbientSession, tab, 50) != StmtArrayOp || NumberToTypeSess(testAmbientSession, tab, 59) != StmtArrayOp {
 		t.Fatal("arrayop")
 	}
-	if NumberToType(tab, 60) != StmtAssign || NumberToType(tab, 99) != StmtAssign {
+	if NumberToTypeSess(testAmbientSession, tab, 60) != StmtAssign || NumberToTypeSess(testAmbientSession, tab, 99) != StmtAssign {
 		t.Fatal("assign")
 	}
 }

@@ -35,7 +35,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	var list FunctionList
 	// need a function for context
 	r := NewRngSess(testAmbientSession, 2)
@@ -72,7 +72,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
@@ -97,7 +97,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	// StatementFor.cpp always has RNG+CG sticky; nil FM soft re-pick
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil); st != nil {
+	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -105,7 +105,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cgEmpty := EmptyCGContext().WithSession(testAmbientSession)
-	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
+	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cgEmpty); st != nil {
 		t.Fatal("nil RNG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -116,7 +116,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession) // no FM
-	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg); st != nil {
+	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg); st != nil {
 		t.Fatalf("nil FM must return nil, got %#v", st)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -163,7 +163,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)

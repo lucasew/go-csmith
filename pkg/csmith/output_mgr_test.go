@@ -30,16 +30,16 @@ func TestMonitoredFuncs(t *testing.T) {
 	// OutputMgr.cpp:81–86
 	ClearMonitoredFuncsSess(testAmbientSession)
 	defer ClearMonitoredFuncsSess(testAmbientSession)
-	if !IsMonitoredFuncSess(testAmbientSession, ) {
+	if !IsMonitoredFuncSess(testAmbientSession) {
 		t.Fatal("empty list → all monitored")
 	}
 	SetMonitoredFuncsSess(testAmbientSession, "func_1,func_2")
 	SetCurrFuncSess(testAmbientSession, "func_1")
-	if !IsMonitoredFuncSess(testAmbientSession, ) {
+	if !IsMonitoredFuncSess(testAmbientSession) {
 		t.Fatal("func_1 in list")
 	}
 	SetCurrFuncSess(testAmbientSession, "func_3")
-	if IsMonitoredFuncSess(testAmbientSession, ) {
+	if IsMonitoredFuncSess(testAmbientSession) {
 		t.Fatal("func_3 not in list")
 	}
 	// Options.ApplyMonitoredFuncs
@@ -47,7 +47,7 @@ func TestMonitoredFuncs(t *testing.T) {
 	o.MonitorFuncs = "main"
 	o.ApplyMonitoredFuncsSess(testAmbientSession)
 	SetCurrFuncSess(testAmbientSession, "main")
-	if !IsMonitoredFuncSess(testAmbientSession, ) {
+	if !IsMonitoredFuncSess(testAmbientSession) {
 		t.Fatal("main")
 	}
 }

@@ -37,7 +37,7 @@ func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 		t.Fatal("nil GlobalList hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if VariablesComplete(GetAllLocalVars(&Block{LocalVars: []*Variable{g, nil}})) {
+	if VariablesComplete(GetAllLocalVarsSess(testAmbientSession, &Block{LocalVars: []*Variable{g, nil}})) {
 		t.Fatal("nil LocalVars hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -278,7 +278,7 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 
 func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if ChooseOKVar(NewRngSess(testAmbientSession, 1), []*Variable{nil}) != nil {
+	if ChooseOKVarSess(testAmbientSession, NewRngSess(testAmbientSession, 1), []*Variable{nil}) != nil {
 		t.Fatal("incomplete list must fail closed ChooseOKVar")
 	}
 	if !HasErrorSess(testAmbientSession) {

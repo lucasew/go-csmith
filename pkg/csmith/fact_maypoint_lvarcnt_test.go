@@ -18,7 +18,7 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 	// facts_out for g_73 only (make_facts skipped null special)
 	// lvar_cnt==2 because lvars were {null, g_73} (may-point-to)
 	newFacts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, g73, []*Variable{g4})}
-	_, ok := applyPointToAssignFacts(&facts, g73, 0, newFacts, 2)
+	_, ok := applyPointToAssignFactsSess(testAmbientSession, &facts, g73, 0, newFacts, 2)
 	if !ok {
 		t.Fatalf("apply failed err=%v", HasErrorSess(testAmbientSession))
 	}
@@ -39,7 +39,7 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 	facts2 := []*FactPointTo{
 		MakeFactPointToSetSess(testAmbientSession, g73, []*Variable{NullPtr, g4}),
 	}
-	_, ok = applyPointToAssignFacts(&facts2, g73, 0, newFacts, 1)
+	_, ok = applyPointToAssignFactsSess(testAmbientSession, &facts2, g73, 0, newFacts, 1)
 	if !ok {
 		t.Fatalf("renew apply failed err=%v", HasErrorSess(testAmbientSession))
 	}

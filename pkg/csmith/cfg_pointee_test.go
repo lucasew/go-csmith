@@ -34,18 +34,18 @@ func TestRhsTransferUsesMergePointees(t *testing.T) {
 func TestClosestLoopingBlock(t *testing.T) {
 	outer := &Block{Looping: true}
 	inner := &Block{Parent: outer, Looping: false}
-	if ClosestLoopingBlock(inner) != outer {
+	if ClosestLoopingBlockSess(testAmbientSession, inner) != outer {
 		t.Fatal("walk")
 	}
-	if ClosestLoopingBlock(outer) != outer {
+	if ClosestLoopingBlockSess(testAmbientSession, outer) != outer {
 		t.Fatal("self")
 	}
-	if ClosestLoopingBlock(&Block{}) != nil {
+	if ClosestLoopingBlockSess(testAmbientSession, &Block{}) != nil {
 		t.Fatal("none")
 	}
 	// Block always live; sticky nil (no invent no-loop soft-skip past hole)
 	ClearErrorSess(testAmbientSession)
-	if ClosestLoopingBlock(nil) != nil {
+	if ClosestLoopingBlockSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil ClosestLoopingBlock must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -117,7 +117,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	}
 	// seed new_facts with a related fact entry so makeup sees the var
 	newF := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	MakeupNewVarFacts(&old, newF)
+	MakeupNewVarFactsSess(testAmbientSession, &old, newF)
 	got := FindRelatedPointToSess(testAmbientSession, old, p)
 	if got == nil {
 		t.Fatal("added")
@@ -130,7 +130,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 		t.Fatalf("want null from init, got %+v", got.PointTo)
 	}
 	// idempotent
-	MakeupNewVarFacts(&old, newF)
+	MakeupNewVarFactsSess(testAmbientSession, &old, newF)
 	n := 0
 	for _, f := range old {
 		if f != nil && f.Var == p {
@@ -146,7 +146,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	q := CreateVariableQferSess(testAmbientSession, "g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
 	q.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	old2 := []*FactPointTo{}
-	MakeupNewVarFacts(&old2, []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, GarbagePtr)})
+	MakeupNewVarFactsSess(testAmbientSession, &old2, []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, GarbagePtr)})
 	fq := FindRelatedPointToSess(testAmbientSession, old2, q)
 	if fq == nil || fq.IsDeadSess(testAmbientSession) || len(fq.PointTo) != 1 || fq.PointTo[0] != tgt {
 		t.Fatalf("want &g_t fact, got %+v", fq)
@@ -154,7 +154,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	// nil hole fails closed sticky — no invent skip past hole to makeup later vars
 	r := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	old3 := []*FactPointTo{}
-	MakeupNewVarFacts(&old3, []*FactPointTo{nil, MakeFactPointToSess(testAmbientSession, r, NullPtr)})
+	MakeupNewVarFactsSess(testAmbientSession, &old3, []*FactPointTo{nil, MakeFactPointToSess(testAmbientSession, r, NullPtr)})
 	if FindRelatedPointToSess(testAmbientSession, old3, r) != nil {
 		t.Fatal("makeup must not invent past nil hole")
 	}

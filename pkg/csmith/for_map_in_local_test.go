@@ -72,7 +72,7 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 		fm.UnionFacts = DropUnionSubjectsByVarsSess(testAmbientSession, fm.UnionFacts, body.LocalVars)
 	}
 	out := fm.GetMapFactsOut(20)
-	if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
+	if _, ok := tryMergeJumpFactsSess(testAmbientSession, &fm.GlobalFacts, out); !ok {
 		t.Fatalf("merge must succeed: err=%v", HasErrorSess(testAmbientSession))
 	}
 	// l_body must not reappear as garbage invent
@@ -89,7 +89,7 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 		MakeFactPointToSess(testAmbientSession, lBody, g),
 	}
 	breakOut := []*FactPointTo{MakeFactPointToSess(testAmbientSession, gPtr, g)}
-	if _, ok := tryMergeJumpFacts(&polluted, breakOut); !ok {
+	if _, ok := tryMergeJumpFactsSess(testAmbientSession, &polluted, breakOut); !ok {
 		t.Fatal("raw invent path must complete")
 	}
 	if f := FindRelatedPointToSess(testAmbientSession, polluted, lBody); f == nil || !f.IsDeadSess(testAmbientSession) {

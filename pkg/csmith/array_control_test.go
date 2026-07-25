@@ -120,7 +120,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = []int{5, 5}
@@ -155,12 +155,12 @@ func TestCombineVariableSets(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	got := CombineVariableSets([]*Variable{a}, []*Variable{a, b})
+	got := CombineVariableSetsSess(testAmbientSession, []*Variable{a}, []*Variable{a, b})
 	if len(got) != 2 {
 		t.Fatalf("%d", len(got))
 	}
 	// nil hole fails closed sticky IncompleteVariables (not bare nil invent empty-complete)
-	bad := CombineVariableSets([]*Variable{a, nil}, []*Variable{b})
+	bad := CombineVariableSetsSess(testAmbientSession, []*Variable{a, nil}, []*Variable{b})
 	if VariablesComplete(bad) {
 		t.Fatal("nil hole must IncompleteVariables, not empty-complete")
 	}
@@ -200,7 +200,7 @@ func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
 	// empty stack → CreateRandomArray cannot invent local array
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
-	st := MakeRandomArrayLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st != nil {
 		t.Fatal("nil select_array must fail closed whole array-loop, not soft-skip slots")
 	}
@@ -212,7 +212,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// seed several arrays so select_array can pick
 	for i := 0; i < 3; i++ {
@@ -256,11 +256,11 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	// manual simulation of access choices via AddVariableToSet
 	av0 := vs.Arrays[0]
 	var mr, mw []*Variable
-	AddVariableToSet(&mr, &av0.Variable) // read only
+	AddVariableToSetSess(testAmbientSession, &mr, &av0.Variable) // read only
 	if len(mr) != 1 || len(mw) != 0 {
 		t.Fatal("read only")
 	}
-	AddVariableToSet(&mw, &av0.Variable)
+	AddVariableToSetSess(testAmbientSession, &mw, &av0.Variable)
 	if len(mw) != 1 {
 		t.Fatal("write")
 	}
@@ -280,7 +280,7 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// pre-seed effect_stm as dirty
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
-	st := MakeRandomFor(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st == nil {
 		t.Fatal("nil")
 	}
@@ -328,7 +328,7 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeRandomArrayLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomArrayLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -342,14 +342,14 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg2.EffectAccum = &eff
 	cg2.RW = &RWDirective{NoReadVars: IncompleteVariables()}
-	if MakeRandomArrayLoop(NewRngSess(testAmbientSession, 2), opts0, NewProbabilities(opts0), vs, NewExprTablesSess(testAmbientSession, opts0), NewStatementThresholdTable(opts0), &cg2) != nil {
+	if MakeRandomArrayLoop(NewRngSess(testAmbientSession, 2), opts0, NewProbabilities(opts0), vs, NewExprTablesSess(testAmbientSession, opts0), NewStatementThresholdTableSess(testAmbientSession, opts0), &cg2) != nil {
 		t.Fatal("incomplete RW NoReadVars must fail closed MakeRandomArrayLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete RW lists must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if stmtOK(MakeRandomArrayOp(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)) {
+	if stmtOK(MakeRandomArrayOp(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayOp")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -135,9 +135,7 @@ func (b *Block) MustReturnSess(s *Session) bool {
 
 // MustReturnWithFM is must_return with an explicit FactMgr for back-edge checks.
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
-func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
-	return b.MustReturnWithFMSess(testAmbientSession, fm)
-}
+// Non-Sess MustReturnWithFM deleted — pass run bag or testAmbientSession explicitly.
 
 // MustReturnWithFMSess is MustReturnWithFM with explicit session residual sticky.
 func (b *Block) MustReturnWithFMSess(s *Session, fm *FactMgr) bool {
@@ -249,9 +247,7 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 // NeedReturnStmt mirrors Function::need_return_stmt.
 // Function.cpp:618–619 — return_type always live; void simple → false.
 // Incomplete Function/ReturnType sticky true (no invent "no return needed" past holes).
-func (f *Function) NeedReturnStmt() bool {
-	return f.NeedReturnStmtSess(testAmbientSession)
-}
+// Non-Sess NeedReturnStmt deleted — pass run bag or testAmbientSession explicitly.
 
 // NeedReturnStmtSess is NeedReturnStmt with explicit session residual sticky.
 func (f *Function) NeedReturnStmtSess(s *Session) bool {

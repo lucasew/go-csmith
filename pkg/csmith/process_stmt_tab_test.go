@@ -174,7 +174,7 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 	// without jumps/arrays, Goto/ArrayOp cutoffs absent — Assign at 100
 	// rnd 50 must not be Goto
 	for v := 0; v < 100; v++ {
-		st := NumberToType(tab, uint32(v))
+		st := NumberToTypeSess(testAmbientSession, tab, uint32(v))
 		if st == StmtGoto || st == StmtArrayOp {
 			t.Fatalf("value %d → %v with jumps/arrays off", v, st)
 		}

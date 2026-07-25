@@ -4,22 +4,22 @@ import "testing"
 
 func TestPartialExpanderInactiveAllowsAll(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
-	if !ExpandCheck(StmtFor) || !ExpandCheck(StmtAssign) {
+	if !ExpandCheckSess(testAmbientSession, StmtFor) || !ExpandCheckSess(testAmbientSession, StmtAssign) {
 		t.Fatal("inactive allows all")
 	}
 }
 
 func TestInitPartialExpanderAssignment(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
-	if !InitPartialExpander("assignment") {
+	if !InitPartialExpanderSess(testAmbientSession, "assignment") {
 		t.Fatal("init")
 	}
 	// partial mode active: only assignment (and invoke via assign alias) allowed
-	if !ExpandCheck(StmtAssign) {
+	if !ExpandCheckSess(testAmbientSession, StmtAssign) {
 		t.Fatal("assign")
 	}
 	// first success clears MAX → subsequent all allowed
-	if !ExpandCheck(StmtFor) {
+	if !ExpandCheckSess(testAmbientSession, StmtFor) {
 		t.Fatal("after first, mode off")
 	}
 	ClearPartialExpanderSess(testAmbientSession)
@@ -27,7 +27,7 @@ func TestInitPartialExpanderAssignment(t *testing.T) {
 
 func TestInitPartialExpanderForOnly(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
-	if !InitPartialExpander("for") {
+	if !InitPartialExpanderSess(testAmbientSession, "for") {
 		t.Fatal("init")
 	}
 	// For allowed
@@ -38,10 +38,10 @@ func TestInitPartialExpanderForOnly(t *testing.T) {
 		t.Fatal("assign not set")
 	}
 	// ExpandCheck(For) succeeds and disables partial mode
-	if !ExpandCheck(StmtFor) {
+	if !ExpandCheckSess(testAmbientSession, StmtFor) {
 		t.Fatal("expand for")
 	}
-	if ExpandCheck(StmtAssign) != true {
+	if ExpandCheckSess(testAmbientSession, StmtAssign) != true {
 		// mode off
 	}
 	// restore backup
@@ -57,7 +57,7 @@ func TestInitPartialExpanderForOnly(t *testing.T) {
 
 func TestInitPartialExpanderAll(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
-	if !InitPartialExpander("all") {
+	if !InitPartialExpanderSess(testAmbientSession, "all") {
 		t.Fatal("all")
 	}
 	// "all" sets every kind true including MAX from init then MAX true again
@@ -69,14 +69,14 @@ func TestInitPartialExpanderAll(t *testing.T) {
 
 func TestInitPartialExpanderMulti(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
-	if !InitPartialExpander("if-else,return,invoke") {
+	if !InitPartialExpanderSess(testAmbientSession, "if-else,return,invoke") {
 		t.Fatal("multi")
 	}
 	if !DirectExpandCheckSess(testAmbientSession, StmtIfElse) || !DirectExpandCheckSess(testAmbientSession, StmtReturn) || !DirectExpandCheckSess(testAmbientSession, StmtInvoke) {
 		t.Fatal("kinds")
 	}
 	// assign allowed via invoke alias while MAX set
-	if !ExpandCheck(StmtAssign) {
+	if !ExpandCheckSess(testAmbientSession, StmtAssign) {
 		t.Fatal("assign via invoke")
 	}
 	ClearPartialExpanderSess(testAmbientSession)
@@ -84,7 +84,7 @@ func TestInitPartialExpanderMulti(t *testing.T) {
 
 func TestInitPartialExpanderBad(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
-	if InitPartialExpander("nope") {
+	if InitPartialExpanderSess(testAmbientSession, "nope") {
 		t.Fatal("bad token")
 	}
 	ClearPartialExpanderSess(testAmbientSession)

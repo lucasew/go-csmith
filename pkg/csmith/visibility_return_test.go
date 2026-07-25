@@ -96,7 +96,7 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, loc)}
-	out := RemoveFunctionLocalFactsAt(facts2, f, blk)
+	out := RemoveFunctionLocalFactsAtSess(testAmbientSession, facts2, f, blk)
 	if FactsComplete(out) {
 		t.Fatal("RemoveFunctionLocalFactsAt must fail closed on incomplete stack", out)
 	}
@@ -104,7 +104,7 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 		t.Fatal("RemoveFunctionLocalFactsAt incomplete stack must SetError sticky")
 	}
 	// Block stack scan
-	if blk.StackScanComplete() {
+	if blk.StackScanCompleteSess(testAmbientSession) {
 		t.Fatal("Block.StackScanComplete hole")
 	}
 	ClearErrorSess(testAmbientSession)

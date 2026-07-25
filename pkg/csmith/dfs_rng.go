@@ -31,9 +31,7 @@ type dfsEngine struct {
 // AbsRndNumGenerator.cpp:70 seedrand then DFSRndNumGenerator::make_rndnum_generator.
 // opts.MaxExhaustiveDepth sizes the SearchState vector (CGOptions::max_exhaustive_depth).
 // Incomplete maxDepth<=0 sticky nil (no invent empty engine that always EXCEED).
-func NewDFSRng(seed uint64, opts Options) *Rng {
-	return NewDFSRngSess(testAmbientSession, seed, opts)
-}
+// Non-Sess NewDFSRng deleted — pass run bag or testAmbientSession explicitly.
 
 // NewDFSRngSess is NewDFSRng with explicit session residual sticky.
 func NewDFSRngSess(s *Session, seed uint64, opts Options) *Rng {
@@ -75,9 +73,7 @@ func NewDFSRngSess(s *Session, seed uint64, opts Options) *Rng {
 // makeDFSRndNumGeneratorOpts mirrors DFSRndNumGenerator::make_rndnum_generator singleton.
 // DFSRndNumGenerator.cpp:137–158.
 // opts must be supplied by caller (avoids ProcessOptions RLock under processOptsMu).
-func makeDFSRndNumGeneratorOpts(seed uint64, opts Options) *Rng {
-	return makeDFSRndNumGeneratorOptsSess(testAmbientSession, seed, opts)
-}
+// Non-Sess makeDFSRndNumGeneratorOpts deleted — pass run bag or testAmbientSession explicitly.
 
 // makeDFSRndNumGeneratorOptsSess is the DFS factory on an explicit session bag.
 func makeDFSRndNumGeneratorOptsSess(s *Session, seed uint64, opts Options) *Rng {
@@ -94,9 +90,7 @@ func makeDFSRndNumGeneratorOptsSess(s *Session, seed uint64, opts Options) *Rng 
 }
 
 // clearDFSImpl drops the process DFS singleton (RandomNumber::doFinalization path).
-func clearDFSImpl() {
-	clearDFSImplSess(testAmbientSession)
-}
+// Non-Sess clearDFSImpl deleted — pass run bag or testAmbientSession explicitly.
 
 // clearDFSImplSess drops DFSImpl on an explicit session bag.
 func clearDFSImplSess(s *Session) {
@@ -108,9 +102,7 @@ func clearDFSImplSess(s *Session) {
 	}
 }
 
-func (e *dfsEngine) initializeSequence(v []int) {
-	e.initializeSequenceSess(testAmbientSession, v)
-}
+// Non-Sess initializeSequence deleted — pass run bag or testAmbientSession explicitly.
 
 func (e *dfsEngine) initializeSequenceSess(s *Session, v []int) {
 	// DFSRndNumGenerator.cpp:161–165
@@ -125,9 +117,7 @@ func (e *dfsEngine) initializeSequenceSess(s *Session, v []int) {
 
 // EagerBacktracking mirrors DFSRndNumGenerator::eager_backtracking.
 // DFSRndNumGenerator.cpp:181–206 — true means do eager backtracking (sets BACKTRACKING_ERROR).
-func (r *Rng) EagerBacktracking(depthNeeded int) bool {
-	return r.EagerBacktrackingSess(testAmbientSession, depthNeeded)
-}
+// Non-Sess EagerBacktracking deleted — pass run bag or testAmbientSession explicitly.
 
 // EagerBacktrackingSess is EagerBacktracking with explicit session residual sticky.
 func (r *Rng) EagerBacktrackingSess(s *Session, depthNeeded int) bool {
@@ -157,9 +147,7 @@ func (r *Rng) EagerBacktrackingSess(s *Session, depthNeeded int) bool {
 }
 
 // DFSGetDecisionDepth mirrors get_decision_depth.
-func (r *Rng) DFSGetDecisionDepth() int {
-	return r.DFSGetDecisionDepthSess(testAmbientSession)
-}
+// Non-Sess DFSGetDecisionDepth deleted — pass run bag or testAmbientSession explicitly.
 
 // DFSGetDecisionDepthSess is DFSGetDecisionDepth with explicit session residual sticky.
 func (r *Rng) DFSGetDecisionDepthSess(s *Session) int {
@@ -171,9 +159,7 @@ func (r *Rng) DFSGetDecisionDepthSess(s *Session) int {
 }
 
 // DFSGetCurrentPos mirrors get_current_pos.
-func (r *Rng) DFSGetCurrentPos() int {
-	return r.DFSGetCurrentPosSess(testAmbientSession)
-}
+// Non-Sess DFSGetCurrentPos deleted — pass run bag or testAmbientSession explicitly.
 
 // DFSGetCurrentPosSess is DFSGetCurrentPos with explicit session residual sticky.
 func (r *Rng) DFSGetCurrentPosSess(s *Session) int {
@@ -185,9 +171,7 @@ func (r *Rng) DFSGetCurrentPosSess(s *Session) int {
 }
 
 // DFSSetCurrentPos mirrors set_current_pos.
-func (r *Rng) DFSSetCurrentPos(pos int) {
-	r.DFSSetCurrentPosSess(testAmbientSession, pos)
-}
+// Non-Sess DFSSetCurrentPos deleted — pass run bag or testAmbientSession explicitly.
 
 // DFSSetCurrentPosSess is DFSSetCurrentPos with explicit session residual sticky.
 func (r *Rng) DFSSetCurrentPosSess(s *Session, pos int) {
@@ -199,9 +183,7 @@ func (r *Rng) DFSSetCurrentPosSess(s *Session, pos int) {
 }
 
 // DFSGetAllDone mirrors get_all_done.
-func (r *Rng) DFSGetAllDone() bool {
-	return r.DFSGetAllDoneSess(testAmbientSession)
-}
+// Non-Sess DFSGetAllDone deleted — pass run bag or testAmbientSession explicitly.
 
 // DFSGetAllDoneSess is DFSGetAllDone with explicit session residual sticky.
 func (r *Rng) DFSGetAllDoneSess(s *Session) bool {
@@ -214,9 +196,7 @@ func (r *Rng) DFSGetAllDoneSess(s *Session) bool {
 
 // DFSResetState mirrors reset_state.
 // DFSRndNumGenerator.cpp:381–385.
-func (r *Rng) DFSResetState() {
-	r.DFSResetStateSess(testAmbientSession)
-}
+// Non-Sess DFSResetState deleted — pass run bag or testAmbientSession explicitly.
 
 // DFSResetStateSess is DFSResetState with explicit session residual sticky.
 func (r *Rng) DFSResetStateSess(s *Session) {
@@ -245,9 +225,7 @@ func filterInvalidNums(invalid []int, v int) bool {
 
 // dfsRevisitNode mirrors revisit_node.
 // DFSRndNumGenerator.cpp:208–227.
-func (e *dfsEngine) revisitNode(state *dfsSearchState, localPos, bound int, f Filter) int {
-	return e.revisitNodeSess(testAmbientSession, state, localPos, bound, f)
-}
+// Non-Sess revisitNode deleted — pass run bag or testAmbientSession explicitly.
 
 func (e *dfsEngine) revisitNodeSess(s *Session, state *dfsSearchState, localPos, bound int, f Filter) int {
 	rv := state.value
@@ -277,9 +255,7 @@ func (e *dfsEngine) revisitNodeSess(s *Session, state *dfsSearchState, localPos,
 // dfsRandomChoice mirrors random_choice.
 // DFSRndNumGenerator.cpp:238–348.
 // Returns choice in [0,bound) or -1 on backtrack/error (error sticky).
-func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
-	return r.dfsRandomChoiceSess(testAmbientSession, bound, f, invalid)
-}
+// Non-Sess dfsRandomChoice deleted — pass run bag or testAmbientSession explicitly.
 
 func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int) int {
 	if r == nil || r.dfs == nil {
@@ -427,9 +403,7 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 // DFSLogDepth mirrors log_depth.
 // DFSRndNumGenerator.cpp:351–365.}
 
-func (r *Rng) DFSLogDepth(d int, where, log string) {
-	r.DFSLogDepthSess(testAmbientSession, d, where, log)
-}
+// Non-Sess DFSLogDepth deleted — pass run bag or testAmbientSession explicitly.
 
 // DFSLogDepthSess is DFSLogDepth with explicit session residual sticky.
 func (r *Rng) DFSLogDepthSess(s *Session, d int, where, log string) {
@@ -453,9 +427,7 @@ func (r *Rng) DFSLogDepthSess(s *Session, d int, where, log string) {
 
 // GetPrefixedNameDFS mirrors DFSRndNumGenerator::get_prefixed_name.
 // DFSRndNumGenerator.cpp:397–403 — "p_" + sequence + sep + name.
-func (r *Rng) GetPrefixedNameDFS(name string) string {
-	return r.GetPrefixedNameDFSSess(testAmbientSession, name)
-}
+// Non-Sess GetPrefixedNameDFS deleted — pass run bag or testAmbientSession explicitly.
 
 // GetPrefixedNameDFSSess is GetPrefixedNameDFS with explicit session residual sticky.
 func (r *Rng) GetPrefixedNameDFSSess(s *Session, name string) string {
@@ -473,9 +445,7 @@ func (r *Rng) GetPrefixedNameDFSSess(s *Session, name string) string {
 
 // dfsRndUpto mirrors DFSRndNumGenerator::rnd_upto.
 // DFSRndNumGenerator.cpp:411–415.
-func (r *Rng) dfsRndUpto(n uint32, f Filter) uint32 {
-	return r.dfsRndUptoSess(testAmbientSession, n, f)
-}
+// Non-Sess dfsRndUpto deleted — pass run bag or testAmbientSession explicitly.
 
 func (r *Rng) dfsRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 	x := r.dfsRandomChoiceSess(s, int(n), f, nil)
@@ -488,9 +458,7 @@ func (r *Rng) dfsRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 
 // dfsRndFlipcoin mirrors DFSRndNumGenerator::rnd_flipcoin.
 // DFSRndNumGenerator.cpp:417–431 — p==100 forces 1; p==0 forces 0 via invalid list.
-func (r *Rng) dfsRndFlipcoin(p uint32, f Filter) bool {
-	return r.dfsRndFlipcoinSess(testAmbientSession, p, f)
-}
+// Non-Sess dfsRndFlipcoin deleted — pass run bag or testAmbientSession explicitly.
 
 func (r *Rng) dfsRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 	var invalid []int
@@ -510,9 +478,7 @@ func (r *Rng) dfsRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 }
 
 // Format helper for tests — sequence string via engine.
-func (r *Rng) dfsSequenceString() string {
-	return r.dfsSequenceStringSess(testAmbientSession)
-}
+// Non-Sess dfsSequenceString deleted — pass run bag or testAmbientSession explicitly.
 
 // dfsSequenceStringSess is dfsSequenceString with explicit session residual sticky.
 func (r *Rng) dfsSequenceStringSess(s *Session) string {

@@ -53,7 +53,7 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 	uv.CreateFieldVarsSess(testAmbientSession)
 	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	// merge fid 4 into fid 0 → neither implies → BOTTOM (not replace with 4)
-	merged := MergeUnionFact(facts, MakeFactUnionSess(testAmbientSession, uv, 4))
+	merged := MergeUnionFactSess(testAmbientSession, facts, MakeFactUnionSess(testAmbientSession, uv, 4))
 	if !UnionFactsComplete(merged) || HasErrorSess(testAmbientSession) {
 		t.Fatal("merge incomplete", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
@@ -64,7 +64,7 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 	// old already implies new → keep old
 	ClearErrorSess(testAmbientSession)
 	facts2 := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 3)}
-	merged2 := MergeUnionFact(facts2, MakeFactUnionSess(testAmbientSession, uv, 3))
+	merged2 := MergeUnionFactSess(testAmbientSession, facts2, MakeFactUnionSess(testAmbientSession, uv, 3))
 	got2 := FindRelatedUnionSess(testAmbientSession, merged2, uv)
 	if got2 == nil || got2.LastWrittenFID != 3 {
 		t.Fatalf("want keep 3, got %#v", got2)
@@ -117,7 +117,7 @@ func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
 	// pointer that may point to either union's f4 field parent via indir write is complex;
 	// exercise MergeUnionFact join path used by may-assign: 0 join 4 → BOTTOM
 	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, u0, 0)}
-	merged := MergeUnionFact(facts, MakeFactUnionSess(testAmbientSession, u0, 4))
+	merged := MergeUnionFactSess(testAmbientSession, facts, MakeFactUnionSess(testAmbientSession, u0, 4))
 	got := FindRelatedUnionSess(testAmbientSession, merged, u0)
 	if got == nil || !got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("may-merge must BOTTOM not replace-to-4: %#v", got)
@@ -144,7 +144,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	}
 	f1 := uv.FieldVars[1]
 	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
-	body := &Block{StmID: AllocStmID(), Func: f}
+	body := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f}
 	f.Body = body
 	f.Stack = []*Block{body}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -161,14 +161,14 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 		t.Fatalf("after f1 write want last=1 got %#v", got)
 	}
 	// empty then/else blocks with entry last=1
-	thenB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
-	elseB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
+	thenB := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Parent: body}
+	elseB := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Parent: body}
 	fm.SetMapFactsInPair(thenB.StmID, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts), CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts))
 	fm.SetMapFactsOutForBlock(thenB, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts))
 	// else starts from then map_in (StatementIf.cpp:97)
 	fm.AssignGlobalFactsFromMapIn(thenB.StmID)
 	fm.SetMapFactsOutForBlock(elseB, CloneFactSliceSess(testAmbientSession, fm.GlobalFacts))
-	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmID(), Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
+	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmIDSess(testAmbientSession), Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	prePT := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	preU := CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts)
 	CombineBranchFacts(ifSt, &prePT, &preU, fm)

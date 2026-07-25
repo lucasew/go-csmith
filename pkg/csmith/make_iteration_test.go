@@ -163,7 +163,7 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 2))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomFor(NewRngSess(testAmbientSession, 9), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 9), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")
 	}
@@ -180,7 +180,7 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
-	blk := &Block{Func: f, StmID: AllocStmID()}
+	blk := &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession)}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -189,7 +189,7 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 	if lc == nil {
 		t.Skip("no IV")
 	}
-	st := &Stmt{Kind: StmtFor, Loop: lc, Then: &Block{Func: f, StmID: AllocStmID()}, StmID: AllocStmID()}
+	st := &Stmt{Kind: StmtFor, Loop: lc, Then: &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession)}, StmID: AllocStmIDSess(testAmbientSession)}
 	cgp := cg
 	if !VisitFactsStatementFor(st, &cgp, opts) {
 		t.Fatal("visit_facts for")

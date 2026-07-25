@@ -133,7 +133,7 @@ func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	fn.Blocks = []*Block{body}
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	facts := []*FactPointTo{{Var: gp, PointTo: []*Variable{nil}}}
-	if FactsComplete(RemoveFunctionLocalFacts(facts, fn)) {
+	if FactsComplete(RemoveFunctionLocalFactsAtSess(testAmbientSession, facts, fn, fn.Body)) {
 		t.Fatal("incomplete PointTo must fail closed incomplete, not invent filter")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -154,7 +154,7 @@ func TestRemoveFunctionLocalFacts(t *testing.T) {
 		MakeFactPointToSess(testAmbientSession, loc, NullPtr),
 		MakeFactPointToSess(testAmbientSession, g, NullPtr),
 	}
-	out := RemoveFunctionLocalFacts(facts, f)
+	out := RemoveFunctionLocalFactsAtSess(testAmbientSession, facts, f, f.Body)
 	if len(out) != 1 || out[0].Var != g {
 		t.Fatal(out)
 	}
@@ -168,7 +168,7 @@ func TestRemoveFunctionLocalFactsNilFuncNoResidualInvent(t *testing.T) {
 	defer ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, g, NullPtr)}
-	out := RemoveFunctionLocalFactsAt(facts, nil, nil)
+	out := RemoveFunctionLocalFactsAtSess(testAmbientSession, facts, nil, nil)
 	if !FactsComplete(out) || len(out) != 1 {
 		t.Fatal("nil Func RemoveFunctionLocalFactsAt must stay complete", out)
 	}
@@ -187,7 +187,7 @@ func TestRemoveLoopLocalFacts(t *testing.T) {
 	inner.LocalVars = append(inner.LocalVars, lp)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, lp, NullPtr), MakeFactPointToSess(testAmbientSession, g, NullPtr)}
-	out := RemoveLoopLocalFacts(facts, inner)
+	out := RemoveLoopLocalFactsSess(testAmbientSession, facts, inner)
 	if len(out) != 1 || out[0].Var != g {
 		t.Fatal(out)
 	}
@@ -200,7 +200,7 @@ func TestRemoveLoopLocalFactsMarksDeadPointee(t *testing.T) {
 	loop.LocalVars = []*Variable{loc}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, g, loc)}
-	out := RemoveLoopLocalFacts(facts, loop)
+	out := RemoveLoopLocalFactsSess(testAmbientSession, facts, loop)
 	if len(out) != 1 || out[0].Var != g {
 		t.Fatal(out)
 	}
@@ -221,7 +221,7 @@ func TestRemoveLoopLocalFactsForStmtUsesParent(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	br := &Stmt{Kind: StmtBreak, StmID: 3}
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, lp, NullPtr), MakeFactPointToSess(testAmbientSession, g, NullPtr)}
-	out := RemoveLoopLocalFactsForStmt(facts, br, body)
+	out := RemoveLoopLocalFactsForStmtSess(testAmbientSession, facts, br, body)
 	if len(out) != 1 || out[0].Var != g {
 		t.Fatal(out)
 	}

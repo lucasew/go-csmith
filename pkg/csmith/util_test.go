@@ -42,10 +42,9 @@ func TestDoFinalizationResetsGensym(t *testing.T) {
 func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 	// Block.cpp:216–219 — always gensym("t_") process-wide; ignore private GenSym
 	ResetDefaultGensym()
-	var sym GenSym
 	b := &Block{}
-	a := b.CreateNewTmpVar(&sym, EInt)
-	c := b.CreateNewTmpVar(&sym, EShort)
+	a := b.CreateNewTmpVarSess(testAmbientSession, EInt)
+	c := b.CreateNewTmpVarSess(testAmbientSession, EShort)
 	if a != "t_1" || c != "t_2" {
 		t.Fatalf("want t_1,t_2 got %q,%q", a, c)
 	}
@@ -53,8 +52,8 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 		t.Fatal(b.TmpVars)
 	}
 	// private GenSym must not invent separate stream
-	x := b.CreateNewTmpVar(nil, EInt)
-	y := b.CreateNewTmpVar(&sym, EInt)
+	x := b.CreateNewTmpVarSess(testAmbientSession, EInt)
+	y := b.CreateNewTmpVarSess(testAmbientSession, EInt)
 	if x != "t_3" || y != "t_4" {
 		t.Fatalf("process gensym sequence %q %q", x, y)
 	}
@@ -65,7 +64,7 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 	// nil Block — sticky no invent bare t_N without registration
 	ClearErrorSess(testAmbientSession)
 	var nb *Block
-	if nb.CreateNewTmpVar(nil, EInt) != "" {
+	if nb.CreateNewTmpVarSess(testAmbientSession, EInt) != "" {
 		t.Fatal("nil Block CreateNewTmpVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

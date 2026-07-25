@@ -98,8 +98,8 @@ func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 	// When src is not an ancestor of dest, path uses !IsVisibleLocal(src) for each intermediate.
 	ClearErrorSess(testAmbientSession)
 	src := &Block{}
-	src.LocalVars = []*Variable{nil}                  // incomplete: IsVisibleLocal hits nil hole
-	mid := &Block{}                                   // no Parent chain to src → !reachedSrc
+	src.LocalVars = []*Variable{nil}                                        // incomplete: IsVisibleLocal hits nil hole
+	mid := &Block{}                                                         // no Parent chain to src → !reachedSrc
 	loc := &Variable{Name: "l_x", Type: GetIntTypeSess(testAmbientSession)} // non-global local
 	mid.LocalVars = []*Variable{loc}
 	got := CollectInitSkippedVarsSess(testAmbientSession, src, mid)
@@ -124,7 +124,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	if av == nil {
 		t.Fatal("av")
 	}
-	out := OutputPtrResets([]*Variable{&av.Variable}, opts)
+	out := OutputPtrResetsSess(testAmbientSession, []*Variable{&av.Variable}, opts)
 	if !strings.Contains(out, "g_a") || !strings.Contains(out, " = 0;") || !strings.Contains(out, "for (i = 0") {
 		t.Fatal(out)
 	}
@@ -135,7 +135,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	av2.AsArray = av2
-	if got := outputArrayInitForced(av2, "    ", []string{"i"}, true); got != "" {
+	if got := outputArrayInitForcedSess(testAmbientSession, av2, "    ", []string{"i"}, true); got != "" {
 		t.Fatalf("nil init must fail closed, got %q", got)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -144,7 +144,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// post_incr_operator false → "i = i + 1" (ArrayVariable.cpp:640–645)
 	opts.PostIncrOperator = false
-	out2 := OutputPtrResets([]*Variable{&av.Variable}, opts)
+	out2 := OutputPtrResetsSess(testAmbientSession, []*Variable{&av.Variable}, opts)
 	if !strings.Contains(out2, "i = i + 1") {
 		t.Fatal(out2)
 	}
@@ -167,8 +167,8 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// two stmts so dest (last) != other candidate
 	b1 := &Block{Func: f, Stmts: []Stmt{
-		{Kind: StmtAssign, StmID: AllocStmID()},
-		{Kind: StmtAssign, StmID: AllocStmID()},
+		{Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession)},
+		{Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession)},
 	}}
 	f.Blocks = []*Block{b1}
 	f.Stack = []*Block{b1}

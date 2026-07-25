@@ -35,7 +35,7 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	// alts also &l_118
 	av.InitExprs = []*Expression{addr, addr}
 
-	pt, _ := AbstractFactForVarInit(&av.Variable)
+	pt, _ := AbstractFactForVarInitSess(testAmbientSession, &av.Variable)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("abstract sticky %v", HasErrorSess(testAmbientSession))
 	}
@@ -75,7 +75,7 @@ func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
 		InitExprs: []*Expression{addr, addr},
 	}
 	av.AsArray = av
-	pt, _ := AbstractFactForVarInit(&av.Variable)
+	pt, _ := AbstractFactForVarInitSess(testAmbientSession, &av.Variable)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("sticky err %v", HasErrorSess(testAmbientSession))
 	}

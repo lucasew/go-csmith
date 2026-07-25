@@ -40,7 +40,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	// Count AllocStmID consumed by multi-dim array-init
 	currentSession().NextStmID = 200
 	before := currentSession().NextStmID
-	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 7), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 7), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("MakeRandomArrayInit sticky: %v", GetErrorSess(testAmbientSession))
 	}
@@ -112,7 +112,7 @@ func TestMultiDimArrayOpLabelOnce(t *testing.T) {
 	// FM with jump source → PreOutput finds label via SourceLabel path without FM,
 	// or use SourceLabel when FM nil.
 	b := &Block{Stmts: []Stmt{outer}, EmitFM: nil}
-	out := b.outputStmtsOnly(0)
+	out := b.outputStmtsOnlySess(testAmbientSession, 0, false, sessOpts(testAmbientSession))
 	if HasErrorSess(testAmbientSession) || out == "" {
 		t.Fatalf("emit empty/err: %q err=%v", out, HasErrorSess(testAmbientSession))
 	}

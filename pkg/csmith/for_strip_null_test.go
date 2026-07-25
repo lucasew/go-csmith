@@ -32,30 +32,30 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 
 	// then: *g99 = (void*)0  — FactPointTo.cpp:275–278 + FactMgr renew
 	thenNull := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: g99, Lhs: &Lhs{Var: g99, Type: pt},
 		Expr:     &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}, ExprType: pt},
 		AssignOp: AssignSimple,
 	}
 	// else: (*g77) = 1 — Lhs subject g77, desired type after one deref is i32
 	elseDeref := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: g77, Lhs: &Lhs{Var: g77, Type: i32},
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
 		AssignOp: AssignSimple,
 	}
 	ifSt := Stmt{
-		Kind: StmtIfElse, StmID: AllocStmID(),
+		Kind: StmtIfElse, StmID: AllocStmIDSess(testAmbientSession),
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
-		Then: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{thenNull}},
-		Else: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{elseDeref}},
+		Then: &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{thenNull}},
+		Else: &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{elseDeref}},
 	}
 	for _, id := range []int{thenNull.StmID, elseDeref.StmID, ifSt.StmID, ifSt.Then.StmID, ifSt.Else.StmID} {
 		fm.SetMapStmEffect(id, EmptyEffect())
 	}
 
 	body := &Block{
-		Func: f, StmID: AllocStmID(), Looping: true,
+		Func: f, StmID: AllocStmIDSess(testAmbientSession), Looping: true,
 		Stmts: []Stmt{ifSt},
 	}
 	fm.SetMapStmEffect(body.StmID, EmptyEffect())
@@ -116,29 +116,29 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 
 	thenNull := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: g99, Lhs: &Lhs{Var: g99, Type: pt},
 		Expr:     &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}, ExprType: pt},
 		AssignOp: AssignSimple,
 	}
 	elseDeref := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: g77, Lhs: &Lhs{Var: g77, Type: i32},
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
 		AssignOp: AssignSimple,
 	}
 	ifSt := Stmt{
-		Kind: StmtIfElse, StmID: AllocStmID(),
+		Kind: StmtIfElse, StmID: AllocStmIDSess(testAmbientSession),
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
-		Then: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{thenNull}},
-		Else: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{elseDeref}},
+		Then: &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{thenNull}},
+		Else: &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{elseDeref}},
 	}
 	ret := Stmt{
-		Kind: StmtReturn, StmID: AllocStmID(),
+		Kind: StmtReturn, StmID: AllocStmIDSess(testAmbientSession),
 		Expr: &Expression{Term: TermVariable, Var: f.RV, ExprType: i32},
 	}
 	body := &Block{
-		Func: f, StmID: AllocStmID(), Looping: true,
+		Func: f, StmID: AllocStmIDSess(testAmbientSession), Looping: true,
 		Stmts: []Stmt{ifSt, ret},
 	}
 	for _, id := range []int{thenNull.StmID, elseDeref.StmID, ifSt.StmID, ifSt.Then.StmID, ifSt.Else.StmID, ret.StmID, body.StmID} {
@@ -147,7 +147,7 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	f.Blocks = []*Block{body, ifSt.Then, ifSt.Else}
 	f.Stack = []*Block{body}
 
-	if !body.MustReturnWithFM(fm) {
+	if !body.MustReturnWithFMSess(testAmbientSession, fm) {
 		t.Fatal("body ending in return must MustReturn")
 	}
 	if body.MustBreakOrReturnFull(fm) {

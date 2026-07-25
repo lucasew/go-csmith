@@ -1040,9 +1040,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 // OutputPtrResets mirrors OutputMgr::OutputPtrResets.
 // OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init(&zero).
 // Incomplete dead_globals fails closed empty (no invent soft-skip hole as partial resets).
-func OutputPtrResets(ptrs []*Variable, opts Options) string {
-	return OutputPtrResetsSess(testAmbientSession, ptrs, opts)
-}
+// Non-Sess OutputPtrResets deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputPtrResetsSess is OutputPtrResets on an explicit session bag (ctrl pool + sticky).
 func OutputPtrResetsSess(s *Session, ptrs []*Variable, opts Options) string {
@@ -1123,9 +1121,7 @@ func OutputPtrResetsSess(s *Session, ptrs []*Variable, opts Options) string {
 // outputArrayInitForced is OutputInit without NoLoopInitializer early-out.
 // Used by OutputPtrResets (upstream always loops for array dead_globals).
 // ArrayVariable.cpp:619–655 — init->Output only; no invent "0" when init missing.
-func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {
-	return outputArrayInitForcedSess(testAmbientSession, av, indent, ctrl, postIncr)
-}
+// Non-Sess outputArrayInitForced deleted — pass run bag or testAmbientSession explicitly.
 
 // outputArrayInitForcedSess is outputArrayInitForced with sticky errors on bag s.
 func outputArrayInitForcedSess(s *Session, av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {

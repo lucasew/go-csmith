@@ -10,7 +10,7 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 		t.Fatal("create")
 	}
 	// single collective with nil r → sticky fail closed (itemize needs RNG)
-	if ChooseOKVar(nil, []*Variable{&av.Variable}) != nil {
+	if ChooseOKVarSess(testAmbientSession, nil, []*Variable{&av.Variable}) != nil {
 		t.Fatal("itemize needs RNG; no soft return collective")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -20,14 +20,14 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	// multi-cand without RNG sticky — no invent vars[0]
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
-	if ChooseOKVar(nil, []*Variable{a, b}) != nil {
+	if ChooseOKVarSess(testAmbientSession, nil, []*Variable{a, b}) != nil {
 		t.Fatal("nil RNG multi ChooseOKVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG multi ChooseOKVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	got := ChooseOKVar(NewRngSess(testAmbientSession, 3), []*Variable{&av.Variable})
+	got := ChooseOKVarSess(testAmbientSession, NewRngSess(testAmbientSession, 3), []*Variable{&av.Variable})
 	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
 		t.Fatalf("want itemized member, got %+v", got)
 	}
@@ -40,25 +40,25 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	b := CreateVariableScalarsSess(testAmbientSession, "g_2", GetSimpleTypeSess(testAmbientSession, EInt), false, false)
 	c := CreateVariableScalarsSess(testAmbientSession, "g_3", GetSimpleTypeSess(testAmbientSession, EInt), false, false)
 
-	if ChooseOKVar(NewRngSess(testAmbientSession, 2), nil) != nil {
+	if ChooseOKVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), nil) != nil {
 		t.Fatal("empty")
 	}
 	// nil hole fails closed sticky — no invent skip as absent candidate
-	if ChooseOKVar(NewRngSess(testAmbientSession, 2), []*Variable{a, nil, b}) != nil {
+	if ChooseOKVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), []*Variable{a, nil, b}) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ChooseOKVar(NewRngSess(testAmbientSession, 2), []*Variable{a}) != a {
+	if ChooseOKVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), []*Variable{a}) != a {
 		t.Fatal("sole")
 	}
 	// seed2 first RndUpto(3) = 1959434203 % 3
 	r := NewRngSess(testAmbientSession, 2)
 	wantIdx := int(r.RndUptoSess(testAmbientSession, 3))
 	r2 := NewRngSess(testAmbientSession, 2)
-	got := ChooseOKVar(r2, []*Variable{a, b, c})
+	got := ChooseOKVarSess(testAmbientSession, r2, []*Variable{a, b, c})
 	want := []*Variable{a, b, c}[wantIdx]
 	if got != want {
 		t.Fatalf("choose_ok_var: got %v want %v (idx %d)", got.Name, want.Name, wantIdx)
@@ -72,7 +72,7 @@ func TestChooseOKVarMatchTypeNilSticky(t *testing.T) {
 	defer ClearErrorSess(testAmbientSession)
 	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	hole := &Variable{Name: "g_hole", Type: nil}
-	if ChooseOKVarMatch(NewRngSess(testAmbientSession, 1), []*Variable{hole, good}, GetIntTypeSess(testAmbientSession), MatchFlexible, false) != nil {
+	if ChooseOKVarMatchSess(testAmbientSession, NewRngSess(testAmbientSession, 1), []*Variable{hole, good}, GetIntTypeSess(testAmbientSession), MatchFlexible, false) != nil {
 		t.Fatal("Type-nil candidate must fail closed ChooseOKVarMatch, not invent later good")
 	}
 	if !HasErrorSess(testAmbientSession) {

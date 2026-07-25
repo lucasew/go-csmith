@@ -59,7 +59,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "l_1226", ptrType, false, false)
 	p.InitExpr = init
 
-	pt, _ := AbstractFactForVarInit(p)
+	pt, _ := AbstractFactForVarInitSess(testAmbientSession, p)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("AbstractFactForVarInit sticky err=%v", GetErrorSess(testAmbientSession))
 	}
@@ -79,7 +79,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	}
 
 	facts := []*FactPointTo{}
-	AddNewVarFactInto(p, &facts)
+	AddNewVarFactIntoSess(testAmbientSession, p, &facts)
 	if HasErrorSess(testAmbientSession) || !FactsComplete(facts) {
 		t.Fatalf("AddNewVarFactInto err=%v complete=%v", GetErrorSess(testAmbientSession), FactsComplete(facts))
 	}

@@ -191,7 +191,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 			// pure_rnd_upto(bound/2); no soft invent skip rng when 0
 			off := 0
 			if bound/2 > 0 {
-				off = int(r.RndUptoSess(s, uint32(bound / 2)))
+				off = int(r.RndUptoSess(s, uint32(bound/2)))
 			}
 			init = bound - off
 		}
@@ -201,7 +201,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 			limit = 0
 		} else {
 			if bound/2 > 0 {
-				limit = int(r.RndUptoSess(s, uint32(bound / 2)))
+				limit = int(r.RndUptoSess(s, uint32(bound/2)))
 			}
 		}
 		incrOp = AssignSub

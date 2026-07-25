@@ -1949,7 +1949,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 		return true
 	}
 	// incomplete LocalVars/Param sticky (membership short-circuit invents not-local)
-	if b != nil && !b.StackScanComplete() {
+	if b != nil && !b.StackScanCompleteSess(s) {
 		// residual ERROR sticky — no invent soft not-local past StackScan residual
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)

@@ -4,9 +4,7 @@ package csmith
 
 // MakeRandomIterCtrl mirrors StatementArrayOp::make_random_iter_ctrl.
 // StatementArrayOp.cpp:64–70 — pure_rnd flip for init 0 or upto(size); incr 1 or upto(size)+1.
-func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
-	return MakeRandomIterCtrlSess(testAmbientSession, r, size)
-}
+// Non-Sess MakeRandomIterCtrl deleted — pass run bag or testAmbientSession explicitly.
 
 // MakeRandomIterCtrlSess is MakeRandomIterCtrl with explicit session residual sticky.
 func MakeRandomIterCtrlSess(s *Session, r *Rng, size int) (init, incr int) {
@@ -35,9 +33,7 @@ func MakeRandomIterCtrlSess(s *Session, r *Rng, size int) (init, incr int) {
 // Variable* always live; nil v / nil set sticky no-op (no invent soft-skip past holes).
 // Incomplete *set (nil hole) sticky no-op — no invent append/dup when
 // IsVariableInSet is false only because membership cannot be decided past a hole.
-func AddVariableToSet(set *[]*Variable, v *Variable) {
-	AddVariableToSetSess(testAmbientSession, set, v)
-}
+// Non-Sess AddVariableToSet deleted — pass run bag or testAmbientSession explicitly.
 
 // AddVariableToSetSess is AddVariableToSet with explicit session residual sticky.
 func AddVariableToSetSess(s *Session, set *[]*Variable, v *Variable) {
@@ -59,9 +55,7 @@ func AddVariableToSetSess(s *Session, set *[]*Variable, v *Variable) {
 // CombineVariableSets mirrors combine_variable_sets.
 // Variable* always live in sets; incomplete list fails closed IncompleteVariables
 // (not bare nil invent empty-complete combined set via VariablesComplete(nil)).
-func CombineVariableSets(a, b []*Variable) []*Variable {
-	return CombineVariableSetsSess(testAmbientSession, a, b)
-}
+// Non-Sess CombineVariableSets deleted — pass run bag or testAmbientSession explicitly.
 
 // CombineVariableSetsSess is CombineVariableSets with explicit session residual sticky.
 func CombineVariableSetsSess(s *Session, a, b []*Variable) []*Variable {

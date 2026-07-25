@@ -9,7 +9,7 @@ func TestMergeJumpFacts(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	jump := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	if !MergeJumpFacts(&facts, jump) {
+	if !MergeJumpFactsSess(testAmbientSession, &facts, jump) {
 		t.Fatal("changed")
 	}
 	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
@@ -24,7 +24,7 @@ func TestMergeJumpFactsMissingIsGarbage(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	// jump has no fact for p → garbage join
-	if !MergeJumpFacts(&facts, nil) {
+	if !MergeJumpFactsSess(testAmbientSession, &facts, nil) {
 		t.Fatal("expect garbage merge")
 	}
 	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
@@ -138,7 +138,7 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
 	jump := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	// incomplete subject map must not soft-join past hole — sticky
-	if MergeJumpFacts(&facts, jump) {
+	if MergeJumpFactsSess(testAmbientSession, &facts, jump) {
 		t.Fatal("nil subject hole must fail closed")
 	}
 	// fail closed clears *facts — no invent leave partial / hole-bearing map
@@ -150,7 +150,7 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	holeSubj := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a), nil}
-	if _, ok := tryMergeJumpFacts(&holeSubj, jump); ok {
+	if _, ok := tryMergeJumpFactsSess(testAmbientSession, &holeSubj, jump); ok {
 		t.Fatal("tryMerge incomplete subject must ok=false")
 	}
 	if FactsComplete(holeSubj) {
@@ -162,7 +162,7 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	jumpHole := []*FactPointTo{nil}
-	if MergeJumpFacts(&facts2, jumpHole) {
+	if MergeJumpFactsSess(testAmbientSession, &facts2, jumpHole) {
 		t.Fatal("nil jump hole must fail closed")
 	}
 	if FactsComplete(facts2) {
@@ -173,14 +173,14 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// facts out always live; sticky (no invent soft-skip jump merge past hole)
-	if MergeJumpFacts(nil, jump) {
+	if MergeJumpFactsSess(testAmbientSession, nil, jump) {
 		t.Fatal("nil facts MergeJumpFacts must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts MergeJumpFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if _, ok := tryMergeJumpFacts(nil, jump); ok {
+	if _, ok := tryMergeJumpFactsSess(testAmbientSession, nil, jump); ok {
 		t.Fatal("nil facts tryMergeJumpFacts must ok=false")
 	}
 	if !HasErrorSess(testAmbientSession) {

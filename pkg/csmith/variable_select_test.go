@@ -48,7 +48,7 @@ func TestVariableSelectionProbabilityNilRNGSticky(t *testing.T) {
 		t.Fatal("nil RNG VariableSelectionProbability must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if sc := VariableCreationProbability(nil, opts); sc != MaxVarScope {
+	if sc := VariableCreationProbabilitySess(testAmbientSession, nil, opts); sc != MaxVarScope {
 		t.Fatalf("nil RNG creation must fail closed MAX, got %v", sc)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -148,7 +148,7 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 
 func TestMakeRandomIterCtrl(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
-	init, incr := MakeRandomIterCtrl(r, 10)
+	init, incr := MakeRandomIterCtrlSess(testAmbientSession, r, 10)
 	if incr < 1 {
 		t.Fatalf("incr %d", incr)
 	}
@@ -160,7 +160,7 @@ func TestMakeRandomIterCtrl(t *testing.T) {
 	}
 	// nil RNG sticky — no invent incr=1 shell
 	ClearErrorSess(testAmbientSession)
-	init, incr = MakeRandomIterCtrl(nil, 10)
+	init, incr = MakeRandomIterCtrlSess(testAmbientSession, nil, 10)
 	if init != 0 || incr != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d", init, incr)
 	}
@@ -176,7 +176,7 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -201,7 +201,7 @@ func TestExpandStructUnionVarsIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent soft-continue expand past incomplete pool.
 	ClearErrorSess(testAmbientSession)
 	// incomplete vars pool sticky
-	out := ExpandStructUnionVars([]*Variable{nil}, GetIntTypeSess(testAmbientSession))
+	out := ExpandStructUnionVarsSess(testAmbientSession, []*Variable{nil}, GetIntTypeSess(testAmbientSession))
 	if VariablesComplete(out) {
 		t.Fatal("nil hole ExpandStructUnionVars must fail closed incomplete")
 	}

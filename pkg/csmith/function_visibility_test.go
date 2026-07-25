@@ -54,7 +54,7 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	ptr := CreateVariableScalarsSess(testAmbientSession, "l_1226", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
 	factsIn := []*FactPointTo{MakeFactPointToSess(testAmbientSession, ptr, field)}
 	factsOut := []*FactPointTo{}
-	UpdateFactsForDest(factsIn, &factsOut, f, body)
+	UpdateFactsForDestSess(testAmbientSession, factsIn, &factsOut, f, body)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}

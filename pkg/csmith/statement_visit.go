@@ -999,9 +999,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	return true
 }
 
-func findArrayOpInnermost(st *Stmt) *Stmt {
-	return findArrayOpInnermostSess(testAmbientSession, st)
-}
+// Non-Sess findArrayOpInnermost deleted — pass run bag or testAmbientSession explicitly.
 
 // findArrayOpInnermostSess is findArrayOpInnermost with explicit session residual sticky.
 func findArrayOpInnermostSess(s *Session, st *Stmt) *Stmt {
@@ -1017,9 +1015,7 @@ func findArrayOpInnermostSess(s *Session, st *Stmt) *Stmt {
 	return cur
 }
 
-func isArrayInitBody(b *Block) bool {
-	return isArrayInitBodySess(testAmbientSession, b)
-}
+// Non-Sess isArrayInitBody deleted — pass run bag or testAmbientSession explicitly.
 
 // isArrayInitBodySess is isArrayInitBody with explicit session residual sticky.
 func isArrayInitBodySess(s *Session, b *Block) bool {

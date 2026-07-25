@@ -5,7 +5,7 @@ import "testing"
 func TestAddInterestedFactsGates(t *testing.T) {
 	defer ClearMetaFactsSess(testAmbientSession)
 	// only point-to
-	AddInterestedFacts(FactCategoryPointTo)
+	AddInterestedFactsSess(testAmbientSession, FactCategoryPointTo)
 	if !MetaFactPointToEnabledSess(testAmbientSession) || MetaFactUnionEnabledSess(testAmbientSession) {
 		t.Fatal("point only")
 	}
@@ -24,7 +24,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	}
 
 	// only union
-	AddInterestedFacts(FactCategoryUnionWrite)
+	AddInterestedFactsSess(testAmbientSession, FactCategoryUnionWrite)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.AddNewVarFact(p)
 	if FindRelatedPointToSess(testAmbientSession, fm2.GlobalFacts, p) != nil {
@@ -47,7 +47,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 func TestGenerateFunctionsCallsAddInterested(t *testing.T) {
 	defer ClearMetaFactsSess(testAmbientSession)
 	// start with both off
-	AddInterestedFacts(0)
+	AddInterestedFactsSess(testAmbientSession, 0)
 	if MetaFactPointToEnabledSess(testAmbientSession) {
 		t.Fatal("should be off")
 	}

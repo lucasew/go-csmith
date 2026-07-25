@@ -12,19 +12,19 @@ func TestBlockContainsStmIDParentChain(t *testing.T) {
 	// StatementIf always has both arms
 	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner, Else: &Block{}}, src}
 
-	if !BlockContainsStmID(inner, 10) {
+	if !BlockContainsStmIDSess(testAmbientSession, inner, 10) {
 		t.Fatal("inner should contain dest")
 	}
-	if BlockContainsStmID(inner, 20) {
+	if BlockContainsStmIDSess(testAmbientSession, inner, 20) {
 		t.Fatal("inner must not contain outer goto")
 	}
-	if !BlockContainsStmID(outer, 10) || !BlockContainsStmID(outer, 20) {
+	if !BlockContainsStmIDSess(testAmbientSession, outer, 10) || !BlockContainsStmIDSess(testAmbientSession, outer, 20) {
 		t.Fatal("outer contains both")
 	}
 	// incomplete if-arm sticky (no invent soft-continue past nil Else then miss Then)
 	ClearErrorSess(testAmbientSession)
 	outer.Stmts[0].Else = nil
-	if BlockContainsStmID(outer, 10) {
+	if BlockContainsStmIDSess(testAmbientSession, outer, 10) {
 		t.Fatal("nil Else must fail closed not-contain (sticky miss whole search)")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -168,13 +168,13 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 
 	// contains_stmt: dest under thenArm via parent chain (not root tree alone)
-	if !BlockContainsStmID(thenArm, 323) {
+	if !BlockContainsStmIDSess(testAmbientSession, thenArm, 323) {
 		t.Fatal("thenArm must contain dest mid-gen")
 	}
-	if BlockContainsStmID(thenArm, 324) {
+	if BlockContainsStmIDSess(testAmbientSession, thenArm, 324) {
 		t.Fatal("thenArm must not contain parent goto")
 	}
-	if !BlockContainsStmID(parent, 324) {
+	if !BlockContainsStmIDSess(testAmbientSession, parent, 324) {
 		t.Fatal("parent must contain goto")
 	}
 
@@ -232,7 +232,7 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntTypeSess(testAmbientSession), false, false)
 	a.Name = "l_a"
 	inner := &Block{LocalVars: []*Variable{a, nil}}
-	blk, rem := LowerBlockForVars([]*Block{inner}, []*Variable{a})
+	blk, rem := LowerBlockForVarsSess(testAmbientSession, []*Block{inner}, []*Variable{a})
 	if blk != nil || VariablesComplete(rem) {
 		t.Fatal("incomplete LocalVars must fail closed incomplete remaining", blk, rem)
 	}
@@ -250,22 +250,22 @@ func TestLowerBlockForVars(t *testing.T) {
 	inner := &Block{LocalVars: []*Variable{a}}
 	outer := &Block{LocalVars: []*Variable{a, b}, Parent: nil}
 	// vars {a,b}: inner covers only a → remaining {b}; outer covers rest
-	blk, rem := LowerBlockForVars([]*Block{inner, outer}, []*Variable{a, b})
+	blk, rem := LowerBlockForVarsSess(testAmbientSession, []*Block{inner, outer}, []*Variable{a, b})
 	if blk != outer || len(rem) != 0 {
 		t.Fatalf("blk=%v rem=%v", blk, rem)
 	}
 	// only globals → nil
-	blk, rem = LowerBlockForVars([]*Block{inner}, []*Variable{g})
+	blk, rem = LowerBlockForVarsSess(testAmbientSession, []*Block{inner}, []*Variable{g})
 	if blk != nil || len(rem) != 1 {
 		t.Fatalf("want nil remaining g, got %v %v", blk, rem)
 	}
 	// first block already covers all
-	blk, rem = LowerBlockForVars([]*Block{outer, inner}, []*Variable{a, b})
+	blk, rem = LowerBlockForVarsSess(testAmbientSession, []*Block{outer, inner}, []*Variable{a, b})
 	if blk != outer || len(rem) != 0 {
 		t.Fatalf("first cover: %v %v", blk, rem)
 	}
 	// nil block hole fails closed sticky
-	blk, rem = LowerBlockForVars([]*Block{nil, outer}, []*Variable{a, b})
+	blk, rem = LowerBlockForVarsSess(testAmbientSession, []*Block{nil, outer}, []*Variable{a, b})
 	if blk != nil || VariablesComplete(rem) {
 		t.Fatal("nil block hole must fail closed incomplete remaining", blk, rem)
 	}
@@ -281,11 +281,11 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
-	dest := Stmt{Kind: StmtAssign, StmID: AllocStmID()}
-	srcID := AllocStmID()
+	dest := Stmt{Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession)}
+	srcID := AllocStmIDSess(testAmbientSession)
 	src := Stmt{Kind: StmtGoto, StmID: srcID, GotoDestStmID: dest.StmID}
 	inner.Stmts = []Stmt{dest}
-	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: AllocStmID(), Then: inner, Else: &Block{}}, src}
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: AllocStmIDSess(testAmbientSession), Then: inner, Else: &Block{}}, src}
 	f.Blocks = []*Block{outer}
 	f.Stack = []*Block{outer, inner}
 

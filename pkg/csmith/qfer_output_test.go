@@ -846,7 +846,7 @@ func TestOutputArrayInitForcedResidualSticky(t *testing.T) {
 		Sizes: []int{2},
 	}
 	av.AsArray = av
-	if s := outputArrayInitForced(av, "    ", []string{"i"}, true); s != "" {
+	if s := outputArrayInitForcedSess(testAmbientSession, av, "    ", []string{"i"}, true); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed outputArrayInitForced", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

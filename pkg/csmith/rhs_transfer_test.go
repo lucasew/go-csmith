@@ -301,14 +301,14 @@ func TestRhsToLhsTransferAssignNilExprFailClosed(t *testing.T) {
 
 func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
 	// FactPointTo.cpp:247–253 — RV return fact copied to LHS
-	InvocationReturnFactsDoFinalization()
-	defer InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
+	defer InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fn.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fi := &Invocation{User: fn}
-	AddReturnFactForInvocation(fi, MakeFactPointToSess(testAmbientSession, fn.RV, tgt))
+	AddReturnFactForInvocationSess(testAmbientSession, fi, MakeFactPointToSess(testAmbientSession, fn.RV, tgt))
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if len(facts) != 1 || len(facts[0].PointTo) != 1 || facts[0].PointTo[0] != tgt {
@@ -319,8 +319,8 @@ func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
 func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
 	// RV Type* always live; Type-nil no invent scalar rv soft-transfer past hole
 	ClearErrorSess(testAmbientSession)
-	InvocationReturnFactsDoFinalization()
-	defer InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
+	defer InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fn.RV = &Variable{Name: "f_rv", Type: nil}
@@ -493,8 +493,8 @@ func TestRhsToLhsTransferAggregateLenMismatchNDEBUG(t *testing.T) {
 func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	// FactPointTo.cpp:252 — missing rv_fact: incomplete non-sticky (generation soft re-pick)
 	ClearErrorSess(testAmbientSession)
-	InvocationReturnFactsDoFinalization()
-	defer InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
+	defer InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fn.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)

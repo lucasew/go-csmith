@@ -63,7 +63,7 @@ func TestChooseOKVarItemizesArray(t *testing.T) {
 	}
 	// sole array → itemize consumes per-dim RNG
 	r := NewRngSess(testAmbientSession, 5)
-	got := ChooseOKVar(r, []*Variable{&av.Variable})
+	got := ChooseOKVarSess(testAmbientSession, r, []*Variable{&av.Variable})
 	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
 		t.Fatalf("itemize %+v", got)
 	}

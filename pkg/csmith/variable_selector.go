@@ -91,15 +91,7 @@ func (vs *VariableSelector) atMaxGlobals() bool {
 // VariableSelector.cpp:361–377 — expand structs; match convert; on stack or global; not vol.
 // Variable* always live; expand/list holes fail closed (nil pick).
 // Ambient ProcessOptions bridge for unit tests; generation uses ChooseVisibleReadVarOpts.
-func ChooseVisibleReadVar(
-	r *Rng,
-	b *Block,
-	readVars []*Variable,
-	typ *Type,
-	unionFacts []*FactUnion,
-) *Variable {
-	return ChooseVisibleReadVarSess(testAmbientSession, r, b, readVars, typ, unionFacts)
-}
+// Non-Sess ChooseVisibleReadVar deleted — pass run bag or testAmbientSession explicitly.
 
 // ChooseVisibleReadVarSess is ChooseVisibleReadVar with Options/sticky from bag s.
 func ChooseVisibleReadVarSess(
@@ -115,16 +107,7 @@ func ChooseVisibleReadVarSess(
 
 // ChooseVisibleReadVarOpts is ChooseVisibleReadVar with explicit session Options
 // (MatchConvert / is_convertable strict_float / lang_cpp).
-func ChooseVisibleReadVarOpts(
-	r *Rng,
-	b *Block,
-	readVars []*Variable,
-	typ *Type,
-	unionFacts []*FactUnion,
-	opts Options,
-) *Variable {
-	return ChooseVisibleReadVarOptsSess(testAmbientSession, r, b, readVars, typ, unionFacts, opts)
-}
+// Non-Sess ChooseVisibleReadVarOpts deleted — pass run bag or testAmbientSession explicitly.
 
 func ChooseVisibleReadVarOptsSess(s *Session,
 	r *Rng,
@@ -151,7 +134,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		return nil
 	}
 	// incomplete stack lists must not invent filter that drops all locals
-	if b != nil && !b.StackScanComplete() {
+	if b != nil && !b.StackScanCompleteSess(s) {
 		// residual ERROR sticky — no invent soft-filter past StackScan residual
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
@@ -518,9 +501,7 @@ func cgHasSignedCharIndex(vs *VariableSelector) bool {
 // VariableSelector.cpp:318–337 — rnd pick; collective array → itemize.
 // ChooseOKVar picks one eligible variable (optionally itemizing arrays).
 // Incomplete candidate list fails closed sticky (nil pick — no invent skip hole).
-func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
-	return ChooseOKVarSess(testAmbientSession, r, vars)
-}
+// Non-Sess ChooseOKVar deleted — pass run bag or testAmbientSession explicitly.
 
 func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
 	if !VariablesComplete(vars) {
@@ -570,9 +551,7 @@ func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
 
 // ChooseOKVarExactType filters vars whose Type matches want with eExact.}
 
-func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
-	return ChooseOKVarMatch(r, vars, want, MatchExact, false)
-}
+// Non-Sess ChooseOKVarExactType deleted — use ChooseOKVarMatchSess.
 
 // FindAllVisibleVars mirrors VariableSelector::find_all_visible_vars.
 // VariableSelector.cpp:752–759 — GlobalList + block chain locals (no params).
@@ -613,9 +592,7 @@ func rootBlock(b *Block) *Block {
 // Walks get_blocks only; incomplete if-arm sticky whole miss
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
-func findParentOfStmIDInTree(root *Block, stmID int) *Block {
-	return findParentOfStmIDInTreeSess(testAmbientSession, root, stmID)
-}
+// Non-Sess findParentOfStmIDInTree deleted — pass run bag or testAmbientSession explicitly.
 
 // findParentOfStmIDInTreeSess is findParentOfStmIDInTree with explicit session residual sticky.
 func findParentOfStmIDInTreeSess(s *Session, root *Block, stmID int) *Block {
@@ -656,9 +633,7 @@ func findParentOfStmIDInTreeSess(s *Session, root *Block, stmID int) *Block {
 // Walks get_blocks only; incomplete if-arm sticky whole miss
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
-func findStmtByIDInTree(root *Block, stmID int) *Stmt {
-	return findStmtByIDInTreeSess(testAmbientSession, root, stmID)
-}
+// Non-Sess findStmtByIDInTree deleted — pass run bag or testAmbientSession explicitly.
 
 // findStmtByIDInTreeSess is findStmtByIDInTree with explicit session residual sticky.
 func findStmtByIDInTreeSess(s *Session, root *Block, stmID int) *Stmt {
@@ -704,9 +679,7 @@ func findStmtByIDInTreeSess(s *Session, root *Block, stmID int) *Stmt {
 // parent lookup — not findParentOfStmIDInTree(root) only (misses unlinked arms
 // and spuriously treated live gotos as orphans; seed-62 locals on then vs parent).
 // Block always live; sticky false (no invent not-contained soft-skip past hole).
-func BlockContainsStmID(b *Block, stmID int) bool {
-	return BlockContainsStmIDSess(testAmbientSession, b, stmID)
-}
+// Non-Sess BlockContainsStmID deleted — pass run bag or testAmbientSession explicitly.
 
 func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
 	if b == nil || StmIDUnset(stmID) {
@@ -869,9 +842,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 // vars as locals; remaining uncovered vars returned for callers.
 // Block*/Variable* always live; nil hole or incomplete LocalVars fails closed
 // (nil blk, IncompleteVariables remaining — no invent empty remaining past hole).
-func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
-	return LowerBlockForVarsSess(testAmbientSession, blks, vars)
-}
+// Non-Sess LowerBlockForVars deleted — pass run bag or testAmbientSession explicitly.
 
 // LowerBlockForVarsSess is LowerBlockForVars with explicit session residual sticky.
 func LowerBlockForVarsSess(s *Session, blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
@@ -964,9 +935,7 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 // VariableSelector.cpp:747–751.
 // Variable* always live on LocalVars; nil hole fails closed IncompleteVariables
 // (not bare nil invent empty-complete local pool).
-func GetAllLocalVars(b *Block) []*Variable {
-	return GetAllLocalVarsSess(testAmbientSession, b)
-}
+// Non-Sess GetAllLocalVars deleted — pass run bag or testAmbientSession explicitly.
 
 // GetAllLocalVarsSess is GetAllLocalVars with explicit session residual sticky.
 func GetAllLocalVarsSess(s *Session, b *Block) []*Variable {
@@ -1602,7 +1571,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 	}
 	blk := cg.CurrentBlock()
 	// incomplete Param/LocalVars must not invent IsVisible false and skip must-use vars
-	if blk != nil && !blk.StackScanComplete() {
+	if blk != nil && !blk.StackScanCompleteSess(vsSess(vs)) {
 		// residual ERROR sticky — no invent soft-must-use past StackScan residual
 		if !hasErrVS(vs) {
 			noteErrVS(vs, ErrGeneric)
@@ -1913,9 +1882,7 @@ func ChooseVarFull(
 // Volatile bias block is disabled upstream (if (0)).
 // chooseVarFromOK biases among already-filtered candidates.
 // Variable* always live in ok; nil hole fails closed (nil pick).
-func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
-	return chooseVarFromOKSess(testAmbientSession, r, want, ok, opts)
-}
+// Non-Sess chooseVarFromOK deleted — pass run bag or testAmbientSession explicitly.
 
 func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
 	for _, vv := range ok {
@@ -1985,9 +1952,7 @@ func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Op
 // Variable* always live; nil hole / incomplete FieldVars fails closed
 // IncompleteVariables (not bare nil invent empty-complete expand pool).}
 
-func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
-	return ExpandStructUnionVarsSess(testAmbientSession, vars, want)
-}
+// Non-Sess ExpandStructUnionVars deleted — pass run bag or testAmbientSession explicitly.
 
 func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Variable {
 	if !VariablesComplete(vars) {
@@ -2051,9 +2016,7 @@ func ExpandStructUnionVarsSess(s *Session, vars []*Variable, want *Type) []*Vari
 // VariableSelector.cpp choose_var — expand_struct_union_vars; Type::match(mt); optional skip const.
 // Ambient ProcessOptions bridge; generation prefers ChooseOKVarMatchOpts.}
 
-func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
-	return ChooseOKVarMatchSess(testAmbientSession, r, vars, want, mt, skipConst)
-}
+// Non-Sess ChooseOKVarMatch deleted — pass run bag or testAmbientSession explicitly.
 
 // ChooseOKVarMatchSess is ChooseOKVarMatch with Options/sticky from bag s.
 func ChooseOKVarMatchSess(s *Session, r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
@@ -2061,9 +2024,7 @@ func ChooseOKVarMatchSess(s *Session, r *Rng, vars []*Variable, want *Type, mt M
 }
 
 // ChooseOKVarMatchOpts is ChooseOKVarMatch with explicit session Options.
-func ChooseOKVarMatchOpts(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
-	return ChooseOKVarMatchOptsSess(testAmbientSession, r, vars, want, mt, skipConst, opts)
-}
+// Non-Sess ChooseOKVarMatchOpts deleted — pass run bag or testAmbientSession explicitly.
 
 func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool, opts Options) *Variable {
 	if want == nil {
@@ -2115,9 +2076,7 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 	return ChooseOKVarSess(s, r, ok)
 }
 
-func typesMatchExact(a, b *Type) bool {
-	return typesMatchExactSess(testAmbientSession, a, b)
-}
+// Non-Sess typesMatchExact deleted — pass run bag or testAmbientSession explicitly.
 
 // typesMatchExactSess is typesMatchExact with explicit session residual sticky.
 func typesMatchExactSess(s *Session, a, b *Type) bool {
@@ -2137,9 +2096,7 @@ func typesMatchExactSess(s *Session, a, b *Type) bool {
 // applyInitExpr stores make_init_value result on Variable (Constant and/or full expr).
 // Variable always live; sticky (no invent soft-skip init bind past hole).
 // Nil init is complete no-op (nothing to store).
-func applyInitExpr(v *Variable, init *Expression) {
-	applyInitExprSess(testAmbientSession, v, init)
-}
+// Non-Sess applyInitExpr deleted — pass run bag or testAmbientSession explicitly.
 
 // applyInitExprSess is applyInitExpr with explicit session residual sticky.
 func applyInitExprSess(s *Session, v *Variable, init *Expression) {
@@ -2268,9 +2225,7 @@ func (vs *VariableSelector) createAndInitialize(
 
 // varCollective returns get_collective() for FM (itemized array → parent collective).
 // Variable always live; sticky nil (no invent soft-skip collective past hole).
-func varCollective(v *Variable) *Variable {
-	return varCollectiveSess(testAmbientSession, v)
-}
+// Non-Sess varCollective deleted — pass run bag or testAmbientSession explicitly.
 
 // varCollectiveSess is varCollective with explicit session residual sticky.
 func varCollectiveSess(s *Session, v *Variable) *Variable {
@@ -3430,10 +3385,7 @@ const (
 // NewScopeThresholdTable mirrors InitScopeTable / VariableSelectionProbability table.
 // VariableSelector.cpp:112–121 — with globals: 35 Global, 65 Local, 95 Param, 100 New;
 // without: 50 Local, 95 Param, 100 New.
-func NewScopeThresholdTable(opts Options) *ThresholdTable {
-	// Construction path: residual bag unused (table always live).
-	return NewScopeThresholdTableSess(testAmbientSession, opts)
-}
+// Non-Sess NewScopeThresholdTable deleted — pass run bag or testAmbientSession explicitly.
 
 // NewScopeThresholdTableSess builds the scope selection table with explicit residual bag.
 func NewScopeThresholdTableSess(s *Session, opts Options) *ThresholdTable {
@@ -3524,9 +3476,7 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 
 // VariableCreationProbability mirrors VariableCreationProbability.
 // VariableSelector.cpp:1063–1070 — flipcoin(10) global if allowed else local.
-func VariableCreationProbability(r *Rng, opts Options) VariableScope {
-	return VariableCreationProbabilitySess(testAmbientSession, r, opts)
-}
+// Non-Sess VariableCreationProbability deleted — pass run bag or testAmbientSession explicitly.
 
 // VariableCreationProbabilitySess is VariableCreationProbability with explicit session residual sticky.
 func VariableCreationProbabilitySess(s *Session, r *Rng, opts Options) VariableScope {

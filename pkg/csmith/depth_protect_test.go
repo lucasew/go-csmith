@@ -89,13 +89,13 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
-	stmtTab := NewStatementThresholdTable(opts)
+	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
 	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	if f == nil {
 		t.Fatal("nil")
 	}
-	if f.NeedReturnStmt() && f.RetConst == nil {
+	if f.NeedReturnStmtSess(testAmbientSession) && f.RetConst == nil {
 		t.Fatal("expected ret_c")
 	}
 	out := f.OutputSess(testAmbientSession, false, false, nil)

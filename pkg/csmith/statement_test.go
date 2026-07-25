@@ -4,16 +4,16 @@ import "testing"
 
 func TestStatementProbabilitySeed2(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	tab := NewStatementThresholdTable(Defaults())
+	tab := NewStatementThresholdTableSess(testAmbientSession, Defaults())
 	r := NewRngSess(testAmbientSession, 2)
 	// first RndUpto(100) seed2 = 1959434203 % 100 = 3 → IfElse
-	st := StatementProbability(r, tab)
+	st := StatementProbabilitySess(testAmbientSession, r, tab)
 	if st != StmtIfElse {
 		t.Fatalf("got %v want IfElse", st)
 	}
 	// nil table sticky MAX
 	ClearErrorSess(testAmbientSession)
-	if StatementProbability(NewRngSess(testAmbientSession, 1), nil) != MaxStatementType {
+	if StatementProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil) != MaxStatementType {
 		t.Fatal("nil table must fail closed MAX")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -25,14 +25,14 @@ func TestStatementProbabilitySeed2(t *testing.T) {
 func TestStatementProbabilityFilterRejectCompound(t *testing.T) {
 	// Simulate max block depth: reject compound types via custom filter on the U100 value.
 	ClearErrorSess(testAmbientSession)
-	tab := NewStatementThresholdTable(Defaults())
+	tab := NewStatementThresholdTableSess(testAmbientSession, Defaults())
 	// Filter that rejects values mapping to compound statements
 	f := filterFunc(func(v uint32) bool {
-		return IsCompound(NumberToType(tab, v))
+		return IsCompound(NumberToTypeSess(testAmbientSession, tab, v))
 	})
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 30; i++ {
-		st := StatementProbabilityFilter(r, tab, f)
+		st := StatementProbabilityFilterSess(testAmbientSession, r, tab, f)
 		if IsCompound(st) {
 			t.Fatalf("compound slipped through: %v", st)
 		}
@@ -56,7 +56,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := makeRandomStmtKind(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
-		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, blk, MaxStatementType)
+		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, blk, MaxStatementType)
 	if stmtOK(st) {
 		t.Fatal("unknown kind must not invent usable stmt")
 	}
@@ -75,7 +75,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil RNG sticky — no invent Kind-only shell
 	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
-		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, blk, StmtAssign)
+		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, blk, StmtAssign)
 	if stmtOK(st3) || st3.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st3)
 	}

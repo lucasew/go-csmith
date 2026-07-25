@@ -185,7 +185,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: nil}
 	fm := callee.ensurePairedFactMgrSess(testAmbientSession)
 	// NeedsRevisit false (no FactChanged / ptrs) — visit_facts still revisits
-	if callee.NeedsRevisit() {
+	if callee.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("fixture must not NeedsRevisit; testing always-revisit gate")
 	}
 	fi := &Invocation{User: callee}

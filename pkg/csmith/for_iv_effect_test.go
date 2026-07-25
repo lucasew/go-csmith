@@ -72,10 +72,10 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 		t.Fatalf("make_iteration must write+read IV, IsW=%v IsR=%v",
 			cg.EffectStm.IsWrittenSess(testAmbientSession, lc.IV), cg.EffectStm.IsReadSess(testAmbientSession, lc.IV))
 	}
-	body := &Block{Func: fn, StmID: AllocStmID()}
+	body := &Block{Func: fn, StmID: AllocStmIDSess(testAmbientSession)}
 	fm.SetMapStmEffect(body.StmID, EmptyEffect())
 	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, []*FactUnion{})
-	forSt := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
+	forSt := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmIDSess(testAmbientSession)}
 	pre := cg.EffectStm.CloneSess(testAmbientSession)
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{}, []*FactUnion{}, pre, &cg)
 	got := fm.GetMapStmEffect(forSt.StmID)

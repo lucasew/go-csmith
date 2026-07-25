@@ -375,7 +375,7 @@ func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {
 		MakeFactPointToSess(testAmbientSession, lp, NullPtr),
 		MakeFactPointToSess(testAmbientSession, gp, loc),
 	}
-	out := RemoveFunctionLocalFacts(facts, fn)
+	out := RemoveFunctionLocalFactsAtSess(testAmbientSession, facts, fn, fn.Body)
 	if len(out) != 1 || out[0].Var != gp {
 		t.Fatalf("%+v", out)
 	}
@@ -643,7 +643,7 @@ func TestIsNullIsDeadPointsToNilSticky(t *testing.T) {
 		t.Fatal("nil Fact IsDead must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*FactPointTo)(nil).PointsTo(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) {
+	if !(*FactPointTo)(nil).PointsToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) {
 		t.Fatal("nil Fact PointsTo must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -718,7 +718,7 @@ func TestFactFreeHelpers(t *testing.T) {
 		t.Fatal("print empty")
 	}
 	ClearErrorSess(testAmbientSession)
-	FactDoFinalizationSess(testAmbientSession, )
+	FactDoFinalizationSess(testAmbientSession)
 }
 
 func TestFactPointToPointToAndStr(t *testing.T) {
@@ -726,10 +726,10 @@ func TestFactPointToPointToAndStr(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := MakeFactPointToSess(testAmbientSession, p, a)
-	if !f.PointsTo(a) {
+	if !f.PointsToSess(testAmbientSession, a) {
 		t.Fatal("points to a")
 	}
-	if f.PointsTo(p) {
+	if f.PointsToSess(testAmbientSession, p) {
 		t.Fatal("not points to p")
 	}
 	if PointToStrSess(testAmbientSession, NullPtr) != "0" || PointToStrSess(testAmbientSession, TBDPtr) != "tbd" || PointToStrSess(testAmbientSession, GarbagePtr) != "garbage" {

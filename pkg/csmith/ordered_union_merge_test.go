@@ -32,7 +32,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.GlobalFacts = []*FactPointTo{}
 
-	if !makeupNewUnionFacts(&unionCopy, fm.UnionFacts) {
+	if !makeupNewUnionFactsSess(testAmbientSession, &unionCopy, fm.UnionFacts) {
 		t.Fatalf("union makeup sticky=%v", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnionSess(testAmbientSession, unionCopy, parent)
@@ -87,8 +87,8 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{}
 
 	// Same block as make_random ordered path (no factsCopy != nil guard).
-	if !MakeupNewVarFacts(&factsCopy, fm.GlobalFacts) ||
-		!makeupNewUnionFacts(&unionCopy, fm.UnionFacts) {
+	if !MakeupNewVarFactsSess(testAmbientSession, &factsCopy, fm.GlobalFacts) ||
+		!makeupNewUnionFactsSess(testAmbientSession, &unionCopy, fm.UnionFacts) {
 		t.Fatalf("makeup sticky=%v", GetErrorSess(testAmbientSession))
 	}
 	if !FactsComplete(factsCopy) || !UnionFactsComplete(unionCopy) {

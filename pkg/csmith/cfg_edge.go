@@ -21,9 +21,7 @@ type CFGEdge struct {
 // StatementBreak.cpp:71–75 / StatementContinue.cpp:73–76.
 // Block always live at break/continue; sticky nil (no invent no-loop soft-skip past hole).
 // Non-looping chain end (Parent nil) is complete miss (not incomplete IR).
-func ClosestLoopingBlock(b *Block) *Block {
-	return ClosestLoopingBlockSess(testAmbientSession, b)
-}
+// Non-Sess ClosestLoopingBlock deleted — pass run bag or testAmbientSession explicitly.
 
 // ClosestLoopingBlockSess is ClosestLoopingBlock with explicit session residual sticky.
 func ClosestLoopingBlockSess(s *Session, b *Block) *Block {

@@ -19,7 +19,7 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 		t.Fatal("global")
 	}
 	// g points at param — after function exit must become garbage
-	body := &Block{Func: fn, Parent: nil, StmID: AllocStmID()}
+	body := &Block{Func: fn, Parent: nil, StmID: AllocStmIDSess(testAmbientSession)}
 	fn.Body = body
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	facts := []*FactPointTo{
@@ -64,7 +64,7 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	}
 	// Nested block: parent non-nil — no remove_function_local_facts
 	ClearErrorSess(testAmbientSession)
-	inner := &Block{Func: fn, Parent: body, StmID: AllocStmID()}
+	inner := &Block{Func: fn, Parent: body, StmID: AllocStmIDSess(testAmbientSession)}
 	facts2 := []*FactPointTo{
 		MakeFactPointToSess(testAmbientSession, p, NullPtr),
 		MakeFactPointToSess(testAmbientSession, g, p),

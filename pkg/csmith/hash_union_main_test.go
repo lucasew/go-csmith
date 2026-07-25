@@ -124,7 +124,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	ClearErrorSess(testAmbientSession) // generation may fail-closed other paths; hash path only needs VS+FM
 	// attach union fact on first func FM (or use generator FM after seed)
 	if len(g.Funcs.Funcs) > 0 {
-		fm := g.FactMgrs.ForFunc(g.Funcs.Funcs[0])
+		fm := g.FactMgrs.ForFuncSess(testAmbientSession, g.Funcs.Funcs[0])
 		if fm != nil {
 			fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 		}

@@ -11,11 +11,11 @@ func TestIsVarOnStack(t *testing.T) {
 	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	outer.LocalVars = []*Variable{l}
 	inner := &Block{Func: f, Parent: outer}
-	if !inner.IsVarOnStack(l) || !inner.IsVarOnStack(p) {
+	if !inner.IsVarOnStackSess(testAmbientSession, l) || !inner.IsVarOnStackSess(testAmbientSession, p) {
 		t.Fatal("stack")
 	}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
-	if inner.IsVarOnStack(g) {
+	if inner.IsVarOnStackSess(testAmbientSession, g) {
 		t.Fatal("global")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -24,7 +24,7 @@ func TestIsVarOnStack(t *testing.T) {
 	// incomplete LocalVars sticky not-on-stack
 	ClearErrorSess(testAmbientSession)
 	outer.LocalVars = []*Variable{l, nil}
-	if inner.IsVarOnStack(l) {
+	if inner.IsVarOnStackSess(testAmbientSession, l) {
 		t.Fatal("LocalVars hole Block.IsVarOnStack must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -35,7 +35,7 @@ func TestIsVarOnStack(t *testing.T) {
 	// Match residual: Type-nil param soft invent was soft-continue then invent on-stack later good.
 	// Fair: sticky fail closed not-on-stack.
 	f.Param = []*Variable{&Variable{Name: "p_hole"}, p} // Type-nil then good
-	if inner.IsVarOnStack(p) {
+	if inner.IsVarOnStackSess(testAmbientSession, p) {
 		t.Fatal("Match residual must fail closed not-on-stack, not invent later param match")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -52,7 +52,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	// nil type sticky
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, nil, nil) != nil {
+	if ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -60,7 +60,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// only a in read set and global
-	got := ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, b}, GetIntTypeSess(testAmbientSession), nil)
+	got := ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{a, b}, GetIntTypeSess(testAmbientSession), nil)
 	if got != a && got != b {
 		// both global so either ok if both in list
 		if got == nil {
@@ -69,18 +69,18 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	// local not on stack from empty block → only global
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntTypeSess(testAmbientSession), false, false)
-	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntTypeSess(testAmbientSession), nil)
+	got = ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntTypeSess(testAmbientSession), nil)
 	if got != nil {
 		t.Fatal("local not on stack")
 	}
 	blk.LocalVars = []*Variable{loc}
-	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntTypeSess(testAmbientSession), nil)
+	got = ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntTypeSess(testAmbientSession), nil)
 	if got != loc {
 		t.Fatal("local on stack")
 	}
 	// nil candidate hole fails closed sticky
 	ClearErrorSess(testAmbientSession)
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, nil}, GetIntTypeSess(testAmbientSession), nil) != nil {
+	if ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{a, nil}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil readVars hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -88,7 +88,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete union facts must not invent soft-filter pick
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, GetIntTypeSess(testAmbientSession), IncompleteUnionFactSlice()) != nil {
+	if ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, GetIntTypeSess(testAmbientSession), IncompleteUnionFactSlice()) != nil {
 		t.Fatal("incomplete union facts must fail closed nil pick")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -98,7 +98,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	// IsArray without AsArray soft invent was IsVirtual residual false then pick shell
 	// fair: sticky nil fail closed
 	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, arrShell}, GetIntTypeSess(testAmbientSession), nil) != nil {
+	if ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 2), blk, []*Variable{a, arrShell}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("IsArray without AsArray must fail closed ChooseVisibleReadVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -111,7 +111,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	field := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	// empty facts: IsInsideUnionField still stickies residual before early return not-banned
 	blk.LocalVars = []*Variable{field, a}
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 3), blk, []*Variable{field, a}, GetIntTypeSess(testAmbientSession), nil) != nil {
+	if ChooseVisibleReadVarSess(testAmbientSession, NewRngSess(testAmbientSession, 3), blk, []*Variable{field, a}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("IsInsideUnionField residual must fail closed ChooseVisibleReadVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -152,7 +152,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	// prior statement as target
-	prior := Stmt{Kind: StmtAssign, StmID: AllocStmID()}
+	prior := Stmt{Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession)}
 	blk.Stmts = []Stmt{prior}
 	f.Blocks = []*Block{blk}
 	f.Stack = []*Block{blk}

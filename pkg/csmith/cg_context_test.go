@@ -42,8 +42,8 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
-	parent := &Block{Func: f, StmID: AllocStmID()}
-	st := &Stmt{Kind: StmtReturn, StmID: AllocStmID(), Expr: &Expression{
+	parent := &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession)}
+	st := &Stmt{Kind: StmtReturn, StmID: AllocStmIDSess(testAmbientSession), Expr: &Expression{
 		Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession),
 	}}
 	// Return with const may not need RV; still exercise CurrBlk assignment path

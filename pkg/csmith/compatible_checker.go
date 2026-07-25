@@ -7,9 +7,7 @@ package csmith
 
 // EnableCompatibleCheck mirrors CompatibleChecker::enable_compatible_check.
 // CompatibleChecker.cpp:68–70; CGOptions.cpp:416–417 (resolve_exhaustive_options).
-func EnableCompatibleCheck() {
-	EnableCompatibleCheckSess(testAmbientSession)
-}
+// Non-Sess EnableCompatibleCheck deleted — pass run bag or testAmbientSession explicitly.
 
 // EnableCompatibleCheckSess enables the checker on an explicit session bag.
 func EnableCompatibleCheckSess(s *Session) {
@@ -17,9 +15,7 @@ func EnableCompatibleCheckSess(s *Session) {
 }
 
 // ResetCompatibleCheck clears the process static (tests / finalization).
-func ResetCompatibleCheck() {
-	ResetCompatibleCheckSess(testAmbientSession)
-}
+// Non-Sess ResetCompatibleCheck deleted — pass run bag or testAmbientSession explicitly.
 
 // ResetCompatibleCheckSess clears the checker flag on an explicit session bag.
 func ResetCompatibleCheckSess(s *Session) {
@@ -27,9 +23,7 @@ func ResetCompatibleCheckSess(s *Session) {
 }
 
 // compatibleCheckOn is true when option or session static requests the checker.
-func compatibleCheckOn(opts Options) bool {
-	return compatibleCheckOnSess(testAmbientSession, opts)
-}
+// Non-Sess compatibleCheckOn deleted — pass run bag or testAmbientSession explicitly.
 
 // compatibleCheckOnSess is compatibleCheckOn with an explicit session bag.
 func compatibleCheckOnSess(s *Session, opts Options) bool {
@@ -42,9 +36,7 @@ func compatibleCheckOnSess(s *Session, opts Options) bool {
 // CompatibleCheckExprVar mirrors CompatibleChecker::compatible_check(Variable*, Expression*).
 // CompatibleChecker.cpp:43–53 — when disabled always false.
 // Returns true when assignment should be rejected (COMPATIBLE_CHECK_ERROR).
-func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
-	return CompatibleCheckExprVarSess(testAmbientSession, opts, v, exp)
-}
+// Non-Sess CompatibleCheckExprVar deleted — pass run bag or testAmbientSession explicitly.
 
 // CompatibleCheckExprVarSess is CompatibleCheckExprVar on bag s.
 func CompatibleCheckExprVarSess(s *Session, opts Options, v *Variable, exp *Expression) bool {
@@ -65,9 +57,7 @@ func CompatibleCheckExprVarSess(s *Session, opts Options, v *Variable, exp *Expr
 
 // CompatibleCheckExprs mirrors CompatibleChecker::compatible_check(Expression*, Expression*).
 // CompatibleChecker.cpp:58–65 — when disabled false; else bidirectional compatible.
-func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
-	return CompatibleCheckExprsSess(testAmbientSession, opts, a, b)
-}
+// Non-Sess CompatibleCheckExprs deleted — pass run bag or testAmbientSession explicitly.
 
 // CompatibleCheckExprsSess is CompatibleCheckExprs on bag s.
 func CompatibleCheckExprsSess(s *Session, opts Options, a, b *Expression) bool {

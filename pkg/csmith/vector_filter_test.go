@@ -111,7 +111,7 @@ func TestBlockProbabilityMatchesDisabledKeepFilter(t *testing.T) {
 	// first genrand % 4 == 1959434203 % 4
 	want := int(NewRngSess(testAmbientSession, 2).RndUptoSess(testAmbientSession, 4))
 	r = NewRngSess(testAmbientSession, 2)
-	got := BlockProbability(4, r)
+	got := BlockProbabilitySess(testAmbientSession, 4, r)
 	if got != want {
 		t.Fatalf("BlockProbability(4) seed2: got %d want %d (uniform)", got, want)
 	}

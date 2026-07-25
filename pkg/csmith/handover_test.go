@@ -195,7 +195,7 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
-	UpdateUnionFactsForOOSVars([]*Variable{lu}, &facts)
+	UpdateUnionFactsForOOSVarsSess(testAmbientSession, []*Variable{lu}, &facts)
 	if FindRelatedUnionSess(testAmbientSession, facts, gu) == nil || FindRelatedUnionSess(testAmbientSession, facts, lu) != nil {
 		t.Fatal("OOS must drop local keep global", facts)
 	}

@@ -297,7 +297,7 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 10}
-	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, false)
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, false)
 	if b == nil || !b.InArrayLoop {
 		t.Fatal("InArrayLoop", b)
 	}
@@ -312,7 +312,7 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	b := &Block{Func: f, StmID: AllocStmID(), Parent: nil}
+	b := &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession), Parent: nil}
 	f.Stack = []*Block{b}
 	st := b.AppendReturnStmt(NewRngSess(testAmbientSession, 1), opts, NewVariableSelector(testAmbientSession, opts), &cg)
 	if st == nil || st.Kind != StmtReturn {
@@ -468,7 +468,7 @@ func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	b := &Block{StmID: AllocStmID(), Func: f}
+	b := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	b.PostCreationAnalysis(&cg, Defaults(), IncompleteEffect(), nil, nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -632,7 +632,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	// seed a prior fact so clear is observable vs empty start
 	prior := MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_other", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr)
 	facts := []*FactPointTo{prior}
-	AddNewVarFactInto(v, &facts)
+	AddNewVarFactIntoSess(testAmbientSession, v, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("nil FieldVars hole must fail closed clear facts, not soft-skip", facts)
 	}
@@ -642,7 +642,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil Variable* subject fails closed sticky (no invent skip as absent)
 	facts2 := []*FactPointTo{prior}
-	AddNewVarFactInto(nil, &facts2)
+	AddNewVarFactIntoSess(testAmbientSession, nil, &facts2)
 	if FactsComplete(facts2) {
 		t.Fatal("nil v must fail closed clear facts", facts2)
 	}
@@ -651,7 +651,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip makeup past hole)
-	AddNewVarFactInto(CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntTypeSess(testAmbientSession), false, false), nil)
+	AddNewVarFactIntoSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntTypeSess(testAmbientSession), false, false), nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts AddNewVarFactInto must SetError sticky")
 	}
@@ -660,7 +660,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	// complete skip (facts stay complete). Fair: clear facts sticky before field walk.
 	shell := &Variable{Name: "g_typeless"}
 	facts3 := []*FactPointTo{prior}
-	AddNewVarFactInto(shell, &facts3)
+	AddNewVarFactIntoSess(testAmbientSession, shell, &facts3)
 	if FactsComplete(facts3) {
 		t.Fatal("Type-nil shell must fail closed clear facts, not empty-fields complete", facts3)
 	}
@@ -910,11 +910,11 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
-		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, false)
+		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil")
 	}
-	if f.NeedReturnStmt() && !b.MustReturn() {
+	if f.NeedReturnStmtSess(testAmbientSession) && !b.MustReturn() {
 		t.Fatal("missing return after post_creation", b.Output(0))
 	}
 }
@@ -991,8 +991,8 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 }
 
 func TestFindJumpLabel(t *testing.T) {
-	GotoLabelsDoFinalizationSess(testAmbientSession, )
-	defer GotoLabelsDoFinalizationSess(testAmbientSession, )
+	GotoLabelsDoFinalizationSess(testAmbientSession)
+	defer GotoLabelsDoFinalizationSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	body := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 7},
@@ -1023,18 +1023,18 @@ func TestFindStmtByID(t *testing.T) {
 	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner, Else: &Block{}}}}
 	inner.Parent = outer
 	f.Blocks = []*Block{outer, inner}
-	st := FindStmtByID(f, 3)
+	st := FindStmtByIDSess(testAmbientSession, f, 3)
 	if st == nil || st.Kind != StmtAssign {
 		t.Fatalf("%+v", st)
 	}
-	if FindStmtByID(f, 999) != nil {
+	if FindStmtByIDSess(testAmbientSession, f, 999) != nil {
 		t.Fatal("missing")
 	}
 	// incomplete if on sole Blocks entry fails closed sticky (no invent soft-continue past nil Else)
 	ClearErrorSess(testAmbientSession)
 	f.Blocks = []*Block{outer}
 	outer.Stmts[0].Else = nil
-	if FindStmtByID(f, 3) != nil {
+	if FindStmtByIDSess(testAmbientSession, f, 3) != nil {
 		t.Fatal("nil Else must fail closed when only reachable via incomplete if")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1042,14 +1042,14 @@ func TestFindStmtByID(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Function + live StmID always required; sticky no invent miss soft-success
-	if FindStmtByID(nil, 3) != nil {
+	if FindStmtByIDSess(testAmbientSession, nil, 3) != nil {
 		t.Fatal("nil Function FindStmtByID must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function FindStmtByID must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindStmtByID(f, IncompleteStmID) != nil {
+	if FindStmtByIDSess(testAmbientSession, f, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtByID must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1112,7 +1112,7 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 		MakeFactPointToSess(testAmbientSession, loc, NullPtr),
 		MakeFactPointToSess(testAmbientSession, f.RV, NullPtr),
 	}
-	body := &Block{Func: f, StmID: AllocStmID(), LocalVars: []*Variable{loc}}
+	body := &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession), LocalVars: []*Variable{loc}}
 	f.Body = body
 	f.Blocks = []*Block{body}
 	f.Stack = []*Block{body}
@@ -1338,7 +1338,7 @@ func TestBlockProbabilityUniformNotAlwaysMax(t *testing.T) {
 	seen := map[int]bool{}
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 80; i++ {
-		v := BlockProbability(5, r)
+		v := BlockProbabilitySess(testAmbientSession, 5, r)
 		if v < 0 || v >= 5 {
 			t.Fatalf("out of range %d", v)
 		}
@@ -1362,7 +1362,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	opts.MaxBlockSize = 1
 	// Minimal process tables so MakeRandomFor can run or fail cleanly
 	prevStmt := ProcessStmtTabSess(testAmbientSession)
-	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTable(opts))
+	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTableSess(testAmbientSession, opts))
 	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
@@ -1376,7 +1376,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 
 	pre := cg.BlkDepth
-	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	// Whether for succeeds or null-fails, outer depth must restore (Statement.cpp:315–317).
 	if cg.BlkDepth != pre {
 		t.Fatalf("AppendNestedLoop must restore BlkDepth: got %d want %d", cg.BlkDepth, pre)
@@ -1395,7 +1395,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	opts.MaxBlockDepth = 5
 	opts.MaxBlockSize = 1
 	prevStmt := ProcessStmtTabSess(testAmbientSession)
-	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTable(opts))
+	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTableSess(testAmbientSession, opts))
 	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
@@ -1409,7 +1409,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	cg.ExprDepth = 7 // leftover from prior sibling assign
 
 	preBlk := cg.BlkDepth
-	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
+	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg)
 	if cg.BlkDepth != preBlk {
 		t.Fatalf("BlkDepth restore after make_random(eFor): got %d want %d", cg.BlkDepth, preBlk)
 	}
@@ -1434,18 +1434,18 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	f.Stack = []*Block{b}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg) != nil {
 		t.Fatal("sticky error must not append nested for")
 	}
 	ClearErrorSess(testAmbientSession)
 	// Block.cpp always has RNG for make_random(eFor)
-	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg) != nil {
 		t.Fatal("nil RNG must not invent nested for")
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete ambient must not invent nested for past holes
 	cgInc := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
-	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cgInc) != nil {
+	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cgInc) != nil {
 		t.Fatal("incomplete EffectContext must fail closed AppendNestedLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1601,7 +1601,7 @@ func TestContainsBackEdgeNilResidualSticky(t *testing.T) {
 
 func TestFromTailToHeadNilResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).FromTailToHead() {
+	if (*Block)(nil).FromTailToHeadSess(testAmbientSession) {
 		t.Fatal("nil Block FromTailToHead must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1697,17 +1697,17 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
-	nested := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
+	nested := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession)}}}
 	b := &Block{
-		StmID: AllocStmID(), Func: f,
+		StmID: AllocStmIDSess(testAmbientSession), Func: f,
 		Stmts: []Stmt{
-			{Kind: StmtReturn, StmID: AllocStmID()},
-			{Kind: StmtIfElse, StmID: AllocStmID(), Then: nested, Else: &Block{StmID: AllocStmID()}},
+			{Kind: StmtReturn, StmID: AllocStmIDSess(testAmbientSession)},
+			{Kind: StmtIfElse, StmID: AllocStmIDSess(testAmbientSession), Then: nested, Else: &Block{StmID: AllocStmIDSess(testAmbientSession)}},
 		},
 	}
 	f.Stack = []*Block{b}
 	f.Blocks = []*Block{b, nested}
-	abortBlockMake(f, b)
+	abortBlockMakeSess(testAmbientSession, f, b)
 	if len(f.Stack) != 0 {
 		t.Fatalf("abort must pop stack, got %d", len(f.Stack))
 	}
@@ -1722,7 +1722,7 @@ func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 	}
 	// sticky on nil args still
 	ClearErrorSess(testAmbientSession)
-	abortBlockMake(nil, b)
+	abortBlockMakeSess(testAmbientSession, nil, b)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil func must SetError")
 	}
@@ -1734,13 +1734,13 @@ func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
-	b1 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: AllocStmID()}}}
-	b2 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
-	b3 := &Block{StmID: AllocStmID(), Func: f}
+	b1 := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: AllocStmIDSess(testAmbientSession)}}}
+	b2 := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession)}}}
+	b3 := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f}
 	for _, b := range []*Block{b1, b2, b3} {
 		f.Stack = append(f.Stack, b)
 		f.Blocks = append(f.Blocks, b)
-		abortBlockMake(f, b)
+		abortBlockMakeSess(testAmbientSession, f, b)
 	}
 	if len(f.Blocks) != 3 {
 		t.Fatalf("three ERROR make_random must leave 3 Blocks entries, got %d", len(f.Blocks))
@@ -2041,13 +2041,13 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, outer, bodyLoc)}
 	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
-	parent := &Block{StmID: AllocStmID(), Func: f}
+	parent := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f}
 	body := &Block{
-		StmID: AllocStmID(), Func: f, Looping: true, Parent: parent,
+		StmID: AllocStmIDSess(testAmbientSession), Func: f, Looping: true, Parent: parent,
 		LocalVars: []*Variable{bodyLoc},
 		Stmts:     []Stmt{asg},
 	}
@@ -2169,7 +2169,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	if liveU[0] == nil {
 		t.Fatal("MakeFactUnion")
 	}
-	if !makeupNewUnionFacts(&preU, liveU) {
+	if !makeupNewUnionFactsSess(testAmbientSession, &preU, liveU) {
 		t.Fatal("makeup", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	if len(preU) != 1 || preU[0].Var != g {
@@ -2205,15 +2205,15 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// Nested no-FP block: parent != nil so map_out keeps full post-OOS without
 	// remove_function_local; live must OOS lu but not invent map_out install.
-	parent := &Block{StmID: AllocStmID(), Func: fn}
+	parent := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: fn}
 	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	inner := &Block{
-		StmID: AllocStmID(), Func: fn, Parent: parent, Looping: false, NeedRevisit: false,
+		StmID: AllocStmIDSess(testAmbientSession), Func: fn, Parent: parent, Looping: false, NeedRevisit: false,
 		LocalVars: []*Variable{lu},
 		Stmts:     []Stmt{asg},
 	}
@@ -2253,12 +2253,12 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	bodyLoc := CreateVariableQferSess(testAmbientSession, "l_bu", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	bodyAsg := Stmt{
-		Kind: StmtAssign, StmID: AllocStmID(),
+		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}, AssignOp: AssignSimple,
 	}
 	body := &Block{
-		StmID: AllocStmID(), Func: fn, Parent: nil, Looping: false, NeedRevisit: false,
+		StmID: AllocStmIDSess(testAmbientSession), Func: fn, Parent: nil, Looping: false, NeedRevisit: false,
 		LocalVars: []*Variable{bodyLoc},
 		Stmts:     []Stmt{bodyAsg},
 	}
@@ -2307,17 +2307,17 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
-	parent := &Block{StmID: AllocStmID(), Func: fn}
+	parent := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: fn}
 	// Last stmt is return → must_break_or_return true → is_loop_body false
 	// even though Looping (Block.cpp:729).
 	ret := Stmt{
-		Kind: StmtReturn, StmID: AllocStmID(),
+		Kind: StmtReturn, StmID: AllocStmIDSess(testAmbientSession),
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}
 	// Fall-through last would be from_tail; with return last, from_tail is false
 	// unless continue/break topology. Use looping + return last and assert no edge.
 	b := &Block{
-		StmID: AllocStmID(), Func: fn, Parent: parent,
+		StmID: AllocStmIDSess(testAmbientSession), Func: fn, Parent: parent,
 		Looping: true, NeedRevisit: false,
 		Stmts: []Stmt{ret},
 	}

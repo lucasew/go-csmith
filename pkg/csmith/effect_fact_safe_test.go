@@ -140,12 +140,12 @@ func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
 		t.Fatalf("field then parent should keep both: %v", namesOf(r2))
 	}
 	// expand of that set: parent expands to fields → f0 appears twice
-	exp := ExpandStructUnionVars(append([]*Variable(nil), r2...), GetIntTypeSess(testAmbientSession))
+	exp := ExpandStructUnionVarsSess(testAmbientSession, append([]*Variable(nil), r2...), GetIntTypeSess(testAmbientSession))
 	if !VariablesComplete(exp) {
 		t.Fatal("expand must complete")
 	}
 	// parent-only set expands without dups
-	expParent := ExpandStructUnionVars([]*Variable{parent}, GetIntTypeSess(testAmbientSession))
+	expParent := ExpandStructUnionVarsSess(testAmbientSession, []*Variable{parent}, GetIntTypeSess(testAmbientSession))
 	if len(exp) <= len(expParent) {
 		// field-first path can have dups; parent-only path is the fair post-ReadVar set
 		t.Fatalf("sanity: field+parent expand len=%d parent-only=%d", len(exp), len(expParent))

@@ -183,7 +183,7 @@ func (e Effect) AddExternalEffectWithCallersSess(s *Session, other Effect, callC
 		return IncompleteEffect()
 	}
 	for _, b := range callChain {
-		if !b.StackScanComplete() {
+		if !b.StackScanCompleteSess(s) {
 			// residual ERROR sticky — no invent soft-merge past StackScan residual
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
@@ -268,7 +268,7 @@ func varOnCallChainSess(s *Session, v *Variable, chain []*Block) bool {
 		if b == nil {
 			continue
 		}
-		if !b.StackScanComplete() {
+		if !b.StackScanCompleteSess(s) {
 			// incomplete stack sticky not-on-chain residual for caller IncompleteEffect
 			sessNoteError(s, ErrGeneric)
 			return false

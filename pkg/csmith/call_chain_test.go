@@ -39,7 +39,7 @@ func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
 	callee := &Function{Name: "callee", ReturnType: GetIntTypeSess(testAmbientSession)}
-	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
+	callerBlk := &Block{Func: caller, StmID: AllocStmIDSess(testAmbientSession)}
 	caller.Stack = []*Block{callerBlk}
 
 	// Fair: prev is still the caller when ExtendCallChain runs (generateBodyCore order).
@@ -77,7 +77,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi == nil || fi.Failed || fi.User == nil {
 		t.Fatal("fail")
 	}

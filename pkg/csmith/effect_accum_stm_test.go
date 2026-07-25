@@ -22,7 +22,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	for _, g := range vs.GlobalList {
 		fm.AddNewVarFact(g)
 	}
-	blk := &Block{Func: f, StmID: AllocStmID()}
+	blk := &Block{Func: f, StmID: AllocStmIDSess(testAmbientSession)}
 	f.Body = blk
 	f.Blocks = []*Block{blk}
 	f.Stack = []*Block{blk}

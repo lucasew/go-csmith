@@ -370,16 +370,16 @@ func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 func TestOutputWrapperH(t *testing.T) {
 	ClearSafeOpWrapperNamesSess(testAmbientSession)
 	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
-	if OutputWrapperHSess(testAmbientSession, ) != "#define N_WRAP 0\n" {
-		t.Fatal(OutputWrapperHSess(testAmbientSession, ))
+	if OutputWrapperHSess(testAmbientSession) != "#define N_WRAP 0\n" {
+		t.Fatal(OutputWrapperHSess(testAmbientSession))
 	}
 	_ = SafeOpFlagsToIDSess(testAmbientSession, "func_add_int32_t")
 	_ = SafeOpFlagsToIDSess(testAmbientSession, "func_sub_int32_t")
 	if WrapperNamesCountSess(testAmbientSession) != 2 {
 		t.Fatal(WrapperNamesCountSess(testAmbientSession))
 	}
-	if OutputWrapperHSess(testAmbientSession, ) != "#define N_WRAP 2\n" {
-		t.Fatal(OutputWrapperHSess(testAmbientSession, ))
+	if OutputWrapperHSess(testAmbientSession) != "#define N_WRAP 2\n" {
+		t.Fatal(OutputWrapperHSess(testAmbientSession))
 	}
 }
 

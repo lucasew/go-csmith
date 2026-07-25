@@ -98,7 +98,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	live := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
-	if !mergeJumpUnionFacts(&live, []*FactUnion{}) {
+	if !mergeJumpUnionFactsSess(testAmbientSession, &live, []*FactUnion{}) {
 		t.Fatal("merge failed", HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnionSess(testAmbientSession, live, uv)
@@ -132,7 +132,7 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 		t.Fatal("clone")
 	}
 	gotoOutU := []*FactUnion{} // missing subject
-	if !mergeJumpUnionFacts(&stmInU, gotoOutU) {
+	if !mergeJumpUnionFactsSess(testAmbientSession, &stmInU, gotoOutU) {
 		t.Fatal("merge_jump union", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnionSess(testAmbientSession, stmInU, parent)
@@ -181,7 +181,7 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	// local union is OOS at dest outside its block — use global only
 	in := []*FactUnion{MakeFactUnionSess(testAmbientSession, g, 0)}
 	var out []*FactUnion
-	UpdateUnionFactsForDest(in, &out, fn, body)
+	UpdateUnionFactsForDestSess(testAmbientSession, in, &out, fn, body)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
@@ -191,7 +191,7 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	}
 	// nil func fail closed
 	var out2 []*FactUnion
-	UpdateUnionFactsForDest(in, &out2, nil, body)
+	UpdateUnionFactsForDestSess(testAmbientSession, in, &out2, nil, body)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil func must sticky")
 	}
@@ -216,8 +216,8 @@ func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	loc.CreateFieldVarsSess(testAmbientSession)
 	fn := &Function{Name: "f_goto_u", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// then-arm holds local; dest is body (sibling path) where local is OOS
-	body := &Block{Func: fn, StmID: AllocStmID()}
-	thenArm := &Block{Func: fn, Parent: body, StmID: AllocStmID(), LocalVars: []*Variable{loc}}
+	body := &Block{Func: fn, StmID: AllocStmIDSess(testAmbientSession)}
+	thenArm := &Block{Func: fn, Parent: body, StmID: AllocStmIDSess(testAmbientSession), LocalVars: []*Variable{loc}}
 	fn.Body = body
 	fn.Blocks = []*Block{body, thenArm}
 	// Live unions include both global and then-local
@@ -226,8 +226,8 @@ func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{}
 	// Goto in then-arm jumping to a dest in body (local OOS at dest)
 	sg := &Stmt{
-		Kind: StmtGoto, StmID: AllocStmID(),
-		GotoDestStmID: AllocStmID(), GotoDestParent: body,
+		Kind: StmtGoto, StmID: AllocStmIDSess(testAmbientSession),
+		GotoDestStmID: AllocStmIDSess(testAmbientSession), GotoDestParent: body,
 	}
 	// parent of goto is thenArm for stack/OOS
 	fm.SetMapFactsOutForStmtDest(sg, []*FactPointTo{}, thenArm, body)

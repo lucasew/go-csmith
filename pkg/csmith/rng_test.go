@@ -476,7 +476,7 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	o.MaxExhaustiveDepth = 3
 	SetProcessOptionsSess(testAmbientSession, o)
 	// clear prior singleton if any
-	clearDFSImpl()
+	clearDFSImplSess(testAmbientSession)
 	dr := MakeRndNumGeneratorSess(testAmbientSession, RngKindDFS, 1)
 	if dr == nil || HasErrorSess(testAmbientSession) || dr.KindSess(testAmbientSession) != RngKindDFS {
 		t.Fatal("DFS generator", HasErrorSess(testAmbientSession))
@@ -485,7 +485,7 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	if MakeRndNumGeneratorSess(testAmbientSession, RngKindDFS, 9) != dr {
 		t.Fatal("DFS singleton")
 	}
-	clearDFSImpl()
+	clearDFSImplSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, prevO)
 	ClearErrorSess(testAmbientSession)
 }

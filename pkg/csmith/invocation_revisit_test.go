@@ -7,7 +7,7 @@ func TestPermuteParamOrdersTwo(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}}
-	ords := fi.PermuteParamOrders()
+	ords := fi.PermuteParamOrdersSess(testAmbientSession)
 	if len(ords) != 2 {
 		t.Fatal(ords)
 	}
@@ -23,20 +23,20 @@ func TestRenewFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	RenewFacts(&facts, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
+	RenewFactsSess(testAmbientSession, &facts, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
 	if !facts[0].IsDeadSess(testAmbientSession) {
 		t.Fatal(facts[0])
 	}
 	// equal → no growth
 	n := len(facts)
-	RenewFacts(&facts, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
+	RenewFactsSess(testAmbientSession, &facts, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)})
 	if len(facts) != n {
 		t.Fatal(len(facts))
 	}
 	// incomplete maps fail closed sticky (no invent soft re-pick past hole)
 	hole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
 	base := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
-	if RenewFacts(&base, hole) {
+	if RenewFactsSess(testAmbientSession, &base, hole) {
 		t.Fatal("incomplete newFacts must fail closed false")
 	}
 	if FactsComplete(base) {
@@ -48,7 +48,7 @@ func TestRenewFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete RenewFact target
 	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	if RenewFact(&facts2, nil) {
+	if RenewFactSess(testAmbientSession, &facts2, nil) {
 		t.Fatal("nil nf must fail closed false")
 	}
 	if FactsComplete(facts2) {
@@ -75,7 +75,7 @@ func TestRenewFacts(t *testing.T) {
 	}
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_tgt", GetIntTypeSess(testAmbientSession), true, false)
 	nfField := MakeFactPointToSess(testAmbientSession, p, tgt) // definitive p = &tgt
-	if !RenewFact(&factsX, nfField) {
+	if !RenewFactSess(testAmbientSession, &factsX, nfField) {
 		t.Fatal("renew field by var identity must succeed")
 	}
 	// parent fact must remain (not replaced via Match)
@@ -89,7 +89,7 @@ func TestRenewFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil-hole subject in map still fails closed sticky (FactsComplete false path)
 	factsHole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
-	if RenewFact(&factsHole, MakeFactPointToSess(testAmbientSession, p, GarbagePtr)) {
+	if RenewFactSess(testAmbientSession, &factsHole, MakeFactPointToSess(testAmbientSession, p, GarbagePtr)) {
 		t.Fatal("incomplete map RenewFact must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -99,16 +99,16 @@ func TestRenewFacts(t *testing.T) {
 }
 
 func TestReturnFactRegistry(t *testing.T) {
-	InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	fi := &Invocation{User: &Function{Name: "f", RV: CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)}}
 	f := MakeFactPointToSess(testAmbientSession, fi.User.RV, NullPtr)
-	fi.SaveReturnFacts([]*FactPointTo{f})
-	got := GetReturnFactForInvocation(fi, fi.User.RV)
+	fi.SaveReturnFactsSess(testAmbientSession, []*FactPointTo{f})
+	got := GetReturnFactForInvocationSess(testAmbientSession, fi, fi.User.RV)
 	if got == nil || !got.IsNullSess(testAmbientSession) {
 		t.Fatal(got)
 	}
-	InvocationReturnFactsDoFinalization()
-	if GetReturnFactForInvocation(fi, fi.User.RV) != nil {
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
+	if GetReturnFactForInvocationSess(testAmbientSession, fi, fi.User.RV) != nil {
 		t.Fatal("cleared")
 	}
 }
@@ -120,8 +120,8 @@ func TestReturnFactRegistry(t *testing.T) {
 // from choose_var (seed-213 p_34.f0 vs p_33.f0 pool).
 func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	InvocationReturnFactsDoFinalization()
-	defer InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
+	defer InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_ret", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
@@ -129,11 +129,11 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	f := &Function{Name: "func_u", ReturnType: ut, RV: rv}
 	fi := &Invocation{User: f}
 	uf := MakeFactUnionSess(testAmbientSession, rv, 0)
-	fi.SaveReturnUnionFacts([]*FactUnion{uf})
+	fi.SaveReturnUnionFactsSess(testAmbientSession, []*FactUnion{uf})
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("SaveReturnUnionFacts sticky", GetErrorSess(testAmbientSession))
 	}
-	got := GetReturnUnionFactForInvocation(fi, rv)
+	got := GetReturnUnionFactForInvocationSess(testAmbientSession, fi, rv)
 	if got == nil || got.LastWrittenFID != 0 {
 		t.Fatalf("registry must return eUnionWrite fact for rv, got %+v", got)
 	}
@@ -150,13 +150,13 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	// incomplete maps sticky (no invent soft-skip hole and still register later)
 	ClearErrorSess(testAmbientSession)
-	InvocationReturnFactsDoFinalization()
-	defer InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
+	defer InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fi := &Invocation{User: &Function{Name: "f", RV: rv}}
 	good := MakeFactPointToSess(testAmbientSession, rv, NullPtr)
-	fi.SaveReturnFacts([]*FactPointTo{nil, good})
-	if GetReturnFactForInvocation(fi, rv) != nil {
+	fi.SaveReturnFactsSess(testAmbientSession, []*FactPointTo{nil, good})
+	if GetReturnFactForInvocationSess(testAmbientSession, fi, rv) != nil {
 		t.Fatal("incomplete SaveReturnFacts must not invent registry entry")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -164,8 +164,8 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete PointTo on matching fact sticky
-	fi.SaveReturnFacts([]*FactPointTo{{Var: rv, PointTo: []*Variable{nil}}})
-	if GetReturnFactForInvocation(fi, rv) != nil {
+	fi.SaveReturnFactsSess(testAmbientSession, []*FactPointTo{{Var: rv, PointTo: []*Variable{nil}}})
+	if GetReturnFactForInvocationSess(testAmbientSession, fi, rv) != nil {
 		t.Fatal("incomplete PointTo must not invent registry")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -178,12 +178,12 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	// (FactsComplete rejects nil fact). Residual path: Match on complete then Add residual.
 	// Plant desynced registry so AddReturnFact stickies after first Match success.
 	ClearErrorSess(testAmbientSession)
-	InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 	fiOK := &Invocation{User: &Function{Name: "h", RV: rv}}
 	currentSession().ReturnFactInvocations = []*Invocation{&Invocation{User: &Function{Name: "x"}}}
 	currentSession().ReturnFactPoints = []*FactPointTo{} // desync sizes
-	fiOK.SaveReturnFacts([]*FactPointTo{MakeFactPointToSess(testAmbientSession, rv, NullPtr)})
-	if GetReturnFactForInvocation(fiOK, rv) != nil {
+	fiOK.SaveReturnFactsSess(testAmbientSession, []*FactPointTo{MakeFactPointToSess(testAmbientSession, rv, NullPtr)})
+	if GetReturnFactForInvocationSess(testAmbientSession, fiOK, rv) != nil {
 		t.Fatal("desync Add residual must fail closed no invent registry")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -193,10 +193,10 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	// nil Invocation* registry slot sticky fail closed (no invent later match)
 	ClearErrorSess(testAmbientSession)
 	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}
-	AddReturnFactForInvocation(fi2, MakeFactPointToSess(testAmbientSession, rv, NullPtr))
+	AddReturnFactForInvocationSess(testAmbientSession, fi2, MakeFactPointToSess(testAmbientSession, rv, NullPtr))
 	currentSession().ReturnFactInvocations = append([]*Invocation{nil}, currentSession().ReturnFactInvocations...)
 	currentSession().ReturnFactPoints = append([]*FactPointTo{MakeFactPointToSess(testAmbientSession, rv, NullPtr)}, currentSession().ReturnFactPoints...)
-	if GetReturnFactForInvocation(fi2, rv) != nil {
+	if GetReturnFactForInvocationSess(testAmbientSession, fi2, rv) != nil {
 		t.Fatal("nil inv registry hole must fail closed, not invent later match")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -204,29 +204,29 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	}
 	// Add with hole must wipe sticky rather than soft-skip re-seed
 	ClearErrorSess(testAmbientSession)
-	AddReturnFactForInvocation(fi2, MakeFactPointToSess(testAmbientSession, rv, NullPtr))
-	if GetReturnFactForInvocation(fi2, rv) != nil {
+	AddReturnFactForInvocationSess(testAmbientSession, fi2, MakeFactPointToSess(testAmbientSession, rv, NullPtr))
+	if GetReturnFactForInvocationSess(testAmbientSession, fi2, rv) != nil {
 		t.Fatal("AddReturnFact over hole must wipe, not invent re-seed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddReturnFact over hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	InvocationReturnFactsDoFinalization()
+	InvocationReturnFactsDoFinalizationSess(testAmbientSession)
 }
 
 func TestNeedsRevisit(t *testing.T) {
 	f := &Function{}
-	if f.NeedsRevisit() {
+	if f.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("empty")
 	}
 	f.FactChanged = true
-	if !f.NeedsRevisit() {
+	if !f.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("fact")
 	}
 	f.FactChanged = false
 	f.ReferencedPtrs = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)}
-	if !f.IsPointerReferenced() || !f.NeedsRevisit() {
+	if !f.IsPointerReferencedSess(testAmbientSession) || !f.NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("ptrs")
 	}
 }
@@ -234,7 +234,7 @@ func TestNeedsRevisit(t *testing.T) {
 func TestGetQualifiers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{IsStd: true}
-	q := fi.GetQualifiers()
+	q := fi.GetQualifiersSess(testAmbientSession)
 	if q.IsConstSess(testAmbientSession) || q.IsVolatileSess(testAmbientSession) {
 		t.Fatal(q)
 	}
@@ -244,13 +244,13 @@ func TestGetQualifiers(t *testing.T) {
 	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntTypeSess(testAmbientSession), false, false)
 	rv.Qfer.SetConstSess(testAmbientSession, true, 0)
 	fi2 := &Invocation{User: &Function{RV: rv}}
-	if !fi2.GetQualifiers().IsConstSess(testAmbientSession) {
+	if !fi2.GetQualifiersSess(testAmbientSession).IsConstSess(testAmbientSession) {
 		t.Fatal("rv const")
 	}
 	// nil RV sticky empty qfer (no invent storage-level false/false shell)
 	ClearErrorSess(testAmbientSession)
 	fi3 := &Invocation{User: &Function{Name: "f"}}
-	q3 := fi3.GetQualifiers()
+	q3 := fi3.GetQualifiersSess(testAmbientSession)
 	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
 		t.Fatalf("nil RV must not invent qfer bits: %+v", q3)
 	}
@@ -259,7 +259,7 @@ func TestGetQualifiers(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Invocation sticky empty
-	if q4 := (*Invocation)(nil).GetQualifiers(); len(q4.IsConsts) != 0 {
+	if q4 := (*Invocation)(nil).GetQualifiersSess(testAmbientSession); len(q4.IsConsts) != 0 {
 		t.Fatal("nil Invocation GetQualifiers must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -290,11 +290,11 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 	fi := &Invocation{Args: []*Expression{
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}
-	if got := fi.PermuteParamOrders(); len(got) != 0 {
+	if got := fi.PermuteParamOrdersSess(testAmbientSession); len(got) != 0 {
 		t.Fatalf("want empty orders for n!=2 without call args, got %v", got)
 	}
 	fi0 := &Invocation{}
-	if got := fi0.PermuteParamOrders(); len(got) != 0 {
+	if got := fi0.PermuteParamOrdersSess(testAmbientSession); len(got) != 0 {
 		t.Fatalf("want empty for 0 args, got %v", got)
 	}
 	// n==2 still both orders
@@ -302,7 +302,7 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}}
-	if len(fi2.PermuteParamOrders()) != 2 {
+	if len(fi2.PermuteParamOrdersSess(testAmbientSession)) != 2 {
 		t.Fatal("2-arg shortcut")
 	}
 	// n!=2 with nil arg hole — no invent skip hole as non-call permute slot
@@ -311,7 +311,7 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		nil,
 	}}
-	if got := fiHole.PermuteParamOrders(); got != nil {
+	if got := fiHole.PermuteParamOrdersSess(testAmbientSession); got != nil {
 		t.Fatalf("nil arg must fail closed nil orders, got %v", got)
 	}
 }
@@ -573,7 +573,7 @@ func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
 
 func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Function)(nil).NeedsRevisit() {
+	if (*Function)(nil).NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("nil Function NeedsRevisit must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -581,7 +581,7 @@ func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReferencedPtrs: []*Variable{nil}}
-	if !f.IsPointerReferenced() {
+	if !f.IsPointerReferencedSess(testAmbientSession) {
 		t.Fatal("incomplete ReferencedPtrs must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -592,7 +592,7 @@ func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
 
 func TestRenewFactNilFactsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if RenewFact(nil, MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false), NullPtr)) {
+	if RenewFactSess(testAmbientSession, nil, MakeFactPointToSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false), NullPtr)) {
 		t.Fatal("nil facts RenewFact must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -604,7 +604,7 @@ func TestRenewFactNilFactsSticky(t *testing.T) {
 func TestNeedsRevisitNilResidualSticky(t *testing.T) {
 	// NeedsRevisit residual soft invent was invent not-revisit soft-skip past nil Function.
 	ClearErrorSess(testAmbientSession)
-	if (*Function)(nil).NeedsRevisit() {
+	if (*Function)(nil).NeedsRevisitSess(testAmbientSession) {
 		t.Fatal("nil NeedsRevisit must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

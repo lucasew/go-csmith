@@ -943,7 +943,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
-	return ChooseOKVar(r, ok)
+	return ChooseOKVarSess(vsSess(vs), r, ok)
 }
 
 // selectDerefPointer mirrors VariableSelector::select_deref_pointer.

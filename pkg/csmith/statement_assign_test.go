@@ -172,7 +172,7 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	}
 	// array op: nil vs sticky
 	ClearErrorSess(testAmbientSession)
-	if st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil); st.Kind != 0 || stmtOK(st) {
+	if st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), nil); st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil arrayop invent %#v", st)
 	}
 	if !HasErrorSess(testAmbientSession) {

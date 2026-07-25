@@ -22,7 +22,7 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	preU := []*FactUnion{MakeFactUnionSess(testAmbientSession, oldU, 0)}
 	// map_in after fair FP: old last_write 4 + body-created new global
 	mapIn := []*FactUnion{MakeFactUnionSess(testAmbientSession, oldU, 4), MakeFactUnionSess(testAmbientSession, newU, 0)}
-	body := &Block{Func: f, Looping: true, StmID: AllocStmID()}
+	body := &Block{Func: f, Looping: true, StmID: AllocStmIDSess(testAmbientSession)}
 	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, mapIn)
 	fm.UnionFacts = CloneUnionFactSliceDeepSess(testAmbientSession, mapIn)
 	fm.GlobalFacts = []*FactPointTo{}
@@ -30,7 +30,7 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 		fm.MapStmEffect = make(map[int]Effect)
 	}
 	fm.MapStmEffect[body.StmID] = EmptyEffect()
-	forSt := &Stmt{Kind: StmtFor, Then: body, StmID: AllocStmID()}
+	forSt := &Stmt{Kind: StmtFor, Then: body, StmID: AllocStmIDSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{}, preU, EmptyEffect(), &cg)
 	if HasErrorSess(testAmbientSession) {
@@ -74,9 +74,9 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	bottomU.SetBottomSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// outer function body (non-looping) so post_creation does not append return
-	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
+	outer := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Looping: false}
 	// looping for-body, empty stms → no self-back (FromTailToHead false when empty)
-	body := &Block{StmID: AllocStmID(), Func: f, Looping: true, Parent: outer}
+	body := &Block{StmID: AllocStmIDSess(testAmbientSession), Func: f, Looping: true, Parent: outer}
 	f.Body = outer
 	f.Stack = []*Block{outer, body}
 	// map_facts_in = entry last=0 (Block::make_random set_fact_in at start)
