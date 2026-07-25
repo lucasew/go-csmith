@@ -190,10 +190,8 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	// Share gensym + derived_types across selector and generator.
 	g.Types.Sess = s
 	vs.Types = &g.Types
-	// Attribute generators for this generation (Initialize*Attributes)
-	InitAttrGeneratorsSess(s, opts, probs)
-	// ExtensionMgr::CreateExtension — null default; sticky if klee/crest/coverage
-	CreateExtensionSess(s, opts)
+	// Attribute generators + ExtensionMgr::CreateExtension run in Initialize()
+	// after Finalization reseeds RNG — DefaultProgramGenerator.cpp:54–60.
 	// PartialExpander::init_partial_expander when --partial-expand set
 	if opts.PartialExpand != "" {
 		if !InitPartialExpanderFromOptionsSess(s, opts) {
@@ -218,9 +216,8 @@ func (g *ProgramGenerator) Initialize() {
 	// DoFinalizationSess(s) clears only the generator bag — quarantined unit-test
 	// testAmbientSession / ProcessRng are preserved (Generate never writes them).
 	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
-	// ExtensionMgr::CreateExtension — null default, nothing to do.
 	// Finalization::doFinalization subset for a fresh generation
-	// (includes RandomNumber::doFinalization).
+	// (includes RandomNumber::doFinalization + DestroyExtension).
 	DoFinalizationSess(s)
 	// re-install from g after Finalization cleared s
 	s.Opts = g.Opts
@@ -248,6 +245,11 @@ func (g *ProgramGenerator) Initialize() {
 	// re-init scope + assign ops from session opts (once-per-run tables)
 	InitScopeTableSess(s, g.Opts)
 	s.AssignOpsTab = NewAssignOpsTableSess(gSess(g), g.Opts)
+	// Attribute generators after Finalization cleared them
+	InitAttrGeneratorsSess(s, g.Opts, g.Probs)
+	// DefaultProgramGenerator.cpp:59 — ExtensionMgr::CreateExtension after
+	// CreateInstance so klee/crest Initialize burns the live generation RNG.
+	CreateExtensionSess(s, g.Opts)
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).
@@ -484,9 +486,10 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		structAttr = EnsureStructTypeAttrGeneratorSess(g.Sess)
 		unionAttr = EnsureUnionTypeAttrGeneratorSess(g.Sess)
 	}
-	// Type.cpp:1895 — output_comment_line always (empty section when no used aggregates)
+	// Type.cpp:1895 — output_comment_line always (empty section when no used aggregates;
+	// quiet/concise → blank line only per OutputMgr.cpp:314–320)
 	var b strings.Builder
-	b.WriteString("/* --- Struct/Union Declarations --- */\n")
+	b.WriteString(OutputCommentLineSess(g.Sess, "--- Struct/Union Declarations ---", g.Opts.Quiet, g.Opts.Concise))
 	// reset printed for this emit pass (Type.cpp printed_ is process-lifetime; one emit per run)
 	for _, t := range g.Types.AllTypes {
 		if t != nil && t.IsAggregateSess(g.Sess) {
@@ -574,7 +577,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	}
 	// VariableSelector.cpp:1552 — header always; empty GlobalList still emits section
 	if g.VS == nil || len(g.VS.GlobalList) == 0 {
-		return "/* --- GLOBAL VARIABLES --- */\n"
+		return OutputCommentLineSess(g.Sess, "--- GLOBAL VARIABLES ---", g.Opts.Quiet, g.Opts.Concise)
 	}
 	// incomplete GlobalList fails closed sticky (no invent partial section / empty shell)
 	if !VariablesComplete(g.VS.GlobalList) {
@@ -667,7 +670,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	// before /* --- FORWARD DECLARATIONS --- */).
 	// Empty body after filtering still keeps the section header (C++ always prints it).
 	var b strings.Builder
-	b.WriteString("/* --- GLOBAL VARIABLES --- */\n")
+	b.WriteString(OutputCommentLineSess(g.Sess, "--- GLOBAL VARIABLES ---", g.Opts.Quiet, g.Opts.Concise))
 	b.WriteString(body.String())
 	return b.String()
 }
@@ -738,17 +741,21 @@ func (g *ProgramGenerator) OutputFunctions() string {
 	if forwards.Len() == 0 && aliases.Len() == 0 && bodies.Len() == 0 {
 		return ""
 	}
+	// Function.cpp:812–838 — two outputln then output_comment_line (concise → blank only)
 	var b strings.Builder
 	if forwards.Len() > 0 {
-		b.WriteString("\n\n/* --- FORWARD DECLARATIONS --- */\n")
+		b.WriteString("\n\n")
+		b.WriteString(OutputCommentLineSess(g.Sess, "--- FORWARD DECLARATIONS ---", g.Opts.Quiet, g.Opts.Concise))
 		b.WriteString(forwards.String())
 	}
 	if aliases.Len() > 0 {
-		b.WriteString("\n\n/* --- FORWARD ALIAS DECLARATIONS --- */\n")
+		b.WriteString("\n\n")
+		b.WriteString(OutputCommentLineSess(g.Sess, "--- FORWARD ALIAS DECLARATIONS ---", g.Opts.Quiet, g.Opts.Concise))
 		b.WriteString(aliases.String())
 	}
 	if bodies.Len() > 0 {
-		b.WriteString("\n\n/* --- FUNCTIONS --- */\n")
+		b.WriteString("\n\n")
+		b.WriteString(OutputCommentLineSess(g.Sess, "--- FUNCTIONS ---", g.Opts.Quiet, g.Opts.Concise))
 		b.WriteString(bodies.String())
 	}
 	return b.String()
@@ -1018,18 +1025,20 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 			return ""
 		}
 	}
+	// OutputMgr.cpp:209–220 — no leading endl before hash def (step_hash has one)
 	var b strings.Builder
-	b.WriteString("\nvoid csmith_compute_hash(void)\n{\n")
+	b.WriteString("void csmith_compute_hash(void)\n{\n")
 	b.WriteString(ctrlDecl)
 	b.WriteString(g.hashGlobals())
 	b.WriteString("}\n")
-	// OutputMgr::OutputStepHashFuncDef — OutputMgr.cpp:170–201
+	// OutputMgr::OutputStepHashFuncDef — OutputMgr.cpp:170–201 (leading endl;
+	// trailing spaces after UL; and "{ " match C++ string literals exactly)
 	b.WriteString("\nvoid step_hash(int stmt_id)\n{\n")
 	b.WriteString("    int i = 0;\n")
 	b.WriteString("    csmith_compute_hash();\n")
 	b.WriteString("    printf(\"before stmt(%d): checksum = %X\\n\", stmt_id, crc32_context ^ 0xFFFFFFFFUL);\n")
-	b.WriteString("    crc32_context = 0xFFFFFFFFUL;\n")
-	b.WriteString("    for (i = 0; i < 256; i++) {\n")
+	b.WriteString("    crc32_context = 0xFFFFFFFFUL; \n")
+	b.WriteString("    for (i = 0; i < 256; i++) { \n")
 	b.WriteString("        crc32_tab[i] = 0;\n")
 	b.WriteString("    }\n")
 	b.WriteString("    crc32_gentab();\n")

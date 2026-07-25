@@ -201,22 +201,26 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	b.WriteString(" = ")
 	b.WriteString(initOut)
 	b.WriteString(";")
-	// Variable.cpp:662–667 — is_volatile() only (locals too; comment text still says GLOBAL)
-	// OutputMgr.cpp:314–319 — immediately "/* " + comment + " */" (no invent space before /*)
+	// Variable.cpp:662–667 — is_volatile() → output_comment_line("VOLATILE GLOBAL …")
+	// OutputMgr.cpp:314–320 — quiet/concise → no comment body (caller still adds \n)
 	if v.IsVolatileSess(s) {
 		// residual ERROR sticky — no invent soft-skip comment past IsVolatile residual
 		if sessHasError(s) {
 			return ""
 		}
-		nm := v.GetActualNameSess(s, prefixName)
-		// residual ERROR sticky — no invent complete def past GetActualName residual
-		if sessHasError(s) {
-			return ""
-		}
-		if nm != "" {
-			b.WriteString("/* VOLATILE GLOBAL ")
-			b.WriteString(nm)
-			b.WriteString(" */")
+		opts := sessOpts(s)
+		if !opts.Quiet && !opts.Concise {
+			nm := v.GetActualNameSess(s, prefixName)
+			// residual ERROR sticky — no invent complete def past GetActualName residual
+			if sessHasError(s) {
+				return ""
+			}
+			if nm != "" {
+				// immediately "/* " + comment + " */" (no invent space before /*)
+				b.WriteString("/* VOLATILE GLOBAL ")
+				b.WriteString(nm)
+				b.WriteString(" */")
+			}
 		}
 	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent complete def past IsVolatile residual false path
@@ -3052,7 +3056,8 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		if !opts.ComputeHash {
 			b.WriteString(indent + "csmith_sink_ = " + access + ";\n")
 		} else if isF {
-			b.WriteString(indent + "transparent_crc_bytes (&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
+			// ArrayVariable.cpp:775 — no space before '(&' (scalar Variable has space)
+			b.WriteString(indent + "transparent_crc_bytes(&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
 		} else {
 			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
 		}
@@ -3071,7 +3076,8 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			if !opts.ComputeHash {
 				b.WriteString(indent + "csmith_sink_ = " + access + fn + ";\n")
 			} else if isF {
-				b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
+				// ArrayVariable.cpp:775 — no space before '(&'
+				b.WriteString(indent + "transparent_crc_bytes(&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
 			} else {
 				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
 			}

@@ -513,7 +513,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 }
 
 // generateSmallRandomFloatHexConstant mirrors GenerateSmallRandomFloatHexConstant.
-// Constant.cpp:207–223 — ±0x{num}.{RandomHexDigits(1)}p±1 via pure_rnd_flipcoin(50).}
+// Constant.cpp:207–223 — RandomHexDigits(1) then pure_rnd_flipcoin(50) for p±1.
 
 func generateSmallRandomFloatHexConstantSess(s *Session, num int, r *Rng) string {
 	if r == nil {
@@ -527,13 +527,14 @@ func generateSmallRandomFloatHexConstantSess(s *Session, num int, r *Rng) string
 		sign = "-"
 		abs = -abs
 	}
+	// Constant.cpp:212–220 — digits first, then flipcoin for ±1 (RNG order matters).
+	frac := r.RandomHexDigitsSess(s, 1)
 	pm := "+1"
 	// pure_rnd_flipcoin(50) — random mode == rnd_flipcoin(50)
 	if !r.RndFlipcoinSess(s, 50) {
 		pm = "-1"
 	}
-	// Constant.cpp:215 — num << "." << RandomHexDigits(1)
-	return sign + "0x" + strconv.Itoa(abs) + "." + r.RandomHexDigitsSess(s, 1) + "p" + pm
+	return sign + "0x" + strconv.Itoa(abs) + "." + frac + "p" + pm
 }
 
 func formatSmallConstantSess(s *Session, st ESimpleType, num int, opts Options) string {
@@ -709,7 +710,8 @@ func generateRandomInt128Constant(s *Session, opts Options, r *Rng) string {
 }
 
 // generateRandomFloatHexConstant mirrors GenerateRandomFloatHexConstant.
-// Constant.cpp:187–199 — pure_rnd_upto(100); hex; pure_rnd_flipcoin(50) for +/− exp.
+// Constant.cpp:187–199 — pure_rnd_upto(100); RandomHexDigits(1)+RandomHexDigits(6);
+// then pure_rnd_flipcoin(50) for +/− exp (RNG order matches C++ stream).
 
 func generateRandomFloatHexConstantSess(s *Session, r *Rng) string {
 	if r == nil {
@@ -717,11 +719,14 @@ func generateRandomFloatHexConstantSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
+	// Constant.cpp:188–198 — exp, then hex digits, then sign flipcoin.
 	exp := int(r.RndUptoSess(s, 100))
+	hi := r.RandomHexDigitsSess(s, 1)
+	lo := r.RandomHexDigitsSess(s, 6)
 	sign := "+"
 	// pure_rnd_flipcoin(50) — random mode == rnd_flipcoin(50)
 	if !r.RndFlipcoinSess(s, 50) {
 		sign = "-"
 	}
-	return fmt.Sprintf("0x%s.%sp%s%d", r.RandomHexDigitsSess(s, 1), r.RandomHexDigitsSess(s, 6), sign, exp)
+	return fmt.Sprintf("0x%s.%sp%s%d", hi, lo, sign, exp)
 }

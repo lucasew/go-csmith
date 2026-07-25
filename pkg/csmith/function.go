@@ -445,6 +445,10 @@ func MakeFirst(
 	}
 
 	// Function.cpp:460 — ExtensionMgr::GenerateFirstParameterList (null → no params)
+	ExtensionMgrGenerateFirstParameterListSess(runSess, f, vs)
+	if sessHasError(runSess) {
+		return nil
+	}
 
 	// register before body so recursive choose_func can see it
 	if list != nil {
