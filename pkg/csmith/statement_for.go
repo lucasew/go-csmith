@@ -120,10 +120,15 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 // StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb;
 // returns adjusted IV bound (out-param `bound` in C++).
 func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
+	return MakeRandomArrayControlSess(nil, r, bound, isSigned, oobProb)
+}
+
+// MakeRandomArrayControlSess is MakeRandomArrayControl with OOB bookkeeping on bag s.
+func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
 	// StatementFor.cpp:128+ — pure_rnd_*; bound is unsigned in C++ (0 allowed after --size)
 	// sticky no invent fixed array-loop control when RNG missing
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, 0, 0, 0, 0, 0
 	}
 	if bound < 0 {
@@ -133,7 +138,7 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 	oob := r.RndFlipcoin(uint32(oobProb))
 	if oob {
 		// StatementFor.cpp:157–158 — Bookkeeper::oob_cnt++
-		RecordOOB()
+		RecordOOBSess(s)
 	}
 	// StatementFor.cpp:134 —
 	//   test_op = is_signed ? (rnd_flipcoin(50) ? eCmpLe : eCmpGe) : eCmpLe
@@ -381,7 +386,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			oob = opts.ArrayOOBProb
 		}
 		var outBound int
-		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControl(r, b, signed, oob)
+		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControlSess(cg.Sess, r, b, signed, oob)
 		// C++ replaces bound with adjusted return value for IV bounds
 		bound = outBound
 	} else {

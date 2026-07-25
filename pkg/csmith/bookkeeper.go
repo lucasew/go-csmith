@@ -353,40 +353,45 @@ func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 // Type always live; sticky (no invent soft-skip bitfield stats past hole).
 // Non-aggregate is complete no-op.
 func RecordTypeWithBitfields(t *Type) {
+	RecordTypeWithBitfieldsSess(nil, t)
+}
+
+// RecordTypeWithBitfieldsSess is RecordTypeWithBitfields on an explicit session bag.
+func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-skip count past IsAggregate residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue count past IsAggregate residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
 	if !t.HasBitfields() {
 		// residual ERROR sticky — no invent soft-skip count past HasBitfields residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		return
 	}
 	// residual ERROR sticky — no invent soft-count past HasBitfields residual true path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	// Bookkeeper.cpp:482–483 — assert(len == fields.size()); Fields carry BitWidth
 	// incomplete field IR (nil Type) sticky stop — no invent zero counts past gaps
-	sessBK(nil).structsWithBitfields++
+	sessBK(s).structsWithBitfields++
 	for _, f := range t.Fields {
 		// StructField Type always live for bitfield stats; nil hole sticky stop
 		if f.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		// Bookkeeper.cpp:485 — if (!is_bitfield(i)) continue
@@ -394,28 +399,28 @@ func RecordTypeWithBitfields(t *Type) {
 			continue
 		}
 		// Bookkeeper.cpp:488–489 — bitfields_in_total++; zero width → unamed
-		sessBK(nil).bitfieldsInTotal++
+		sessBK(s).bitfieldsInTotal++
 		if f.BitWidth == 0 {
-			sessBK(nil).unamedBitfieldsInTotal++
+			sessBK(s).unamedBitfieldsInTotal++
 		}
 		// Bookkeeper.cpp:491–495 — qfers_[i] const/volatile
 		if f.Qfer.IsConst() {
 			// residual ERROR sticky — no invent soft-count past IsConst residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return
 			}
-			sessBK(nil).constBitfieldsInTotal++
-		} else if sessHasError(nil) {
+			sessBK(s).constBitfieldsInTotal++
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue stats past IsConst residual false
 			return
 		}
 		if f.Qfer.IsVolatile() {
 			// residual ERROR sticky — no invent soft-count past IsVolatile residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return
 			}
-			sessBK(nil).volatileBitfieldsInTotal++
-		} else if sessHasError(nil) {
+			sessBK(s).volatileBitfieldsInTotal++
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue stats past IsVolatile residual false
 			return
 		}

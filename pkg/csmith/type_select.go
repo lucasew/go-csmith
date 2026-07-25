@@ -201,9 +201,15 @@ func IncompleteTypes() []*Type {
 // Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
 // Type* always live on ok_types; nil hole fails closed (nil — no invent pick past hole).
 func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
+	return ChooseRandomStructUnionTypeSess(nil, r, ok)
+}
+
+// ChooseRandomStructUnionTypeSess is ChooseRandomStructUnionType with bitfield
+// stats on bag s (or ambient when nil).
+func ChooseRandomStructUnionTypeSess(s *Session, r *Rng, ok []*Type) *Type {
 	// Type.cpp always has process RNG; sticky no invent pick without it
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Type.cpp:523 — assert(sz > 0); empty pool fail closed (non-sticky soft when no candidates)
@@ -211,18 +217,18 @@ func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 		return nil
 	}
 	if !typesComplete(ok) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	rv := ok[r.RndUpto(uint32(len(ok)))]
 	// Type.cpp:526 — ERROR_GUARD(0)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	// pre-validated complete
 	if !rv.Used {
 		// Type.cpp:528–531
-		RecordTypeWithBitfields(rv)
+		RecordTypeWithBitfieldsSess(s, rv)
 		rv.Used = true
 	}
 	return rv
@@ -231,7 +237,11 @@ func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 // ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
 // Type.cpp:570–586 — if type is struct return it; else random from env.
 func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
-	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, ProcessOptions())
+	var s *Session
+	if env != nil {
+		s = env.Sess
+	}
+	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, sessOpts(s))
 }
 
 // ChooseRandomStructFromTypeOpts is ChooseRandomStructFromType with explicit Options.
@@ -274,7 +284,11 @@ func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile
 			return nil
 		}
 	}
-	return ChooseRandomStructUnionType(r, ok)
+	var s *Session
+	if env != nil {
+		s = env.Sess
+	}
+	return ChooseRandomStructUnionTypeSess(s, r, ok)
 }
 
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
@@ -396,7 +410,11 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 	t := env.AllTypes[idx]
 	// Type.cpp:1186–1190 choose_random only — make_one_struct_field does not mark used
 	if markUsed && !t.Used {
-		RecordTypeWithBitfields(t)
+		var s *Session
+		if env != nil {
+			s = env.Sess
+		}
+		RecordTypeWithBitfieldsSess(s, t)
 		t.Used = true
 	}
 	return t
@@ -565,9 +583,13 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 	}
 	t := env.AllTypes[idx]
 	if !t.Used {
-		RecordTypeWithBitfields(t)
+		var s *Session
+		if env != nil {
+			s = env.Sess
+		}
+		RecordTypeWithBitfieldsSess(s, t)
 		// residual ERROR sticky — no invent soft-mark used past RecordTypeWithBitfields residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		t.Used = true
@@ -694,9 +716,13 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			if sessHasError(nil) {
 				return nil
 			}
-			typ = ChooseRandomStructUnionType(r, cands)
+			var s *Session
+			if env != nil {
+				s = env.Sess
+			}
+			typ = ChooseRandomStructUnionTypeSess(s, r, cands)
 			// Type.cpp:526 ERROR_GUARD inside choose_random_struct_union_type
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 		}
