@@ -36,20 +36,36 @@ type VectorFilter struct {
 	table *DistributionTable
 	// mode mirrors VectorFilter::mode_.
 	mode FilterMode
+	// modeKind snapshots Filter::current_kind() from session Options at construction
+	// so Filter()/ValidFilter do not residual-read ProcessOptions ambient mid-draw.
+	modeKind FilterKind
+	// modeKindSet is true when modeKind was snapped from opts (not zero-value default).
+	modeKindSet bool
 }
 
 // NewVectorFilter mirrors VectorFilter(DistributionTable*) — FilterOut, empty set.
 // Filter.cpp:40 — kinds_.set() all true.
 func NewVectorFilter(table *DistributionTable) *VectorFilter {
+	return NewVectorFilterSess(nil, table)
+}
+
+// NewVectorFilterSess is NewVectorFilter with current_kind snapshotted from bag opts.
+func NewVectorFilterSess(s *Session, table *DistributionTable) *VectorFilter {
 	f := &VectorFilter{table: table, mode: FilterModeOut}
 	for i := range f.kinds {
 		f.kinds[i] = true
 	}
+	f.snapModeKind(s)
 	return f
 }
 
 // NewVectorFilterItems mirrors VectorFilter(vector&, Mode).
 func NewVectorFilterItems(items []int, mode FilterMode) *VectorFilter {
+	return NewVectorFilterItemsSess(nil, items, mode)
+}
+
+// NewVectorFilterItemsSess is NewVectorFilterItems with current_kind snapshotted from bag opts.
+func NewVectorFilterItemsSess(s *Session, items []int, mode FilterMode) *VectorFilter {
 	f := &VectorFilter{mode: mode, table: nil}
 	for i := range f.kinds {
 		f.kinds[i] = true
@@ -57,7 +73,16 @@ func NewVectorFilterItems(items []int, mode FilterMode) *VectorFilter {
 	for _, it := range items {
 		f.Add(it)
 	}
+	f.snapModeKind(s)
 	return f
+}
+
+func (f *VectorFilter) snapModeKind(s *Session) {
+	if f == nil {
+		return
+	}
+	f.modeKind = f.CurrentKindOpts(sessOpts(s))
+	f.modeKindSet = true
 }
 
 // Enable mirrors Filter::enable.
@@ -128,7 +153,11 @@ func (f *VectorFilter) ValidFilterSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	k := f.CurrentKindSess(s)
+	// Prefer construction snapshot so Filter interface draws stay bag-local.
+	k := f.modeKind
+	if !f.modeKindSet {
+		k = f.CurrentKindSess(s)
+	}
 	if k < 0 || k >= FilterKindMax {
 		return false
 	}

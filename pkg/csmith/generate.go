@@ -33,7 +33,6 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	// Bridge: residual Process* / sessOpts(nil) still require activeSession.
 	restore := activateSession(s)
 	defer restore()
 

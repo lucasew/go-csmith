@@ -137,19 +137,19 @@ func CreateArrayVariable(
 	av.AsArray = av
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
 	if elem.IsAggregate() {
-		av.CreateFieldVars()
+		av.CreateFieldVarsSess(cgSess(cg))
 	}
 	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// ArrayVariable.cpp:165–186 — pure_rnd_upto(total_size/2) then alt inits.
-	// pure_rnd_upto(0)==0 with no draw; use PureRndUpto so ProcessRng matches C++
+	// pure_rnd_upto(0)==0 with no draw; use PureRndUptoSess so bag ProcessRng matches C++
 	// RandomNumber singleton when r is the session process RNG.
 	half := uint32(total / 2)
 	// Prefer process pure path when r is the live session generator (C++ pure_rnd_*)
 	var initNum int
 	if pr := sessRng(cgSess(cg)); pr != nil && pr == r {
-		initNum = int(PureRndUpto(half, nil))
+		initNum = int(PureRndUptoSess(cgSess(cg), half, nil))
 	} else {
 		initNum = int(r.RndUpto(half))
 	}
@@ -663,7 +663,7 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 		return nil
 	}
 	if item.Type.IsAggregate() {
-		item.CreateFieldVars()
+		item.CreateFieldVarsSess(vsSess(vs))
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -1296,7 +1296,7 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 		return nil
 	}
 	if item.Type.IsAggregate() {
-		item.CreateFieldVars()
+		item.CreateFieldVarsSess(vsSess(vs))
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
 		if sessHasError(vsSess(vs)) {
 			return nil

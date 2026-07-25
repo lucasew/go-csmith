@@ -272,7 +272,7 @@ func MakeRandomSignature(
 	if sessHasError(s) {
 		return nil
 	}
-	f.RV = CreateVariableQfer(name+"_rv", retType, retQ)
+	f.RV = CreateVariableQferSess(s, name+"_rv", retType, retQ)
 	// Function.cpp:419–420 — CreateVariable + ERROR_GUARD path; no soft invent signature without rv
 	if f.RV == nil || sessHasError(s) {
 		return nil
@@ -429,11 +429,11 @@ func MakeFirst(
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty, AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
 	// Function.cpp:452–453 — CVQualifiers::random_qualifiers(ty); ERROR_GUARD
-	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
+	retQ := RandomQualifiersNoContextNoVolatileSess(runSess, ty, opts, probs, r)
 	if sessHasError(runSess) {
 		return nil
 	}
-	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
+	f.RV = CreateVariableQferSess(runSess, name+"_rv", ty, retQ)
 	// Function.cpp:453 — CreateVariable + ERROR_GUARD; no soft invent first without rv
 	if f.RV == nil || sessHasError(runSess) {
 		return nil
@@ -1383,7 +1383,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 		return ""
 	}
 	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell
-	hdr := f.OutputHeaderOpts(forceStatic, opts)
+	hdr := f.OutputHeaderOptsSess(sess, forceStatic, opts)
 	// residual ERROR sticky — no invent soft-continue body past OutputHeader residual
 	if sessHasError(sess) {
 		return ""

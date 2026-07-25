@@ -202,7 +202,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 		return ""
 	}
 	// Variable.cpp:640–660 — OutputDecl always live; sticky no invent " = init;" without decl
-	decl := v.OutputDeclWith(forceStatic, prefixName, sessOpts(s))
+	decl := v.OutputDeclWithSess(s, forceStatic, prefixName, sessOpts(s))
 	// residual ERROR sticky — no invent soft-continue def past OutputDecl residual
 	if sessHasError(s) {
 		return ""
@@ -859,7 +859,12 @@ func OutputArrayInitializersSess(s *Session, vars []*Variable, opts Options, ind
 // CreateVariableQfer mirrors Variable::CreateVariable(name, type, init, qfer).
 // Variable.cpp:405–421 — caller supplies init (may be nil); expand aggregates.
 func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
-	return CreateVariableWithInit(name, typ, nil, qfer)
+	return CreateVariableQferSess(nil, name, typ, qfer)
+}
+
+// CreateVariableQferSess is CreateVariableQfer with sticky/field expand on bag s.
+func CreateVariableQferSess(s *Session, name string, typ *Type, qfer CVQualifiers) *Variable {
+	return CreateVariableWithInitSess(s, name, typ, nil, qfer)
 }
 
 // CreateVariableWithInit mirrors Variable::CreateVariable(name, type, init, qfer).
@@ -900,7 +905,7 @@ func CreateVariableWithInitSess(s *Session, name string, typ *Type, init *Consta
 		if sessHasError(s) {
 			return nil
 		}
-		v.CreateFieldVars()
+		v.CreateFieldVarsSess(s)
 	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-create past IsAggregate residual false
 		return nil

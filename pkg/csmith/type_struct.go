@@ -56,7 +56,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
-	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext().WithSession(envSess(env)), false, constP, volP, opts, r)
 	// Type.cpp:694 ERROR_RETURN after random_qualifiers
 	if sessHasError(envSess(env)) {
 		return StructField{}
@@ -101,7 +101,7 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 	}
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
-	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext().WithSession(s), false, constP, volP, opts, r)
 	if sessHasError(s) {
 		return fail
 	}
@@ -780,7 +780,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	// Type.cpp:733–735 — FieldConstProb / FieldVolatileProb (traced random_qualifiers)
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
-	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext().WithSession(envSess(env)), false, constP, volP, opts, r)
 	if sessHasError(envSess(env)) {
 		return StructField{}
 	}

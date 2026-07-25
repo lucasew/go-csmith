@@ -239,7 +239,7 @@ func (t *Type) IsConstStructUnionSess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if f.Type.IsConstStructUnion() {
+		if f.Type.IsConstStructUnionSess(s) {
 			// residual ERROR sticky — no invent const-true past nested IsConstStructUnion hole
 			if sessHasError(s) {
 				return true
@@ -284,7 +284,7 @@ func (t *Type) IsVolatileStructUnionSess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if f.Type.IsVolatileStructUnion() {
+		if f.Type.IsVolatileStructUnionSess(s) {
 			// residual ERROR sticky — no invent vol-true past nested IsVolatileStructUnion hole
 			if sessHasError(s) {
 				return true

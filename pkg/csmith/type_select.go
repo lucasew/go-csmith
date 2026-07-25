@@ -147,7 +147,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 		if sessHasError(envSess(env)) {
 			return IncompleteTypes()
 		}
-		if noConst && t.IsConstStructUnion() {
+		if noConst && t.IsConstStructUnionSess(envSess(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
 			if sessHasError(envSess(env)) {
 				return IncompleteTypes()
@@ -158,7 +158,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 		if sessHasError(envSess(env)) {
 			return IncompleteTypes()
 		}
-		if noVolatile && t.IsVolatileStructUnion() {
+		if noVolatile && t.IsVolatileStructUnionSess(envSess(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
 			if sessHasError(envSess(env)) {
 				return IncompleteTypes()
@@ -259,7 +259,7 @@ func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile
 		if sessHasError(envSess(env)) {
 			return nil
 		}
-		if noVolatile && typ.IsVolatileStructUnion() {
+		if noVolatile && typ.IsVolatileStructUnionSess(envSess(env)) {
 			// residual ERROR sticky — no invent soft-fallthrough past IsVolatileStructUnion residual
 			if sessHasError(envSess(env)) {
 				return nil
@@ -550,7 +550,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		if simple && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
 			return true
 		}
-		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnion() {
+		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnionSess(envSess(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past IsVolatileStructUnion hole
 			if sessHasError(envSess(env)) {
 				return true
@@ -769,7 +769,7 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 				sessNoteError(envSess(env), ErrGeneric)
 				return IncompleteTypes()
 			}
-			if noVolatile && t.IsVolatileStructUnion() {
+			if noVolatile && t.IsVolatileStructUnionSess(envSess(env)) {
 				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
 				if sessHasError(envSess(env)) {
 					return IncompleteTypes()
@@ -785,7 +785,7 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 				sessNoteError(envSess(env), ErrGeneric)
 				return IncompleteTypes()
 			}
-			if noVolatile && t.IsVolatileStructUnion() {
+			if noVolatile && t.IsVolatileStructUnionSess(envSess(env)) {
 				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
 				if sessHasError(envSess(env)) {
 					return IncompleteTypes()

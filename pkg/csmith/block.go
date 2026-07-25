@@ -555,7 +555,7 @@ func BlockProbabilitySess(s *Session, blockSize int, r *Rng) int {
 		return 0
 	}
 	// Block.cpp:88–92 — Keep {block_size-1}, disable fDefault, rnd_upto
-	f := NewVectorFilterItems([]int{blockSize - 1}, FilterModeKeep)
+	f := NewVectorFilterItemsSess(s, []int{blockSize - 1}, FilterModeKeep)
 	f.DisableSess(s, FilterKindDefault)
 	return int(r.RndUptoFilterSess(s, uint32(blockSize), f))
 }

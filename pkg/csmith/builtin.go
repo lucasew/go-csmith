@@ -191,7 +191,7 @@ func GenerateParameterListFromStringSess(s *Session, f *Function, params string)
 		q := NewCVQualifiers([]bool{false}, []bool{false})
 		name := "p_" + itoa(i+1)
 		// Function.cpp:359–360 — GenerateParameterVariable; assert(v)
-		v := CreateVariableQfer(name, ty, q)
+		v := CreateVariableQferSess(s, name, ty, q)
 		if v == nil {
 			fail()
 			return false
@@ -254,8 +254,8 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 		BuildState: BuildBuilding,
 	}
 	// return dummy variable — Probabilities singleton always live; nil probs → 0% quals
-	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
-	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
+	retQ := RandomQualifiersNoContextNoVolatileSess(s, ty, opts, probs, r)
+	f.RV = CreateVariableQferSess(s, name+"_rv", ty, retQ)
 	if f.RV == nil {
 		sessNoteError(s, ErrGeneric)
 		return nil

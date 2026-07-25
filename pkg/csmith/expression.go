@@ -1037,7 +1037,7 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 		sessNoteError(s, ErrGeneric)
 		return MaxTermTypes
 	}
-	f := NewVectorFilter(&tables.Expr)
+	f := NewVectorFilterSess(s, &tables.Expr)
 	if noFunc {
 		f.Add(int(TermFunction))
 	}
@@ -1104,7 +1104,7 @@ func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options,
 		sessNoteError(s, ErrGeneric)
 		return MaxTermTypes
 	}
-	f := NewVectorFilter(&tables.Param)
+	f := NewVectorFilterSess(s, &tables.Param)
 	// don't call functions with constant parameters
 	f.Add(int(TermConstant))
 	if typ != nil {

@@ -1409,5 +1409,10 @@ func RandomQualifiersDefaultProbs(
 // RandomQualifiersNoContextNoVolatile mirrors CVQualifiers::random_qualifiers(const Type *t)
 // → READ, empty context, no_volatile=true.
 func RandomQualifiersNoContextNoVolatile(t *Type, opts Options, probs *Probabilities, r *Rng) CVQualifiers {
-	return RandomQualifiersDefaultProbs(t, AccessRead, EmptyCGContext(), true, opts, probs, r)
+	return RandomQualifiersNoContextNoVolatileSess(nil, t, opts, probs, r)
+}
+
+// RandomQualifiersNoContextNoVolatileSess is RandomQualifiersNoContextNoVolatile with bag sticky.
+func RandomQualifiersNoContextNoVolatileSess(s *Session, t *Type, opts Options, probs *Probabilities, r *Rng) CVQualifiers {
+	return RandomQualifiersDefaultProbs(t, AccessRead, EmptyCGContext().WithSession(s), true, opts, probs, r)
 }

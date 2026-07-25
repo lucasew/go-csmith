@@ -1367,7 +1367,7 @@ func MakeRandomBinaryInvocation(
 						}
 					}
 					if !lhsF && !rhsF {
-						f := NewVectorFilterItems([]int{
+						f := NewVectorFilterItemsSess(cgSess(cg), []int{
 							int(BinMod), int(BinDiv), int(BinLShift), int(BinRShift),
 						}, FilterModeOut)
 						op = BinaryOp(r.RndUptoFilterSess(cgSess(cg), uint32(MaxBinaryOp), f))

@@ -66,7 +66,7 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 		sessNoteError(s, ErrGeneric)
 		return AssignOp(-1)
 	}
-	f := NewVectorFilter(table)
+	f := NewVectorFilterSess(s, table)
 	// signed ints: filter out ++/-- (upstream avoids for signed)
 	if typ != nil {
 		signed := typ.IsSigned()

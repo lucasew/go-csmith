@@ -2805,7 +2805,7 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	v := CreateVariableQfer(name, typ, qfer)
+	v := CreateVariableQferSess(vsSess(vs), name, typ, qfer)
 	if v == nil {
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
@@ -2857,7 +2857,7 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 		return nil
 	}
 	// VariableSelector.cpp:976 — CVQualifiers::random_qualifiers(t)
-	qfer := RandomQualifiersNoContextNoVolatile(t, vs.Opts, vs.Probs, r)
+	qfer := RandomQualifiersNoContextNoVolatileSess(vsSess(vs), t, vs.Opts, vs.Probs, r)
 	// VariableSelector.cpp:977 ERROR_RETURN
 	if sessHasError(vsSess(vs)) {
 		return nil
