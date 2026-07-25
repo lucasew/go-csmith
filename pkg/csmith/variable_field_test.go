@@ -115,7 +115,7 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
 		t.Fatal("incomplete frame stack must fail closed incomplete, not invent empty complete")
@@ -137,7 +137,7 @@ func TestFindReachableFrameVarsIsVisibleResidualSticky(t *testing.T) {
 	f.Param = []*Variable{nil}
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// second good pointee that would invent partial frame set after residual soft-skip
 	loc2 := CreateVariableScalars("l_2", GetIntType(), false, false)

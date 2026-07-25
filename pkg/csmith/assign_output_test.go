@@ -147,7 +147,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 	// reset sid
 	currentSession().NextStmID = 0
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// make block — should tend to returns when stop is low
 	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
@@ -264,7 +264,7 @@ func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
 	opts.Consts = true
 	opts.Volatiles = true
 	// with real probs, may get bits; with nil, always non-const/non-vol under Regular*
-	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext(), false, opts, nil, NewRng(1))
+	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), false, opts, nil, NewRng(1))
 	if q.IsConst() || q.IsVolatile() {
 		t.Fatal("nil probs must not invent non-zero regular const/vol")
 	}

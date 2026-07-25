@@ -10,7 +10,7 @@ func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
 	// finalizes via map_stm_effect[body] only).
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	g := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	l := CreateVariableQfer("l_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg.NoteWrite(g)

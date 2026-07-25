@@ -897,7 +897,7 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 	// Self back-edge (loop)
 	fm.CreateCFGEdge(body.StmID, body, false, true)
 
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

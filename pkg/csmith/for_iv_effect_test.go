@@ -45,7 +45,7 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 		vs.AllVars = append(vs.AllVars, f)
 	}
 	vs.AllVars = append(vs.AllVars, parent)
-	cg := WithFunc(fn, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(fn, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &Effect{}
 	*cg.EffectAccum = EmptyEffect()
 	cg.EffectStm = EmptyEffect()

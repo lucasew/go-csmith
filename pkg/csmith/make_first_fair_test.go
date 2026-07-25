@@ -142,12 +142,12 @@ func TestMakeRandomFunction(t *testing.T) {
 	opts.MaxBlockDepth = 1
 	opts.MaxFuncs = 5
 	vs := NewVariableSelector(opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	list := &FunctionList{}
 	// seed first so list non-empty for choose
 	seedTypesForTest(NewRng(2), opts, NewProbabilities(opts), vs, list)
 	_ = MakeFirst(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Funcs = list
 	f := MakeRandomFunction(NewRng(3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list)
 	if f == nil {
@@ -212,7 +212,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	list2 := &FunctionList{}
 	seedTypesForTest(NewRng(6), opts, probs, vs2, list2)
 	vs2.GlobalList = []*Variable{CreateVariableScalars("g_2", GetIntType(), false, false), nil}
-	cg := EmptyCGContext().WithFuncList(list2)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list2)
 	if MakeRandomFunction(NewRng(7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list2) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}

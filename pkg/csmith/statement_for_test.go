@@ -50,7 +50,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	if fm == nil {
 		fm = NewFactMgrSess(testAmbientSession, f)
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if f.Body != nil {
 		f.Stack = []*Block{f.Body}
 	}
@@ -78,7 +78,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	// StatementFor.cpp:172 assert(blk) — parent block on stack (MakeFirst pops body)
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		t.Fatalf("%+v", st)
@@ -103,7 +103,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 		t.Fatal("nil cg MakeRandomFor must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cgEmpty := EmptyCGContext()
+	cgEmpty := EmptyCGContext().WithSession(testAmbientSession)
 	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
 		t.Fatal("nil RNG")
 	}
@@ -114,7 +114,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()) // no FM
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession) // no FM
 	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatalf("nil FM must return nil, got %#v", st)
 	}
@@ -172,7 +172,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	// Plant a read on the parent accum before for-body generation.
 	pre := CreateVariableScalars("pre_rd", GetIntType(), true, false)
 	accum := EmptyEffect().ReadVar(pre)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &accum
 	// WithLoopBody / C++ loop-body ctor share EffectAccum pointer.
 	bodyCG := cg.WithLoopBody(cg.RW, nil, 0)

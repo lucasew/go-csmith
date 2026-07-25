@@ -83,14 +83,14 @@ func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{false}, []bool{false})
 	base.AcceptStricter = true
-	if out := base.RandomQualifiersFrom(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
+	if out := base.RandomQualifiersFrom(false, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG From must fail closed empty, got %+v", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomQualifiersFrom must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if out := base.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
+	if out := base.RandomLooseQualifiers(false, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG Loose must fail closed empty, got %+v", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -99,7 +99,7 @@ func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// wildcard still works without RNG (short-circuit before RNG)
 	w := CVQualifiers{Wildcard: true}
-	if out := w.RandomQualifiersFrom(true, AccessRead, EmptyCGContext(), opts, probs, nil); !out.Wildcard {
+	if out := w.RandomQualifiersFrom(true, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, nil); !out.Wildcard {
 		t.Fatal("wildcard")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -162,7 +162,7 @@ func TestRandomQualifiersFromNoVolatile(t *testing.T) {
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{true, false}, []bool{true, true})
 	base.AcceptStricter = true
-	out := base.RandomQualifiersFrom(true, AccessRead, EmptyCGContext(), opts, probs, NewRng(2))
+	out := base.RandomQualifiersFrom(true, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, NewRng(2))
 	for _, v := range out.IsVolatiles {
 		if v {
 			t.Fatal("no_volatile", out)
@@ -172,7 +172,7 @@ func TestRandomQualifiersFromNoVolatile(t *testing.T) {
 		t.Fatal(out)
 	}
 	// WRITE clears storage const
-	outW := base.RandomQualifiersFrom(true, AccessWrite, EmptyCGContext(), opts, probs, NewRng(2))
+	outW := base.RandomQualifiersFrom(true, AccessWrite, EmptyCGContext().WithSession(testAmbientSession), opts, probs, NewRng(2))
 	if len(outW.IsConsts) > 0 && outW.IsConsts[len(outW.IsConsts)-1] {
 		t.Fatal("write no storage const", outW)
 	}
@@ -186,7 +186,7 @@ func TestRandomQualifiersFromIsSideEffectFreeResidualSticky(t *testing.T) {
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{false}, []bool{true})
 	base.AcceptStricter = false
-	cg := WithEffectContext(IncompleteEffect())
+	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	out := base.RandomQualifiersFrom(false, AccessRead, cg, opts, probs, NewRng(2))
 	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("IsSideEffectFree residual RandomQualifiersFrom must fail closed empty, got %+v", out)
@@ -209,7 +209,7 @@ func TestRandomLooseQualifiers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{true}, []bool{true})
-	out := base.RandomLooseQualifiers(true, AccessRead, EmptyCGContext(), opts, probs, NewRng(3))
+	out := base.RandomLooseQualifiers(true, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, NewRng(3))
 	if len(out.IsVolatiles) != 1 || out.IsVolatiles[0] {
 		t.Fatal(out)
 	}
@@ -331,7 +331,7 @@ func TestRandomQualifiersSimpleWriteNoConst(t *testing.T) {
 	r := NewRng(2)
 	// no_volatile true so only possible draws: for WRITE, only vol flip if SE-free then cleared.
 	// WRITE: const_ok=false → no const flip. vol flip then cleared.
-	q := RandomQualifiersDefaultProbs(ty, AccessWrite, EmptyCGContext(), true, opts, probs, r)
+	q := RandomQualifiersDefaultProbs(ty, AccessWrite, EmptyCGContext().WithSession(testAmbientSession), true, opts, probs, r)
 	if q.IsConsts[0] {
 		t.Fatal("WRITE must not set storage const")
 	}
@@ -341,7 +341,7 @@ func TestRandomQualifiersSideEffectBlocksVolatile(t *testing.T) {
 	// effect_context not SE-free → volatile_ok false for storage → no vol flip for storage.
 	opts := Defaults()
 	ty := GetSimpleType(EInt)
-	cg := WithEffectContext(WithSideEffects())
+	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)
 	// Use volatile_prob=100 const=0 so if vol were OK it would always be true.
 	r := NewRng(2)
 	q := RandomQualifiersForType(ty, AccessRead, cg, false, 0, 100, opts, r)
@@ -357,7 +357,7 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 	// incomplete EffectContext fails closed sticky (no invent non-vol qfer past holes)
 	opts := Defaults()
 	ty := GetSimpleType(EInt)
-	cg := WithEffectContext(IncompleteEffect())
+	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	q := RandomQualifiersForType(ty, AccessRead, cg, false, 0, 100, opts, NewRng(2))
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
@@ -377,7 +377,7 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type + RNG always live; sticky empty (no invent soft-skip qfer past hole)
-	q3 := RandomQualifiersForType(nil, AccessRead, EmptyCGContext(), false, 0, 100, opts, NewRng(1))
+	q3 := RandomQualifiersForType(nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 0, 100, opts, NewRng(1))
 	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
 		t.Fatalf("nil type must fail closed empty qfer %+v", q3)
 	}
@@ -385,7 +385,7 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("nil type RandomQualifiersForType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	q4 := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), false, 0, 100, opts, nil)
+	q4 := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 0, 100, opts, nil)
 	if len(q4.IsConsts) != 0 || len(q4.IsVolatiles) != 0 {
 		t.Fatalf("nil rng must fail closed empty qfer %+v", q4)
 	}
@@ -399,7 +399,7 @@ func TestRandomQualifiersSEFreeVolatileAlways(t *testing.T) {
 	opts := Defaults()
 	ty := GetSimpleType(EInt)
 	r := NewRng(2)
-	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), false, 0, 100, opts, r)
+	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 0, 100, opts, r)
 	if !q.IsVolatiles[0] {
 		t.Fatal("SE-free + vol_prob 100 → storage volatile")
 	}
@@ -411,7 +411,7 @@ func TestRandomQualifiersDisallowConstVolatile(t *testing.T) {
 	ty := GetSimpleType(EInt)
 	// Force both flips true with prob 100; const must be cleared when both set.
 	r := NewRng(2)
-	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), false, 100, 100, opts, r)
+	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 100, 100, opts, r)
 	if q.IsVolatiles[0] && q.IsConsts[0] {
 		t.Fatal("allow_const_volatile false → cannot be both")
 	}
@@ -432,7 +432,7 @@ func TestRandomQualifiersPointerLevels(t *testing.T) {
 	}
 	r := NewRng(2)
 	// no_volatile, const_prob 0 → all false; still correct depths
-	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), true, 0, 0, opts, r)
+	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), true, 0, 0, opts, r)
 	if len(q.IsConsts) != 2 || len(q.IsVolatiles) != 2 {
 		t.Fatalf("int* depth want 2, got consts=%v vols=%v", q.IsConsts, q.IsVolatiles)
 	}
@@ -445,7 +445,7 @@ func TestRandomQualifiersPointerDrawOrderSeed2(t *testing.T) {
 	opts := Defaults()
 	ty := PointerTo(GetSimpleType(EInt))
 	r := NewRng(2)
-	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), false, 50, 50, opts, r)
+	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 50, 50, opts, r)
 
 	// Independent replay of flip order
 	r2 := NewRng(2)
@@ -480,7 +480,7 @@ func TestCVQualifiersCloneIsolatesRestrict(t *testing.T) {
 	}
 	// IndirectQualifiers(0) / Clone used by ExpressionVariable get_qualifiers
 	cp := src.IndirectQualifiers(0)
-	cg := WithEffectContext(WithSideEffects()) // non-SE-free → Restrict clears vol
+	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession) // non-SE-free → Restrict clears vol
 	cp.Restrict(AccessWrite, cg)
 	if cp.IsVolatile() {
 		t.Fatal("copy Restrict must clear volatile under non-SE-free")
@@ -571,7 +571,7 @@ func TestRandomLooseQualifiersNilRNGSticky(t *testing.T) {
 	// nil RNG residual soft invent was invent fixed looser qfer shell.
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	out := q.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), Defaults(), NewProbabilities(Defaults()), nil)
+	out := q.RandomLooseQualifiers(false, AccessRead, EmptyCGContext().WithSession(testAmbientSession), Defaults(), NewProbabilities(Defaults()), nil)
 	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatal("nil RNG RandomLooseQualifiers must fail closed empty", out)
 	}
@@ -584,10 +584,10 @@ func TestRandomLooseQualifiersNilRNGSticky(t *testing.T) {
 func TestRandomLooseQualifiersIncompleteEffectSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// incomplete effect context
 	inc := IncompleteEffect()
-	cg = WithEffectContext(inc)
+	cg = WithEffectContext(inc).WithSession(testAmbientSession)
 	out := q.RandomLooseQualifiers(false, AccessRead, cg, Defaults(), NewProbabilities(Defaults()), NewRng(1))
 	if len(out.IsConsts) != 0 {
 		t.Fatal("incomplete ambient RandomLooseQualifiers must fail closed empty", out)

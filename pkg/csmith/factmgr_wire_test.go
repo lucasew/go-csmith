@@ -492,7 +492,7 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtReturn, StmID: 8,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementReturn(st, &cg, Defaults()) {

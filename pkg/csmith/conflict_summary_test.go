@@ -6,7 +6,7 @@ import (
 
 func TestAllowVolatileAndAcceptType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if !cg.AllowVolatile() {
 		t.Fatal("SE-free allows volatile")
 	}
@@ -14,7 +14,7 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 		t.Fatal("complete AllowVolatile must not sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithEffectContext(WithSideEffects())
+	cg2 := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)
 	if cg2.AllowVolatile() {
 		t.Fatal("SE should block")
 	}
@@ -42,7 +42,7 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 		t.Fatal("nil type AcceptType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cgi := WithEffectContext(IncompleteEffect())
+	cgi := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	if cgi.AllowVolatile() {
 		t.Fatal("incomplete ambient must not AllowVolatile")
 	}
@@ -75,21 +75,21 @@ func TestInConflictReadWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	// context already wrote g
-	ctx := WithEffectContext(EmptyEffect().WriteVar(g))
+	ctx := WithEffectContext(EmptyEffect().WriteVar(g)).WithSession(testAmbientSession)
 	// callee reads g
 	eff := EmptyEffect().ReadVar(g)
 	if !ctx.InConflict(eff) {
 		t.Fatal("write then read conflict")
 	}
 	// empty context ok
-	if EmptyCGContext().InConflict(eff) {
+	if EmptyCGContext().WithSession(testAmbientSession).InConflict(eff) {
 		t.Fatal("empty should not conflict on read alone")
 	}
 }
 
 func TestInConflictNoWrite(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	eff := EmptyEffect().WriteVar(g)
 	if !cg.InConflict(eff) {
 		t.Fatal("no_write conflict")
@@ -101,7 +101,7 @@ func TestInConflictNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	eff := EmptyEffect()
 	eff.written = map[*Variable]bool{nil: true}
-	if !EmptyCGContext().InConflict(eff) {
+	if !EmptyCGContext().WithSession(testAmbientSession).InConflict(eff) {
 		t.Fatal("nil write hole must fail closed as conflict")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -110,7 +110,7 @@ func TestInConflictNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	eff2 := EmptyEffect()
 	eff2.read = map[*Variable]bool{nil: true}
-	if !EmptyCGContext().InConflict(eff2) {
+	if !EmptyCGContext().WithSession(testAmbientSession).InConflict(eff2) {
 		t.Fatal("nil read hole must fail closed as conflict")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -122,14 +122,14 @@ func TestInConflictNilHoleFailClosed(t *testing.T) {
 func TestInConflictIncompleteEffectFailClosed(t *testing.T) {
 	// IncompleteEffect / incomplete ambient sticky conflict
 	ClearErrorSess(testAmbientSession)
-	if !EmptyCGContext().InConflict(IncompleteEffect()) {
+	if !EmptyCGContext().WithSession(testAmbientSession).InConflict(IncompleteEffect()) {
 		t.Fatal("IncompleteEffect must fail closed as conflict")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect InConflict must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg := WithEffectContext(IncompleteEffect())
+	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	if !cg.InConflict(EmptyEffect()) {
 		t.Fatal("incomplete ambient must fail closed as conflict")
 	}
@@ -145,7 +145,7 @@ func TestChooseFuncContextSkipsConflict(t *testing.T) {
 	bad.FEffect = EmptyEffect().WriteVar(g)
 	good := &Function{Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// context already wrote g → bad conflicts
-	cg := WithEffectContext(EmptyEffect().WriteVar(g))
+	cg := WithEffectContext(EmptyEffect().WriteVar(g)).WithSession(testAmbientSession)
 	got := ChooseFuncContext(NewRng(2), []*Function{bad, good}, GetIntType(), nil, &cg, Defaults(), nil)
 	if got != good {
 		t.Fatalf("got %v", got)
@@ -385,7 +385,7 @@ func TestIsFrameVar(t *testing.T) {
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if !cg.IsFrameVar(loc) {
 		t.Fatal("local frame")
 	}
@@ -396,7 +396,7 @@ func TestIsFrameVar(t *testing.T) {
 	// CGContext.cpp:494 — no curr_blk: complete not-frame (not invent via call_chain only;
 	// sticky would poison FindReachableFrameVars empty-frame complete path)
 	ClearErrorSess(testAmbientSession)
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.CallChain = []*Block{blk}
 	if cg2.IsFrameVar(loc) {
 		t.Fatal("nil curr_blk must fail closed, not invent via call_chain only")
@@ -408,7 +408,7 @@ func TestIsFrameVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	blkHole := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Stack = []*Block{blkHole}
-	cg3 := WithFunc(f, EmptyEffect())
+	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if cg3.IsFrameVar(loc) {
 		t.Fatal("incomplete stack IsFrameVar must fail closed false")
 	}
@@ -487,7 +487,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 
 func TestNeedNestedLoopIsEffectKnownSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).NeedNestedLoop(EmptyCGContext(), NewRng(1)) {
+	if (*Block)(nil).NeedNestedLoop(EmptyCGContext().WithSession(testAmbientSession), NewRng(1)) {
 		t.Fatal("nil Block NeedNestedLoop must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

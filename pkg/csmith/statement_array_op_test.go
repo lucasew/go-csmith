@@ -36,7 +36,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// Count AllocStmID consumed by multi-dim array-init
 	currentSession().NextStmID = 200
 	before := currentSession().NextStmID

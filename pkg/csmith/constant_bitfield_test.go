@@ -139,12 +139,12 @@ func TestSelectGlobalFlexibleMatchesConvert(t *testing.T) {
 	// create a short global; SelectGlobal for int with Flexible may match if MatchFlexible allows
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	sh := GetSimpleType(EShort)
-	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), sh, &q, NewRng(1))
+	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), sh, &q, NewRng(1))
 	if g == nil {
 		t.Fatal("no global")
 	}
 	// exact would miss int, flexible may convert short→int depending on Match
-	v := vs.SelectGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(2))
+	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(2))
 	// should at least not panic; may create new int global
 	if v == nil {
 		t.Fatal("nil")

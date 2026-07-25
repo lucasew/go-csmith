@@ -125,7 +125,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 		Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
 		FEffect: EmptyEffect(),
 	}
-	cg := WithEffectContext(IncompleteEffect())
+	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	if ChooseFuncContext(NewRng(1), []*Function{good}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
 		t.Fatal("incomplete ambient must fail closed")
@@ -135,7 +135,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete EffectStm / GlobalFacts also sticky
-	cgStm := EmptyCGContext()
+	cgStm := EmptyCGContext().WithSession(testAmbientSession)
 	cgStm.EffectStm = IncompleteEffect()
 	if ChooseFuncContext(NewRng(3), []*Function{good}, GetIntType(), nil, &cgStm, Defaults(), nil) != nil {
 		t.Fatal("incomplete EffectStm must fail closed")
@@ -147,7 +147,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	f := &Function{Name: "caller"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cgFacts := EmptyCGContext().WithFactMgr(fm)
+	cgFacts := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if ChooseFuncContext(NewRng(4), []*Function{good}, GetIntType(), nil, &cgFacts, Defaults(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed")
 	}
@@ -156,7 +156,7 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete ambient still chooses
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, &cg2, Defaults(), nil) != good {
 		t.Fatal("complete ambient must still choose")
 	}
@@ -172,7 +172,7 @@ func TestChooseFuncContextIncompleteFEffectSticky(t *testing.T) {
 		Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
 		FEffect: IncompleteEffect(),
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	if ChooseFuncContext(NewRng(1), []*Function{good, bad}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
 		t.Fatal("incomplete FEffect among candidates must fail closed whole choose")

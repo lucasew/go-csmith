@@ -20,7 +20,7 @@ func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// plant incomplete GlobalFacts before visit — fails early
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := Stmt{
 		Kind: StmtIfElse,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -70,7 +70,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	st.Then = &Block{StmID: 3, Stmts: []Stmt{ret}}
 	st.Else = &Block{StmID: 4, Stmts: []Stmt{}}
 	st.StmID = 1
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	// return path needs CurrentFunc.RV for fact update; visit still runs expr visit
 	// Generation-time stack top is the enclosing make_random block (not if arms);
 	// find_fixed_point does not push arms (Block.cpp:513–568).
@@ -120,7 +120,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 		Then: &Block{StmID: 3, Stmts: []Stmt{ret}},
 		Else: &Block{StmID: 4, Stmts: []Stmt{}},
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = &Function{Name: "f", ReturnType: GetIntType(), RV: rv}
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
@@ -139,7 +139,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 		Then: nil, Else: &Block{StmID: 4},
 	}
-	cg2 := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	if VisitFactsStatementIf(&st2, &cg2, Defaults()) {
 		t.Fatal("nil Then must fail closed")
 	}
@@ -154,7 +154,7 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectStm = IncompleteEffect()
 	// Jump / Label / Expr
 	if VisitFactsStatementJump(&Stmt{Kind: StmtBreak, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}, &cg, Defaults()) {
@@ -220,7 +220,7 @@ func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
 	// Type-nil subject stickies IsPointingToLocals
 	shell := &Variable{Name: "g_shell", Type: nil}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := &Stmt{
 		Kind: StmtReturn, StmID: 1,
 		Expr: &Expression{Term: TermVariable, Var: shell, ExprType: PointerTo(GetIntType())},
@@ -264,7 +264,7 @@ func TestVisitFactsStatementForIV(t *testing.T) {
 		},
 		Then: body,
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// visit should fail because IV write in body
@@ -282,7 +282,7 @@ func TestVisitFactsStatementForRequiresInitStmt(t *testing.T) {
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1},
 		Then: &Block{},
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if VisitFactsStatementFor(&st, &cg, Defaults()) {
@@ -316,7 +316,7 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalars("g_1", GetIntType(), false, false), Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
 	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(2), GetIntType(), lhs, AssignAdd, rhs, nil)
@@ -353,7 +353,7 @@ func TestMakePossibleCompoundAssignGetTypeResidualSticky(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// Lhs Type-nil + Var Type-nil → GetType residual
 	lhs := &Lhs{Var: &Variable{Name: "g_hole"}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
@@ -375,7 +375,7 @@ func TestMakePossibleCompoundAssignNoSafeMathStillCanonizes(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalars("g_1", GetIntType(), false, false), Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(3), GetIntType(), lhs, AssignBitAnd, rhs, nil)
@@ -393,7 +393,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 		{Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple},
 	}}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsBlock(b, &cg, Defaults()) {
@@ -406,7 +406,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	cg2 := EmptyCGContext().WithFactMgr(fm)
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
 	if VisitFactsBlock(b, &cg2, Defaults()) {
@@ -435,7 +435,7 @@ func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 		},
 		Then: body,
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// After empty VisitFactsBlock succeeds, plant incomplete body in and re-check
@@ -465,7 +465,7 @@ func TestVisitFactsStatementForSameContextNoInventInLoop(t *testing.T) {
 		},
 		Then: body,
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Parent not already IN_LOOP (function-level for visit)
@@ -516,7 +516,7 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 		},
 		Then: body,
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// start with different fact
@@ -563,7 +563,7 @@ func TestVisitFactsStatementForMustReturnRestoresPostInit(t *testing.T) {
 		},
 		Then: body,
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
@@ -596,7 +596,7 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 	// break edge into for (post_dest)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 12, PostDest: true}}
 	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointTo(p, c)})
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
@@ -647,7 +647,7 @@ func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 12, PostDest: true}}
 	fm.SetMapFactsOutPair(99, []*FactPointTo{}, []*FactUnion{MakeFactUnion(uv, 1)})
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
@@ -669,7 +669,7 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	asg := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -708,7 +708,7 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	facts := []*FactPointTo{}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if ValidateAndUpdateFacts(nil, &facts, &cg, Defaults(), nil) {
 		t.Fatal("nil st must fail closed")
 	}
@@ -718,7 +718,7 @@ func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtLabel, StmID: 1}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg = EmptyCGContext().WithFactMgr(fm)
+	cg = EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	hole := IncompleteFactSlice()
 	if ValidateAndUpdateFacts(st, &hole, &cg, Defaults(), nil) {
 		t.Fatal("incomplete facts must fail closed")
@@ -741,7 +741,7 @@ func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
 	// StatementArrayOp always has live ctrl_vars; nil Loop/IV sticky
 	// (no invent soft-skip dimension / soft re-pick past holes)
 	ClearErrorSess(testAmbientSession)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if VisitFactsStatementArrayOp(&Stmt{Kind: StmtArrayOp, Then: &Block{}}, &cg, Defaults()) {
 		t.Fatal("nil Loop must fail closed")
 	}
@@ -778,7 +778,7 @@ func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
 	}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 88, DestStmID: 15, PostDest: true}}
 	fm.SetMapFactsOut(88, []*FactPointTo{MakeFactPointTo(p, c)})
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
@@ -808,7 +808,7 @@ func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
 		Else: &Block{StmID: 8, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 9,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, Defaults()) {
@@ -835,7 +835,7 @@ func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
 		Else: &Block{StmID: 13, Func: f, Stmts: []Stmt{}},
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, Defaults()) {
@@ -852,7 +852,7 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	thenB := &Block{StmID: 2, Func: f}
 	elseB := &Block{StmID: 3, Func: f}
@@ -894,7 +894,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 		Lhs:  &Lhs{Var: x, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple}
 	b := &Block{StmID: 50, Func: f, Stmts: []Stmt{bad}}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	w := CreateVariableScalars("g_w", GetIntType(), false, false)
 	pre := EmptyEffect().WriteVar(w)
@@ -919,7 +919,7 @@ func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	b := &Block{StmID: 51, Func: f, Stmts: nil}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -950,7 +950,7 @@ func TestVisitFactsBlockPreservesMapVisitedForShortcut(t *testing.T) {
 	fm.SetMapFactsOut(50, entry)
 	fm.SetMapStmEffect(50, EmptyEffect())
 	fm.GlobalFacts = entry
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -981,7 +981,7 @@ func TestVisitFactsBlockMergesBackEdgesWhenVisited(t *testing.T) {
 	// with map_visited, merge runs then full/shortcut path.
 	fm.SetMapFactsIn(50, []*FactPointTo{})
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(ptr, loc)}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

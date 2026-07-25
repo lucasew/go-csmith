@@ -16,7 +16,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	tab.Add(100, int(StmtAssign))
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// StatementAssign.cpp:127 assert(fm) — assign needs FactMgr
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
 	eff := EmptyEffect()
@@ -43,7 +43,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	}
 	// volatile write clears SE-free
 	eff2 := EmptyEffect()
-	cg2 := WithFunc(f, EmptyEffect())
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg2.EffectAccum = &eff2
 	vv := CreateVariableQfer("g_v", GetIntType(), NewCVQualifiers([]bool{false}, []bool{true}))
 	cg2.NoteWrite(vv)
@@ -127,7 +127,7 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 	tables := NewExprTables(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
-	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	cg.Types = env
 	e := MakeExpressionComma(NewRng(3), opts, probs, vs, tables, &cg, GetIntType(), nil)
 	if e == nil || e.Term != TermCommaExpr {
@@ -142,7 +142,7 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 	// WriteVar residual soft invent was invent soft-complete NoteWrite past Type-nil IsVolatile residual.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), FEffect: EmptyEffect()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Type-nil Variable IsVolatile residual on WriteVar path
@@ -155,7 +155,7 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 	// Type-nil IsVolatile: Variable.IsVolatile uses Qfer only - no Type residual
 	// Use incomplete EffectAccum residual path
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(f, EmptyEffect())
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	inc := IncompleteEffect()
 	cg2.EffectAccum = &inc
 	cg2.NoteWrite(CreateVariableScalars("g_y", GetIntType(), false, false))
@@ -167,7 +167,7 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 
 func TestNoteWriteNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.NoteWrite(nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoteWrite must SetError sticky")
@@ -180,7 +180,7 @@ func TestNoteWriteNilSticky(t *testing.T) {
 func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.EffectStm = EmptyEffect()
@@ -208,7 +208,7 @@ func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 func TestReadVarGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-complete read past Type-nil array field shell.
 	ClearErrorSess(testAmbientSession)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// IsArray without AsArray GetCollective residual
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	cg.ReadVar(shell)
@@ -221,7 +221,7 @@ func TestReadVarGetCollectiveResidualSticky(t *testing.T) {
 func TestWriteVarIsNonWritableResidualSticky(t *testing.T) {
 	// IsNonWritable residual soft invent was invent soft-complete write past incomplete NoWriteVars.
 	ClearErrorSess(testAmbientSession)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.RW = &RWDirective{NoWriteVars: []*Variable{nil}}
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	cg.WriteVar(v)
@@ -234,7 +234,7 @@ func TestWriteVarIsNonWritableResidualSticky(t *testing.T) {
 func TestFindVariableScopeIsGlobalResidualSticky(t *testing.T) {
 	// IsGlobal residual soft invent was invent global-scope past nil Variable already sticky.
 	ClearErrorSess(testAmbientSession)
-	if EmptyCGContext().FindVariableScope(nil) != ScopeInactive {
+	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(nil) != ScopeInactive {
 		t.Fatal("nil FindVariableScope must fail closed ScopeInactive")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -243,7 +243,7 @@ func TestFindVariableScopeIsGlobalResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete global
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
-	if EmptyCGContext().FindVariableScope(v) != ScopeGlobalVar {
+	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(v) != ScopeGlobalVar {
 		t.Fatal("global FindVariableScope")
 	}
 	if HasErrorSess(testAmbientSession) {

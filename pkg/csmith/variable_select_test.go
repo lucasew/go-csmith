@@ -64,7 +64,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// many draws with empty params: never ParentParam
 	for seed := uint64(1); seed < 80; seed++ {
 		sc := VariableSelectionProbabilityCG(NewRng(seed), opts, &cg, MaxVarScope)
@@ -96,7 +96,7 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType(), Param: IncompleteVariables()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if sc := VariableSelectionProbabilityCG(NewRng(1), opts, &cg, MaxVarScope); sc != MaxVarScope {
 		t.Fatalf("incomplete Param must fail closed MAX, got %v", sc)
 	}
@@ -117,7 +117,7 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	f.Body = blk
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	v := vs.Select(AccessRead, cg, GetIntType(), &q, r, MatchFlexible)
 	if v == nil {
@@ -180,7 +180,7 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// force some arrays via select
 	for seed := uint64(1); seed < 30; seed++ {
 		st := MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)

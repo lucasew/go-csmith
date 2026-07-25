@@ -11,7 +11,7 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	fi := BuildInvocationAndFunction(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, nil, nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil return type must fail without soft invent")
@@ -28,7 +28,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	opts := Defaults()
 	callee := &Function{Name: "func_x", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list := &FunctionList{Funcs: []*Function{callee}}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	fi := BuildUserInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil RNG must fail closed user invoke")
@@ -89,13 +89,13 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	list := &FunctionList{}
 	// seed globals for args / body
 	for i := 0; i < 3; i++ {
-		_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(uint64(10+i)))
+		_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(uint64(10+i)))
 	}
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Funcs = list
 	list.Funcs = []*Function{caller}
 
@@ -142,7 +142,7 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	cgSeed := EmptyCGContext()
+	cgSeed := EmptyCGContext().WithSession(testAmbientSession)
 	g := vs.GenerateNewGlobal(AccessRead, cgSeed, GetIntType(), nil, NewRng(1))
 	if g == nil {
 		t.Fatal("need int global")
@@ -164,7 +164,7 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 		caller := &Function{Name: "func_1"}
 		blk := &Block{Func: caller}
 		caller.Stack = []*Block{blk}
-		cg := WithFunc(caller, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
+		cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 		fi = BuildUserInvocation(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 		if fi != nil && !fi.Failed && len(fi.Args) == 2 {
 			break
@@ -197,7 +197,7 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 		IsBuilt:    true,
 	}
 	caller := &Function{Name: "func_1"}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	// nil vs forces ExpressionVariable fail regardless of term choice
 	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), nil, NewExprTables(opts), &cg, nil, callee)
 	if fi == nil || !fi.Failed {
@@ -219,14 +219,14 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	opts.MaxFuncs = 10
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	f := MakeRandomSignature(NewRng(1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, list)
 	if f == nil {
 		t.Fatal("signature", HasErrorSess(testAmbientSession))
 	}
 	// same-package clear paired FM (signature always pairs; strip for fail-closed path)
 	f.factMgr = nil
-	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext())
+	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil {
 		t.Fatal("nil paired FM must fail closed body")
 	}
@@ -236,7 +236,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// BuildInvocationAndFunction incomplete ambient: Failed sticky before body hand-over
 	inc := IncompleteEffect()
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectAccum = &inc
 	fi := BuildInvocationAndFunction(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntType(), nil)
 	if fi == nil || !fi.Failed {
@@ -292,7 +292,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	}
 	caller := &Function{Name: "func_1"}
 	list := &FunctionList{Funcs: []*Function{caller, callee}}
-	cg := WithFunc(caller, EmptyEffect()).WithFuncList(list)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list)
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg = cg.WithFactMgr(fm)
 	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
@@ -317,7 +317,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	list2 := &FunctionList{Funcs: []*Function{caller2, callee2}}
 	fm2 := NewFactMgrSess(testAmbientSession, caller2)
 	fm2.GlobalFacts = IncompleteFactSlice()
-	cg2 := WithFunc(caller2, EmptyEffect()).WithFuncList(list2).WithFactMgr(fm2)
+	cg2 := WithFunc(caller2, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list2).WithFactMgr(fm2)
 	fi2 := BuildUserInvocation(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, list2, callee2)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("incomplete GlobalFacts must fail closed BuildUserInvocation")
@@ -356,7 +356,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	inner.Func = caller
 	list := &FunctionList{Funcs: []*Function{caller}}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	cg := WithFunc(caller, EmptyEffect()).WithFuncList(list).WithFactMgr(fm)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(fm)
 	// Stale curr_blk from prior ValidateAndUpdateFacts on outer statement parent
 	cg.CurrBlk = outer
 	if cg.CurrentBlock() != inner {
@@ -434,7 +434,7 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 	caller := &Function{Name: "func_11", ReturnType: GetIntType()}
 	list := &FunctionList{Funcs: []*Function{caller, callee}}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	cg := WithFunc(caller, EmptyEffect()).WithFuncList(list).WithFactMgr(fm)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(fm)
 	// Simulate ExpressionAssign: CurrRHS set while building invocation as RHS of assign.
 	rhsDummy := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false), ExprType: GetIntType()}
 	cg.CurrRHS = rhsDummy
@@ -470,7 +470,7 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	// plant incomplete ambient on caller before build
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	list.Funcs = []*Function{caller}
-	cg := WithFunc(caller, IncompleteEffect()).WithFuncList(list)
+	cg := WithFunc(caller, IncompleteEffect()).WithSession(testAmbientSession).WithFuncList(list)
 	cg.Types = vs.Types
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg = cg.WithFactMgr(fm)
@@ -515,7 +515,7 @@ func TestGetFirstFunction(t *testing.T) {
 func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	callee := &Function{
 		Name:       "func_2",
 		ReturnType: GetIntType(),
@@ -529,7 +529,7 @@ func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	accum := EmptyEffect()
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &accum
 	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
 	if fi.Failed {
@@ -547,7 +547,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(opts)
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	// callee that needs revisit
 	callee := &Function{
 		Name:        "func_2",
@@ -567,7 +567,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Funcs = list
 	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
 	if fi == nil {
@@ -599,7 +599,7 @@ func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
 	caller := first
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, first)
 	if fi.Failed {
 		t.Fatalf("first should not fail revisit err=%v", HasErrorSess(testAmbientSession))

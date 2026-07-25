@@ -18,7 +18,7 @@ func TestAccessOnceMarking(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRng(seed)
-		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, r)
+		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
 		if v != nil && v.IsAccessOnce {
 			found = true
 			if !strings.Contains(v.OutputC(), "ACCESS_ONCE") {
@@ -68,7 +68,7 @@ func TestForSafeIncrEmit(t *testing.T) {
 	// StatementFor.cpp:172 assert(blk) — parent on stack after MakeFirst
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	st := MakeRandomFor(NewRng(5), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Loop == nil {
 		t.Skip("no for")

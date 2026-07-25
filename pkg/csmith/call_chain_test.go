@@ -20,7 +20,7 @@ func TestExtendCallChain(t *testing.T) {
 	b1 := &Block{Func: f}
 	b2 := &Block{Func: f, Parent: b1}
 	f.Stack = []*Block{b1, b2}
-	from := WithFunc(f, EmptyEffect())
+	from := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	from.CallChain = []*Block{b1}
 	var to CGContext
 	to.ExtendCallChain(from)
@@ -43,7 +43,7 @@ func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
 	caller.Stack = []*Block{callerBlk}
 
 	// Fair: prev is still the caller when ExtendCallChain runs (generateBodyCore order).
-	prev := WithFunc(caller, EmptyEffect())
+	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	prev.CallChain = nil
 	body := prev
 	body.CurrentFunc = callee // only the body context switches
@@ -53,7 +53,7 @@ func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
 	}
 
 	// Unfair pre-switch: prev.CurrentFunc already callee → empty stack → missing frame.
-	prevBad := WithFunc(caller, EmptyEffect())
+	prevBad := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	prevBad.CurrentFunc = callee
 	prevBad.CallChain = nil
 	var bodyBad CGContext
@@ -75,7 +75,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
 	fi := BuildInvocationAndFunction(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 	if fi == nil || fi.Failed || fi.User == nil {
@@ -98,7 +98,7 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	callee.FEffect = EmptyEffect().WriteVar(g)
 	caller := &Function{Name: "a", ReturnType: GetIntType()}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	_ = BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)

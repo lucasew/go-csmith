@@ -29,7 +29,7 @@ func TestVisitFactsStatementAssignSimple(t *testing.T) {
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
 	st := Stmt{Kind: StmtAssign, LhsVar: v, Lhs: lhs, Expr: rhs, AssignOp: AssignSimple}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementAssign(&st, &cg, Defaults()) {
 		t.Fatal("visit")
@@ -46,7 +46,7 @@ func TestVisitFactsStatementAssignNoWriteToIV(t *testing.T) {
 		Kind: StmtAssign, LhsVar: iv, Lhs: lhs,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 10)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -65,7 +65,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	// RHS make_random may pick comma (type nullptr) — needs Type env
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// seed a global
-	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	if g == nil {
 		t.Fatal("global")
 	}
@@ -73,7 +73,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
 	cg.ExprDepth = 0
@@ -82,7 +82,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+		cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
 		st = MakeRandomAssign(NewRng(seed), opts, probs, vs, tables, &cg2, GetIntType())
@@ -124,7 +124,7 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 		CommaRHS: &Expression{Term: TermVariable, Var: b, ExprType: GetIntType()},
 	}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	if !VisitFactsExpression(e, &cg, Defaults()) {
 		t.Fatal("comma")
@@ -201,7 +201,7 @@ func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
 	if st.Lhs.IndirectLevel() != 1 {
 		t.Fatalf("indir %d", st.Lhs.IndirectLevel())
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// visit may fail write checks; update is covered above; soft-check visit
@@ -217,7 +217,7 @@ func TestVisitFactsStatementAssignWriteVarSet(t *testing.T) {
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd,
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// seed lhs_write_vars on effect via a visit that sets them — simple path
@@ -237,14 +237,14 @@ func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
-	cg := WithEffectContext(IncompleteEffect())
+	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if VisitFactsStatementAssign(st, &cg, Defaults()) {
 		t.Fatal("incomplete EffectContext must fail closed assign visit")
 	}
 	// incomplete parent EffectAccum after merge
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	inc := IncompleteEffect()
 	cg2.EffectAccum = &inc
 	if VisitFactsStatementAssign(st, &cg2, Defaults()) {
@@ -267,7 +267,7 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	// plant incomplete EffectStm so RHS path leaves residual before WriteVarSet fold
 	// (incomplete EffectContext fails earlier — use complete context + incomplete rhs via
 	// compound path: seed rhsAccum-like incomplete by incomplete EffectStm after merge gate)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// incomplete EffectStm fails closed before LhsWriteVars — still residual invent class
@@ -284,7 +284,7 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	// via running EffectContext incomplete after RHS succeeds is hard; unit WriteVarSet already
 	// covered in effect_test — here assert assign visit remains sticky under incomplete Accum
 	// after MergeParamContext would re-check EffectComplete.
-	cg3 := EmptyCGContext()
+	cg3 := EmptyCGContext().WithSession(testAmbientSession)
 	inc3 := IncompleteEffect()
 	cg3.EffectAccum = &inc3
 	if VisitFactsStatementAssign(st, &cg3, Defaults()) {
@@ -313,7 +313,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	// Nested stack frame that is NOT the statement parent
 	inner := &Block{Func: caller, Parent: callerBlk, StmID: AllocStmID()}
 	caller.Stack = []*Block{callerBlk, inner}
-	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	cg.CurrBlk = callerBlk // statement parent (stm_visit_facts)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -353,7 +353,7 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	blk := &Block{Func: f, LocalVars: []*Variable{ptr}}
 	f.Stack = []*Block{blk}
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	lhs := &Lhs{Var: ptr, Type: GetIntType(), CompoundAssign: false}
 	ClearErrorSess(testAmbientSession)
@@ -393,7 +393,7 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	}
 	// force pointer assign facts path: assign p = &g_x would change null→g_x if update ran
 	before := CloneFactSlice(fm.GlobalFacts)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.FM = fm
 	cg.CurrentFunc = fm.Func
 	st := MakeRandomAssign(r, opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil)
@@ -432,7 +432,7 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 		MakeFactPointTo(mid, pointee),
 	}
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// Parent EffectStm pretends a sibling already wrote the intermediate pointer.
 	// If visit inherited this into rhs/lhs EffectStm, PtrModifiedInRhs would reject **p=.

@@ -14,13 +14,13 @@ func TestBuildStateTransitions(t *testing.T) {
 	if f.BuildState != BuildUnbuilt || f.IsEffectKnown() {
 		t.Fatal("unbuilt")
 	}
-	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()))
+	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
 	if f.BuildState != BuildBuilt || !f.IsBuilt || !f.IsEffectKnown() {
 		t.Fatalf("built %v", f.BuildState)
 	}
 	// regenerate ignored
 	body := f.Body
-	f.GenerateBody(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()))
+	f.GenerateBody(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
 	if f.Body != body {
 		t.Fatal("regen")
 	}
@@ -37,7 +37,7 @@ func TestPointerParamTBD(t *testing.T) {
 	f.Param = []*Variable{p}
 	// pair FactMgr at create (Function.cpp FMList); pass same via CGContext
 	fm := f.ensurePairedFactMgr()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
 	// after build, may still have fact (or oos); at least was added during building
 	// regenerate blocked so check via second function
@@ -120,7 +120,7 @@ func TestGenerateBodyIncompleteAmbientResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildUnbuilt}
-	prev := EmptyCGContext()
+	prev := EmptyCGContext().WithSession(testAmbientSession)
 	prev.EffectStm = IncompleteEffect()
 	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if f.BuildState != BuildUnbuilt {

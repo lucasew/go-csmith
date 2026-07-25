@@ -35,7 +35,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	av.Sizes = []int{8}
 	av.ArraySizes = []int{8}
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	// scan seeds for offset form
 	foundOff := false
@@ -81,7 +81,7 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 	}
 	av.AsArray = av
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: InvalidIVBound}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("invalid bound must not itemize")
@@ -99,7 +99,7 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	}
 	av.AsArray = av
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{nil: 0, iv: 0}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("nil IVBounds key must fail closed whole itemize")
@@ -121,7 +121,7 @@ func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 	av.AsArray = av
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
@@ -144,7 +144,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	}
 	av.AsArray = av
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("Type-nil array must fail closed ItemizeArray")
@@ -160,7 +160,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	}
 	av2.AsArray = av2
 	ivHole := &Variable{Name: "j", Type: nil}
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.IVBounds = map[*Variable]int{ivHole: 0}
 	if vs.ItemizeArray(NewRng(1), cg2, av2) != nil {
 		t.Fatal("Type-nil IV must fail closed ItemizeArray")
@@ -183,7 +183,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 	av.AsArray = av
 	// visible via GlobalList (C++ find_all_visible_vars); not Arrays invent list
 	vs.GlobalList = []*Variable{&av.Variable}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if vs.SelectArray(NewRng(1), cg) != nil {
 		t.Fatal("Type-nil SelectArray must fail closed")
 	}
@@ -201,7 +201,7 @@ func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable}
 	// mark partially written → filtered → CreateRandomArray may still run
 	eff := EmptyEffect().WriteVar(&av.Variable)
-	cg := WithEffectContext(eff)
+	cg := WithEffectContext(eff).WithSession(testAmbientSession)
 	// disable global create by turning off globals? CreateRandomArray uses globals
 	// ensure filter drops av: if CreateRandomArray returns different name ok
 	got := vs.SelectArray(NewRng(3), cg)
@@ -225,7 +225,7 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	vs.Arrays = []*ArrayVariable{av, av2}
 	vs.GlobalList = []*Variable{&av.Variable, &av2.Variable}
 	// incomplete NoWriteVars hole stickies IsNonWritable residual during filter of av
-	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
 	if vs.SelectArray(NewRng(3), cg) != nil {
 		t.Fatal("IsNonWritable residual must fail closed SelectArray")
 	}
@@ -235,7 +235,7 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsSideEffectFree residual soft invent was soft-continue keep/filter invent pick.
 	// Fair: sticky fail closed whole SelectArray (EffectComplete gate + sefree residual).
-	cg2 := WithEffectContext(IncompleteEffect())
+	cg2 := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	if vs.SelectArray(NewRng(3), cg2) != nil {
 		t.Fatal("IsSideEffectFree residual must fail closed SelectArray")
 	}
@@ -270,7 +270,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	blk := &Block{Func: f, LocalVars: []*Variable{fieldIV, goodIV}}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// force SelectArray to pick av; force IV pool to hit field first via only field+good
 	// SelectLoopCtrlVar uses FindAllNonArrayVisibleVars — both fieldIV and goodIV present
 	// CComp packed: field with Type-nil parent stickies residual on first filter hit

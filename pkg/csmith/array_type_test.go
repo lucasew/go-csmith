@@ -17,7 +17,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 		f := &Function{Name: "func_1", ReturnType: GetIntType()}
 		blk := &Block{Func: f}
 		f.Stack = []*Block{blk}
-		cg := WithFunc(f, EmptyEffect())
+		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 		av := vs.CreateRandomArray(NewRng(seed), cg)
 		if av == nil || av.Type == nil {
 			continue
@@ -118,7 +118,7 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed meta so AddNewVarFact creates point-to when pointer; int array still registers
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Types = env
 	// force global path: seed 25% — try several
 	var av *ArrayVariable
@@ -450,7 +450,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewGlobal")
 	}
@@ -461,7 +461,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// NonArray path same
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntType(), nil, NewRng(2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewNonArrayGlobal")
 	}
@@ -474,7 +474,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
-	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm3)
+	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm3)
 	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewParentLocal")
 	}
@@ -495,7 +495,7 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st, GetIntType()}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// non-SE-free context
-	cg := WithFunc(f, EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), true, false)))
+	cg := WithFunc(f, EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), true, false))).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	// VariableSelector.cpp — no soft invent int elem; nil OK when AcceptType rejects
 	av := vs.CreateRandomArray(NewRng(3), cg)
@@ -510,7 +510,7 @@ func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.Stack = []*Block{nil}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	if vs.CreateRandomArray(NewRng(1), cg) != nil {
 		t.Fatal("incomplete Stack must fail closed CreateRandomArray")
@@ -538,7 +538,7 @@ func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
 	// only broken type so Choose always hits residual IsConstStructUnion
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	// flipcoin(25) gates global create — scan seeds until residual sticky lands
 	sawSticky := false

@@ -38,7 +38,7 @@ func TestVolLValLhs(t *testing.T) {
 }
 
 func TestCGContextFlags(t *testing.T) {
-	c := EmptyCGContext().WithFlags(FlagInLoop | FlagNoDanglingPtr)
+	c := EmptyCGContext().WithSession(testAmbientSession).WithFlags(FlagInLoop | FlagNoDanglingPtr)
 	if !c.InLoop() || !c.NoDanglingPtr() {
 		t.Fatal(c.Flags)
 	}

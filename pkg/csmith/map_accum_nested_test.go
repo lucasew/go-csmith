@@ -32,7 +32,7 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{}
 
 	live := EmptyEffect().ReadVar(g1).ReadVar(g2).ReadVar(g3)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &live
 	cg.EffectStm = EmptyEffect()
 
@@ -77,7 +77,7 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	fm.MapUnionFactsOut = map[int][]*FactUnion{}
 
 	live := EmptyEffect().ReadVar(g1).ReadVar(g2)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &live
 	cg.EffectStm = EmptyEffect()
 

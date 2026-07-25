@@ -41,7 +41,7 @@ func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
 	// create_random_array uses Type env (C++ GenerateSimpleTypes always live)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	r := NewRng(2)
-	av := vs.SelectArray(r, EmptyCGContext())
+	av := vs.SelectArray(r, EmptyCGContext().WithSession(testAmbientSession))
 	if av == nil || len(vs.Arrays) < 1 {
 		t.Fatal(av)
 	}
@@ -59,7 +59,7 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 		t.Fatal("create")
 	}
 	// CreateArrayVariable(blk=nil) registers GlobalList when vs non-nil
-	got := vs.SelectArray(NewRng(3), EmptyCGContext())
+	got := vs.SelectArray(NewRng(3), EmptyCGContext().WithSession(testAmbientSession))
 	if got != a && got != b {
 		t.Fatal(got)
 	}
@@ -77,7 +77,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	// StatementFor.cpp:172 assert(blk) — parent on stack for array_loop → for
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
@@ -142,7 +142,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// force array_init path by calling MakeRandomArrayInit directly
 	st := MakeRandomArrayInit(NewRng(9), opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtArrayOp || st.Loop == nil {
@@ -185,7 +185,7 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{nil}
-	if vs.SelectArray(NewRng(1), EmptyCGContext()) != nil {
+	if vs.SelectArray(NewRng(1), EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("visible list hole must fail closed SelectArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -195,7 +195,7 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	// IsArray without AsArray is incomplete IR — fail closed sticky
 	broken := &Variable{Name: "g_broken", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	vs.GlobalList = []*Variable{broken}
-	if vs.SelectArray(NewRng(3), EmptyCGContext()) != nil {
+	if vs.SelectArray(NewRng(3), EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("IsArray without AsArray must fail closed SelectArray")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -204,7 +204,7 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete ambient fails closed sticky before filters
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	if vs.SelectArray(NewRng(3), cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed SelectArray")
@@ -215,7 +215,7 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg2 := EmptyCGContext().WithFactMgr(fm)
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if vs.SelectArray(NewRng(4), cg2) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed SelectArray")
 	}
@@ -242,7 +242,7 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	// GlobalList empty → must not pick orphan; create_random_array draws flipcoin(25)
 	r := NewRng(7)
 	d0 := r.RandDepth()
-	got := vs.SelectArray(r, EmptyCGContext())
+	got := vs.SelectArray(r, EmptyCGContext().WithSession(testAmbientSession))
 	if got == orphan {
 		t.Fatal("must not invent select from vs.Arrays without visibility")
 	}

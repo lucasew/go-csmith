@@ -64,7 +64,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
@@ -90,7 +90,7 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	// C++ always builds SafeOpFlags; Output must not emit safe_* when SafeMath off.
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	fi := MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &cg, GetIntType())
 	if fi == nil {
 		t.Fatal("nil inv")

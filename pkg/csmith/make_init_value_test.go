@@ -11,11 +11,11 @@ func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	e := vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), &q, nil, NewRng(1))
+	e := vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, nil, NewRng(1))
 	if e == nil || e.Term != TermConstant || e.Con == nil {
 		t.Fatalf("want constant, got %#v", e)
 	}
-	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
+	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil qfer must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -41,7 +41,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	// seed scan until we get ExpressionVariable &path (not constant 20% path)
 	var e *Expression
 	for seed := uint64(1); seed < 80; seed++ {
-		e = vs.MakeInitValue(AccessRead, EmptyCGContext(), pt, &qPtr, nil, NewRng(seed))
+		e = vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), pt, &qPtr, nil, NewRng(seed))
 		if e != nil && e.Term == TermVariable && e.Var != nil {
 			break
 		}
@@ -106,7 +106,7 @@ func TestGenerateNewNonArrayGlobal(t *testing.T) {
 		_ = vs.Probs
 	}
 	f := &Function{Name: "f"}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// many seeds: never array
 	for seed := uint64(1); seed < 30; seed++ {
 		v := vs.GenerateNewNonArrayGlobal(AccessRead, cg, GetIntType(), nil, NewRng(seed))
@@ -167,7 +167,7 @@ func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	v := vs.GenerateNewParentLocal(blk, AccessWrite, cg, GetIntType(), nil, NewRng(4))
 	if v == nil || (v.Init == nil && v.InitExpr == nil) {
 		t.Fatal("expected init")
@@ -182,7 +182,7 @@ func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()), GetIntType(), q, nil, "l_x", NewRng(1)) != nil {
+	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), q, nil, "l_x", NewRng(1)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed createAndInitialize")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -202,7 +202,7 @@ func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 	for seed := uint64(1); seed < 100; seed++ {
 		// fresh selector each time to avoid polluted state
 		vs2 := NewVariableSelector(opts)
-		e := vs2.MakeInitValue(AccessRead, EmptyCGContext(), pt, &q, nil, NewRng(seed))
+		e := vs2.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), pt, &q, nil, NewRng(seed))
 		if e != nil && e.Term == TermVariable {
 			found = true
 			if len(vs2.GlobalList) == 0 && e.Var == nil {
@@ -216,7 +216,7 @@ func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 		}
 	}
 	// either constant (20%) or var expr — at least something non-nil
-	e := vs.MakeInitValue(AccessRead, EmptyCGContext(), pt, &q, nil, NewRng(7))
+	e := vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), pt, &q, nil, NewRng(7))
 	if e == nil {
 		t.Fatal("nil init")
 	}

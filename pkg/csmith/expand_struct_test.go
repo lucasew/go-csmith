@@ -17,7 +17,7 @@ func TestEagerCreateGlobalStruct(t *testing.T) {
 	}
 	// want int — eager create struct then field match
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(5), MatchFlexible)
+	v := vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(5), MatchFlexible)
 	// may fail if no int fields
 	if v != nil && v.Type != nil {
 		if !GetIntType().Match(v.Type, MatchFlexible) {
@@ -38,7 +38,7 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// empty GlobalList → expand or create
-	v := vs.SelectGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(7))
+	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(7))
 	if v == nil {
 		t.Fatal("nil")
 	}
@@ -176,7 +176,7 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	blk := &Block{}
 	f.Stack = []*Block{blk}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(9), MatchFlexible)
+	v := vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRng(9), MatchFlexible)
 	if len(blk.LocalVars) == 0 {
 		t.Fatal("no local created")
 	}
@@ -198,14 +198,14 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	vs.Probs = probs
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()), GetIntType(), &q, NewRng(5), MatchFlexible) != nil {
+	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRng(5), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateGlobalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(5), MatchFlexible, IncompleteVariables()) != nil {
+	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(5), MatchFlexible, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed EagerCreateGlobalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -215,14 +215,14 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
-	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, IncompleteEffect()), GetIntType(), &q, NewRng(9), MatchFlexible) != nil {
+	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRng(9), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateLocalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext local must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(9), MatchFlexible, IncompleteVariables()) != nil {
+	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRng(9), MatchFlexible, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed EagerCreateLocalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -245,7 +245,7 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 	blk := &Block{}
 	f.Stack = []*Block{blk}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	v := vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRng(11), MatchFlexible)
 	if v == nil {
 		t.Fatal("nil")
@@ -261,7 +261,7 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// empty stack → fail closed (no soft invent param/global)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRng(1), MatchFlexible) != nil {
 		t.Fatal("empty stack must not invent parent local")
 	}

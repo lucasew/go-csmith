@@ -45,7 +45,7 @@ func TestExpandBlockForGotoClimbsParent(t *testing.T) {
 
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 
 	got := ExpandBlockForGoto(inner, cg)
 	if got != outer {
@@ -60,12 +60,12 @@ func TestExpandBlockForGotoClimbsParent(t *testing.T) {
 
 func TestExpandBlockForGotoNilFM(t *testing.T) {
 	b := &Block{}
-	if ExpandBlockForGoto(b, EmptyCGContext()) != b {
+	if ExpandBlockForGoto(b, EmptyCGContext().WithSession(testAmbientSession)) != b {
 		t.Fatal("no-op without FM")
 	}
 	// Block always live; sticky no invent soft-skip expand past hole
 	ClearErrorSess(testAmbientSession)
-	if ExpandBlockForGoto(nil, EmptyCGContext()) != nil {
+	if ExpandBlockForGoto(nil, EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("nil ExpandBlockForGoto must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -86,7 +86,7 @@ func TestExpandBlockForGotoAssertB(t *testing.T) {
 	f.Blocks = []*Block{outer}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	got := ExpandBlockForGoto(thenB, cg)
 	if got != outer {
 		t.Fatalf("climb must reach outer for sibling goto: got %#v sticky=%v", got, HasErrorSess(testAmbientSession))
@@ -105,7 +105,7 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	f.Blocks = []*Block{outer}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{nil, {SrcID: 20, DestStmID: 10}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if ExpandBlockForGoto(inner, cg) != nil {
 		t.Fatal("nil CFG hole must fail closed")
 	}
@@ -133,7 +133,7 @@ func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 	f.Blocks = []*Block{outer}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if ExpandBlockForGoto(inner, cg) != nil {
 		t.Fatal("FindStmt residual must fail closed ExpandBlockForGoto, not invent later climb")
 	}
@@ -165,7 +165,7 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	f.Blocks = []*Block{body, parent, thenArm}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 324, DestStmID: 323, DestBlock: thenArm, BackLink: false}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 
 	// contains_stmt: dest under thenArm via parent chain (not root tree alone)
 	if !BlockContainsStmID(thenArm, 323) {
@@ -214,7 +214,7 @@ func TestExpandBlockForGotoSkipsOrphanGotoEdges(t *testing.T) {
 	f.Blocks = []*Block{body, orphan}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 210, DestStmID: 153}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// Without orphan skip, climb from body for src=210 fails (src not in live tree).
 	got := ExpandBlockForGoto(body, cg)
 	if got != body {
@@ -291,7 +291,7 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: srcID, DestStmID: dest.StmID}}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 
 	beforeOuter := len(outer.LocalVars)
 	beforeInner := len(inner.LocalVars)
@@ -328,7 +328,7 @@ func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	beforeG := len(vs.GlobalList)
 	v := vs.GenerateNewParentLocal(blk, AccessRead, cg, st, nil, NewRng(1))
 	if v == nil {

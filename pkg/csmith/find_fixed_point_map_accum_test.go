@@ -54,7 +54,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	fm.MapVisited[b.StmID] = true
 	// No self-back: first walk only; entryAccum reset still applies before walk.
 
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	// Entry accum: only early (block pre_effect).
 	pre := EmptyEffect().ReadVar(early)
 	// Simulate dirty live accum from a prior full body walk.

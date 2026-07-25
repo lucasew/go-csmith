@@ -34,9 +34,9 @@ func TestMakeRandomAssignAllocatesStmID(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	for seed := uint64(1); seed < 40; seed++ {
-		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		st := MakeRandomAssign(NewRng(seed), opts, probs, vs, NewExprTables(opts), &c, GetIntType())
 		if !stmtOK(st) {
 			continue
@@ -56,12 +56,12 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	tables := NewExprTables(opts)
 	// seed globals for selection
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	foundCompound := false
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRng(seed)
 		st := func() Stmt {
-			c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+			c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 			return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType())
 		}()
 		// StmtAssign is iota 0 — empty nullptr and success share Kind; use stmtOK
@@ -116,11 +116,11 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	// seed a volatile global so volatile qfer can select
 	vq := NewCVQualifiers([]bool{false}, []bool{true})
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), &vq, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &vq, NewRng(1))
 	// volatile-only WRITE qfer
 	q := NewCVQualifiers([]bool{false}, []bool{true})
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// should not panic; may fail to find var and return empty assign
 	st := MakeRandomAssignQfer(NewRng(3), opts, probs, vs, NewExprTables(opts), &cg, GetIntType(), &q)
 	// global option restored conceptually (opts is by-value); package default unchanged
@@ -185,7 +185,7 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()) // no FM
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession) // no FM
 	st := MakeRandomGoto(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("goto without FM invent %#v", st)
@@ -202,7 +202,7 @@ func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 	// SafeAssign path uses dummy flags; LhsAsExpression(nil Lhs.Var) fails sticky
 	lhs := &Lhs{Var: nil}
 	st := makePossibleCompoundAssign(
-		EmptyCGContext(),
+		EmptyCGContext().WithSession(testAmbientSession),
 		opts,
 		NewProbabilities(opts),
 		NewRng(1),
@@ -306,7 +306,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// Incomplete Expression type triggers GetType residual under StrictFloat.
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// Force early return after exact set: MakeRandomAssignQfer with qf non-nil,
 	// StrictFloat, and an RHS path is after RHS is built — use incomplete type
 	// after setting by calling with void-ish via force op path.
@@ -347,7 +347,7 @@ func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 		t.Fatal("want AcceptStricter")
 	}
 	// Lhs Select path: Restrict WRITE clears const
-	qfer.Restrict(AccessWrite, EmptyCGContext())
+	qfer.Restrict(AccessWrite, EmptyCGContext().WithSession(testAmbientSession))
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}

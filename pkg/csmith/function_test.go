@@ -50,7 +50,7 @@ func TestMakeRandomSignatureParams(t *testing.T) {
 	// For 1:1 naming, share one GenSym for both
 	sym := &vs.Sym
 	r := NewRng(2)
-	f := MakeRandomSignature(r, opts, probs, vs, sym, EmptyCGContext(), GetSimpleType(EInt), nil, nil)
+	f := MakeRandomSignature(r, opts, probs, vs, sym, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), nil, nil)
 	if f == nil || !strings.HasPrefix(f.Name, "func_") {
 		t.Fatalf("name %+v", f)
 	}
@@ -178,7 +178,7 @@ func TestMakeRandomSignatureERRORGuard(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	f := MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, EmptyCGContext(), GetIntType(), nil, nil)
+	f := MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
 	if f != nil {
 		t.Fatal("sticky error must fail closed")
 	}
@@ -192,7 +192,7 @@ func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if MakeRandomSignature(nil, opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("nil RNG must not invent signature")
 	}
@@ -227,7 +227,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	}
 	ClearErrorSess(testAmbientSession)
 	// MakeRandomFunction same seed gate
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	if MakeRandomFunction(NewRng(4), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
@@ -250,7 +250,7 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}
 	// sticky error before make fails early
@@ -325,7 +325,7 @@ func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	cg.Types = vs.Types
 	if MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {

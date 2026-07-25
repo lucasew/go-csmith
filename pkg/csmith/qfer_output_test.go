@@ -7,7 +7,7 @@ import (
 
 func TestRestrictWrite(t *testing.T) {
 	q := NewCVQualifiers([]bool{true}, []bool{true})
-	q.Restrict(AccessWrite, EmptyCGContext())
+	q.Restrict(AccessWrite, EmptyCGContext().WithSession(testAmbientSession))
 	if q.IsConst() {
 		t.Fatal("const cleared")
 	}
@@ -16,7 +16,7 @@ func TestRestrictWrite(t *testing.T) {
 		t.Fatal("vol kept se-free")
 	}
 	q2 := NewCVQualifiers([]bool{false}, []bool{true})
-	q2.Restrict(AccessRead, WithEffectContext(WithSideEffects()))
+	q2.Restrict(AccessRead, WithEffectContext(WithSideEffects()).WithSession(testAmbientSession))
 	if q2.IsVolatile() {
 		t.Fatal("vol cleared non-se-free")
 	}
@@ -26,7 +26,7 @@ func TestRestrictIncompleteEffectSticky(t *testing.T) {
 	// Incomplete EffectContext must not invent clear-vol via IncompleteEffect SE-false
 	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true}, []bool{true})
-	q.Restrict(AccessWrite, WithEffectContext(IncompleteEffect()))
+	q.Restrict(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession))
 	if !q.IsConst() || !q.IsVolatile() {
 		t.Fatalf("incomplete ambient must not mutate qfer: const=%v vol=%v", q.IsConst(), q.IsVolatile())
 	}
@@ -66,7 +66,7 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// pointee type for *p selection; qfer depth 1 for int
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// force create path: empty nonvol list; ExpandStruct with no struct types → fail
@@ -719,7 +719,7 @@ func TestOutputGlobalsUsesOutputDef(t *testing.T) {
 	g.GenerateAllTypes()
 	// force a global
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	_ = g.VS.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, g.Rng)
+	_ = g.VS.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, g.Rng)
 	out := g.OutputGlobals()
 	if !strings.Contains(out, "static") || !strings.Contains(out, "g_") {
 		t.Fatal(out)

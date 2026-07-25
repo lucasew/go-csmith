@@ -470,7 +470,7 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, loc)}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := Stmt{
 		Kind: StmtReturn,
 		Expr: &Expression{Term: TermVariable, Var: lp, ExprType: PointerTo(GetIntType())},
@@ -483,7 +483,7 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 func TestVisitFactsLhsCompoundRead(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType(), CompoundAssign: true}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !cg.VisitFactsLhs(lhs, Defaults()) {

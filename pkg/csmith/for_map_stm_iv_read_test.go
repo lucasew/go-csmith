@@ -24,7 +24,7 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = append(vs.GlobalList, g)
 	vs.AllVars = append(vs.AllVars, g)
-	cg := WithFunc(fn, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(fn, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &Effect{}
 	*cg.EffectAccum = EmptyEffect()
 	cg.EffectStm = EmptyEffect()

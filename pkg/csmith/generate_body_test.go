@@ -9,7 +9,7 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(opts)
-	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	// caller context with a no-write on global
 	caller := &Function{Name: "func_1"}
 	cblk := &Block{Func: caller}
@@ -20,7 +20,7 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 		fm.AddNewVarFact(g)
 	}
 	accum := EmptyEffect()
-	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
+	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	prev.EffectAccum = &accum
 	prev.RW = &RWDirective{NoWriteVars: []*Variable{g}}
 
@@ -55,7 +55,7 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	_ = caller.ensurePairedFactMgr()
-	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(caller.PairedFactMgr())
+	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(caller.PairedFactMgr())
 	prev.BlkDepth = 4 // nested in caller
 	prev.ExprDepth = 7
 	prev.Flags = FlagInLoop
@@ -87,7 +87,7 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 	iv := CreateVariableScalars("g_iv", GetIntType(), false, false)
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	_ = caller.ensurePairedFactMgr()
-	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(caller.PairedFactMgr())
+	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(caller.PairedFactMgr())
 	prev.AddIVBound(iv, 0) // leftover loop IV as if caller nested
 	if len(prev.IVBounds) != 1 {
 		t.Fatal(prev.IVBounds)
@@ -131,7 +131,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	fm := caller.ensurePairedFactMgr()
 	fm.AddNewVarFact(&av.Variable)
 	accum := EmptyEffect()
-	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
+	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	prev.EffectAccum = &accum
 	// Caller is mid array-loop: must-use g_16 (and optional no-write).
 	prev.RW = &RWDirective{
@@ -185,7 +185,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	// StatementFor.cpp:204–225 — only rw_directive->find_must_use_arrays.
 	blk := &Block{Func: callee, LocalVars: []*Variable{}}
 	callee.Stack = []*Block{blk}
-	cg := WithFunc(callee, EmptyEffect()).WithFactMgr(callee.PairedFactMgr())
+	cg := WithFunc(callee, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(callee.PairedFactMgr())
 	cg.RW = rwd // external no-write only (post–BuildCallee)
 	// IV pool needs a non-array int
 	iv := CreateVariableScalars("g_77", GetIntType(), false, false)
@@ -217,7 +217,7 @@ func TestGenerateBodyBuiltinDummy(t *testing.T) {
 	}
 	// Function.cpp:757–758 FMList at create; GenerateBody uses get_fact_mgr (no invent)
 	_ = f.ensurePairedFactMgr()
-	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext())
+	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body == nil {
 		t.Fatal("dummy body")
 	}
@@ -229,7 +229,7 @@ func TestGenerateBodyBuiltinDummy(t *testing.T) {
 func TestGenerateBodyFailsClosedWithoutFactMgr(t *testing.T) {
 	// Function.cpp:635 get_fact_mgr_for_func; null → fail closed (no invent NewFactMgr)
 	f := &Function{Name: "func_x", ReturnType: GetIntType()}
-	f.GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
+	f.GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil || f.BuildState == BuildBuilt {
 		t.Fatal("must not invent body/FM without paired FactMgr")
 	}
@@ -240,7 +240,7 @@ func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_x", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
-	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
+	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil || f.BuildState != BuildUnbuilt {
 		t.Fatalf("nil RNG must not invent body/Built, state=%v body=%v", f.BuildState, f.Body != nil)
 	}
@@ -249,7 +249,7 @@ func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Function always live; sticky (no invent soft-skip body gen past hole)
-	(*Function)(nil).GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
+	(*Function)(nil).GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function GenerateBody must SetError sticky")
 	}
@@ -264,7 +264,7 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "func_w", ReturnType: GetIntType(), Param: []*Variable{nil}}
 	_ = f.ensurePairedFactMgr()
-	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithFactMgr(f.PairedFactMgr()))
+	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(f.PairedFactMgr()))
 	if f.BuildState == BuildBuilt || f.IsBuilt {
 		t.Fatal("Param nil hole must not invent Built")
 	}
@@ -286,7 +286,7 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 		},
 	}
 	fmTy := fTy.ensurePairedFactMgr()
-	fTy.GenerateBody(NewRng(5), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithFactMgr(fmTy))
+	fTy.GenerateBody(NewRng(5), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fmTy))
 	if fTy.BuildState == BuildBuilt || fTy.IsBuilt {
 		t.Fatal("Type-nil param must not invent Built")
 	}
@@ -305,7 +305,7 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	f2 := &Function{Name: "func_v", ReturnType: GetIntType(), IsBuiltin: true}
 	fm2 := f2.ensurePairedFactMgr()
 	fm2.GlobalFacts = IncompleteFactSlice()
-	f2.GenerateBody(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithFactMgr(fm2))
+	f2.GenerateBody(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm2))
 	if len(f2.Blocks) > 0 && (f2.BuildState == BuildBuilt || f2.IsBuilt) {
 		t.Fatal("incomplete GlobalFacts at mark_func_end must not invent Built")
 	}
@@ -320,7 +320,7 @@ func TestGenerateBodyIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "func_amb", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
-	prev := WithFunc(f, IncompleteEffect()).WithFactMgr(f.PairedFactMgr())
+	prev := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(f.PairedFactMgr())
 	f.GenerateBody(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if f.BuildState == BuildBuilt || f.IsBuilt || f.BuildState == BuildBuilding {
 		t.Fatal("incomplete EffectContext must not invent Built/Building")
@@ -336,7 +336,7 @@ func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
-	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext(), GetIntType(), nil, nil)
+	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
 	if f == nil {
 		t.Fatal("sig")
 	}
@@ -391,9 +391,9 @@ func TestMakeExpressionCommaNilLHSType(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	e := func() *Expression {
-		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = vs.Types
 		return MakeExpressionComma(NewRng(3), opts, probs, vs, NewExprTables(opts), &c, GetIntType(), nil)
 	}()

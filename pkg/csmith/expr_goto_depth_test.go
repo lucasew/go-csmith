@@ -158,7 +158,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	fm.MapVisited = map[int]bool{}
 	fm.GlobalFacts = []*FactPointTo{narrow}
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtGoto, StmID: 5, GotoDestStmID: 10,
@@ -197,7 +197,7 @@ func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 	fm.MapVisited = map[int]bool{}
 	fm.GlobalFacts = []*FactPointTo{narrow}
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtGoto, StmID: 1, GotoDestStmID: 0,

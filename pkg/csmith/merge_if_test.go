@@ -162,15 +162,15 @@ func TestHasEligibleVolatileVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	nv := CreateVariableScalars("g_n", GetIntType(), false, false)
-	if !HasEligibleVolatileVar([]*Variable{v, nv}, GetIntType(), AccessRead, EmptyCGContext()) {
+	if !HasEligibleVolatileVar([]*Variable{v, nv}, GetIntType(), AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("vol")
 	}
 	// non-SE-free blocks volatile
-	if HasEligibleVolatileVar([]*Variable{v}, GetIntType(), AccessRead, WithEffectContext(WithSideEffects())) {
+	if HasEligibleVolatileVar([]*Variable{v}, GetIntType(), AccessRead, WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)) {
 		t.Fatal("se")
 	}
 	// nil hole fails closed sticky — no invent skip as absent non-vol
-	if HasEligibleVolatileVar([]*Variable{nil, v}, GetIntType(), AccessRead, EmptyCGContext()) {
+	if HasEligibleVolatileVar([]*Variable{nil, v}, GetIntType(), AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("nil hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -192,7 +192,7 @@ func TestIfMergesFacts(t *testing.T) {
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	vs.GlobalList = []*Variable{p, a, b, CreateVariableScalars("g_i", GetIntType(), false, false)}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	f.Stack = []*Block{{Func: f}}
 	// generate if — may or may not change facts; ensure no panic and FM restored/merged
 	st := MakeRandomIf(NewRng(11), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)

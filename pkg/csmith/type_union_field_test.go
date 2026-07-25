@@ -158,7 +158,7 @@ func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 	}
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	other := EmptyEffect().WriteVar(loc)

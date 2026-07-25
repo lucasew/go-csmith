@@ -188,7 +188,7 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{a, b}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	// force ordered path by calling MakeRandomBinary many times? just unit-test restore logic
 	preLeft := EmptyEffect()
@@ -201,7 +201,7 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 		t.Fatal("a readable under pre-left")
 	}
 	// under postLeft as ambient effect_context, a is written → not eligible for read
-	cg2 := WithEffectContext(postLeft)
+	cg2 := WithEffectContext(postLeft).WithSession(testAmbientSession)
 	if IsEligibleVar(a, 0, AccessRead, cg2) {
 		t.Fatal("a blocked after left write")
 	}

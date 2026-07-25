@@ -8,7 +8,7 @@ import (
 func TestMakeRandomSignatureSetsAlias(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext(), GetIntType(), nil, nil)
+	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
 	if f == nil || f.AliasName != f.Name+"_alias" {
 		t.Fatalf("%+v", f)
 	}

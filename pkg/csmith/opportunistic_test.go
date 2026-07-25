@@ -163,7 +163,7 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 func TestIsNonReadableNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
-	cg := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
 	if !cg.IsNonReadable(g) {
 		t.Fatal("nil NoReadVars hole must fail closed as nonreadable")
 	}
@@ -171,7 +171,7 @@ func TestIsNonReadableNilHole(t *testing.T) {
 		t.Fatal("nil NoReadVars hole IsNonReadable must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
 	if !cg2.IsNonWritable(g) {
 		t.Fatal("nil NoWriteVars hole must fail closed as nonwritable")
 	}
@@ -227,7 +227,7 @@ func TestHasDereferenceableVar(t *testing.T) {
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if !HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
 		t.Fatal("valid ptr")
 	}
@@ -313,7 +313,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	opts.CompatibleCheck = true
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), &q, NewRng(2))
+	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(2))
 	if g == nil {
 		t.Fatal("g")
 	}
@@ -322,7 +322,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	for seed := uint64(1); seed < 10; seed++ {
 		ClearErrorSess(testAmbientSession) // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
-			c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+			c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 			return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
 		}()
 		if st.Kind != StmtAssign {
@@ -415,7 +415,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// request only storage-level volatile (len 1) — match_indirect via indirect_qualifiers
 	// deref = 2-1 = 1 → other.IndirectQualifiers(1) → should still allow if eligible
 	qfer := NewCVQualifiers([]bool{false}, []bool{true})
-	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qfer, AccessRead, EmptyCGContext()) {
+	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qfer, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		// may fail IsEligibleVar if effect rules; at least no panic
 		t.Log("eligible path optional under empty effect")
 	}
@@ -423,7 +423,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	qw := NewCVQualifiers([]bool{true}, []bool{true})
 	qw.Wildcard = true
 	BookkeeperDoFinalization()
-	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qw, AccessRead, EmptyCGContext()) {
+	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qw, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("wildcard qfer must accept")
 	}
 	if VolatileAvailCount() < 1 {
@@ -435,7 +435,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	BookkeeperDoFinalization()
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	good := CreateVariableScalars("g_v", GetIntType(), true, false)
-	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext()) {
+	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

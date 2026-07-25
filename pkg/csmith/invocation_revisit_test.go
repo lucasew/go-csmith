@@ -272,7 +272,7 @@ func TestVisitUnorderedParamsMerges(t *testing.T) {
 	// two constant args — both orders succeed, facts unchanged
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	fi := &Invocation{Args: []*Expression{
 		{Term: TermConstant, Con: MakeInt(1)},
@@ -324,7 +324,7 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
 	// n==2 forces two permute orders
@@ -345,7 +345,7 @@ func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	fi := &Invocation{Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}}}
 	facts := []*FactPointTo{}
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
@@ -408,7 +408,7 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 	eff := EmptyEffect()
 	// caller context may hold a different FM; revisit must use callee.PairedFactMgr()
 	callerFM := NewFactMgrSess(testAmbientSession, &Function{Name: "caller"})
-	cg := WithFunc(callee, EmptyEffect()).WithFactMgr(callerFM)
+	cg := WithFunc(callee, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(callerFM)
 	cg.EffectAccum = &eff
 	// mark body effect empty on callee maps
 	fm.SetMapStmEffect(100, EmptyEffect())
@@ -454,7 +454,7 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 	callerFM.GlobalFacts = []*FactPointTo{}
 
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(callerFM)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(callerFM)
 	cg.EffectAccum = &eff
 	calFM.SetMapStmEffect(200, EmptyEffect())
 	calFM.SetMapFactsOut(200, []*FactPointTo{})
@@ -514,7 +514,7 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	callerFM.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0)}
 	callerFM.GlobalFacts = []*FactPointTo{}
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(callerFM)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(callerFM)
 	cg.EffectAccum = &eff
 	fi := &Invocation{User: callee, Args: []*Expression{
 		{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
@@ -558,7 +558,7 @@ func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
 	callerFM := NewFactMgrSess(testAmbientSession, &Function{Name: "caller2"})
 	callerFM.UnionFacts = IncompleteUnionFactSlice()
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(callerFM)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(callerFM)
 	cg.EffectAccum = &eff
 	fi := &Invocation{User: callee}
 	facts := []*FactPointTo{}

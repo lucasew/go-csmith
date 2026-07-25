@@ -98,7 +98,7 @@ func TestItemizeArrayWithIV(t *testing.T) {
 		t.Fatal("create")
 	}
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	// need dim 1 array with size > 0
 	if len(av.Sizes) < 1 {
@@ -133,7 +133,7 @@ func TestItemizeArrayTooFewIV(t *testing.T) {
 		Sizes:    []int{2, 3},
 	}
 	av.AsArray = av
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// only one IV for 2 dims
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	cg.IVBounds = map[*Variable]int{iv: 0}
@@ -146,7 +146,7 @@ func TestOutputCallChain(t *testing.T) {
 	f := &Function{Name: "func_1"}
 	b1 := &Block{Func: f}
 	b2 := &Block{Func: f}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.CallChain = []*Block{b1, b2}
 	s := cg.OutputCallChain()
 	if !strings.Contains(s, "func_1") || !strings.Contains(s, " -> ") {

@@ -112,7 +112,7 @@ func TestVisitFactsJumpStoresEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.EffectStm = EmptyEffect().ReadVar(v)
 	st := &Stmt{
@@ -130,7 +130,7 @@ func TestVisitFactsJumpStoresEffect(t *testing.T) {
 func TestVisitFactsStatementExpr(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtInvoke, StmID: 4,

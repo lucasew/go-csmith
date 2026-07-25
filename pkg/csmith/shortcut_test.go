@@ -181,7 +181,7 @@ func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 	fm.SetMapStmEffect(11, EmptyEffect())
 	fm.UnionFacts = []*FactUnion{liveU} // live last_write differs from map_in
 	st := &Stmt{Kind: StmtAssign, StmID: 11}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := append([]*FactPointTo(nil), pt...)
@@ -220,7 +220,7 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	fm.SetMapStmEffect(9, EmptyEffect())
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)} // entry lattice live
 	st := &Stmt{Kind: StmtAssign, StmID: 9}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := append([]*FactPointTo(nil), pt...)
@@ -275,7 +275,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	fm.SetMapFactsIn(5, facts)
 	fm.SetMapFactsOut(5, facts)
 	fm.SetMapStmEffect(5, EmptyEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// first: no prior in match empty — SameFacts empty empty works
@@ -315,7 +315,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 		t.Fatal("nil cg ShortcutAnalysis must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cgNoFM := EmptyCGContext()
+	cgNoFM := EmptyCGContext().WithSession(testAmbientSession)
 	if ShortcutAnalysis(st, &facts, &cgNoFM, Defaults()) != ShortcutNone {
 		t.Fatal("nil FM must ShortcutNone")
 	}
@@ -363,7 +363,7 @@ func TestShortcutConflict(t *testing.T) {
 	// previous effect wrote g_x
 	fm.SetMapStmEffect(3, EmptyEffect().WriteVar(g))
 	// ambient context also wrote g_x → InConflict
-	cg := WithEffectContext(EmptyEffect().WriteVar(g))
+	cg := WithEffectContext(EmptyEffect().WriteVar(g)).WithSession(testAmbientSession)
 	cg.FM = fm
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -380,7 +380,7 @@ func TestValidateAndUpdateFacts(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{}
@@ -413,7 +413,7 @@ func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
 	fm.SetMapFactsOut(10, nil)
 	fm.SetMapStmEffect(10, EmptyEffect())
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10, BackLink: true}}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{}
@@ -466,7 +466,7 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 func TestCGContextAddEffect(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.AddEffect(EmptyEffect().WriteVar(v), false)
@@ -540,7 +540,7 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 		MakeFactPointTo(otherRV, GarbagePtr),
 		MakeFactPointTo(f.RV, v),
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -580,7 +580,7 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.IVBounds = map[*Variable]int{iv: 10}
@@ -747,7 +747,7 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 	fm.SetMapFactsInPair(10, facts, []*FactUnion{})
 	fm.SetMapFactsOutPair(10, facts, []*FactUnion{})
 	fm.SetMapStmEffect(10, EmptyEffect())
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.FM = fm
 	cg.CurrentFunc = f
 	if sc := ShortcutAnalysis(assign, &facts, &cg, Defaults()); sc != ShortcutNone {
@@ -819,7 +819,7 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 	fm.SetMapFactsIn(50, nil)
 	fm.SetMapFactsOut(50, nil)
 	fm.SetMapStmEffect(50, EmptyEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{}
@@ -837,7 +837,7 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{MakeFactPointTo(v, GarbagePtr), nil}
@@ -862,7 +862,7 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{MakeFactPointTo(v, GarbagePtr), nil}
@@ -891,7 +891,7 @@ func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 	fm.SetMapFactsIn(7, facts)
 	// no MapFactsOut[7] — empty complete (C++ map[])
 	fm.SetMapStmEffect(7, EmptyEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
@@ -919,7 +919,7 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 		8: {MakeFactPointTo(p, GarbagePtr), nil},
 	}
 	fm.SetMapStmEffect(8, EmptyEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := CloneFactSlice(in)
@@ -939,7 +939,7 @@ func TestShortcutAnalysisBlockMissingOutIsEmpty(t *testing.T) {
 	fm.SetMapFactsIn(60, facts)
 	// no MapFactsOut[60] — empty complete (C++ map[])
 	fm.SetMapStmEffect(60, EmptyEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutOK {
@@ -957,7 +957,7 @@ func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 		70: {MakeFactPointTo(p, GarbagePtr), nil},
 	}
 	fm.SetMapStmEffect(70, EmptyEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := CloneFactSlice(in)
@@ -979,7 +979,7 @@ func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	fm.SetMapFactsIn(9, facts)
 	fm.SetMapFactsOut(9, facts)
 	fm.SetMapStmEffect(9, IncompleteEffect())
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
@@ -1004,7 +1004,7 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
 	facts := []*FactPointTo{}

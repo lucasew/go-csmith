@@ -62,7 +62,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	inner := &Block{Func: f, Parent: loop, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	f.Stack = []*Block{loop, inner}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// need globals for break test expr
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
@@ -84,7 +84,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	}
 	// continue still creates edge at make (StatementContinue.cpp:83)
 	fm2 := NewFactMgrSess(testAmbientSession, f)
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	inner.Stmts = []Stmt{{Kind: StmtAssign}}
 	f.Stack = []*Block{loop, inner}
 	_ = vs.GenerateNewGlobal(AccessRead, cg2, GetIntType(), &q, NewRng(4))
@@ -188,7 +188,7 @@ func TestMakeRandomContinueRejectsFirstStmt(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	empty := &Block{Func: f, Looping: true}
 	f.Stack = []*Block{empty}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	st := MakeRandomContinue(NewRng(1), opts, vs, NewExprTables(opts), &cg, empty)
 	if st.Expr != nil {
 		t.Fatal("first-stmt continue must not produce expr")

@@ -155,7 +155,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 	blk.LocalVars = []*Variable{loc, &collAV.Variable}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = facts
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// Force pool: only the array is choosable as int*
 	vs.GlobalList = nil
 	// Local array available via block
@@ -276,7 +276,7 @@ func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	v := vs.SelectLoopCtrlVar(NewRng(2), cg, nil)
 	if v == nil {
 		t.Fatal("nil")
@@ -291,7 +291,7 @@ func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	if vs.SelectLoopCtrlVar(NewRng(1), cg, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed SelectLoopCtrlVar")
@@ -302,7 +302,7 @@ func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if vs.SelectLoopCtrlVar(NewRng(2), cg2, nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed SelectLoopCtrlVar")
 	}
@@ -327,7 +327,7 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if vs.SelectLoopCtrlVar(NewRng(2), cg, nil) != nil {
 		t.Fatal("HasIntField residual must fail closed SelectLoopCtrlVar, not invent later good")
 	}
@@ -348,7 +348,7 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 	f2 := &Function{Name: "f", ReturnType: GetIntType()}
 	blk2 := &Block{Func: f2}
 	f2.Stack = []*Block{blk2}
-	cg3 := WithFunc(f2, EmptyEffect())
+	cg3 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession)
 	if vs2.SelectLoopCtrlVar(NewRng(3), cg3, nil) != nil {
 		t.Fatal("ContainPointer residual must fail closed SelectLoopCtrlVar, not invent later good")
 	}
@@ -394,7 +394,7 @@ func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	vs.GlobalList = []*Variable{gp, gt}
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(gp, gt))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// many tries — should never return the local-pointing ptr when filter works
 	for seed := uint64(1); seed < 30; seed++ {
 		ev := makeExpressionVariableFlags(NewRng(seed), vs, &cg, PointerTo(GetIntType()), nil, false, true)

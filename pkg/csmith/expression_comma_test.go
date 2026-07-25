@@ -16,7 +16,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	r := NewRng(2)
 	e := func() *Expression {
 		// ExpressionFuncall / make_random paths need get_fact_mgr
-		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = vs.Types
 		return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntType(), nil)
 	}()
@@ -68,7 +68,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	// Expression.cpp:241 — assert(type) sticky; no GetIntType soft invent
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	c := EmptyCGContext()
+	c := EmptyCGContext().WithSession(testAmbientSession)
 	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(opts), &c, nil, nil, 0); e != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
@@ -96,7 +96,7 @@ func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	tables := NewExprTables(opts)
 	// Many seeds: LHS should not always be a bare hex constant-only pattern... soft check
 	e := func() *Expression {
-		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = vs.Types
 		return MakeExpressionComma(NewRng(11), opts, probs, vs, tables, &c, GetIntType(), nil)
 	}()
@@ -134,7 +134,7 @@ func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionComma")

@@ -157,7 +157,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// seed a read so choose_visible may work
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
@@ -221,7 +221,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// map accum effect for forward path cond
 	fm.MapAccumEffect = map[int]Effect{1: EmptyEffect().ReadVar(g)}
 	eff := EmptyEffect().ReadVar(g)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	seed := CreateVariableScalars("g_z", GetIntType(), false, false)
 	// try seeds until successful goto (Expr set) to assert effect_stm clear order

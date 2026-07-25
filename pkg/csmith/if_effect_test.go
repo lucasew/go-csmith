@@ -16,7 +16,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	tab.Add(100, int(StmtAssign))
 	opts.MaxBlockSize = 2
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -148,7 +148,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}
 	// sticky error after condition would abort; set after a successful path component
@@ -291,7 +291,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 		Then: thenBlk, Else: elseBlk,
 	}
 	fn.RV = CreateVariableScalars("g_rv", GetIntType(), false, false)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = fn
 	// parent accum already observed g_outer (as if prior statements in the block)
 	eff := EmptyEffect().ReadVar(outer)
@@ -355,7 +355,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		Then: thenBlk, Else: elseBlk,
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = fn
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -385,7 +385,7 @@ func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 		t.Fatal("nil RNG+cg MakeRandomIf must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatal("nil RNG")
 	}
@@ -415,7 +415,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	st := MakeRandomIf(NewRng(1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
@@ -450,7 +450,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	g1 := CreateVariableScalars("g_if_arm", GetIntType(), true, false)
 	vs.GlobalList = append(vs.GlobalList, g1)
 	accum := EmptyEffect().ReadVar(pre)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &accum
 	cg.Types = vs.Types
 	preDepth := cg.BlkDepth
@@ -489,7 +489,7 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	// seed globals so MakeIteration can succeed; fail closed is on incomplete EffectAccum after
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
 	inc := IncompleteEffect()

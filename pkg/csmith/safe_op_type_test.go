@@ -27,7 +27,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
 		fi = func() *Invocation {
-			c := EmptyCGContext()
+			c := EmptyCGContext().WithSession(testAmbientSession)
 			return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType())
 		}()
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {

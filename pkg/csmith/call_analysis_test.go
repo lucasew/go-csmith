@@ -558,7 +558,7 @@ func TestPostCreationAssignFacts(t *testing.T) {
 	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 3,
@@ -586,7 +586,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// assign with RHS uncertain call (two call args) — incomplete user IR fails visit
 	a := userCall("func_a")
@@ -631,7 +631,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	// Gen-time effect_stm already includes a global read from a nested call.
 	genEff := EmptyEffect().ReadVar(gKeep).ReadVar(gExtra)
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.EffectStm = genEff
 	// Uncertain call RHS so special path runs validate (may fail/clear EffectStm).

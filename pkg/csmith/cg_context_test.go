@@ -7,7 +7,7 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	iv1 := CreateVariableScalars("i1", GetIntType(), false, false)
 	iv2 := CreateVariableScalars("i2", GetIntType(), false, false)
-	parent := EmptyCGContext()
+	parent := EmptyCGContext().WithSession(testAmbientSession)
 	parent.AddIVBound(iv1, 3)
 	child := parent.CloneSubcontext()
 	child.AddIVBound(iv2, 5)
@@ -25,7 +25,7 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 		t.Fatal("parent must keep iv1 after child Remove")
 	}
 	// WithFlags also isolates
-	parent2 := EmptyCGContext()
+	parent2 := EmptyCGContext().WithSession(testAmbientSession)
 	parent2.AddIVBound(iv1, 1)
 	loop := parent2.WithFlags(FlagInLoop)
 	loop.AddIVBound(iv2, 2)
@@ -51,7 +51,7 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	f.ReturnType = GetIntType()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Valid return expr: variable not pointing to locals
@@ -76,7 +76,7 @@ func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	eff := EmptyEffect()
-	parent := WithFunc(f, EmptyEffect())
+	parent := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	parent.EffectAccum = &eff
 	parent.ExprDepth = 9
 	parent.CurrRHS = rhs

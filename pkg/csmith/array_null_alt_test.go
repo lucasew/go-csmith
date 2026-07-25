@@ -54,7 +54,7 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	fm.SetMapFactsOut(25, []*FactPointTo{outDef})
 	fm.GlobalFacts = []*FactPointTo{outDef}
 	forSt := &Stmt{Kind: StmtFor, StmID: 24, Then: body}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{outDef}, nil, EmptyEffect(), &cg)
 	got := FindRelatedPointTo(fm.GlobalFacts, &arr.Variable)
@@ -88,7 +88,7 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	fm.MapVisited = map[int]bool{1: true}
 	fm.ResetBlockFactMaps(b)
 	factsCopy := CloneFactSlice(entry)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

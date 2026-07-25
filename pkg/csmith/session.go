@@ -10,10 +10,11 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - non-Sess helpers still hardcode ambient (r.RndUpto, bookkeeper Record*,
-//     EmptyCGContext/WithFunc install ambient, …)
+//   - non-Sess helpers still hardcode ambient (r.RndUpto, bookkeeper Record*, …)
 //   - NewVariableSelector (unit-test only) installs ambient; Generate uses
 //     NewVariableSelectorProbs without ambient install + vs.Sess = run bag
+//   - EmptyCGContext/WithFunc/WithEffectContext leave Sess nil — callers
+//     WithSession(run bag) or WithSession(testAmbientSession)
 //   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag (no ambient install)
 //   - vsSess/envSess/fmSess/cgSess/gSess panic if owner.Sess unset
 //   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics

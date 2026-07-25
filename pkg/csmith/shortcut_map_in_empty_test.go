@@ -17,7 +17,7 @@ func TestShortcutAnalysisBlockMissingMapInIsEmpty(t *testing.T) {
 	// set map_out + map_stm so later steps can succeed when same_facts holds
 	fm.SetMapFactsOut(b.StmID, []*FactPointTo{})
 	fm.SetMapStmEffect(b.StmID, EmptyEffect())
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &Effect{}
 	*cg.EffectAccum = EmptyEffect()
 	cg.EffectStm = EmptyEffect()

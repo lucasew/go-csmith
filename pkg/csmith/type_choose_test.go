@@ -64,7 +64,7 @@ func TestMakeRandomParamNoConstant(t *testing.T) {
 	// force many picks — constant weight 0 + filtered
 	for seed := uint64(1); seed < 40; seed++ {
 		e := func() *Expression {
-			c := EmptyCGContext()
+			c := EmptyCGContext().WithSession(testAmbientSession)
 			return MakeRandomParam(NewRng(seed), opts, tables, vs, &c, GetIntType(), nil, 0)
 		}()
 		if e != nil && e.Term == TermConstant {

@@ -42,7 +42,7 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	fm.SetMapStmEffect(b.StmID, EmptyEffect())
 	fm.MapVisited[srcID] = true
 
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	pre := EmptyEffect()
 	cg.EffectAccum = &pre
 	fm.GlobalFacts = CloneFactSlice(entry)

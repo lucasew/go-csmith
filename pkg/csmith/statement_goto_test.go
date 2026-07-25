@@ -13,7 +13,7 @@ func TestMakeRandomGotoEmptyBlockReturnsNull(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	blk := &Block{Func: f}
 	f.Blocks = []*Block{blk}
 	st := MakeRandomGoto(NewRng(9), opts, probs, vs, tables, &cg, blk)
@@ -43,7 +43,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect().ReadVar(g)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	var st Stmt
 	for seed := uint64(1); seed < 60; seed++ {
@@ -87,7 +87,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// accum already has g as read (choose pool); EffectStm empty before make
 	eff := EmptyEffect().ReadVar(g)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.EffectStm = EmptyEffect()
 	found := false
@@ -215,7 +215,7 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	// gen-style map_stm: IV read first (make_iteration read_var) then body
 	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
 	fm.SetMapStmEffect(body.StmID, EmptyEffect().ReadVar(bodyRead))
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	acc := EmptyEffect()
 	cg.EffectAccum = &acc
 	// pollution as after add_effect(map_accum[other]) on the forward path
@@ -239,7 +239,7 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	// negative: VisitFactsStmt without clear keeps pollution in the pre-init snapshot
 	ClearErrorSess(testAmbientSession)
 	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	acc2 := EmptyEffect()
 	cg2.EffectAccum = &acc2
 	cg2.EffectStm = EmptyEffect().ReadVar(pollute)
@@ -340,7 +340,7 @@ func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// no FM
 	st := MakeRandomGoto(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
 	if stmtOK(st) {
@@ -364,7 +364,7 @@ func TestMakeBinaryForCompare(t *testing.T) {
 	opts.SafeMath = true
 	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), true, false), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(10), ExprType: GetIntType()}
-	fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinCmpLt, lhs, rhs)
+	fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinCmpLt, lhs, rhs)
 	if fi == nil || fi.Binary != "<" {
 		t.Fatalf("%+v", fi)
 	}
@@ -390,7 +390,7 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
-	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), WithEffectContext(IncompleteEffect()), BinAdd, lhs, rhs); fi != nil {
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeBinary")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -400,7 +400,7 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if fi := MakeBinary(NewRng(2), opts, NewProbabilities(opts), cg, BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeBinary")
 	}
@@ -416,7 +416,7 @@ func TestMakeBinaryGetTypeResidualSticky(t *testing.T) {
 	opts := Defaults()
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
-	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, hole, rhs); fi != nil {
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, hole, rhs); fi != nil {
 		t.Fatal("GetType residual must fail closed MakeBinary, not invent shell", fi)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -431,21 +431,21 @@ func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 	opts := Defaults()
 	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
-	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, lhs, rhs); fi != nil {
+	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("nil RNG")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeBinary must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, nil, rhs); fi != nil {
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, nil, rhs); fi != nil {
 		t.Fatal("nil lhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs MakeBinary must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinaryOp(MaxBinaryOp), lhs, rhs); fi != nil {
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinaryOp(MaxBinaryOp), lhs, rhs); fi != nil {
 		t.Fatal("MAX binary op must fail closed")
 	}
 	// MAX op BinaryOpC sticky
@@ -506,7 +506,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	g := CreateVariableScalars("g_c", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, g)
 	eff := EmptyEffect().ReadVar(g)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// mark both stmts' accum as having read g so forward cond can choose
 	for i := range src.Stmts {
@@ -605,7 +605,7 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 		fm.SetMapFactsOut(id, nil)
 		fm.MapAccumEffect[id] = eff
 	}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// force many seeds until same-block forward insert lands
 	var got *Stmt
@@ -698,7 +698,7 @@ func TestSeed2GensymNamesMatchUpstreamAfterGotoFix(t *testing.T) {
 }
 
 func TestResetEffectAccum(t *testing.T) {
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
 	pre := EmptyEffect().ReadVar(v)
 	cg.EffectAccum = &Effect{}
@@ -748,7 +748,7 @@ func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.Blocks = []*Block{nil}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
@@ -771,7 +771,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	st := MakeRandomGoto(NewRng(4), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
 	if st.Kind == StmtGoto && st.Label != "" {
@@ -781,7 +781,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg2 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
 	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg2, blk)
@@ -795,7 +795,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete GlobalFacts must fail closed before jump-block scan
 	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
-	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm3)
+	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm3)
 	st3 := MakeRandomGoto(NewRng(6), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg3, blk)
 	if st3.Kind == StmtGoto && st3.Label != "" {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomGoto")
@@ -813,7 +813,7 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, GotoDestStmID: 20}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if VisitFactsStatementGoto(st, &cg, Defaults()) {
@@ -902,7 +902,7 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	curr := &Block{StmID: 3, Func: f, Parent: outer, Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
 	f.Blocks = []*Block{outer}
 	f.Stack = []*Block{curr}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.CurrentFunc = f
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	cg.EffectAccum = &Effect{}
@@ -1059,7 +1059,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 		fm.SetMapFactsOut(id, nil)
 		fm.MapAccumEffect[id] = EmptyEffect()
 	}
-	cg := WithFunc(fn, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(fn, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &Effect{}
 	*cg.EffectAccum = EmptyEffect()
 

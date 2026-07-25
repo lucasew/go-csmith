@@ -27,7 +27,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	f.Stack = []*Block{blk}
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	tables := NewExprTables(opts)
 

@@ -152,7 +152,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 }
 
 func TestClearEffectStm(t *testing.T) {
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectStm = EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), false, false))
 	cg.ClearEffectStm()
 	if !cg.EffectStm.IsSideEffectFree() {
@@ -173,7 +173,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	f.Blocks = []*Block{b1}
 	f.Stack = []*Block{b1}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
 	eff := EmptyEffect().ReadVar(g)

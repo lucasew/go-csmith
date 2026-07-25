@@ -146,11 +146,11 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	// with VS+CG: make_init_value path is live
 	vs := NewVariableSelector(opts)
 	vs.Probs = NewProbabilities(opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
 	av := CreateArrayVariable(NewRng(3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
 	if av == nil {
@@ -209,7 +209,7 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 	vs.Probs.single[PNewArrayVariableProb] = 100
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.createAndInitialize(AccessWrite, EmptyCGContext(), GetIntType(), q, nil, "g_9", r)
+	v := vs.createAndInitialize(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), q, nil, "g_9", r)
 	if v == nil || !v.IsArray {
 		t.Fatalf("%+v arrays=%d", v, len(vs.Arrays))
 	}
@@ -1069,7 +1069,7 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 		// set storage volatile
 		vol.Qfer.IsVolatiles = []bool{true}
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if !HasEligibleVolatileVar([]*Variable{vol}, GetIntType(), AccessRead, cg) {
 		t.Fatal("eligible")
 	}

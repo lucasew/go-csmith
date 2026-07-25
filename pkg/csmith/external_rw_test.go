@@ -7,7 +7,7 @@ import (
 func TestGetExternalNoReadsWrites(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
-	cg := EmptyCGContext().WithRW(&RWDirective{
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{
 		NoReadVars:  []*Variable{g, loc},
 		NoWriteVars: []*Variable{g},
 	})
@@ -26,7 +26,7 @@ func TestGetExternalNoReadsWrites(t *testing.T) {
 	}
 	_ = nw
 	// nil RW hole fails closed incomplete (not bare nil invent empty complete)
-	cg2 := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil, g}})
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{nil, g}})
 	nr, nw = cg2.GetExternalNoReadsWrites(nil)
 	if VariablesComplete(nr) || VariablesComplete(nw) {
 		t.Fatal("nil NoReadVars hole must fail closed incomplete", nr, nw)
@@ -63,7 +63,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 		// still exercise MergePointees nil path via incomplete facts with hole
 		_ = lhs
 	}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// incomplete merge via nil in pointees of related fact
 	facts := []*FactPointTo{{Var: pp, PointTo: []*Variable{nil}}}
 	// for indir > 1 need multi-level pointer
@@ -79,7 +79,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 func TestGetExternalNoWritesFromIV(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_i", GetIntType(), false, false)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(g, 10)
 	_, nw := cg.GetExternalNoReadsWrites(nil)
 	if len(nw) != 1 || nw[0] != g {
@@ -90,7 +90,7 @@ func TestGetExternalNoWritesFromIV(t *testing.T) {
 func TestBuildCalleeRWDirective(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	rwd := cg.BuildCalleeRWDirective(nil)
 	if rwd == nil || len(rwd.NoWriteVars) != 1 {
 		t.Fatal(rwd)
@@ -99,7 +99,7 @@ func TestBuildCalleeRWDirective(t *testing.T) {
 
 func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 	// complete empty must be non-nil empty (not invent nil==incomplete)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	got := cg.FindReachableFrameVars(nil)
 	if got == nil {
 		t.Fatal("complete empty must be non-nil empty slice")
@@ -119,7 +119,7 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	// fair: inherit full NoWrite without inventing unrestricted nil; sticky
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	rwd := cg.BuildCalleeRWDirective([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
 	if rwd == nil {
@@ -144,7 +144,7 @@ func TestVisitFactsInvocationParams(t *testing.T) {
 		},
 	}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
 		t.Fatal("visit")
@@ -166,7 +166,7 @@ func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 		},
 	}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	if VisitFactsInvocation(fi, &cg, Defaults()) {
 		t.Fatal("arg visit residual must fail closed VisitFactsInvocation")
@@ -193,7 +193,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	blk := &Block{StmID: 1, Func: caller}
 	caller.Stack = []*Block{blk}
 	// caller FM for GlobalFacts work set; revisit uses callee.PairedFactMgr
-	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -232,7 +232,7 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntType()}
 	blk := &Block{StmID: 1, Func: caller, LocalVars: nil}
 	caller.Stack = []*Block{blk}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	// Outer assign-like pollution that must not reach nested Lhs visit.
 	outerEff := EmptyEffect().WriteVar(g)
@@ -266,7 +266,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntType()}
 	blk := &Block{StmID: 1, Func: caller}
 	caller.Stack = []*Block{blk}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -309,7 +309,7 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 	// Block::stm_id always live when FM bound
 	b := &Block{StmID: 5, Stmts: []Stmt{st}}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsBlock(b, &cg, Defaults()) {
@@ -335,7 +335,7 @@ func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
 		},
 	}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
 		t.Fatalf("visit_facts must analyze despite Failed=true err=%v", HasErrorSess(testAmbientSession))

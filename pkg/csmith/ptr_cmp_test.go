@@ -12,7 +12,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 		t.Fatal("pointer type")
 	}
 	vs.Types = env
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = env
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -22,7 +22,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	var fi *Invocation
 	for seed := uint64(1); seed < 50; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg2 := EmptyCGContext()
+		cg2 := EmptyCGContext().WithSession(testAmbientSession)
 		cg2.Types = env
 		eff2 := EmptyEffect()
 		cg2.EffectAccum = &eff2
@@ -88,7 +88,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	foundEq, foundNe := false, false
 	for seed := uint64(1); seed < 200 && !(foundEq && foundNe); seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+		cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		cg.Types = env
 		fi := MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, env)
 		if fi == nil {
@@ -123,7 +123,7 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	_ = env.FindPointerType(GetIntType(), true)
 	vs.Types = env
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = env
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

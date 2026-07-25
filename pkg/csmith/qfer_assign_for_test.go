@@ -43,7 +43,7 @@ func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
 	plain := CreateVariableScalars("g_p", GetIntType(), false, false)
 	// const qfer wants exact match — volatile var should fail
 	q := NewCVQualifiers([]bool{true}, []bool{false})
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	got := ChooseVarFull(NewRng(1), []*Variable{vol, plain}, AccessRead, cg, GetIntType(), &q, MatchFlexible, nil, false, false, false)
 	// neither matches exact const; plain is non-const non-vol
 	if got != nil {

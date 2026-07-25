@@ -15,7 +15,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	var list FunctionList
 	seedTypesForTest(r, opts, probs, vs, &list)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
-	cg := WithFunc(f, EmptyEffect()).WithFuncList(&list)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(&list)
 	st := MakeRandomExprStmt(NewRng(7), opts, probs, vs, tables, &cg)
 	// success → Kind Invoke + expr; fail → empty (nullptr), not Kind-only shell
 	if st.Expr != nil {
@@ -84,7 +84,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	eff := EmptyEffect().WriteVar(p)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.Funcs = list
 	// snapshot
@@ -194,7 +194,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 		Body: &Block{},
 	}
 	list.Funcs = []*Function{callee}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Funcs = list
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

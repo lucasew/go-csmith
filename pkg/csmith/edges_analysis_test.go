@@ -196,7 +196,7 @@ func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -219,7 +219,7 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{}
@@ -250,7 +250,7 @@ func TestAnalyzeWithEdgesInNilCFGFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.CFGEdges = []*CFGEdge{nil}
 	facts := []*FactPointTo{}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
@@ -276,7 +276,7 @@ func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
 	fm.MapFactsOut[10] = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	// also seed p fact at dest
 	facts := []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_a", GetIntType(), false, false))}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
@@ -304,7 +304,7 @@ func TestAnalyzeWithEdgesInIncompleteOutFailClosed(t *testing.T) {
 		10: {MakeFactPointTo(p, NullPtr), nil},
 	}
 	facts := []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_a", GetIntType(), false, false))}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
@@ -330,7 +330,7 @@ func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {
 	fm.MapFactsOut = map[int][]*FactPointTo{
 		60: {MakeFactPointTo(p, NullPtr), nil},
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	_, _, _, ok := FindFixedPointBlock(b, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}, &cg, Defaults(), false)
@@ -352,7 +352,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
 	}}}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	out, _, _, ok := FindFixedPointBlock(b, nil, &cg, Defaults(), false)
@@ -394,7 +394,7 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -437,7 +437,7 @@ func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
 	fm.MapVisited = map[int]bool{1: true}
 	// prior block effect writes w; ambient effect_context writes w → InConflict
 	fm.SetMapStmEffect(1, EmptyEffect().WriteVar(w))
-	cg := WithEffectContext(EmptyEffect().WriteVar(w)).WithFactMgr(fm)
+	cg := WithEffectContext(EmptyEffect().WriteVar(w)).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// visitOnce false so shortcut is attempted; conflict must fall through
@@ -457,7 +457,7 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtIfElse, StmID: 7}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
 	if !fm.GetMapStmEffect(7).IsWritten(v) {
@@ -508,7 +508,7 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 		t.Fatal("nil cg SetAccumulatedEffectAfterBlock must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cgNoFM := EmptyCGContext()
+	cgNoFM := EmptyCGContext().WithSession(testAmbientSession)
 	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cgNoFM, EmptyEffect())
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM SetAccumulatedEffectAfterBlock must stay non-sticky soft re-pick")
@@ -589,7 +589,7 @@ func TestAnalyzeWithEdgesInMergesJumpUnions(t *testing.T) {
 	fm.MapVisited = map[int]bool{10: true, 20: true}
 	// back edge src→dest
 	fm.CFGEdges = []*CFGEdge{{SrcID: 10, DestStmID: 20, PostDest: false, BackLink: true}}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	facts := []*FactPointTo{}

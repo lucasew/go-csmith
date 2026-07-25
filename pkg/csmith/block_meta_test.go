@@ -201,7 +201,7 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// make a small looping block
 	b := MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, true)
 	if b == nil {

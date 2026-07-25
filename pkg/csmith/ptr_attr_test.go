@@ -9,7 +9,7 @@ func TestPtrModifiedInRhs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	lhs := &Lhs{Var: p, Type: GetIntType()} // *p
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// RHS wrote the pointer itself
 	cg.EffectStm = EmptyEffect().WriteVar(p)
 	if !cg.PtrModifiedInRhs(lhs, nil) {

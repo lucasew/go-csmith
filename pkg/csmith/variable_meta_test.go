@@ -194,7 +194,7 @@ func TestGetCollectiveTopLevelArray(t *testing.T) {
 	}
 	// IsEligibleVar must not reject collective array solely via GetCollective hole
 	ClearErrorSess(testAmbientSession)
-	if !IsEligibleVar(&av.Variable, 0, AccessRead, EmptyCGContext()) {
+	if !IsEligibleVar(&av.Variable, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("collective array must be eligible under empty context", HasErrorSess(testAmbientSession))
 	}
 	if HasErrorSess(testAmbientSession) {

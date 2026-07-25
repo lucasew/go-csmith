@@ -37,7 +37,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
 	f.Body = outer
 	f.Stack = []*Block{outer}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	f.Stack = []*Block{outer}
 	eff := EmptyEffect()

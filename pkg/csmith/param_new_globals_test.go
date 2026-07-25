@@ -5,11 +5,11 @@ import "testing"
 func TestMergeParamContext(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	parent := EmptyCGContext()
+	parent := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	parent.EffectAccum = &eff
 	paramAccum := EmptyEffect().ReadVar(a)
-	param := EmptyCGContext()
+	param := EmptyCGContext().WithSession(testAmbientSession)
 	param.EffectAccum = &paramAccum
 	param.ExprDepth = 3
 	parent.MergeParamContext(param, true)
@@ -20,10 +20,10 @@ func TestMergeParamContext(t *testing.T) {
 		t.Fatal("depth")
 	}
 	// incomplete param accum must not invent expr_depth handoff after failed merge
-	parent2 := EmptyCGContext()
+	parent2 := EmptyCGContext().WithSession(testAmbientSession)
 	parent2.ExprDepth = 1
 	inc := IncompleteEffect()
-	param2 := EmptyCGContext()
+	param2 := EmptyCGContext().WithSession(testAmbientSession)
 	param2.EffectAccum = &inc
 	param2.ExprDepth = 9
 	parent2.MergeParamContext(param2, true)
@@ -41,7 +41,7 @@ func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	v := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
 	if v == nil || len(f.NewGlobals) != 1 || f.NewGlobals[0] != v {
@@ -60,7 +60,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
 	fm := NewFactMgrSess(testAmbientSession, caller)
-	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
 	// force globals enabled so body can create
 	var fi *Invocation
@@ -100,7 +100,7 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
 	}
 	caller := &Function{Name: "a"}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.ExprDepth = 0
@@ -126,7 +126,7 @@ func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
 	}
 	caller := &Function{Name: "a"}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
@@ -142,7 +142,7 @@ func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Types = env
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = env
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
@@ -160,12 +160,12 @@ func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	var fi *Invocation
 	var cg CGContext
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg = WithFunc(f, EmptyEffect())
+		cg = WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 		cg.ExprDepth = 1
 		fi = MakeRandomUnaryInvocation(NewRng(seed), opts, vs, NewExprTables(opts), &cg, GetIntType())
 		if fi != nil && fi.IsUnary {

@@ -30,7 +30,7 @@ func TestGetSubstring(t *testing.T) {
 func TestFindVariableScope(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	if EmptyCGContext().FindVariableScope(g) != ScopeGlobalVar {
+	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(g) != ScopeGlobalVar {
 		t.Fatal("global")
 	}
 	f := &Function{Name: "f"}
@@ -39,7 +39,7 @@ func TestFindVariableScope(t *testing.T) {
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if cg.FindVariableScope(p) != 0 {
 		t.Fatal("param", cg.FindVariableScope(p))
 	}
@@ -72,7 +72,7 @@ func TestFindVariableScope(t *testing.T) {
 	f.Param = []*Variable{p}
 	// non-global without CurrentFunc sticky (no invent "not found" past missing frame)
 	ClearErrorSess(testAmbientSession)
-	if EmptyCGContext().FindVariableScope(loc) != ScopeInactive {
+	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(loc) != ScopeInactive {
 		t.Fatal("nil CurrentFunc local must fail closed ScopeInactive")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -80,7 +80,7 @@ func TestFindVariableScope(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// global without CurrentFunc stays complete ScopeGlobalVar
-	if EmptyCGContext().FindVariableScope(g) != ScopeGlobalVar {
+	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(g) != ScopeGlobalVar {
 		t.Fatal("global without CurrentFunc must stay ScopeGlobalVar")
 	}
 	if HasErrorSess(testAmbientSession) {

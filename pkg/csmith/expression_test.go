@@ -33,7 +33,7 @@ func TestMakeRandomExpressionConstant(t *testing.T) {
 	tables := NewExprTables(opts)
 	r := NewRng(2)
 	e := func() *Expression {
-		c := EmptyCGContext()
+		c := EmptyCGContext().WithSession(testAmbientSession)
 		return MakeRandomExpression(r, opts, tables, nil, &c, GetSimpleType(EInt), nil, false, false, TermConstant, 0)
 	}()
 	if e == nil || e.Term != TermConstant || e.Con == nil || e.Output() == "" {
@@ -48,7 +48,7 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	e := func() *Expression {
-		c := EmptyCGContext()
+		c := EmptyCGContext().WithSession(testAmbientSession)
 		return MakeRandomExpression(r, opts, tables, vs, &c, GetSimpleType(EInt), &q, false, false, TermVariable, 0)
 	}()
 	if e == nil || e.Term != TermVariable || e.Var == nil {
@@ -491,7 +491,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	opts.GlobalVariables = true
 	vs.Opts = opts
 	// int want — float rejected then new var created (ScopeNewValue) or nil after tries
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	ev := makeExpressionVariableFlags(NewRng(1), vs, &cg, GetIntType(), nil, false, false)
 	// either created a new non-float, or nil — must not return the float
@@ -551,7 +551,7 @@ func TestMakeExpressionVariableIncompleteAmbientFailClosed(t *testing.T) {
 	vs.GlobalList = []*Variable{v}
 	vs.AllVars = []*Variable{v}
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	if makeExpressionVariableFlags(NewRng(1), vs, &cg, GetIntType(), nil, false, false) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed makeExpressionVariable")
@@ -562,7 +562,7 @@ func TestMakeExpressionVariableIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg2 := EmptyCGContext().WithFactMgr(fm)
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if makeExpressionVariableFlags(NewRng(2), vs, &cg2, GetIntType(), nil, false, false) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed makeExpressionVariable")
 	}
@@ -581,7 +581,7 @@ func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
 	vs.GlobalList = []*Variable{v}
 	vs.AllVars = []*Variable{v}
 	vs.Opts = opts
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// want int, var int → indirect 0 → ExprType should be var.Type
 	ev := makeExpressionVariableFlags(NewRng(2), vs, &cg, GetIntType(), nil, false, false)
 	if ev == nil {
@@ -611,7 +611,7 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	ev := makeExpressionVariableFlags(NewRng(2), vs, &cg, GetIntType(), nil, false, false)
 	if ev == nil || ev.Var == nil {
@@ -631,7 +631,7 @@ func TestSelectWithInvalidRejectsVolatileWhenImpure(t *testing.T) {
 	vol := CreateVariableQfer("g_v", GetIntType(), vq)
 	vs.GlobalList = []*Variable{vol}
 	vs.AllVars = []*Variable{vol}
-	cg := WithEffectContext(WithSideEffects())
+	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)
 	// under impure context must never hand back a volatile
 	for seed := uint64(1); seed < 40; seed++ {
 		got := vs.SelectWithInvalid(AccessRead, cg, GetIntType(), nil, NewRng(seed), MatchFlexible, nil)
@@ -655,7 +655,7 @@ func TestSelectWithInvalidExpandStructNewValueErrors(t *testing.T) {
 		// empty lists → local/param fail, NewValue or Global create
 		vs.GlobalList = nil
 		vs.AllVars = nil
-		v := vs.SelectWithInvalid(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(seed), MatchFlexible, nil)
+		v := vs.SelectWithInvalid(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(seed), MatchFlexible, nil)
 		if HasErrorSess(testAmbientSession) {
 			hit = true
 			if v != nil {
@@ -679,7 +679,7 @@ func TestSelectWithInvalidExcludesDummy(t *testing.T) {
 	vs.AllVars = []*Variable{a, b}
 	vs.Opts = opts
 	// only two globals; exclude a → must pick b or create
-	got := vs.SelectWithInvalid(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{a})
+	got := vs.SelectWithInvalid(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{a})
 	if got == a {
 		t.Fatal("invalid_vars must exclude a")
 	}
@@ -748,7 +748,7 @@ func TestBumpsExprDepth(t *testing.T) {
 func TestMakeRandomExpressionBumpsCallerExprDepth(t *testing.T) {
 	// Expression.cpp:213–218 — cg_context.expr_depth++ on Constant/Variable/user call
 	opts := Defaults()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.ExprDepth = 2
 	e := MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
 	if e == nil || e.Term != TermConstant {
@@ -763,7 +763,7 @@ func TestMakeRandomExpressionUsesCGExprDepthNotStaleArg(t *testing.T) {
 	// Expression.cpp:176 — filter uses cg_context.expr_depth, not a separate caller local
 	opts := Defaults()
 	opts.MaxExprComplexity = 3
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.ExprDepth = 2 // near max: 2+2 > 3 → force leaf terms
 	// pass stale exprDepth=0 that would allow Function if used; force Constant leaf
 	e := MakeRandomExpression(NewRng(5), opts, NewExprTables(opts), nil, &cg, GetIntType(), nil, true, false, TermConstant, 0)
@@ -782,7 +782,7 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	opts := Defaults()
 	env := &TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort)}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = env
 	// force constant so we don't need VariableSelector
 	e := MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg, nil, nil, true, false, TermConstant, 0)
@@ -796,7 +796,7 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	// empty/nil TypeEnv: complete soft miss (no invent simple type; non-sticky soft re-pick)
 	// later choose retries may still SetError when typ remains nil after tries
 	ClearErrorSess(testAmbientSession)
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg2, nil, nil, true, false, TermConstant, 0) != nil {
 		t.Fatal("empty Type env must not invent simple type")
@@ -808,7 +808,7 @@ func TestMakeRandomExpressionNoInventSessionProbs(t *testing.T) {
 	// C++ Probabilities singleton; no invent NewProbabilities(opts) when vs.Probs nil
 	opts := Defaults()
 	tables := NewExprTables(opts)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// nil vs: simple constant still ok (MakeRandom allows nil probs for simple)
 	e := MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, true, false, TermConstant, 0)
 	if e == nil || e.Term != TermConstant {
@@ -826,7 +826,7 @@ func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
 	// Expression.cpp:154–157, 186–187 — asserts sticky; no soft invent rewrite/emit
 	opts := Defaults()
 	tables := NewExprTables(opts)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// no_const && eConstant
 	ClearErrorSess(testAmbientSession)
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, false, true, TermConstant, 0) != nil {
@@ -886,7 +886,7 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	vs.Types = env
 	list := &FunctionList{Types: env}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = env
 	cg.Funcs = list
 	// many tries: result if any should not be pure std binary/unary alone when type is struct
@@ -906,7 +906,7 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 func TestMakeExpressionFuncallRequiresFactMgr(t *testing.T) {
 	// ExpressionFuncall.cpp:75 get_fact_mgr — no invent without FM
 	opts := Defaults()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if makeExpressionFuncall(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("nil FM must fail closed")
 	}
@@ -919,7 +919,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	inc := IncompleteEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	if makeExpressionFuncall(NewRng(1), opts, vs, NewExprTables(opts), &cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed makeExpressionFuncall")
@@ -928,7 +928,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(nil, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+	cg2 := WithFunc(nil, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
 	if makeExpressionFuncall(NewRng(2), opts, vs, NewExprTables(opts), &cg2, GetIntType(), nil, nil) != nil {
@@ -940,7 +940,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm3 := NewFactMgrSess(testAmbientSession, nil)
 	fm3.GlobalFacts = IncompleteFactSlice()
-	cg3 := EmptyCGContext().WithFactMgr(fm3)
+	cg3 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm3)
 	if makeExpressionFuncall(NewRng(3), opts, vs, NewExprTables(opts), &cg3, GetIntType(), nil, nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed makeExpressionFuncall")
 	}
@@ -965,7 +965,7 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	eff := EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// mark as written so restore is observable if accum mutates
 	pre := CloneFactSlice(fm.GlobalFacts)
@@ -1002,7 +1002,7 @@ func TestExpressionVariableAddrOfArgForbiddenAsParam(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// only param available — select may create globals; disable globals to force param
 	opts.GlobalVariables = false
 	vs.Opts = opts
@@ -1042,7 +1042,7 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	// must_use Type-nil stickies residual; must not invent soft select past hole
 	rw := &RWDirective{MustReadVars: []*Variable{broken, good}}
-	cg := WithFunc(f, EmptyEffect()).WithRW(rw)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -1059,7 +1059,7 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 	}
 	rw2 := &RWDirective{MustReadVars: []*Variable{shell, good}}
-	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw2)
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
 	if makeExpressionVariableFlags(NewRng(2), vs, &cg2, GetIntType(), &q, false, false) != nil {
@@ -1077,7 +1077,7 @@ func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, false, false, TermConstant, 0) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomExpression")
@@ -1086,7 +1086,7 @@ func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(nil, IncompleteEffect())
+	cg2 := WithFunc(nil, IncompleteEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
 	if MakeRandomExpression(NewRng(2), opts, tables, nil, &cg2, GetIntType(), nil, false, false, TermConstant, 0) != nil {
@@ -1098,7 +1098,7 @@ func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg3 := EmptyCGContext().WithFactMgr(fm)
+	cg3 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if MakeRandomExpression(NewRng(3), opts, tables, nil, &cg3, GetIntType(), nil, false, false, TermConstant, 0) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomExpression")
 	}
@@ -1108,7 +1108,7 @@ func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// MakeRandomParam same ambient gate
 	inc2 := IncompleteEffect()
-	cg4 := EmptyCGContext()
+	cg4 := EmptyCGContext().WithSession(testAmbientSession)
 	cg4.EffectAccum = &inc2
 	if MakeRandomParam(NewRng(4), opts, tables, nil, &cg4, GetIntType(), nil, 0) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomParam")
@@ -1474,7 +1474,7 @@ func TestMakeRandomExpressionVoidIsSimpleResidualSticky(t *testing.T) {
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// force constant term with void type via PickTermType path is hard; direct residual:
 	// void simple constant path
 	e := MakeRandomExpression(r, opts, tables, nil, &cg, GetSimpleType(EVoid), nil, false, false, TermConstant, 0)

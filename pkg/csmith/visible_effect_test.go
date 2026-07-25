@@ -106,7 +106,7 @@ func TestAddVisibleEffectUsesChain(t *testing.T) {
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	// call chain empty; current block has loc
 	other := EmptyEffect().WriteVar(loc)
@@ -193,17 +193,17 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(1))
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
 	// seed may fail; retry
 	var st *Stmt
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+		cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
 		st = MakeRandomIf(NewRng(seed), opts, probs, vs, NewExprTables(opts),

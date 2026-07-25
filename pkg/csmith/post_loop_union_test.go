@@ -31,7 +31,7 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	}
 	fm.MapStmEffect[body.StmID] = EmptyEffect()
 	forSt := &Stmt{Kind: StmtFor, Then: body, StmID: AllocStmID()}
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{}, preU, EmptyEffect(), &cg)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
@@ -88,7 +88,7 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 		fm.MapStmEffect = make(map[int]Effect)
 	}
 	fm.MapStmEffect[body.StmID] = EmptyEffect()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

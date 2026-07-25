@@ -60,14 +60,15 @@ type CGContext struct {
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
-// Sess defaults to the unit-test ambient bag; Generate uses WithSession(run bag).
+// Sess is left nil — callers must WithSession(run bag) or WithSession(testAmbientSession).
+// No ambient install (Generate-path purity).
 func EmptyCGContext() CGContext {
-	return CGContext{effectContext: EmptyEffect(), Sess: testAmbientSession}
+	return CGContext{effectContext: EmptyEffect()}
 }
 
-// ptrEmptyCG returns a heap EmptyCGContext for APIs that take *CGContext.
+// ptrEmptyCG returns a heap EmptyCGContext for unit-test APIs that take *CGContext.
 func ptrEmptyCG() *CGContext {
-	c := EmptyCGContext()
+	c := EmptyCGContext().WithSession(testAmbientSession)
 	return &c
 }
 
@@ -78,14 +79,14 @@ func (c CGContext) WithSession(s *Session) CGContext {
 }
 
 // cgSess returns c.Sess. Nil c → unit-test ambient.
-// Non-nil c must have Sess set (EmptyCGContext / WithSession / Generate).
+// Non-nil c must have Sess set (WithSession / Generate).
 // Pass &cg for by-value CGContext params.
 func cgSess(c *CGContext) *Session {
 	if c == nil {
 		return testAmbientSession
 	}
 	if c.Sess == nil {
-		panic("cgSess: Sess unset (use EmptyCGContext / WithSession / set Sess)")
+		panic("cgSess: Sess unset (use WithSession / set Sess)")
 	}
 	return c.Sess
 }
@@ -126,13 +127,15 @@ func (c *CGContext) NoteRead(v *Variable) {
 }
 
 // WithEffectContext returns a context with the given effect_context.
+// Sess is left nil — callers must WithSession(…).
 func WithEffectContext(eff Effect) CGContext {
-	return CGContext{effectContext: eff, Sess: testAmbientSession}
+	return CGContext{effectContext: eff}
 }
 
 // WithFunc returns a context for generating inside f.
+// Sess is left nil — callers must WithSession(run bag) or WithSession(testAmbientSession).
 func WithFunc(f *Function, eff Effect) CGContext {
-	return CGContext{effectContext: eff, CurrentFunc: f, Sess: testAmbientSession}
+	return CGContext{effectContext: eff, CurrentFunc: f}
 }
 
 // WithFuncList attaches the session function list.

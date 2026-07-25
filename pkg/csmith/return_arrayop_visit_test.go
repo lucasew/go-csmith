@@ -71,7 +71,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := MakeRandomArrayInit(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatal(st.Kind)
@@ -92,9 +92,9 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	f.RV = CreateVariableQfer("rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	fm := NewFactMgrSess(testAmbientSession, f)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := MakeRandomReturn(NewRng(3), opts, vs, &cg)
 	if st.Kind != StmtReturn || st.Expr == nil {
 		t.Fatal(st)

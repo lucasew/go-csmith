@@ -113,7 +113,7 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !cg.VisitFactsLhs(lhs, Defaults()) {

@@ -47,7 +47,7 @@ func TestAddRemoveQualifiers(t *testing.T) {
 		t.Fatal("nil SetVolatile must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*CVQualifiers)(nil).Restrict(AccessWrite, EmptyCGContext())
+	(*CVQualifiers)(nil).Restrict(AccessWrite, EmptyCGContext().WithSession(testAmbientSession))
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Restrict must SetError sticky")
 	}

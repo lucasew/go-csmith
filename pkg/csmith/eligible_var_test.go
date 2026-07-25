@@ -68,18 +68,18 @@ func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 func TestIsEligibleVarSEFreeVolatile(t *testing.T) {
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	// SE-free: ok
-	if !IsEligibleVar(v, 0, AccessRead, EmptyCGContext()) {
+	if !IsEligibleVar(v, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("se-free")
 	}
 	// non-SE-free: reject volatile
-	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(WithSideEffects())) {
+	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)) {
 		t.Fatal("vol + se")
 	}
 }
 
 func TestIsEligibleVarWrittenConflict(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	cg := WithEffectContext(EmptyEffect().WriteVar(a))
+	cg := WithEffectContext(EmptyEffect().WriteVar(a)).WithSession(testAmbientSession)
 	if IsEligibleVar(a, 0, AccessRead, cg) {
 		t.Fatal("written conflict")
 	}
@@ -90,10 +90,10 @@ func TestIsEligibleVarWrittenConflict(t *testing.T) {
 
 func TestIsEligibleVarConstWrite(t *testing.T) {
 	c := CreateVariableScalars("g_c", GetIntType(), true, false)
-	if IsEligibleVar(c, 0, AccessWrite, EmptyCGContext()) {
+	if IsEligibleVar(c, 0, AccessWrite, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("const write")
 	}
-	if !IsEligibleVar(c, 0, AccessRead, EmptyCGContext()) {
+	if !IsEligibleVar(c, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("const read ok")
 	}
 }
@@ -126,7 +126,7 @@ func TestFindAllVisibleVars(t *testing.T) {
 func TestChooseVarSkipsIneligible(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	cg := WithEffectContext(EmptyEffect().WriteVar(a))
+	cg := WithEffectContext(EmptyEffect().WriteVar(a)).WithSession(testAmbientSession)
 	// only b eligible
 	got := ChooseVar(NewRng(2), []*Variable{a, b}, AccessRead, cg, GetIntType(), MatchFlexible)
 	if got != b {
@@ -151,16 +151,16 @@ func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
 	}
 	item.AsArray = item
 	// eligible under empty context
-	if !IsEligibleVar(&item.Variable, 0, AccessRead, EmptyCGContext()) {
+	if !IsEligibleVar(&item.Variable, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("itemized read")
 	}
 	// IV written in context → read_indices fails → not eligible
-	cg := WithEffectContext(EmptyEffect().WriteVar(iv))
+	cg := WithEffectContext(EmptyEffect().WriteVar(iv)).WithSession(testAmbientSession)
 	if IsEligibleVar(&item.Variable, 0, AccessRead, cg) {
 		t.Fatal("want reject when index IV written")
 	}
 	// collective itself written → reject after coll switch
-	cg2 := WithEffectContext(EmptyEffect().WriteVar(&parent.Variable))
+	cg2 := WithEffectContext(EmptyEffect().WriteVar(&parent.Variable)).WithSession(testAmbientSession)
 	if IsEligibleVar(&item.Variable, 0, AccessRead, cg2) {
 		t.Fatal("collective written")
 	}
@@ -187,7 +187,7 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	}
 	fld := item.FieldVars[0]
 	item.FieldVars = append(item.FieldVars, nil)
-	if IsEligibleVar(fld, 0, AccessRead, EmptyCGContext()) {
+	if IsEligibleVar(fld, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("incomplete collective must fail closed not eligible")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -203,7 +203,7 @@ func TestIsEligibleVarIncompleteEffectSticky(t *testing.T) {
 	// Incomplete EffectContext must sticky (no invent soft-skip as absent re-pick)
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(IncompleteEffect())) {
+	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)) {
 		t.Fatal("incomplete EffectContext must fail closed not eligible")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -217,7 +217,7 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	// Fair: sticky fail closed not eligible.
 	ClearErrorSess(testAmbientSession)
 	broken := &Variable{Name: "g_p"} // Type nil
-	if IsEligibleVar(broken, 0, AccessRead, EmptyCGContext()) {
+	if IsEligibleVar(broken, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("Type-nil subject must fail closed not eligible")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -235,7 +235,7 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	// Force Type-nil mid-walk: parent of field is parent with Type then clear after fact
 	// IsInsideUnionField on Type-nil parent stickies residual true
 	parent.Type = nil
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	// plant a related FactUnion so IsNonreadableField walks Imply / ancestry
 	// (empty complete facts already nonreadable without residual walk)
 	uv := &Variable{Name: "g_u2", Type: ut}
@@ -249,7 +249,7 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray GetCollective sticky not eligible
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if IsEligibleVar(shell, 0, AccessRead, EmptyCGContext()) {
+	if IsEligibleVar(shell, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("IsArray without AsArray must fail closed not eligible")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -265,7 +265,7 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	blk := &Block{}
 	f.Stack = []*Block{blk}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	v := vs.SelectParentParam(AccessRead, cg, GetIntType(), &q, NewRng(3), MatchFlexible)
 	if v == nil {
 		t.Fatal("nil")
@@ -286,7 +286,7 @@ func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	if ChooseVarFull(NewRng(2), []*Variable{g, nil}, AccessRead, EmptyCGContext(), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+	if ChooseVarFull(NewRng(2), []*Variable{g, nil}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete vars must fail closed ChooseVarFull")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -300,7 +300,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vars := []*Variable{g}
-	if ChooseVarFull(NewRng(1), vars, AccessRead, WithEffectContext(IncompleteEffect()), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+	if ChooseVarFull(NewRng(1), vars, AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectContext must fail closed ChooseVarFull")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -310,7 +310,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if ChooseVarFull(NewRng(2), vars, AccessRead, cg, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed ChooseVarFull")
 	}
@@ -319,7 +319,7 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
-	cg2 := EmptyCGContext()
+	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectStm = inc
 	if ChooseVarFull(NewRng(3), vars, AccessRead, cg2, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectStm must fail closed ChooseVarFull")
@@ -336,7 +336,7 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// nil qfer
-	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
+	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil qfer must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -345,7 +345,7 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// VariableSelector.cpp:838–839 assert simple != void sticky
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), &q, nil, NewRng(2)) != nil {
+	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EVoid), &q, nil, NewRng(2)) != nil {
 		t.Fatal("void type must fail closed MakeInitValue")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -361,7 +361,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	inc := IncompleteEffect()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	if vs.MakeInitValue(AccessRead, cg, GetIntType(), &q, nil, NewRng(1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeInitValue")
@@ -372,7 +372,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg2 := EmptyCGContext().WithFactMgr(fm)
+	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	if vs.MakeInitValue(AccessRead, cg2, GetIntType(), &q, nil, NewRng(2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeInitValue")
 	}
@@ -380,7 +380,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg3 := WithFunc(nil, IncompleteEffect())
+	cg3 := WithFunc(nil, IncompleteEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.MakeInitValue(AccessRead, cg3, GetIntType(), &q, nil, NewRng(3)) != nil {

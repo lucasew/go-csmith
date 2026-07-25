@@ -10,7 +10,7 @@ func TestMakeRandomStmtErrorGuardNoRepick(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrCompatibleCheck)
 	st := makeRandomStmt(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk)
 	if stmtOK(st) {
@@ -35,7 +35,7 @@ func TestMakeRandomBlockRequiresCurrentFunc(t *testing.T) {
 	// Block.cpp:120 — assert(curr_func) sticky; no soft invent parentless block
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	cg := EmptyCGContext()
+	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
@@ -58,7 +58,7 @@ func TestMakeRandomBlockAbortsOnStickyError(t *testing.T) {
 	opts.MaxBlockSize = 0
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b != nil {
@@ -75,9 +75,9 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	tab := &ThresholdTable{}
 	tab.Add(100, int(StmtAssign))
@@ -100,7 +100,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
@@ -116,7 +116,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
-	cg2 := WithFunc(f2, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.Types = &TypeEnv{Sess: testAmbientSession}
 	if MakeRandomBlock(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, false) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBlock")
@@ -137,7 +137,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
-	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f3))
+	cg3 := WithFunc(f3, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f3))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	cg3.Types = &TypeEnv{Sess: testAmbientSession}
@@ -164,7 +164,7 @@ func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	st := makeRandomStmt(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk)
@@ -177,7 +177,7 @@ func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
 	fm2 := NewFactMgrSess(testAmbientSession, f)
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectAccum = &inc
 	st2 := makeRandomStmt(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, blk)
 	if stmtOK(st2) {
@@ -188,7 +188,7 @@ func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete EffectContext fails closed sticky before re-pick loop
-	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg3 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff3 := EmptyEffect()
 	cg3.EffectAccum = &eff3
 	st3 := makeRandomStmt(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg3, blk)

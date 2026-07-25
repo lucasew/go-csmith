@@ -29,7 +29,7 @@ func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
 	// FunctionInvocation.cpp:144 — assert(type) sticky; no GetIntType soft invent
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	c := EmptyCGContext()
+	c := EmptyCGContext().WithSession(testAmbientSession)
 	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &c, nil); fi != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}

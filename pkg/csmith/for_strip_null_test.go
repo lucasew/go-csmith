@@ -69,7 +69,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	fm.SetMapFactsIn(body.StmID, CloneFactSlice(entry))
 	fm.GlobalFacts = CloneFactSlice(entry)
 
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	pre := EmptyEffect()
 	cg.EffectAccum = &pre
@@ -162,7 +162,7 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	}
 	fm.SetMapFactsIn(body.StmID, CloneFactSlice(entry))
 	fm.GlobalFacts = CloneFactSlice(entry)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	pre := EmptyEffect()
 	cg.EffectAccum = &pre

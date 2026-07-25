@@ -13,9 +13,9 @@ func TestMakeExpressionAssign(t *testing.T) {
 	r := NewRng(2)
 	// ExpressionAssign.cpp:56–62 — get_fact_mgr always live
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	e := func() *Expression {
-		c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+		c := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		return MakeExpressionAssign(r, opts, probs, vs, tables, &c, GetIntType(), nil)
 	}()
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {
@@ -31,7 +31,7 @@ func TestMakeExpressionAssignRequiresFactMgr(t *testing.T) {
 	// non-sticky soft re-pick without FactMgr (no invent assign Expression shell)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	c := EmptyCGContext()
+	c := EmptyCGContext().WithSession(testAmbientSession)
 	e := MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil)
 	if e != nil {
 		t.Fatal("nil FM must fail closed")
@@ -47,7 +47,7 @@ func TestMakeExpressionAssignNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	c := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	if e := MakeExpressionAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil); e != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
@@ -96,7 +96,7 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	if MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionAssign")
@@ -107,7 +107,7 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	if MakeExpressionAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeExpressionAssign")
 	}
@@ -128,7 +128,7 @@ func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// incomplete EffectStm sticky before MakeExpressionAssign
 	cg.EffectStm = IncompleteEffect()

@@ -44,7 +44,7 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	var fi *Invocation
 	for seed := uint64(1); seed < 100; seed++ {
 		ClearErrorSess(testAmbientSession)
-		cg := WithFunc(f, EmptyEffect())
+		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.IsStd && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
 			break
@@ -74,7 +74,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	fi := MakeRandomBinaryInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())
 	if fi != nil {
@@ -88,7 +88,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectAccum = &eff
 	fi2 := MakeRandomBinaryInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType())
 	if fi2 != nil {
@@ -109,7 +109,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	list := &FunctionList{Funcs: []*Function{f}}
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	fi := MakeRandomInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, GetIntType(), nil, false)
 	if fi == nil || !fi.Failed {
@@ -122,7 +122,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectAccum = &eff
 	fi2 := MakeRandomInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, list, GetIntType(), nil, false)
 	if fi2 == nil || !fi2.Failed {
@@ -145,7 +145,7 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.Types = &env
 	// seed forces flipcoin(10) path when possible — try many seeds
@@ -185,7 +185,7 @@ func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	eff := EmptyEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.ExprDepth = 0
 	var fi *Invocation
@@ -280,7 +280,7 @@ func TestGenerateNewParentLocal(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
 	blk := &Block{}
-	v := vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext(), GetIntType(), nil, r)
+	v := vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
 	if v == nil || !v.IsLocal() || len(blk.LocalVars) != 1 {
 		t.Fatalf("%+v", v)
 	}
@@ -298,7 +298,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	vs.Types = env
 	tables := NewExprTables(opts)
 	fi := func() *Invocation {
-		c := EmptyCGContext().WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
+		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = env
 		return MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, &c, env)
 	}()
@@ -338,7 +338,7 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 	// mark effect known for ChooseFunc
 	callee.FEffect = EmptyEffect()
 	list.Funcs = []*Function{caller, callee}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Funcs = list
 	// force non-std and pick existing callee when flipcoin allows
 	found := false

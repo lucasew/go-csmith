@@ -10,7 +10,7 @@ func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
 	// seed one global so reuse is possible
-	g := vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
+	g := vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	if g == nil {
 		t.Fatal("seed global")
 	}
@@ -21,7 +21,7 @@ func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	for seed := uint64(2); seed < 40; seed++ {
 		beforeOld := currentSession().BK.useOldVarCnt
 		beforeNew := currentSession().BK.useNewVarCnt
-		v := vs.Select(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(seed), MatchFlexible)
+		v := vs.Select(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(seed), MatchFlexible)
 		if v == nil {
 			continue
 		}
@@ -49,7 +49,7 @@ func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
 	f.Stack = []*Block{outer, inner}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// many creates — both blocks should get locals across seeds
 	outerN, innerN := 0, 0
 	for seed := uint64(1); seed < 30; seed++ {
@@ -83,7 +83,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	inc := IncompleteEffect()
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.EffectAccum = &inc
 	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed GenerateNewVariable")
@@ -94,7 +94,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
-	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if vs.GenerateNewVariable(AccessWrite, cg2, GetIntType(), nil, NewRng(2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewVariable")
 	}
@@ -102,7 +102,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
+	cg3 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.GenerateNewVariable(AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
@@ -122,7 +122,7 @@ func TestSelectGlobalMTInvalidVars(t *testing.T) {
 	vs.GlobalList = []*Variable{a, b}
 	vs.GlobalNonvolatilesList = []*Variable{a, b}
 	// invalidate a → only b
-	got := vs.SelectGlobalMT(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{a})
+	got := vs.SelectGlobalMT(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{a})
 	if got != b {
 		// may create new if choose fails eligibility — accept b or new
 		if got == a {
@@ -143,7 +143,7 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	got := selectDerefPointer(NewRng(2), opts, NewProbabilities(opts), vs, cg, GetIntType(), &q, AccessRead)
 	if got != pv {
 		// may create — ensure not nil
@@ -167,7 +167,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	probs := NewProbabilities(opts)
-	cg := WithFunc(f, IncompleteEffect())
+	cg := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg, GetIntType(), &q, AccessRead, nil) != nil {
 		t.Fatal("incomplete EffectContext must fail closed selectDerefPointerInv")
 	}
@@ -175,7 +175,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	cg2 := WithFunc(f, EmptyEffect())
+	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed selectDerefPointerInv")
 	}
