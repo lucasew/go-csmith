@@ -420,8 +420,8 @@ func FindGoodJumpBlockSess(s *Session, r *Rng, blocks []*Block, curr *Block, asD
 			return nil
 		}
 		if asDest {
-			if last := curr.GetLastStm(); last != nil {
-				must := last.MustReturn()
+			if last := curr.GetLastStmSess(s); last != nil {
+				must := last.MustReturnSess(s)
 				// residual ERROR sticky — no invent soft-reject/allow dest past MustReturn residual
 				if sessHasError(s) {
 					return nil
@@ -583,7 +583,7 @@ func MakeRandomGoto(
 		if dest != nil && s == dest {
 			continue
 		}
-		if s.MustReturn() {
+		if s.MustReturnSess(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-skip must-return then pick later target
 			if sessHasError(cgSess(cg)) {
 				return makeGotoFailed()

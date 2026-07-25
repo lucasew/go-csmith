@@ -27,7 +27,7 @@ func (st Stmt) MustReturnSess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if !blks[0].MustReturn() {
+		if !blks[0].MustReturnSess(s) {
 			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
 			if sessHasError(s) {
 				return false
@@ -38,7 +38,7 @@ func (st Stmt) MustReturnSess(s *Session) bool {
 		if sessHasError(s) {
 			return false
 		}
-		ok := blks[1].MustReturn()
+		ok := blks[1].MustReturnSess(s)
 		// residual ERROR sticky — no invent must-return true past Else residual hole
 		if sessHasError(s) {
 			return false
@@ -92,7 +92,7 @@ func (st Stmt) MustJumpSess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if !blks[0].MustJump() {
+		if !blks[0].MustJumpSess(s) {
 			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
 			if sessHasError(s) {
 				return false
@@ -103,7 +103,7 @@ func (st Stmt) MustJumpSess(s *Session) bool {
 		if sessHasError(s) {
 			return false
 		}
-		ok := blks[1].MustJump()
+		ok := blks[1].MustJumpSess(s)
 		// residual ERROR sticky — no invent must-jump true past Else residual hole
 		if sessHasError(s) {
 			return false
@@ -118,22 +118,38 @@ func (st Stmt) MustJumpSess(s *Session) bool {
 // MustReturn mirrors Block::must_return.
 // Block.cpp:313–331 — last must_return, no break_stms, no escape via back edges.
 // Uses b.EmitFM for CFG when set; prefer MustReturnWithFM during DFA.
-// Block always live; sticky false (no invent not-must-return soft-skip past hole).}
+// Block always live; sticky false (no invent not-must-return soft-skip past hole).
 
 func (b *Block) MustReturn() bool {
+	return b.MustReturnSess(nil)
+}
+
+// MustReturnSess is MustReturn with explicit session residual sticky.
+func (b *Block) MustReturnSess(s *Session) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	return b.MustReturnWithFM(b.EmitFM)
+	return b.MustReturnWithFMSess(s, b.EmitFM)
 }
 
 // MustReturnWithFM is must_return with an explicit FactMgr for back-edge checks.
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
+	return b.MustReturnWithFMSess(nil, fm)
+}
+
+// MustReturnWithFMSess is MustReturnWithFM with explicit session residual sticky.
+func (b *Block) MustReturnWithFMSess(s *Session, fm *FactMgr) bool {
 	if b == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		if s == nil {
+			s = fmSess(fm)
+		}
+		sessNoteError(s, ErrGeneric)
 		return false
+	}
+	if s == nil {
+		s = fmSess(fm)
 	}
 	if len(b.Stmts) == 0 {
 		return false
@@ -142,22 +158,22 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	if len(b.BreakStmIDs) > 0 {
 		return false
 	}
-	last := b.GetLastStm()
-	if last == nil || !last.MustReturn() {
+	last := b.GetLastStmSess(s)
+	if last == nil || !last.MustReturnSess(s) {
 		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn residual
-		if sessHasError(fmSess(fm)) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue escape check past MustReturn residual true
-	if sessHasError(fmSess(fm)) {
+	if sessHasError(s) {
 		return false
 	}
 	// Block.cpp:318–326 — back edges into block (continue) can skip end return
 	esc := b.hasEscapeBackEdge(fm)
 	// residual ERROR sticky — no invent must-return true past escape CFG residual hole
-	if sessHasError(fmSess(fm)) {
+	if sessHasError(s) {
 		return false
 	}
 	return !esc
@@ -167,8 +183,13 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 // Block.cpp:336–341 — last must_jump and break_stms empty.
 // Block always live; sticky false (no invent not-must-jump soft-skip past hole).
 func (b *Block) MustJump() bool {
+	return b.MustJumpSess(nil)
+}
+
+// MustJumpSess is MustJump with explicit session residual sticky.
+func (b *Block) MustJumpSess(s *Session) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) == 0 {
@@ -177,13 +198,13 @@ func (b *Block) MustJump() bool {
 	if len(b.BreakStmIDs) > 0 {
 		return false
 	}
-	last := b.GetLastStm()
+	last := b.GetLastStmSess(s)
 	if last == nil {
 		return false
 	}
-	ok := last.MustJump()
+	ok := last.MustJumpSess(s)
 	// residual ERROR sticky — no invent must-jump true past last MustJump residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -229,19 +250,24 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 // Function.cpp:618–619 — return_type always live; void simple → false.
 // Incomplete Function/ReturnType sticky true (no invent "no return needed" past holes).
 func (f *Function) NeedReturnStmt() bool {
+	return f.NeedReturnStmtSess(nil)
+}
+
+// NeedReturnStmtSess is NeedReturnStmt with explicit session residual sticky.
+func (f *Function) NeedReturnStmtSess(s *Session) bool {
 	// Function always live; sticky incomplete need-return (restrictive)
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.ReturnType == nil {
 		// incomplete return type sticky need return (no invent void soft-skip)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	simple := f.ReturnType.IsSimple()
 	// residual ERROR sticky — no invent soft need-return past IsSimple residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return !(simple && f.ReturnType.Simple() == EVoid)

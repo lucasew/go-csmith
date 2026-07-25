@@ -698,7 +698,7 @@ func MakeRandomBlock(
 			pendingFwd = st.Label
 		}
 		// Block.cpp:152 — stop when statement must_return
-		must := st.MustReturn()
+		must := st.MustReturnSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-continue more stmts past MustReturn residual
 		if sessHasError(cgSess(cg)) {
 			break
@@ -727,8 +727,8 @@ func MakeRandomBlock(
 	// Block::post_creation_analysis (Block.cpp:682–742)
 	// Upstream appends return only inside post_creation when still missing.
 	// Without FactMgr, append return here so function bodies stay valid C.
-	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() {
-		must := b.MustReturn()
+	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmtSess(cgSess(cg)) {
+		must := b.MustReturnSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-append return past MustReturn residual
 		if sessHasError(cgSess(cg)) {
 			abortBlockMakeSess(cgSess(cg), f, b)
@@ -1331,8 +1331,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	fm.MapVisited[b.StmID] = true
 	// Block.cpp:734–741 — append return for top-level body when still missing
 	// incomplete postFacts must not invent return gen via FactsComplete(nil) empty
-	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() {
-		must := b.MustReturn()
+	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmtSess(cgSess(cg)) {
+		must := b.MustReturnSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-append return past MustReturn residual
 		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
