@@ -4,6 +4,8 @@ package csmith
 
 // TypeEnv holds derived_types / session type lists (Type.cpp statics).
 type TypeEnv struct {
+	// Sess is the pure-run bag when set (PointerTo cache / sticky errors).
+	Sess *Session
 	// DerivedTypes mirrors Type::derived_types (pointer types created so far).
 	DerivedTypes []*Type
 	// AllTypes mirrors Type::AllTypes (simples + aggregates available for fields).
@@ -23,17 +25,26 @@ type TypeEnv struct {
 // Incomplete DerivedTypes fails closed nil when add (no invent soft-skip hole
 // then match/append as if the pool were complete).
 func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
+	var s *Session
+	if env != nil {
+		s = env.Sess
+	}
+	return env.FindPointerTypeSess(s, t, add)
+}
+
+// FindPointerTypeSess is FindPointerType with explicit PointerCache bag.
+func (env *TypeEnv) FindPointerTypeSess(s *Session, t *Type, add bool) *Type {
 	// Type* pointee always live; sticky no invent pointer-to-nil / soft-skip hole
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	// PointerTo already caches by pointee identity.
-	p := PointerTo(t)
+	// PointerToSess caches by pointee identity on the run bag.
+	p := PointerToSess(s, t)
 	if env != nil && add {
 		// Type* always live on derived_types; hole → fail closed sticky (no invent soft-skip hole)
 		if !typesComplete(env.DerivedTypes) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		found := false

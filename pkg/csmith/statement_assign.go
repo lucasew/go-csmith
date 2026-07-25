@@ -468,16 +468,16 @@ func MakeRandomAssignQfer(
 	}
 
 	// StatementAssign.cpp:218–223 — CompatibleChecker → nullptr
-	if CompatibleCheckExprs(opts, rhs, LhsAsExpression(lhs)) {
+	if CompatibleCheckExprsSess(cgSess(cg), opts, rhs, LhsAsExpression(lhs)) {
 		// residual ERROR sticky — no invent soft-assign past CompatibleCheck residual true
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
-		sessNoteError(nil, ErrCompatibleCheck)
+		sessNoteError(cgSess(cg), ErrCompatibleCheck)
 		return Stmt{}
 	}
 	// residual ERROR sticky — no invent soft-assign past CompatibleCheck residual false
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return Stmt{}
 	}
 

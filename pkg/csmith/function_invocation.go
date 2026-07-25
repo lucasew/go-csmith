@@ -1351,7 +1351,7 @@ func MakeRandomBinaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:266–273 — CompatibleChecker hard-fail (nullptr)
-	if CompatibleCheckExprs(opts, left, right) {
+	if CompatibleCheckExprsSess(cgSess(cg), opts, left, right) {
 		// residual ERROR sticky — no invent soft-binary past CompatibleCheck residual true
 		if sessHasError(cgSess(cg)) {
 			return nil

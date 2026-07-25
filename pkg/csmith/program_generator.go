@@ -202,6 +202,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	}
 	s.ProgramGen = g
 	// Share gensym + derived_types across selector and generator.
+	g.Types.Sess = s
 	vs.Types = &g.Types
 	// Attribute generators for this generation (Initialize*Attributes)
 	InitAttrGeneratorsSess(s, opts, probs)

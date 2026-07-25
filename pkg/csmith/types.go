@@ -575,13 +575,18 @@ func SetPlatformSizesSess(s *Session, intSize, ptrSize int) {
 // to return 0 — fair port returns 0 (is_convertable compares pointee sizes via this).
 // Type* always live at SizeInBytes sites; sticky 0 (no invent zero-size soft-skip).
 func (t *Type) SizeInBytes() int {
+	return t.SizeInBytesSess(nil)
+}
+
+// SizeInBytesSess is SizeInBytes with PlatformPtrSize read on bag s.
+func (t *Type) SizeInBytesSess(s *Session) int {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	if t.ptrTo != nil {
 		// Type.cpp:1568–1572 — ePointer: pointer_size() side-effect then return 0
-		_ = sessOrAmbient(nil).PlatformPtrSize
+		_ = sessOrAmbient(s).PlatformPtrSize
 		return 0
 	}
 	// Type.cpp:1502–1531 — fixed simple sizes (independent of host LP64)
@@ -606,7 +611,7 @@ func (t *Type) SizeInBytes() int {
 		return 16
 	default:
 		// unknown simple — assert path sticky; no soft invent platform int size
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 }

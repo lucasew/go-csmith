@@ -1297,11 +1297,11 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell
 	hdr := f.OutputHeaderOpts(forceStatic, opts)
 	// residual ERROR sticky — no invent soft-continue body past OutputHeader residual
-	if sessHasError(nil) {
+	if sessHasError(sess) {
 		return ""
 	}
 	if hdr == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	s := ""
@@ -1311,7 +1311,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()
 		// residual ERROR sticky — no invent soft-continue past CommentOutput residual
-		if sessHasError(nil) {
+		if sessHasError(sess) {
 			return ""
 		}
 	}
@@ -1329,17 +1329,17 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 	// Function.cpp:575–598 — depth_protect + body + else ret_c always live together
 	// sticky no invent header-only / empty-body shells (C++ would dereference body)
 	if f.Body == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 	bodyOut := f.Body.OutputOpts(0, opts)
 	// residual ERROR sticky — no invent soft-continue past Body.Output residual
-	if sessHasError(nil) {
+	if sessHasError(sess) {
 		return ""
 	}
 	if bodyOut == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	if f.DepthProtect && f.RetConst != nil {
@@ -1348,7 +1348,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 		retVal := f.RetConst.Value
 		if retVal == "" {
 			// incomplete ret_c sticky — body only, no invent depth if/else
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(sess, ErrGeneric)
 			return ""
 		}
 		s += "if (DEPTH < MAX_DEPTH) \n"

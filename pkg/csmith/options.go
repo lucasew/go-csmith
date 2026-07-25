@@ -755,11 +755,11 @@ func (o Options) normalizeUpstreamFlow() Options {
 	}
 	// Upstream DFS mode forces fixed struct fields.
 	// CGOptions.cpp:410–417 resolve_exhaustive_options side effects.
+	// CompatibleCheck: C++ also sets CompatibleChecker static; Go reads
+	// opts.CompatibleCheck (and Session.CompatibleCheck when set via *Sess).
+	// No EnableCompatibleCheck process write here — keeps normalize pure.
 	if o.DFSExhaustive {
 		o.FixedStructFields = true
-		if o.CompatibleCheck {
-			EnableCompatibleCheck()
-		}
 	}
 	return o
 }

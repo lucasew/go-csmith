@@ -26,16 +26,29 @@ func ResetCompatibleCheckSess(s *Session) {
 	sessOrAmbient(s).CompatibleCheck = false
 }
 
-// compatibleCheckOn is true when process static or option requests the checker.
+// compatibleCheckOn is true when option or session static requests the checker.
 func compatibleCheckOn(opts Options) bool {
-	return sessOrAmbient(nil).CompatibleCheck || opts.CompatibleCheck
+	return compatibleCheckOnSess(nil, opts)
+}
+
+// compatibleCheckOnSess is compatibleCheckOn with an explicit session bag.
+func compatibleCheckOnSess(s *Session, opts Options) bool {
+	if opts.CompatibleCheck {
+		return true
+	}
+	return sessOrAmbient(s).CompatibleCheck
 }
 
 // CompatibleCheckExprVar mirrors CompatibleChecker::compatible_check(Variable*, Expression*).
 // CompatibleChecker.cpp:43–53 — when disabled always false.
 // Returns true when assignment should be rejected (COMPATIBLE_CHECK_ERROR).
 func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
-	if !compatibleCheckOn(opts) {
+	return CompatibleCheckExprVarSess(nil, opts, v, exp)
+}
+
+// CompatibleCheckExprVarSess is CompatibleCheckExprVar on bag s.
+func CompatibleCheckExprVarSess(s *Session, opts Options, v *Variable, exp *Expression) bool {
+	if !compatibleCheckOnSess(s, opts) {
 		return false
 	}
 	// CompatibleChecker.cpp:46–49 — assert(v); assert(exp); assert(0)
@@ -43,45 +56,50 @@ func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
 	// Fail closed: reject assignment rather than invent exp.compatible(v).
 	// incomplete IR rejects sticky (no invent "compatible OK" / soft re-pick)
 	if v == nil || exp == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	// complete path always reject (C++ assert(0)); callers sessNoteError(nil, ErrCompatibleCheck)
+	// complete path always reject (C++ assert(0)); callers sessNoteError(..., ErrCompatibleCheck)
 	return true
 }
 
 // CompatibleCheckExprs mirrors CompatibleChecker::compatible_check(Expression*, Expression*).
 // CompatibleChecker.cpp:58–65 — when disabled false; else bidirectional compatible.
 func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
+	return CompatibleCheckExprsSess(nil, opts, a, b)
+}
+
+// CompatibleCheckExprsSess is CompatibleCheckExprs on bag s.
+func CompatibleCheckExprsSess(s *Session, opts Options, a, b *Expression) bool {
 	// CompatibleChecker.cpp:60–61 — assert(exp1); assert(exp2)
-	if !compatibleCheckOn(opts) {
+	if !compatibleCheckOnSess(s, opts) {
 		return false
 	}
 	// incomplete Expression* fails closed sticky as reject (no invent non-error)
 	if a == nil || b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if a.CompatibleWithExpr(b, opts.ExpandStruct) {
 		// residual ERROR sticky — no invent reject-true past CompatibleWithExpr residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue reverse check past residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if b.CompatibleWithExpr(a, opts.ExpandStruct) {
 		// residual ERROR sticky — no invent reject-true past reverse CompatibleWithExpr residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue no-reject past reverse residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return false
