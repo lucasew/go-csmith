@@ -857,7 +857,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 
 	// find innermost body assign (array init) or nested block body
-	inner := findArrayOpInnermost(st)
+	inner := findArrayOpInnermostSess(cgSess(cg), st)
 	// StatementArrayOp.cpp:276–317 — body OR init_value path; neither is incomplete sticky
 	if inner == nil || inner.Then == nil {
 		sessNoteError(cgSess(cg), ErrGeneric)
@@ -866,7 +866,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 
 	// body path: nested fors around a Block of statements (array loop)
 	// init path: Then is a block whose first stmt is assign with ArrayAccess
-	if isArrayInitBody(inner.Then) {
+	if isArrayInitBodySess(cgSess(cg), inner.Then) {
 		// StatementArrayOp.cpp:299–316 — init_value + lhs visit + update_fact_for_assign
 		// StatementAssign always has live Lhs + Expression*
 		asg := &inner.Then.Stmts[0]
@@ -1000,9 +1000,14 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 }
 
 func findArrayOpInnermost(st *Stmt) *Stmt {
+	return findArrayOpInnermostSess(nil, st)
+}
+
+// findArrayOpInnermostSess is findArrayOpInnermost with explicit session residual sticky.
+func findArrayOpInnermostSess(s *Session, st *Stmt) *Stmt {
 	// Statement always live; sticky incomplete no invent nil soft-skip
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	cur := st
@@ -1013,14 +1018,19 @@ func findArrayOpInnermost(st *Stmt) *Stmt {
 }
 
 func isArrayInitBody(b *Block) bool {
+	return isArrayInitBodySess(nil, b)
+}
+
+// isArrayInitBodySess is isArrayInitBody with explicit session residual sticky.
+func isArrayInitBodySess(s *Session, b *Block) bool {
 	// Block always live for array-init body check; sticky incomplete no invent false soft-skip
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) != 1 {
 		return false
 	}
-	s := &b.Stmts[0]
-	return s.Kind == StmtAssign && s.ArrayAccess != ""
+	s0 := &b.Stmts[0]
+	return s0.Kind == StmtAssign && s0.ArrayAccess != ""
 }

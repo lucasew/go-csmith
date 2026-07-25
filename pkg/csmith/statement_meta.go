@@ -66,8 +66,8 @@ func GetBlocksStmtSess(s *Session, st *Stmt) []*Block {
 		if st.Then == nil {
 			return nil
 		}
-		inner := findArrayOpInnermost(st)
-		if inner != nil && isArrayInitBody(inner.Then) {
+		inner := findArrayOpInnermostSess(s, st)
+		if inner != nil && isArrayInitBodySess(s, inner.Then) {
 			return nil
 		}
 		// true body path (Block ctor) — rare; keep Then when not array-init shape
