@@ -1461,7 +1461,7 @@ func makeRandomStmtForced(
 	}
 	// StatementFilter (Statement.cpp:150–182)
 	f := filterFunc(func(v uint32) bool {
-		k := NumberToType(stmtTab, v)
+		k := NumberToTypeSess(cgSess(cg), stmtTab, v)
 		// Statement.cpp:158–160 — PartialExpander::expand_check
 		if !ExpandCheckSess(cgSess(cg), k) {
 			return true
@@ -1514,7 +1514,7 @@ func makeRandomStmtForced(
 			// Block.cpp:424 / Statement.cpp:259 — caller passed eFor (or other forced t)
 			kind = forceKind
 		} else {
-			kind = StatementProbabilityFilter(r, stmtTab, f)
+			kind = StatementProbabilityFilterSess(cgSess(cg), r, stmtTab, f)
 		}
 		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
 		if opts.StopByStmt >= 0 && GetCurrentSIDSess(cgSess(cg)) >= opts.StopByStmt {

@@ -72,13 +72,18 @@ func NewStatementThresholdTableSess(s *Session, opts Options) *ThresholdTable {
 // NumberToType mirrors Statement::number_to_type(value) for value in [0,100).
 // Statement.cpp:141–147.
 func NumberToType(table *ThresholdTable, value uint32) StatementType {
+	return NumberToTypeSess(nil, table, value)
+}
+
+// NumberToTypeSess is NumberToType with explicit session residual sticky.
+func NumberToTypeSess(s *Session, table *ThresholdTable, value uint32) StatementType {
 	// Statement.cpp:141–147 — assert(stmtTable_); assert(value < 100)
 	// sticky fail closed MaxStatementType (invalid) — no invent eAssign / soft re-pick
 	if table == nil || value >= 100 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxStatementType
 	}
-	v := table.GetValue(int(value))
+	v := table.GetValueSess(s, int(value))
 	if v < 0 {
 		return MaxStatementType
 	}
@@ -89,30 +94,40 @@ func NumberToType(table *ThresholdTable, value uint32) StatementType {
 // Statement.cpp:230–235 — rnd_upto(100); number_to_type.
 // Callers that need filter pass reject via RndUptoFilter.
 func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
+	return StatementProbabilitySess(nil, r, table)
+}
+
+// StatementProbabilitySess is StatementProbability with explicit session residual sticky.
+func StatementProbabilitySess(s *Session, r *Rng, table *ThresholdTable) StatementType {
 	// Statement.cpp:233–234 — assert(value != -1); assert(0..99)
 	// ERROR_GUARD(MAX_STATEMENT_TYPE); sticky no soft invent eAssign
 	if r == nil || table == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxStatementType
 	}
-	v := r.RndUpto(100)
-	return NumberToType(table, v)
+	v := r.RndUptoSess(s, 100)
+	return NumberToTypeSess(s, table, v)
 }
 
 // StatementProbabilityFilter mirrors StatementProbability with a Filter
 // (e.g. reject compound when at max depth — filter implemented by caller).
 func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) StatementType {
+	return StatementProbabilityFilterSess(nil, r, table, f)
+}
+
+// StatementProbabilityFilterSess is StatementProbabilityFilter with explicit session residual sticky.
+func StatementProbabilityFilterSess(s *Session, r *Rng, table *ThresholdTable, f Filter) StatementType {
 	// Statement.cpp ERROR_GUARD(MAX_STATEMENT_TYPE); sticky no soft invent eAssign
 	if r == nil || table == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxStatementType
 	}
-	v := r.RndUptoFilter(100, f)
+	v := r.RndUptoFilterSess(s, 100, f)
 	// filter rejection may yield -1 from RndUptoFilter — non-sticky MAX (soft re-pick kinds)
 	if int32(v) < 0 {
 		return MaxStatementType
 	}
-	return NumberToType(table, v)
+	return NumberToTypeSess(s, table, v)
 }
 
 // IsCompound mirrors Statement::is_compound.
@@ -132,8 +147,13 @@ func InitProbabilityTable(opts Options) *ThresholdTable {
 // GetType mirrors Statement::get_type — returns the eStatementType kind.
 // Incomplete Stmt sticky MaxStatementType.
 func (st *Stmt) GetType() StatementType {
+	return st.GetTypeSess(nil)
+}
+
+// GetTypeSess is GetType with explicit session residual sticky.
+func (st *Stmt) GetTypeSess(s *Session) StatementType {
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxStatementType
 	}
 	return st.Kind
