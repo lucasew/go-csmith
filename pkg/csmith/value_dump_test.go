@@ -16,7 +16,7 @@ func TestOutputValueDumpSimple(t *testing.T) {
 
 func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	// Variable* always live in FieldVars sticky; soft invent skip would dump later fields
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -27,10 +27,10 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	if s := v.OutputValueDump("checksum ", 1, nil); s != "" {
 		t.Fatal("nil FieldVars hole must fail closed whole dump, not soft-skip", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars hole dump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// union hole
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "a", Type: GetIntType(), BitWidth: -1},
@@ -44,14 +44,14 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	if s := uv.OutputValueDump("c ", 1, facts); s != "" {
 		t.Fatal("nil union FieldVars hole must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil union FieldVars hole dump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputValueDumpStructFields(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
@@ -93,14 +93,14 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 	}
 	// incomplete UnionFacts residual: soft invent was soft-skip unreadable then partial dump.
 	// Fair: sticky fail closed empty whole dump.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := uv.OutputValueDump("c ", 1, IncompleteUnionFactSlice()); s != "" {
 		t.Fatal("incomplete UnionFacts OutputValueDump must fail closed empty", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete UnionFacts OutputValueDump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputValueDumpArrayExpand(t *testing.T) {
@@ -118,34 +118,34 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 		t.Fatal(out)
 	}
 	// IsArray without AsArray soft invent was scalar printf path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if shell.OutputValueDump("c ", 1, nil) != "" {
 		t.Fatal("IsArray without AsArray OutputValueDump must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray OutputValueDump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputValueDumpTypeNilSticky(t *testing.T) {
 	// Variable + Type always live at dump; sticky no invent empty dump past Type-nil shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Variable{Name: "g_broken"}).OutputValueDump("c ", 0, nil) != "" {
 		t.Fatal("Type-nil OutputValueDump must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil OutputValueDump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if outputValueDumpArray(&Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil) != "" {
 		t.Fatal("Type-nil outputValueDumpArray must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil outputValueDumpArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
@@ -154,8 +154,8 @@ func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
 	// Soft invent residual: Type-nil field on union dump via IsFieldReadable already sticky.
 	// Here: ambient residual ERROR before directive soft invents soft-continue later field.
 	// Fair: residual sticky whole dump fail closed (empty dir + residual → "").
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -177,10 +177,10 @@ func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
 	if av.Variable.OutputValueDump("c ", 1, nil) != "" {
 		t.Fatal("Type-nil field must fail closed array dump, not invent later field")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil field array dump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpandWithinRanges(t *testing.T) {

@@ -94,7 +94,7 @@ func TestGoGeneratorHasForwardAndBody(t *testing.T) {
 
 func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 	// no invent program without built user function / functions section / main
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Seed = 11
 	opts.MaxBlockSize = 1
@@ -106,15 +106,15 @@ func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 		t.Fatal("full program requires FUNCTIONS and main")
 	}
 	// sticky ERROR_RETURN path returns error, not partial C
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts2 := Defaults()
 	opts2.Seed = 12
 	g := NewProgramGenerator(NewSession(opts2))
 	g.Initialize()
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	// GenerateFunctions stops; without built user GoGenerator must empty
 	// (re-Initialize at start of GoGenerator clears error — call pipeline manually)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g2 := NewProgramGenerator(NewSession(opts2))
 	g2.Initialize()
 	g2.GenerateAllTypes()
@@ -137,12 +137,12 @@ func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 	if g2.OutputFunctions() != "" {
 		t.Fatal("no invent functions section without built user")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	// Function* hole on Funcs must not invent hasUser / functions section from later built
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	g := NewProgramGenerator(NewSession(opts))
 	built := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
@@ -204,47 +204,47 @@ func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 }
 
 func TestOutputMainNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ProgramGenerator)(nil).OutputMain() != "" {
 		t.Fatal("nil generator OutputMain must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil generator OutputMain must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// --nomain soft empty
 	g := NewProgramGenerator(NewSession(Defaults()))
 	g.Opts.NoMain = true
 	if g.OutputMain() != "" {
 		t.Fatal("--nomain OutputMain must soft empty")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("--nomain OutputMain must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestProgramGeneratorNilEmitSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ProgramGenerator)(nil).OutputHeader() != "" {
 		t.Fatal("nil OutputHeader must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputHeader must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ProgramGenerator)(nil).GoGenerator() != "" {
 		t.Fatal("nil GoGenerator must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GoGenerator must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ProgramGenerator)(nil).OutputFunctions() != "" {
 		t.Fatal("nil OutputFunctions must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputFunctions must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func TestSameFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	b := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -17,31 +17,31 @@ func TestSameFacts(t *testing.T) {
 		t.Fatal("diff")
 	}
 	// nil hole sticky — no invent same-as-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{nil}
 	if SameFacts(hole, hole) {
 		t.Fatal("nil hole must not be same")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("SameFacts nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete PointTo sticky
 	ptHole := []*FactPointTo{{Var: p, PointTo: []*Variable{nil}}}
 	if SameFacts(ptHole, ptHole) {
 		t.Fatal("nil pointee must not invent SameFacts")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("SameFacts nil pointee must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindFact(ptHole, MakeFactPointTo(p, NullPtr)) >= 0 {
 		t.Fatal("FindFact incomplete map must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindFact incomplete map must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Equal residual soft invent was soft-continue later match invent found index.
 	// Fair: sticky -1. Want with PointTo hole stickies Equal residual false.
 	wantHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
@@ -49,10 +49,10 @@ func TestSameFacts(t *testing.T) {
 	if FindFact(complete, wantHole) >= 0 {
 		t.Fatal("Equal residual FindFact must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("equal residual FindFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// SameFacts residual via FindFact Equal residual soft invent was same-true.
 	// Fair: sticky not-same.
 	// Use complete map vs want that causes Equal residual on first scan element...
@@ -66,7 +66,7 @@ func TestSameFacts(t *testing.T) {
 }
 
 func TestSubsetFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// wider set implies narrower
 	wide := []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})}
@@ -94,15 +94,15 @@ func TestSubsetFacts(t *testing.T) {
 		}
 	}
 	// nil fact hole sticky — no invent skip as subset
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{nil}
 	if SubsetFacts(hole, hole) {
 		t.Fatal("nil hole must not be subset")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("SubsetFacts nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Imply residual: PointTo nil hole soft invent was soft-continue not-subset then invent subset later.
 	// Fair: sticky fail closed not-subset with ERROR.
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{NullPtr, nil}}
@@ -110,10 +110,10 @@ func TestSubsetFacts(t *testing.T) {
 	if SubsetFacts(ok, []*FactPointTo{broken}) {
 		t.Fatal("Imply residual must fail closed not-subset")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Imply residual SubsetFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsCtrlStmt(t *testing.T) {
@@ -127,19 +127,19 @@ func TestIsCtrlStmt(t *testing.T) {
 		t.Fatal("assign/return/for must not be is_ctrl_stmt")
 	}
 	// Statement always live; sticky no invent not-ctrl soft-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if IsCtrlStmt(nil) {
 		t.Fatal("nil IsCtrlStmt must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsCtrlStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSameFactVec(t *testing.T) {
 	// Fact.cpp:237–246 full FactVec (ePointTo + eUnionWrite).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_sfv", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -156,13 +156,13 @@ func TestSameFactVec(t *testing.T) {
 	if SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{u1}) {
 		t.Fatal("union mismatch")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 	// Statement.cpp:551 — same_facts on full FactVec; PT match + union lattice
 	// mismatch must not ShortcutOK (soft invent was PT-only SameFacts).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_scu", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -186,22 +186,22 @@ func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 	cg.EffectAccum = &eff
 	facts := append([]*FactPointTo(nil), pt...)
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
-		t.Fatalf("want ShortcutNone when eUnionWrite lattice differs, err=%v", HasError())
+		t.Fatalf("want ShortcutNone when eUnionWrite lattice differs, err=%v", HasErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// matching live + map_in → still ShortcutOK
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
 	facts = append([]*FactPointTo(nil), pt...)
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
-		t.Fatalf("want ShortcutOK when full FactVec matches, err=%v", HasError())
+		t.Fatalf("want ShortcutOK when full FactVec matches, err=%v", HasErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	// Statement.cpp:559 — inputs = map_facts_out[this] full FactVec (eUnionWrite too).
 	// Soft invent left live UnionFacts at entry after ShortcutOK.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_sc", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -225,7 +225,7 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	cg.EffectAccum = &eff
 	facts := append([]*FactPointTo(nil), pt...)
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
-		t.Fatalf("want ShortcutOK err=%v", HasError())
+		t.Fatalf("want ShortcutOK err=%v", HasErrorSess(testAmbientSession))
 	}
 	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil || fm.UnionFacts[0].LastWrittenFID != 1 {
 		t.Fatalf("shortcut must install map_out unions last_write=1, got %#v", fm.UnionFacts)
@@ -234,12 +234,12 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	if entryU.LastWrittenFID != 0 {
 		t.Fatal("entry fact object must stay fid 0")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
 	// Statement.cpp:600–605 inputs_copy before visit; set_fact_in(pre full FactVec).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_vin2", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -261,7 +261,7 @@ func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
 	if len(got) != 1 || got[0].LastWrittenFID != 0 {
 		t.Fatalf("map_in pre fid 0, got %#v", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestShortcutAnalysisReuse(t *testing.T) {
@@ -293,44 +293,44 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	}
 	// Statement + facts + CGContext always live; sticky
 	// Nil FM / StmID≤0 stay non-sticky ShortcutNone
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ShortcutAnalysis(nil, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("nil stmt must ShortcutNone")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil stmt ShortcutAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ShortcutAnalysis(st, nil, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("nil facts must ShortcutNone")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts ShortcutAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ShortcutAnalysis(st, &facts, nil, Defaults()) != ShortcutNone {
 		t.Fatal("nil cg must ShortcutNone")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg ShortcutAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cgNoFM := EmptyCGContext()
 	if ShortcutAnalysis(st, &facts, &cgNoFM, Defaults()) != ShortcutNone {
 		t.Fatal("nil FM must ShortcutNone")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM ShortcutAnalysis must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	if ShortcutAnalysis(st0, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("StmID 0 must ShortcutNone")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 ShortcutAnalysis must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block shortcut: hard IR sticky; FM/StmID 0 non-sticky
 	b := &Block{StmID: 9}
 	fm.SetMapFactsIn(9, facts)
@@ -339,21 +339,21 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	if ShortcutAnalysisBlock(nil, &facts, &cg) != ShortcutNone {
 		t.Fatal("nil block must ShortcutNone")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block ShortcutAnalysisBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ShortcutAnalysisBlock(b, &facts, &cgNoFM) != ShortcutNone {
 		t.Fatal("nil FM block shortcut must ShortcutNone")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM ShortcutAnalysisBlock must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestShortcutConflict(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
 	fm := NewFactMgr(nil)
@@ -373,7 +373,7 @@ func TestShortcutConflict(t *testing.T) {
 }
 
 func TestValidateAndUpdateFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -431,7 +431,7 @@ func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
 func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 	// soft invent: mark first goto then stop on nil CFG edge
 	// fair: incomplete CFG sticky — mark none (no invent partial / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
 	root := &Stmt{Kind: StmtFor, StmID: 10, Then: &Block{Stmts: []Stmt{gotoSt}}}
 	fm := NewFactMgr(nil)
@@ -446,25 +446,25 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 	if fm.MapVisited[20] {
 		t.Fatal("incomplete CFG must not invent partial goto visited mark")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete CFG MarkContainedGotosVisited must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Statement + FactMgr always live; sticky (no invent soft-skip mark past hole)
 	MarkContainedGotosVisited(nil, fm)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil root MarkContainedGotosVisited must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	MarkContainedGotosVisited(root, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fm MarkContainedGotosVisited must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCGContextAddEffect(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext()
 	eff := EmptyEffect()
@@ -483,42 +483,42 @@ func TestContainsStmt(t *testing.T) {
 		t.Fatal("contains")
 	}
 	// Statement always live; sticky no invent not-contained soft-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ContainsStmt(nil, &inner) {
 		t.Fatal("nil root ContainsStmt must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil root ContainsStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ContainsStmt(&outer, nil) {
 		t.Fatal("nil target ContainsStmt must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil target ContainsStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindStmtInTree(nil, 1) != nil {
 		t.Fatal("nil FindStmtInTree must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FindStmtInTree must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindStmtInTree(&outer, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtInTree must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmID 0 FindStmtInTree must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if BlockContainsStmt(nil, &inner) {
 		t.Fatal("nil BlockContainsStmt must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BlockContainsStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
@@ -602,8 +602,8 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 	// FindStmt residual soft invent was soft-continue skip then invent fixed tree later.
 	// Fair: residual sticky restrictive unfixed true.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	// incomplete if sole Blocks entry — FindStmt residual when classifying edge src
 	outer := &Block{Func: f, Stmts: []Stmt{
@@ -617,10 +617,10 @@ func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("FindStmt residual must fail closed unfixed, not invent fixed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindStmt residual ContainsUnfixedGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual after containsUnfixedGotoIDs residual soft invent was invent fixed false.
 	// Fair: sticky unfixed true. incomplete CFG residual.
 	fm2 := NewFactMgr(f)
@@ -628,10 +628,10 @@ func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 	if !ContainsUnfixedGoto(root, fm2) {
 		t.Fatal("CFG residual ContainsUnfixedGoto must fail closed unfixed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CFG residual ContainsUnfixedGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestContainsUnfixedGotoImply(t *testing.T) {
@@ -665,17 +665,17 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	}
 	// Imply residual: PointTo nil hole soft invent was soft-continue then invent fixed.
 	// Fair: sticky unfixed true.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{a, nil}}
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
 	fm.SetMapFactsIn(10, []*FactPointTo{broken})
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("Imply residual must fail closed unfixed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Imply residual ContainsUnfixedGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
 	// incomplete srcOut hole: fail closed unfixed (no invent fixed past hole)
 	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointTo(p, a), nil}
@@ -683,29 +683,29 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 		t.Fatal("incomplete MapFactsOut must fail closed unfixed")
 	}
 	// Statement/Block always live; sticky unfixed (no invent all-fixed soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !ContainsUnfixedGoto(nil, fm) {
 		t.Fatal("nil root ContainsUnfixedGoto must fail closed unfixed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil root ContainsUnfixedGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !ContainsUnfixedGotoBlock(nil, fm) {
 		t.Fatal("nil Block ContainsUnfixedGotoBlock must fail closed unfixed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block ContainsUnfixedGotoBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 	// Statement.cpp:785–803 — visited goto whose *dest* is inside this statement;
 	// src need not be contained (nGotoIn to a plain assign). Soft invent required
 	// ids[src] for cond2 → false ShortcutOK on seed-7 func_33 remaining assign.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -740,7 +740,7 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 		t.Fatal("nonempty srcOut + empty destIn must be unfixed")
 	}
 	// Shortcut must not reuse when unfixed (Statement.cpp:551–553)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
 	fm.UnionFacts = []*FactUnion{}
@@ -760,8 +760,8 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 // imply jump-src out still pure-shortcut (seed-895 if-926 unfixed=0 vs UP=1 →
 // nested for IV read kept → feffect g_924.f2 order).
 func TestContainsUnfixedGotoUnionImply(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	// union subject for eUnionWrite lattice
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
@@ -801,7 +801,7 @@ func TestContainsUnfixedGotoUnionImply(t *testing.T) {
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("nonempty union srcOut + empty destIn must be unfixed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
@@ -830,7 +830,7 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 
 func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 	// Fact* always live; incomplete working set sticky (no invent visit success)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 88, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -844,18 +844,18 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 	if StmVisitFacts(st, &facts, &cg, Defaults()) {
 		t.Fatal("incomplete inputs must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete inputs StmVisitFacts must SetError sticky")
 	}
 	if fm.MapVisited[88] {
 		t.Fatal("must not mark visited when inputs incomplete before visit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	// incomplete pre-visit inputs sticky (no invent set_fact_in from cleaned clone)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -869,13 +869,13 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	if ValidateAndUpdateFacts(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("incomplete inputs must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete inputs ValidateAndUpdateFacts must SetError sticky")
 	}
 	if _, ok := fm.MapFactsIn[90]; ok {
 		t.Fatal("must not invent MapFactsIn from incomplete inputs")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
@@ -904,7 +904,7 @@ func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 
 func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 	// nil fact hole in MapFactsOut — no invent clone-to-nil while ShortcutOK
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{
@@ -968,7 +968,7 @@ func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 
 func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	// incomplete map_stm_effect / accum must not invent ShortcutOK
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -992,12 +992,12 @@ func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("incomplete EffectAccum must fail closed ShortcutNone")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	// incomplete EffectAccum must not invent StmVisitFacts true while recording map_accum
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -1018,10 +1018,10 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	if EffectComplete(fm.GetMapAccumEffect(90)) {
 		t.Fatal("map_accum must stay incomplete marker")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// StmID 0 fails closed sticky (no invent soft-skip map_accum/visited)
 	st0 := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -1036,8 +1036,8 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	if FactsComplete(facts0) {
 		t.Fatal("StmID 0 must wipe facts incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

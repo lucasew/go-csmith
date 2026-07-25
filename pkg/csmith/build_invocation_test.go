@@ -7,7 +7,7 @@ import (
 
 func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	// FunctionInvocationUser.cpp:175 — assert(type); sticky Failed no GetIntType invent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
@@ -16,15 +16,15 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil return type must fail without soft invent")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil return type must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	// zero-param callee must not invent success call without process RNG — sticky Failed
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	callee := &Function{Name: "func_x", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list := &FunctionList{Funcs: []*Function{callee}}
@@ -33,27 +33,27 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil RNG must fail closed user invoke")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG BuildInvocationAndFunction must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// callee / cg hard IR sticky Failed
 	fi3 := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, nil)
 	if fi3 == nil || !fi3.Failed {
 		t.Fatal("nil callee must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil callee BuildUserInvocation must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Param hole sticky Failed
 	callee2 := &Function{Name: "func_y", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
 		Param: []*Variable{nil}}
@@ -61,19 +61,19 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi4 == nil || !fi4.Failed {
 		t.Fatal("nil Param hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Param hole BuildUserInvocation must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MakeRandomInvocation nil r/cg sticky Failed
 	fi5 := MakeRandomInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, GetIntType(), nil, false)
 	if fi5 == nil || !fi5.Failed {
 		t.Fatal("nil RNG MakeRandomInvocation must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomInvocation must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
@@ -139,7 +139,7 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 
 func TestBuildUserInvocationArgCount(t *testing.T) {
 	// SanityCheck sticky on GenerateNewParentLocal: plant int+pointer targets and scan seeds
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	cgSeed := EmptyCGContext()
@@ -160,7 +160,7 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	callee.FEffect = EmptyEffect().ReadVar(g)
 	var fi *Invocation
 	for seed := uint64(3); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		caller := &Function{Name: "func_1"}
 		blk := &Block{Func: caller}
 		caller.Stack = []*Block{blk}
@@ -174,13 +174,13 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	if fi == nil {
 		t.Fatal("no successful BuildUserInvocation with 2 args in seed scan")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	// FunctionInvocationUser.cpp:257–258 — ERROR_GUARD(false) when make_random_param null
 	// sticky Failed (no invent soft re-pick past null param without ERROR)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// force param term → Variable only; empty selector cannot select → null
 	opts.MaxExprComplexity = 0
@@ -206,15 +206,15 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	if len(fi.Args) != 0 {
 		t.Fatalf("must not append partial args: %d", len(fi.Args))
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("null param BuildUserInvocation must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	// get_fact_mgr_for_func after signature always live; sticky Failed without paired FM
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxFuncs = 10
 	vs := NewVariableSelector(opts)
@@ -222,7 +222,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	cg := EmptyCGContext()
 	f := MakeRandomSignature(NewRng(1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, list)
 	if f == nil {
-		t.Fatal("signature", HasError())
+		t.Fatal("signature", HasErrorSess(testAmbientSession))
 	}
 	// same-package clear paired FM (signature always pairs; strip for fail-closed path)
 	f.factMgr = nil
@@ -230,10 +230,10 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	if f.Body != nil {
 		t.Fatal("nil paired FM must fail closed body")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil paired FM GenerateBody must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// BuildInvocationAndFunction incomplete ambient: Failed sticky before body hand-over
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext()
@@ -242,10 +242,10 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete ambient BuildInvocationAndFunction must Failed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete ambient BuildInvocationAndFunction must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// stripped calFM sticky Failed: signature ok then clear FM before hand-over via
 	// same-package re-entry of PairedFactMgr path — BuildInvocationAndFunction re-makes
 	// signature so clear after MakeRandomSignature inside is not injectable.
@@ -254,24 +254,24 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	if (*Function)(nil).PairedFactMgr() != nil {
 		t.Fatal("nil Function PairedFactMgr must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function PairedFactMgr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f2 := &Function{Name: "no_fm", ReturnType: GetIntType()}
 	if f2.PairedFactMgr() != nil {
 		t.Fatal("unpaired Function PairedFactMgr must be nil")
 	}
 	// unpaired is complete miss (no invent FM) — not sticky until generate path
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("unpaired live Function PairedFactMgr must not sticky empty miss")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	// revisit under incomplete AccumEffContext must not invent success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
@@ -299,10 +299,10 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete AccumEffContext must fail closed BuildUserInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete AccumEffContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts on revisit must sticky fail
 	callee2 := &Function{
 		Name:            "g_helper2",
@@ -322,10 +322,10 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("incomplete GlobalFacts must fail closed BuildUserInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock — gen-time revisit handoff
@@ -339,7 +339,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 // Mid-gen FP leaves CurrBlk on a nested statement parent; preferring AnalysisBlock
 // folds visible effects against the wrong frame (ok-var eligibility / seed-7 pool size).
 func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	// Frame local lives only on stack-top (inner). Outer parent is stale CurrBlk.
@@ -370,8 +370,8 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	writeInner := EmptyEffect().WriteVar(innerLoc)
 	// Gen path: CurrentBlock (inner) — l_inner is frame of inner → folded
 	cg.AddVisibleEffectAt(writeInner, cg.CurrentBlock())
-	if HasError() {
-		t.Fatalf("CurrentBlock handoff sticky: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("CurrentBlock handoff sticky: %v", HasErrorSess(testAmbientSession))
 	}
 	if !cg.EffectAccum.IsWritten(innerLoc) {
 		t.Fatal("gen path CurrentBlock=inner must fold inner-frame write")
@@ -380,14 +380,14 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	eff2 := EmptyEffect()
 	cg.EffectAccum = &eff2
 	cg.AddVisibleEffectAt(writeInner, cg.AnalysisBlock())
-	if HasError() {
-		t.Fatalf("AnalysisBlock handoff sticky: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("AnalysisBlock handoff sticky: %v", HasErrorSess(testAmbientSession))
 	}
 	if cg.EffectAccum.IsWritten(innerLoc) {
 		t.Fatal("AnalysisBlock=outer must not invent fold of inner-only frame write")
 	}
 	// Full BuildUserInvocation revisit with stale CurrBlk must still succeed (gen uses stack top)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	callee := &Function{
 		Name:            "func_rev",
 		ReturnType:      GetIntType(),
@@ -404,19 +404,19 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	cg.EffectStm = EmptyEffect()
 	fi := BuildUserInvocation(NewRng(11), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee)
 	if fi == nil || fi.Failed {
-		t.Fatalf("gen revisit with stale CurrBlk must succeed; Failed=%v err=%v", fi != nil && fi.Failed, HasError())
+		t.Fatalf("gen revisit with stale CurrBlk must succeed; Failed=%v err=%v", fi != nil && fi.Failed, HasErrorSess(testAmbientSession))
 	}
-	if HasError() {
-		t.Fatalf("must not sticky: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("must not sticky: %v", HasErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestBuildUserInvocationRevisitClearsCallerCurrRHS — FunctionInvocationUser.cpp:282–284
 // / CGContext.cpp:85–93. BUILD revisit must not inherit caller CurrRHS (ExpressionAssign
 // leaves it set); else Lhs::visit_facts in the callee body can fail closed on overlap.
 func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	// Simple built callee: empty body always visits OK; FactChanged forces NeedsRevisit.
@@ -446,21 +446,21 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 		t.Fatal("BuildUserInvocation returned nil")
 	}
 	if fi.Failed {
-		t.Fatalf("revisit must succeed with empty body despite caller CurrRHS; Failed=%v err=%v", fi.Failed, HasError())
+		t.Fatalf("revisit must succeed with empty body despite caller CurrRHS; Failed=%v err=%v", fi.Failed, HasErrorSess(testAmbientSession))
 	}
-	if HasError() {
-		t.Fatalf("must not sticky-error: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("must not sticky-error: %v", HasErrorSess(testAmbientSession))
 	}
 	// Caller CurrRHS must remain (BUILD clones, does not clear caller)
 	if cg.CurrRHS != rhsDummy {
 		t.Fatal("caller CurrRHS must be left intact after BuildUserInvocation")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	// BuildInvocationAndFunction effect hand-over must not invent success past incomplete
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxFuncs = 5
@@ -479,22 +479,22 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 		// may return Failed or nil; must not invent clean success under incomplete ambient
 		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete caller EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetFirstFunction(t *testing.T) {
 	// nil/empty list is complete miss (isolated BuildUserInvocation passes nil list)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetFirstFunction(nil) != nil {
 		t.Fatal("nil list")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil list GetFirstFunction must stay non-sticky complete miss")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := &Function{Name: "func_1"}
 	b := &Function{Name: "func_2"}
 	list := &FunctionList{Funcs: []*Function{a, b}}
@@ -502,14 +502,14 @@ func TestGetFirstFunction(t *testing.T) {
 		t.Fatal("want first")
 	}
 	// nil hole at [0] sticky (no invent scan later)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetFirstFunction(&FunctionList{Funcs: []*Function{nil, b}}) != nil {
 		t.Fatal("nil first hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil first hole GetFirstFunction must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
@@ -582,7 +582,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 		// empty body visit may still count
 		t.Log("visited", callee.VisitedCnt, "failed", fi.Failed)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
@@ -602,7 +602,7 @@ func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect())
 	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, first)
 	if fi.Failed {
-		t.Fatalf("first should not fail revisit err=%v", HasError())
+		t.Fatalf("first should not fail revisit err=%v", HasErrorSess(testAmbientSession))
 	}
 	// first path uses add_external_effect, not revisit → VisitedCnt unchanged by Revisit
 	if first.VisitedCnt != 0 {

@@ -13,32 +13,22 @@ const (
 	ErrInvalidSimpleDelta = -6
 )
 
-// GetError mirrors Error::get_error (session-local).
-func GetError() int { return GetErrorSess(testAmbientSession) }
-
 // GetErrorSess returns GenError on an explicit session bag.
+// Non-Sess GetError/SetError/ClearError/HasError bridges are deleted — unit
+// tests pass testAmbientSession explicitly.
 func GetErrorSess(s *Session) int { return sessOrAmbient(s).GenError }
-
-// SetError mirrors Error::set_error.
-func SetError(code int) { SetErrorSess(testAmbientSession, code) }
 
 // SetErrorSess sets GenError on an explicit session bag.
 func SetErrorSess(s *Session, code int) { sessOrAmbient(s).GenError = code }
 
-// ClearError mirrors resetting to SUCCESS.
-func ClearError() { ClearErrorSess(testAmbientSession) }
-
 // ClearErrorSess clears GenError on an explicit session bag.
 func ClearErrorSess(s *Session) { sessOrAmbient(s).GenError = ErrSuccess }
-
-// HasError is true when get_error() != SUCCESS.
-func HasError() bool { return HasErrorSess(testAmbientSession) }
 
 // HasErrorSess reports sticky error on an explicit session bag.
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
 // sessNoteError writes GenError on an explicit bag. Nil s panics — residual
-// sticky must not dual-fill testAmbientSession (unit tests use SetError/ClearError
+// sticky must not dual-fill testAmbientSession (unit tests use *Sess helpers
 // or pass testAmbientSession / vsSess/cgSess/envSess/fmSess).
 func sessNoteError(s *Session, code int) {
 	if s == nil {

@@ -29,62 +29,62 @@ func TestFactPointToNullDead(t *testing.T) {
 		t.Fatal("special ptr is not array is_virtual")
 	}
 	// nil subject sticky fact ctor
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if NewFactPointTo(nil) != nil || MakeFactPointTo(nil, NullPtr) != nil || MakeFactPointToSet(nil, nil) != nil {
 		t.Fatal("nil subject must fail closed fact ctor")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil subject fact ctor must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil pointee sticky
 	if MakeFactPointTo(p, nil) != nil {
 		t.Fatal("nil pointTo must fail closed MakeFactPointTo")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil pointTo MakeFactPointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeFactPointToSet(p, []*Variable{NullPtr, nil}) != nil {
 		t.Fatal("nil hole in set must fail closed MakeFactPointToSet")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole MakeFactPointToSet must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil set is incomplete merge non-sticky — no invent empty IsTop from nil
 	if MakeFactPointToSet(p, nil) != nil {
 		t.Fatal("nil set must fail closed MakeFactPointToSet")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil set MakeFactPointToSet must stay non-sticky for soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MakeFactsPointToSet([]*Variable{p}, nil)) {
 		t.Fatal("nil set must fail closed incomplete MakeFactsPointToSet")
 	}
 	// MakeFactsPointToSet may sticky on nil set path — clear after
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty non-nil is valid top
 	if MakeFactPointToSet(p, []*Variable{}) == nil {
 		t.Fatal("empty non-nil set must succeed as top")
 	}
 	// Clone of incomplete PointTo sticky fail closed
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&FactPointTo{Var: p, PointTo: []*Variable{nil}}).Clone() != nil {
 		t.Fatal("Clone incomplete PointTo must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Clone incomplete PointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactPointTo)(nil).Clone() != nil {
 		t.Fatal("nil FactPointTo Clone must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FactPointTo Clone must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactsComplete requires complete PointTo (empty IsTop OK)
 	if !FactsComplete([]*FactPointTo{{Var: p, PointTo: nil}}) {
 		t.Fatal("empty PointTo (top) is complete")
@@ -93,21 +93,21 @@ func TestFactPointToNullDead(t *testing.T) {
 		t.Fatal("nil pointee hole is incomplete")
 	}
 	// CloneFactSlice incomplete → sticky hole marker (not bare nil invent empty complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(CloneFactSlice([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("CloneFactSlice nil fact hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CloneFactSlice nil fact hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(CloneFactSlice([]*FactPointTo{{Var: p, PointTo: []*Variable{nil}}})) {
 		t.Fatal("CloneFactSlice pointee hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CloneFactSlice pointee hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete empty stays empty complete
 	if CloneFactSlice(nil) != nil {
 		t.Fatal("CloneFactSlice(nil) must stay complete empty nil")
@@ -120,21 +120,21 @@ func TestFactPointToNullDead(t *testing.T) {
 		t.Fatal("CloneFactSlice complete must clone", cl)
 	}
 	// MakeFacts — no invent skip of nil holes as partial success / empty complete sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MakeFactsPointTo([]*Variable{p, nil}, NullPtr)) {
 		t.Fatal("nil hole in lvars must fail closed incomplete MakeFactsPointTo")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole MakeFactsPointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MakeFactsPointToSet([]*Variable{nil, p}, []*Variable{NullPtr})) {
 		t.Fatal("nil hole in lvars must fail closed incomplete MakeFactsPointToSet")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole MakeFactsPointToSet must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// specials Type-nil skipped; non-special Type-nil fails closed sticky whole batch
 	if !FactsComplete(MakeFactsPointTo([]*Variable{NullPtr, p}, NullPtr)) {
 		t.Fatal("special Type-nil must soft-skip not fail batch")
@@ -143,17 +143,17 @@ func TestFactPointToNullDead(t *testing.T) {
 	if FactsComplete(MakeFactsPointTo([]*Variable{broken, p}, NullPtr)) {
 		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointTo")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-special Type-nil MakeFactsPointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MakeFactsPointToSet([]*Variable{broken, p}, []*Variable{NullPtr})) {
 		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointToSet")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-special Type-nil MakeFactsPointToSet must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayIsVirtualCollectiveParent(t *testing.T) {
@@ -181,36 +181,36 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 	}
 	// IsArray without AsArray soft invent was virtual-collective true
 	// fair: sticky false (broken IR, not invent virtual soft-success)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if shell.IsVirtual() {
 		t.Fatal("IsArray without AsArray must fail closed not-virtual")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray IsVirtual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsValidPtr(t *testing.T) {
 	p := CreateVariableScalars("g_p", GetIntType(), false, false)
 	target := CreateVariableScalars("g_t", GetIntType(), false, false)
 	// Variable always live; sticky invalid / dangling
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if IsValidPtr(nil, nil, 0, 0) {
 		t.Fatal("nil p IsValidPtr must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil p IsValidPtr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsDanglingPtr(nil, nil, 0) {
 		t.Fatal("nil p IsDanglingPtr must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil p IsDanglingPtr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// no fact → invalid
 	if IsValidPtr(p, nil, 0, 0) {
 		t.Fatal("no fact")
@@ -239,43 +239,43 @@ func TestIsValidPtr(t *testing.T) {
 	}
 	// IsDead residual: PointTo nil hole soft invent was soft-continue then invent valid true.
 	// Fair: sticky invalid / dangling.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{target, nil}}
 	if IsValidPtr(p, []*FactPointTo{broken}, 0, 0) {
 		t.Fatal("IsDead residual must fail closed invalid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsDead residual IsValidPtr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsDanglingPtr(p, []*FactPointTo{broken}, 0) {
 		t.Fatal("IsDead residual must fail closed dangling true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsDead residual IsDanglingPtr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil subject soft invent: related-fact match invents valid true
 	// fair: sticky invalid / dangling before fact lookup
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_typeless"}
 	factsShell := []*FactPointTo{MakeFactPointTo(shell, target)}
 	if IsValidPtr(shell, factsShell, 0, 0) {
 		t.Fatal("Type-nil subject IsValidPtr must fail closed false, not invent valid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil subject IsValidPtr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsDanglingPtr(shell, factsShell, 0) {
 		t.Fatal("Type-nil subject IsDanglingPtr must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil subject IsDanglingPtr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete maps fail closed as dangling (no invent not-dangling past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	if !IsDanglingPtr(p, hole, 0) {
 		t.Fatal("incomplete facts must fail closed as dangling")
@@ -283,10 +283,10 @@ func TestIsValidPtr(t *testing.T) {
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), hole, 0, 0) != 0 {
 		t.Fatal("incomplete facts must reject opportunistic validate")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts OpportunisticValidate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactMgrGlobalFacts(t *testing.T) {
@@ -320,43 +320,43 @@ func TestMarkFuncEnd(t *testing.T) {
 		t.Fatal("global pointee")
 	}
 	// nil Function: complete no-op non-sticky (no invent residual wipe via RemoveFunctionLocal)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ft.MarkFuncEnd(nil, body) != nil {
 		t.Fatal("nil Function MarkFuncEnd must no-op nil")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function MarkFuncEnd must stay non-sticky complete no-op")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil pointee hole fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ft3 := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	if ft3.MarkFuncEnd(f, body) != nil {
 		t.Fatal("nil PointTo hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PointTo hole MarkFuncEnd must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ft.MarkFuncEndLocals([]*Variable{nil}) != nil {
 		t.Fatal("nil locals hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil locals hole MarkFuncEndLocals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ft3.MarkDeadVar(loc) != nil {
 		t.Fatal("MarkDeadVar nil PointTo hole must fail closed")
 	}
 	// incomplete facts IsValidPtr sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if IsValidPtr(p, []*FactPointTo{nil}, 0, 0) {
 		t.Fatal("IsValidPtr incomplete facts must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsValidPtr incomplete facts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {
@@ -388,28 +388,28 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	idx := CreateVariableScalars("i", GetIntType(), false, false)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f.UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("nil pointee hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil pointee UpdateWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactPointTo)(nil).UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("nil fact UpdateWithModifiedIndex must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact UpdateWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f.UpdateWithModifiedIndex(nil) != nil {
 		t.Fatal("nil indexVar UpdateWithModifiedIndex must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil indexVar UpdateWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was continue soft-skip → identity success
 	// fair: sticky nil fail closed
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -417,64 +417,64 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 	if fShell.UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("IsArray without AsArray root must fail closed UpdateWithModifiedIndex")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray UpdateWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable always live for string index use; sticky false
 	if indexExprUsesVar("i", nil) {
 		t.Fatal("nil indexVar indexExprUsesVar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil indexVar indexExprUsesVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if indexExprUsesVar("", idx) {
 		t.Fatal("empty idx must complete not-used")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty idx indexExprUsesVar must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{nil}, nil)) {
 		t.Fatal("nil ptr hole MergePointees must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptr hole MergePointees must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
 	// FactPointTo.cpp:691–696 — assert(exist_fact); if (exist_fact) merge.
 	// NDEBUG: missing related fact skips that pointer (empty complete, not Incomplete).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// facts empty / no related fact for p — NDEBUG skip → empty complete
 	got := MergePointeesOfPointers([]*Variable{p}, nil)
 	if !VariablesComplete(got) || len(got) != 0 {
 		t.Fatalf("missing exist_fact must NDEBUG-skip empty complete, got %+v", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("missing exist_fact must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got = MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{})
 	if !VariablesComplete(got) || len(got) != 0 {
 		t.Fatalf("empty facts without related must NDEBUG-skip empty, got %+v", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty facts missing related must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete fact map still fails closed non-sticky
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("incomplete facts must fail closed incomplete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts MergePointees must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete related fact still works
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	got = MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, tgt)})
@@ -498,24 +498,24 @@ func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{bad})) {
 		t.Fatal("nil pointee hole must fail closed incomplete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil pointee via incomplete facts must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// indirect 1 with missing fact → NDEBUG skip → empty complete (not Incomplete)
 	gotMiss := MergePointeesOfPointer(p, 1, nil)
 	if !VariablesComplete(gotMiss) || len(gotMiss) != 0 {
 		t.Fatalf("missing fact at indir 1 must NDEBUG empty complete, got %+v", gotMiss)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("missing fact MergePointeesOfPointer must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// indirect 0 does not look up facts
 	got := MergePointeesOfPointer(p, 0, nil)
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != p {
@@ -525,10 +525,10 @@ func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
 	if VariablesComplete(MergePointeesOfPointer(nil, 0, nil)) {
 		t.Fatal("nil ptr must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptr MergePointeesOfPointer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUpdateWithModifiedIndex(t *testing.T) {
@@ -566,7 +566,7 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 		t.Fatal("j should not rewrite")
 	}
 	// bulk update
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts := []*FactPointTo{f.Clone()}
 	UpdateFactsWithModifiedIndex(&facts, idx)
 	if facts[0] == f || facts[0].PointTo[0].AsArray.Indices[0] != "-1" {
@@ -578,21 +578,21 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 	if FactsComplete(hole) {
 		t.Fatal("incomplete bulk must wipe IncompleteFactSlice", hole)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete UpdateFactsWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// facts + indexVar always live; sticky no invent soft-skip update past hole
 	UpdateFactsWithModifiedIndex(nil, idx)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts UpdateFactsWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	UpdateFactsWithModifiedIndex(&facts, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil indexVar UpdateFactsWithModifiedIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// offset form "(i + 2)"
 	item2 := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
@@ -609,47 +609,47 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 }
 
 func TestFindRelatedPointToNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindRelatedPointTo(nil, nil) != nil {
 		t.Fatal("nil subject FindRelatedPointTo must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil subject FindRelatedPointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	if FindRelatedPointTo([]*FactPointTo{nil}, p) != nil {
 		t.Fatal("nil fact hole FindRelatedPointTo must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole FindRelatedPointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsNullIsDeadPointsToNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*FactPointTo)(nil).IsNull() {
 		t.Fatal("nil Fact IsNull must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact IsNull must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*FactPointTo)(nil).IsDead() {
 		t.Fatal("nil Fact IsDead must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact IsDead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*FactPointTo)(nil).PointsTo(CreateVariableScalars("g_x", GetIntType(), false, false)) {
 		t.Fatal("nil Fact PointsTo must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact PointsTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactPointToLatticeTopBottom(t *testing.T) {
@@ -680,7 +680,7 @@ func TestFactPointToLatticeTopBottom(t *testing.T) {
 }
 
 func TestFactFreeHelpers(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -700,24 +700,24 @@ func TestFactFreeHelpers(t *testing.T) {
 	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType()), RV: rv}
 	// null constant RHS is a complete abstract path
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ret := AbstractFactForReturn(nil, rhs, fn)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("return abstract sticky")
 	}
 	// nil fn/expr sticky
-	ClearError()
-	if FactsComplete(AbstractFactForReturn(nil, rhs, nil)) || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if FactsComplete(AbstractFactForReturn(nil, rhs, nil)) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fn must sticky incomplete")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = ret
 	// PrintFacts not sticky on complete empty
 	_ = PrintFacts(nil, nil)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("print empty")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	FactDoFinalization()
 }
 
@@ -749,9 +749,9 @@ func TestFactPointToPointToAndStr(t *testing.T) {
 	if !f.Empty() || !f.IsTop() {
 		t.Fatal("clear → top")
 	}
-	ClearError()
-	if PointToStr(nil) != "" || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if PointToStr(nil) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PointToStr sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

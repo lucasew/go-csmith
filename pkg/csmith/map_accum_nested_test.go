@@ -5,7 +5,7 @@ import "testing"
 // Statement.cpp:563 — shortcut_analysis: map_accum_effect[this] = *get_effect_accum()
 // after add_effect(map_stm_effect[this]). Live accum reads must be preserved in the snapshot.
 func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -39,7 +39,7 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	facts := []*FactPointTo{}
 	sc := ShortcutAnalysis(&st, &facts, &cg, opts)
 	if sc != ShortcutOK {
-		t.Fatalf("want ShortcutOK got %d err=%v", sc, HasError())
+		t.Fatalf("want ShortcutOK got %d err=%v", sc, HasErrorSess(testAmbientSession))
 	}
 	got := fm.GetMapAccumEffect(st.StmID)
 	names := mapAccumNamesOf(got.ReadVars())
@@ -56,13 +56,13 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	if !has["g_2"] || !has["g_3"] {
 		t.Fatalf("missing live reads in map_accum after shortcut: %v", names)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // StmVisitFacts always records map_accum_effect even when visit_facts fails.
 // Statement.cpp:622.
 func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -90,13 +90,13 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	got := fm.GetMapAccumEffect(st.StmID)
 	if len(got.ReadVars()) < 2 {
 		t.Fatalf("StmVisitFacts must record live accum on fail: %v err=%v",
-			mapAccumNamesOf(got.ReadVars()), HasError())
+			mapAccumNamesOf(got.ReadVars()), HasErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
 	live2 := EmptyEffect().ReadVar(g1)
@@ -105,7 +105,7 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 	if len(stored.ReadVars()) != 1 {
 		t.Fatalf("Clone store must stay frozen: %v", mapAccumNamesOf(stored.ReadVars()))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // Effect.cpp:84–89 — map_stm_effect assignment deep-copies vectors. Soft invent was
@@ -114,7 +114,7 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 // then alias-corrupted snapshots used as generation ambient (seed-7 ChooseOKVar
 // n=26 vs UP n=56 when effect_context seFree poisoned by shared write sets).
 func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(&Function{Name: "f", ReturnType: GetIntType()})
 	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
@@ -148,7 +148,7 @@ func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 	if !merged.IsWritten(g2) {
 		t.Fatal("merged snapshot must keep g2 after map entry replaced")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func mapAccumNamesOf(vs []*Variable) []string {

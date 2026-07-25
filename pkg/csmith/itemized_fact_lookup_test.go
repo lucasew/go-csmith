@@ -7,7 +7,7 @@ import "testing"
 // without dual-registering itemized subjects into the FactVec (that inflates
 // same_facts and breaks nested for shortcut reuse — seed-90).
 func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	i32 := GetIntType()
 	tgt := CreateVariableScalars("g_t", i32, false, false)
@@ -36,14 +36,14 @@ func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
 	if IsValidPtr(&item.Variable, facts, 0, 0) {
 		t.Fatal("gen IsValidPtr(itemized) must miss without dual-reg")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	currentSession().InUserInvocationRevisit = true
 	defer func() { currentSession().InUserInvocationRevisit = false }()
 	if !IsValidPtr(&item.Variable, facts, 0, 0) {
-		t.Fatalf("revisit IsValidPtr(itemized) must fall back to collective err=%v", GetError())
+		t.Fatalf("revisit IsValidPtr(itemized) must fall back to collective err=%v", GetErrorSess(testAmbientSession))
 	}
 	if FindRelatedPointTo(facts, &item.Variable) != nil {
 		t.Fatal("fallback must not invent dual-reg entry")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

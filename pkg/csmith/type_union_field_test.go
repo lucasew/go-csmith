@@ -54,7 +54,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 	}
 	// many seeds: never get pointer-containing struct
 	for seed := uint64(1); seed < 60; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.ContainPointerField() {
 			t.Fatalf("pointer struct in union field seed %d", seed)
@@ -68,7 +68,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	// Type.cpp:694–696 / 723–727 — weight-0 simples stay in ok_nonstruct_types;
 	// SIMPLE_TYPES_PROB_FILTER rejects at pick (retry). Trimmed pool changes rnd_upto size.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
 	opts.Bitfields = false // always non-bitfield path
@@ -85,9 +85,9 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	// Must successfully pick a weight>0 simple without inventing trimmed pool (no hang / nil)
 	ok := 0
 	for seed := uint64(1); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		f := MakeOneUnionField(NewRng(seed), opts, probs, &env, 0, true)
-		if f.Type == nil || HasError() {
+		if f.Type == nil || HasErrorSess(testAmbientSession) {
 			continue
 		}
 		if !f.Type.IsSimple() || f.Type.Simple() == EVoid {
@@ -101,13 +101,13 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	if ok < 10 {
 		t.Fatalf("too few successful picks: %d", ok)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	// ContainPointerField/HasBitfields Type-nil field residual: soft invent was soft-skip
 	// then pick good simple. Fair: sticky fail closed whole MakeOneUnionField.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
@@ -120,10 +120,10 @@ func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	if f.Type != nil {
 		t.Fatal("ContainPointerField residual must fail closed MakeOneUnionField")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ContainPointerField residual MakeOneUnionField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
@@ -151,7 +151,7 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 
 func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 	// non-global on call chain block is tracked
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	if loc == nil {
 		t.Fatal("create local")
@@ -173,7 +173,7 @@ func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 // zero-width pad is allowed. Invent always-true prevZero forced seed-33 GO
 // non-zero bitfield where UP had `const signed : 0`.
 func TestMakeOneUnionFieldPrevZero(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort)}}
@@ -181,7 +181,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	// Search seeds that draw bitfield with length 0 under prevZero=false.
 	foundPad := false
 	for seed := uint64(1); seed < 500 && !foundPad; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 1, false)
 		if f.Type != nil && f.BitWidth == 0 {
 			foundPad = true
@@ -192,7 +192,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	}
 	// First field / after pad: prevZero true — length 0 must be forced non-zero.
 	for seed := uint64(1); seed < 200; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0, true)
 		if f.Type != nil && f.BitWidth == 0 {
 			t.Fatalf("seed %d: prevZero=true must not leave zero-width (no_zero_len)", seed)
@@ -200,7 +200,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	}
 	// MakeRandomUnionType: after first non-bitfield, second field bitfield with
 	// prevZero=false can keep length 0 (Type.cpp:640 back()!=0 → no force).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort), GetSimpleType(EUShort)}}
 	// Craft: first field normal (BitWidth -1) → prevZero becomes false;
 	// second call with prevZero=false can return pad.
@@ -208,7 +208,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	if f0.Type == nil {
 		// rare; try other seeds
 		for seed := uint64(2); seed < 50 && f0.Type == nil; seed++ {
-			ClearError()
+			ClearErrorSess(testAmbientSession)
 			f0 = MakeOneUnionField(NewRng(seed), opts, probs, env2, 0, true)
 		}
 	}
@@ -221,5 +221,5 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	if f0.BitWidth < 0 && prev {
 		t.Fatal("non-bitfield must not set prevZero")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

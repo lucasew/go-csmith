@@ -6,7 +6,7 @@ import (
 )
 
 func TestFunctionIsVarOnStack(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
@@ -22,10 +22,10 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	if !f.IsVarVisible(g, blk) {
 		t.Fatal("global visible")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete visibility paths must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Function.cpp:194 — find_variable_in_set uses Variable::match (not ==).
 	// Aggregate local match(field) via has_field_var → field is on-stack so
 	// mark_func_end / eReturn set_fact_out garbage field pointees (seed-30).
@@ -45,27 +45,27 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	if !f.IsVarOnStack(fld, blk2) {
 		t.Fatal("field of stack aggregate must IsVarOnStack (C++ find_variable_in_set+match)")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("field check must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil param soft invent was soft-continue then invent on-stack later good.
 	// Fair: sticky fail closed not-on-stack (StackScanComplete / Param hole).
 	f.Param = []*Variable{&Variable{Name: "p_hole"}, p}
 	if f.IsVarOnStack(p, blk) {
 		t.Fatal("Param hole must fail closed not-on-stack, not invent later param match")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Param hole Function.IsVarOnStack must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{p}
 }
 
 func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	// soft invent: IsVarOnStack false past LocalVars hole → leave stack pointees live
 	// fair: StackScanComplete false; MarkFuncEndOnFacts / RemoveFunctionLocal clear sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -76,42 +76,42 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	if f.IsVarOnStack(loc, blk) {
 		t.Fatal("IsVarOnStack must not invent membership past hole")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVarOnStack incomplete stack must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
 	MarkFuncEndOnFacts(&facts, f, blk)
 	if FactsComplete(facts) {
 		t.Fatal("MarkFuncEndOnFacts must clear on incomplete stack, not invent live pointee", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MarkFuncEndOnFacts incomplete stack must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// facts slice always live; sticky no invent soft-skip mark past hole
 	MarkFuncEndOnFacts(nil, f, blk)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts MarkFuncEndOnFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts2 := []*FactPointTo{MakeFactPointTo(p, loc)}
 	out := RemoveFunctionLocalFactsAt(facts2, f, blk)
 	if FactsComplete(out) {
 		t.Fatal("RemoveFunctionLocalFactsAt must fail closed on incomplete stack", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("RemoveFunctionLocalFactsAt incomplete stack must SetError sticky")
 	}
 	// Block stack scan
 	if blk.StackScanComplete() {
 		t.Fatal("Block.StackScanComplete hole")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFunctionIsVarOOS(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	inner := &Block{Func: f, LocalVars: []*Variable{loc}}
@@ -127,14 +127,14 @@ func TestFunctionIsVarOOS(t *testing.T) {
 	if f.IsVarOOS(loc, inner) {
 		t.Fatal("visible not oos")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete IsVarOOS paths must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddBackReturnFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -156,16 +156,16 @@ func TestAddBackReturnFacts(t *testing.T) {
 	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: IncompleteStmID}}}, fm, &facts0, &unions0) || FactsComplete(facts0) {
 		t.Fatal("return StmID 0 must fail closed", facts0)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("return StmID 0 must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // Statement.cpp:528 — merge_facts full FactVec joins eUnionWrite from return outs.
 // Body exit last=0 + early-return last=1 → BOTTOM (seed-123 g_135 lattice).
 func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	ut := &Type{
@@ -191,15 +191,15 @@ func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
 	if got == nil || !got.IsBottom() {
 		t.Fatalf("0 join 1 must BOTTOM, got %v", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete path must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	// incomplete map_facts_out fails closed sticky — no invent merge of later returns
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -222,10 +222,10 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	if AddBackReturnFacts(body, fm, &facts, &unions) || FactsComplete(facts) {
 		t.Fatal("incomplete out must fail closed nil accumulator, not invent later return", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete out must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested if Then with incomplete return must stop before Else returns
 	fm2 := NewFactMgr(f)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
@@ -246,10 +246,10 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	if AddBackReturnFacts(body2, fm2, &facts2, &unions2) || FactsComplete(facts2) {
 		t.Fatal("nested incomplete must fail closed without inventing Else return", facts2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
@@ -270,39 +270,39 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 		t.Fatal("should mark dead pointee")
 	}
 	// nil fact hole fails closed sticky — no invent clean filter past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	UpdateFactsForOOSVars([]*Variable{loc}, &hole)
 	if FactsComplete(hole) {
 		t.Fatal("nil fact hole must fail closed", hole)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil OOS var hole fails closed sticky
 	ok := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	UpdateFactsForOOSVars([]*Variable{nil}, &ok)
 	if FactsComplete(ok) {
 		t.Fatal("nil OOS var hole must fail closed", ok)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OOS var hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip OOS cleanup past hole)
 	// empty vars is complete no-op
 	UpdateFactsForOOSVars(nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts UpdateFactsForOOSVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	var empty []*FactPointTo
 	UpdateFactsForOOSVars(nil, &empty)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty vars UpdateFactsForOOSVars must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Match residual: Type-nil OOS var soft invent was soft-continue keep later fact.
 	// Fair: sticky IncompleteFactSlice.
 	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
@@ -313,14 +313,14 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	if FactsComplete(facts2) {
 		t.Fatal("Match residual UpdateFactsForOOSVars must fail closed incomplete", facts2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Match residual UpdateFactsForOOSVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputCommentLine(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	s := OutputCommentLine("hello", false, false)
 	if s != "/* hello */\n" {
 		t.Fatal(s)
@@ -329,14 +329,14 @@ func TestOutputCommentLine(t *testing.T) {
 		t.Fatal("quiet")
 	}
 	// empty comment sticky — no invent "/*  */"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if OutputCommentLine("", false, false) != "" {
 		t.Fatal("empty comment must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty comment must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFunctionOutputSeparator(t *testing.T) {

@@ -6,7 +6,7 @@ import "testing"
 // (imply short-circuit; copy=new.clone(); join(old)). Soft invent always-joined without
 // imply short-circuit.
 func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
@@ -19,15 +19,15 @@ func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
 	// old already implies new → keep old (must not join-to-BOTTOM)
 	facts := []*FactUnion{MakeFactUnion(uv, 3)}
 	got := MergeUnionFactInto(facts, MakeFactUnion(uv, 3))
-	if !UnionFactsComplete(got) || HasError() {
-		t.Fatal("into incomplete", HasError(), GetError())
+	if !UnionFactsComplete(got) || HasErrorSess(testAmbientSession) {
+		t.Fatal("into incomplete", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	fu := FindRelatedUnion(got, uv)
 	if fu == nil || fu.LastWrittenFID != 3 || fu.IsBottom() {
 		t.Fatalf("want keep fid 3, got %#v", fu)
 	}
 	// 0 join 3 → BOTTOM
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got2 := MergeUnionFactInto([]*FactUnion{MakeFactUnion(uv, 0)}, MakeFactUnion(uv, 3))
 	fu2 := FindRelatedUnion(got2, uv)
 	if fu2 == nil || !fu2.IsBottom() {
@@ -37,7 +37,7 @@ func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
 
 // Fact.cpp:149–171 merge_fact for eUnionWrite — join lattice, not replace.
 func TestMergeUnionFactJoinsLattice(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
@@ -54,15 +54,15 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 	facts := []*FactUnion{MakeFactUnion(uv, 0)}
 	// merge fid 4 into fid 0 → neither implies → BOTTOM (not replace with 4)
 	merged := MergeUnionFact(facts, MakeFactUnion(uv, 4))
-	if !UnionFactsComplete(merged) || HasError() {
-		t.Fatal("merge incomplete", HasError(), GetError())
+	if !UnionFactsComplete(merged) || HasErrorSess(testAmbientSession) {
+		t.Fatal("merge incomplete", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(merged, uv)
 	if got == nil || !got.IsBottom() {
 		t.Fatalf("want BOTTOM after 0 join 4, got %#v", got)
 	}
 	// old already implies new → keep old
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts2 := []*FactUnion{MakeFactUnion(uv, 3)}
 	merged2 := MergeUnionFact(facts2, MakeFactUnion(uv, 3))
 	got2 := FindRelatedUnion(merged2, uv)
@@ -73,7 +73,7 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 
 // FactMgr.cpp:376–381 — definitive union field write renews (replace), not join-to-BOTTOM.
 func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
@@ -92,7 +92,7 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 	// definitive assign to union field f3 → renew last_written to field id of f3
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	if !fm.UpdateFactForAssign(f3, 0, rhs) {
-		t.Fatal("update", HasError(), GetError())
+		t.Fatal("update", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(fm.UnionFacts, uv)
 	if got == nil || got.LastWrittenFID != f3.GetFieldID() {
@@ -102,7 +102,7 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 
 // May-assign (multi pointee) must join, not replace last_written.
 func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
@@ -128,8 +128,8 @@ func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
 // After for-IV write to union.f1 (last=1), empty if/else combine must keep last=1.
 // seed-123: combine then=0 else=1 bottomed g_721 after for(g_721.f1) post_loop left last=1.
 func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U0",
 		Fields: []StructField{
@@ -154,7 +154,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	// IV assign g_721.f1 = 0
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
-		t.Fatal("assign f1", HasError(), GetError())
+		t.Fatal("assign f1", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(fm.UnionFacts, uv)
 	if got == nil || got.LastWrittenFID != 1 {
@@ -172,8 +172,8 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	prePT := CloneFactSlice(fm.GlobalFacts)
 	preU := CloneUnionFactSliceDeep(fm.UnionFacts)
 	CombineBranchFacts(ifSt, &prePT, &preU, fm)
-	if HasError() {
-		t.Fatal("combine", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("combine", GetErrorSess(testAmbientSession))
 	}
 	got = FindRelatedUnion(fm.UnionFacts, uv)
 	if got == nil || got.IsBottom() {

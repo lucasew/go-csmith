@@ -68,7 +68,7 @@ func TestIsFieldReadable(t *testing.T) {
 }
 
 func TestFactUnionOutput(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	uv := &Variable{Name: "g_u", Type: ut}
 	f := MakeFactUnion(uv, 2)
@@ -80,45 +80,45 @@ func TestFactUnionOutput(t *testing.T) {
 		t.Fatal(s)
 	}
 	// sticky no invent " last written field: N" without identifier
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	anon := MakeFactUnion(&Variable{Type: ut}, 0)
 	if anon != nil {
 		if out := anon.Output(); out != "" {
 			t.Fatal("empty union var name must fail closed", out)
 		}
-		if !HasError() {
+		if !HasErrorSess(testAmbientSession) {
 			t.Fatal("empty union var name Output must SetError sticky")
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
 	// FactUnion.cpp:163 assert union type sticky — no invent FactUnion on int
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_i", GetIntType(), true, false)
 	if MakeFactUnion(v, 0) != nil {
 		t.Fatal("non-union must not invent FactUnion")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-union MakeFactUnion must SetError sticky")
 	}
 	// MakeFactUnions fails closed sticky incomplete on non-union / nil hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if UnionFactsComplete(MakeFactUnions([]*Variable{v}, 0)) {
 		t.Fatal("non-union MakeFactUnions must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-union MakeFactUnions must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if UnionFactsComplete(MakeFactUnions([]*Variable{nil}, 0)) {
 		t.Fatal("nil hole MakeFactUnions must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole MakeFactUnions must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if len(MakeFactUnions([]*Variable{}, 0)) != 0 {
 		t.Fatal("empty vars must yield empty facts")
 	}
@@ -139,7 +139,7 @@ func TestJoinVarFactsUnion(t *testing.T) {
 func TestJoinVarFactsUnionResidualSticky(t *testing.T) {
 	// FindRelated residual soft invent was continue then join later complete var.
 	// Fair: sticky fail closed nil whole join.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	u1 := &Variable{Name: "g_u1", Type: ut}
 	u2 := &Variable{Name: "g_u2", Type: ut}
@@ -148,15 +148,15 @@ func TestJoinVarFactsUnionResidualSticky(t *testing.T) {
 	if JoinVarFactsUnion(facts, []*Variable{u1, u2}) != nil {
 		t.Fatal("FindRelated residual must fail closed JoinVarFactsUnion")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindRelated residual JoinVarFactsUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 	// FactUnion.cpp:65 assert union; OOB fid fail closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -171,25 +171,25 @@ func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 	if f.GetLastWrittenType() != nil {
 		t.Fatal("OOB fid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB fid GetLastWrittenType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactUnion always live; sticky nil (no invent soft-skip past hole)
 	if (*FactUnion)(nil).GetLastWrittenType() != nil {
 		t.Fatal("nil GetLastWrittenType must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GetLastWrittenType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&FactUnion{}).GetLastWrittenType() != nil {
 		t.Fatal("nil Var GetLastWrittenType must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Var GetLastWrittenType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferUnionConstant(t *testing.T) {
@@ -218,31 +218,31 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 		t.Fatalf("%+v", out)
 	}
 	// incomplete union map — non-sticky hole (soft re-pick factories)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if UnionFactsComplete(RhsToLhsTransferUnion([]*FactUnion{MakeFactUnion(src, 0), nil}, nil, []*Variable{dst}, rhs)) {
 		t.Fatal("incomplete unionFacts must fail closed incomplete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete unionFacts transfer must stay non-sticky")
 	}
 	// non-union lvar hard IR sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	i := CreateVariableScalars("g_i", GetIntType(), true, false)
 	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-union lvar must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-union lvar RhsToLhsTransferUnion must SetError sticky")
 	}
 	// nil rhs with targets — incomplete non-sticky (AddParamFacts missing union args)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, nil)) {
 		t.Fatal("nil rhs must fail closed incomplete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil rhs RhsToLhsTransferUnion must stay non-sticky for soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty lvars is complete empty
 	if RhsToLhsTransferUnion(nil, nil, nil, rhs) != nil {
 		t.Fatal("empty lvars must be complete empty")
@@ -251,7 +251,7 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 
 func TestRhsToLhsTransferUnionCommaNilRHSFailClosed(t *testing.T) {
 	// incomplete CommaRHS must not soft-re-pick via bare nil-rhs peel path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -265,15 +265,15 @@ func TestRhsToLhsTransferUnionCommaNilRHSFailClosed(t *testing.T) {
 	if UnionFactsComplete(out) {
 		t.Fatal("nil CommaRHS must fail closed incomplete", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CommaRHS RhsToLhsTransferUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferUnionAssignNilExprFailClosed(t *testing.T) {
 	// incomplete Assign.Expr must not soft-re-pick via bare nil-rhs peel path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -290,10 +290,10 @@ func TestRhsToLhsTransferUnionAssignNilExprFailClosed(t *testing.T) {
 	if UnionFactsComplete(out) {
 		t.Fatal("nil Assign.Expr must fail closed incomplete", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Assign.Expr RhsToLhsTransferUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactUnionForAssignField(t *testing.T) {
@@ -348,26 +348,26 @@ func TestAbstractFactUnionPaddingBottom(t *testing.T) {
 
 func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	// FactUnion.cpp:129 — lhs->get_type() always live; Type-nil sticky incomplete
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	lhs := &Variable{Name: "g_x", Type: nil}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
 	out, _ := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
 	if UnionFactsComplete(out) {
 		t.Fatal("Type-nil LHS must IncompleteUnionFactSlice, not invent non-union complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil LHS AbstractFactUnionForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// special null Type-nil is complete non-union path (by design)
 	out2, n := AbstractFactUnionForAssign(nil, nil, NullPtr, 0, nil, rhs)
 	if !UnionFactsComplete(out2) || n != 1 {
 		t.Fatalf("special Type-nil must complete non-union path n=%d out=%+v", n, out2)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("special Type-nil must not SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsUnionField residual: Type-nil parent soft invent was soft-continue IsInside path.
 	// Fair: sticky IncompleteUnionFactSlice.
 	parentHole := &Variable{Name: "g_u", Type: nil}
@@ -377,118 +377,118 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	if UnionFactsComplete(out3) {
 		t.Fatal("IsUnionField residual AbstractFactUnion must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsUnionField residual AbstractFactUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindRelatedUnionNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindRelatedUnion(nil, nil) != nil {
 		t.Fatal("nil subject FindRelatedUnion must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil subject FindRelatedUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_u", GetIntType(), false, false)
 	if FindRelatedUnion([]*FactUnion{nil}, v) != nil {
 		t.Fatal("nil fact hole FindRelatedUnion must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole FindRelatedUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactUnionEqualImplyJoinIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).Equal(&FactUnion{}) {
 		t.Fatal("nil Equal must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Equal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).Imply(&FactUnion{}) {
 		t.Fatal("nil Imply must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Imply must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).Join(&FactUnion{}) {
 		t.Fatal("nil Join must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Join must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactUnionIsTopBottomCloneIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).IsTop() {
 		t.Fatal("nil IsTop must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsTop must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).IsBottom() {
 		t.Fatal("nil IsBottom must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsBottom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).Clone() != nil {
 		t.Fatal("nil Clone must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Clone must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &FactUnion{LastWrittenFID: FactUnionTop}
 	if !f.IsTop() || f.IsBottom() {
 		t.Fatal("TOP lattice")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete IsTop must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 	// IsUnion residual soft invent was invent soft-nil FactUnion past non-union Type.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	if MakeFactUnion(v, 0) != nil {
 		t.Fatal("non-union MakeFactUnion must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-union MakeFactUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil sticky
 	if MakeFactUnion(&Variable{Name: "g_y", Type: nil}, 0) != nil {
 		t.Fatal("Type-nil MakeFactUnion must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil MakeFactUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestImplyIsBottomResidualSticky(t *testing.T) {
 	// IsBottom residual soft invent was invent soft-imply past nil FactUnion.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactUnion)(nil).Imply(MakeFactUnionTop(CreateVariableScalars("g_u", GetIntType(), false, false))) {
 		t.Fatal("nil Imply must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Imply must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

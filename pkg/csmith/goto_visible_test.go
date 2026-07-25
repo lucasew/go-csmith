@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestIsVarOnStack(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
@@ -18,19 +18,19 @@ func TestIsVarOnStack(t *testing.T) {
 	if inner.IsVarOnStack(g) {
 		t.Fatal("global")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete Block.IsVarOnStack must not sticky")
 	}
 	// incomplete LocalVars sticky not-on-stack
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outer.LocalVars = []*Variable{l, nil}
 	if inner.IsVarOnStack(l) {
 		t.Fatal("LocalVars hole Block.IsVarOnStack must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("LocalVars hole Block.IsVarOnStack must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outer.LocalVars = []*Variable{l}
 	// Match residual: Type-nil param soft invent was soft-continue then invent on-stack later good.
 	// Fair: sticky fail closed not-on-stack.
@@ -38,15 +38,15 @@ func TestIsVarOnStack(t *testing.T) {
 	if inner.IsVarOnStack(p) {
 		t.Fatal("Match residual must fail closed not-on-stack, not invent later param match")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Match residual IsVarOnStack must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{p}
 }
 
 func TestChooseVisibleReadVar(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -55,10 +55,10 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type ChooseVisibleReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// only a in read set and global
 	got := ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, b}, GetIntType(), nil)
 	if got != a && got != b {
@@ -79,32 +79,32 @@ func TestChooseVisibleReadVar(t *testing.T) {
 		t.Fatal("local on stack")
 	}
 	// nil candidate hole fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil readVars hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil readVars hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete union facts must not invent soft-filter pick
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, GetIntType(), IncompleteUnionFactSlice()) != nil {
 		t.Fatal("incomplete union facts must fail closed nil pick")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete union facts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was IsVirtual residual false then pick shell
 	// fair: sticky nil fail closed
 	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, arrShell}, GetIntType(), nil) != nil {
 		t.Fatal("IsArray without AsArray must fail closed ChooseVisibleReadVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ChooseVisibleReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsNonreadableField / IsInsideUnionField Type-nil ancestry residual: soft invent was
 	// continue then pick later good. Fair: sticky fail closed whole choose.
 	parent := &Variable{Name: "g_u"} // Type nil
@@ -114,16 +114,16 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	if ChooseVisibleReadVar(NewRng(3), blk, []*Variable{field, a}, GetIntType(), nil) != nil {
 		t.Fatal("IsInsideUnionField residual must fail closed ChooseVisibleReadVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsInsideUnionField residual ChooseVisibleReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectReadVarsInsertionOrder(t *testing.T) {
 	// Effect.cpp:get_read_vars — C++ vector insertion order, not name-sorted.
 	// choose_visible_read_var ok_vars index depends on this order.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_z", GetIntType(), false, false)
 	b := CreateVariableScalars("g_a", GetIntType(), false, false)
 	e := EmptyEffect().ReadVar(a).ReadVar(b)
@@ -200,7 +200,7 @@ func TestCastIfNeeded(t *testing.T) {
 
 func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// StatementGoto.cpp:74/110 ERROR_GUARD after flipcoin / rnd_upto
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -227,7 +227,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// try seeds until successful goto (Expr set) to assert effect_stm clear order
 	cleared := false
 	for seedN := uint64(1); seedN < 40; seedN++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect().WriteVar(seed)
 		st := MakeRandomGoto(NewRng(seedN), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
 		if st.Expr == nil {
@@ -244,11 +244,11 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 		t.Log("no successful goto in seed scan — ERROR_GUARD path still checked")
 	}
 	// sticky ERROR after flipcoin → fail closed (no cond invent)
-	ClearError()
-	SetError(ErrGeneric)
+	ClearErrorSess(testAmbientSession)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
 	if st2.Expr != nil {
 		t.Fatal("sticky error must not invent goto condition")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

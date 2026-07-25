@@ -64,25 +64,25 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 		t.Fatal(out)
 	}
 	// empty tmp name — sticky fail closed whole block (no invent skip hole / partial tmp list)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b2 := &Block{TmpVars: map[string]ESimpleType{"": EInt, "t_ok": EInt}}
 	out2 := b2.Output(0)
 	if out2 != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty tmp name must SetError sticky")
 	}
 	// invalid eSimpleType — sticky fail closed (no invent "int" for OOB tmp type)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b3 := &Block{TmpVars: map[string]ESimpleType{"t_bad": ESimpleType(MaxSimpleTypes + 1)}}
 	if b3.Output(0) != "" {
 		t.Fatal("OOB tmp type must fail closed whole block")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB tmp type must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// default !math_notmp: create-only, no decls (C++ OutputTmpVariableList gated)
 	opts.MathNoTmp = false
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -98,7 +98,7 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	g := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	if g == nil {
-		t.Fatal("CreateVariableQfer nil", GetError())
+		t.Fatal("CreateVariableQfer nil", GetErrorSess(testAmbientSession))
 	}
 	f.FEffect = f.FEffect.ReadVar(g)
 	if !f.FEffect.IsRead(g) {
@@ -114,15 +114,15 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	}
 	// empty actual name sticky fail closed (OutputForComment — no invent blank token)
 	anon := &Variable{Type: GetIntType()}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	c := EmptyEffect().ReadVar(anon).WriteVar(g).CommentOutput()
-	if c != "" || !HasError() {
+	if c != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty-name read must fail closed CommentOutput", c)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	onlyAnon := EmptyEffect().ReadVar(anon).CommentOutput()
-	if onlyAnon != "" || !HasError() {
+	if onlyAnon != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name only must fail closed", onlyAnon)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

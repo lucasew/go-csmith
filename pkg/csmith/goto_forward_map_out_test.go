@@ -13,7 +13,7 @@ import "testing"
 // {l_2181,g_106,l_2156} → contains_unfixed_goto false → pure-shortcut of
 // need_revisit LCA → Func.Blocks n=37 vs UP n=3 at FindGoodJumpBlock).
 func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -34,8 +34,8 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 
 	// Contract: re-fetch like C++ live reference must see wide lattice.
 	gotoIn := CloneFactSlice(fm.GetMapFactsOut(10))
-	if HasError() || !FactsComplete(gotoIn) {
-		t.Fatalf("GetMapFactsOut: err=%v facts=%v", GetError(), gotoIn)
+	if HasErrorSess(testAmbientSession) || !FactsComplete(gotoIn) {
+		t.Fatalf("GetMapFactsOut: err=%v facts=%v", GetErrorSess(testAmbientSession), gotoIn)
 	}
 	got := FindRelatedPointTo(gotoIn, g124)
 	if got == nil || len(got.PointTo) < 3 {
@@ -45,8 +45,8 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	// update_facts_for_dest at dest parent must keep function-visible pointees
 	var gotoOut []*FactPointTo
 	UpdateFactsForDest(gotoIn, &gotoOut, f, body)
-	if HasError() {
-		t.Fatalf("UpdateFactsForDest sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("UpdateFactsForDest sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	outF := FindRelatedPointTo(gotoOut, g124)
 	if outF == nil {
@@ -67,7 +67,7 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	if df.Imply(sf) {
 		t.Fatal("precise dest must not imply wide jump src (contains_unfixed_goto path)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func ptsNamesGoto(f *FactPointTo) []string {

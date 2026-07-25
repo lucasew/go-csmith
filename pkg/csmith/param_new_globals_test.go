@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestMergeParamContext(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	parent := EmptyCGContext()
 	eff := EmptyEffect()
@@ -27,17 +27,17 @@ func TestMergeParamContext(t *testing.T) {
 	param2.EffectAccum = &inc
 	param2.ExprDepth = 9
 	parent2.MergeParamContext(param2, true)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete param accum must SetError")
 	}
 	if parent2.ExprDepth != 1 {
 		t.Fatal("must not invent ExprDepth after failed effect merge")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
-	ClearError() // ERROR_GUARD on GenerateNewGlobal must not see prior test sticky error
+	ClearErrorSess(testAmbientSession) // ERROR_GUARD on GenerateNewGlobal must not see prior test sticky error
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}
@@ -50,7 +50,7 @@ func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
 }
 
 func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 2
 	opts.MaxFuncs = 5
@@ -65,7 +65,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	// force globals enabled so body can create
 	var fi *Invocation
 	for seed := uint64(7); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		list.Funcs = []*Function{caller}
 		caller.NewGlobals = nil
 		fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
@@ -127,9 +127,9 @@ func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 	}
 	caller := &Function{Name: "a"}
 	cg := WithFunc(caller, EmptyEffect())
-	ClearError()
-	SetError(ErrGeneric)
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	SetErrorSess(testAmbientSession, ErrGeneric)
+	defer ClearErrorSess(testAmbientSession)
 	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("sticky error must fail invocation, not invent params")
@@ -144,9 +144,9 @@ func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
 	vs.Types = env
 	cg := EmptyCGContext()
 	cg.Types = env
-	ClearError()
-	SetError(ErrGeneric)
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	SetErrorSess(testAmbientSession, ErrGeneric)
+	defer ClearErrorSess(testAmbientSession)
 	if MakeRandomSignature(NewRng(1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("sticky error must not invent signature")
 	}
@@ -164,7 +164,7 @@ func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	var fi *Invocation
 	var cg CGContext
 	for seed := uint64(1); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg = WithFunc(f, EmptyEffect())
 		cg.ExprDepth = 1
 		fi = MakeRandomUnaryInvocation(NewRng(seed), opts, vs, NewExprTables(opts), &cg, GetIntType())
@@ -179,5 +179,5 @@ func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	if cg.ExprDepth < 2 {
 		t.Fatalf("ExprDepth=%d want ≥2 after operand leaf", cg.ExprDepth)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

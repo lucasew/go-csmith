@@ -15,7 +15,7 @@ func TestStmtReturnMustReturn(t *testing.T) {
 }
 
 func TestIfMustReturnBothBranches(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := Stmt{
 		Kind: StmtIfElse,
 		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}},
@@ -33,17 +33,17 @@ func TestIfMustReturnBothBranches(t *testing.T) {
 	if st.MustReturn() {
 		t.Fatal("nil Else must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else MustReturn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestForArrayOpMustReturnBaseFalse — Statement.h:187 default false; StatementFor /
 // StatementArrayOp do not override. A for/array-op whose body returns must NOT
 // stop Block::make_random (seed-2 e13830 parent stack depth).
 func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	body := &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
 	for _, kind := range []StatementType{StmtFor, StmtArrayOp} {
 		st := Stmt{Kind: kind, Then: body}
@@ -53,7 +53,7 @@ func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
 		if st.MustJump() {
 			t.Fatalf("%v MustJump must be false (Statement.h default)", kind)
 		}
-		if HasError() {
+		if HasErrorSess(testAmbientSession) {
 			t.Fatalf("%v must not sticky-error on complete body", kind)
 		}
 	}
@@ -71,11 +71,11 @@ func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
 	if onlyFor.MustReturn() {
 		t.Fatal("block last=for must not must_return (for base false)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockMustReturnLast(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{Stmts: []Stmt{{Kind: StmtAssign}, {Kind: StmtReturn}}}
 	if !b.MustReturn() {
 		t.Fatal("last return")
@@ -129,7 +129,7 @@ func TestGenerateFunctionsHaveReturnWhenNeeded(t *testing.T) {
 func TestHashNoEmptyArrayLoops(t *testing.T) {
 	// pointer array should produce empty hash (skipped)
 	// IsArray without AsArray is incomplete IR sticky empty (suite hygiene ClearError)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := &Variable{
 		Name: "g_p", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{4},
 		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
@@ -138,14 +138,14 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 		t.Fatal("pointer array must not hash")
 	}
 	// sticky residual from IsArray without AsArray — clear so later hash tests stay complete
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray HashOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHashGlobalVarsSharedIndices(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

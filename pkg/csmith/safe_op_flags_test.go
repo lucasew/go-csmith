@@ -63,7 +63,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	// Full eBinaryOps includes cmp/logic; Output uses safe_* only for arith/shift.
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
@@ -133,23 +133,23 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil probs arg + nil process → sticky fail closed
 	if _, ok := pickSafeOpSize(NewRng(1), nil); ok {
 		t.Fatal("nil probs must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil probs pickSafeOpSize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil RNG sticky
 	if _, ok := pickSafeOpSize(nil, probs); ok {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG pickSafeOpSize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// explicit probs works
 	sz, ok := pickSafeOpSize(NewRng(2), probs)
 	if !ok || int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat {
@@ -172,46 +172,46 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 
 func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
 	// SafeOpFlags.cpp always uses rnd_*; no invent fixed flags
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if f := MakeRandomBinaryKind(nil, opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f != nil {
 		t.Fatal("nil RNG binary must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomBinaryKind must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f := MakeRandomUnary(nil, opts, NewProbabilities(opts), GetIntType(), GetIntType(), UnMinus); f != nil {
 		t.Fatal("nil RNG unary must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomUnary must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSafeOpFlagsCloneNilSticky(t *testing.T) {
 	// SafeOpFlags* always live at clone; sticky no invent soft-skip past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*SafeOpFlags)(nil).Clone() != nil {
 		t.Fatal("nil Clone must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Clone must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSafeOpsSizeWeightNilSticky(t *testing.T) {
 	// Probabilities always live at weight query; sticky 0 (no invent zero-weight soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Probabilities)(nil).SafeOpsSizeWeight(0) != 0 {
 		t.Fatal("nil SafeOpsSizeWeight must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SafeOpsSizeWeight must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeDummyFlagsAndGetters(t *testing.T) {
@@ -233,11 +233,11 @@ func TestMakeDummyFlagsAndGetters(t *testing.T) {
 	if MinimalDepth(DtSafeOpFlags, int(SafeOpUnary)) != 3 {
 		t.Fatal("unary minimal depth")
 	}
-	ClearError()
-	if (*SafeOpFlags)(nil).Op1Sign() || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if (*SafeOpFlags)(nil).Op1Sign() || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Op1Sign sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSafeOpFlagsOutputPieces(t *testing.T) {
@@ -271,9 +271,9 @@ func TestSafeOpFlagsOutputPieces(t *testing.T) {
 	if got := f.UnaryMinusFuncName(); got != "safe_unary_minus_func_int32_t_s" {
 		t.Fatal(got)
 	}
-	ClearError()
-	if (*SafeOpFlags)(nil).OutputSize() != "" || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if (*SafeOpFlags)(nil).OutputSize() != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputSize sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

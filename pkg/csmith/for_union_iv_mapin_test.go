@@ -8,8 +8,8 @@ import "testing"
 // after init → post_creation FP merged entry f0 with body/continue f1 → BOTTOM
 // (seed-177 g_88 choose ok n=29 vs UP n=30 with g_88.f0).
 func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -52,7 +52,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 		AssignOp: AssignSimple, StmID: AllocStmID(),
 	}
 	if !VisitFactsStatementAssign(initSt, &cg, opts) {
-		t.Fatal("init visit", GetError())
+		t.Fatal("init visit", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(fm.UnionFacts, g88)
 	if got == nil || got.LastWrittenFID != 1 {
@@ -60,8 +60,8 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	}
 	// Block entry must snapshot post-init lattice
 	body := MakeRandomBlock(r, opts, probs, vs, nil, nil, &cg, true)
-	if body == nil || HasError() {
-		t.Fatal("body", GetError())
+	if body == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal("body", GetErrorSess(testAmbientSession))
 	}
 	inU := fm.GetMapUnionFactsIn(body.StmID)
 	gotIn := FindRelatedUnion(inU, g88)

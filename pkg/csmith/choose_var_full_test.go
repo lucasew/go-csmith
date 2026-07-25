@@ -75,19 +75,19 @@ func TestChooseVarFullNoExpandKeepsStruct(t *testing.T) {
 func TestChooseVarFullAmbientResidualSticky(t *testing.T) {
 	// Ambient residual ERROR: HasEligibleVolatileVarQfer may soft-return false while residual sticks.
 	// Soft invent was soft-continue choose then pick later good. Fair: sticky fail closed whole choose.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	if ChooseVarFull(NewRng(2), []*Variable{a, b}, AccessRead, EmptyCGContext(),
 		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("ambient residual must fail closed ChooseVarFull, not invent later pick")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ambient residual ChooseVarFull must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
@@ -116,14 +116,14 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 	}
 	// incomplete UnionFacts residual: soft invent was soft-skip unreadable then partial hash.
 	// Fair: sticky fail closed empty whole hash.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := uv.HashOutputWithUnionFacts(IncompleteUnionFactSlice()); s != "" {
 		t.Fatal("incomplete UnionFacts HashOutput must fail closed empty", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete UnionFacts HashOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRecordPointerAvailForDeref(t *testing.T) {
@@ -209,7 +209,7 @@ func TestChooseVarFromOKIsInsideUnionFieldResidualSticky(t *testing.T) {
 	// take_union_field_addr off + Type-nil parent: IsInsideUnionField stickies ERROR.
 	// Soft invent was continue past residual then invent addressable bias / later pick.
 	// Fair: sticky fail closed whole choose.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -220,8 +220,8 @@ func TestChooseVarFromOKIsInsideUnionFieldResidualSticky(t *testing.T) {
 	if got != nil {
 		t.Fatalf("Type-nil ancestry residual must fail closed nil, got %v", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil ancestry chooseVarFromOK must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

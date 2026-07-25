@@ -5,7 +5,7 @@ import "testing"
 // Production path for seed-2 l_233: InitExpr=&g then ArrayOp-style merge assign.
 // FactMgr.cpp:376–388 merge for array; Fact.cpp:85–112 var init abstract.
 func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -22,8 +22,8 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	av.InitExpr = ie
 	fm := NewFactMgr(&Function{Name: "f"})
 	fm.AddNewVarFact(&av.Variable)
-	if HasError() {
-		t.Fatalf("add %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("add %v", HasErrorSess(testAmbientSession))
 	}
 	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
 	if fp == nil || fp.IsNull() || fp.IsDead() {
@@ -46,5 +46,5 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	if fp3 == nil || !fp3.IsNull() {
 		t.Fatalf("from null entry must keep may-null: %+v", fp3)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

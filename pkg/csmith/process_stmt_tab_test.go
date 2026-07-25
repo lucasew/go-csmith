@@ -5,7 +5,7 @@ import "testing"
 func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	// Expression::InitProbabilityTables always live; no invent NewExprTables
 	// when both arg and process tables are missing — sticky MaxTermTypes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessExprTablesSess(testAmbientSession)
 	SetProcessExprTablesSess(testAmbientSession, nil)
 	defer SetProcessExprTablesSess(testAmbientSession, prev)
@@ -13,23 +13,23 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	if tt != MaxTermTypes {
 		t.Fatalf("want MaxTermTypes, got %v", tt)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil tables PickTermType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	tt = PickParamTermType(NewRng(1), nil, Defaults(), GetIntType(), 0)
 	if tt != MaxTermTypes {
 		t.Fatalf("param want MaxTermTypes, got %v", tt)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil tables PickParamTermType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	// StatementAssign::assignOpsTable_ sticky; no invent per assign
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessAssignOpsTableSess(testAmbientSession)
 	SetProcessAssignOpsTableSess(testAmbientSession, nil)
 	defer SetProcessAssignOpsTableSess(testAmbientSession, prev)
@@ -40,40 +40,40 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("nil assignOpsTable must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil assignOpsTable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InitSessionProbabilityTables(opts)
 	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
 	// may still fail for other reasons; at least table is live
 	_ = st
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 	// StatementAssign::assignOpsTable_ always live sticky; no invent NewAssignOpsTable
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	op := AssignOpsProbability(NewRng(1), Defaults(), nil, GetIntType())
 	if op != AssignOp(-1) {
 		t.Fatalf("want invalid op, got %v", op)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil table AssignOpsProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if AssignOpsProbability(nil, Defaults(), NewAssignOpsTable(Defaults()), GetIntType()) != AssignOp(-1) {
 		t.Fatal("nil RNG AssignOpsProbability must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG AssignOpsProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	// nested GenerateBody needs session Statement table; sticky no invent second table
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessStmtTabSess(testAmbientSession)
 	SetProcessStmtTabSess(testAmbientSession, nil)
 	defer SetProcessStmtTabSess(testAmbientSession, prev)
@@ -96,10 +96,10 @@ func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 		}
 	}
 	// when create-new path is taken without StmtTab, sticky Failed
-	if fi != nil && fi.Failed && HasError() {
+	if fi != nil && fi.Failed && HasErrorSess(testAmbientSession) {
 		// sticky path exercised
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateSeed65WithProcessStmtTab(t *testing.T) {
@@ -198,32 +198,32 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 }
 
 func TestMakeRandomExprStmtNilCGSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil).Kind != 0 {
 		t.Fatal("nil cg MakeRandomExprStmt must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg MakeRandomExprStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHasUncertainCallRecursiveExprNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !HasUncertainCallRecursiveExpr(nil) {
 		t.Fatal("nil HasUncertainCallRecursiveExpr must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasUncertainCallRecursiveExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete constant no uncertain
 	e := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	if HasUncertainCallRecursiveExpr(e) {
 		t.Fatal("constant must not invent uncertain call")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete HasUncertainCallRecursiveExpr must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

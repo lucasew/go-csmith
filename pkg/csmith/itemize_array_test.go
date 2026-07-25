@@ -90,7 +90,7 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 
 func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	// Variable* always live as IVBounds keys; nil key must not soft-skip to other IVs
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	av := &ArrayVariable{
@@ -104,14 +104,14 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("nil IVBounds key must fail closed whole itemize")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IVBounds key must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	av := &ArrayVariable{
@@ -127,15 +127,15 @@ func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed ItemizeArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky ItemizeArray")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	// type always live at itemize; Type-nil no invent soft-success item
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	av := &ArrayVariable{
@@ -149,10 +149,10 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("Type-nil array must fail closed ItemizeArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil array ItemizeArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IV Type-nil sticky — no invent OK-IV soft pool past hole
 	av2 := &ArrayVariable{
 		Variable: Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
@@ -165,15 +165,15 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	if vs.ItemizeArray(NewRng(1), cg2, av2) != nil {
 		t.Fatal("Type-nil IV must fail closed ItemizeArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil IV ItemizeArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectArrayTypeNilSticky(t *testing.T) {
 	// av->type always live; Type-nil no invent soft-include / CreateRandom soft-success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	av := &ArrayVariable{
@@ -187,10 +187,10 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 	if vs.SelectArray(NewRng(1), cg) != nil {
 		t.Fatal("Type-nil SelectArray must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil SelectArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
@@ -213,7 +213,7 @@ func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	// IsNonWritable residual ERROR soft invent was soft-skip then CreateRandomArray / later pick.
 	// Fair: sticky fail closed whole SelectArray.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
@@ -229,26 +229,26 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	if vs.SelectArray(NewRng(3), cg) != nil {
 		t.Fatal("IsNonWritable residual must fail closed SelectArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsNonWritable residual SelectArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsSideEffectFree residual soft invent was soft-continue keep/filter invent pick.
 	// Fair: sticky fail closed whole SelectArray (EffectComplete gate + sefree residual).
 	cg2 := WithEffectContext(IncompleteEffect())
 	if vs.SelectArray(NewRng(3), cg2) != nil {
 		t.Fatal("IsSideEffectFree residual must fail closed SelectArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsSideEffectFree residual SelectArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	// IsPackedAggregateFieldVar Type-nil parent stickies residual true; soft invent was
 	// continue then pick later IV. Fair: sticky fail closed whole array-op make.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.CComp = true
 	probs := NewProbabilities(opts)
@@ -285,16 +285,16 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("packed residual must fail closed MakeRandomArrayOp")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("packed residual MakeRandomArrayOp must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeIndexOutputResidualSticky(t *testing.T) {
 	// index Output residual soft invent was soft-continue later dims invent partial item.
 	// SetIndexExpr residual: Type-nil index Output stickies without inventing index slot.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -308,41 +308,41 @@ func TestItemizeIndexOutputResidualSticky(t *testing.T) {
 	item.AsArray = item
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual Output
 	item.SetIndexExpr(0, hole)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("index Output residual SetIndexExpr must SetError sticky")
 	}
 	if len(item.IndexExprs) != 0 {
 		t.Fatal("index Output residual must not invent IndexExprs slot", item.IndexExprs)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// AddIndexExpr residual same
 	item.AddIndexExpr(hole)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("index Output residual AddIndexExpr must SetError sticky")
 	}
 	if len(item.IndexExprs) != 0 {
 		t.Fatal("index Output residual must not invent AddIndexExpr slot")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactUnionOutputGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was invent " last written field: N" past empty name.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &FactUnion{Var: &Variable{Type: GetIntType()}, LastWrittenFID: 0}
 	if s := f.Output(); s != "" {
 		t.Fatal("empty name residual must fail closed FactUnion.Output", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name residual FactUnion.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent itemize shell past CreateFieldVars skip.
 	// Type-nil already sticky before IsAggregate; complete scalar element itemizes without expand.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil itemize path
 	// covered by Itemize Type-nil tests; hygiene for residual after CreateFieldVars on aggregate with nil field
 	parent := &ArrayVariable{
@@ -354,23 +354,23 @@ func TestItemizeIsAggregateResidualSticky(t *testing.T) {
 	parent.AsArray = parent
 	// Itemize may CreateFieldVars residual on nil field Type
 	item := parent.Itemize(NewRng(1))
-	if item != nil && !HasError() {
+	if item != nil && !HasErrorSess(testAmbientSession) {
 		// if itemize succeeded without expand hole, CreateFieldVars may not run on non-aggregate wait - Type is struct aggregate
 		// CreateFieldVars on nil field Type should sticky
 		t.Fatal("CreateFieldVars residual must SetError sticky when itemize returns")
 	}
-	if item == nil && !HasError() {
+	if item == nil && !HasErrorSess(testAmbientSession) {
 		// Itemize may soft-fail without sticky for other reasons — require sticky on aggregate expand hole
 		// Force CreateFieldVars residual: Type aggregate with nil field after Itemize mounts
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Direct CreateFieldVars residual
 	v := &Variable{Name: "g_s", Type: &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}}
 	v.CreateFieldVars()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateFieldVars nil field Type must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

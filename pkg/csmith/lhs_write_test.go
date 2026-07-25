@@ -5,7 +5,7 @@ import (
 )
 
 func TestLhsWriteVarsFromWritten(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	e := EmptyEffect().WriteVar(v)
 	e = e.SetLhsWriteVarsFromWritten()
@@ -17,19 +17,19 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 	if VariablesComplete(IncompleteEffect().LhsWriteVars()) {
 		t.Fatal("IncompleteEffect LhsWriteVars must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect LhsWriteVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := EmptyEffect()
 	hole.lhsWrite = map[*Variable]bool{nil: true}
 	if VariablesComplete(hole.LhsWriteVars()) {
 		t.Fatal("nil lhsWrite key must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhsWrite key must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IncompleteEffect().HasGlobalEffect() {
 		t.Fatal("IncompleteEffect must fail closed HasGlobalEffect true")
 	}
@@ -39,7 +39,7 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 }
 
 func TestWriteVarSet(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	e := EmptyEffect().WriteVarSet([]*Variable{a, b})
@@ -81,36 +81,36 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if !hole.UnionFieldIsRead() {
 		t.Fatal("nil read key must fail closed as union field read")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if hole.CommentOutput() != "" {
 		t.Fatal("nil key CommentOutput must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil key CommentOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EffectComplete(EmptyEffect().WriteVarSet([]*Variable{v, nil})) {
 		t.Fatal("WriteVarSet nil hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVarSet nil hole must SetError sticky")
 	}
 	// consolidate incomplete → sticky IncompleteEffect
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	c := EmptyEffect()
 	c.read = map[*Variable]bool{nil: true}
 	c.Consolidate()
 	if EffectComplete(c) {
 		t.Fatal("Consolidate incomplete must yield IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Consolidate incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	cg := EmptyCGContext()
@@ -126,7 +126,7 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 
 func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	// soft invent: Clone incomplete PointTo appends nil / keeps partial out
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
 	body := &Block{Func: fn}
 	fn.Body = body
@@ -136,10 +136,10 @@ func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	if FactsComplete(RemoveFunctionLocalFacts(facts, fn)) {
 		t.Fatal("incomplete PointTo must fail closed incomplete, not invent filter")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete PointTo RemoveFunctionLocalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRemoveFunctionLocalFacts(t *testing.T) {
@@ -164,18 +164,18 @@ func TestRemoveFunctionLocalFactsNilFuncNoResidualInvent(t *testing.T) {
 	// Soft invent: MarkFuncEnd(nil) residual ERROR then SetMapFactsOut incomplete
 	// while GlobalFacts complete invents visit success past residual.
 	// Fair: nil Func is complete no-op mark; filter stays complete non-sticky.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr)}
 	out := RemoveFunctionLocalFactsAt(facts, nil, nil)
 	if !FactsComplete(out) || len(out) != 1 {
 		t.Fatal("nil Func RemoveFunctionLocalFactsAt must stay complete", out)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Func RemoveFunctionLocalFactsAt must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRemoveLoopLocalFacts(t *testing.T) {
@@ -242,7 +242,7 @@ func TestGetDereferencedPtrs(t *testing.T) {
 
 func TestGetDereferencedPtrsIncompleteFailClosed(t *testing.T) {
 	// incomplete IR must IncompleteExpressions sticky (not bare nil invent empty-complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cases := []*Expression{
 		{Term: TermVariable},
 		{Term: TermCommaExpr},
@@ -254,13 +254,13 @@ func TestGetDereferencedPtrsIncompleteFailClosed(t *testing.T) {
 		nil,
 	}
 	for _, e := range cases {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		if ExpressionsComplete(GetDereferencedPtrs(e)) {
 			t.Fatalf("incomplete deref must IncompleteExpressions, got complete for %#v", e)
 		}
-		if !HasError() {
+		if !HasErrorSess(testAmbientSession) {
 			t.Fatalf("incomplete deref must SetError sticky for %#v", e)
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

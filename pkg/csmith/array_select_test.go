@@ -35,7 +35,7 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 }
 
 func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// create_random_array uses Type env (C++ GenerateSimpleTypes always live)
@@ -159,49 +159,49 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 }
 
 func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
 	vs.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false), nil}
 	if VariablesComplete(vs.FindAllVisibleVars(nil)) {
 		t.Fatal("GlobalList nil hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GlobalList nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs.GlobalList = nil
 	blk := &Block{LocalVars: []*Variable{CreateVariableScalars("l_1", GetIntType(), false, false), nil}}
 	if VariablesComplete(vs.FindAllVisibleVars(blk)) {
 		t.Fatal("LocalVars nil hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("LocalVars nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectArrayNilHoleFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{nil}
 	if vs.SelectArray(NewRng(1), EmptyCGContext()) != nil {
 		t.Fatal("visible list hole must fail closed SelectArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("visible list hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray is incomplete IR — fail closed sticky
 	broken := &Variable{Name: "g_broken", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	vs.GlobalList = []*Variable{broken}
 	if vs.SelectArray(NewRng(3), EmptyCGContext()) != nil {
 		t.Fatal("IsArray without AsArray must fail closed SelectArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete ambient fails closed sticky before filters
 	inc := IncompleteEffect()
 	cg := EmptyCGContext()
@@ -209,26 +209,26 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	if vs.SelectArray(NewRng(3), cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed SelectArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky SelectArray")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if vs.SelectArray(NewRng(4), cg2) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed SelectArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky SelectArray")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	// VariableSelector.cpp:1386–1426 — only find_all_visible_vars; vs.Arrays is not a
 	// second inventory. Array only on Arrays (not GlobalList/local) → create_random_array.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
@@ -250,5 +250,5 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	if r.RandDepth() <= d0 {
 		t.Fatal("empty visible must draw create_random_array RNG")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -12,7 +12,7 @@ import "testing"
 // Contract: pre eUnionWrite lattice must be the special-revalidate base for
 // CheckReadVar/IsNonreadableField (same as C++ FactVec pre_facts).
 func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -41,14 +41,14 @@ func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
 	if IsNonreadableField(f1, postGenUnion) {
 		t.Fatal("post-gen last=f1: f1 readable")
 	}
-	if HasError() {
-		t.Fatalf("complete paths must not sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("complete paths must not sticky: %v", GetErrorSess(testAmbientSession))
 	}
 
 	// Deep clone of pre must not alias post-gen mutations (visit Join/SetBottom).
 	work := CloneUnionFactSliceDeep(preUnion)
-	if !UnionFactsComplete(work) || HasError() {
-		t.Fatalf("deep clone pre incomplete err=%v", GetError())
+	if !UnionFactsComplete(work) || HasErrorSess(testAmbientSession) {
+		t.Fatalf("deep clone pre incomplete err=%v", GetErrorSess(testAmbientSession))
 	}
 	// Mutate work in place like visit.
 	if len(work) > 0 && work[0] != nil {

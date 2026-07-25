@@ -6,7 +6,7 @@ import (
 )
 
 func TestMakeExpressionComma(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -33,62 +33,62 @@ func TestMakeExpressionComma(t *testing.T) {
 		t.Fatal(out)
 	}
 	// Expression always live for cast_if_needed; sticky (no invent soft-skip past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	castIfNeeded(testAmbientSession, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil castIfNeeded must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-constant complete no-op
 	castIfNeeded(testAmbientSession, &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false)})
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-constant castIfNeeded must complete no-op")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// ExpressionComma always has live lhs/rhs; sticky no invent "( , )" for missing sides
 	bare := &Expression{Term: TermCommaExpr}
 	if bare.Output() != "" {
 		t.Fatalf("incomplete comma must fail closed empty, got %q", bare.Output())
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete comma Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	oneSide := &Expression{Term: TermCommaExpr, CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	if oneSide.Output() != "" {
 		t.Fatalf("one-side comma must fail closed empty, got %q", oneSide.Output())
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("one-side comma Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomParamNilType(t *testing.T) {
 	// Expression.cpp:241 — assert(type) sticky; no GetIntType soft invent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext()
 	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(opts), &c, nil, nil, 0); e != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type MakeRandomParam must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Expression.cpp always has RNG sticky; no invent param shell
 	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(opts), &c, GetIntType(), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomParam must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	// LHS built with noConst=true — may still be variable/function/assign
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -130,7 +130,7 @@ func TestGenerateCanEmitCommaExpr(t *testing.T) {
 }
 
 func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	inc := IncompleteEffect()
@@ -139,45 +139,45 @@ func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionComma")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), ptrEmptyCG(), GetIntType(), nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeExpressionComma must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), nil, GetIntType(), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg MakeExpressionComma must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCastIfNeededGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was soft-skip cast then invent CastType / complete no-op.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil Con → GetType residual; no invent cast
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
 	castIfNeeded(testAmbientSession, hole)
 	if hole.CastType != nil {
 		t.Fatal("GetType residual must not invent CastType", hole.CastType)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual castIfNeeded must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty Value → EqualsInt residual after live pointer type; no invent cast
 	pt := PointerTo(GetIntType())
 	eqHole := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: ""}}
@@ -185,15 +185,15 @@ func TestCastIfNeededGetTypeResidualSticky(t *testing.T) {
 	if eqHole.CastType != nil {
 		t.Fatal("EqualsInt residual must not invent CastType", eqHole.CastType)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("EqualsInt residual castIfNeeded must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCommaOutputLHSResidualSticky(t *testing.T) {
 	// CommaLHS Output residual soft invent was soft-continue invent partial comma with RHS.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	e := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
@@ -202,23 +202,23 @@ func TestCommaOutputLHSResidualSticky(t *testing.T) {
 	if s := e.Output(); s != "" {
 		t.Fatal("LHS Output residual must fail closed comma Output", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("LHS Output residual comma Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHaveOverlappingFieldsFindUnionResidualSticky(t *testing.T) {
 	// FindUnionPointees residual soft invent was invent no-overlap soft-success past Type-nil.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special expr → FindUnionPointees incomplete → overlap sticky
 	e1 := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
 	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)}
 	if !HaveOverlappingFields(e1, e2, nil) {
 		t.Fatal("Type-nil FindUnion residual must fail closed overlap true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil FindUnion residual HaveOverlappingFields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

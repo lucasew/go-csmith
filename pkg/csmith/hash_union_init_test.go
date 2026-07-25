@@ -8,18 +8,18 @@ import (
 // Variable.cpp:891–898 — hash uses get_fact_mgr_for_func(GetFirstFunction())
 // live global_facts (Go: first-func FM.UnionFacts), not init-abstract rebuild.
 func TestUnionWriteFactsForHashUsesLiveFirstFunc(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// seed 999: upstream hashes g_605.f0 / g_467.f0 (live last_written=0)
 	opts := Defaults()
 	opts.Seed = 999
 	g := NewProgramGenerator(NewSession(opts))
 	_ = g.GoGenerator()
-	if HasError() {
-		t.Log("gen err", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Log("gen err", GetErrorSess(testAmbientSession))
 	}
 	uf := g.unionWriteFactsForHash()
-	if !UnionFactsComplete(uf) || HasError() {
-		t.Fatal("incomplete", uf, HasError(), GetError())
+	if !UnionFactsComplete(uf) || HasErrorSess(testAmbientSession) {
+		t.Fatal("incomplete", uf, HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	first := GetFirstFunction(&g.Funcs)
 	if first == nil {
@@ -62,13 +62,13 @@ func TestUnionWriteFactsForHashUsesLiveFirstFunc(t *testing.T) {
 
 // seed 34: live g_26 BOTTOM → no field crc; g_255 last=4 → g_255.f4 (Variable.cpp:893–898).
 func TestUnionWriteFactsForHashSeed34(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Seed = 34
 	g := NewProgramGenerator(NewSession(opts))
 	src := g.GoGenerator()
 	if src == "" {
-		t.Fatal("empty gen", GetError())
+		t.Fatal("empty gen", GetErrorSess(testAmbientSession))
 	}
 	uf := g.unionWriteFactsForHash()
 	var g26, g255 *Variable

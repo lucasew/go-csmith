@@ -6,7 +6,7 @@ import (
 )
 
 func TestMakeRandomStructType(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -44,7 +44,7 @@ func TestMakeRandomStructType(t *testing.T) {
 // Type.cpp:658–666 make_one_struct_field must not mark nested field types used
 // (only Type::choose_random does). Regression: seed 56 emitted unused S1.
 func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
@@ -57,7 +57,7 @@ func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
 	env.StructTypes = []*Type{s0}
 	// Many field picks; S0 may be chosen as nested type — must stay unused.
 	for seed := uint64(1); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		s0.Used = false
 		f := MakeOneStructField(NewRng(seed), opts, probs, env, 0)
 		if f.Type == nil {
@@ -68,7 +68,7 @@ func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
 		}
 	}
 	// choose_random still marks used when it picks the type
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	s0.Used = false
 	picked := false
 	for seed := uint64(1); seed < 200 && !picked; seed++ {
@@ -86,7 +86,7 @@ func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
 func TestAggregateSharedSIDSequence(t *testing.T) {
 	// Type.cpp:298–302 + 1675–1678 — one static sequence for struct and union tags.
 	// After S0, first union is U1 (not U0).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -118,12 +118,12 @@ func TestAggregateSharedSIDSequence(t *testing.T) {
 	if env.AggregateSeq != 2 {
 		t.Fatalf("AggregateSeq want 2 got %d", env.AggregateSeq)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	// Type.cpp:1823–1829 / 1879–1883 — non-ccomp pack(push) then pack(1); pack(pop)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults()) // CComp=false
 	st := &Type{
 		isStruct: true, StructName: "S0", Packed: true, Used: true,
@@ -142,7 +142,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 		t.Fatalf("expected pack(pop): %q", decl)
 	}
 	// ccomp path: only pack(1) / pack()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.CComp = true
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -154,12 +154,12 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 		t.Fatalf("ccomp pack(1)/pack(): %q", decl2)
 	}
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
 	// Type.cpp always has process RNG; sticky no invent aggregate type shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -167,26 +167,26 @@ func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
 	if MakeRandomStructType(nil, opts, probs, &env, "S0") != nil {
 		t.Fatal("nil RNG struct must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomStructType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeRandomUnionType(nil, opts, probs, &env, "U0") != nil {
 		t.Fatal("nil RNG union must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomUnionType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.FixedStructFields = true
 	opts.MaxStructFields = 0
 	if MakeRandomStructType(NewRng(1), opts, probs, &env, "Sempty") != nil {
 		t.Fatal("zero fields must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("zero-field MakeRandomStructType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateAllTypesEnvCreatesStructs(t *testing.T) {
@@ -201,7 +201,7 @@ func TestGenerateAllTypesEnvCreatesStructs(t *testing.T) {
 
 func TestGenerateSimpleTypesSeedsAllNonVoid(t *testing.T) {
 	// Type.cpp:1170–1176 — eChar..eUInt128 always on AllTypes (float off still listed).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
 	opts.LongLong = false // AllowInt64 may still depend on math64
@@ -227,36 +227,36 @@ func TestGenerateSimpleTypesSeedsAllNonVoid(t *testing.T) {
 
 func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	// C++ always has RNG + Probabilities sticky; no invent fields/aggregates without them
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if MoreTypesProbability(nil, NewProbabilities(opts), 20) {
 		t.Fatal("nil RNG past threshold must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MoreTypesProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
 		t.Fatal("nil RNG MakeOneStructField must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeOneStructField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f := MakeOneStructField(NewRng(1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
 		t.Fatal("nil probs MakeOneStructField must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil probs MakeOneStructField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0, true); f.Type != nil {
 		t.Fatal("nil RNG MakeOneUnionField must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeOneUnionField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	env := TypeEnv{Sess: testAmbientSession}
 	opts.Structs = true
 	opts.Unions = true
@@ -267,13 +267,13 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	if len(env.AllTypes) == 0 {
 		t.Fatal("simples still seeded")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// TypeEnv always live; sticky (no invent soft-skip type gen past hole)
 	GenerateAllTypesEnv(NewRng(1), opts, NewProbabilities(opts), nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil env GenerateAllTypesEnv must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateEmitsStructDecl(t *testing.T) {
@@ -306,24 +306,24 @@ func TestMakeStructConstant(t *testing.T) {
 		t.Fatal(c)
 	}
 	// Constant.cpp always has RNG sticky; no invent "{}" aggregate shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeStructConstant(nil, opts, probs, st) != nil {
 		t.Fatal("nil RNG struct constant")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeStructConstant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	if MakeUnionConstant(nil, opts, probs, ut) != nil {
 		t.Fatal("nil RNG union constant")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeUnionConstant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil field sticky (no invent soft-empty then ERROR_GUARD as complete miss)
 	stHole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
@@ -331,20 +331,20 @@ func TestMakeStructConstant(t *testing.T) {
 	if MakeStructConstant(NewRng(5), opts, probs, stHole) != nil {
 		t.Fatal("Type-nil field MakeStructConstant must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil field MakeStructConstant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	utHole := &Type{isUnion: true, StructName: "Uhole", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
 	if MakeUnionConstant(NewRng(5), opts, probs, utHole) != nil {
 		t.Fatal("Type-nil field MakeUnionConstant must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil field MakeUnionConstant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckImplicitNontrivialAssignOps(t *testing.T) {
@@ -369,14 +369,14 @@ func TestCheckImplicitNontrivialAssignOps(t *testing.T) {
 		t.Fatal("flagged field")
 	}
 	// nil field Type sticky true (no invent no-nontrivial soft-skip past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !CheckImplicitNontrivialAssignOps(opts, []StructField{{Name: "f0", Type: nil}}) {
 		t.Fatal("nil field Type must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type CheckImplicitNontrivialAssignOps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func min(a, b int) int {

@@ -6,7 +6,7 @@ import (
 )
 
 func TestHashSimpleInt(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	out := v.HashOutput()
 	if !strings.Contains(out, `transparent_crc(g_1, "g_1"`) {
@@ -17,10 +17,10 @@ func TestHashSimpleInt(t *testing.T) {
 	if anon.HashOutput() != "" {
 		t.Fatal("empty name must fail closed hash")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name HashOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHashPointerEmpty(t *testing.T) {
@@ -51,7 +51,7 @@ func TestHashStructFields(t *testing.T) {
 }
 
 func TestHashArrayLoops(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	// ArrayVariable::hash uses get_last_ctrl_vars (no letter invent without pool)
 	_ = GetNewCtrlVars(Defaults())
@@ -77,31 +77,31 @@ func TestHashArrayLoops(t *testing.T) {
 		t.Fatal("missing hash_value_printf index line", out)
 	}
 	// undersized ctrl sticky — no invent loops with empty index
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	if av.Variable.HashOutput() != "" {
 		t.Fatal("no last ctrl must fail closed array hash")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("no last ctrl HashOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray sticky empty
 	shell := &Variable{Name: "g_5", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}}
 	if shell.HashOutput() != "" {
 		t.Fatal("IsArray without AsArray HashOutput must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray HashOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 }
 
 // ArrayVariable.cpp:722–723 — itemized (collective!=0) hash is a no-op.
 // GlobalList holds collective + itemized; only parent emits one loop nest.
 func TestHashArraySkipsItemizedCollective(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -136,17 +136,17 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	if item.Variable.HashOutput() != "" {
 		t.Fatal("itemized ArrayVariable::hash must no-op")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("itemized no-op must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 }
 
 // ArrayVariable.cpp:742–744 — field_names empty after union exclusions → give up
 // before for-loops (no empty for+index shell). Seed 94: g_336[5] all unreadable.
 func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -173,8 +173,8 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	if out != "" {
 		t.Fatalf("empty field_names must skip hash entirely, got:\n%s", out)
 	}
-	if HasError() {
-		t.Fatal("complete BOTTOM facts must not sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("complete BOTTOM facts must not sticky", GetErrorSess(testAmbientSession))
 	}
 	// without facts (nil) still has type leaves → would hash both fields
 	all := hashArrayVariable(&av.Variable, nil, nil)
@@ -190,12 +190,12 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	if !strings.Contains(part, "for (i = 0") {
 		t.Fatal("readable payload must still emit loops", part)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 }
 
 func TestHashArrayHashValuePrintfOff(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	opts.HashValuePrintf = false
@@ -218,7 +218,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	}
 	// restore process defaults for later tests
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 }
 
@@ -249,13 +249,13 @@ func TestGenerateHashUsesFieldCrc(t *testing.T) {
 func TestHashOutputIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent soft-continue scalar hash past incomplete.
 	// Type-nil already sticky at hashOutput entry.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := &Variable{Name: "g_x", Type: nil}
 	if v.hashOutput(nil, nil) != "" {
 		t.Fatal("Type-nil hashOutput must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil hashOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

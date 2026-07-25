@@ -8,8 +8,8 @@ import "testing"
 // name in array-init body while for-header used OutputC (seed-48:
 // l_91[p_74][g_105][g_106[4]] vs …[g_106]).
 func TestArrayInitAccessUsesItemizedIVOutput(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)

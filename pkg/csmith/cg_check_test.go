@@ -35,7 +35,7 @@ func TestCheckWriteVarConst(t *testing.T) {
 
 func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
 	// GetCollective nil on incomplete FieldVars must not invent write success / panic
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -65,26 +65,26 @@ func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
 	}
 	// force-write path sets sticky error, not invent silent skip
 	cg.WriteVar(fld)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVar incomplete collective must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// force path on incomplete EffectStm must SetError (no invent silent grow)
 	cg2 := EmptyCGContext()
 	cg2.EffectStm = IncompleteEffect()
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	cg2.WriteVar(v)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVar incomplete EffectStm must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg3 := EmptyCGContext()
 	cg3.EffectStm = IncompleteEffect()
 	cg3.ReadVar(v)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ReadVar incomplete EffectStm must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckWriteVarIVBound(t *testing.T) {
@@ -172,22 +172,22 @@ func TestVisitFactsExpressionVariableAddrBitfield(t *testing.T) {
 
 func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	// incomplete Lhs hard IR sticky (no invent visit success / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	if cg.VisitFactsLhs(nil, Defaults()) {
 		t.Fatal("nil lhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if cg.VisitFactsLhs(&Lhs{}, Defaults()) {
 		t.Fatal("nil lhs.Var")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs.Var VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsValidPtr residual soft invent was soft-continue visit invent success.
 	// Fair: sticky false. deref>0 + incomplete facts.
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -199,10 +199,10 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	if cgPtr.VisitFactsLhs(lhsPtr, Defaults()) {
 		t.Fatal("IsValidPtr residual VisitFactsLhs must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsValidPtr residual VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// PtrModified residual soft invent was soft-continue visit invent success.
 	// Fair: sticky false via incomplete EffectStm IsWritten residual true (modified).
 	cgMod := EmptyCGContext()
@@ -212,10 +212,10 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	if cgMod.VisitFactsLhs(lhsPtr, Defaults()) {
 		t.Fatal("PtrModified residual VisitFactsLhs must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("PtrModified residual VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete EffectStm/accum sticky via CheckWriteVar
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
@@ -224,24 +224,24 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	if cg2.VisitFactsLhs(lhs, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed VisitFactsLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg3 := EmptyCGContext()
 	inc := IncompleteEffect()
 	cg3.EffectAccum = &inc
 	if cg3.VisitFactsLhs(lhs, Defaults()) {
 		t.Fatal("incomplete EffectAccum must fail closed VisitFactsLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReadPointedNullRejected(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.NullPointerDerefProb = 0
 	opts.DeadPointerDerefProb = 0
@@ -254,10 +254,10 @@ func TestReadPointedNullRejected(t *testing.T) {
 	if cg.ReadPointed(p, 1, fm.GlobalFacts, opts) {
 		t.Fatal("null pointee")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete null reject ReadPointed must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// CheckReadVar residual soft invent was soft-continue later pointees invent success.
 	// Fair: sticky false. pointee with incomplete EffectStm stickies CheckReadVar residual.
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
@@ -270,10 +270,10 @@ func TestReadPointedNullRejected(t *testing.T) {
 	if cg2.ReadPointed(p, 1, fm2.GlobalFacts, opts) {
 		t.Fatal("CheckReadVar residual ReadPointed must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CheckReadVar residual ReadPointed must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAccessDerefVolatile(t *testing.T) {
@@ -295,27 +295,27 @@ func TestAccessDerefVolatile(t *testing.T) {
 		t.Fatal("non-strict")
 	}
 	// under strictVolatile, Variable always live; sticky IncompleteEffect
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EffectComplete(e.AccessDerefVolatile(nil, 1, true)) {
 		t.Fatal("nil Variable strict AccessDerefVolatile must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable strict AccessDerefVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-strict nil subject complete identity
 	if !EffectComplete(e.AccessDerefVolatile(nil, 1, false)) {
 		t.Fatal("non-strict nil subject must stay complete identity")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-strict nil subject must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
 	// incomplete ambient/stm sticky (no invent CheckDerefVolatile / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.StrictVolatileRule = true
 	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -323,113 +323,113 @@ func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
 	if cg.CheckDerefVolatile(v, 1, opts) {
 		t.Fatal("incomplete ambient must fail closed CheckDerefVolatile")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete ambient CheckDerefVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := EmptyCGContext()
 	cg2.EffectStm = IncompleteEffect()
 	if cg2.CheckDerefVolatile(v, 1, opts) {
 		t.Fatal("incomplete EffectStm must fail closed CheckDerefVolatile")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm CheckDerefVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckReadWriteVarIncompleteStmFailClosed(t *testing.T) {
 	// incomplete EffectStm sticky (no invent CheckRead/WriteVar / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	cg := EmptyCGContext()
 	cg.EffectStm = IncompleteEffect()
 	if cg.CheckReadVar(v, nil) {
 		t.Fatal("incomplete EffectStm must fail closed CheckReadVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm CheckReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if cg.CheckWriteVar(v, nil) {
 		t.Fatal("incomplete EffectStm must fail closed CheckWriteVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm CheckWriteVar must SetError sticky")
 	}
 	// incomplete EffectAccum sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := EmptyCGContext()
 	inc := IncompleteEffect()
 	cg2.EffectAccum = &inc
 	if cg2.CheckReadVar(v, nil) {
 		t.Fatal("incomplete EffectAccum must fail closed CheckReadVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum CheckReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if cg2.CheckWriteVar(v, nil) {
 		t.Fatal("incomplete EffectAccum must fail closed CheckWriteVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum CheckWriteVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckReadVarIsInsideUnionFieldResidualSticky(t *testing.T) {
 	// IsNonreadableField / IsInsideUnionField Type-nil ancestry residual: soft invent was
 	// return CheckReadVar true past hole under empty facts path. Fair: sticky fail closed.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	cg := EmptyCGContext()
 	if cg.CheckReadVar(field, nil) {
 		t.Fatal("IsInsideUnionField residual must fail closed CheckReadVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsInsideUnionField residual CheckReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil soft invent: IsPointer residual ERROR+false skip dangling then
 	// ReadVar/WriteVar return true. Fair: sticky false before classify.
 	shell := &Variable{Name: "g_typeless"}
 	if cg.CheckReadVar(shell, nil) {
 		t.Fatal("Type-nil must fail closed CheckReadVar, not invent read success")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil CheckReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if cg.CheckWriteVar(shell, nil) {
 		t.Fatal("Type-nil must fail closed CheckWriteVar, not invent write success")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil CheckWriteVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReadIndicesHardIRSticky(t *testing.T) {
 	// IsArray without AsArray hard IR sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	broken := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if cg.ReadIndices(broken, nil) {
 		t.Fatal("IsArray without AsArray must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ReadIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if cg.ReadIndices(nil, nil) {
 		t.Fatal("nil var ReadIndices must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var ReadIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReadIndicesConstantOK(t *testing.T) {
@@ -455,7 +455,7 @@ func TestReadIndicesConstantOK(t *testing.T) {
 
 func TestReadIndicesVarRecordsRead(t *testing.T) {
 	// Variable index: visit_facts records read of IV
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -482,7 +482,7 @@ func TestReadIndicesVarRecordsRead(t *testing.T) {
 }
 
 func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -501,10 +501,10 @@ func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
 	if !cg.ReadIndices(field, nil) {
 		t.Fatal("array field")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete array field ReadIndices must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArrayField residual: IsArray without AsArray parent soft invent was soft-continue
 	// complete true skip indices. Fair: sticky false.
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -512,15 +512,15 @@ func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
 	if cg.ReadIndices(fieldHole, nil) {
 		t.Fatal("IsArrayField residual ReadIndices must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArrayField residual ReadIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitIndicesEffectContext(t *testing.T) {
 	// Lhs.cpp:273–284 — IV ok under empty RHS context
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}},
 		Sizes:    []int{3},
@@ -552,13 +552,13 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 	if lhs.VisitIndices(&cg3, Defaults()) {
 		t.Fatal("incomplete EffectContext must fail closed VisitIndices")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg4 := EmptyCGContext()
 	cg4.EffectStm = IncompleteEffect()
 	if lhs.VisitIndices(&cg4, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed VisitIndices")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was complete true (no indices path)
 	// fair: sticky false (mirrors ReadIndices hard IR)
 	broken := &Lhs{Var: &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}}
@@ -566,18 +566,18 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 	if broken.VisitIndices(&cg5, Defaults()) {
 		t.Fatal("IsArray without AsArray VisitIndices must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray VisitIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Lhs sticky
 	if ((*Lhs)(nil)).VisitIndices(&cg5, Defaults()) {
 		t.Fatal("nil Lhs VisitIndices must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs VisitIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExtendCallChainNilHoleFailClosed(t *testing.T) {
@@ -593,7 +593,7 @@ func TestExtendCallChainNilHoleFailClosed(t *testing.T) {
 
 func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
 	// incomplete call_chain must not invent partial external merge
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	e := EmptyEffect().WriteVar(g)
 	cg := EmptyCGContext()
@@ -605,126 +605,126 @@ func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
 	if eff.IsWritten(g) {
 		t.Fatal("nil CallChain hole must not invent external write merge")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CallChain hole must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
 	// NoteWrite/NoteRead must not invent silent grow on incomplete accum
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg.NoteWrite(g)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("NoteWrite incomplete accum must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inc2 := IncompleteEffect()
 	cg2 := WithFunc(f, EmptyEffect())
 	cg2.EffectAccum = &inc2
 	cg2.NoteRead(g)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("NoteRead incomplete accum must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky no invent soft-skip write/read past hole
 	cg.NoteWrite(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable NoteWrite must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.NoteRead(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable NoteRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// CGContext always live on mutators
 	(*CGContext)(nil).ClearEffectStm()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext ClearEffectStm must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).ResetEffectAccum(EmptyEffect())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext ResetEffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddExternalEffect(EmptyEffect())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext AddExternalEffect must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddVisibleEffectAt(EmptyEffect(), nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext AddVisibleEffectAt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddEffect(EmptyEffect(), false)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext AddEffect must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).MergeParamContext(EmptyCGContext(), false)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext MergeParamContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).ReadVar(g)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext ReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).WriteVar(g)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext WriteVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.ReadVar(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable CGContext.ReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.WriteVar(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable CGContext.WriteVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddIVBound(g, 1)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext AddIVBound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.AddIVBound(nil, 1)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IV AddIVBound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).RemoveIVBound(g)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CGContext RemoveIVBound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddEffectIncompleteFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	cg.EffectStm = IncompleteEffect()
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	cg.AddEffect(EmptyEffect().WriteVar(v), false)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddEffect incomplete stm must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := EmptyCGContext()
 	cg2.AddEffect(IncompleteEffect(), false)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddEffect incomplete e must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

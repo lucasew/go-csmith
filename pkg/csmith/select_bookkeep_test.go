@@ -76,7 +76,7 @@ func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 
 func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / facts fail closed sticky before scope pick
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -88,30 +88,30 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed GenerateNewVariable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if vs.GenerateNewVariable(AccessWrite, cg2, GetIntType(), nil, NewRng(2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewVariable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.GenerateNewVariable(AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed GenerateNewVariable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectGlobalMTInvalidVars(t *testing.T) {
@@ -155,7 +155,7 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 
 func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	// Incomplete ambient / invalidVars / pools must not invent soft re-pick success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	pt := PointerTo(GetIntType())
@@ -171,48 +171,48 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg, GetIntType(), &q, AccessRead, nil) != nil {
 		t.Fatal("incomplete EffectContext must fail closed selectDerefPointerInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, EmptyEffect())
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed selectDerefPointerInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete invalidVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs.GlobalNonvolatilesList = IncompleteVariables()
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, nil) != nil {
 		t.Fatal("incomplete GlobalNonvolatilesList must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalNonvolatilesList must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type + RNG always live; sticky
 	vs.GlobalNonvolatilesList = []*Variable{pv}
 	if selectDerefPointerInv(nil, opts, probs, vs, cg2, GetIntType(), &q, AccessRead, nil) != nil {
 		t.Fatal("nil RNG selectDerefPointerInv must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG selectDerefPointerInv must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, nil, &q, AccessRead, nil) != nil {
 		t.Fatal("nil type selectDerefPointerInv must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type selectDerefPointerInv must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// assert(qfer) sticky
 	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), nil, AccessRead, nil) != nil {
 		t.Fatal("nil qfer selectDerefPointerInv must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil qfer selectDerefPointerInv must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

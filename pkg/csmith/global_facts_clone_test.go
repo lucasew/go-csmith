@@ -4,7 +4,7 @@ import "testing"
 
 func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// StatementFor.cpp:299–300 pre_facts snapshot; incomplete must not invent cleaned
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	fm := NewFactMgr(nil)
@@ -17,11 +17,11 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomFor")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
@@ -36,10 +36,10 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if b.AppendReturnStmt(NewRng(2), opts, vs, &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed AppendReturnStmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete EffectContext fails closed sticky before EffectStm clear
 	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
 	eff2 := EmptyEffect()
@@ -47,15 +47,15 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if b.AppendReturnStmt(NewRng(3), opts, vs, &cg2) != nil {
 		t.Fatal("incomplete EffectContext must fail closed AppendReturnStmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	// incomplete ambient/facts must not invent assign shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -66,30 +66,30 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	if stmtOK(MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomAssign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if stmtOK(MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType())) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomAssign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("must SetError GlobalFacts")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete EffectStm must not invent assign under hole shell
 	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg3.EffectStm = IncompleteEffect()
 	if stmtOK(MakeRandomAssign(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3, GetIntType())) {
 		t.Fatal("incomplete EffectStm must fail closed MakeRandomAssign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
@@ -114,7 +114,7 @@ func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 
 func TestVisitFactsBinaryOrderedVisitResidualSticky(t *testing.T) {
 	// Visit residual soft invent was soft-continue right/merge invent visit success.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -126,24 +126,24 @@ func TestVisitFactsBinaryOrderedVisitResidualSticky(t *testing.T) {
 	if VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
 		t.Fatal("visit residual must fail closed ordered binary, not invent success")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("visit residual VisitFactsBinaryOrdered must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual on right after left succeeds
 	fi2 := &Invocation{Args: []*Expression{good, hole}, Binary: "||"}
 	if VisitFactsBinaryOrdered(fi2, &cg, Defaults()) {
 		t.Fatal("right visit residual must fail closed ordered binary")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("right visit residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	// func_1 pre_facts snapshot must fail closed on incomplete GlobalFacts
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
@@ -160,12 +160,12 @@ func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	if MakeRandomIf(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomIf func_1 path")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// StatementExpr.cpp:58–59 snapshot; incomplete must not invent cleaned rollback
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
@@ -178,10 +178,10 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if st.Kind != 0 || st.StmID != 0 {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomExprStmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete EffectAccum must not invent expr stmt under hole shell
 	inc := IncompleteEffect()
 	cg3 := EmptyCGContext()
@@ -190,10 +190,10 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if st3.Kind != 0 || st3.StmID != 0 {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomExprStmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete EffectContext fails closed sticky
 	cg4 := WithFunc(nil, IncompleteEffect())
 	eff4 := EmptyEffect()
@@ -202,15 +202,15 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if st4.Kind != 0 || st4.StmID != 0 {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomExprStmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 	// incomplete inputs fail closed (no invent cleaned fixed-point)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 1, Stmts: nil}
 	fm := NewFactMgr(nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -222,11 +222,11 @@ func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 	if ok {
 		t.Fatal("incomplete inputs must fail closed FindFixedPointBlock")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{
 		Args: []*Expression{
 			{Term: TermConstant, Con: MakeInt(1)},
@@ -239,14 +239,14 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
 		t.Fatal("incomplete facts must fail closed VisitUnorderedParams")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts VisitUnorderedParams must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 3, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -264,10 +264,10 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete pre must clear GlobalFacts, not invent post-creation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete pre must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts seed
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	pre2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -275,10 +275,10 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete GlobalFacts must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// StmID 0 — no invent post_creation success without maps
 	st0 := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -289,33 +289,33 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("IncompleteStmID must fail closed nil GlobalFacts")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Statement + CGContext always live; sticky (no invent soft-skip past hole)
 	// Nil FM is non-sticky soft re-pick
 	PostCreationAnalysis(nil, []*FactPointTo{}, nil, EmptyEffect(), &cg, Defaults())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil stmt PostCreationAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	PostCreationAnalysis(st, []*FactPointTo{}, nil, EmptyEffect(), nil, Defaults())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cgNoFM := EmptyCGContext()
 	PostCreationAnalysis(st, []*FactPointTo{}, nil, EmptyEffect(), &cgNoFM, Defaults())
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM PostCreationAnalysis must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient at entry must sticky ERROR before EffectStm clear
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
@@ -327,17 +327,17 @@ func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomIf(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MakeRandomIf must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg2.EffectAccum = &inc
 	if MakeRandomFor(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MakeRandomFor must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

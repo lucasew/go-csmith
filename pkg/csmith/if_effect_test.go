@@ -72,25 +72,25 @@ func TestMergeEffectsUnion(t *testing.T) {
 
 func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 	// incomplete arm must not invent pure/empty-complete merge success — sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	ok := EmptyEffect().WriteVar(a)
 	m := MergeEffects(ok, IncompleteEffect())
 	if EffectComplete(m) {
 		t.Fatal("incomplete b must fail closed MergeEffects")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete b MergeEffects must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	m2 := MergeEffects(IncompleteEffect(), ok)
 	if EffectComplete(m2) {
 		t.Fatal("incomplete a must fail closed MergeEffects")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete a MergeEffects must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil map key on complete-looking shell
 	bad := EmptyEffect()
 	bad.read = map[*Variable]bool{nil: true}
@@ -98,10 +98,10 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 	if EffectComplete(m3) {
 		t.Fatal("nil key must fail closed MergeEffects")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil key MergeEffects must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayBuildInitRecursive(t *testing.T) {
@@ -119,26 +119,26 @@ func TestArrayBuildInitRecursive(t *testing.T) {
 		t.Fatal("want nested braces", out)
 	}
 	// empty init_strings list is broken IR sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if av.buildInitRecursive(0, nil) != "" {
 		t.Fatal("empty init list must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty init list must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if av.buildInitRecursive(0, []string{""}) != "" {
 		t.Fatal("empty hole string must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty hole string must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	// StatementIf.cpp:94/99 ERROR_GUARD after Block::make_random branches
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
@@ -154,18 +154,18 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	// sticky error after condition would abort; set after a successful path component
 	st := MakeRandomIf(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	// may succeed with empty blocks (max size 0)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		if st != nil {
 			t.Fatal("sticky error must fail closed")
 		}
 	}
-	ClearError()
-	SetError(ErrGeneric)
+	ClearErrorSess(testAmbientSession)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	st2 := MakeRandomIf(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st2 != nil {
 		t.Fatal("ERROR_GUARD after flip path: want nil")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
@@ -212,7 +212,7 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	// Full FactVec (ePointTo + eUnionWrite). Soft invent was SetGlobalFacts(PT-only)
 	// so else generation kept then-exit UnionFacts last-writes → IsNonreadableField
 	// over-filtered choose_var (seed-7 eligible pool half-size).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -235,13 +235,13 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	// map_facts_in[then] stored entry FactVec (both partitions)
 	thenID := 42
 	fm.SetMapFactsInPair(thenID, []*FactPointTo{}, []*FactUnion{entryU})
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	// Production path: AssignGlobalFactsFromMapIn (full FactVec)
 	fm.AssignGlobalFactsFromMapIn(thenID)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil || fm.UnionFacts[0].LastWrittenFID != 0 {
 		t.Fatalf("want entry last_written 0, got %#v", fm.UnionFacts)
@@ -255,7 +255,7 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	if !IsNonreadableField(f0, fm.UnionFacts) {
 		t.Fatal("PT-only SetGlobalFacts must leave exit union last-write (hole)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestVisitFactsStatementIfSharesEffectAccum — StatementIf.cpp:170–177.
@@ -263,7 +263,7 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 // then false. Soft invent forked arm accums → StmVisitFacts rewrote
 // map_accum_effect[nested] without outer history (seed-42 choose_visible nOk).
 func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
@@ -297,7 +297,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	eff := EmptyEffect().ReadVar(outer)
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, opts) {
-		t.Fatalf("visit if err=%v", HasError())
+		t.Fatalf("visit if err=%v", HasErrorSess(testAmbientSession))
 	}
 	// After shared-arm visit, accum must include outer (pre) + both arm reads.
 	if cg.EffectAccum == nil || !cg.EffectAccum.IsRead(outer) {
@@ -311,7 +311,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	if !EffectComplete(thenAcc) || !thenAcc.IsRead(outer) {
 		t.Fatalf("map_accum_effect[then] must include outer pre-history, reads=%v", thenAcc.ReadVars())
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestVisitFactsStatementIfRewindsUnionBeforeElse — StatementIf.cpp:170–177.
@@ -319,7 +319,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 // Soft invent restored only GlobalFacts so UnionFacts stayed at then-exit
 // last-writes (seed-7 nested over-strip).
 func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U_vif", Fields: []StructField{
@@ -360,7 +360,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, opts) {
-		t.Fatalf("visit if failed err=%v", HasError())
+		t.Fatalf("visit if failed err=%v", HasErrorSess(testAmbientSession))
 	}
 	if !UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("UnionFacts incomplete")
@@ -371,43 +371,43 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	// Sanity: exit-only would make f0 nonreadable; merged then+else should not be stuck
 	// solely in a way that loses completeness.
 	_ = f0
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil RNG+cg")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG+cg MakeRandomIf must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatal("nil RNG")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomIf must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomParentBlockERRORGuard(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{}
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	if b.RandomParentBlock(NewRng(1), true) != nil {
 		t.Fatal("ERROR_GUARD")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	// incomplete EffectAccum must fail closed before arms (shared accum contract)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
@@ -422,7 +422,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	if st != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestMakeRandomIfSharesCGContextWithParent — StatementIf.cpp:93–99 both arms
@@ -430,7 +430,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 // CloneSubcontext arms left parent EffectStm/BlkDepth stale so else started from a
 // second clone (seed-2 e13830: SelectParentLocal stack n=4 vs UP n=5).
 func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -477,11 +477,11 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	}
 	_ = g1
 	_ = stmtTab
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
@@ -498,5 +498,5 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
 	}
 	// nil return is the invent ban; SetError when iteration path reaches accum check
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

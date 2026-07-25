@@ -19,39 +19,39 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 
 func TestMakeRandomVoidFailClosed(t *testing.T) {
 	// Constant.cpp:312 — assert(st != eVoid) sticky; no invent "/* void */" / soft success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	c := MakeRandom(GetSimpleType(EVoid), Defaults(), nil, NewRng(1))
 	if c != nil {
 		t.Fatalf("void constant must fail closed, got %+v", c)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("void MakeRandom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type* always live; sticky no invent Constant{Type:nil, Value:"0"} shell
 	if MakeRandom(nil, Defaults(), nil, NewRng(1)) != nil {
 		t.Fatal("nil type MakeRandom must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type MakeRandom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// simple non-void needs RNG sticky (no invent NewRng)
 	if MakeRandom(GetIntType(), Defaults(), nil, nil) != nil {
 		t.Fatal("nil RNG simple MakeRandom must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG simple MakeRandom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Constant.cpp:411 unsupported kind sticky
 	if MakeRandom(&Type{}, Defaults(), nil, NewRng(1)) != nil {
 		t.Fatal("non-simple/non-ptr MakeRandom must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unsupported type MakeRandom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIntHexPathSeed2(t *testing.T) {
@@ -104,7 +104,7 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 }
 
 func TestMakeRandomUpto(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := NewRng(2)
 	// first RndUpto(10) = 3 for seed2
 	c := MakeRandomUpto(10, r)
@@ -115,10 +115,10 @@ func TestMakeRandomUpto(t *testing.T) {
 	if MakeRandomUpto(10, nil) != nil {
 		t.Fatal("nil RNG MakeRandomUpto must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomUpto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeInt(t *testing.T) {
@@ -153,26 +153,26 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 
 func TestHexToBinary(t *testing.T) {
 	// Constant.cpp:85–97
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if HexToBinary("0") != "0000" || HexToBinary("f") != "1111" || HexToBinary("A") != "1010" {
 		t.Fatalf("nibbles: 0=%q f=%q A=%q", HexToBinary("0"), HexToBinary("f"), HexToBinary("A"))
 	}
 	if HexToBinary("0f") != "00001111" {
 		t.Fatalf("0f=%q", HexToBinary("0f"))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if HexToBinary("g") != "" {
 		t.Fatal("invalid hex must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid hex must SetError sticky")
 	}
 	// empty string has no broken digit — complete empty is ok non-sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if HexToBinary("") != "" {
 		t.Fatal("empty hex must be empty")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBinaryConstantPath(t *testing.T) {
@@ -208,25 +208,25 @@ func TestBinaryConstantPath(t *testing.T) {
 			t.Fatalf("binary off invent %q", s)
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// BinaryConstant on + nil RNG sticky (no invent soft skip without draw)
 	opts.BinaryConstant = true
 	if _, ok := maybeBinaryConstant(opts, nil, 2, ""); ok {
 		t.Fatal("nil RNG maybeBinaryConstant must not claim binary branch")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG BinaryConstant maybeBinaryConstant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// BinaryConstant off complete no-op
 	opts.BinaryConstant = false
 	if _, ok := maybeBinaryConstant(opts, nil, 2, ""); ok {
 		t.Fatal("BinaryConstant off must complete no-op")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("BinaryConstant off must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMarkMutableConstWrapsSimple(t *testing.T) {
@@ -288,84 +288,84 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	if !sawP || !sawM {
 		t.Fatalf("need both p±1, +1=%v -1=%v", sawP, sawM)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if generateSmallRandomFloatHexConstant(0, nil) != "" {
 		t.Fatal("nil rng fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil rng generateSmallRandomFloatHexConstant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// formatSmallConstant must not invent float without RNG; sticky broken dispatch
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if formatSmallConstant(EFloat, 1, Defaults()) != "" {
 		t.Fatal("formatSmallConstant float invent")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("formatSmallConstant float must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
 	// AbsRndNumGenerator always has live RNG sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if NewRng(1).RandomHexDigits(0) != "" {
 		t.Fatal("num<=0 returns empty non-sticky")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("num<=0 must not SetError")
 	}
 	if (*Rng)(nil).RandomHexDigits(4) != "" {
 		t.Fatal("nil RNG must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomHexDigits must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent Constant void shell past eVoid.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vt := GetSimpleType(EVoid)
 	if MakeRandom(vt, Defaults(), nil, NewRng(1)) != nil {
 		t.Fatal("void MakeRandom must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("void MakeRandom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Type sticky
 	if MakeRandom(nil, Defaults(), nil, NewRng(1)) != nil {
 		t.Fatal("nil Type MakeRandom must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type MakeRandom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomNonzero(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := NewRng(2)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	c := MakeRandomNonzero(GetIntType(), opts, probs, r)
-	if c == nil || HasError() {
-		t.Fatal("nonzero", HasError())
+	if c == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal("nonzero", HasErrorSess(testAmbientSession))
 	}
 	if c.Equals(0) {
 		t.Fatal("must nonzero", c.Value)
 	}
-	if MakeRandomNonzero(nil, opts, probs, r) != nil || !HasError() {
+	if MakeRandomNonzero(nil, opts, probs, r) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestConstantCloneOutputCompatible(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	c := MakeInt(-3)
 	cl := c.Clone()
 	if cl == nil || cl.Value != "-3" || cl == c {
@@ -397,11 +397,11 @@ func TestConstantCloneOutputCompatible(t *testing.T) {
 	if MakeIntOpts(5, o).Value != "(5)" {
 		t.Fatal(MakeIntOpts(5, o).Value)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockDepthProtectAndFind(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 7, blockSize: 4}
 	if b.BlockSize() != 4 {
 		t.Fatal(b.BlockSize())
@@ -423,8 +423,8 @@ func TestBlockDepthProtectAndFind(t *testing.T) {
 	if FindBlockByID([]*Function{f}, 99) != nil {
 		t.Fatal("miss")
 	}
-	if FindBlockByID([]*Function{f}, 0) != nil || !HasError() {
+	if FindBlockByID([]*Function{f}, 0) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("id 0 sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

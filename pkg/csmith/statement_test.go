@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestStatementProbabilitySeed2(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	tab := NewStatementThresholdTable(Defaults())
 	r := NewRng(2)
 	// first RndUpto(100) seed2 = 1959434203 % 100 = 3 → IfElse
@@ -12,19 +12,19 @@ func TestStatementProbabilitySeed2(t *testing.T) {
 		t.Fatalf("got %v want IfElse", st)
 	}
 	// nil table sticky MAX
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if StatementProbability(NewRng(1), nil) != MaxStatementType {
 		t.Fatal("nil table must fail closed MAX")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil table StatementProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestStatementProbabilityFilterRejectCompound(t *testing.T) {
 	// Simulate max block depth: reject compound types via custom filter on the U100 value.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	tab := NewStatementThresholdTable(Defaults())
 	// Filter that rejects values mapping to compound statements
 	f := filterFunc(func(v uint32) bool {
@@ -37,7 +37,7 @@ func TestStatementProbabilityFilterRejectCompound(t *testing.T) {
 			t.Fatalf("compound slipped through: %v", st)
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsCompound(t *testing.T) {
@@ -48,8 +48,8 @@ func TestIsCompound(t *testing.T) {
 
 func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	// Statement.cpp:275–277 — assert(!"unknown Statement type"); no invent shell
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -60,29 +60,29 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("unknown kind must not invent usable stmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown kind must set sticky error like assert")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil CGContext sticky — no invent Kind-only shell
 	st2 := makeRandomStmtKind(NewRng(1), opts, nil, nil, nil, nil, nil, nil, StmtAssign)
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil cg soft invent %#v", st2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg makeRandomStmtKind must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil RNG sticky — no invent Kind-only shell
 	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, StmtAssign)
 	if stmtOK(st3) || st3.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st3)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG makeRandomStmtKind must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestStmtOKBlockRequiresThen(t *testing.T) {

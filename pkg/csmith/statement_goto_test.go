@@ -70,7 +70,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 // StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only; no read_var
 // during make_random (visit_facts later). Soft invent NoteRead bloated EffectStm/accum.
 func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -116,7 +116,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	if !found {
 		t.Skip("no goto with g_c cond in seed sample")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateCanEmitGoto(t *testing.T) {
@@ -171,14 +171,14 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 		t.Fatal("must not invent same fixed lbl_1")
 	}
 	// empty nextLabel — sticky fail closed, no invent empty label token
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if LabelForGotoDest(9, func() string { return "" }) != "" {
 		t.Fatal("empty gensym must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty gensym must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestStmVisitFactsClearsEffectStmBeforeForVisit — Statement.cpp:611 +
@@ -187,7 +187,7 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 // Soft invent VisitFactsStmt after add_effect(map_accum) kept pollution and
 // froze gen IV-first reads (seed-42 func_68: g_77 before g_16).
 func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_68", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -222,7 +222,7 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	cg.EffectStm = EmptyEffect().ReadVar(pollute)
 	facts := []*FactPointTo{}
 	if !StmVisitFacts(forSt, &facts, &cg, opts) {
-		t.Fatalf("StmVisitFacts for: err=%v", HasError())
+		t.Fatalf("StmVisitFacts for: err=%v", HasErrorSess(testAmbientSession))
 	}
 	got := fm.GetMapStmEffect(forSt.StmID)
 	if !EffectComplete(got) {
@@ -237,20 +237,20 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 		t.Fatalf("map_stm still pollution/IV-first after StmVisitFacts clear: %v", mapAccumNamesOf(reads))
 	}
 	// negative: VisitFactsStmt without clear keeps pollution in the pre-init snapshot
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	acc2 := EmptyEffect()
 	cg2.EffectAccum = &acc2
 	cg2.EffectStm = EmptyEffect().ReadVar(pollute)
 	if !VisitFactsStmt(forSt, &cg2, opts) {
-		t.Fatalf("VisitFactsStmt for: err=%v", HasError())
+		t.Fatalf("VisitFactsStmt for: err=%v", HasErrorSess(testAmbientSession))
 	}
 	polluted := fm.GetMapStmEffect(forSt.StmID)
 	if !polluted.IsRead(pollute) {
 		t.Fatal("precondition: VisitFactsStmt without clear should keep EffectStm pollution in map_stm")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMarkNeedRevisitLCA(t *testing.T) {
@@ -292,7 +292,7 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 // body contains a dest in an if-arm that is not yet in body.Stmts (MakeRandomIf
 // builds then/else before the if is appended). Soft invent Stmts-walk missed body.
 func TestMarkNeedRevisitLCABodyWhileIfNotAppended(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	body := &Block{StmID: 1, Func: &Function{Name: "func_21", ReturnType: GetIntType()}}
 	// then arm holds dest; else is curr (back-edge from else to then)
 	dest := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 10}
@@ -307,11 +307,11 @@ func TestMarkNeedRevisitLCABodyWhileIfNotAppended(t *testing.T) {
 	if elseB.NeedRevisit {
 		t.Fatal("else does not contain then dest")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockContainsViaParent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	body := &Block{StmID: 1}
 	mid := &Block{StmID: 2, Parent: body}
 	leaf := &Block{StmID: 3, Parent: mid}
@@ -325,15 +325,15 @@ func TestBlockContainsViaParent(t *testing.T) {
 	if BlockContainsViaParent(nil, leaf) {
 		t.Fatal("nil block sticky false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 	// StatementGoto.cpp:66–67 get_fact_mgr; non-sticky soft re-pick without FM
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -346,17 +346,17 @@ func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("goto without FactMgr must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM goto must stay non-sticky soft re-pick")
 	}
 	// sticky without RNG / cg / curr_func
 	if stmtOK(MakeRandomGoto(nil, opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)) {
 		t.Fatal("nil RNG goto must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG goto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeBinaryForCompare(t *testing.T) {
@@ -386,17 +386,17 @@ func TestMakeBinaryForCompare(t *testing.T) {
 
 func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient must not invent binary shell / soft re-pick past holes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
 	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), WithEffectContext(IncompleteEffect()), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeBinary")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	fm.GlobalFacts = IncompleteFactSlice()
@@ -404,55 +404,55 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	if fi := MakeBinary(NewRng(2), opts, NewProbabilities(opts), cg, BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeBinary")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeBinaryGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was MakeRandomBinaryKind with nil types then invent binary shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
 	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, hole, rhs); fi != nil {
 		t.Fatal("GetType residual must fail closed MakeBinary, not invent shell", fi)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual MakeBinary must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 	// FunctionInvocation.cpp:565+ — always has RNG + operands sticky; no invent Binary shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
 	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("nil RNG")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeBinary must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, nil, rhs); fi != nil {
 		t.Fatal("nil lhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs MakeBinary must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinaryOp(MaxBinaryOp), lhs, rhs); fi != nil {
 		t.Fatal("MAX binary op must fail closed")
 	}
 	// MAX op BinaryOpC sticky
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MAX binary op MakeBinary must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGotoLabelsClearedOnFinalization(t *testing.T) {
@@ -576,7 +576,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 // stays heap-stable; Go must not use &Stmts[i] after insert for dest StmID
 // (CFG edge / set_fact). seed-42: mis-aimed edge labeled the pre-dest assign.
 func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -666,14 +666,14 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 	if okMid && strings.Contains(preMid, got.Label) {
 		t.Fatalf("mid must not carry dest label; pre=%q", preMid)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // StatementGoto.cpp:185 — StatementGoto ctor gensyms lbl_ only after DFA ok.
 // Pre-visit gensym on failed forward burned seed-2 names (extra lbl_710 →
 // g_733/l_718). After fix, surviving names match upstream (g_732, l_717, lbl_1269).
 func TestSeed2GensymNamesMatchUpstreamAfterGotoFix(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Seed = 2
 	out, err := Generate(opts)
@@ -711,39 +711,39 @@ func TestResetEffectAccum(t *testing.T) {
 
 func TestFindGoodJumpBlockNilRNGSticky(t *testing.T) {
 	// StatementGoto always has process RNG; sticky no invent jump block without it
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	good := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	if FindGoodJumpBlock(nil, []*Block{good}, good, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG FindGoodJumpBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindGoodJumpBlockNilHoleFailClosed(t *testing.T) {
 	// Block* always live; nil hole fails closed sticky (no invent soft-skip / re-pick)
 	good := &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindGoodJumpBlock(NewRng(1), []*Block{good, nil}, good, false) != nil {
 		t.Fatal("nil Block hole must fail closed FindGoodJumpBlock")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindGoodJumpBlock(NewRng(2), []*Block{nil, good}, good, true) != nil {
 		t.Fatal("nil hole first must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole first must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.Blocks = []*Block{nil}
@@ -756,15 +756,15 @@ func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
 	if st.Kind == StmtGoto && st.Label != "" {
 		t.Fatal("nil Blocks hole must fail closed MakeRandomGoto")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Blocks hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete EffectAccum/EffectContext must sticky ERROR (no invent goto re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
@@ -777,10 +777,10 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	if st.Kind == StmtGoto && st.Label != "" {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomGoto")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
@@ -788,10 +788,10 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	if st2.Kind == StmtGoto && st2.Label != "" {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomGoto")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts must fail closed before jump-block scan
 	fm3 := NewFactMgr(f)
 	fm3.GlobalFacts = IncompleteFactSlice()
@@ -800,15 +800,15 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	if st3.Kind == StmtGoto && st3.Label != "" {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomGoto")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	// incomplete working facts or prev outs sticky fail closed
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
@@ -819,10 +819,10 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	if VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("incomplete GlobalFacts must fail closed VisitFactsGoto")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts VisitFactsGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete facts, incomplete prev out
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.MapFactsOut = map[int][]*FactPointTo{
@@ -831,17 +831,17 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	if VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("incomplete prev MapFactsOut must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete prev MapFactsOut VisitFactsGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
 	// Label attr Output residual soft invent was invent label line past broken attr shell.
 	// PreOutput with fixed LabelAttr skips generator; residual path uses generator.
 	// Fair: incomplete Statement StmID 0 with FM already sticky; without FM uses SourceLabel.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtAssign, SourceLabel: "lbl_1", StmID: 1}
 	// emitLabelAttrs true with rng — generator complete path may emit attrs; no residual unless hole.
 	// residual hole: verify complete path hygiene + empty LabelAttr path ok
@@ -849,23 +849,23 @@ func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
 	if !isGoto || !strings.Contains(out, "lbl_1:") {
 		t.Fatal("complete SourceLabel PreOutput", out, isGoto)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete PreOutput must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Statement residual
 	if s, _ := PreOutput(nil, nil, false, false, nil, ""); s != "" {
 		t.Fatal("nil PreOutput must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PreOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	// InitExpr Output residual soft invent was soft-continue invent partial re-inits.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
 	ok.Init = MakeInt(0)
 	ok.InitExpr = nil
@@ -876,25 +876,25 @@ func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	if s := OutputSkippedVarInits(st, "    "); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed OutputSkippedVarInits", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("InitExpr Output residual OutputSkippedVarInits must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete single re-init
 	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{ok}}
 	if s := OutputSkippedVarInits(st2, "    "); !strings.Contains(s, "l_ok = 0") {
 		t.Fatal("complete OutputSkippedVarInits", s)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete OutputSkippedVarInits must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	// StatementGoto.cpp:70–84 — vector copy of func->blocks only; no invent
 	// append of current block when missing from the list.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	outer := &Block{StmID: 1, Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
@@ -919,7 +919,7 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 
 func TestIsVisibleLocalUsesMatch(t *testing.T) {
 	// Variable.cpp:490–500 — match() for params and locals.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	if p == nil {
@@ -936,7 +936,7 @@ func TestIsVisibleLocalUsesMatch(t *testing.T) {
 	if !loc.IsVisibleLocal(blk) {
 		t.Fatal("local must be visible")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("sticky")
 	}
 }
@@ -947,8 +947,8 @@ func TestIsVisibleLocalUsesMatch(t *testing.T) {
 // from live GlobalFacts must restore those facts so opportunistic_validate
 // still sees them (seed-2 e19427: l_432 wiped → extra Select U100 vs UP U120).
 func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, StmID: 1}
 	f.Blocks = []*Block{blk}
@@ -977,12 +977,12 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 		t.Fatal("map_in should start without l_early")
 	}
 	if !MakeupNewVarFacts(&stmIn, fm.GlobalFacts) {
-		t.Fatal("MakeupNewVarFacts", HasError())
+		t.Fatal("MakeupNewVarFacts", HasErrorSess(testAmbientSession))
 	}
 	if FindRelatedPointTo(stmIn, lp) == nil {
 		t.Fatal("MakeupNewVarFacts must re-add later local fact into visit inputs")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete makeup must not sticky")
 	}
 	// without makeup, SetGlobalFacts(map_in) would wipe l_early from live env
@@ -996,7 +996,7 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 // not live global_facts. Soft invent always-live UnionFacts over-filtered when live
 // last-writes differ from historical out lattice (seed-42 first_div: U13 vs U100).
 func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -1016,16 +1016,16 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	outUF := []*FactUnion{MakeFactUnion(uv, 0)}
 
 	// ChooseVisibleReadVar with live → NR skip → nil pool
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	gotLive := ChooseVisibleReadVar(NewRng(1), nil, []*Variable{f0}, GetIntType(), liveUF)
 	if gotLive != nil {
 		t.Fatal("live last_write=f1 must make f0 nonreadable → no pick")
 	}
 	// With map out lattice → f0 ok
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	gotOut := ChooseVisibleReadVar(NewRng(1), nil, []*Variable{f0}, GetIntType(), outUF)
 	if gotOut != f0 {
-		t.Fatalf("map_facts_out last_write=f0 must allow f0, got %v err=%v", gotOut, HasError())
+		t.Fatalf("map_facts_out last_write=f0 must allow f0, got %v err=%v", gotOut, HasErrorSess(testAmbientSession))
 	}
 
 	// Wire MakeRandomGoto forward path: live UF would fail; MapUnionFactsOut succeeds.
@@ -1077,7 +1077,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 			fm.MapUnionFactsOut[id] = outUF
 			fm.MapAccumEffect[id] = eff
 		}
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, curr)
 		// success: either labeled back-edge or forward insert with cond on f0
 		for _, b := range fn.Blocks {
@@ -1098,13 +1098,13 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 		// At least unit ChooseVisibleReadVar contract is locked above; integration may skip.
 		t.Log("integration scan found no goto cond on f0; ChooseVisibleReadVar contract holds")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGotoOkStmsPointerNotStmID(t *testing.T) {
 	// StatementGoto.cpp:97–106 — exclude only s==stm pointer, not StmID match.
 	// Two distinct statements may share no identity even if tests assign equal ids.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Build ok_stms logic inline (same as MakeRandomGoto)
 	dest := &Stmt{Kind: StmtAssign, StmID: 5}
 	other := &Stmt{Kind: StmtAssign, StmID: 5} // same id, different pointer
@@ -1124,5 +1124,5 @@ func TestGotoOkStmsPointerNotStmID(t *testing.T) {
 		t.Fatalf("want both stmts (pointer != dest), got %v", okStms)
 	}
 	// StmID-based exclusion would drop other (id 5) unfairly
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

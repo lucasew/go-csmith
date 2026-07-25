@@ -29,18 +29,18 @@ func TestParamListProbabilityRange(t *testing.T) {
 		}
 	}
 	// sticky no invent param count 0 without RNG draw
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ParamListProbability(nil, opts) != 0 {
 		t.Fatal("nil RNG ParamListProbability must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG ParamListProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomSignatureParams(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -130,14 +130,14 @@ func TestBlockProbabilityAlwaysMaxMinusOne(t *testing.T) {
 
 func TestBlockProbabilityNilRNGSticky(t *testing.T) {
 	// C++ always has RNG; sticky no invent fixed block size without draw
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if BlockProbability(4, nil) != 0 {
 		t.Fatal("nil RNG must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG BlockProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeFirstReturnBreaksEarly(t *testing.T) {
@@ -172,22 +172,22 @@ func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 
 func TestMakeRandomSignatureERRORGuard(t *testing.T) {
 	// Function.cpp:408/419 ERROR_GUARD after depth / random_qualifiers
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	f := MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, EmptyCGContext(), GetIntType(), nil, nil)
 	if f != nil {
 		t.Fatal("sticky error must fail closed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 	// Function.cpp always has RNG + Probabilities; no invent signature shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -210,7 +210,7 @@ func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 
 func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T) {
 	// incomplete GlobalList seed must sticky ERROR (no invent partial FM / body success)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
@@ -222,25 +222,25 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	if MakeFirst(NewRng(3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalList must SetError sticky MakeFirst")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MakeRandomFunction same seed gate
 	cg := EmptyCGContext()
 	cg.Types = vs.Types
 	if MakeRandomFunction(NewRng(4), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalList must SetError sticky MakeRandomFunction")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	// StatementFor.cpp:304 ERROR_GUARD after body
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
@@ -254,18 +254,18 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}
 	// sticky error before make fails early
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	st := MakeRandomFor(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil && st.Loop != nil && st.Then != nil {
 		t.Fatal("sticky error should not complete for")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	// Function.cpp:575–597 — depth_protect + body + ret_c always together
 	// sticky no invent empty braces / header-only / if without else / "0"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{
 		Name: "func_x", ReturnType: GetIntType(),
 		RV:           CreateVariableScalars("func_x_rv", GetIntType(), false, false),
@@ -275,21 +275,21 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	if out != "" {
 		t.Fatal("nil Body must fail closed empty, got", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Body Output must SetError sticky")
 	}
 	// RetConst only — sticky no invent if/else without body
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.RetConst = MakeInt(42)
 	out = f.Output()
 	if out != "" {
 		t.Fatal("RetConst without Body must fail closed empty", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("RetConst without Body must SetError sticky")
 	}
 	// Body without RetConst — body only, no invent if without else
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.RetConst = nil
 	f.Body = &Block{Func: f}
 	out = f.Output()
@@ -306,20 +306,20 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 		t.Fatal("complete depth_protect IR", out)
 	}
 	// empty ret_c value — sticky no invent "return ;" depth shell (whole emit fail closed)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.RetConst = &Constant{Type: GetIntType(), Value: ""}
 	out = f.Output()
 	if out != "" {
 		t.Fatal("empty RetConst.Value must fail closed empty", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty RetConst.Value must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -331,26 +331,26 @@ func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomSignature")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputHeaderNilFunctionSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Function)(nil).OutputHeader(false) != "" {
 		t.Fatal("nil Function OutputHeader must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function OutputHeader must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	// RV Type-nil sticky (no invent fall through to ReturnType / void)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{
 		Name: "f", ReturnType: GetIntType(),
 		RV: &Variable{Name: "rv", Type: nil},
@@ -358,30 +358,30 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	if s := f.returnTypeC(); s != "" {
 		t.Fatal("RV Type-nil returnTypeC invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("RV Type-nil returnTypeC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := f.OutputHeader(false); s != "" {
 		t.Fatal("RV Type-nil OutputHeader invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("RV Type-nil OutputHeader must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Function paramList sticky empty (no invent "void")
 	if s := (*Function)(nil).paramListC(); s != "" {
 		t.Fatal("nil Function paramListC invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function paramListC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty Param is complete void
 	if s := (&Function{Name: "g"}).paramListC(); s != "void" {
 		t.Fatal("empty Param want void, got", s)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Param paramListC must not SetError")
 	}
 	// live RV path
@@ -392,27 +392,27 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	if s := f2.returnTypeC(); s == "" {
 		t.Fatal("live RV returnTypeC empty")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("live RV returnTypeC must not leave sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFunctionOutputNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Function)(nil).Output() != "" {
 		t.Fatal("nil Function Output must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// builtin soft empty
 	if (&Function{IsBuiltin: true, Name: "b"}).Output() != "" {
 		t.Fatal("builtin Function Output must soft empty")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("builtin Function Output must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

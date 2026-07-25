@@ -29,32 +29,32 @@ func TestMakeExpressionAssign(t *testing.T) {
 
 func TestMakeExpressionAssignRequiresFactMgr(t *testing.T) {
 	// non-sticky soft re-pick without FactMgr (no invent assign Expression shell)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext()
 	e := MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil)
 	if e != nil {
 		t.Fatal("nil FM must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM MakeExpressionAssign must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionAssignNoInventWithoutRNG(t *testing.T) {
 	// ExpressionAssign.cpp always has RNG; sticky no invent empty-qfer then assign shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	if e := MakeExpressionAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil); e != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeExpressionAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPickTermAssignmentDepthOk(t *testing.T) {
@@ -78,19 +78,19 @@ func TestPickTermAssignmentDepthOk(t *testing.T) {
 func TestLhsGetTypeResidualNoInventExprType(t *testing.T) {
 	// GetType residual soft invent was soft-fallback exprType=typ then invent ExpressionAssign shell.
 	// Probe Lhs.GetType residual itself (wrap path guards HasError after same residual).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := &Lhs{Var: &Variable{Name: "g_hole"}}
 	if hole.GetType() != nil {
 		t.Fatal("Type-nil Lhs GetType must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil Lhs GetType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -101,27 +101,27 @@ func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionAssign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if MakeExpressionAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeExpressionAssign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 	// IndirectLevel residual soft invent was invent ExpressionAssign shell past Type-nil Lhs.
 	// Force path: complete assign then Type-nil Lhs on re-apply UpdateFact is hard.
 	// Hygiene: Type-nil ambient incomplete Effect fails closed before assign.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -135,19 +135,19 @@ func TestMakeExpressionAssignIndirectLevelResidualSticky(t *testing.T) {
 	if MakeExpressionAssign(NewRng(1), opts, probs, vs, tables, &cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectStm must fail closed MakeExpressionAssign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm MakeExpressionAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionAssignNilCGSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeExpressionAssign(NewRng(1), Defaults(), nil, nil, nil, nil, GetIntType(), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg MakeExpressionAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

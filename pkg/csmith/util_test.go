@@ -63,24 +63,24 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 		t.Fatal("shared counter with RandomGlobalName path")
 	}
 	// nil Block — sticky no invent bare t_N without registration
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	var nb *Block
 	if nb.CreateNewTmpVar(nil, EInt) != "" {
 		t.Fatal("nil Block CreateNewTmpVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block CreateNewTmpVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty gensym basename sticky — no invent bare "1"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if Gensym("") != "" {
 		t.Fatal("empty basename must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty basename Gensym must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLogAnalysisFailAndEnclosers(t *testing.T) {

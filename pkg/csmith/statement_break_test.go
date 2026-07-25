@@ -53,17 +53,17 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 
 func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	// StatementFor always has init/test/incr + body; sticky no invent for(;;) or header-only
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	// Loop with IV only — missing InitStmt/TestExpr/IncrStmt
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1}
 	if forHeaderOutput(lc) != "" {
 		t.Fatal("forHeader must fail closed without init/test/incr IR")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete forHeader must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Test residual soft invent was soft-continue incr invent partial for header.
 	// Fair: sticky empty whole header.
 	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple}
@@ -73,16 +73,16 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	if forHeaderOutput(lcRes) != "" {
 		t.Fatal("test Output residual must fail closed forHeaderOutput, not invent partial")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("test Output residual forHeaderOutput must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	out := (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc}}}).Output(0)
 	if strings.Contains(out, "for") {
 		t.Fatal("for without body/IR must not invent header", out)
 	}
 	// header present but no Then body
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	goodTest := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	lc2 := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: goodTest, IncrStmt: goodIncr}
 	if forHeaderOutput(lc2) == "" {
@@ -93,12 +93,12 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 		t.Fatal("for without body must not invent header-only", out)
 	}
 	// ArrayOp header without Then
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	out = (&Block{Stmts: []Stmt{{Kind: StmtArrayOp, Loop: lc}}}).Output(0)
 	if strings.Contains(out, "for") {
 		t.Fatal("arrayop without body must not invent header", out)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayLoopKeepsStmtForKind(t *testing.T) {
@@ -117,7 +117,7 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 	// force non-init path: flipcoin(5) false — seed until we get array loop (for) not array_init
 	var got *Stmt
 	for seed := uint64(1); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		st := MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st.Kind == StmtFor && st.Loop != nil && st.Then != nil {
 			got = &st
@@ -167,7 +167,7 @@ func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
 
 func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	// StatementBreak.cpp:72 assert(b) sticky — no soft invent break without looping parent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -183,15 +183,15 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("stmtOK rejects incomplete break")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("no looping parent must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
 	// StatementBreak/Continue always have RNG + CGContext; sticky no invent shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -200,22 +200,22 @@ func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
 	if stmtOK(MakeRandomBreak(nil, opts, vs, NewExprTables(opts), ptrEmptyCG())) {
 		t.Fatal("nil RNG break must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomBreak must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if stmtOK(MakeRandomContinue(nil, opts, vs, NewExprTables(opts), ptrEmptyCG(), loop)) {
 		t.Fatal("nil RNG continue must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomContinue must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR before EffectStm clear / soft re-pick
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -229,10 +229,10 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	if st.Expr != nil || stmtOK(st) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBreak")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky MakeRandomBreak")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, IncompleteEffect())
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
@@ -241,10 +241,10 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	if st2.Expr != nil || stmtOK(st2) {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomContinue")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky MakeRandomContinue")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts fails closed sticky
 	fm := NewFactMgr(f)
 	fm.GlobalFacts = IncompleteFactSlice()
@@ -256,10 +256,10 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	if st3.Expr != nil || stmtOK(st3) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBreak")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky MakeRandomBreak")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayOpHeaderNumeric(t *testing.T) {
@@ -277,19 +277,19 @@ func TestArrayOpHeaderNumeric(t *testing.T) {
 		t.Fatal(out)
 	}
 	// empty IV OutputC — sticky no invent for ( = 0; …)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	anon := &Variable{Type: GetIntType()}
 	if s := arrayOpHeaderOutput(&LoopControl{IV: anon, InitN: 0, LimitN: 3, IncrN: 1}, Defaults()); s != "" {
 		t.Fatal("empty IV name must fail closed arrayop header", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty IV arrayop header must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
@@ -303,14 +303,14 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("stmtOK must reject first-stmt continue")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("first-stmt continue must stay non-sticky soft re-pick")
 	}
 }
 
 func TestMakeRandomContinueRequiresLoop(t *testing.T) {
 	// StatementContinue.cpp:71 assert(b) sticky — no soft invent without looping parent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -323,14 +323,14 @@ func TestMakeRandomContinueRequiresLoop(t *testing.T) {
 	if st.Expr != nil || stmtOK(st) {
 		t.Fatalf("no looping parent must fail closed, got %+v", st)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("no looping parent continue must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomContinueWithPrior(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
@@ -339,7 +339,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	if f == nil {
-		t.Fatal("MakeFirst nil", HasError(), GetError())
+		t.Fatal("MakeFirst nil", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2
@@ -349,7 +349,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	if st.Kind != StmtContinue {
 		t.Fatalf("got %v", st.Kind)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateEmitsIfBreakOrContinue(t *testing.T) {
@@ -380,7 +380,7 @@ func TestGenerateEmitsIfBreakOrContinue(t *testing.T) {
 
 func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	// StatementBreak.cpp:79–81 — only break_stms push; edges in post_loop_analysis
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
@@ -414,12 +414,12 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 
 func TestMakeRandomBreakNilCGSticky(t *testing.T) {
 	// nil CG residual soft invent was invent Kind-only break shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeRandomBreak(NewRng(1), Defaults(), nil, nil, nil).Kind != 0 {
 		t.Fatal("nil cg MakeRandomBreak must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg MakeRandomBreak must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

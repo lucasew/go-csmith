@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestIsWrittenFieldInheritsParent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -26,24 +26,24 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 }
 
 func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g, nil}
 	if VariablesComplete(vs.FindAllNonArrayVisibleVars(nil)) {
 		t.Fatal("nil GlobalList hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GlobalList hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VariablesComplete(GetAllLocalVars(&Block{LocalVars: []*Variable{g, nil}})) {
 		t.Fatal("nil LocalVars hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil LocalVars hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was soft-skip as array-filtered → complete pool
 	// fair: sticky IncompleteVariables
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -51,18 +51,18 @@ func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 	if VariablesComplete(vs.FindAllNonArrayVisibleVars(nil)) {
 		t.Fatal("IsArray without AsArray must fail closed incomplete non-array pool")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray FindAllNonArrayVisibleVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// same for LocalVars
 	if VariablesComplete(vs.FindAllNonArrayVisibleVars(&Block{LocalVars: []*Variable{shell}})) {
 		t.Fatal("IsArray without AsArray LocalVars must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray local FindAllNonArrayVisibleVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsEligibleVarSEFreeVolatile(t *testing.T) {
@@ -168,7 +168,7 @@ func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
 
 func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	// incomplete FieldVars → GetCollective nil must not invent eligible / panic
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -190,10 +190,10 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	if IsEligibleVar(fld, 0, AccessRead, EmptyCGContext()) {
 		t.Fatal("incomplete collective must fail closed not eligible")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete collective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if fld.LooseMatch(fld) {
 		t.Fatal("incomplete LooseMatch must fail closed false")
 	}
@@ -201,29 +201,29 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 
 func TestIsEligibleVarIncompleteEffectSticky(t *testing.T) {
 	// Incomplete EffectContext must sticky (no invent soft-skip as absent re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(IncompleteEffect())) {
 		t.Fatal("incomplete EffectContext must fail closed not eligible")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	// Type-nil subject / Type-nil parent field residual: soft invent was eligible true past hole.
 	// Fair: sticky fail closed not eligible.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	broken := &Variable{Name: "g_p"} // Type nil
 	if IsEligibleVar(broken, 0, AccessRead, EmptyCGContext()) {
 		t.Fatal("Type-nil subject must fail closed not eligible")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil subject IsEligibleVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil parent field: IsNonreadableField residual under FM
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
@@ -243,19 +243,19 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 	if IsEligibleVar(field, 0, AccessRead, cg) {
 		t.Fatal("Type-nil parent IsInsideUnionField residual must fail closed not eligible")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent residual IsEligibleVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray GetCollective sticky not eligible
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if IsEligibleVar(shell, 0, AccessRead, EmptyCGContext()) {
 		t.Fatal("IsArray without AsArray must fail closed not eligible")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray IsEligibleVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectParentParamFallsBackLocal(t *testing.T) {
@@ -277,36 +277,36 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 }
 
 func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ChooseOKVar(NewRng(1), []*Variable{nil}) != nil {
 		t.Fatal("incomplete list must fail closed ChooseOKVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ChooseOKVar incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if ChooseVarFull(NewRng(2), []*Variable{g, nil}, AccessRead, EmptyCGContext(), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete vars must fail closed ChooseVarFull")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ChooseVarFull incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts must not invent choose / soft re-pick past holes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vars := []*Variable{g}
 	if ChooseVarFull(NewRng(1), vars, AccessRead, WithEffectContext(IncompleteEffect()), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectContext must fail closed ChooseVarFull")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	fm.GlobalFacts = IncompleteFactSlice()
@@ -314,49 +314,49 @@ func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	if ChooseVarFull(NewRng(2), vars, AccessRead, cg, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed ChooseVarFull")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext()
 	cg2.EffectStm = inc
 	if ChooseVarFull(NewRng(3), vars, AccessRead, cg2, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectStm must fail closed ChooseVarFull")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	// assert(qf.sanity_check(t)) — incomplete/mismatched qfer fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// nil qfer
 	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil qfer must fail closed MakeInitValue")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil qfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// VariableSelector.cpp:838–839 assert simple != void sticky
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), &q, nil, NewRng(2)) != nil {
 		t.Fatal("void type must fail closed MakeInitValue")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("void type must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky before const/pointer pick
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -366,28 +366,28 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	if vs.MakeInitValue(AccessRead, cg, GetIntType(), &q, nil, NewRng(1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeInitValue")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if vs.MakeInitValue(AccessRead, cg2, GetIntType(), &q, nil, NewRng(2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeInitValue")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg3 := WithFunc(nil, IncompleteEffect())
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.MakeInitValue(AccessRead, cg3, GetIntType(), &q, nil, NewRng(3)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeInitValue")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

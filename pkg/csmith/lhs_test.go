@@ -57,7 +57,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 
 func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	// Variable::type always live; Type-nil candidate must not soft-skip filters
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -70,20 +70,20 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	// Type-nil in pool stickies select residual; whole MakeRandomLhs fails closed
 	// (no invent soft fall-through create/accept past incomplete type IR)
 	for seed := uint64(1); seed < 20; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		lhs := MakeRandomLhs(NewRng(seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
 		if lhs != nil && lhs.Var == broken {
 			t.Fatal("Type-nil var must not be accepted as Lhs")
 		}
 	}
 	// sticky after incomplete type IR in select — clear for suite
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	// residual ERROR soft-continue invents Lhs via fall-through select / later try.
 	// Fair: sticky fail closed whole MakeRandomLhs.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -102,10 +102,10 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	if MakeRandomLhs(NewRng(1), opts, probs, vs, &cg, GetIntType(), false, false, nil) != nil {
 		t.Fatal("must-use Type-nil residual must fail closed MakeRandomLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("must-use residual MakeRandomLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray shell in must-use: SelectMustUse stickies residual;
 	// soft invent was fall through soft select invent Lhs from good global.
 	shell := &Variable{
@@ -119,10 +119,10 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	if MakeRandomLhs(NewRng(2), opts, probs, vs, &cg2, GetIntType(), false, false, nil) != nil {
 		t.Fatal("IsArray without AsArray must-use residual must fail closed MakeRandomLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray residual MakeRandomLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsOutputVolLval(t *testing.T) {
@@ -149,29 +149,29 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if _, ok := broken.IndirectLevelComplete(); ok {
 		t.Fatal("nil Var.Type must fail closed Incomplete")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !broken.IsVolatile() {
 		t.Fatal("incomplete Lhs IsVolatile must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Lhs IsVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Lhs shell sticky restrictive volatile + empty quals
 	if !(*Lhs)(nil).IsVolatile() {
 		t.Fatal("nil Lhs IsVolatile must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs IsVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if q := (*Lhs)(nil).GetQualifiers(); len(q.IsConsts) != 0 {
 		t.Fatal("nil Lhs GetQualifiers must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs GetQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// GetCollective residual soft invent was soft-merge invent complete GetLvars list.
 	// IsArray without AsArray stickies GetCollective.
 	arrShell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -179,39 +179,39 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if VariablesComplete(lhsArr.GetLvars(nil)) {
 		t.Fatal("GetCollective residual GetLvars must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetCollective residual GetLvars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VariablesComplete(broken.GetLvars(nil)) {
 		t.Fatal("GetLvars incomplete must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetLvars incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VariablesComplete((&Lhs{}).GetReferencedPtrs()) {
 		t.Fatal("GetReferencedPtrs incomplete Lhs must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetReferencedPtrs incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil Var soft invent: IsPointer residual ERROR+false → complete empty no-ptrs
 	// fair: sticky IncompleteVariables before classify
 	tyNilLhs := &Lhs{Var: &Variable{Name: "g_typeless"}}
 	if VariablesComplete(tyNilLhs.GetReferencedPtrs()) {
 		t.Fatal("GetReferencedPtrs Type-nil must fail closed incomplete, not empty-complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetReferencedPtrs Type-nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	eBroken := &Expression{Term: TermVariable, Var: &Variable{Name: "y"}}
 	if _, ok := eBroken.IndirectLevelComplete(); ok {
 		t.Fatal("expr incomplete type must fail closed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPickUnaryOp(t *testing.T) {
@@ -272,7 +272,7 @@ func TestExpressionVariableMultiLevelAddrFailClosed(t *testing.T) {
 }
 
 func TestLhsBookkeepingWriteDeref(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalization()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
@@ -283,11 +283,11 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	// pointer type needs two-level qfer for SanityCheck / MakeInitValue
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), p, &q, NewRng(1))
-	ClearError() // sticky ERROR_GUARD on failed qfer/create must not poison Lhs make
+	ClearErrorSess(testAmbientSession) // sticky ERROR_GUARD on failed qfer/create must not poison Lhs make
 	// bump deref prob
 	probs.single[PSelectDerefPointerProb] = 100
 	for seed := uint64(1); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), false, false, nil)
 	}
 	if CalcTotal(currentSession().BK.writeDereferenceCnts) == 0 && currentSession().BK.writeVolatileCnt+currentSession().BK.writeNonVolatileCnt == 0 {
@@ -389,7 +389,7 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 
 func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 	// Lhs::make_random always has type + RNG + VS + CG sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -397,22 +397,22 @@ func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, nil, false, false, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type MakeRandomLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR (no invent LHS / soft re-pick past holes)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -426,20 +426,20 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg2, GetIntType(), false, false, nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalList hole fails closed sticky via selectWritable pool scan
 	vs2 := NewVariableSelector(opts)
 	vs2.GlobalList = []*Variable{g, nil}
@@ -449,17 +449,17 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomLhs(NewRng(3), opts, NewProbabilities(opts), vs2, &cg3, GetIntType(), false, false, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomLhs/selectWritable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalList must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectWritableNilTypSticky(t *testing.T) {
 	// nil want typ soft invent was soft-skip Match as not-match then empty pool soft-miss.
 	// Fair: sticky fail closed whole selectWritable.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
@@ -471,92 +471,92 @@ func TestSelectWritableNilTypSticky(t *testing.T) {
 	if selectWritable(NewRng(1), vs, cg, nil, false) != nil {
 		t.Fatal("nil typ must fail closed selectWritable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil typ selectWritable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsOutputNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Lhs)(nil).Output(false) != "" {
 		t.Fatal("nil Lhs Output must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Lhs{}).Output(false) != "" {
 		t.Fatal("nil Var Lhs Output must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Var Lhs Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsGetVarGetTypeNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Lhs)(nil).GetVar() != nil {
 		t.Fatal("nil Lhs GetVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs GetVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Lhs{}).GetVar() != nil {
 		t.Fatal("nil Var Lhs GetVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Var Lhs GetVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Lhs)(nil).GetType() != nil {
 		t.Fatal("nil Lhs GetType must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs GetType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Lhs{Var: &Variable{Name: "x"}}).GetType() != nil {
 		t.Fatal("Lhs without type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Lhs without type GetType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if LhsAsExpression(nil) != nil {
 		t.Fatal("nil Lhs LhsAsExpression must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs LhsAsExpression must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if LhsAsExpression(&Lhs{}) != nil {
 		t.Fatal("Lhs without Var LhsAsExpression must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Lhs without Var LhsAsExpression must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntType()})
 	if e == nil || e.Var != v {
 		t.Fatal("complete LhsAsExpression must return TermVariable")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete LhsAsExpression must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsOutputAccessResidualSticky(t *testing.T) {
 	// OutputAccess residual soft invent was soft-empty invent bare/partial LHS.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
@@ -569,50 +569,50 @@ func TestLhsOutputAccessResidualSticky(t *testing.T) {
 	if s := lhs.Output(false); s != "" {
 		t.Fatal("OutputAccess residual must fail closed Lhs.Output", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OutputAccess residual Lhs.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// OutputLhsC residual same hole
 	if s := item.OutputLhsC(); s != "" {
 		t.Fatal("OutputAccess residual must fail closed OutputLhsC", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OutputAccess residual OutputLhsC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsOutputCNameResidualSticky(t *testing.T) {
 	// CName residual soft invent was soft-wrap invent VOL_LVAL(name, invented type).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	lhs := &Lhs{Var: v, Type: &Type{isStruct: true}} // unnamed struct → CName residual
 	if s := lhs.Output(true); s != "" {
 		t.Fatal("CName residual must fail closed Lhs.Output VOL_LVAL wrap", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CName residual Lhs.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputLhsCAccessResidualSticky(t *testing.T) {
 	// covered by TestLhsOutputAccessResidualSticky OutputLhsC arm; keep Complete path hygiene.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_ok", GetIntType(), false, false)
 	if s := v.OutputLhsC(); s != "g_ok" {
 		t.Fatal("complete OutputLhsC", s)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete OutputLhsC must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was invent compound-read visit success past Type-nil Lhs.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())
@@ -622,37 +622,37 @@ func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 	if cg.VisitFactsLhs(lhs, opts) {
 		t.Fatal("GetType residual must fail closed VisitFactsLhs")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual VisitFactsLhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsAsExpressionTypeNilResidualSticky(t *testing.T) {
 	// Type-nil Lhs soft invent was invent TermVariable shell past incomplete type IR.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if LhsAsExpression(&Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: nil}) != nil {
 		t.Fatal("Type-nil LhsAsExpression must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil LhsAsExpression must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete path
 	v := CreateVariableScalars("g_y", GetIntType(), false, false)
 	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntType()})
 	if e == nil || e.Var != v {
 		t.Fatal("complete LhsAsExpression")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete LhsAsExpression must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 	// AddEffect residual soft invent was invent index visit under incomplete ambient merge.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())
@@ -667,50 +667,50 @@ func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 	if l.VisitIndices(&cg, opts) {
 		t.Fatal("incomplete EffectStm AddEffect residual must fail closed VisitIndices")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm AddEffect residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCompatibleVarResidualSticky(t *testing.T) {
 	// Compatible residual soft invent was invent soft-compat past nil other.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalars("g_a", GetIntType(), false, false)}
 	if lhs.CompatibleVar(nil, false) {
 		t.Fatal("nil other CompatibleVar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil other CompatibleVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
 	// IndirectLevel residual soft invent was invent level-0 complete past Type-nil shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	l := &Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: GetIntType()}
 	n, ok := l.IndirectLevelComplete()
 	if ok || n != 0 {
 		t.Fatal("Type-nil Lhs IndirectLevelComplete must fail closed 0,false", n, ok)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil Lhs IndirectLevelComplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Lhs
 	n2, ok2 := (*Lhs)(nil).IndirectLevelComplete()
 	if ok2 || n2 != 0 {
 		t.Fatal("nil Lhs must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs IndirectLevelComplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsCloneDereferencedComplexity(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()} // deref once: pointer → int
 	cl := lhs.Clone()
@@ -730,7 +730,7 @@ func TestLhsCloneDereferencedComplexity(t *testing.T) {
 	if len(bare.GetDereferencedPtrs()) != 0 {
 		t.Fatal("no deref")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
@@ -738,7 +738,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	// VariableSelector.cpp:221–227 — is_eligible itemized read_indices pollutes
 	// shared effect_accum via cg_tmp. Soft invent restore() on filter reject wiped
 	// that pollution so map_stm_effect missed outer-loop IV reads (seed-46 g_952.f8).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	iv := CreateVariableScalars("g_iv", GetIntType(), false, false)
 	parent := &ArrayVariable{
@@ -769,7 +769,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 
 	// Residual pollution (as after filter-reject keep) must survive a successful Lhs
 	// that does not itself re-run is_eligible on the itemized member.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{ok}
 	vs.AllVars = []*Variable{ok}
@@ -777,8 +777,8 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
-	if lhs == nil || HasError() {
-		t.Fatalf("expected Lhs from l_ok-only pool err=%v", HasError())
+	if lhs == nil || HasErrorSess(testAmbientSession) {
+		t.Fatalf("expected Lhs from l_ok-only pool err=%v", HasErrorSess(testAmbientSession))
 	}
 	if !cg.EffectAccum.IsRead(iv) {
 		t.Fatal("filter-reject path must not wipe residual is_eligible effect_accum reads")

@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestConstantEquals(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !MakeInt(0).Equals(0) {
 		t.Fatal("0")
 	}
@@ -16,7 +16,7 @@ func TestConstantEquals(t *testing.T) {
 	if !zeroL.Equals(0) {
 		t.Fatal("0L must Equals(0) via Str2Int stream extract")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("0L Equals must not sticky")
 	}
 	zeroUL := &Constant{Type: GetSimpleType(EUInt), Value: "0UL"}
@@ -31,70 +31,70 @@ func TestConstantEquals(t *testing.T) {
 	if (*Constant)(nil).Equals(0) {
 		t.Fatal("nil Constant Equals must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Constant Equals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Constant)(nil).NotEquals(0) {
 		t.Fatal("nil Constant NotEquals must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Constant NotEquals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Constant)(nil).LessThan(1) {
 		t.Fatal("nil Constant LessThan must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Constant LessThan must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty Value incomplete shell sticky (no invent not-equal / not-less soft-skip)
 	empty := &Constant{Type: GetIntType(), Value: ""}
 	if empty.Equals(0) {
 		t.Fatal("empty Value Equals must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Value Equals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if empty.NotEquals(0) {
 		t.Fatal("empty Value NotEquals must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Value NotEquals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if empty.LessThan(1) {
 		t.Fatal("empty Value LessThan must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Value LessThan must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil incomplete shell sticky (no invent fold success past hole)
 	noTy := &Constant{Value: "0"}
 	if noTy.Equals(0) {
 		t.Fatal("nil Type Equals must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type Equals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if noTy.NotEquals(1) {
 		t.Fatal("nil Type NotEquals must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type NotEquals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if noTy.LessThan(1) {
 		t.Fatal("nil Type LessThan must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type LessThan must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferNullConst(t *testing.T) {
@@ -114,16 +114,16 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 		t.Fatal("nil rhs must abstract as garbage like C++", facts)
 	}
 	// return always has Expression*; sticky fail closed before garbage invent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
 	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, nil) {
 		t.Fatal("nil return expr must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil return expr UpdateFactForReturnStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts after assign path fails closed sticky
 	fm.GlobalFacts = IncompleteFactSlice()
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
@@ -133,10 +133,10 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("must stay incomplete GlobalFacts")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts return update must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferAddrOf(t *testing.T) {
@@ -168,23 +168,23 @@ func TestRhsToLhsTransferCopy(t *testing.T) {
 }
 
 func TestUpdateFactForAssign(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil FM / lhs sticky — no invent soft-skip assign update
 	if (*FactMgr)(nil).UpdateFactForAssign(CreateVariableScalars("g_x", GetIntType(), false, false), 0, nil) {
 		t.Fatal("nil FM must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM UpdateFactForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	if fm.UpdateFactForAssign(nil, 0, nil) {
 		t.Fatal("nil lhs must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs UpdateFactForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable.cpp:395 — pointer Constant::make_random is "0" → null on AddNewVarFact
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
@@ -230,7 +230,7 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 
 func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
 	// incomplete CommaRHS must not invent complete GarbagePtr via nil-rhs peel
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{
 		Term:     TermCommaExpr,
@@ -241,25 +241,25 @@ func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
 	if FactsComplete(out) {
 		t.Fatal("nil CommaRHS must fail closed incomplete, not invent GarbagePtr", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CommaRHS RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
 	// multi-level & hard IR sticky — no invent MakeFactsPointTo past assert(indirect==-1)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// force Indir < -1 by ExprType deeper than Var.Type
 	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), false, false), ExprType: PointerTo(PointerTo(GetIntType()))}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level & must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("multi-level & must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferAssignPeel(t *testing.T) {
@@ -280,7 +280,7 @@ func TestRhsToLhsTransferAssignPeel(t *testing.T) {
 
 func TestRhsToLhsTransferAssignNilExprFailClosed(t *testing.T) {
 	// incomplete Assign.Expr must not invent complete GarbagePtr via nil-rhs peel
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
 	assign := &Stmt{
@@ -293,10 +293,10 @@ func TestRhsToLhsTransferAssignNilExprFailClosed(t *testing.T) {
 	if FactsComplete(out) {
 		t.Fatal("nil Assign.Expr must fail closed incomplete, not invent GarbagePtr", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Assign.Expr RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
@@ -318,7 +318,7 @@ func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
 
 func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
 	// RV Type* always live; Type-nil no invent scalar rv soft-transfer past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -329,15 +329,15 @@ func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("Type-nil RV must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil RV RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferUnionParentTypeNilSticky(t *testing.T) {
 	// union constant field0 path: parent Type* always live
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_u", Type: nil}
 	f0 := &Variable{Name: "g_u.f0", Type: PointerTo(GetIntType()), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0}
@@ -348,10 +348,10 @@ func TestRhsToLhsTransferUnionParentTypeNilSticky(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{f0}, rhs)) {
 		t.Fatal("Type-nil union parent must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil union parent RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferUnionAggregateFields(t *testing.T) {
@@ -438,21 +438,21 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 
 func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
 	// FactPointTo.cpp:164–167 — assert all LHS are pointers; hard IR sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	i := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-pointer lvar must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-pointer lvar RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	// FactPointTo.cpp:205 — assert(indirect == -1); hard IR sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	// int var with ** type → IndirectLevel = 0-2 = -2
@@ -463,16 +463,16 @@ func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level address-of must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("multi-level & RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferAggregateLenMismatchNDEBUG(t *testing.T) {
 	// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size()); NDEBUG elides
 	// and pairs only the overlapping prefix (no sticky-poison generation).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
 	}}
@@ -484,15 +484,15 @@ func TestRhsToLhsTransferAggregateLenMismatchNDEBUG(t *testing.T) {
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
 	// two LHS pointers vs one field pointer → must not sticky-poison (NDEBUG assert).
 	_ = RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)
-	if HasError() {
-		t.Fatal("NDEBUG len mismatch must not sticky-poison", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("NDEBUG len mismatch must not sticky-poison", GetErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	// FactPointTo.cpp:252 — missing rv_fact: incomplete non-sticky (generation soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -504,15 +504,15 @@ func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("missing rv_fact must fail closed incomplete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("missing rv_fact must stay non-sticky for soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 	// incomplete fact map / MergePointees hole stays non-sticky for soft re-pick
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
 	// incomplete map: nil hole so MergePointeesOfPointer fails closed incomplete
@@ -521,29 +521,29 @@ func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(hole, []*Variable{p}, rhs)) {
 		t.Fatal("incomplete map transfer must fail closed incomplete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete map RhsToLhsTransfer must stay non-sticky for soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactForAssignNilLhsSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outAF, _ := AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})
 	if FactsComplete(outAF) {
 		t.Fatal("nil lhs AbstractFactForAssign must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs AbstractFactForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 	// *p peels to non-pointer; lvars may be pointer pointees; more = pointees of those.
 	// soft invent: IsPointer residual ERROR+false skip Type-nil then partial transfer.
 	// fair: sticky IncompleteFactSlice before classify.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// p:int* points to q:int*; *p peels to int (non-pointer branch); lvars=[q];
 	// more = MergePointees(q,1) → Type-nil shell sticky
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -558,16 +558,16 @@ func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 	if FactsComplete(out) {
 		t.Fatal("Type-nil more pointee must fail closed incomplete, not partial transfer", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil more pointee AbstractFactForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	// IsUnion residual soft invent was invent non-union complete transfer past hole.
 	// Type-nil non-special already sticky; complete non-union empty transfer hygiene.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	out, n := AbstractFactUnionForAssign(nil, nil, iv, 0, nil, nil)
 	if !UnionFactsComplete(out) && out != nil {
@@ -575,10 +575,10 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	}
 	// complete non-union with nil maps: UnionFactsComplete(nil)==true and FactsComplete(nil)==true
 	// then non-union path returns nil, lvarCnt
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete non-union AbstractFactUnionForAssign must not sticky", out, n)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky
 	hole := &Variable{Name: "g_x", Type: nil}
 	uf, _ := AbstractFactUnionForAssign(nil, nil, hole, 0, nil, nil)
@@ -586,44 +586,44 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 		// IncompleteUnionFactSlice is not complete
 		t.Fatal("Type-nil must fail closed incomplete", uf)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil non-special AbstractFactUnionForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was invent GarbagePtr complete success past Type-nil RHS.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// Type-nil constant shell → GetType residual
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("GetType residual must fail closed IncompleteFactSlice")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferIsPointerResidualSticky(t *testing.T) {
 	// IsPointer residual soft invent was invent transfer past non-pointer LHS soft-skip.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special IsPointer residual ERROR+false
 	hole := &Variable{Name: "g_x", Type: nil}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{hole}, nil)) {
 		t.Fatal("IsPointer residual must fail closed IncompleteFactSlice")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsPointer residual RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferUnionGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-merge union transfer past array shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray GetCollective residual
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	lvars := []*Variable{CreateVariableScalars("g_u", GetIntType(), false, false)}
@@ -633,16 +633,16 @@ func TestRhsToLhsTransferUnionGetCollectiveResidualSticky(t *testing.T) {
 	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		// GetCollective on IsArray without AsArray SetError
 		t.Fatal("IsArray without AsArray GetCollective residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRhsToLhsTransferGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-merge pointees past array shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray GetCollective residual
 	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -651,59 +651,59 @@ func TestRhsToLhsTransferGetCollectiveResidualSticky(t *testing.T) {
 	if FactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete empty
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray GetCollective residual RhsToLhsTransfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactForAssignGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-abstract past array shell LHS.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
 	out, _ := AbstractFactForAssign(nil, shell, 0, rhs)
 	if FactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray GetCollective residual AbstractFactForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactUnionForAssignGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-abstract union past array shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	out, _ := AbstractFactUnionForAssign(nil, nil, shell, 0, nil, nil)
 	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray GetCollective residual AbstractFactUnionForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMergePointeesFindRelatedResidualSticky(t *testing.T) {
 	// FindRelated residual soft invent was invent soft-empty merge past nil ptr subject.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// VariablesComplete(ptrs) fails sticky on nil ptr (hard IR)
 	out := MergePointeesOfPointers([]*Variable{nil}, nil)
 	if VariablesComplete(out) {
 		t.Fatal("nil ptr MergePointeesOfPointers must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptr MergePointeesOfPointers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FindRelated residual via nil subject
 	if FindRelatedPointTo(nil, nil) != nil {
 		t.Fatal("nil subject FindRelatedPointTo must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil subject FindRelatedPointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

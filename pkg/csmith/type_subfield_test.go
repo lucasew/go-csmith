@@ -13,7 +13,7 @@ func TestGetIntSubfieldNamesNested(t *testing.T) {
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
 	got := s2.GetIntSubfieldNames("", nil)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("sticky")
 	}
 	want := []string{".f0.f0", ".f0.f1", ".f1"}

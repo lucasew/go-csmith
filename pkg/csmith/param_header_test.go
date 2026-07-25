@@ -6,7 +6,7 @@ import (
 )
 
 func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.ArgStructs = false
 	opts.ArgUnions = false
@@ -38,14 +38,14 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 }
 
 func TestGenerateParameterVariablePointerChoice(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	pt := PointerTo(GetIntType())
 	vs.Types = &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{pt}, AllTypes: []*Type{GetIntType(), pt}}
 	foundPtr := false
 	for seed := uint64(1); seed < 50; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		f := &Function{Name: "f"}
 		_ = vs.GenerateParameterVariable(f, NewRng(seed))
 		if len(f.Param) > 0 && f.Param[0].Type != nil && f.Param[0].Type.IsPointerLike() {
@@ -60,7 +60,7 @@ func TestGenerateParameterVariablePointerChoice(t *testing.T) {
 
 func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 	// VariableSelector.cpp:968–970 — only choose_random_pointer_type; no make invent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// HasPointerType true via DerivedTypes but ChooseRandomPointerType needs non-empty
@@ -84,7 +84,7 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 
 func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
 	// Function.cpp:517–518 — assert when !return_structs and eStruct return sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
 	f := &Function{Name: "f", ReturnType: st}
 	opts := Defaults()
@@ -92,15 +92,15 @@ func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
 	if f.OutputHeaderOpts(false, opts) != "" {
 		t.Fatal("struct return with ReturnStructs off must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("forbidden return struct must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
 	// Function.cpp:489–490 — assert when !arg_structs and struct param sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
 	pv := &Variable{Name: "p", Type: st}
 	f := &Function{Name: "f", ReturnType: GetIntType(), Param: []*Variable{pv}}
@@ -109,15 +109,15 @@ func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
 	if f.OutputHeaderOpts(false, opts) != "" {
 		t.Fatal("struct arg with ArgStructs off must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("forbidden arg struct must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 	// Function.cpp param Output — live type + name; sticky no invent "int " / bare type
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{
 		Name:       "func_p",
 		ReturnType: GetIntType(),
@@ -128,19 +128,19 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 	if out := f.OutputHeader(false); out != "" {
 		t.Fatal("empty param name must fail closed header", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty param name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Param[0].Name = "p_1"
 	f.Param[0].Type = nil
 	if out := f.OutputHeader(false); out != "" {
 		t.Fatal("nil param type must fail closed header", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil param type must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputHeaderInlineStatic(t *testing.T) {
@@ -191,7 +191,7 @@ func TestOutputHeaderAlias(t *testing.T) {
 
 func TestOutputHeaderReturnStructOptionResidualSticky(t *testing.T) {
 	// IsStruct residual soft invent was invent scalar header past ReturnStructs off.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.ReturnStructs = false
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
@@ -201,15 +201,15 @@ func TestOutputHeaderReturnStructOptionResidualSticky(t *testing.T) {
 	if s := f.OutputHeaderOpts(false, opts); s != "" {
 		t.Fatal("ReturnStructs off must fail closed OutputHeader", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ReturnStructs off OutputHeader must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestParamListArgStructOptionResidualSticky(t *testing.T) {
 	// IsStruct residual soft invent was invent param list past ArgStructs off.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.ArgStructs = false
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
@@ -220,8 +220,8 @@ func TestParamListArgStructOptionResidualSticky(t *testing.T) {
 	if s := f.paramListCOpts(opts); s != "" {
 		t.Fatal("ArgStructs off must fail closed paramListC", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ArgStructs off paramListC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

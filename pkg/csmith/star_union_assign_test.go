@@ -8,8 +8,8 @@ import "testing"
 // stayed BOTTOM while UP renewed last_write from whole-union star-assign
 // (seed-177: UP g_88.f0 vs GO g_76 — ok pool n=30 with g_88.f0 vs n=29).
 func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -34,10 +34,10 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	rhs := &Expression{Term: TermVariable, Var: src, ExprType: ut}
 	indir := lhs.IndirectLevel()
 	if indir != 1 {
-		t.Fatalf("indir want 1 got %d err=%v", indir, GetError())
+		t.Fatalf("indir want 1 got %d err=%v", indir, GetErrorSess(testAmbientSession))
 	}
 	if !fm.UpdateFactForAssignWant(l90, indir, lhs.GetType(), rhs) {
-		t.Fatalf("UpdateFactForAssignWant: %v", GetError())
+		t.Fatalf("UpdateFactForAssignWant: %v", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(fm.UnionFacts, g88)
 	if got == nil {

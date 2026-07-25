@@ -45,7 +45,7 @@ func TestGenrandSeed0And1(t *testing.T) {
 
 func TestRndUptoUsesModulo(t *testing.T) {
 	// DefaultRndNumGenerator::rnd_upto: v = genrand() % n; rand_depth++.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := NewRng(2)
 	// first genrand % 10 == 1959434203 % 10 == 3
 	if got := r.RndUpto(10); got != 3 {
@@ -59,14 +59,14 @@ func TestRndUptoUsesModulo(t *testing.T) {
 		t.Fatalf("RndUpto(10) second: got %d want 5", got)
 	}
 	// n==0 undefined non-sticky fail closed (soft re-pick empty domain)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if got := r.RndUpto(0); got != 0 {
 		t.Fatalf("RndUpto(0) got %d want 0", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("RndUpto(0) must stay non-sticky for soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRndUptoFilterRetries(t *testing.T) {
@@ -86,21 +86,21 @@ func TestRndUptoFilterRetries(t *testing.T) {
 func TestRndUptoFilterResidualSticky(t *testing.T) {
 	// Filter residual ERROR soft invent was soft-retry forever (hang) then invent pick.
 	// Fair: sticky fail closed return 0 without infinite soft-retry.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	r := NewRng(1)
 	residualReject := filterFunc(func(v uint32) bool {
-		SetError(ErrGeneric)
+		SetErrorSess(testAmbientSession, ErrGeneric)
 		return true
 	})
 	got := r.RndUptoFilter(10, residualReject)
 	if got != 0 {
 		t.Fatalf("residual filter must fail closed 0, got %d", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("residual filter RndUptoFilter must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRndFlipcoin(t *testing.T) {
@@ -150,39 +150,39 @@ func TestRandomDigits(t *testing.T) {
 	if d != "3" {
 		t.Fatalf("RandomDigits(1) seed2: got %q want 3", d)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Rng)(nil).RandomDigits(4) != "" {
 		t.Fatal("nil RNG RandomDigits must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomDigits must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRngNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Rng)(nil).Genrand() != 0 {
 		t.Fatal("nil Genrand must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Genrand must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Rng)(nil).RndUpto(5) != 0 {
 		t.Fatal("nil RndUpto must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RndUpto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Rng)(nil).RndFlipcoin(50) {
 		t.Fatal("nil RndFlipcoin must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RndFlipcoin must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // --- AbsRndNumGenerator / DefaultRndNumGenerator component contracts ---
@@ -382,19 +382,19 @@ func TestProcessRndNilSticky(t *testing.T) {
 	prev := ProcessRngSess(testAmbientSession)
 	SetProcessRngSess(testAmbientSession, nil)
 	defer SetProcessRngSess(testAmbientSession, prev)
-	ClearError()
-	if ProcessRndUptoSess(testAmbientSession, 5, nil) != 0 || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if ProcessRndUptoSess(testAmbientSession, 5, nil) != 0 || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil process Rng RndUpto sticky 0")
 	}
-	ClearError()
-	if ProcessRndFlipcoinSess(testAmbientSession, 50, nil) || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if ProcessRndFlipcoinSess(testAmbientSession, 50, nil) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil process Rng flipcoin sticky false")
 	}
-	ClearError()
-	if ProcessRandomHexDigitsSess(testAmbientSession, 2) != "" || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if ProcessRandomHexDigitsSess(testAmbientSession, 2) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil process hex sticky empty")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomNumberCreateInstance(t *testing.T) {
@@ -406,10 +406,10 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 		SetProcessRngSess(testAmbientSession, prevR)
 	}()
 
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CreateRandomNumberInstance(RngKindDefault, 2)
 	rn := GetRandomNumber()
-	if rn == nil || HasError() {
+	if rn == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateInstance default must succeed")
 	}
 	if GetRndNumGenerator() == nil {
@@ -427,7 +427,7 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 		t.Fatalf("switch same kind old=%v", old)
 	}
 	// DFS requires MaxExhaustiveDepth > 0 on process options
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 4
 	SetProcessOptionsSess(testAmbientSession, o)
@@ -435,11 +435,11 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 	if old != RngKindDefault {
 		t.Fatalf("switch to DFS old=%v", old)
 	}
-	if HasError() || GetRndNumGenerator() == nil || GetRndNumGenerator().Kind() != RngKindDFS {
-		t.Fatal("DFS switch", HasError(), GetRndNumGenerator())
+	if HasErrorSess(testAmbientSession) || GetRndNumGenerator() == nil || GetRndNumGenerator().Kind() != RngKindDFS {
+		t.Fatal("DFS switch", HasErrorSess(testAmbientSession), GetRndNumGenerator())
 	}
 	// restore default for later tests via finalization path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomNumberDoFinalization(t *testing.T) {
@@ -447,39 +447,39 @@ func TestRandomNumberDoFinalization(t *testing.T) {
 	defer SetProcessRngSess(testAmbientSession, prevR)
 	CreateRandomNumberInstance(RngKindDefault, 1)
 	RandomNumberDoFinalization()
-	ClearError()
-	if GetRandomNumber() != nil || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if GetRandomNumber() != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("after doFinalization GetInstance sticky nil")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	// AbsRndNumGenerator::make_rndnum_generator default
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := MakeRndNumGenerator(RngKindDefault, 7)
-	if r == nil || HasError() {
+	if r == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("default generator")
 	}
 	if r.Kind() != RngKindDefault {
 		t.Fatal(r.Kind())
 	}
 	// DFS without positive max depth sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prevO := ProcessOptionsSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults()) // MaxExhaustiveDepth -1
-	if MakeRndNumGenerator(RngKindDFS, 1) != nil || !HasError() {
+	if MakeRndNumGenerator(RngKindDFS, 1) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("DFS max_depth<=0 sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 3
 	SetProcessOptionsSess(testAmbientSession, o)
 	// clear prior singleton if any
 	clearDFSImpl()
 	dr := MakeRndNumGenerator(RngKindDFS, 1)
-	if dr == nil || HasError() || dr.Kind() != RngKindDFS {
-		t.Fatal("DFS generator", HasError())
+	if dr == nil || HasErrorSess(testAmbientSession) || dr.Kind() != RngKindDFS {
+		t.Fatal("DFS generator", HasErrorSess(testAmbientSession))
 	}
 	// singleton
 	if MakeRndNumGenerator(RngKindDFS, 9) != dr {
@@ -487,5 +487,5 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	}
 	clearDFSImpl()
 	SetProcessOptionsSess(testAmbientSession, prevO)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

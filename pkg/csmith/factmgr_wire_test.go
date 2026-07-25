@@ -49,7 +49,7 @@ func TestUpdateFactForReturn(t *testing.T) {
 func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	// soft invent: MergeUnionFact nil still changed=true with wiped UnionFacts
 	// fair: incomplete union map hole fails closed false (abstract incomplete non-sticky)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -69,7 +69,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 		t.Fatal("incomplete union merge must fail closed incomplete UnionFacts", fm.UnionFacts)
 	}
 	// incomplete abstract alone must not invent success; soft re-pick keeps non-sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete map + MergeUnionFact incomplete subject sticky wipe
 	fm2 := NewFactMgr(nil)
 	fm2.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
@@ -77,16 +77,16 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	if UnionFactsComplete(merged) {
 		t.Fatal("nil fact MergeUnionFact must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact MergeUnionFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// soft invent: MergeFactInto nil still return true with partial maps
 	// fair: incomplete newFacts fails closed ok=false without poisoning prior map
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -98,7 +98,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("incomplete newFacts must not wipe prior complete facts", facts)
 	}
 	// incomplete subject map — wipe sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts = []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 1); ok {
 		t.Fatal("nil subject map hole must fail closed ok=false")
@@ -106,10 +106,10 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("incomplete subject must clear", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete subject wipe must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty newFacts is ok no-op (not incomplete)
 	facts = []*FactPointTo{MakeFactPointTo(p, a)}
 	ch, ok := applyPointToAssignFacts(&facts, p, 0, nil, 1)
@@ -125,24 +125,24 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("IncompleteFactSlice newFacts must not wipe prior", facts)
 	}
 	// incomplete lhs pointees must not invent lvar_cnt via len(IncompleteVariables)==1 renew
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts = []*FactPointTo{MakeFactPointTo(p, a)}
 	if VariablesComplete(lhsAssignPointees(facts, nil, 0)) {
 		t.Fatal("nil lhs must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs lhsAssignPointees must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky (no invent empty lvars soft-complete past hole)
 	hole := &Variable{Name: "g_hole", Type: nil}
 	if VariablesComplete(lhsAssignPointees(facts, hole, 0)) {
 		t.Fatal("Type-nil lhs must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil lhs lhsAssignPointees must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil lhs: incomplete abstract path — lvarCnt still applied; fail closed on sticky
 	if _, ok := applyPointToAssignFacts(&facts, nil, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 1); ok {
 		// nil lhs is unused for renew path when lvarCnt provided; renew may succeed
@@ -150,15 +150,15 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		// Keep prior map when newFacts complete and lvarCnt==1 renews p.
 		_ = ok
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// facts accumulator always live; sticky
 	if _, ok := applyPointToAssignFacts(nil, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 1); ok {
 		t.Fatal("nil facts applyPointToAssignFacts must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts applyPointToAssignFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactPointTo is_related is var identity only (FactPointTo.h:65–68).
 	// Unrelated Type-nil subject is not related to p — renew appends p's fact (C++).
 	// Soft invent Match residual sticky-wipe is gone with is_related-only RenewFact.
@@ -173,12 +173,12 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if FindRelatedPointTo(factsR, brokenSubj) == nil {
 		t.Fatal("unrelated subject fact must remain")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
 	// incomplete point-to apply must not invent union merge success sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	fm := NewFactMgr(nil)
@@ -195,15 +195,15 @@ func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
 	if UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("must not invent keep UnionFacts after point-to fail", fm.UnionFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts assign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUpdateFactForAssignRenewsDefinitive(t *testing.T) {
 	// FactMgr.cpp:376–380 — lvar_cnt==1 non-array → renew (replace, not join)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
@@ -240,15 +240,15 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		t.Fatal(fm.UnionFacts)
 	}
 	// incomplete hard IR: nil var sticky (no invent empty init success / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	pt2, un2 := AbstractFactForVarInit(nil)
 	if FactsComplete(pt2) || UnionFactsComplete(un2) {
 		t.Fatal("nil var init must fail closed incomplete", pt2, un2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var AbstractFactForVarInit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// array without AsArray sticky (Fact.cpp:99 assert(av))
 	ptArr, _ := AbstractFactForVarInit(&Variable{
 		Name: "g_ap_bad", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2},
@@ -257,10 +257,10 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if FactsComplete(ptArr) {
 		t.Fatal("IsArray without AsArray must fail closed incomplete", ptArr)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil InitExprs hole sticky
 	badInit := &ArrayVariable{
 		Variable: Variable{
@@ -275,10 +275,10 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if FactsComplete(ptNil) {
 		t.Fatal("nil InitExprs hole must fail closed incomplete", ptNil)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil InitExprs AbstractFactForVarInit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete abstract of live alt sticky (no invent soft-skip incomplete init alt)
 	badAlt := &ArrayVariable{
 		Variable: Variable{
@@ -295,30 +295,30 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if FactsComplete(more) {
 		t.Fatal("nil Invoke AbstractFactForAssign must incomplete", more)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Invoke AbstractFactForAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ptBad, _ := AbstractFactForVarInit(&badAlt.Variable)
 	if FactsComplete(ptBad) {
-		t.Fatalf("incomplete alt abstract must fail closed incomplete complete=%v err=%v n=%d", FactsComplete(ptBad), HasError(), len(ptBad))
+		t.Fatalf("incomplete alt abstract must fail closed incomplete complete=%v err=%v n=%d", FactsComplete(ptBad), HasErrorSess(testAmbientSession), len(ptBad))
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete alt AbstractFactForVarInit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// union without rhs/init — incomplete abstract non-sticky (AddParamFacts soft path);
 	// AddNewVarFact sticks after incomplete abstract (no invent skip no-fact)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	uv2 := &Variable{Name: "g_u2", Type: ut}
 	_, un3 := AbstractFactForVarInit(uv2)
 	if UnionFactsComplete(un3) {
 		t.Fatal("union without init must fail closed incomplete", un3)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("union without init abstract must stay non-sticky for soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(
 		CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr)}
@@ -326,10 +326,10 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if UnionFactsComplete(fm2.UnionFacts) {
 		t.Fatal("AddNewVarFact incomplete union must fail closed", fm2.UnionFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddNewVarFact incomplete union must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {
@@ -508,23 +508,23 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 }
 
 func TestGetMapFactsStmID0FailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	// StmID 0 must IncompleteFactSlice sticky — not invent empty-complete map miss
 	if FactsComplete(fm.GetMapFactsIn(IncompleteStmID)) || FactsComplete(fm.GetMapFactsOut(IncompleteStmID)) {
 		t.Fatal("StmID 0 must IncompleteFactSlice")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 GetMapFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(fm.GetMapFactsInFinal(IncompleteStmID)) || FactsComplete(fm.GetMapFactsOutFinal(IncompleteStmID)) {
 		t.Fatal("StmID 0 final maps must IncompleteFactSlice")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 GetMapFactsFinal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// missing live key is complete empty
 	if !FactsComplete(fm.GetMapFactsIn(42)) || len(fm.GetMapFactsIn(42)) != 0 {
 		t.Fatal("missing live id must complete empty")
@@ -535,172 +535,172 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("stored incomplete must stay incomplete via getter")
 	}
 	// FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsIn(1)) {
 		t.Fatal("nil FM GetMapFactsIn must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM GetMapFactsIn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsOut(1)) {
 		t.Fatal("nil FM GetMapFactsOut must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM GetMapFactsOut must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsInFinal(1)) {
 		t.Fatal("nil FM GetMapFactsInFinal must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM GetMapFactsInFinal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsOutFinal(1)) {
 		t.Fatal("nil FM GetMapFactsOutFinal must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM GetMapFactsOutFinal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// GetMapStmEffect / GetMapAccumEffect nil FM sticky IncompleteEffect
 	if EffectComplete((*FactMgr)(nil).GetMapStmEffect(1)) {
 		t.Fatal("nil FM GetMapStmEffect must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM GetMapStmEffect must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EffectComplete((*FactMgr)(nil).GetMapAccumEffect(1)) {
 		t.Fatal("nil FM GetMapAccumEffect must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM GetMapAccumEffect must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// SetMap* nil FM / bad stm_id sticky
 	(*FactMgr)(nil).SetMapFactsIn(1, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM SetMapFactsIn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.SetMapFactsIn(IncompleteStmID, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmID 0 SetMapFactsIn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SetMapStmEffect(1, EmptyEffect())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM SetMapStmEffect must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).ClearMapVisited()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM ClearMapVisited must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).CreateCFGEdgeTo(1, &Block{}, 0, false, false)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM CreateCFGEdgeTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactMgr mutators always live; sticky no invent soft-skip past hole
 	(*FactMgr)(nil).SetupInOutMaps(true)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM SetupInOutMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).AddNewVarFact(CreateVariableScalars("g_x", GetIntType(), false, false))
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM AddNewVarFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.AddNewVarFact(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable AddNewVarFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).FindDanglingGlobalPtrs(&Function{Name: "f"})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM FindDanglingGlobalPtrs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.FindDanglingGlobalPtrs(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function FindDanglingGlobalPtrs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).AddFactOut(&Stmt{StmID: 1}, nil, MakeFactPointTo(
 		CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr))
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM AddFactOut must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SetMapFactsOutForStmtDest(&Stmt{StmID: 1}, nil, nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM SetMapFactsOutForStmtDest must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).BackupStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{}, map[int][]*FactUnion{}, map[int][]*FactUnion{})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM BackupStmFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).RestoreStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{}, map[int][]*FactUnion{}, map[int][]*FactUnion{})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM RestoreStmFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).AddNewVarFactAndUpdate(nil, CreateVariableScalars("g_y", GetIntType(), false, false))
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM AddNewVarFactAndUpdate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).UpdateFactsForOOSVars([]*Variable{CreateVariableScalars("g_z", GetIntType(), false, false)})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM UpdateFactsForOOSVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty OOS list complete no-op
 	fm.UpdateFactsForOOSVars(nil)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty UpdateFactsForOOSVars must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts := []*FactPointTo{}
 	(*FactMgr)(nil).AddParamFacts(nil, &facts)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM AddParamFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindParentBlockNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindParentBlockOfStmID(nil, 1) != nil {
 		t.Fatal("nil Function FindParentBlockOfStmID must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function FindParentBlockOfStmID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindParentBlockOfStmID(&Function{Name: "f"}, IncompleteStmID) != nil {
 		t.Fatal("StmID 0 FindParentBlockOfStmID must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 FindParentBlockOfStmID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block* always live on Function.Blocks; nil hole sticky miss
 	f := &Function{Name: "f", Blocks: []*Block{nil}}
 	if FindParentBlockOfStmID(f, 1) != nil {
 		t.Fatal("nil Blocks hole FindParentBlockOfStmID must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Blocks hole FindParentBlockOfStmID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete if-arm sticky whole miss (no invent soft-continue past nil Else)
 	inner := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
 	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner, Else: nil}}}
@@ -709,28 +709,28 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 	if FindParentBlockOfStmID(f, 3) != nil {
 		t.Fatal("nil Else arm must fail closed FindParentBlockOfStmID")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else arm FindParentBlockOfStmID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestApplyFactForAssignIsPointerResidualSticky(t *testing.T) {
 	// IsPointer residual soft invent was invent lvarCnt=1 renew past Type-nil LHS.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := &Variable{Name: "g_p", Type: nil}
 	if hole.IsPointer() {
 		t.Fatal("Type-nil IsPointer must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil IsPointer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
 	// IsGlobal residual soft invent was invent soft-skip makeup past FieldVarOf residual.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	// FieldVarOf with Type-nil parent chain residual IsGlobal
@@ -745,22 +745,22 @@ func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
 	orphan := &Variable{Name: "orphan"}
 	// nil subject IsGlobal residual
 	(*Variable)(nil).IsGlobal()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsGlobal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// blk==nil + non-global complete soft-skip no sticky
 	fm.AddNewVarFactAndUpdate(nil, orphan)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-global complete AddNewVarFactAndUpdate must soft-skip no sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual: Variable with FieldVarOf whose IsGlobal residual — FieldVarOf nil Variable?
 	// FieldVarOf points to var; if FieldVarOf itself is ok. Plant residual via
 	// IsGlobal after FieldVarOf: parent nil Variable not possible as FieldVarOf type.
 	// Plant via recursive: hole.FieldVarOf where parent.FieldVarOf is set, walk ends.
 	// Soft invent was: residual ERROR already set before call soft-continues makeup.
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	// ambient residual before call — AddNewVarFactAndUpdate must not invent soft-skip past residual
 	// via !IsGlobal path without checking HasError first after IsGlobal
 	// After our fix: IsGlobal after residual ambient still checks HasError after call.
@@ -775,42 +775,42 @@ func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
 	// The invent was residual ambient before IsGlobal: IsGlobal complete returns false, HasError still true from ambient, old code:
 	//   if blk == nil && !v.IsGlobal() { return } // soft return with ambient residual invent soft-skip
 	// New code checks HasError after IsGlobal.
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	fm.AddNewVarFactAndUpdate(nil, CreateVariableScalars("l_1", GetIntType(), false, false))
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		// ambient residual should remain sticky (IsGlobal complete false still HasError after)
 		t.Fatal("ambient residual AddNewVarFactAndUpdate must keep sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual FieldVarOf: Variable with FieldVarOf that is nil receiver?
 	// Use (*Variable)(nil) as subject — already sticky at entry.
 	fm.AddNewVarFactAndUpdate(nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var AddNewVarFactAndUpdate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCloneFactSliceIncompleteResidualSticky(t *testing.T) {
 	// CloneFactSlice residual soft invent was invent soft-complete empty past IncompleteFactSlice.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	out := CloneFactSlice(IncompleteFactSlice())
 	if FactsComplete(out) {
 		t.Fatal("IncompleteFactSlice CloneFactSlice must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteFactSlice CloneFactSlice must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete empty
 	out2 := CloneFactSlice([]*FactPointTo{})
 	if !FactsComplete(out2) || out2 == nil {
 		// empty complete may be non-nil empty
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete empty CloneFactSlice must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetProgramEndFacts(t *testing.T) {
@@ -826,44 +826,44 @@ func TestGetProgramEndFacts(t *testing.T) {
 	if len(got) != 1 || FindRelatedPointTo(got, p) == nil {
 		t.Fatal(got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetProgramEndFacts(nil, fms) != nil {
 		t.Fatal("empty list")
 	}
-	ClearError()
-	if FactsComplete(GetProgramEndFacts(list, nil)) || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if FactsComplete(GetProgramEndFacts(list, nil)) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fms sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSanityCheckMap(t *testing.T) {
 	f := &Function{Name: "func_1"}
 	fm := NewFactMgr(f)
 	// empty maps ok
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.SanityCheckMap()
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty complete")
 	}
 	// incomplete map sticky
 	fm.MapFactsIn[1] = IncompleteFactSlice()
 	fm.SanityCheckMap()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SanityCheckMap()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fm sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // storeUnionFactMapEntry must deep-clone so renew/join on live cannot rewrite maps.
 // Soft invent CloneUnionFactSlice left *FactUnion shared (seed-123 g_721 combine).
 func TestStoreUnionFactMapEntryDeepIsolatesLive(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
@@ -890,5 +890,5 @@ func TestStoreUnionFactMapEntryDeepIsolatesLive(t *testing.T) {
 	if live.LastWrittenFID != 1 {
 		t.Fatal("live must still be 1")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

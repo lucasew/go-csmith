@@ -14,7 +14,7 @@ import "testing"
 // Fair: snapshot entry accum at FindFixedPointBlock entry and re-reset before
 // each full statement walk so map_accum rebuilds progressively.
 func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_map_accum_prog"}
 	fm := NewFactMgr(f)
@@ -73,7 +73,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 
 	_, _, _, ok := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), true)
 	_ = ok
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 
 	acc0 := fm.GetMapAccumEffect(s0.StmID)
 	if !EffectComplete(acc0) {

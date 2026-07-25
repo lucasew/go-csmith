@@ -9,7 +9,7 @@ import (
 
 func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
 	// Constant.cpp:228 — (int)pow(2, bound/2.0); bound=15 → ~181 not 1<<(15/2)=128
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	wantB := int(math.Pow(2, 15.0/2.0))
 	if wantB < 180 || wantB > 182 {
@@ -21,8 +21,8 @@ func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
 	_ = rManual.RndFlipcoin(50)
 	rGen := NewRng(1)
 	s := GenerateRandomConstantInRange(GetIntType(), 15, opts, rGen)
-	if s == "" || HasError() {
-		t.Fatal("range const", s, GetError())
+	if s == "" || HasErrorSess(testAmbientSession) {
+		t.Fatal("range const", s, GetErrorSess(testAmbientSession))
 	}
 	if rGen.RandDepth() != rManual.RandDepth() {
 		t.Fatalf("depth want %d (U%d+F) got %d — integer shift would use U128", rManual.RandDepth(), wantB, rGen.RandDepth())
@@ -38,7 +38,7 @@ func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
 	if wantB == 128 {
 		t.Fatal("bound=15 must not collapse to integer half-shift domain 128")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
@@ -55,7 +55,7 @@ func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
 func TestGenerateRandomConstantInRangeSignPolarity(t *testing.T) {
 	// Constant.cpp:230–236 — flip true → positive digit string; false → "-" + digits.
 	// Seed 2 first eInt range: U then F; first flip seed2 after U domain is fixed.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// bound=8 → b=pow(2,4)=16
 	r := NewRng(2)
@@ -74,41 +74,41 @@ func TestGenerateRandomConstantInRangeSignPolarity(t *testing.T) {
 	if strings.ContainsAny(got, "LUlu") {
 		t.Fatalf("range const must be bare digits, got %q", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
 	// Constant.cpp assert path sticky — no invent empty/default past broken range IR
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if GenerateRandomConstantInRange(GetIntType(), 8, opts, nil) != "" {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG GenerateRandomConstantInRange must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GenerateRandomConstantInRange(nil, 8, opts, NewRng(1)) != "" {
 		t.Fatal("nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type GenerateRandomConstantInRange must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GenerateRandomConstantInRange(GetIntType(), 0, opts, NewRng(1)) != "" {
 		t.Fatal("bound 0 must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("bound 0 GenerateRandomConstantInRange must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GenerateRandomConstantInRange(GetSimpleType(EChar), 8, opts, NewRng(1)) != "" {
 		t.Fatal("non int/uint simple must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("char GenerateRandomConstantInRange must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {

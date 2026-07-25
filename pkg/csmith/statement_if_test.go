@@ -6,7 +6,7 @@ import "testing"
 // Mid-condition Join mutates the shared FactPointTo; pre_facts must observe it
 // (deep CloneFactSlice freezes the lattice and diverges from C++ restore path).
 func TestFunc1PreFactsSnapshotIsShallow(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	g := CreateVariableScalars("g_ptr", PointerTo(GetIntType()), false, false)
@@ -24,7 +24,7 @@ func TestFunc1PreFactsSnapshotIsShallow(t *testing.T) {
 		t.Fatal("missing live fact")
 	}
 	if !live.Join(MakeFactPointTo(g, NullPtr)) {
-		t.Fatal("Join should add null", HasError())
+		t.Fatal("Join should add null", HasErrorSess(testAmbientSession))
 	}
 	// pre must observe may-null (shared Fact*)
 	preF := FindRelatedPointTo(pre, g)
@@ -37,5 +37,5 @@ func TestFunc1PreFactsSnapshotIsShallow(t *testing.T) {
 	if deepF == nil || deepF.IsNull() {
 		t.Fatal("control: deep clone of pre-Join lattice must stay non-null")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

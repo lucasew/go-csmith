@@ -4,32 +4,32 @@ import "testing"
 
 func TestNewCVQualifiersMismatchSticky(t *testing.T) {
 	// C++ assert equal vector sizes; mismatch no invent truncated paired qfer
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true, false}, []bool{false})
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatalf("mismatch must fail closed empty, got consts=%v vols=%v", q.IsConsts, q.IsVolatiles)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("mismatch NewCVQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// unpaired shells sticky on Match / StricterThan
 	unpaired := CVQualifiers{IsConsts: []bool{true, false}, IsVolatiles: []bool{false}}
 	other := NewCVQualifiers([]bool{false}, []bool{false})
 	if unpaired.Match(other, false) {
 		t.Fatal("unpaired Match must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unpaired Match must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if unpaired.StricterThan(other) {
 		t.Fatal("unpaired StricterThan must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unpaired StricterThan must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomStricterAndLooserConsts(t *testing.T) {
@@ -66,19 +66,19 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 		t.Fatalf("add level %d", len(added.IsConsts))
 	}
 	// nil RNG sticky — no invent fixed non-const non-vol pointer level
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if got := q4.RandomAddQualifiers(nil, opts, NewProbabilities(opts), false); len(got.IsConsts) != len(q4.IsConsts) {
 		t.Fatalf("nil RNG must not invent grow, got %d", len(got.IsConsts))
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomAddQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	// CVQualifiers.cpp always has process RNG sticky; no invent fixed looser/stricter shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{false}, []bool{false})
@@ -86,60 +86,60 @@ func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	if out := base.RandomQualifiersFrom(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG From must fail closed empty, got %+v", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomQualifiersFrom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if out := base.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG Loose must fail closed empty, got %+v", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomLooseQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// wildcard still works without RNG (short-circuit before RNG)
 	w := CVQualifiers{Wildcard: true}
 	if out := w.RandomQualifiersFrom(true, AccessRead, EmptyCGContext(), opts, probs, nil); !out.Wildcard {
 		t.Fatal("wildcard")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("wildcard RandomQualifiersFrom must not sticky on nil RNG")
 	}
 }
 
 func TestRandomStricterLooserNilRNGAndProbs(t *testing.T) {
 	// C++ always has RNG sticky; nil r must not invent identity bits as successful draw
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if q.RandomStricterConsts(nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG stricter const must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomStricterConsts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if q.RandomStricterVolatiles(nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG stricter vol must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomStricterVolatiles must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if q.RandomLooserConsts(nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG looser const must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomLooserConsts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if q.RandomLooserVolatiles(nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG looser vol must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomLooserVolatiles must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil probs → 0% (no invent default 50); drawable non-const stays false under stricter
 	got := q.RandomStricterConsts(NewRng(1), opts, nil)
 	if len(got) != 1 || got[0] {
@@ -151,7 +151,7 @@ func TestRandomStricterLooserNilRNGAndProbs(t *testing.T) {
 	if got := q2.RandomStricterConsts(nil, opts, nil); !boolsEqual(got, q2.IsConsts) {
 		t.Fatal("exact match still identity", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("exact match must not SetError on nil RNG")
 	}
 }
@@ -181,7 +181,7 @@ func TestRandomQualifiersFromNoVolatile(t *testing.T) {
 func TestRandomQualifiersFromIsSideEffectFreeResidualSticky(t *testing.T) {
 	// IsSideEffectFree residual soft invent was soft-clear/keep vol invent looser qfer.
 	// Fair: sticky fail closed empty CVQualifiers (EffectComplete gate + sefree residual).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{false}, []bool{true})
@@ -191,18 +191,18 @@ func TestRandomQualifiersFromIsSideEffectFreeResidualSticky(t *testing.T) {
 	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("IsSideEffectFree residual RandomQualifiersFrom must fail closed empty, got %+v", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsSideEffectFree residual RandomQualifiersFrom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	out2 := base.RandomLooseQualifiers(false, AccessRead, cg, opts, probs, NewRng(2))
 	if len(out2.IsConsts) != 0 || len(out2.IsVolatiles) != 0 {
 		t.Fatalf("IsSideEffectFree residual RandomLooseQualifiers must fail closed empty, got %+v", out2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsSideEffectFree residual RandomLooseQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomLooseQualifiers(t *testing.T) {
@@ -276,17 +276,17 @@ func TestHasPadding(t *testing.T) {
 		t.Fatal("bitfield")
 	}
 	// packed nested field Type hole sticky has-padding (no invent padding-free soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st4 := &Type{isStruct: true, Packed: true, Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
 	if !st4.HasPadding() {
 		t.Fatal("nil field Type must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type HasPadding must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested HasPadding residual soft invent was soft-continue later fields padding-free.
 	// Fair: sticky has-padding true.
 	innerHole := &Type{isStruct: true, Packed: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
@@ -297,10 +297,10 @@ func TestHasPadding(t *testing.T) {
 	if !outer.HasPadding() {
 		t.Fatal("nested residual HasPadding must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual HasPadding must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomQualifiersSimpleNoVolatile(t *testing.T) {
@@ -358,41 +358,41 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	ty := GetSimpleType(EInt)
 	cg := WithEffectContext(IncompleteEffect())
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := RandomQualifiersForType(ty, AccessRead, cg, false, 0, 100, opts, NewRng(2))
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatalf("incomplete ambient must fail closed empty qfer %+v", q)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete ambient must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	base := NewCVQualifiers([]bool{false}, []bool{false})
 	q2 := base.RandomQualifiersFrom(false, AccessRead, cg, opts, NewProbabilities(opts), NewRng(3))
 	if len(q2.IsConsts) != 0 || len(q2.IsVolatiles) != 0 {
 		t.Fatalf("RandomQualifiersFrom incomplete ambient must empty %+v", q2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("RandomQualifiersFrom incomplete ambient must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type + RNG always live; sticky empty (no invent soft-skip qfer past hole)
 	q3 := RandomQualifiersForType(nil, AccessRead, EmptyCGContext(), false, 0, 100, opts, NewRng(1))
 	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
 		t.Fatalf("nil type must fail closed empty qfer %+v", q3)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type RandomQualifiersForType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q4 := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), false, 0, 100, opts, nil)
 	if len(q4.IsConsts) != 0 || len(q4.IsVolatiles) != 0 {
 		t.Fatalf("nil rng must fail closed empty qfer %+v", q4)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil rng RandomQualifiersForType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomQualifiersSEFreeVolatileAlways(t *testing.T) {
@@ -473,7 +473,7 @@ func TestRandomQualifiersPointerDrawOrderSeed2(t *testing.T) {
 
 func TestCVQualifiersCloneIsolatesRestrict(t *testing.T) {
 	// C++ value-copy owns vectors; shallow Go copy + Restrict must not strip source var qfer.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	src := NewCVQualifiers([]bool{false}, []bool{true}) // storage volatile
 	if !src.IsVolatile() {
 		t.Fatal("src must be volatile")
@@ -488,7 +488,7 @@ func TestCVQualifiersCloneIsolatesRestrict(t *testing.T) {
 	if !src.IsVolatile() {
 		t.Fatal("Restrict on copy must not mutate source CVQualifiers (seed-4 g_81)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeScalarVolatilesClearsInner(t *testing.T) {
@@ -503,7 +503,7 @@ func TestMakeScalarVolatilesClearsInner(t *testing.T) {
 
 func TestIsConstAfterDeref(t *testing.T) {
 	// is_consts = [outerPtr, storage]; deref 0 → storage (last); deref 1 → outerPtr
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
 	if q.IsConstAfterDeref(0) {
 		t.Fatal("deref0 should be storage false")
@@ -527,62 +527,62 @@ func TestIsConstAfterDeref(t *testing.T) {
 	}
 	// Variable.IsConstAfterDeref residual: Type-nil after non-const qfer soft invent was non-const WRITE OK.
 	// Fair: sticky const true (restrictive).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if !v.IsConstAfterDeref(0) {
 		t.Fatal("Type-nil IsConstAfterDeref must fail closed const true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil IsConstAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsVolatileAfterDeref residual same
 	if !v.IsVolatileAfterDeref(0) {
 		t.Fatal("Type-nil IsVolatileAfterDeref must fail closed volatile true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil IsVolatileAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSanityCheckIndirectLevelResidualSticky(t *testing.T) {
 	// IndirectLevel residual soft invent was invent sanity true past Type-nil.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if q.SanityCheck(nil) {
 		t.Fatal("nil Type SanityCheck must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type SanityCheck must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete scalar depth 1
 	if !q.SanityCheck(GetIntType()) {
 		t.Fatal("complete SanityCheck")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete SanityCheck must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomLooseQualifiersNilRNGSticky(t *testing.T) {
 	// nil RNG residual soft invent was invent fixed looser qfer shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	out := q.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), Defaults(), NewProbabilities(Defaults()), nil)
 	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatal("nil RNG RandomLooseQualifiers must fail closed empty", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomLooseQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomLooseQualifiersIncompleteEffectSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	cg := EmptyCGContext()
 	// incomplete effect context
@@ -592,10 +592,10 @@ func TestRandomLooseQualifiersIncompleteEffectSticky(t *testing.T) {
 	if len(out.IsConsts) != 0 {
 		t.Fatal("incomplete ambient RandomLooseQualifiers must fail closed empty", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete ambient RandomLooseQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCVQualifiersGettersAndOutput(t *testing.T) {
@@ -621,7 +621,7 @@ func TestStricterThanStorageVolatileMustMatch(t *testing.T) {
 	// CVQualifiers.cpp:116–119 — depth>1 storage volatile must match exactly.
 	// Seed-2 e914: make_init_value pointer path MatchIndirect → StricterThan after
 	// indirect_qualifiers(-1); missing rule admitted non-vol scalars (ok n=10 vs UP n=5).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// volatile pointer to non-vol int: vols=[true,false]
 	ptrQ := NewCVQualifiers([]bool{false, false}, []bool{true, false})
 	// address-of non-vol scalar: vols=[false,false]
@@ -631,7 +631,7 @@ func TestStricterThanStorageVolatileMustMatch(t *testing.T) {
 	if ptrQ.StricterThan(nonVolTarget) {
 		t.Fatal("storage vol mismatch must fail StricterThan (depth>1)")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete storage-vol mismatch must not sticky")
 	}
 	if !ptrQ.StricterThan(volTarget) {
@@ -650,7 +650,7 @@ func TestStricterThanStorageVolatileMustMatch(t *testing.T) {
 
 func TestStricterThanMultiLevelVolatileExact(t *testing.T) {
 	// CVQualifiers.cpp:122–125 — depth-i>2 requires exact volatile match (like const)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// three-level pointer qfer
 	a := NewCVQualifiers([]bool{false, false, false}, []bool{false, true, false})
 	b := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})

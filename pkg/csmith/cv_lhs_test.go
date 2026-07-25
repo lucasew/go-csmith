@@ -16,67 +16,67 @@ func TestAddRemoveQualifiers(t *testing.T) {
 		t.Fatal(q)
 	}
 	// over-pop sticky (no invent soft-break partial pop as complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q.RemoveQualifiers(5)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("over-pop RemoveQualifiers must SetError sticky")
 	}
 	// vector emptied up to fail; residual ERROR sticky
 	if len(q.IsConsts) != 0 {
 		t.Fatalf("over-pop must stop at empty, got %v", q.IsConsts)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// CVQualifiers always live; sticky no invent soft-skip mutators past hole
 	(*CVQualifiers)(nil).AddQualifiers(false, false)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AddQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CVQualifiers)(nil).RemoveQualifiers(1)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RemoveQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CVQualifiers)(nil).SetConst(true, 0)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SetConst must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CVQualifiers)(nil).SetVolatile(true, 0)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SetVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*CVQualifiers)(nil).Restrict(AccessWrite, EmptyCGContext())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Restrict must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIndirectQualifiersMultiLevelAddrFailClosed(t *testing.T) {
 	// CVQualifiers.cpp:510 — assert(level == -1); multi-level & sticky → empty
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	got := q.IndirectQualifiers(-2)
 	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
 		t.Fatal("multi-level address-of must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("multi-level address-of must SetError sticky")
 	}
 	// -1 adds one level
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got = q.IndirectQualifiers(-1)
 	if len(got.IsConsts) != 2 || got.IsConsts[1] {
 		t.Fatal(got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 	// CVQualifiers.cpp:641–648 — assert sticky when bit set but option off
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessOptionsSess(testAmbientSession)
 	opts := Defaults()
 	opts.Consts = false
@@ -87,36 +87,36 @@ func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 	if s := q.OutputFirstQuals(); s != "" {
 		t.Fatalf("want empty when options off, got %q", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("const bit without Consts option must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.Consts = true
 	opts.Volatiles = true
 	SetProcessOptionsSess(testAmbientSession, opts)
 	if s := q.OutputFirstQuals(); !strings.Contains(s, "const") || !strings.Contains(s, "volatile") {
 		t.Fatal(s)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("valid OutputFirstQuals must not leave sticky")
 	}
 }
 
 func TestNewCVQualifiersUnequalLenFailClosed(t *testing.T) {
 	// CVQualifiers.cpp:96 — sizes must match; sticky empty (no invent truncate)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true, false}, []bool{false})
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatal(q)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unequal len NewCVQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSanityCheck(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// int: level 0 → need 1 qualifier slot
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if !q.SanityCheck(GetIntType()) {
@@ -135,10 +135,10 @@ func TestSanityCheck(t *testing.T) {
 	if q.SanityCheck(nil) {
 		t.Fatal("nil type SanityCheck invent")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type SanityCheck must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomAddQualifiers(t *testing.T) {
@@ -209,17 +209,17 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 
 func TestLhsGetQualifiersConstSetsError(t *testing.T) {
 	// Lhs.cpp:200 — assert(!qfer.is_const()); sticky error, no invent strip / invent quals shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_c", GetIntType(), true, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	q := lhs.GetQualifiers()
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatal("const LHS residual must fail closed empty quals, not invent shell", q)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("const LHS qfer must set sticky error")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsVisitIndicesOK(t *testing.T) {
@@ -248,30 +248,30 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	// soft invent: Type nil / OOB peel → not const/vol → allow write/access
 	// fair: incomplete sticky fails closed const/vol true
 	// 2-level non-vol qfer so Qfer path does not OOB-fail-closed as full vol first
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := &Variable{Name: "g_p", Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false})}
 	// Type nil
 	if !v.IsConstAfterDeref(1) {
 		t.Fatal("nil Type must fail closed as const after deref")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsConstAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !v.IsVolatileAfterDeref(1) {
 		t.Fatal("nil Type must fail closed as volatile after deref")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsVolatileAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !v.IsPartialVolatileAfterDeref(1) {
 		t.Fatal("nil Type must fail closed as partial volatile")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsPartialVolatileAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// OOB peel: pointer type peels once then nil at high deref.
 	// Qfer OOB (len 2, deref 3) fail-closed const/vol non-sticky first; Type peel
 	// sticky only when Qfer does not already short-circuit (empty qfer + nil type).
@@ -283,15 +283,15 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 		t.Fatal("OOB peel must fail closed as volatile")
 	}
 	// Type peel sticky path: empty qfer + incomplete type
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v2 := &Variable{Name: "g_q", Type: nil}
 	if !v2.IsConstAfterDeref(0) {
 		t.Fatal("nil Type empty qfer must fail closed const")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsConstAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// GetFieldID incomplete parent FieldVars sticky -1
 	parent := &Variable{Name: "u", Type: &Type{isUnion: true}}
 	f0 := &Variable{Name: "u.f0", Type: GetIntType(), FieldVarOf: parent}
@@ -299,16 +299,16 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	if f0.GetFieldID() != -1 {
 		t.Fatal("FieldVars hole must fail closed GetFieldID -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FieldVars hole GetFieldID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky -1 (no invent not-field soft-skip past hole)
 	if (*Variable)(nil).GetFieldID() != -1 {
 		t.Fatal("nil GetFieldID must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GetFieldID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

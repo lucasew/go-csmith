@@ -4,7 +4,7 @@ import "testing"
 
 func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	// VariableSelector.cpp:332–337 — collective array must itemize(); no return bare
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := CreateArrayVariable(NewRng(2), Defaults(), NewProbabilities(Defaults()), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
@@ -13,20 +13,20 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	if ChooseOKVar(nil, []*Variable{&av.Variable}) != nil {
 		t.Fatal("itemize needs RNG; no soft return collective")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG itemize ChooseOKVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// multi-cand without RNG sticky — no invent vars[0]
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	if ChooseOKVar(nil, []*Variable{a, b}) != nil {
 		t.Fatal("nil RNG multi ChooseOKVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG multi ChooseOKVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got := ChooseOKVar(NewRng(3), []*Variable{&av.Variable})
 	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
 		t.Fatalf("want itemized member, got %+v", got)
@@ -35,7 +35,7 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 
 func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	// VariableSelector::choose_ok_var
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_1", GetSimpleType(EInt), false, false)
 	b := CreateVariableScalars("g_2", GetSimpleType(EInt), false, false)
 	c := CreateVariableScalars("g_3", GetSimpleType(EInt), false, false)
@@ -47,10 +47,10 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	if ChooseOKVar(NewRng(2), []*Variable{a, nil, b}) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ChooseOKVar(NewRng(2), []*Variable{a}) != a {
 		t.Fatal("sole")
 	}
@@ -68,17 +68,17 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 func TestChooseOKVarMatchTypeNilSticky(t *testing.T) {
 	// Type-nil candidate: soft invent was soft-skip as absent then pick later good.
 	// Fair: sticky fail closed whole ChooseOKVarMatch.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	good := CreateVariableScalars("g_1", GetIntType(), false, false)
 	hole := &Variable{Name: "g_hole", Type: nil}
 	if ChooseOKVarMatch(NewRng(1), []*Variable{hole, good}, GetIntType(), MatchFlexible, false) != nil {
 		t.Fatal("Type-nil candidate must fail closed ChooseOKVarMatch, not invent later good")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil candidate ChooseOKVarMatch must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateNewGlobalNamesAndList(t *testing.T) {
@@ -110,7 +110,7 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 
 func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky before create
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false
 	vs := NewVariableSelector(opts)
@@ -123,33 +123,33 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 	if vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed GenerateNewGlobal")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	if len(vs.GlobalList) != 0 {
 		t.Fatal("must not invent GlobalList registration past ambient hole")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	if vs.GenerateNewGlobal(AccessRead, cg2, GetIntType(), &q, NewRng(2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewGlobal")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
 	if vs.GenerateNewGlobal(AccessRead, cg3, GetIntType(), &q, NewRng(3)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed GenerateNewGlobal")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMaxGlobalsFailClosed(t *testing.T) {
@@ -208,8 +208,8 @@ func TestDefaultsMaxGlobalsUnlimited(t *testing.T) {
 	// Past the old unfair default of 80 — still create (upstream has no cap).
 	for i := 0; i < 85; i++ {
 		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(uint64(100+i)))
-		if v == nil || HasError() {
-			t.Fatalf("global %d: unlimited Defaults must create (got nil err=%v list=%d)", i, GetError(), len(vs.GlobalList))
+		if v == nil || HasErrorSess(testAmbientSession) {
+			t.Fatalf("global %d: unlimited Defaults must create (got nil err=%v list=%d)", i, GetErrorSess(testAmbientSession), len(vs.GlobalList))
 		}
 	}
 	if len(vs.GlobalList) != 85 {
@@ -235,14 +235,14 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, &cg, nil, "g_a", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed CreateArrayVariable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
@@ -251,10 +251,10 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 	if CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, &cg2, nil, "g_b", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed CreateArrayVariable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectGlobalEmptyCreates(t *testing.T) {
@@ -357,7 +357,7 @@ func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
 func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	// VariableSelector.cpp:526–527 — Constant::make_random then create_array;
 	// no invent array with nil init when make_random fails.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.StrictConstArrays = true
 	opts.Arrays = true
@@ -368,25 +368,25 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_x", NewRng(1)) != nil {
 		t.Fatal("void must fail closed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_y", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG createAndInitialize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "", NewRng(1)) != nil {
 		t.Fatal("empty name must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name createAndInitialize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCreateRandomArrayIncompleteAmbientSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	inc := IncompleteEffect()
@@ -395,20 +395,20 @@ func TestCreateRandomArrayIncompleteAmbientSticky(t *testing.T) {
 	if vs.CreateRandomArray(NewRng(1), cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed CreateRandomArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := EmptyCGContext().WithFactMgr(fm)
 	if vs.CreateRandomArray(NewRng(2), cg2) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed CreateRandomArray")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
@@ -428,118 +428,118 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect())
 	for seed := uint64(1); seed < 30; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		if av := vs.CreateRandomArray(NewRng(seed), cg); av != nil {
 			t.Fatalf("seed %d: must not invent array when make_random fails", seed)
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeInitValueSelectLoopCtrlNilDepsSticky(t *testing.T) {
 	// MakeInitValue / SelectLoopCtrl / SelectParentLocal always have VS+RNG sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), &q, nil, nil) != nil {
 		t.Fatal("nil RNG MakeInitValue must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeInitValue must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.SelectLoopCtrlVar(nil, EmptyCGContext(), nil) != nil {
 		t.Fatal("nil RNG SelectLoopCtrlVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG SelectLoopCtrlVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// no CurrentFunc is soft re-pick (not sticky) — EmptyCGContext select scopes
 	if vs.SelectParentLocalInv(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1), MatchFlexible, nil) != nil {
 		t.Fatal("nil CurrentFunc SelectParentLocalInv must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CurrentFunc SelectParentLocalInv must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.SelectParentLocalInv(AccessRead, WithFunc(&Function{Name: "f"}, EmptyEffect()), GetIntType(), nil, nil, MatchFlexible, nil) != nil {
 		t.Fatal("nil RNG SelectParentLocalInv must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG SelectParentLocalInv must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext(), nil, nil, NewRng(1), MatchFlexible) != nil {
 		t.Fatal("nil type EagerCreateGlobalStruct must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type EagerCreateGlobalStruct must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCreateSelectArrayNilDepsSticky(t *testing.T) {
 	// VariableSelector always has VS + RNG; sticky no invent select/create array shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*VariableSelector)(nil).SelectArray(NewRng(1), EmptyCGContext()) != nil {
 		t.Fatal("nil VS SelectArray must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil VS SelectArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
 	if vs.SelectArray(nil, EmptyCGContext()) != nil {
 		t.Fatal("nil RNG SelectArray must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG SelectArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.CreateRandomArray(nil, EmptyCGContext()) != nil {
 		t.Fatal("nil RNG CreateRandomArray must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG CreateRandomArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateNewParentLocalNilDepsSticky(t *testing.T) {
 	// parent-local always has VS + block + type + RNG; sticky no invent shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	blk := &Block{}
 	if vs.GenerateNewParentLocal(nil, AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1)) != nil {
 		t.Fatal("nil block must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block GenerateNewParentLocal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type GenerateNewParentLocal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext(), GetIntType(), nil, nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG GenerateNewParentLocal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	// VariableSelector.cpp:531–533 — make_init_value then new_variable;
 	// make_init_value always Expression* or ERROR_GUARD — no invent uninit shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false // force scalar path
 	vs := NewVariableSelector(opts)
@@ -549,25 +549,25 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 		t.Fatal("void must fail closed")
 	}
 	// nil RNG sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_n", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG createAndInitialize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// bad qfer (empty levels on pointer) — MakeInitValue fail closed sticky
 	ptr := PointerTo(GetIntType())
 	badQ := CVQualifiers{} // empty not sanity_check for pointer
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), ptr, badQ, nil, "g_p", NewRng(3)) != nil {
 		t.Fatal("bad qfer must fail closed without invent uninit var")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -577,10 +577,10 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 	if vs.SelectParentLocalInv(AccessRead, cg, GetIntType(), nil, NewRng(1), MatchFlexible, nil) != nil {
 		t.Fatal("nil Stack hole must fail closed SelectParentLocalInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Stack hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete LocalVars
 	blk := &Block{Func: f, LocalVars: []*Variable{nil}}
 	f.Stack = []*Block{blk}
@@ -588,18 +588,18 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 	if vs.SelectParentLocalInv(AccessRead, cg2, GetIntType(), nil, NewRng(2), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete LocalVars must fail closed SelectParentLocalInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete LocalVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete invalid_vars on SelectWithInvalid
 	if vs.SelectWithInvalid(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{nil}) != nil {
 		t.Fatal("incomplete invalid_vars must fail closed SelectWithInvalid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete invalid_vars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete ambient on SelectWithInvalid
 	inc := IncompleteEffect()
 	cg3 := EmptyCGContext()
@@ -607,20 +607,20 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 	if vs.SelectWithInvalid(AccessRead, cg3, GetIntType(), nil, NewRng(4), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed SelectWithInvalid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky SelectWithInvalid")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg4 := EmptyCGContext().WithFactMgr(fm)
 	if vs.SelectWithInvalid(AccessRead, cg4, GetIntType(), nil, NewRng(5), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed SelectWithInvalid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky SelectWithInvalid")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete ambient on SelectParentLocalInv
 	f3 := &Function{Name: "f3", ReturnType: GetIntType()}
 	blk3 := &Block{Func: f3}
@@ -631,36 +631,36 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 	if vs.SelectParentLocalInv(AccessRead, cg5, GetIntType(), nil, NewRng(6), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed SelectParentLocalInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky SelectParentLocalInv")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete Param on SelectParentParamInv
 	f4 := &Function{Name: "f4", ReturnType: GetIntType(), Param: []*Variable{nil}}
 	cg6 := WithFunc(f4, EmptyEffect())
 	if vs.SelectParentParamInv(AccessRead, cg6, GetIntType(), nil, NewRng(7), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete Param must fail closed SelectParentParamInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Param must SetError sticky SelectParentParamInv")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Function always live for parent-param select; sticky
 	if vs.SelectParentParamInv(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(7), MatchFlexible, nil) != nil {
 		t.Fatal("nil CurrentFunc must fail closed SelectParentParamInv")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CurrentFunc SelectParentParamInv must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalList on SelectGlobalMT
 	vs2 := NewVariableSelector(opts)
 	vs2.GlobalList = []*Variable{nil}
 	if vs2.SelectGlobalMT(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(8), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed SelectGlobalMT")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalList must SetError sticky SelectGlobalMT")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

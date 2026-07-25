@@ -53,31 +53,31 @@ func TestUnionFieldHelpers(t *testing.T) {
 		t.Fatalf("fid %d", f0.GetFieldID())
 	}
 	// Variable always live; sticky false (no invent not-union-field soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).IsUnionField() {
 		t.Fatal("nil IsUnionField must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsUnionField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).IsInsideUnionField() {
 		t.Fatal("nil IsInsideUnionField must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsInsideUnionField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil parent sticky true (restrictive — no invent not-inside soft-skip)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	if !field.IsInsideUnionField() {
 		t.Fatal("Type-nil parent IsInsideUnionField must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsInsideUnionField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-field complete false
 	if !f0.IsInsideUnionField() {
 		// f0 is real union field — should be true; use scalar
@@ -86,14 +86,14 @@ func TestUnionFieldHelpers(t *testing.T) {
 	if scalar.IsInsideUnionField() {
 		t.Fatal("scalar IsInsideUnionField must be false complete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("scalar IsInsideUnionField must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsNonreadableField(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -111,19 +111,19 @@ func TestIsNonreadableField(t *testing.T) {
 	if !IsNonreadableField(f1, nil) {
 		t.Fatal("empty complete facts: no related FactUnion → nonreadable")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty complete path must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky nonreadable (no invent readable soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsNonreadableField(nil, nil) {
 		t.Fatal("nil Variable IsNonreadableField must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable IsNonreadableField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// last write f0 → f1 nonreadable
 	facts := []*FactUnion{MakeFactUnion(uv, 0)}
 	if IsNonreadableField(f0, facts) {
@@ -132,29 +132,29 @@ func TestIsNonreadableField(t *testing.T) {
 	if !IsNonreadableField(f1, facts) {
 		t.Fatal("f1 blocked")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete IsNonreadableField paths must not sticky")
 	}
 	// Imply residual: PointTo-style hole via incomplete union fact soft invent was soft-continue readable.
 	// Fair: sticky nonreadable. Use incomplete map already covers; also Type-nil ancestry residual.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete UnionFacts hole: sticky fail closed nonreadable / not-readable
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := []*FactUnion{MakeFactUnion(uv, 0), nil}
 	if IsFieldReadable(uv, 0, hole) {
 		t.Fatal("incomplete UnionFacts must not invent field readable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete UnionFacts IsFieldReadable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsNonreadableField(f0, hole) {
 		t.Fatal("incomplete UnionFacts must fail closed nonreadable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete UnionFacts IsNonreadableField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUpdateAssignUnionFact(t *testing.T) {
@@ -181,7 +181,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 
 func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	// && : after left writes a, RHS generation sees pre-left context only
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)

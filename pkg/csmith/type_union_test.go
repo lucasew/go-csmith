@@ -6,7 +6,7 @@ import (
 )
 
 func TestMakeRandomUnionType(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -37,11 +37,11 @@ func TestMakeRandomUnionType(t *testing.T) {
 			return ut2.StructName
 		}())
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	ut := &Type{
@@ -93,10 +93,10 @@ func TestCreateFieldVarsUnion(t *testing.T) {
 			{Name: "f1", Type: GetSimpleType(EShort), BitWidth: -1},
 		},
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if v == nil {
-		t.Fatal("CreateVariableQfer union", HasError())
+		t.Fatal("CreateVariableQfer union", HasErrorSess(testAmbientSession))
 	}
 	if len(v.FieldVars) != 2 {
 		t.Fatal(len(v.FieldVars))
@@ -104,5 +104,5 @@ func TestCreateFieldVarsUnion(t *testing.T) {
 	if v.FieldVars[0].Name != "g_u.f0" {
 		t.Fatal(v.FieldVars[0].Name)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

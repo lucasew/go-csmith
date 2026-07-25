@@ -62,27 +62,27 @@ func TestResetBlockFactMaps(t *testing.T) {
 		// block itself may be collected via collectBlockStmIDs
 	}
 	// FactMgr + Block always live; sticky no invent soft-skip reset past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).ResetBlockFactMaps(b)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM ResetBlockFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.ResetBlockFactMaps(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block ResetBlockFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).ResetStmFactMaps(&Stmt{StmID: 1})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM ResetStmFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.ResetStmFactMaps(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Stmt ResetStmFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindJumpSources(t *testing.T) {
@@ -102,37 +102,37 @@ func TestFindJumpSources(t *testing.T) {
 		t.Fatal("complete empty", none)
 	}
 	// FactMgr + live dest StmID always required; sticky nil
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactMgr)(nil).FindJumpSources(5) != nil {
 		t.Fatal("nil FM FindJumpSources must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM FindJumpSources must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if fm.FindJumpSources(IncompleteStmID) != nil {
 		t.Fatal("destStmID 0 FindJumpSources must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("destStmID 0 FindJumpSources must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil CFG hole fails closed sticky
 	fm.CFGEdges = []*CFGEdge{{SrcID: 10, DestStmID: 5}, nil}
 	if fm.FindJumpSources(5) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CFG hole FindJumpSources must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindJumpLabel(fm, 5) != "" {
 		t.Fatal("nil hole FindJumpLabel must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CFG hole FindJumpLabel must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IncompleteCFGEdges marker is incomplete (not invent empty-complete)
 	if CFGEdgesComplete(IncompleteCFGEdges()) {
 		t.Fatal("IncompleteCFGEdges must be incomplete")
@@ -174,7 +174,7 @@ func TestNeedNestedLoop(t *testing.T) {
 func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	// Soft invent: skip nil RW entry as absent → no nested needed (false).
 	// Fair: incomplete MustRead/MustWrite list fails closed sticky true (need nested).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
@@ -187,36 +187,36 @@ func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("nil MustRead hole must fail closed true need-nested, not invent none")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete MustReadVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	rw2 := &RWDirective{MustWriteVars: []*Variable{nil, arr}}
 	cg2 := CGContext{Sess: testAmbientSession, RW: rw2, IVBounds: map[*Variable]int{}}
 	if !b.NeedNestedLoop(cg2, NewRng(1)) {
 		t.Fatal("nil MustWrite hole must fail closed true need-nested, not invent none")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete MustWriteVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNeedNestedLoopMustJumpResidualSticky(t *testing.T) {
 	// StmtBreak with nil Expr: MustJump stickies residual ERROR+false.
 	// Soft invent was treat as not-must-jump then invent "no nested" (false) past hole.
 	// Fair: residual sticky restrictive need nested true.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtBreak}}} // nil Expr
 	cg := EmptyCGContext()                                            // RW nil would soft invent false after residual
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("MustJump residual must fail closed true need-nested, not invent none")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MustJump residual NeedNestedLoop must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
@@ -249,22 +249,22 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 		t.Fatal("goto-to-label must not escape must_break_or_return")
 	}
 	// Block always live; sticky no invent not-must-break soft-skip past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Block)(nil).MustBreakOrReturnFull(fm) {
 		t.Fatal("nil MustBreakOrReturnFull must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MustBreakOrReturnFull must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block always live at remove_stmt; sticky no invent no-op remove soft-skip
 	if (*Block)(nil).RemoveStmt(1, fm) != 0 {
 		t.Fatal("nil RemoveStmt must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RemoveStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectCloneIndependent(t *testing.T) {
@@ -332,16 +332,16 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 		t.Fatal("nil RNG must not invent return")
 	}
 	// Block StmID 0 + FM fails closed (no invent fold into key 0)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	bad := &Block{Func: f, StmID: IncompleteStmID, Parent: nil}
 	f.Stack = []*Block{bad}
 	if bad.AppendReturnStmt(NewRng(2), opts, NewVariableSelector(opts), &cg) != nil {
 		t.Fatal("block StmID 0 must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("expect sticky error on incomplete block id")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestContainsBackEdge(t *testing.T) {
@@ -370,7 +370,7 @@ func TestContainsBackEdge(t *testing.T) {
 }
 
 func TestMakeDummyBlockCG(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// void: no append_return_stmt during post_creation
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
@@ -391,36 +391,36 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	if len(f.Stack) != 0 {
 		t.Fatal("stack not popped")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block.cpp:96–97 assert(curr_func) sticky
 	if MakeDummyBlockCG(nil, opts) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	empty := EmptyCGContext()
 	if MakeDummyBlockCG(&empty, opts) != nil {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CurrentFunc must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MakeDummyBlock without CG still needs live Function sticky
 	if MakeDummyBlock(nil) != nil {
 		t.Fatal("nil Function MakeDummyBlock must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function MakeDummyBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	// incomplete EffectAccum / GlobalFacts / EffectContext must not invent dummy block success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgr(f)
@@ -430,13 +430,13 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	if MakeDummyBlockCG(&cg, opts) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeDummyBlockCG")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("must SetError")
 	}
 	if len(f.Blocks) != 0 || len(f.Stack) != 0 {
 		t.Fatal("must not leave partial block registration")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
 	fm2 := NewFactMgr(f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
@@ -444,10 +444,10 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	if MakeDummyBlockCG(&cg2, opts) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeDummyBlockCG")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("must SetError GlobalFacts")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
 	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgr(f3))
 	eff := EmptyEffect()
@@ -455,23 +455,23 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	if MakeDummyBlockCG(&cg3, opts) != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeDummyBlockCG")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("must SetError EffectContext")
 	}
 	if len(f3.Blocks) != 0 || len(f3.Stack) != 0 {
 		t.Fatal("must not leave partial block on incomplete context")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgr(f)
 	b := &Block{StmID: AllocStmID(), Func: f}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	b.PostCreationAnalysis(&cg, Defaults(), IncompleteEffect(), nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete preEffect must SetError")
 	}
 	if FactsComplete(fm.GlobalFacts) && len(fm.GlobalFacts) == 0 {
@@ -480,25 +480,25 @@ func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("must wipe GlobalFacts incomplete")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b0 := &Block{StmID: IncompleteStmID, Func: f}
 	b0.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block + CGContext always live; sticky (no invent soft-skip past hole)
 	// Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM)
 	(*Block)(nil).PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block PostCreationAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b.PostCreationAnalysis(nil, Defaults(), EmptyEffect(), nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
@@ -517,25 +517,25 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	o.MathNoTmp = true
 	SetProcessOptionsSess(testAmbientSession, o)
 	defer SetProcessOptionsSess(testAmbientSession, prevO)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{TmpVars: map[string]ESimpleType{"": EInt}}
 	if out := b.Output(0); out != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty tmp name must SetError sticky")
 	}
 	// incomplete LocalVars fails closed sticky (no invent soft-skip hole partial defs)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	b2 := &Block{LocalVars: []*Variable{loc, nil}}
 	if out := b2.Output(0); out != "" {
 		t.Fatal("LocalVars hole must fail closed whole block", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("LocalVars hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable from ArraySizes
 	// fair: sticky empty whole block (no invent partial def emit)
 	arrShell := &Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -543,10 +543,10 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	if out := b3.Output(0); out != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole block", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray Block.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// PreOutput residual soft invent was soft-continue then emit later stmts.
 	// Fair: sticky fail closed whole Block.Output (StmID 0 under FM stickies PreOutput).
 	f := &Function{Name: "f"}
@@ -563,16 +563,16 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	if out := b4.Output(0); out != "" {
 		t.Fatal("PreOutput residual must fail closed whole block", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("PreOutput residual Block.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddNewVarFactTo(t *testing.T) {
 	// Block.cpp:546–549 / FactMgr.cpp:118–131 — abstract_fact_for_var_init;
 	// no invent NewFactPointTo garbage for null-init pointer.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -614,14 +614,14 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	// fair: incomplete FieldVars clears *facts
 	currentSession().MetaFactPointToEnabled = true
 	defer ClearMetaFacts()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "p", Type: PointerTo(GetIntType()), BitWidth: -1},
 		{Name: "q", Type: PointerTo(GetIntType()), BitWidth: -1},
 	}}
 	v := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
-	if v == nil || HasError() {
-		t.Fatal("CreateVariableQfer struct with pointer fields", v, HasError())
+	if v == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal("CreateVariableQfer struct with pointer fields", v, HasErrorSess(testAmbientSession))
 	}
 	// CreateFieldVars may have filled; force nil hole + later live pointer field
 	q := CreateVariableScalars("g_s.q", PointerTo(GetIntType()), false, false)
@@ -636,26 +636,26 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("nil FieldVars hole must fail closed clear facts, not soft-skip", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Variable* subject fails closed sticky (no invent skip as absent)
 	facts2 := []*FactPointTo{prior}
 	AddNewVarFactInto(nil, &facts2)
 	if FactsComplete(facts2) {
 		t.Fatal("nil v must fail closed clear facts", facts2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil v must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip makeup past hole)
 	AddNewVarFactInto(CreateVariableScalars("g_n", GetIntType(), false, false), nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts AddNewVarFactInto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special shell: soft invent was IsPointer residual ERROR + empty FieldVars
 	// complete skip (facts stay complete). Fair: clear facts sticky before field walk.
 	shell := &Variable{Name: "g_typeless"}
@@ -664,10 +664,10 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts3) {
 		t.Fatal("Type-nil shell must fail closed clear facts, not empty-fields complete", facts3)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil shell must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// AddNewVarFact same Type-nil sticky clear GlobalFacts
 	fm := NewFactMgr(nil)
 	if fm == nil {
@@ -678,17 +678,17 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("AddNewVarFact Type-nil must clear GlobalFacts", fm.GlobalFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddNewVarFact Type-nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {
 	// soft invent: AddNewVarFactTo(nil) no-op skip LocalVars hole
 	// fair: nil LocalVars fails closed fixed-point
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	b := &Block{
 		StmID:     60,
 		LocalVars: []*Variable{nil},
@@ -740,7 +740,7 @@ func TestFindFixedPointShortcut(t *testing.T) {
 // StatementGoto.cpp:125–128 choose_visible_read_var (g_6 vs UP g_1192).
 // After drop, currentUnions must equal the map_in half so shortcut can match.
 func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_sync", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -776,7 +776,7 @@ func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 	if !SameUnionFacts(currentUnions, entryUnions) {
 		t.Fatal("synced currentUnions must same_facts with map_in half")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
@@ -784,7 +784,7 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 	// has_edge_in: Statement.cpp:434–446 e->dest == this (the block).
 	// ContainsBackEdge (dest->parent==this) must NOT invent force FP: that wiped
 	// mid-gen may-null via map_facts_out re-analysis install (seed-2 e10107).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	parent := &Block{StmID: 1, Func: f}
 	inner := &Block{StmID: 50, Func: f, Parent: parent, Looping: false, NeedRevisit: false}
@@ -825,7 +825,7 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 	if !inner.ContainsBackEdge(fm) {
 		t.Log("note: ContainsBackEdge false — edge shape may not match parent check; still no wipe")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
@@ -866,7 +866,7 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	// incomplete MapFactsIn[block] must not invent empty fixed-point re-analysis
 	// (old soft path: FactsComplete fail → treat as nil empty env → FP success)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	parent := &Block{StmID: 1, Func: f}
 	b := &Block{StmID: 80, Func: f, Parent: parent, Looping: true, NeedRevisit: true,
@@ -894,10 +894,10 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete MapFactsIn must fail closed incomplete GlobalFacts, not invent empty FP", fm.GlobalFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete MapFactsIn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostCreationAppendsReturn(t *testing.T) {
@@ -922,8 +922,8 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 func TestFindJumpSourcesFindStmtResidualSticky(t *testing.T) {
 	// FindStmt residual soft invent was soft-continue sources then invent complete src list.
 	// Fair: sticky fail closed nil sources.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	// incomplete if sole Blocks — FindStmt residual for SrcID under incomplete arm
 	outer := &Block{Func: f, Stmts: []Stmt{
@@ -936,10 +936,10 @@ func TestFindJumpSourcesFindStmtResidualSticky(t *testing.T) {
 	if fm.FindJumpSources(10) != nil {
 		t.Fatal("FindStmt residual must fail closed nil sources, not invent complete list")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindStmt residual FindJumpSources must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
@@ -970,24 +970,24 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 		t.Fatal("break must not be jump source", got)
 	}
 	// dangling SrcID with Func set sticky — no invent skip as non-goto
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{SrcID: 99, DestStmID: 10})
 	if fm.FindJumpSources(10) != nil {
 		t.Fatal("unresolved SrcID must fail closed nil sources")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unresolved SrcID FindJumpSources must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// only unresolved edge for dest 11 — no invent skip hole to registry/label
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 11}}
 	if FindJumpLabel(fm, 11) != "" {
 		t.Fatal("unresolved SrcID must fail closed empty label")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unresolved SrcID FindJumpLabel must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindJumpLabel(t *testing.T) {
@@ -1031,31 +1031,31 @@ func TestFindStmtByID(t *testing.T) {
 		t.Fatal("missing")
 	}
 	// incomplete if on sole Blocks entry fails closed sticky (no invent soft-continue past nil Else)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Blocks = []*Block{outer}
 	outer.Stmts[0].Else = nil
 	if FindStmtByID(f, 3) != nil {
 		t.Fatal("nil Else must fail closed when only reachable via incomplete if")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else FindStmtByID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Function + live StmID always required; sticky no invent miss soft-success
 	if FindStmtByID(nil, 3) != nil {
 		t.Fatal("nil Function FindStmtByID must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function FindStmtByID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindStmtByID(f, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtByID must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmID 0 FindStmtByID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetDimension(t *testing.T) {
@@ -1074,17 +1074,17 @@ func TestGetDimension(t *testing.T) {
 		t.Fatal(av.Variable.GetDimension())
 	}
 	// IsArray without AsArray soft invent was dim from ArraySizes; fair sticky 0
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_b", GetIntType(), false, false)
 	v.IsArray = true
 	v.ArraySizes = []int{5, 6}
 	if v.GetDimension() != 0 {
 		t.Fatal("IsArray without AsArray GetDimension must fail closed 0, got", v.GetDimension())
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray GetDimension must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
@@ -1169,8 +1169,8 @@ func TestRemoveStmtCascadesGotoSource(t *testing.T) {
 func TestRemoveStmtFindStmtResidualNoInventGotoCascade(t *testing.T) {
 	// Soft invent was FindStmt residual/nil miss → isGoto true cascade invent.
 	// Fair: unresolved SrcID with Func set sticky wipe IncompleteCFGEdges.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	destID := 10
@@ -1186,10 +1186,10 @@ func TestRemoveStmtFindStmtResidualNoInventGotoCascade(t *testing.T) {
 	if CFGEdgesComplete(fm.CFGEdges) {
 		t.Fatal("unresolved SrcID must wipe IncompleteCFGEdges, not invent empty complete / cascade")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unresolved SrcID RemoveStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
@@ -1224,7 +1224,7 @@ func TestRemoveStmtScrubsParentChainOrphanBlocks(t *testing.T) {
 	// remove_stmt of the ancestor must still erase them (Block.cpp:655–663).
 	// Soft invent Stmts-only walk left them for StatementGoto find_good_jump_block
 	// (seed 11466719812903307384 first_div: Go n=37 vs UP n=3).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	body := &Block{Func: f, StmID: 10}
@@ -1239,7 +1239,7 @@ func TestRemoveStmtScrubsParentChainOrphanBlocks(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("RemoveStmt count=%d", n)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("sticky ERROR after RemoveStmt")
 	}
 	for _, b := range f.Blocks {
@@ -1256,7 +1256,7 @@ func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
 	// Block.cpp:632–646 — if (s->contains_stmt(edge->dest)) full contains_stmt.
 	// Soft invent was blockUnderStmt (Stmts walk) for DestBlock, missing orphan
 	// nested blocks with only Parent set → edge kept, goto cascade skipped.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	body := &Block{Func: f, StmID: 10}
@@ -1275,7 +1275,7 @@ func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
 	if n < 1 {
 		t.Fatalf("RemoveStmt count=%d", n)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("sticky ERROR after RemoveStmt")
 	}
 	for _, e := range fm.CFGEdges {
@@ -1292,7 +1292,7 @@ func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
 
 func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	// incomplete CFG scrub must wipe IncompleteCFGEdges sticky (not bare nil invent empty complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	b := &Block{
 		StmID: 10,
@@ -1309,10 +1309,10 @@ func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	if CFGEdgesComplete(fm.CFGEdges) {
 		t.Fatal("incomplete scrub must leave IncompleteCFGEdges, not invent empty complete", fm.CFGEdges)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete CFG scrub must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete Function.Blocks hole → IncompleteBlocks sticky
 	f := &Function{Name: "f"}
 	fm2 := NewFactMgr(f)
@@ -1325,16 +1325,16 @@ func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	if BlocksComplete(f.Blocks) {
 		t.Fatal("incomplete Blocks scrub must leave IncompleteBlocks", f.Blocks)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Blocks scrub must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockProbabilityUniformNotAlwaysMax(t *testing.T) {
 	// Block.cpp:87–93 random mode: disable filter → uniform rnd_upto(size)
 	// not soft invent always size-1
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	seen := map[int]bool{}
 	r := NewRng(2)
 	for i := 0; i < 80; i++ {
@@ -1356,7 +1356,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	// Block.cpp:424 Statement::make_random(eFor) → Statement.cpp:272–274 / 315–317
 	// compound eFor increments blk_depth for the nested body, restores after.
 	// Without the bump, body statements see parent depth (seed-4 e11119: GO blk=3 vs UP blk=5).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockDepth = 5
 	opts.MaxBlockSize = 1
@@ -1381,7 +1381,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	if cg.BlkDepth != pre {
 		t.Fatalf("AppendNestedLoop must restore BlkDepth: got %d want %d", cg.BlkDepth, pre)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
@@ -1390,7 +1390,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	// Leftover ExprDepth=7 must not stick as the starting depth of make_iteration:
 	// after append returns, either factory ran (depth may be non-zero from exprs)
 	// or null-failed; BlkDepth must restore either way.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockDepth = 5
 	opts.MaxBlockSize = 1
@@ -1421,42 +1421,42 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 		// makeRandomStmtForced never ran (regression).
 		t.Fatal("AppendNestedLoop must enter makeRandomStmtForced (ExprDepth still 7, no stmt)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	// Block.cpp:425 ERROR_GUARD after make for
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	b := &Block{Looping: true}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	b.Func = f
 	f.Stack = []*Block{b}
 	cg := WithFunc(f, EmptyEffect())
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	if b.AppendNestedLoop(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("sticky error must not append nested for")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block.cpp always has RNG for make_random(eFor)
 	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("nil RNG must not invent nested for")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete ambient must not invent nested for past holes
 	cgInc := WithFunc(f, IncompleteEffect())
 	if b.AppendNestedLoop(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgInc) != nil {
 		t.Fatal("incomplete EffectContext must fail closed AppendNestedLoop")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	// StatementAssign.cpp:124 assert(!is_const_struct_union) sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// ProcessAssignOpsTable required past FM gate
 	prevTab := ProcessAssignOpsTableSess(testAmbientSession)
@@ -1475,27 +1475,27 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	if stmtOK(got) {
 		t.Fatal("const struct assign must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("const struct assign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsConstStructUnion residual soft invent was soft-continue assign past Type-nil field.
 	// Fair: sticky fail closed empty Stmt.
 	hole := &Type{isStruct: true, StructName: "H", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if !hole.IsConstStructUnion() || !HasError() {
+	if !hole.IsConstStructUnion() || !HasErrorSess(testAmbientSession) {
 		t.Fatal("fixture Type-nil field must residual IsConstStructUnion sticky true")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got2 := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, hole)
 	if stmtOK(got2) {
 		t.Fatal("IsConstStructUnion residual must fail closed assign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsConstStructUnion residual assign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsVolatileStructUnion residual under StrictVolatileRule soft invent was soft-continue RHS.
 	optsSV := Defaults()
 	optsSV.StrictVolatileRule = true
@@ -1504,15 +1504,15 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	if stmtOK(got3) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed assign")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVolatileStructUnion residual assign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeDummyBlockCGFactIn(t *testing.T) {
 	// Block.cpp:95–110 — fact_in + post_creation, not empty shell only
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "builtin_x", ReturnType: GetIntType(), IsBuiltin: true}
 	fm := NewFactMgr(f)
@@ -1534,7 +1534,7 @@ func TestMakeDummyBlockCGFactIn(t *testing.T) {
 
 func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
 	// Block.cpp:383–384 assert(visited) → sticky error, no soft drop only
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// void return type makes NeedReturn false; use int return without seed for expr
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1551,63 +1551,63 @@ func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
 	vs.Opts.GlobalVariables = false
 	st := b.AppendReturnStmt(NewRng(1), opts, vs, &cg)
 	// either success or fail with SetError on visit fail; must not leave incomplete without error if visit fails
-	if st == nil && !HasError() {
+	if st == nil && !HasErrorSess(testAmbientSession) {
 		// make return itself failed without visit — also ok (no invent)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindJumpLabelNilFMSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindJumpLabel(nil, 1) != "" {
 		t.Fatal("nil FM FindJumpLabel must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM FindJumpLabel must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestContainsBackEdgeIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Block)(nil).ContainsBackEdge(NewFactMgr(nil)) {
 		t.Fatal("nil Block ContainsBackEdge must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block ContainsBackEdge must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 1}
 	if !b.ContainsBackEdge(nil) {
 		t.Fatal("nil FM ContainsBackEdge must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM ContainsBackEdge must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestContainsBackEdgeNilResidualSticky(t *testing.T) {
 	// ContainsBackEdge residual soft invent was invent no-back soft-skip past nil Block.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Block)(nil).ContainsBackEdge(NewFactMgr(nil)) {
 		t.Fatal("nil Block ContainsBackEdge must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block ContainsBackEdge must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFromTailToHeadNilResidualSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Block)(nil).FromTailToHead() {
 		t.Fatal("nil Block FromTailToHead must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block FromTailToHead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
@@ -1616,7 +1616,7 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	// Block.cpp:513–568 — find_fixed_point does not assign global_facts; mid-gen
 	// live may stay polluted until post_creation installs map_facts_out (729).
 	// map_facts_out from re-analysis outputs only (no invent reinject after strip).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -1660,7 +1660,7 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	// Statement.cpp:609–626 — does not assign global_facts = inputs.
 	// After visit, mid-gen may-null on GlobalFacts must remain (seed-2 e10107).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	inputs := []*FactPointTo{MakeFactPointTo(p, tgt)}
@@ -1680,13 +1680,13 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	cg.EffectAccum = &eff
 	facts := CloneFactSlice(inputs)
 	if !StmVisitFacts(st, &facts, &cg, Defaults()) {
-		t.Fatalf("simple assign visit must ok hasErr=%v", HasError())
+		t.Fatalf("simple assign visit must ok hasErr=%v", HasErrorSess(testAmbientSession))
 	}
 	gotLive := FindRelatedPointTo(fm.GlobalFacts, p)
 	if gotLive == nil || !gotLive.IsNull() {
 		t.Fatalf("live GlobalFacts must restore mid-gen may-null: %+v", gotLive)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestAbortBlockMakeLeavesOnFuncBlocks — Block.cpp:142–174 ERROR path.
@@ -1695,7 +1695,7 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 // StatementGoto::make_random's func->blocks copy (seed-2 e12688 n=11 vs 14).
 // ~Block clears stms so find_good_jump filters empty (StatementGoto.cpp:333–336).
 func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	nested := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
 	b := &Block{
@@ -1721,18 +1721,18 @@ func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 		t.Fatal("nested then via if must be tombstoned (~StatementIf delete &if_true)")
 	}
 	// sticky on nil args still
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	abortBlockMake(nil, b)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil func must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestMakeRandomBlockPostPushErrorLeavesOnBlocks — after blocks.push_back,
 // ERROR cleanup (Block.cpp:142–174) leaves entries on Blocks for goto pool size.
 func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	b1 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: AllocStmID()}}}
 	b2 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
@@ -1756,14 +1756,14 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 	if n := len(append([]*Block(nil), f.Blocks...)); n != 3 {
 		t.Fatalf("goto pool copy size %d want 3", n)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestStmVisitFactsDoesNotMergeLiveMayNullIntoInputs — Statement.cpp:609–626.
 // stm_visit_facts mutates inputs only; never merges global_facts may-null into inputs.
 // Invent per-stmt mergeMayNull reinjected mid-gen null during FP (seed-2 e12688).
 func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -1789,19 +1789,19 @@ func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	// entry to FP is map_facts_in (facts_copy)
 	out, _, _, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
 	if !ok {
-		t.Fatalf("FP must succeed sticky=%v", HasError())
+		t.Fatalf("FP must succeed sticky=%v", HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(out, p)
 	if got == nil || !got.IsNull() {
 		t.Fatalf("self-back must bring mid-gen may-null into out: %+v", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src]) full FactVec.
 	// Soft invent was PT-only merge; eUnionWrite half stayed at entry last_write.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	ut := &Type{isUnion: true, StructName: "U_fpbe", Fields: []StructField{
@@ -1832,7 +1832,7 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	// full pass must still merge eUnionWrite into current_inputs before set_fact_in.
 	_, _, _, ok := FindFixedPointBlock(b, pt, &cg, Defaults(), true)
 	if !ok {
-		t.Fatalf("FP must succeed sticky=%v", HasError())
+		t.Fatalf("FP must succeed sticky=%v", HasErrorSess(testAmbientSession))
 	}
 	// After first full pass + second merge: entryUnions for set_fact_in should reflect
 	// merge of map_out (fid 1) into currentUnions. map_facts_in[block] is entry of last pass.
@@ -1846,7 +1846,7 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	if got.LastWrittenFID == 0 {
 		t.Fatalf("back-edge must merge map_out last_write into currentUnions, got fid=%d", got.LastWrittenFID)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestFindFixedPointRecreatesMayNullFromAssign — after reset_stm_fact_maps clears
@@ -1856,7 +1856,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	// FactPointTo.cpp:411–419 — is_valid_ptr rejects may-null when null_prob=0.
 	// Self-back / entry with may-null makes *p=… visit fail (C++ same); strip path.
 	// No invent mergeMayNull needed for that fail — inputs already carry null.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1887,14 +1887,14 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	if idx != 0 {
 		t.Fatalf("failIdx want 0 got %d", idx)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestFindFixedPointKeepsUnrelatedMayNull — self-back merges mid-gen may-null;
 // a non-touching assign must not drop it (Statement.cpp inputs flow).
 // No invent mergeMayNullFromLive — pure sequential + self-back.
 func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -1924,13 +1924,13 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	cg.EffectAccum = &eff
 	out, _, idx, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
 	if !ok {
-		t.Fatalf("FP must succeed idx=%d err=%v", idx, HasError())
+		t.Fatalf("FP must succeed idx=%d err=%v", idx, HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(out, p)
 	if got == nil || !got.IsNull() {
 		t.Fatalf("unrelated assign must keep self-back may-null on g_p, got %+v", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestFindFixedPointReturnsPreOOSPostFacts — Block.cpp:558 vs 560–561.
@@ -1940,7 +1940,7 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 // Full FactVec: pre-OOS eUnionWrite is returned with post_facts (seed-49:
 // append_return must not re-read live after ShortcutAnalysis installs map_out).
 func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -1972,7 +1972,7 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	// visitOnce true → full sequential visit (no pure shortcut)
 	post, postU, _, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
 	if !ok || post == nil {
-		t.Fatalf("full visit must return pre-OOS post_facts ok=%v post=%v err=%v", ok, post, HasError())
+		t.Fatalf("full visit must return pre-OOS post_facts ok=%v post=%v err=%v", ok, post, HasErrorSess(testAmbientSession))
 	}
 	// pre-OOS outputs include local facts
 	if FindRelatedPointTo(post, loc) == nil {
@@ -1999,14 +1999,14 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	}
 	// Returned unions are independent of live after ShortcutAnalysis may install
 	// map_union_out into fm.UnionFacts on a later loop iteration.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestIsNonreadableFieldNeedsUnionFact — FactUnion.cpp:178–192 + Block.cpp:747.
 // Body-local union field is nonreadable without related FactUnion; readable with
 // the pre-OOS post_facts subject that append_return restores.
 func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_nr", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -2024,14 +2024,14 @@ func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
 	if IsNonreadableField(f0, facts) {
 		t.Fatal("matching FactUnion must make field readable")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestPostCreationDefersOOSUntilAfterFP — Block.cpp:690–729.
 // OOS for map_out must not permanently poison GlobalFacts before find_fixed_point
 // when Go uses GlobalFacts as the analysis working set (unlike C++ inputs FactVec).
 func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgr(f)
@@ -2066,8 +2066,8 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 		t.Fatal("setup: outer must be live→bodyLoc")
 	}
 	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
-	if HasError() {
-		t.Fatalf("post_creation: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("post_creation: %v", HasErrorSess(testAmbientSession))
 	}
 	// map_out exists
 	if !FactsComplete(fm.GetMapFactsOut(body.StmID)) {
@@ -2077,7 +2077,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	if fm.MapVisited == nil || !fm.MapVisited[body.StmID] {
 		t.Fatal("must mark visited after post_creation")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestPostCreationMapVisitedMergesSelfBackMayNull — Block.cpp:687 map_visited[this]=true
@@ -2087,7 +2087,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 // visit_once=false pure-shortcuts on entry and post_loop wipes live may-null
 // (seed-2 first_div 10107: auto_statement_for_631 WIPE).
 func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -2131,8 +2131,8 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	pre := EmptyEffect()
 	cg.EffectAccum = &pre
 	body.PostCreationAnalysis(&cg, opts, pre, NewRng(1), nil)
-	if HasError() {
-		t.Fatalf("PostCreationAnalysis sticky err=%v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("PostCreationAnalysis sticky err=%v", HasErrorSess(testAmbientSession))
 	}
 	inAfter := fm.GetMapFactsIn(body.StmID)
 	fpIn := FindRelatedPointTo(inAfter, &av.Variable)
@@ -2152,13 +2152,13 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	if !factHasL233MayNull(inAfter) {
 		t.Fatal("factHasL233MayNull map_facts_in")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	// Block.cpp:429 makeup_new_var_facts(pre_facts, global) full FactVec then set_fact_in.
 	// Soft invent was MakeupNewVarFacts (PT) only — preUnion map_in missed mid-for unions.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_nloop", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -2170,7 +2170,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 		t.Fatal("MakeFactUnion")
 	}
 	if !makeupNewUnionFacts(&preU, liveU) {
-		t.Fatal("makeup", HasError(), GetError())
+		t.Fatal("makeup", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	if len(preU) != 1 || preU[0].Var != g {
 		t.Fatalf("makeup must add init union for mid-for global: %#v", preU)
@@ -2183,7 +2183,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 			t.Fatal("empty pre should not find g")
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestPostCreationNoFPOOSsLiveUnionsNotMapOut — Block.cpp:723–726 + 735–773.
@@ -2191,7 +2191,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 // Soft invent (1) left live UnionFacts mid-body; (2) AssignGlobalFactsFromMapOut
 // applied remove_function_local to live env on function body (parent==nullptr).
 func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U_nofp", Fields: []StructField{
@@ -2233,8 +2233,8 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	inner.PostCreationAnalysis(&cg, opts, EmptyEffect(), nil, nil)
-	if HasError() {
-		t.Fatalf("no-FP post_creation sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("no-FP post_creation sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	// live Union: local subject dropped; global kept
 	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
@@ -2250,7 +2250,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	}
 	// Function-body no-FP: live must NOT apply remove_function_local (param subject stays).
 	// map_out for parent==nil does strip params.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	bodyLoc := CreateVariableQfer("l_bu", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	bodyAsg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
@@ -2278,8 +2278,8 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
 	body.PostCreationAnalysis(&cg2, opts, EmptyEffect(), nil, nil)
-	if HasError() {
-		t.Fatalf("function-body no-FP sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("function-body no-FP sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	// live: param subject still present (C++ OOS only local_vars, not remove_function_local)
 	if FindRelatedPointTo(fm2.GlobalFacts, param) == nil {
@@ -2295,7 +2295,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	if FindRelatedUnion(fm2.UnionFacts, bodyLoc) != nil {
 		t.Fatal("no-FP live must OOS body local union", fm2.UnionFacts)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestPostCreationNoFPNoSelfBackWhenMustBreak — Block.cpp:735–739.
@@ -2303,7 +2303,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 // Soft invent created self-back on no-FP when Looping && must_break_or_return
 // (is_loop_body false) && from_tail.
 func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
@@ -2335,8 +2335,8 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	b.PostCreationAnalysis(&cg, opts, EmptyEffect(), nil, nil)
-	if HasError() {
-		t.Fatalf("sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	// No self-back: is_loop_body false so FP arm (and its CreateCFGEdge) never runs.
 	for _, e := range fm.CFGEdges[nEdgesBefore:] {
@@ -2348,5 +2348,5 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	if !b.MustBreakOrReturnFull(fm) {
 		t.Fatal("setup: return last must must_break_or_return")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

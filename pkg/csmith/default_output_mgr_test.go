@@ -6,13 +6,13 @@ import (
 )
 
 func TestCreateDefaultOutputMgrSplit(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ClearOutputMgr()
 	o := Defaults()
 	o.MaxSplitFiles = 3
 	o.SplitFilesDir = "/tmp/csmith-split-unit"
-	if !CreateDefaultOutputMgr(o) || HasError() {
-		t.Fatal("create", HasError())
+	if !CreateDefaultOutputMgr(o) || HasErrorSess(testAmbientSession) {
+		t.Fatal("create", HasErrorSess(testAmbientSession))
 	}
 	paths := ProcessSplitPathsSess(testAmbientSession)
 	if len(paths) != 3 {
@@ -28,25 +28,25 @@ func TestCreateDefaultOutputMgrSplit(t *testing.T) {
 }
 
 func TestCreateDefaultOutputMgrSplitDirSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ClearOutputMgr()
 	o := Defaults()
 	o.MaxSplitFiles = 2
 	o.SplitFilesDir = ""
-	if CreateDefaultOutputMgr(o) || !HasError() {
+	if CreateDefaultOutputMgr(o) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty dir sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ClearOutputMgr()
 }
 
 func TestRandomOutputVarDefsAssign(t *testing.T) {
 	// DefaultOutputMgr.cpp:144–151 pure_rnd_upto per global
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	defer func() {
 		RandomNumberDoFinalization()
 		ReinstallTestProcessSingletons()
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}()
 	CreateRandomNumberInstance(RngKindDefault, 2)
 	o := Defaults()
@@ -54,8 +54,8 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 	v1 := CreateVariableScalars("g_1", GetIntType(), true, false)
 	v2 := CreateVariableScalars("g_2", GetIntType(), true, false)
 	out := RandomOutputVarDefs([]*Variable{v1, v2}, 2, true)
-	if out == nil || HasError() {
-		t.Fatal("var defs", HasError())
+	if out == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal("var defs", HasErrorSess(testAmbientSession))
 	}
 	if len(out) != 2 {
 		t.Fatal(len(out))
@@ -68,15 +68,15 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 }
 
 func TestRandomOutputDefsEmptyFilesSticky(t *testing.T) {
-	ClearError()
-	if RandomOutputVarDefs(nil, 0, true) != nil || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if RandomOutputVarDefs(nil, 0, true) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nFiles 0 sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSplitAllHeadersContent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	h := SplitAllHeadersContent(3, true, "void foo(void);\n")
 	if len(h) != 3 {
 		t.Fatal(len(h))
@@ -95,7 +95,7 @@ func TestSplitAllHeadersContent(t *testing.T) {
 }
 
 func TestCreateDFSOutputMgr(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ClearOutputMgr()
 	o := Defaults()
 	CreateDFSOutputMgr(o)
@@ -120,29 +120,29 @@ func TestCreateDFSOutputMgr(t *testing.T) {
 }
 
 func TestGetCountPrefix(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := &ProgramGenerator{Sess: testAmbientSession, OutputKind: OutputMgrKindDefault, GoodCount: 3}
-	if g.GetCountPrefix("x") != "" || !HasError() {
+	if g.GetCountPrefix("x") != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("default assert sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g.OutputKind = OutputMgrKindDFS
 	if g.GetCountPrefix("foo") != "p_3_foo" {
 		t.Fatal(g.GetCountPrefix("foo"))
 	}
-	if g.GetCountPrefix("") != "" || !HasError() {
+	if g.GetCountPrefix("") != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestProcessProgramGenerator(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ClearProcessProgramGeneratorSess(testAmbientSession)
-	if ProcessProgramGeneratorSess(testAmbientSession) != nil || !HasError() {
+	if ProcessProgramGeneratorSess(testAmbientSession) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	s := NewSession(o)
 	g := NewProgramGenerator(s)
@@ -157,18 +157,18 @@ func TestProcessProgramGenerator(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	if ProcessProgramGeneratorSess(testAmbientSession) != nil {
 		// finalization clears; may sticky on Get
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}
 }
 
 func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prevO := ProcessOptionsSess(testAmbientSession)
 	defer func() {
 		DoFinalization()
 		ReinstallTestProcessSingletons()
 		SetProcessOptionsSess(testAmbientSession, prevO)
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}()
 	o := Defaults()
 	o.DFSExhaustive = true

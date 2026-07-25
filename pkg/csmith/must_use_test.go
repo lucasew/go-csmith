@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestFindMustUseArrays(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
@@ -18,19 +18,19 @@ func TestFindMustUseArrays(t *testing.T) {
 	if len(got) != 1 || got[0] != av {
 		t.Fatalf("%v", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete FindMustUseArrays must not sticky")
 	}
 	// incomplete must-use list sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	rw.MustReadVars = []*Variable{&av.Variable, nil}
 	if rw.FindMustUseArrays() != nil {
 		t.Fatal("nil hole FindMustUseArrays must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole FindMustUseArrays must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was soft-skip shell as absent → empty complete
 	// fair: sticky nil fail closed
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -38,10 +38,10 @@ func TestFindMustUseArrays(t *testing.T) {
 	if rw2.FindMustUseArrays() != nil {
 		t.Fatal("IsArray without AsArray FindMustUseArrays must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray FindMustUseArrays must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectMustUseVar(t *testing.T) {
@@ -63,7 +63,7 @@ func TestSelectMustUseVar(t *testing.T) {
 
 func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	// Variable::type always live; Type-nil must not soft-skip to a later candidate
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}
@@ -77,10 +77,10 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
 		t.Fatal("Type-nil must-use entry must fail closed whole select")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was bare pick via else branch
 	// fair: sticky fail closed whole select
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -89,15 +89,15 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {
 		t.Fatal("IsArray without AsArray must fail closed SelectMustUseVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray SelectMustUseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
 	// Incomplete EffectContext / GlobalFacts must not invent soft re-pick success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}
@@ -109,25 +109,25 @@ func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
 		t.Fatal("incomplete EffectContext must fail closed SelectMustUseVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw).WithFactMgr(fm)
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed SelectMustUseVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 	// want==nil path: Type-nil candidate must fail closed sticky, not invent eligible
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	broken := CreateVariableScalars("g_broken", GetIntType(), false, false)
 	broken.Type = nil
 	good := CreateVariableScalars("g_good", GetIntType(), false, false)
@@ -135,10 +135,10 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 		nil, nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("Type-nil with want==nil must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was IsEligible residual false soft-continue
 	// then invent pick later good. Fair: sticky fail closed whole choose.
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -146,24 +146,24 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 		nil, nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("IsArray without AsArray want==nil must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ChooseVarFull want==nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// same for want!=nil path
 	if ChooseVarFull(NewRng(1), []*Variable{shell, good}, AccessRead, EmptyCGContext(),
 		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("IsArray without AsArray want!=nil must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ChooseVarFull want!=nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	// residual ERROR soft-continue invents later must-use pick. Fair: sticky whole select.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}
@@ -182,10 +182,10 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(5), AccessRead, cgArr, GetIntType(), nil) != nil {
 		t.Fatal("ItemizeArray Type-nil IV residual must fail closed SelectMustUseVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ItemizeArray residual SelectMustUseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// unpaired qfer Match residual: Match stickies on len(consts)!=len(vols)
 	brokenQ := CreateVariableScalars("g_q", GetIntType(), false, false)
 	badQfer := CVQualifiers{IsConsts: []bool{false, false}, IsVolatiles: []bool{true}} // len mismatch
@@ -194,10 +194,10 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cgQ, GetIntType(), &badQfer) != nil {
 		t.Fatal("Match residual must fail closed SelectMustUseVar")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Match residual SelectMustUseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectMustUseArrayItemize(t *testing.T) {
@@ -220,18 +220,18 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 		t.Fatalf("want itemized member, got %v asArray=%v", v, v.AsArray)
 	}
 	// VariableSelector.cpp:1528–1530 — always itemize; sticky no bare collective without RNG
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if bare := vs.SelectMustUseVar(nil, AccessRead, cg, GetIntType(), nil); bare != nil {
 		t.Fatalf("nil RNG must not invent bare collective array, got %v", bare)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG SelectMustUseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	rw := &RWDirective{}
@@ -239,18 +239,18 @@ func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(1), AccessWrite, cg, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type SelectMustUseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil RW is soft re-pick (no must-use list)
 	if vs.SelectMustUseVar(NewRng(1), AccessWrite, EmptyCGContext(), GetIntType(), nil) != nil {
 		t.Fatal("nil RW must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RW SelectMustUseVar must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomLhsMustUse(t *testing.T) {

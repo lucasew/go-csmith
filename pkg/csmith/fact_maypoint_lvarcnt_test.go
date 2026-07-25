@@ -7,7 +7,7 @@ import "testing"
 // make_facts skips. lvar_cnt==2 → merge_fact, not renew_fact.
 // Soft invent re-computed/forced lvarCnt==1 and wiped may-null (seed-363 g_73).
 func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g4 := CreateVariableScalars("g_4", GetIntType(), true, false)
 	g73 := CreateVariableScalars("g_73", PointerTo(GetIntType()), true, false)
 
@@ -20,7 +20,7 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 	newFacts := []*FactPointTo{MakeFactPointToSet(g73, []*Variable{g4})}
 	_, ok := applyPointToAssignFacts(&facts, g73, 0, newFacts, 2)
 	if !ok {
-		t.Fatalf("apply failed err=%v", HasError())
+		t.Fatalf("apply failed err=%v", HasErrorSess(testAmbientSession))
 	}
 	fp := FindRelatedPointTo(facts, g73)
 	if fp == nil || !fp.IsNull() {
@@ -41,18 +41,18 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 	}
 	_, ok = applyPointToAssignFacts(&facts2, g73, 0, newFacts, 1)
 	if !ok {
-		t.Fatalf("renew apply failed err=%v", HasError())
+		t.Fatalf("renew apply failed err=%v", HasErrorSess(testAmbientSession))
 	}
 	fp2 := FindRelatedPointTo(facts2, g73)
 	if fp2 == nil || fp2.IsNull() {
 		t.Fatal("lvar_cnt==1 renew must replace with {g_4} only (control)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMergePointeesIncludesNullSpecial(t *testing.T) {
 	// FactPointTo.cpp:756–784 — specials skipped as *ptrs*; pointees may be null
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g73 := CreateVariableScalars("g_73c", PointerTo(GetIntType()), true, false)
 	g72 := CreateVariableScalars("g_72c", PointerTo(PointerTo(GetIntType())), true, false)
 	factsIn := []*FactPointTo{
@@ -60,7 +60,7 @@ func TestMergePointeesIncludesNullSpecial(t *testing.T) {
 	}
 	lvars := MergePointeesOfPointer(g72, 1, factsIn)
 	if !VariablesComplete(lvars) {
-		t.Fatalf("incomplete lvars err=%v", HasError())
+		t.Fatalf("incomplete lvars err=%v", HasErrorSess(testAmbientSession))
 	}
 	if len(lvars) != 2 {
 		t.Fatalf("want {null,g_73}, got %d", len(lvars))
@@ -77,5 +77,5 @@ func TestMergePointeesIncludesNullSpecial(t *testing.T) {
 	if !hasNull || !has73 {
 		t.Fatalf("want null+g_73 in merge_pointees, got %v", lvars)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

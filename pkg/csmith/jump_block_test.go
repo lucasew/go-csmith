@@ -19,22 +19,22 @@ func TestHasInitSkippedVars(t *testing.T) {
 		t.Fatal("same")
 	}
 	// src nil sticky has-skipped (no invent none soft-skip past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !HasInitSkippedVars(nil, inner) {
 		t.Fatal("nil src HasInitSkippedVars must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil src HasInitSkippedVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// destParent nil complete false
 	if HasInitSkippedVars(outer, nil) {
 		t.Fatal("nil dest complete false")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil dest HasInitSkippedVars must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindGoodJumpBlock(t *testing.T) {
@@ -61,7 +61,7 @@ func TestFindGoodJumpBlock(t *testing.T) {
 func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	// HasInitSkippedVars residual ERROR soft invent was soft-continue then pick later block.
 	// Fair: sticky fail closed whole FindGoodJumpBlock.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	src := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	// hole in LocalVars stickies CollectInitSkippedVars residual when climbed as dest parent
@@ -71,10 +71,10 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	if FindGoodJumpBlock(NewRng(1), []*Block{hole, good}, src, true) != nil {
 		t.Fatal("HasInitSkippedVars residual must fail closed FindGoodJumpBlock")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasInitSkippedVars residual FindGoodJumpBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// curr last MustReturn residual soft invent was soft-continue allow dest invent pick.
 	// Fair: sticky fail closed whole FindGoodJumpBlock (asDest).
 	// last if incomplete residual MustReturn false; without sticky re-pick continues to good.
@@ -86,17 +86,17 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	if FindGoodJumpBlock(NewRng(1), []*Block{good2}, curr, true) != nil {
 		t.Fatal("MustReturn residual must fail closed FindGoodJumpBlock asDest")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MustReturn residual FindGoodJumpBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 	// IsVisibleLocal residual soft invent was treat not-visible then complete skip list.
 	// Fair: sticky IncompleteVariables fail closed.
 	// When src is not an ancestor of dest, path uses !IsVisibleLocal(src) for each intermediate.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	src := &Block{}
 	src.LocalVars = []*Variable{nil}                  // incomplete: IsVisibleLocal hits nil hole
 	mid := &Block{}                                   // no Parent chain to src → !reachedSrc
@@ -106,10 +106,10 @@ func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 	if VariablesComplete(got) {
 		t.Fatal("IsVisibleLocal residual must fail closed incomplete skip list")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVisibleLocal residual CollectInitSkippedVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputPtrResetsArray(t *testing.T) {
@@ -129,7 +129,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 		t.Fatal(out)
 	}
 	// ArrayVariable.cpp:649 — missing init sticky fail closed (no invent "0" shell)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av2 := &ArrayVariable{
 		Variable: Variable{Name: "g_b", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -138,10 +138,10 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	if got := outputArrayInitForced(av2, "    ", []string{"i"}, true); got != "" {
 		t.Fatalf("nil init must fail closed, got %q", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil init outputArrayInitForced must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// post_incr_operator false → "i = i + 1" (ArrayVariable.cpp:640–645)
 	opts.PostIncrOperator = false
 	out2 := OutputPtrResets([]*Variable{&av.Variable}, opts)

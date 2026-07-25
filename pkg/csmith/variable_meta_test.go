@@ -12,7 +12,7 @@ func TestIsTmpVar(t *testing.T) {
 }
 
 func TestIsValidVolatile(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-const always ok
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	if !v.IsValidVolatile() {
@@ -35,17 +35,17 @@ func TestIsValidVolatile(t *testing.T) {
 	if !p2.IsValidVolatile() {
 		t.Fatal("const non-null")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil parent inside union-field path sticky invalid (no invent valid soft-skip)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	if field.IsValidVolatile() {
 		t.Fatal("Type-nil parent field IsValidVolatile must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent field IsValidVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested IsValidVolatile residual on container recurse soft invent was valid soft-skip.
 	// Fair: sticky invalid via Type-nil container.
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType()}}}
@@ -56,15 +56,15 @@ func TestIsValidVolatile(t *testing.T) {
 	if cBroken.IsValidVolatile() {
 		t.Fatal("Type-nil const IsValidVolatile must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil const IsValidVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = uv
 }
 
 func TestIsPackedAfterBitfield(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{
 		isStruct: true,
 		Packed:   true,
@@ -83,29 +83,29 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("f1 after bitfield in packed struct")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete IsPackedAfterBitfield must not sticky")
 	}
 	// incomplete FieldVars hole before f1: sticky packed-after (restrictive)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent.FieldVars = []*Variable{f0, nil, f1}
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("FieldVars hole must fail closed as packed-after-bitfield")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FieldVars hole IsPackedAfterBitfield must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil parent sticky packed-after (restrictive — no invent not-packed soft-skip)
 	parent.FieldVars = []*Variable{f0, f1}
 	parent.Type = nil
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("Type-nil parent must fail closed as packed-after-bitfield")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsPackedAfterBitfield must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// sibling Type-nil residual soft invent was soft-continue later siblings invent not-packed.
 	// Fair: sticky packed-after true. Use non-bitfield field layout so walk hits Type-nil.
 	stNoBF := &Type{
@@ -122,10 +122,10 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("sibling Type-nil residual IsPackedAfterBitfield must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("sibling Type-nil residual IsPackedAfterBitfield must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested HasBitfields residual on sibling: soft invent was soft-continue invent not-packed.
 	// Fair: sticky packed-after true.
 	innerHole := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
@@ -134,30 +134,30 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("HasBitfields residual IsPackedAfterBitfield must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasBitfields residual IsPackedAfterBitfield must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetSeqNum(t *testing.T) {
 	// Variable.cpp:261–265 — assert '_' present
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_42", GetIntType(), false, false)
 	if v == nil || v.GetSeqNum() != 42 {
 		t.Fatal(v)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete GetSeqNum must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Variable{Name: "badname"}).GetSeqNum() != -1 {
 		t.Fatal("no underscore fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("no underscore GetSeqNum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetCollectiveTopLevelArray(t *testing.T) {
@@ -166,7 +166,7 @@ func TestGetCollectiveTopLevelArray(t *testing.T) {
 	// then base Variable::get_collective path assert(parent) — but C++ never runs that
 	// for ArrayVariable* (virtual override). Go must take AsArray override first.
 	// Broken path rejected every collective array in IsEligibleVar (seed-7 ok pool).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_16", Type: GetIntType(), IsArray: true, ArraySizes: []int{7}},
 		Sizes:    []int{7},
@@ -178,10 +178,10 @@ func TestGetCollectiveTopLevelArray(t *testing.T) {
 	}
 	got := av.GetCollective()
 	if got != &av.Variable {
-		t.Fatalf("top-level collective GetCollective want self, got %v err=%v", got, HasError())
+		t.Fatalf("top-level collective GetCollective want self, got %v err=%v", got, HasErrorSess(testAmbientSession))
 	}
-	if HasError() {
-		t.Fatal("top-level collective GetCollective must not sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("top-level collective GetCollective must not sticky", GetErrorSess(testAmbientSession))
 	}
 	// itemized member → collective parent
 	item := av.ItemizeConstIndices([]int{3}, nil)
@@ -193,19 +193,19 @@ func TestGetCollectiveTopLevelArray(t *testing.T) {
 		t.Fatalf("itemized GetCollective want parent, got %v", got)
 	}
 	// IsEligibleVar must not reject collective array solely via GetCollective hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsEligibleVar(&av.Variable, 0, AccessRead, EmptyCGContext()) {
-		t.Fatal("collective array must be eligible under empty context", HasError())
+		t.Fatal("collective array must be eligible under empty context", HasErrorSess(testAmbientSession))
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("eligible collective array must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetCollectiveArrayField(t *testing.T) {
 	// Variable.cpp:583–612 — field of itemized array maps to collective field
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -231,24 +231,24 @@ func TestGetCollectiveArrayField(t *testing.T) {
 		t.Fatalf("want parent field, got %v", got)
 	}
 	// incomplete FieldVars on path fails closed sticky nil (no invent self as collective)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	item.FieldVars[0].FieldVarOf.FieldVars = append(item.FieldVars[0].FieldVarOf.FieldVars, nil)
 	// force hole on parent of field (item itself)
 	item.FieldVars = append(item.FieldVars, nil)
 	if item.FieldVars[0].GetCollective() != nil {
 		t.Fatal("incomplete FieldVars must fail closed GetCollective nil, not invent self")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete FieldVars GetCollective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ((*Variable)(nil)).GetCollective() != nil {
 		t.Fatal("nil subject GetCollective must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil subject GetCollective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray ancestor soft invent was self-collective success
 	// fair: sticky nil fail closed
 	shell := &Variable{Name: "g_shell", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -256,19 +256,19 @@ func TestGetCollectiveArrayField(t *testing.T) {
 	if fld.GetCollective() != nil {
 		t.Fatal("IsArray without AsArray ancestor GetCollective must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ancestor GetCollective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// bare IsArray without AsArray soft invent was return self as collective
 	// fair: sticky nil fail closed
 	if shell.GetCollective() != nil {
 		t.Fatal("IsArray without AsArray GetCollective must fail closed nil, not invent self")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray bare GetCollective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsArrayField(t *testing.T) {
@@ -284,16 +284,16 @@ func TestIsArrayField(t *testing.T) {
 	}
 	// IsArray without AsArray soft invent was true without sticky
 	// fair: still true restrictive + SetError sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	field2 := &Variable{Name: "g_b[0].f0", Type: GetIntType(), FieldVarOf: shell}
 	if !field2.IsArrayField() {
 		t.Fatal("IsArray without AsArray parent must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray parent IsArrayField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested IsArrayField residual soft invent was not-array-field soft-skip.
 	// Fair: sticky true restrictive via nested IsArray without AsArray.
 	mid := &Variable{Name: "g_m.f0", Type: GetIntType(), FieldVarOf: shell}
@@ -301,60 +301,60 @@ func TestIsArrayField(t *testing.T) {
 	if !deep.IsArrayField() {
 		t.Fatal("nested IsArray residual IsArrayField must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested IsArray residual IsArrayField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsPackedAggregateFieldVarNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).IsPackedAggregateFieldVar() {
 		t.Fatal("nil IsPackedAggregateFieldVar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsPackedAggregateFieldVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil ancestor sticky packed (restrictive — no invent not-packed soft-skip)
 	parent := &Variable{Name: "g_s"} // Type nil
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	if !field.IsPackedAggregateFieldVar() {
 		t.Fatal("Type-nil ancestor must fail closed as packed-aggregate field")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil ancestor IsPackedAggregateFieldVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsVirtualParentResidualSticky(t *testing.T) {
 	// IsVirtual residual soft invent was invent soft not-virtual past IsArray without AsArray parent.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray on self sticky
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if shell.IsVirtual() {
 		t.Fatal("IsArray without AsArray IsVirtual must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray IsVirtual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// field of IsArray without AsArray parent residual recursive
 	parent := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	field := &Variable{Name: "g_a.f0", Type: GetIntType(), FieldVarOf: parent}
 	if field.IsVirtual() {
 		t.Fatal("field of IsArray without AsArray parent must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("field of IsArray without AsArray parent IsVirtual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetCollectiveIsArrayFieldResidualSticky(t *testing.T) {
 	// IsArrayField residual soft invent was invent soft-collective past FieldVarOf shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray as FieldVarOf parent IsArrayField residual restrictive true
 	parent := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	field := &Variable{Name: "g_a.f0", Type: GetIntType(), FieldVarOf: parent}
@@ -362,15 +362,15 @@ func TestGetCollectiveIsArrayFieldResidualSticky(t *testing.T) {
 	if field.GetCollective() != nil {
 		// may incomplete nil
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArrayField residual GetCollective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetFieldIDIncompleteParentResidualSticky(t *testing.T) {
 	// GetFieldID residual soft invent was invent field index past incomplete parent FieldVars.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := CreateVariableScalars("g_s", GetIntType(), false, false)
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	// incomplete parent FieldVars (hole)
@@ -378,8 +378,8 @@ func TestGetFieldIDIncompleteParentResidualSticky(t *testing.T) {
 	if field.GetFieldID() != -1 {
 		t.Fatal("incomplete parent FieldVars GetFieldID must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete parent FieldVars GetFieldID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

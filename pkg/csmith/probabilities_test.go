@@ -129,59 +129,59 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 		t.Fatalf("first choose: got %v want %v", st, ESimpleType(v))
 	}
 	// C++ always has RNG+probs sticky — no invent EInt when missing
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ChooseRandomNonvoidSimple(nil, p) != EVoid {
 		t.Fatal("nil RNG must fail closed EVoid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG ChooseRandomNonvoidSimple must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ChooseRandomNonvoidSimple(NewRng(1), nil) != EVoid {
 		t.Fatal("nil probs must fail closed EVoid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil probs ChooseRandomNonvoidSimple must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestProbabilitiesNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Probabilities)(nil).Single(PMoreStructUnionProb) != 0 {
 		t.Fatal("nil Single must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Single must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Probabilities)(nil).BinaryOpWeight(0) != 0 {
 		t.Fatal("nil BinaryOpWeight must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BinaryOpWeight must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Probabilities)(nil).StatementThresholdTable() != nil {
 		t.Fatal("nil StatementThresholdTable must return nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil StatementThresholdTable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSimpleTypesFilterNilProbsResidualSticky(t *testing.T) {
 	// SimpleTypeWeight residual soft invent was invent keep candidate past nil probs.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := (*Probabilities)(nil).SimpleTypesFilter()
 	if !f.Filter(0) {
 		t.Fatal("nil probs filter must reject (filter true) fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil probs SimpleTypesFilter must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestProbabilityFilterEqualGroup(t *testing.T) {
@@ -249,24 +249,24 @@ func TestGetProbFilterMissingSticky(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := GetProbFilter(PSimpleTypesProb)
 	if !f.Filter(0) {
 		t.Fatal("missing process probs filter must reject")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetProbFilter without process must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestProbabilityFilterNilReceiver(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*ProbabilityFilter)(nil).Filter(0) {
 		t.Fatal("nil ProbabilityFilter must reject")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ProbabilityFilter must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

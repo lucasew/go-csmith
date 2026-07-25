@@ -5,7 +5,7 @@ import "testing"
 func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVarVisible false → drop stack local fact
 	// fair: incomplete stack → sticky IncompleteFactSlice (not invent empty-complete skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
@@ -16,20 +16,20 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("incomplete stack must fail closed incomplete out, not invent empty complete", fm.MapFactsOut[3])
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete stack AddFactOut must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// later appends must not invent cleaned facts onto incomplete map
 	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("append after incomplete must stay incomplete", fm.MapFactsOut[3])
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("append onto incomplete map must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete fact PointTo → sticky hole marker
 	fm2 := NewFactMgr(f)
 	body2 := &Block{Func: f, LocalVars: []*Variable{loc}}
@@ -40,10 +40,10 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	if FactsComplete(fm2.MapFactsOut[4]) {
 		t.Fatal("incomplete fact must fail closed IncompleteFactSlice", fm2.MapFactsOut[4])
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete fact PointTo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsVarVisible residual via incomplete Param after StackScanComplete path:
 	// Param hole on Function stickies StackScanComplete first — already covered.
 	// Type-nil subject IsGlobal residual is nil-only; use incomplete Blocks for goto dest.
@@ -60,10 +60,10 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	if FactsComplete(fm3.MapFactsOut[9]) {
 		t.Fatal("FindParentBlock residual must fail closed incomplete out", fm3.MapFactsOut[9])
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindParentBlock residual AddFactOut must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddFactOutVisible(t *testing.T) {
@@ -200,7 +200,7 @@ func TestArrayIsVariant(t *testing.T) {
 		t.Fatal("diff collective")
 	}
 	// incomplete IndexExprs must not invent variant via string Indices soft-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a.IndexExprs = []*Expression{nil}
 	a.Indices = []string{"i"}
 	b.IndexExprs = []*Expression{nil}
@@ -208,18 +208,18 @@ func TestArrayIsVariant(t *testing.T) {
 	if a.IsVariant(&b.Variable) {
 		t.Fatal("IndexExprs hole must fail closed not invent string match")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IndexExprs hole IsVariant must SetError sticky")
 	}
 	// mixed IndexExprs vs Indices-only must not invent dual-path match
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalars("i", GetIntType(), false, false), ExprType: GetIntType()}}
 	b.IndexExprs = nil
 	b.Indices = []string{"i"}
 	if a.IsVariant(&b.Variable) {
 		t.Fatal("mixed IndexExprs/Indices must fail closed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestAddFactOutUnionContinueDropsNestedLoopLocal —
@@ -229,8 +229,8 @@ func TestArrayIsVariant(t *testing.T) {
 // (seed 2020240685: continue 39 kept l_237 → for-body map_in pollution →
 // post_loop break invent BOTTOM → VisitFacts nonreadable → FP strip).
 func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	// loop body (looping)
 	body := &Block{Func: f, Looping: true, StmID: 26}
@@ -254,8 +254,8 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 	// add_fact_out union for nested local must drop (not visible at loop head body)
 	uf := MakeFactUnion(l237, 0)
 	fm.AddFactOutUnion(cont, contParent, uf)
-	if HasError() {
-		t.Fatal("AddFactOutUnion sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("AddFactOutUnion sticky", GetErrorSess(testAmbientSession))
 	}
 	outU := fm.GetMapUnionFactsOut(39)
 	if !UnionFactsComplete(outU) {
@@ -275,8 +275,8 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 // TestAddNewVarFactAndUpdateUnionContinueFilter —
 // end-to-end: AddNewVarFactAndUpdate must not re-append nested union onto continue out.
 func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	body := &Block{Func: f, Looping: true, StmID: 26}
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
@@ -298,8 +298,8 @@ func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
 	fm.MapUnionFactsOut[100] = []*FactUnion{}
 	// declare nested local under nested block
 	fm.AddNewVarFactAndUpdate(nested, l237)
-	if HasError() {
-		t.Fatal("AddNewVarFactAndUpdate sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("AddNewVarFactAndUpdate sticky", GetErrorSess(testAmbientSession))
 	}
 	if FindRelatedUnion(fm.GetMapUnionFactsOut(39), l237) != nil {
 		t.Fatalf("AddNewVarFactAndUpdate must not re-append l_237 onto continue map_out, got %v",

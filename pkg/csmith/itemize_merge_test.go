@@ -8,7 +8,7 @@ import "testing"
 // (flipcoin p=0) while GO had pure g_127 — merge vs renew on array is the
 // contract that keeps null in the lattice across element assigns.
 func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort))) // int16_t**
@@ -32,7 +32,7 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 	// RHS: &g_127 — ExpressionVariable(g) with desired type int16_t** (indir -1)
 	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	if !fm.UpdateFactForAssign(&item.Variable, 0, rhs) {
-		t.Fatalf("update err=%v", HasError())
+		t.Fatalf("update err=%v", HasErrorSess(testAmbientSession))
 	}
 	fp := FindRelatedPointTo(fm.GlobalFacts, &coll.Variable)
 	if fp == nil {
@@ -57,7 +57,7 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 	if !hasG {
 		t.Fatalf("must also include g_127, pts=%v", pts)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // FactPointTo.cpp:448–450 + ExpressionVariable after itemize:
@@ -66,7 +66,7 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 // that incorrectly lost null/may-null will skip F p=0 that upstream still draws
 // (seed-2 first_div@10107 after itemize size 10).
 func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := PointerTo(GetIntType())
 	coll := &ArrayVariable{
@@ -102,5 +102,5 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	if r2.RandDepth() != d1 {
 		t.Fatalf("pure live must not flipcoin: depth %d → %d", d1, r2.RandDepth())
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -4,11 +4,11 @@ import "testing"
 
 func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 	// DFSRndNumGenerator::random_choice first-visit path picks lowest valid v.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	defer func() {
 		RandomNumberDoFinalization()
 		ReinstallTestProcessSingletons()
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}()
 	o := Defaults()
 	o.MaxExhaustiveDepth = 5
@@ -22,15 +22,15 @@ func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 	}
 	// first choice bound 3 → 0
 	v := r.RndUpto(3)
-	if HasError() || v != 0 {
-		t.Fatalf("first upto got %d err=%d", v, GetError())
+	if HasErrorSess(testAmbientSession) || v != 0 {
+		t.Fatalf("first upto got %d err=%d", v, GetErrorSess(testAmbientSession))
 	}
 	if r.DFSGetCurrentPos() != 0 {
 		t.Fatal("pos", r.DFSGetCurrentPos())
 	}
 	// second choice
 	v2 := r.RndUpto(4)
-	if HasError() || v2 != 0 {
+	if HasErrorSess(testAmbientSession) || v2 != 0 {
 		t.Fatalf("second %d", v2)
 	}
 	seq := r.GetSequence()
@@ -38,21 +38,21 @@ func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 		t.Fatal(seq)
 	}
 	// flipcoin p=100 forces 1
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ok := r.RndFlipcoin(100)
-	if HasError() || !ok {
-		t.Fatal("p100", ok, GetError())
+	if HasErrorSess(testAmbientSession) || !ok {
+		t.Fatal("p100", ok, GetErrorSess(testAmbientSession))
 	}
 	// flipcoin p=0 forces 0
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ok = r.RndFlipcoin(0)
-	if HasError() || ok {
-		t.Fatal("p0", ok, GetError())
+	if HasErrorSess(testAmbientSession) || ok {
+		t.Fatal("p0", ok, GetErrorSess(testAmbientSession))
 	}
 }
 
 func TestDFSRandomChoiceFilterRejects(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 4
 	r := NewDFSRng(1, o)
@@ -61,23 +61,23 @@ func TestDFSRandomChoiceFilterRejects(t *testing.T) {
 	// chain: need filter that rejects 0 and 1
 	f = filterFunc(func(v uint32) bool { return v < 2 })
 	v := r.RndUptoFilter(4, f)
-	if HasError() || v != 2 {
-		t.Fatalf("got %d err=%d", v, GetError())
+	if HasErrorSess(testAmbientSession) || v != 2 {
+		t.Fatalf("got %d err=%d", v, GetErrorSess(testAmbientSession))
 	}
 }
 
 func TestDFSBacktrackingExhaustsBranch(t *testing.T) {
 	// After first choice, reset_state and re-walk with filter rejecting previous.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 2
 	r := NewDFSRng(1, o)
 	// depth 0: take 0 of bound 2
-	if r.RndUpto(2) != 0 || HasError() {
+	if r.RndUpto(2) != 0 || HasErrorSess(testAmbientSession) {
 		t.Fatal("first")
 	}
 	// depth 1: take 0 of bound 1 → only value 0
-	if r.RndUpto(1) != 0 || HasError() {
+	if r.RndUpto(1) != 0 || HasErrorSess(testAmbientSession) {
 		t.Fatal("second")
 	}
 	// reset for next program enumeration step
@@ -87,32 +87,32 @@ func TestDFSBacktrackingExhaustsBranch(t *testing.T) {
 	// C++ reset_state same. Full re-search uses decision_depth backtracking.
 	// Advance again: current_pos becomes 0, state.init true, decision_depth was 1.
 	// current_pos(0) < decision_depth(1) && init → revisit returns same value 0.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := r.RndUpto(2)
-	if HasError() || v != 0 {
-		t.Fatalf("revisit got %d err=%d", v, GetError())
+	if HasErrorSess(testAmbientSession) || v != 0 {
+		t.Fatalf("revisit got %d err=%d", v, GetErrorSess(testAmbientSession))
 	}
 }
 
 func TestDFSExceedMaxDepth(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 1
 	r := NewDFSRng(1, o)
 	_ = r.RndUpto(2)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("first ok")
 	}
 	// second choice current_pos=1 >= max 1 → EXCEED
 	_ = r.RndUpto(2)
-	if GetError() != ErrExceedMaxDepth {
-		t.Fatal("want exceed", GetError())
+	if GetErrorSess(testAmbientSession) != ErrExceedMaxDepth {
+		t.Fatal("want exceed", GetErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDFSEagerBacktracking(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 5
 	r := NewDFSRng(1, o)
@@ -130,25 +130,25 @@ func TestDFSEagerBacktracking(t *testing.T) {
 		t.Fatal("enough remain")
 	}
 	// depth_needed 5 → remain 4 < 5 → backtrack
-	if !r.EagerBacktracking(5) || GetError() != ErrBacktracking {
-		t.Fatal("eager", GetError())
+	if !r.EagerBacktracking(5) || GetErrorSess(testAmbientSession) != ErrBacktracking {
+		t.Fatal("eager", GetErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDFSDebugSequence(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 5
 	o.DFSDebugSequence = "3_1_4"
 	r := NewDFSRng(1, o)
-	if r == nil || HasError() {
+	if r == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("debug seq ctor")
 	}
 	// debug path: get_number_by_pos after ++current_pos; starts -1 → pos 0 → 3
 	v0 := r.RndUpto(10)
-	if HasError() || v0 != 3 {
-		t.Fatalf("v0=%d err=%d", v0, GetError())
+	if HasErrorSess(testAmbientSession) || v0 != 3 {
+		t.Fatalf("v0=%d err=%d", v0, GetErrorSess(testAmbientSession))
 	}
 	v1 := r.RndUpto(10)
 	if v1 != 1 {
@@ -164,7 +164,7 @@ func TestDFSDebugSequence(t *testing.T) {
 }
 
 func TestDFSGetPrefixedName(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.MaxExhaustiveDepth = 3
 	r := NewDFSRng(1, o)
@@ -178,11 +178,11 @@ func TestDFSGetPrefixedName(t *testing.T) {
 }
 
 func TestDFSDepthGuardIntegration(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	defer func() {
 		RandomNumberDoFinalization()
 		ReinstallTestProcessSingletons()
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}()
 	o := Defaults()
 	o.DFSExhaustive = true
@@ -191,7 +191,7 @@ func TestDFSDepthGuardIntegration(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, o)
 	clearDFSImpl()
 	CreateRandomNumberInstance(RngKindDFS, 2)
-	if DepthGuardByDepth(o, 1) != GoodDepth || HasError() {
+	if DepthGuardByDepth(o, 1) != GoodDepth || HasErrorSess(testAmbientSession) {
 		t.Fatal("fresh GOOD")
 	}
 	// burn a few choices so pos advances
@@ -199,8 +199,8 @@ func TestDFSDepthGuardIntegration(t *testing.T) {
 	_ = r.RndUpto(2)
 	_ = r.RndUpto(2)
 	// pos=1, remain=7; need 20 → BAD + BACKTRACKING
-	if DepthGuardByDepth(o, 20) != BadDepth || GetError() != ErrBacktracking {
-		t.Fatal("deep need BAD", GetError())
+	if DepthGuardByDepth(o, 20) != BadDepth || GetErrorSess(testAmbientSession) != ErrBacktracking {
+		t.Fatal("deep need BAD", GetErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestBlockContainsStmIDParentChain(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outer := &Block{StmID: 1}
 	inner := &Block{Parent: outer, StmID: 2}
 	dest := Stmt{Kind: StmtAssign, StmID: 10}
@@ -22,15 +22,15 @@ func TestBlockContainsStmIDParentChain(t *testing.T) {
 		t.Fatal("outer contains both")
 	}
 	// incomplete if-arm sticky (no invent soft-continue past nil Else then miss Then)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outer.Stmts[0].Else = nil
 	if BlockContainsStmID(outer, 10) {
 		t.Fatal("nil Else must fail closed not-contain (sticky miss whole search)")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else BlockContainsStmID must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpandBlockForGotoClimbsParent(t *testing.T) {
@@ -64,20 +64,20 @@ func TestExpandBlockForGotoNilFM(t *testing.T) {
 		t.Fatal("no-op without FM")
 	}
 	// Block always live; sticky no invent soft-skip expand past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ExpandBlockForGoto(nil, EmptyCGContext()) != nil {
 		t.Fatal("nil ExpandBlockForGoto must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ExpandBlockForGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpandBlockForGotoAssertB(t *testing.T) {
 	// Live tree: goto in sibling arm so climb from then must reach outer.
 	// VariableSelector.cpp:773–779 expand then stop when src is covered.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f, StmID: 1}
 	thenB := &Block{Func: f, Parent: outer, StmID: 2, Stmts: []Stmt{{Kind: StmtAssign, StmID: 10}}}
@@ -89,14 +89,14 @@ func TestExpandBlockForGotoAssertB(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	got := ExpandBlockForGoto(thenB, cg)
 	if got != outer {
-		t.Fatalf("climb must reach outer for sibling goto: got %#v sticky=%v", got, HasError())
+		t.Fatalf("climb must reach outer for sibling goto: got %#v sticky=%v", got, HasErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	// CFGEdge* always live; nil hole must not invent skip as absent edge
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f, StmID: 1}
 	inner := &Block{Func: f, Parent: outer, StmID: 2}
@@ -109,18 +109,18 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	if ExpandBlockForGoto(inner, cg) != nil {
 		t.Fatal("nil CFG hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CFG hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 	// FindStmt residual: incomplete if-arm on sole Blocks path stickies ERROR.
 	// Soft invent was soft-continue expand past residual then climb later complete edge.
 	// Fair: sticky fail closed nil ExpandBlockForGoto.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f, StmID: 1}
 	inner := &Block{Func: f, Parent: outer, StmID: 2}
@@ -137,10 +137,10 @@ func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 	if ExpandBlockForGoto(inner, cg) != nil {
 		t.Fatal("FindStmt residual must fail closed ExpandBlockForGoto, not invent later climb")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindStmt residual ExpandBlockForGoto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestExpandBlockForGotoMidGenUnlinkedThenArm — seed-62 body parity.
@@ -149,8 +149,8 @@ func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 // then-arm GenerateNewParentLocal must climb via Statement::parent chain
 // (Statement.cpp:689–696), not root GetBlocksStmt tree membership only.
 func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	// parent already has a forward goto; then-arm is NOT yet a child of any IfElse
 	parent := &Block{Func: f, StmID: 298}
@@ -180,7 +180,7 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 
 	got := ExpandBlockForGoto(thenArm, cg)
 	if got != parent {
-		t.Fatalf("mid-gen expand must climb thenArm->parent, got %#v sticky=%v", got, HasError())
+		t.Fatalf("mid-gen expand must climb thenArm->parent, got %#v sticky=%v", got, HasErrorSess(testAmbientSession))
 	}
 	// Create local on thenArm must land on parent after expand
 	opts := Defaults()
@@ -189,21 +189,21 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	beforeP, beforeT := len(parent.LocalVars), len(thenArm.LocalVars)
 	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntType(), nil, NewRng(5))
 	if v == nil {
-		t.Fatal("nil var", HasError())
+		t.Fatal("nil var", HasErrorSess(testAmbientSession))
 	}
 	if len(parent.LocalVars) != beforeP+1 || !IsVariableInSet(parent.LocalVars, v) {
 		t.Fatalf("var must land on parent: parent=%d then=%d v=%s",
 			len(parent.LocalVars)-beforeP, len(thenArm.LocalVars)-beforeT, v.Name)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestExpandBlockForGotoSkipsOrphanGotoEdges — aborted make_random leaves Blocks
 // on Func.Blocks with CFGEdges to live dests (C++ delete frees IR; edges gone).
 // Expand must not climb-fail on those orphans (seed-2 e15453 GenerateNewParentLocal).
 func TestExpandBlockForGotoSkipsOrphanGotoEdges(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	body := &Block{Func: f, StmID: 22}
 	// live dest statement in body
@@ -218,9 +218,9 @@ func TestExpandBlockForGotoSkipsOrphanGotoEdges(t *testing.T) {
 	// Without orphan skip, climb from body for src=210 fails (src not in live tree).
 	got := ExpandBlockForGoto(body, cg)
 	if got != body {
-		t.Fatalf("orphan goto edge must be skipped; want body, got %#v sticky=%v", got, HasError())
+		t.Fatalf("orphan goto edge must be skipped; want body, got %#v sticky=%v", got, HasErrorSess(testAmbientSession))
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("orphan skip must not SetError sticky")
 	}
 }
@@ -228,7 +228,7 @@ func TestExpandBlockForGotoSkipsOrphanGotoEdges(t *testing.T) {
 func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVariableInSet false → var stays remaining
 	// fair: incomplete LocalVars → nil, IncompleteVariables sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	a.Name = "l_a"
 	inner := &Block{LocalVars: []*Variable{a, nil}}
@@ -236,14 +236,14 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	if blk != nil || VariablesComplete(rem) {
 		t.Fatal("incomplete LocalVars must fail closed incomplete remaining", blk, rem)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete LocalVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLowerBlockForVars(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	b := CreateVariableScalars("l_b", GetIntType(), false, false)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
@@ -269,10 +269,10 @@ func TestLowerBlockForVars(t *testing.T) {
 	if blk != nil || VariablesComplete(rem) {
 		t.Fatal("nil block hole must fail closed incomplete remaining", blk, rem)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
@@ -345,17 +345,17 @@ func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 func TestReachMaxFunctionsNilFuncResidualSticky(t *testing.T) {
 	// nil Func soft invent was invent room for more past incomplete Funcs hole.
 	// Fair: fail closed max-reached true, non-sticky (soft re-pick factories).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	list := &FunctionList{Funcs: []*Function{nil}}
 	opts := Defaults()
 	opts.MaxFuncs = 10
 	if !ReachMaxFunctions(list, opts) {
 		t.Fatal("nil Func hole must fail closed max-reached true")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Func hole ReachMaxFunctions must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete under max
 	list2 := &FunctionList{Funcs: []*Function{
 		{Name: "func_1", ReturnType: GetIntType()},
@@ -363,8 +363,8 @@ func TestReachMaxFunctionsNilFuncResidualSticky(t *testing.T) {
 	if ReachMaxFunctions(list2, opts) {
 		t.Fatal("one user func under max must not invent max")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete ReachMaxFunctions must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

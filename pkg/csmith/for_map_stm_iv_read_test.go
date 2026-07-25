@@ -8,7 +8,7 @@ import "testing"
 // from map_stm; FEffect still sees gen IV reads via effect_accum when need_revisit
 // FP re-injects gen map_accum along back edges (Statement.cpp:817–820).
 func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
@@ -33,12 +33,12 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 
 	var forSt *Stmt
 	for seed := uint64(1); seed < 200; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		*cg.EffectAccum = EmptyEffect()
 		cg.EffectStm = EmptyEffect()
 		fm.GlobalFacts = []*FactPointTo{}
 		forSt = MakeRandomFor(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
-		if forSt == nil || HasError() || forSt.Loop == nil || forSt.Loop.IV == nil {
+		if forSt == nil || HasErrorSess(testAmbientSession) || forSt.Loop == nil || forSt.Loop.IV == nil {
 			continue
 		}
 		break
@@ -57,5 +57,5 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	if cg.EffectAccum == nil || !cg.EffectAccum.IsRead(iv) {
 		t.Fatal("effect_accum must read IV after make_iteration")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

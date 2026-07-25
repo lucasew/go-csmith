@@ -48,21 +48,21 @@ func TestFindTypedStmts(t *testing.T) {
 
 func TestGetBlocksStmtKindGated(t *testing.T) {
 	// complete if both arms
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	thenB, elseB := &Block{StmID: 1}, &Block{StmID: 2}
 	ifBlks := GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB})
 	if len(ifBlks) != 2 || ifBlks[0] != thenB || ifBlks[1] != elseB {
 		t.Fatalf("if arms: %+v", ifBlks)
 	}
 	// missing Else sticky IncompleteBlocks (no invent soft list with nil hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if BlocksComplete(GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: &Block{StmID: 1}})) {
 		t.Fatal("nil Else GetBlocksStmt must fail closed IncompleteBlocks")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else GetBlocksStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// missing Else fails typed walk sticky
 	var stms []*Stmt
 	if FindTypedStmts(&Stmt{Kind: StmtIfElse, Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}}}, &stms, []StatementType{StmtReturn}) >= 0 {
@@ -71,18 +71,18 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	if StmtsComplete(stms) {
 		t.Fatal("nil Else arm must leave IncompleteStmtsSlice, not invent empty complete", stms)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else FindTypedStmts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// for without body sticky IncompleteBlocks
 	if BlocksComplete(GetBlocksStmt(&Stmt{Kind: StmtFor})) {
 		t.Fatal("nil for body GetBlocksStmt must fail closed IncompleteBlocks")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil for body GetBlocksStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// for with body
 	body := &Block{StmID: 3}
 	forBlks := GetBlocksStmt(&Stmt{Kind: StmtFor, Then: body})
@@ -95,7 +95,7 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	}
 	// StatementArrayOp.h:69–71 — array_init Expression ctor has body=0.
 	// Go Then is Output-only; get_blocks must stay empty (no invent body walk).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	initBody := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, ArrayAccess: "a[i]",
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
@@ -104,13 +104,13 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	if blks := GetBlocksStmt(arr); len(blks) != 0 {
 		t.Fatal("array-init ArrayOp get_blocks must be empty (C++ body=null)", blks)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("array-init GetBlocksStmt must not SetError")
 	}
 }
 
 func TestIs1stStm(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
 		{Kind: StmtAssign, StmID: 2},
@@ -121,17 +121,17 @@ func TestIs1stStm(t *testing.T) {
 	if Is1stStm(&b.Stmts[1], b) {
 		t.Fatal("second")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete Is1stStm must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if Is1stStm(nil, b) {
 		t.Fatal("nil stmt Is1stStm must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil stmt Is1stStm must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindContainerAndDominate(t *testing.T) {
@@ -169,22 +169,22 @@ func TestFindContainerAndDominate(t *testing.T) {
 		t.Fatal("assign must not invent dominate via stray Then")
 	}
 	// Block always live; sticky nil (no invent soft-skip missing container past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindContainerStm(nil) != nil {
 		t.Fatal("nil FindContainerStm must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FindContainerStm must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// root complete nil
 	if FindContainerStm(&Block{StmID: 1}) != nil {
 		t.Fatal("root FindContainerStm must complete nil")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("root FindContainerStm must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete if-arm sticky (no invent soft-continue past nil Else)
 	body2 := &Block{StmID: 30}
 	outer2 := &Block{Stmts: []Stmt{{Kind: StmtIfElse, StmID: 31, Then: body2, Else: nil}}}
@@ -193,24 +193,24 @@ func TestFindContainerAndDominate(t *testing.T) {
 	if FindContainerStm(body2) != nil {
 		t.Fatal("nil Else FindContainerStm must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else FindContainerStm must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Dominate via incomplete if get_blocks sticky (no invent match Then past nil Else)
 	inner2 := Stmt{Kind: StmtAssign, StmID: 32}
 	body2.Stmts = []Stmt{inner2}
 	if Dominate(&outer2.Stmts[0], outer2, &body2.Stmts[0], body2) {
 		t.Fatal("nil Else Dominate must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else Dominate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// StmID 0 is incomplete IR; orphans not in parent must not invent dominate via 0<=0
 	parent := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	orphanA := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
@@ -218,10 +218,10 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	if Dominate(orphanA, parent, orphanB, parent) {
 		t.Fatal("orphan StmID 0 pair must fail closed not dominate")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("orphan StmID 0 Dominate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// same-parent members with StmID 0 still order by index
 	parent.Stmts = []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}, {Kind: StmtAssign, StmID: IncompleteStmID}}
 	if !Dominate(&parent.Stmts[0], parent, &parent.Stmts[1], parent) {
@@ -230,11 +230,11 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	if Dominate(&parent.Stmts[1], parent, &parent.Stmts[0], parent) {
 		t.Fatal("later must not dominate earlier")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	destParent := &Block{Stmts: []Stmt{{StmID: 5}}}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 5}}
@@ -248,43 +248,43 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 		t.Fatal("sibling not other block")
 	}
 	// nil FM sticky — no invent "not a jump target"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsJumpTargetFromOtherBlocks(5, destParent, nil, nil) {
 		t.Fatal("nil FM must fail closed jump-target")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM IsJumpTarget must SetError sticky")
 	}
 	// StmID 0 fails closed sticky as jump-target (no invent not-target)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsJumpTargetFromOtherBlocks(IncompleteStmID, destParent, fm, nil) {
 		t.Fatal("StmID 0 must fail closed jump-target")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 IsJumpTarget must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Dominate nil sticky
 	if Dominate(nil, nil, &Stmt{StmID: 1}, nil) {
 		t.Fatal("nil Dominate a must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Dominate a must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// GetBlocksStmt nil sticky IncompleteBlocks
 	if BlocksComplete(GetBlocksStmt(nil)) {
 		t.Fatal("nil Stmt GetBlocksStmt must fail closed IncompleteBlocks")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Stmt GetBlocksStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsPtrUsedForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs → test; ptr in for-test must count (no invent skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	pt := PointerTo(GetIntType())
 	pv := CreateVariableScalars("p", pt, false, false)
 	test := &Expression{Term: TermVariable, Var: pv, ExprType: pt}
@@ -293,15 +293,15 @@ func TestIsPtrUsedForTestExpr(t *testing.T) {
 		t.Fatal("for-test pointer must be used")
 	}
 	// incomplete for without TestExpr fails closed sticky as true (IsPtrUsed)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st2 := &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}
 	if !IsPtrUsed(st2) {
 		t.Fatal("incomplete for must fail closed ptr-used true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete for IsPtrUsed must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsPtrUsed(t *testing.T) {
@@ -318,7 +318,7 @@ func TestIsPtrUsed(t *testing.T) {
 }
 
 func TestContainsStmtTree(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inner := Stmt{Kind: StmtAssign, StmID: 2}
 	thenB := &Block{Stmts: []Stmt{inner}}
 	elseB := &Block{}
@@ -338,34 +338,34 @@ func TestContainsStmtTree(t *testing.T) {
 	if ContainsStmtTree(&Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}, &thenB.Stmts[0]) {
 		t.Fatal("nil Else must fail closed (no invent membership)")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Else ContainsStmtTree must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// blockHasStmtIDDeep: Block + live StmID always required sticky
 	if blockHasStmtIDDeep(nil, 1) {
 		t.Fatal("nil block blockHasStmtIDDeep must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block blockHasStmtIDDeep must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if blockHasStmtIDDeep(thenB, 0) {
 		t.Fatal("StmID 0 blockHasStmtIDDeep must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 blockHasStmtIDDeep must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete nested arm sticky
 	bad := &Block{Stmts: []Stmt{{Kind: StmtIfElse, StmID: 9, Then: &Block{StmID: 10}, Else: nil}}}
 	if blockHasStmtIDDeep(bad, 10) {
 		t.Fatal("incomplete if arm must fail closed not invent nest match")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete if arm blockHasStmtIDDeep must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {
@@ -381,16 +381,16 @@ func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {
 }
 
 func TestMustReturnIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// if with nil Then sticky not-must-return
 	st := Stmt{Kind: StmtIfElse, Then: nil, Else: &Block{}}
 	if st.MustReturn() {
 		t.Fatal("nil Then MustReturn must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Then MustReturn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested MustReturn residual soft invent was soft-continue false-arm invent must-return true.
 	// Fair: sticky false. Then arm incomplete if (nil Else) residual.
 	thenHole := &Block{Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}}}
@@ -399,43 +399,43 @@ func TestMustReturnIncompleteSticky(t *testing.T) {
 	if st2.MustReturn() {
 		t.Fatal("nested MustReturn residual must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested MustReturn residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MustJump residual via nested MustReturn residual same invent soft-continue.
 	// Fair: sticky false.
 	st3 := Stmt{Kind: StmtIfElse, Then: thenHole, Else: elseOK}
 	if st3.MustJump() {
 		t.Fatal("nested MustJump residual must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested MustJump residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNeedReturnStmtIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Function)(nil).NeedReturnStmt() {
 		t.Fatal("nil Function NeedReturnStmt must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function NeedReturnStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(&Function{Name: "f"}).NeedReturnStmt() {
 		t.Fatal("nil ReturnType must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ReturnType NeedReturnStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Function{Name: "f", ReturnType: GetSimpleType(EVoid)}).NeedReturnStmt() {
 		t.Fatal("void must not need return")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("void NeedReturnStmt must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

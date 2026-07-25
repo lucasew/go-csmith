@@ -61,14 +61,14 @@ func TestGenerateHasEffectComments(t *testing.T) {
 
 func TestCommentOutputInsertionOrderAndFormat(t *testing.T) {
 	// Effect.cpp:507–529 — vector order; OutputMgr.cpp:318 — "/* " wrap
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableQfer("g_a", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	b := CreateVariableQfer("g_b", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	c := CreateVariableQfer("g_c", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	// insert b then a then c — not alphabetical
 	eff := EmptyEffect().ReadVar(b).ReadVar(a).ReadVar(c).WriteVar(c).WriteVar(a)
 	out := eff.CommentOutput()
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete CommentOutput sticky")
 	}
 	wantReads := " * reads : g_b g_a g_c"

@@ -38,7 +38,7 @@ func TestAccessOnceMarking(t *testing.T) {
 
 func TestAccessOnceWrapRequiresOption(t *testing.T) {
 	// Variable.cpp:694–695 — assert(access_once); sticky, no invent wrap when option off
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessOptionsSess(testAmbientSession)
 	opts := Defaults()
 	opts.AccessOnce = false
@@ -50,10 +50,10 @@ func TestAccessOnceWrapRequiresOption(t *testing.T) {
 	if strings.Contains(out, "ACCESS_ONCE") {
 		t.Fatal("option off must not wrap")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsAccessOnce with option off must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestForSafeIncrEmit(t *testing.T) {

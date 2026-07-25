@@ -6,7 +6,7 @@ import (
 )
 
 func TestPtrModifiedInRhs(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	lhs := &Lhs{Var: p, Type: GetIntType()} // *p
 	cg := EmptyCGContext()
@@ -19,10 +19,10 @@ func TestPtrModifiedInRhs(t *testing.T) {
 	if cg.PtrModifiedInRhs(lhs, nil) {
 		t.Fatal("clean")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete PtrModifiedInRhs must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsWritten residual soft invent was soft-continue unmodified past Type-nil parent shell.
 	// Fair: sticky modified true.
 	parentHole := &Variable{Name: "g_s"} // Type nil
@@ -34,10 +34,10 @@ func TestPtrModifiedInRhs(t *testing.T) {
 	if !cg.PtrModifiedInRhs(lhs, nil) {
 		t.Fatal("IsWritten residual (incomplete EffectStm) must fail closed modified true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsWritten residual PtrModifiedInRhs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = field
 	_ = lhs2
 }

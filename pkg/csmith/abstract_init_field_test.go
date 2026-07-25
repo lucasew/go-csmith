@@ -6,7 +6,7 @@ import "testing"
 // Pointer local init &arr[i].field must abstract to a related FactPointTo (not nofact).
 // Seed 86: int16_t *l_1226 = &l_1053[5][2][1].f3; re-visit IsValidPtr failed with nofact.
 func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Process RNG for CreateFieldVars field Constant::make_random
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -30,12 +30,12 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	av.AsArray = av
 	// ArrayVariable.cpp:161–163 — collective create_field_vars for aggregate element
 	av.CreateFieldVars()
-	if HasError() || len(av.FieldVars) < 4 {
-		t.Fatalf("collective fields n=%d err=%v", len(av.FieldVars), GetError())
+	if HasErrorSess(testAmbientSession) || len(av.FieldVars) < 4 {
+		t.Fatalf("collective fields n=%d err=%v", len(av.FieldVars), GetErrorSess(testAmbientSession))
 	}
 	item := av.Itemize(NewRng(2))
-	if item == nil || HasError() {
-		t.Fatal("itemize", HasError())
+	if item == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal("itemize", HasErrorSess(testAmbientSession))
 	}
 	if len(item.FieldVars) < 4 {
 		t.Fatalf("item field vars %d", len(item.FieldVars))
@@ -43,8 +43,8 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	f3 := item.FieldVars[3]
 	// GetCollective of itemized field maps onto collective field
 	collF3 := f3.GetCollective()
-	if collF3 == nil || HasError() {
-		t.Fatalf("GetCollective itemized field err=%v", GetError())
+	if collF3 == nil || HasErrorSess(testAmbientSession) {
+		t.Fatalf("GetCollective itemized field err=%v", GetErrorSess(testAmbientSession))
 	}
 	if collF3 != av.FieldVars[3] {
 		t.Fatalf("collective field want %p %s got %p %s",
@@ -60,8 +60,8 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	p.InitExpr = init
 
 	pt, _ := AbstractFactForVarInit(p)
-	if HasError() {
-		t.Fatalf("AbstractFactForVarInit sticky err=%v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("AbstractFactForVarInit sticky err=%v", GetErrorSess(testAmbientSession))
 	}
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("want 1 complete fact complete=%v n=%d", FactsComplete(pt), len(pt))
@@ -80,14 +80,14 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 
 	facts := []*FactPointTo{}
 	AddNewVarFactInto(p, &facts)
-	if HasError() || !FactsComplete(facts) {
-		t.Fatalf("AddNewVarFactInto err=%v complete=%v", GetError(), FactsComplete(facts))
+	if HasErrorSess(testAmbientSession) || !FactsComplete(facts) {
+		t.Fatalf("AddNewVarFactInto err=%v complete=%v", GetErrorSess(testAmbientSession), FactsComplete(facts))
 	}
 	if FindRelatedPointTo(facts, p) == nil {
 		t.Fatal("makeup nofact")
 	}
 	if !IsValidPtr(p, facts, 0, 0) {
-		t.Fatalf("IsValidPtr after makeup err=%v", GetError())
+		t.Fatalf("IsValidPtr after makeup err=%v", GetErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

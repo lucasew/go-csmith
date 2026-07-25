@@ -5,7 +5,7 @@ import "testing"
 // CGContext.cpp:175–185 — read_var updates both effect_accum and effect_stm.
 // After MakeRandomAssign, EffectAccum must include every EffectStm read.
 func TestAssignGenAccumIncludesStmReads(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelectorProbs(opts, probs)
@@ -32,14 +32,14 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 
 	checked := 0
 	for seed := uint64(1); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect()
 		st := MakeRandomAssign(NewRng(seed), opts, probs, vs, tables, &cg, nil)
 		if st.Kind != StmtAssign {
 			continue
 		}
 		if !EffectComplete(cg.EffectStm) || cg.EffectAccum == nil || !EffectComplete(*cg.EffectAccum) {
-			ClearError()
+			ClearErrorSess(testAmbientSession)
 			continue
 		}
 		checked++
@@ -58,5 +58,5 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	if checked < 3 {
 		t.Fatalf("too few assigns checked: %d", checked)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

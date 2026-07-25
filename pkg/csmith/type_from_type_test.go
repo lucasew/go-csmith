@@ -56,41 +56,41 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 		t.Fatal("struct should pass through")
 	}
 	// nil type / simple re-roll need RNG sticky; no invent pick/keep-simple shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if RandomTypeFromType(nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil RNG + nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG + nil type must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if RandomTypeFromType(nil, nil, opts, probs, GetIntType(), false, false) != nil {
 		t.Fatal("nil RNG + simple re-roll must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG + simple re-roll must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-simple keep path does not need RNG
 	if RandomTypeFromType(nil, nil, opts, probs, st, false, false) != st {
 		t.Fatal("struct keep without RNG")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// TypeEnv + AllTypes always live after GenerateAllTypes; sticky nil
 	if RandomTypeFromType(NewRng(1), nil, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil env + nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil env RandomTypeFromType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if RandomTypeFromType(NewRng(1), &TypeEnv{Sess: testAmbientSession}, opts, probs, nil, false, false) != nil {
 		t.Fatal("empty AllTypes + nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty AllTypes RandomTypeFromType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateMainHasReturn0(t *testing.T) {

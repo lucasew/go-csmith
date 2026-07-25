@@ -21,7 +21,7 @@ func TestVariableSelectionProbabilityRange(t *testing.T) {
 
 func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
 	// VariableSelector.cpp:1050 InitScopeTable required sticky ERROR_GUARD MAX
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessScopeTabSess(testAmbientSession)
 	SetProcessScopeTabSess(testAmbientSession, nil)
 	defer SetProcessScopeTabSess(testAmbientSession, prev)
@@ -29,37 +29,37 @@ func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
 	if sc != MaxVarScope {
 		t.Fatalf("want MAX without InitScopeTable, got %v", sc)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ProcessScopeTab must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVariableSelectionProbabilityNilRNGSticky(t *testing.T) {
 	// VariableSelector.cpp:1053 ERROR_GUARD sticky without RNG
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	InitScopeTable(opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	if sc := VariableSelectionProbability(nil, opts); sc != MaxVarScope {
 		t.Fatalf("nil RNG must fail closed MAX, got %v", sc)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG VariableSelectionProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if sc := VariableCreationProbability(nil, opts); sc != MaxVarScope {
 		t.Fatalf("nil RNG creation must fail closed MAX, got %v", sc)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG VariableCreationProbability must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	// VariableSelector.cpp:98–105 — ParentParam filtered when param.empty()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	InitScopeTable(opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
@@ -91,7 +91,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 
 func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 	// incomplete Param must not invent scope filter / soft re-pick past holes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	InitScopeTable(opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
@@ -100,10 +100,10 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 	if sc := VariableSelectionProbabilityCG(NewRng(1), opts, &cg, MaxVarScope); sc != MaxVarScope {
 		t.Fatalf("incomplete Param must fail closed MAX, got %v", sc)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Param must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectCreatesOrFinds(t *testing.T) {
@@ -159,15 +159,15 @@ func TestMakeRandomIterCtrl(t *testing.T) {
 		}
 	}
 	// nil RNG sticky — no invent incr=1 shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	init, incr = MakeRandomIterCtrl(nil, 10)
 	if init != 0 || incr != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d", init, incr)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomIterCtrl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
@@ -199,14 +199,14 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 
 func TestExpandStructUnionVarsIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent soft-continue expand past incomplete pool.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete vars pool sticky
 	out := ExpandStructUnionVars([]*Variable{nil}, GetIntType())
 	if VariablesComplete(out) {
 		t.Fatal("nil hole ExpandStructUnionVars must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole ExpandStructUnionVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

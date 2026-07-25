@@ -44,14 +44,14 @@ func TestClosestLoopingBlock(t *testing.T) {
 		t.Fatal("none")
 	}
 	// Block always live; sticky nil (no invent no-loop soft-skip past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ClosestLoopingBlock(nil) != nil {
 		t.Fatal("nil ClosestLoopingBlock must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ClosestLoopingBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBreakContinueCFGEdges(t *testing.T) {
@@ -105,7 +105,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 
 func TestMakeupNewVarFacts(t *testing.T) {
 	// FactMgr.cpp:504 — add_new_var_fact → abstract_fact_for_var_init; no invent garbage
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -158,10 +158,10 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	if FindRelatedPointTo(old3, r) != nil {
 		t.Fatal("makeup must not invent past nil hole")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("makeup nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsPointingToLocalsMultiLevel(t *testing.T) {

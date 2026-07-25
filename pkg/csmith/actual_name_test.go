@@ -6,7 +6,7 @@ import (
 )
 
 func TestGetActualNameAndPrefix(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if g.GetActualName(false) != "g_1" {
 		t.Fatal(g.GetActualName(false))
@@ -23,18 +23,18 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 	if s := (&Variable{Name: "", Type: GetIntType()}).GetActualName(false); s != "" {
 		t.Fatal("empty Name GetActualName invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Name GetActualName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Variable sticky empty (no invent bare name without shell)
 	if s := (*Variable)(nil).GetActualName(false); s != "" {
 		t.Fatal("nil GetActualName invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GetActualName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputDefVolatileComment(t *testing.T) {
@@ -62,7 +62,7 @@ func TestOutputDefVolatileComment(t *testing.T) {
 }
 
 func TestOutputAddrOf(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	v.UseVolRVal = true
 	// even with wrap, AddrOf uses bare name
@@ -70,62 +70,62 @@ func TestOutputAddrOf(t *testing.T) {
 		t.Fatal(v.OutputAddrOf(false))
 	}
 	// Variable.cpp:707 — always live Variable*; sticky no invent "&0"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (*Variable)(nil).OutputAddrOf(false); s != "" {
 		t.Fatal("nil must fail closed, got", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputAddrOf must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&Variable{}).OutputAddrOf(false); s != "" {
 		t.Fatal("empty name must fail closed bare &, got", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name OutputAddrOf must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputBoundNoInventFieldWithoutDot(t *testing.T) {
 	// Variable.cpp:724–727 assert(dot != npos); sticky no invent base-only field path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := CreateVariableScalars("g_s", GetIntType(), false, false)
 	f := &Variable{Name: "broken_field", Type: GetIntType(), FieldVarOf: parent}
 	if s := f.OutputUpperBound(false); s != "" {
 		t.Fatal("field without '.' must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("field without '.' OutputUpperBound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := f.OutputLowerBound(false); s != "" {
 		t.Fatal("field without '.' must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("field without '.' OutputLowerBound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Name = "g_s.f0"
 	if s := f.OutputUpperBound(false); s != "g_s.f0" {
 		t.Fatal(s)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockNoInventIndentOnlyIncompleteStmt(t *testing.T) {
 	// incomplete break sticky must not invent whitespace-only indented line
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{Stmts: []Stmt{{Kind: StmtBreak}}} // no Expr
 	out := b.Output(1)
 	// incomplete stmt fails whole Output sticky empty (no invent bare break / indent-only)
 	if out != "" {
 		t.Fatal("incomplete break must fail closed whole block", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete break Block.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {
@@ -213,42 +213,42 @@ func TestOutputGlobalsIncompleteSticky(t *testing.T) {
 }
 
 func TestOutputCNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).OutputC() != "" {
 		t.Fatal("nil Variable OutputC must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable OutputC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).OutputValueDump("x ", 0, nil) != "" {
 		t.Fatal("nil Variable OutputValueDump must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable OutputValueDump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was bare-name OutputC/LHS
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if shell.OutputC() != "" {
 		t.Fatal("IsArray without AsArray OutputC must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray OutputC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if shell.OutputLhsC() != "" {
 		t.Fatal("IsArray without AsArray OutputLhsC must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray OutputLhsC must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetActualNameIsGlobalFieldResidualSticky(t *testing.T) {
 	// Parent IsGlobal residual soft invent was invent bare field name past Type-nil parent shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Field of nil parent shell: FieldVarOf nil path is not field; force parent nil Variable residual via FieldVarOf cycle?
 	// Field with parent that is nil Variable pointer stuck:
 	// parent Type-nil still IsGlobal by name if g_
@@ -257,10 +257,10 @@ func TestGetActualNameIsGlobalFieldResidualSticky(t *testing.T) {
 	if child.GetActualName(false) != "g_s.f0" {
 		// globals may use name as-is
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete field GetActualName must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil FieldVarOf parent residual: FieldVarOf points to incomplete — use nil parent via incomplete FieldVarOf chain
 	// IsGlobal residual on nil: FieldVarOf of child is non-nil parent; parent.FieldVarOf = nil → name g_
 	// Force residual: FieldVarOf is nil Variable embedded? can't.
@@ -268,15 +268,15 @@ func TestGetActualNameIsGlobalFieldResidualSticky(t *testing.T) {
 	if (&Variable{FieldVarOf: parent}).GetActualName(false) != "" {
 		t.Fatal("empty name GetActualName must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name GetActualName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsGlobalFieldParentResidualSticky(t *testing.T) {
 	// Parent IsGlobal residual soft invent was invent not-global soft-skip past nil parent.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FieldVarOf to incomplete parent with residual: parent nil is not possible without pointer.
 	// Field of nil-named parent that is Type-nil still IsGlobal by name.
 	parent := (*Variable)(nil)
@@ -286,9 +286,9 @@ func TestIsGlobalFieldParentResidualSticky(t *testing.T) {
 	if (*Variable)(nil).IsGlobal() {
 		t.Fatal("nil IsGlobal must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsGlobal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = parent
 }

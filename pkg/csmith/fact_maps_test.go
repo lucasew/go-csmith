@@ -31,16 +31,16 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 		t.Fatal("p gone")
 	}
 	// nil fact hole fails closed sticky — hole marker (not bare nil / empty complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	var out2 []*FactPointTo
 	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, &out2, f, nil)
 	if FactsComplete(out2) {
 		t.Fatal("nil hole must fail closed incomplete dest facts", out2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole UpdateFactsForDest must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil PointTo hole on live fact fails closed sticky
 	var out3 []*FactPointTo
 	bad := MakeFactPointTo(p, NullPtr)
@@ -49,26 +49,26 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if FactsComplete(out3) {
 		t.Fatal("nil pointee hole must fail closed incomplete dest facts", out3)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil pointee UpdateFactsForDest must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// missing function fails closed sticky incomplete (no invent empty dest)
 	var out4 []*FactPointTo
 	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, &out4, nil, nil)
 	if FactsComplete(out4) {
 		t.Fatal("nil func must fail closed incomplete dest facts", out4)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil func UpdateFactsForDest must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// factsOut always live; sticky (no invent soft-skip dest update past hole)
 	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil, f, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil factsOut UpdateFactsForDest must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsVarOOS residual (Blocks hole before match): soft invent was soft-skip then merge.
 	// Fair: sticky IncompleteFactSlice fail closed whole dest update.
 	fHole := &Function{Name: "fh", ReturnType: GetIntType()}
@@ -79,10 +79,10 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if FactsComplete(outH) {
 		t.Fatal("IsVarOOS residual must fail closed incomplete dest facts", outH)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVarOOS residual UpdateFactsForDest must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestClearMapVisited(t *testing.T) {
@@ -121,7 +121,7 @@ func TestSetupInOutMaps(t *testing.T) {
 func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	// FactMgr.cpp:208–222 — first_time copy_facts; Fact* always live
 	// incomplete hole must not invent cleaned final map entry — sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// plant holes bypassing SetMapFacts* (CloneFactSlice strips holes)
@@ -140,10 +140,10 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	if out2, ok := fm.MapFactsOutFinal[2]; ok && FactsComplete(out2) && len(out2) > 0 && out2[0] != nil {
 		t.Fatal("incomplete MapFactsIn residual must not invent complete OutFinal[2]", out2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete first_time SetupInOutMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete Out only: still sticky
 	fmOut := NewFactMgr(nil)
 	fmOut.MapFactsOut = map[int][]*FactPointTo{
@@ -153,10 +153,10 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fmOut.MapFactsOutFinal[2]) {
 		t.Fatal("incomplete MapFactsOut must not invent cleaned/complete OutFinal")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete MapFactsOut SetupInOutMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete sibling still clones
 	fm2 := NewFactMgr(nil)
 	fm2.MapFactsIn = map[int][]*FactPointTo{
@@ -171,7 +171,7 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 func TestSetupInOutMapsSiblingResidualSticky(t *testing.T) {
 	// incomplete id soft invent was continue then clone later complete sibling final.
 	// Fair: sticky fail closed whole SetupInOutMaps — wipe finals (no invent partial complete).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	good := MakeFactPointTo(p, NullPtr)
@@ -184,15 +184,15 @@ func TestSetupInOutMapsSiblingResidualSticky(t *testing.T) {
 	if in2, ok := fm.MapFactsInFinal[2]; ok && FactsComplete(in2) && len(in2) > 0 && in2[0] != nil {
 		t.Fatal("sibling residual must not invent complete InFinal[2]", in2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("sibling residual SetupInOutMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 	// second visit: incomplete current map must not invent join into final — sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	f1 := MakeFactPointTo(p, NullPtr)
@@ -204,10 +204,10 @@ func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsInFinal[1]) {
 		t.Fatal("incomplete combine must fail closed incomplete final, not invent partial join")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete combine SetupInOutMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBackupRestoreStmFactMaps(t *testing.T) {
@@ -232,7 +232,7 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 		t.Fatal("restored out")
 	}
 	// incomplete if — whole backup fail closed sticky (no invent root-only complete tree)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	in2 := map[int][]*FactPointTo{}
 	out2 := map[int][]*FactPointTo{}
 	bad := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
@@ -245,16 +245,16 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	if FactsComplete(in2[10]) || FactsComplete(out2[10]) {
 		t.Fatal("incomplete if must backup root as IncompleteFactSlice, not invent complete", in2[10], out2[10])
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete if BackupStmFactMaps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
 	// FactMgr.cpp:516–548 — map_facts_in/out are full FactVec (ePointTo + eUnionWrite).
 	// Soft invent was PT-only backup: restore left MapUnionFacts* at post-mutate state.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -279,8 +279,8 @@ func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
 	fm.SetMapFactsInPair(15, []*FactPointTo{}, []*FactUnion{exitU})
 	fm.SetMapFactsOutPair(15, []*FactPointTo{}, []*FactUnion{entryU})
 	fm.RestoreStmFactMaps(st, in, out, uin, uout)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	gotIn := fm.GetMapUnionFactsIn(15)
 	gotOut := fm.GetMapUnionFactsOut(15)
@@ -290,7 +290,7 @@ func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
 	if len(gotOut) != 1 || gotOut[0] == nil || gotOut[0].LastWrittenFID != 1 {
 		t.Fatalf("restored union out want fid 1, got %#v", gotOut)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
@@ -334,28 +334,28 @@ func TestFindUpdatedFacts(t *testing.T) {
 		t.Fatal(u)
 	}
 	// FactMgr always live; sticky IncompleteFactSlice (no invent empty complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).FindUpdatedFacts(1)) {
 		t.Fatal("nil FM FindUpdatedFacts must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM FindUpdatedFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(fm.FindUpdatedFacts(IncompleteStmID)) {
 		t.Fatal("stmID 0 FindUpdatedFacts must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmID 0 FindUpdatedFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).FindUpdatedFinalFacts(1)) {
 		t.Fatal("nil FM FindUpdatedFinalFacts must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM FindUpdatedFinalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// equal → no update
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	if len(fm.FindUpdatedFacts(1)) != 0 {
@@ -368,7 +368,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 		t.Fatal("missing prev must fail closed, not invent as updated")
 	}
 	// Equal residual: PointTo nil hole soft invent was continue then partial updated list
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	goodIn := MakeFactPointTo(p, NullPtr)
 	badOut := &FactPointTo{Var: p, PointTo: []*Variable{GarbagePtr, nil}} // hole for Equal
 	goodOutOther := MakeFactPointTo(q, GarbagePtr)
@@ -378,12 +378,12 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("Equal residual must fail closed incomplete, not invent partial updated")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Equal residual FindUpdatedFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil fact hole fails closed sticky at store and find_updated
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
 	// incomplete store is hole marker (FactsComplete false), not cleaned list
@@ -393,33 +393,33 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("incomplete out map must fail closed incomplete, not invent empty complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete out FindUpdatedFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// direct find with hole in out (bypass Set)
 	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil}
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("nil fact hole in out must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole FindUpdatedFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// final maps: incomplete → sticky IncompleteFactSlice (not bare nil invent empty)
 	fm.MapFactsInFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, NullPtr)}}
 	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, GarbagePtr), nil}}
 	if FactsComplete(fm.FindUpdatedFinalFacts(1)) {
 		t.Fatal("incomplete final out must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete final FindUpdatedFinalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRestoreFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
@@ -440,23 +440,23 @@ func TestRestoreFacts(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete oldFacts must wipe GlobalFacts incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete oldFacts RestoreFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactMgr always live; sticky no invent soft-skip restore past hole
 	(*FactMgr)(nil).RestoreFacts(old)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM RestoreFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestRestoreFactsDoesNotReinjectLiveMayNull: FactMgr.cpp:489–492 is makeup +
 // assign only. Do not invent re-join of live may-null into the restored snapshot
 // (SPEC: no invent may-null reinject).
 func TestRestoreFactsDoesNotReinjectLiveMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(&Function{Name: "f"})
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	p := CreateVariableScalars("l_233", PointerTo(PointerTo(GetSimpleType(EShort))), false, false)
@@ -465,7 +465,7 @@ func TestRestoreFactsDoesNotReinjectLiveMayNull(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, g})}
 	fm.RestoreFacts(snap)
 	if !FactsComplete(fm.GlobalFacts) {
-		t.Fatal("restore incomplete", HasError())
+		t.Fatal("restore incomplete", HasErrorSess(testAmbientSession))
 	}
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil {
@@ -478,14 +478,14 @@ func TestRestoreFactsDoesNotReinjectLiveMayNull(t *testing.T) {
 
 func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	// incomplete old/new maps must not invent partial makeup past holes — sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeupNewVarFacts(nil, nil) {
 		t.Fatal("nil oldFacts must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil oldFacts MakeupNewVarFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
@@ -496,10 +496,10 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(old) {
 		t.Fatal("incomplete oldFacts must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete oldFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	old2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	new2 := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
 	if MakeupNewVarFacts(&old2, new2) {
@@ -508,15 +508,15 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(old2) {
 		t.Fatal("incomplete newFacts must fail closed incomplete oldFacts")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete newFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	// AddNewVarFactInto FieldVars hole clears *oldFacts; must not invent later vars
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -542,17 +542,17 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	if FindRelatedPointTo(old, later) != nil {
 		t.Fatal("later var must not be made up past field hole")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeupNewVarFactsAmbientResidualSticky(t *testing.T) {
 	// Ambient residual ERROR soft invent was soft-continue makeup later complete vars.
 	// Fair: sticky wipe IncompleteFactSlice whole MakeupNewVarFacts.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
 	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
 	if MakeupNewVarFacts(&old, newF) {
@@ -561,10 +561,10 @@ func TestMakeupNewVarFactsAmbientResidualSticky(t *testing.T) {
 	if FactsComplete(old) {
 		t.Fatal("ambient residual must wipe IncompleteFactSlice, not invent later makeup")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ambient residual MakeupNewVarFacts must keep SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSetMapFactsOutGotoDest(t *testing.T) {
@@ -642,7 +642,7 @@ func TestSetMapFactsIncompleteStoresNil(t *testing.T) {
 
 func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	// LocalVars nil hole fails closed sticky (no invent skip partial OOS list)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	loop := &Block{Looping: true, LocalVars: []*Variable{
 		CreateVariableScalars("l_1", GetIntType(), false, false),
 		nil,
@@ -650,10 +650,10 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	if VariablesComplete(collectLoopLocalVars(loop)) {
 		t.Fatal("nil LocalVars hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil LocalVars collectLoopLocalVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete empty
 	empty := &Block{Looping: true}
 	got := collectLoopLocalVars(empty)
@@ -664,15 +664,15 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 		t.Fatal(got)
 	}
 	// incomplete facts on RemoveLoopLocalFacts sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	if FactsComplete(RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty)) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil blk soft invent was complete passthrough keep-all-facts (including loop locals)
 	// fair: sticky IncompleteFactSlice so break/continue cannot invent cleaned out map
 	prior := MakeFactPointTo(p, NullPtr)
@@ -680,24 +680,24 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(gotNil) {
 		t.Fatal("nil blk RemoveLoopLocalFacts must fail closed, not keep-all passthrough", gotNil)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil blk RemoveLoopLocalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// RemoveLoopLocalFactsForStmt with nil parent (non-block) same sticky hole
 	br := &Stmt{Kind: StmtBreak, StmID: 9}
 	gotFor := RemoveLoopLocalFactsForStmt([]*FactPointTo{prior}, br, nil)
 	if FactsComplete(gotFor) {
 		t.Fatal("nil parent RemoveLoopLocalFactsForStmt must fail closed", gotFor)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil parent RemoveLoopLocalFactsForStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
@@ -705,22 +705,22 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsOut[5]) {
 		t.Fatal("incomplete set_fact_out must not invent complete empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete set_fact_out must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// StmID 0 fails closed sticky (no invent silent set_fact_out)
 	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
 	fm.SetMapFactsOutForStmt(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 set_fact_out must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
 	// FactMgr.cpp:378 — array LHS merges.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -748,7 +748,7 @@ func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
 func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
 	// Fact.cpp:97–109 — primary init + more_init_values merge.
 	// Primary &g plus Constant 0 alt must leave may-null.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -769,7 +769,7 @@ func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
 
 	pt, _ := AbstractFactForVarInit(&av.Variable)
 	if !FactsComplete(pt) || len(pt) != 1 {
-		t.Fatalf("abstract incomplete n=%d err=%v", len(pt), HasError())
+		t.Fatalf("abstract incomplete n=%d err=%v", len(pt), HasErrorSess(testAmbientSession))
 	}
 	if !pt[0].IsNull() {
 		names := []string{}
@@ -790,7 +790,7 @@ func TestEqualsIntZeroPointer(t *testing.T) {
 }
 
 func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	elem := PointerTo(GetIntType())
 	base := CreateVariableScalars("p", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{2}}
@@ -801,7 +801,7 @@ func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: elem, Value: "0"}, ExprType: elem}
 	pt, _ := AbstractFactForAssign(nil, &av.Variable, 0, rhs)
 	if !FactsComplete(pt) || len(pt) != 1 {
-		t.Fatalf("n=%d complete=%v err=%v", len(pt), FactsComplete(pt), HasError())
+		t.Fatalf("n=%d complete=%v err=%v", len(pt), FactsComplete(pt), HasErrorSess(testAmbientSession))
 	}
 	if !pt[0].IsNull() {
 		names := []string{}
@@ -817,7 +817,7 @@ func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
 func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 	// After may-null lattice, definitive &g assign to array must merge not wipe null.
 	// FactMgr.cpp:378–388 — isArray → merge_fact not renew_fact.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -840,7 +840,7 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 	// assign l_233 = &g_127 (address-of as ExpressionVariable with pointer type)
 	rhs := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	if !fm.UpdateFactForAssign(&av.Variable, 0, rhs) {
-		t.Fatalf("update failed err=%v", HasError())
+		t.Fatalf("update failed err=%v", HasErrorSess(testAmbientSession))
 	}
 	fp := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
 	if fp == nil {
@@ -861,7 +861,7 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 // assigns that introduce null so map_facts_in (after back-edge merge) and
 // post_loop restore can keep may-null (seed-2 l_233 / first_div 10107).
 func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -905,7 +905,7 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 
 	out, _, failIdx, ok := FindFixedPointBlock(body, CloneFactSlice(entry), &cg, opts2, true)
 	if !ok {
-		t.Fatalf("fixed-point failed idx=%d err=%v", failIdx, HasError())
+		t.Fatalf("fixed-point failed idx=%d err=%v", failIdx, HasErrorSess(testAmbientSession))
 	}
 	// After fixed-point, map_facts_in should have absorbed may-null from out via
 	// back-edge merge on iteration 2+ (or out itself has may-null).
@@ -941,8 +941,8 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 // Soft invent was PT-only OOS on continue/break map_out: parent-block eUnionWrite
 // subjects (l_810) survived into map_union_out and polluted for-body back-edge merge.
 func TestRemoveLoopLocalUnionFactsDropsParentLocals(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U2", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -959,8 +959,8 @@ func TestRemoveLoopLocalUnionFactsDropsParentLocals(t *testing.T) {
 	}
 	cont := &Stmt{Kind: StmtContinue, StmID: 379}
 	fm.SetMapFactsOutForStmt(cont, []*FactPointTo{}, inner)
-	if HasError() {
-		t.Fatal("set_fact_out continue sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("set_fact_out continue sticky", GetErrorSess(testAmbientSession))
 	}
 	outU := fm.GetMapUnionFactsOut(379)
 	if !UnionFactsComplete(outU) {

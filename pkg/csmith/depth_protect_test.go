@@ -27,21 +27,21 @@ func TestDepthGuardRandomModeAlwaysGood(t *testing.T) {
 
 func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
 	// FunctionInvocation.cpp:144 — assert(type) sticky; no GetIntType soft invent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext()
 	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &c, nil); fi != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type MakeRandomUnaryInvocation must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
 	// Type.cpp / SafeOpFlags.cpp DEPTH_GUARD wired; random mode always GOOD
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if DepthGuardByType(opts, DtRandomTypeFromType) != GoodDepth {
 		t.Fatal("dtRandomTypeFromType")
@@ -106,54 +106,54 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 
 func TestDepthGuardUnknownTypeFailClosed(t *testing.T) {
 	// DepthSpec.cpp:381–382 assert(0); DFS mode → BAD_DEPTH sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.DFSExhaustive = true
 	if DepthGuardByType(opts, "dtNoSuchType") != BadDepth {
 		t.Fatal("unknown dType must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown dType DepthGuard must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MinimalDepth("dtNoSuchType", 0) >= 0 {
 		t.Fatal("unknown minimal depth")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown MinimalDepth must SetError sticky")
 	}
 	// random mode still GOOD for any type name (guard short-circuits)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.DFSExhaustive = false
 	if DepthGuardByType(opts, "dtNoSuchType") != GoodDepth {
 		t.Fatal("random mode always GOOD")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestKnownDepthTypeUnknownResidualSticky(t *testing.T) {
 	// MinimalDepth residual soft invent was invent known-true for unknown dType.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if knownDepthType("dtTotallyUnknown") {
 		t.Fatal("unknown dType must fail closed not-known")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown dType knownDepthType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !knownDepthType(DtConstant) {
 		t.Fatal("DtConstant must be known")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete knownDepthType must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDefaultDepthProtectNoInventDEPTH(t *testing.T) {
 	// Block.cpp:255–267 — DEPTH++/-- only when CGOptions::depth_protect()
 	// Function.cpp:648 sets body->set_depth_protect(true) always; must not invent DEPTH emit.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if opts.DepthProtect {
 		t.Fatal("default depth_protect must be false")

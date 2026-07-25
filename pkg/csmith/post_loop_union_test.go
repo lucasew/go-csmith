@@ -5,7 +5,7 @@ import "testing"
 // StatementFor.cpp:355 — non-must_return: global_facts = map_facts_in[body] only.
 // Soft invent rewrote from preUnion + makeup; fair path keeps map_in last_written.
 func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	ut := &Type{isUnion: true, Fields: []StructField{
@@ -33,8 +33,8 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	forSt := &Stmt{Kind: StmtFor, Then: body, StmID: AllocStmID()}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{}, preU, EmptyEffect(), &cg)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	gotOld := FindRelatedUnion(fm.UnionFacts, oldU)
 	if gotOld == nil || gotOld.LastWrittenFID != 4 {
@@ -52,8 +52,8 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 // if-combine) while map_in still had entry last=0 → set_fact_in wrote BOTTOM;
 // post_loop + break merge left g_721 nonreadable (seed-123 choose ok 36 vs 37).
 func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	f.Stack = []*Block{}
@@ -93,8 +93,8 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), NewRng(1), NewVariableSelector(Defaults()))
-	if HasError() {
-		t.Fatal("post_creation", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("post_creation", GetErrorSess(testAmbientSession))
 	}
 	// map_facts_in must retain entry last=0 (no self-back merge of BOTTOM live)
 	inU := fm.GetMapUnionFactsIn(body.StmID)

@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestOpportunisticValidateNoDeref(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if OpportunisticValidate(NewRng(1), v, GetIntType(), nil, 0, 0) != 1 {
 		t.Fatal("same level")
@@ -12,21 +12,21 @@ func TestOpportunisticValidateNoDeref(t *testing.T) {
 	if OpportunisticValidate(NewRng(1), nil, GetIntType(), nil, 0, 0) != 0 {
 		t.Fatal("nil var must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var OpportunisticValidate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if OpportunisticValidate(NewRng(1), v, nil, nil, 0, 0) != 0 {
 		t.Fatal("nil type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type OpportunisticValidate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOpportunisticValidateNullDead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// nil facts is complete empty — no related fact → 0
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), nil, 0, 0) != 0 {
@@ -36,10 +36,10 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), []*FactPointTo{nil}, 0, 0) != 0 {
 		t.Fatal("incomplete must reject")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// null, prob 0 → 0; FactPointTo.cpp:455 still rnd_flipcoin(0)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	rNull := NewRng(1)
@@ -71,7 +71,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	if rDead.RandDepth() != dDead+1 {
 		t.Fatalf("dead p=0 must still flipcoin once: depth %d → %d", dDead, rDead.RandDepth())
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete dead blocked must not sticky")
 	}
 	// null+dead both set: two flips (null then dead)
@@ -85,20 +85,20 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 		t.Fatal("null with nullProb=100 must allow ret=2")
 	}
 	// nil r on null path sticky (C++ always has process RNG for flipcoin)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if OpportunisticValidate(nil, p, GetIntType(), []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 0, 0) != 0 {
 		t.Fatal("nil r null path must reject")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil r null path must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOpportunisticValidateUsesCollective(t *testing.T) {
 	// FactPointTo.cpp:448–450 — FactPointTo tmp(var->get_collective()); find_related_fact
 	// Fact is stored on the collective; itemized member must resolve via get_collective.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	elem := GetIntType()
 	pt := PointerTo(elem)
 	// collective array-of-pointer shell (fact subject)
@@ -119,7 +119,7 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 	if OpportunisticValidate(NewRng(1), &item.Variable, elem, facts, 0, 0) != 1 {
 		t.Fatal("itemized must find fact via get_collective()")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete collective path must not sticky")
 	}
 	// fact keyed only on item (not collective) must miss when looking up via collective
@@ -127,62 +127,62 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 	if OpportunisticValidate(NewRng(1), &item.Variable, elem, factsItemOnly, 0, 0) != 0 {
 		t.Fatal("fact on item alone must miss when lookup uses collective identity")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.CompatibleCheck = true
 	// enabled + incomplete IR rejects sticky (no invent non-error)
 	if !CompatibleCheckExprVar(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
 		t.Fatal("nil var must reject when compatible-check on")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var CompatibleCheck must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !CompatibleCheckExprs(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
 		t.Fatal("nil expr must reject when compatible-check on")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil expr CompatibleCheck must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.CompatibleCheck = false
 	if CompatibleCheckExprVar(opts, nil, nil) {
 		t.Fatal("disabled must not reject")
 	}
 	// disabled incomplete stays non-sticky (feature off, not broken IR path)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("disabled CompatibleCheck must not SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsNonReadableNilHole(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	cg := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
 	if !cg.IsNonReadable(g) {
 		t.Fatal("nil NoReadVars hole must fail closed as nonreadable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoReadVars hole IsNonReadable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
 	if !cg2.IsNonWritable(g) {
 		t.Fatal("nil NoWriteVars hole must fail closed as nonwritable")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoWriteVars hole IsNonWritable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVariableCompatible(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	if !a.Compatible(a, false) {
@@ -201,7 +201,7 @@ func TestVariableCompatible(t *testing.T) {
 }
 
 func TestCompatibleCheckerDisabled(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	e := &Expression{Term: TermVariable, Var: a}
@@ -237,14 +237,14 @@ func TestHasDereferenceableVar(t *testing.T) {
 		t.Fatal("dead")
 	}
 	// Type* always live; sticky no invent no-deref soft-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if HasDereferenceableVar([]*Variable{p}, nil, cg, opts) {
 		t.Fatal("nil typ HasDereferenceableVar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil typ HasDereferenceableVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was residual soft-continue then true
 	// from later good ptr. Fair: sticky fail closed whole probe.
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -252,20 +252,20 @@ func TestHasDereferenceableVar(t *testing.T) {
 	if HasDereferenceableVar([]*Variable{shell, p}, GetIntType(), cg, opts) {
 		t.Fatal("IsArray without AsArray HasDereferenceableVar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray HasDereferenceableVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsValidPtr residual soft invent was soft-continue later good invent true.
 	// Fair: sticky false. incomplete facts on first candidate stickies residual.
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt), nil}
 	if HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
 		t.Fatal("IsValidPtr residual (incomplete facts) must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsValidPtr residual HasDereferenceableVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsPartialVolatileAfterDeref(t *testing.T) {
@@ -285,15 +285,15 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	// IsVolatileAfterDeref(1) depends on qfer layout — just ensure no panic
 	_ = vv.IsPartialVolatileAfterDeref(1)
 	// Type-nil residual soft invent was not-partial soft-skip. Fair: sticky partial true.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := &Variable{Name: "g_p_hole", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if !hole.IsPartialVolatileAfterDeref(0) {
 		t.Fatal("Type-nil IsPartialVolatileAfterDeref must fail closed partial true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil IsPartialVolatileAfterDeref must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsVolatileStructUnion residual: Type-nil field soft invent was not-partial.
 	// Fair: sticky partial true. Use deref 0 on aggregate (qfer level 0 non-vol).
 	broken := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: nil, BitWidth: -1}}}
@@ -301,14 +301,14 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	if !vs.IsPartialVolatileAfterDeref(0) {
 		t.Fatal("IsVolatileStructUnion residual IsPartialVolatile must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVolatileStructUnion residual IsPartialVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.CompatibleCheck = true
 	vs := NewVariableSelector(opts)
@@ -320,7 +320,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	// generate assigns — should not panic; StatementAssign.cpp:127 assert(fm)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	for seed := uint64(1); seed < 10; seed++ {
-		ClearError() // compatible-check fail sticks ErrCompatibleCheck per try
+		ClearErrorSess(testAmbientSession) // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
 			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
 			return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
@@ -329,12 +329,12 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 			t.Fatal(st.Kind)
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLhsCompatibleExpr(t *testing.T) {
 	// Lhs.cpp:359–362
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
 	if a == nil || b == nil {
@@ -350,33 +350,33 @@ func TestLhsCompatibleExpr(t *testing.T) {
 		t.Fatal("other var")
 	}
 	// Lhs + Expression always live; sticky no invent not-compatible soft-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Lhs)(nil).CompatibleExpr(ea, false) {
 		t.Fatal("nil Lhs CompatibleExpr must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs CompatibleExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if lhs.CompatibleExpr(nil, false) {
 		t.Fatal("nil exp CompatibleExpr must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil exp CompatibleExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Lhs)(nil).CompatibleVar(a, false) {
 		t.Fatal("nil Lhs CompatibleVar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs CompatibleVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 	// ExpressionFuncall.cpp:206–207 — unary invoke compatible via operand
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	if v == nil {
 		t.Fatal("var")
@@ -402,7 +402,7 @@ func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// VariableSelector.cpp:301–303 — match_indirect; scalar non-exact Match is always true
 	// (CVQualifiers.cpp both len==1). Filter matters when level counts differ.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalization()
 	defer BookkeeperDoFinalization()
 	// int* var with 2-level qfer; desired qfer 1-level for int* type match_indirect
@@ -431,17 +431,17 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	}
 	// IsArray without AsArray soft invent was residual soft-continue then true
 	// from later good volatile. Fair: sticky fail closed whole probe.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalization()
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	good := CreateVariableScalars("g_v", GetIntType(), true, false)
 	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext()) {
 		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEnableCompatibleCheckProcess(t *testing.T) {

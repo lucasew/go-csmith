@@ -5,15 +5,15 @@ import (
 )
 
 func TestErrorCodes(t *testing.T) {
-	ClearError()
-	if HasError() || GetError() != ErrSuccess {
-		t.Fatal(GetError())
+	ClearErrorSess(testAmbientSession)
+	if HasErrorSess(testAmbientSession) || GetErrorSess(testAmbientSession) != ErrSuccess {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	SetError(ErrCompatibleCheck)
-	if !HasError() || GetError() != ErrCompatibleCheck {
-		t.Fatal(GetError())
+	SetErrorSess(testAmbientSession, ErrCompatibleCheck)
+	if !HasErrorSess(testAmbientSession) || GetErrorSess(testAmbientSession) != ErrCompatibleCheck {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSafeAssign(t *testing.T) {
@@ -58,7 +58,7 @@ func TestVisitFactsStatementAssignNoWriteToIV(t *testing.T) {
 func TestMakeRandomAssignDualContext(t *testing.T) {
 	// StatementAssign.cpp:181/225 — merge_param_context folds RHS/LHS into caller;
 	// expr_depth and effect_accum must stick on *CGContext.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -81,7 +81,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	// single seed may fail Lhs/exact qfer; retry like other factories
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types
@@ -133,25 +133,25 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 		t.Fatal("reads", eff.IsRead(a), eff.IsRead(b))
 	}
 	// incomplete TermConstant shell sticky (no invent visit / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VisitFactsExpression(&Expression{Term: TermConstant}, &cg, Defaults()) {
 		t.Fatal("nil Con constant must fail visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Con VisitFactsExpression must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VisitFactsExpression(&Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}, &cg, Defaults()) {
 		t.Fatal("empty Value constant must fail visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Value VisitFactsExpression must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !VisitFactsExpression(&Expression{Term: TermConstant, Con: MakeInt(0)}, &cg, Defaults()) {
 		t.Fatal("live constant must visit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// comma LHS residual soft invent was soft-continue RHS invent visit success.
 	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}
 	comma := &Expression{
@@ -162,10 +162,10 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 	if VisitFactsExpression(comma, &cg, Defaults()) {
 		t.Fatal("LHS visit residual must fail closed comma visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("LHS visit residual comma must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
@@ -229,7 +229,7 @@ func TestVisitFactsStatementAssignWriteVarSet(t *testing.T) {
 
 func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete EffectContext must not invent assign visit success under poisoned running
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 10,
@@ -250,13 +250,13 @@ func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 	if VisitFactsStatementAssign(st, &cg2, Defaults()) {
 		t.Fatal("incomplete EffectAccum must fail closed assign visit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	// LhsWriteVars residual soft invent was soft-empty skip WriteVarSet invent visit success.
 	// Fair: sticky fail closed false.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 11,
@@ -275,10 +275,10 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	if VisitFactsStatementAssign(st, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed assign visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm assign visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// WriteVarSet residual: nil var in lhs_write map stickies IncompleteVariables → WriteVarSet
 	// force incomplete rhsAccum LhsWriteVars by visiting with incomplete write fold path
 	// via running EffectContext incomplete after RHS succeeds is hard; unit WriteVarSet already
@@ -290,15 +290,15 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	if VisitFactsStatementAssign(st, &cg3, Defaults()) {
 		t.Fatal("incomplete Accum WriteVarSet path must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Accum assign visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // FunctionInvocation.cpp:542–546 — add_visible_effect uses curr_blk (AnalysisBlock).
 func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxFuncs = 3
@@ -325,7 +325,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	fi := &Invocation{User: callee}
 	// Empty body visit should succeed; AddVisibleEffect must use CurrBlk not stack top
 	ok := VisitFactsInvocation(fi, &cg, opts)
-	if !ok && !HasError() {
+	if !ok && !HasErrorSess(testAmbientSession) {
 		// may soft-fail without body maps; still check CurrBlk preference via AnalysisBlock
 	}
 	if cg.AnalysisBlock() != callerBlk {
@@ -334,7 +334,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	if cg.CurrentBlock() != inner {
 		t.Fatal("precondition: stack top is inner")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = probs
 	_ = vs
 }
@@ -343,7 +343,7 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	// Lhs.cpp:337–346 — *p=… CheckReadVar(p)+write_pointed; StatementAssign must not
 	// invent NoteWrite(p) after merge (seed2 first_div e9238: pointer false-written →
 	// no ptr-bias in SelectParentLocal choose_var).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
 	ptr := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
@@ -356,7 +356,7 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	lhs := &Lhs{Var: ptr, Type: GetIntType(), CompoundAssign: false}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !cg.VisitFactsLhs(lhs, opts) {
 		t.Fatal("VisitFactsLhs *p failed")
 	}
@@ -372,7 +372,7 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	// StatementAssign.cpp:make_random — no update_fact_for_assign; only ExpressionAssign
 	// and post_creation_analysis update (seed-2 e10107 double-merge path).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -397,8 +397,8 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	cg.FM = fm
 	cg.CurrentFunc = fm.Func
 	st := MakeRandomAssign(r, opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil)
-	if HasError() {
-		ClearError()
+	if HasErrorSess(testAmbientSession) {
+		ClearErrorSess(testAmbientSession)
 		// may fail to generate; that is ok — key is no fact mutation on success
 	}
 	if stmtOK(st) {
@@ -420,7 +420,7 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	// of && before a nested ExpressionAssign). Lhs::ptr_modified_in_rhs
 	// (Lhs.cpp:240–261) must see only this assign's RHS writes.
 	// Seed 80: (***l_108)=… after (**l_108)=… under && must not FP-fail.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
 	mid := CreateVariableScalars("l_mid", PointerTo(GetIntType()), false, false)
@@ -445,12 +445,12 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	if !cg.PtrModifiedInRhs(lhs, fm.GlobalFacts) {
 		t.Fatal("precondition: parent EffectStm write of mid must mark **p modified")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := Stmt{
 		Kind: StmtAssign, Lhs: lhs, LhsVar: ptr,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	if !VisitFactsStatementAssign(&st, &cg, opts) {
-		t.Fatalf("visit must succeed with fresh rhs EffectStm; err=%v", GetError())
+		t.Fatalf("visit must succeed with fresh rhs EffectStm; err=%v", GetErrorSess(testAmbientSession))
 	}
 }

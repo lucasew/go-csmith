@@ -6,30 +6,30 @@ import (
 )
 
 func TestFromTailToHead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{Looping: true, Stmts: []Stmt{
 		{Kind: StmtAssign},
 	}}
 	if !b.FromTailToHead() {
 		t.Fatal("fall through")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete fall-through FromTailToHead must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b.Stmts = []Stmt{{Kind: StmtReturn}}
 	if b.FromTailToHead() {
 		t.Fatal("return must_jump")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete must_jump FromTailToHead must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b.Looping = false
 	if b.FromTailToHead() {
 		t.Fatal("not looping")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MustJump residual soft invent was soft-continue fall-through invent true.
 	// Fair: sticky false. last if incomplete residual MustJump.
 	b2 := &Block{Looping: true, Stmts: []Stmt{
@@ -38,10 +38,10 @@ func TestFromTailToHead(t *testing.T) {
 	if b2.FromTailToHead() {
 		t.Fatal("MustJump residual FromTailToHead must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MustJump residual FromTailToHead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetLastStmStopsAtReturn(t *testing.T) {
@@ -72,29 +72,29 @@ func TestSetAccumulatedEffect(t *testing.T) {
 		t.Fatal("block effect")
 	}
 	// StmID 0 incomplete sticky — IncompleteEffect (not EmptyEffect invent pure/empty success)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b2 := &Block{StmID: 11, Stmts: []Stmt{{StmID: 1}, {StmID: IncompleteStmID}}}
 	fm.SetMapStmEffect(11, EmptyEffect().WriteVar(v))
 	eff2 := b2.SetAccumulatedEffect(fm)
 	if EffectComplete(eff2) || eff2.IsEmpty() || eff2.IsPure() {
 		t.Fatal("StmID 0 must fail closed IncompleteEffect, not invent empty/pure", eff2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 SetAccumulatedEffect must SetError sticky")
 	}
 	// IncompleteEffect: IsWritten is fail-closed true — probe completeness / map shell only
 	if EffectComplete(fm.GetMapStmEffect(11)) || fm.GetMapStmEffect(11).written[v] {
 		t.Fatal("block map must IncompleteEffect, not invent partial write map entry")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil block/fm must IncompleteEffect sticky (not invent EmptyEffect pure)
 	if EffectComplete(((*Block)(nil)).SetAccumulatedEffect(fm)) {
 		t.Fatal("nil block must IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil block SetAccumulatedEffect must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomParentBlock(t *testing.T) {
@@ -137,19 +137,19 @@ func TestRandomParentBlock(t *testing.T) {
 	}
 	_ = d0
 	// Block.cpp:306 — nil RNG sticky ERROR_GUARD
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if inner.RandomParentBlock(nil, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomParentBlock must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 	// Block.cpp:295–308 + StatementArrayOp.cpp:141 — GlobalVariables → n = 1+depth
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outer := &Block{}
 	inner := &Block{Parent: outer}
 	// Probe domain size by counting distinct results over many seeds with allowGlobal
@@ -171,7 +171,7 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 		t.Fatal("one upto")
 	}
 	// Same seed, same raw, different n → different v is possible; both consume one draw.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestLabelAttrEmit(t *testing.T) {
@@ -222,7 +222,7 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 }
 
 func TestMustBreakOrReturn(t *testing.T) {
-	ClearError() // sticky GenError from earlier suite tests must not mask must_return
+	ClearErrorSess(testAmbientSession) // sticky GenError from earlier suite tests must not mask must_return
 	// Block.cpp:342–357 — last must_return (break alone is not enough)
 	b := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak,
@@ -241,7 +241,7 @@ func TestMustBreakOrReturn(t *testing.T) {
 }
 
 func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block.cpp:313–331 — break_stms nonempty → not must_return
 	ret := Stmt{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
 	b := &Block{StmID: 1, Stmts: []Stmt{ret}, BreakStmIDs: []int{9}}
@@ -263,24 +263,24 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm): DestStmID is the label
 	// statement, not the parent block. Parent DestBlock bookkeeping must not escape
 	// must_return (seed-79 double return / append_return).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 5, DestBlock: b, DestStmID: 2 /* labeled stmt */, BackLink: true}}
 	if !b.MustReturn() {
 		t.Fatal("goto-to-label edge must not escape block must_return")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete goto-to-label must_return must not sticky")
 	}
 	// Block StmID 0 + FM sticky fail closed as escape (no invent "no back edge")
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b0 := &Block{StmID: IncompleteStmID, Stmts: []Stmt{ret}, EmitFM: fm}
 	if b0.MustReturn() {
 		t.Fatal("block StmID 0 must fail closed not must_return")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("block StmID 0 MustReturn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MustJump also requires empty break_stms
 	b2 := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -292,37 +292,37 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	if !b2.MustJump() {
 		t.Fatal("true break must_jump")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete MustJump must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Block always live; sticky no invent not-must-return / not-must-jump soft-skip
 	if (*Block)(nil).MustReturn() {
 		t.Fatal("nil MustReturn must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MustReturn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Block)(nil).MustJump() {
 		t.Fatal("nil MustJump must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MustJump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Block)(nil).MustReturnWithFM(NewFactMgr(nil)) {
 		t.Fatal("nil MustReturnWithFM must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MustReturnWithFM must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBlockOutputBlockIDComment(t *testing.T) {
 	// Block.cpp:250–253 — "{ " + /* block id: N */
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 42, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1,
 		LhsVar:   CreateVariableScalars("g_1", GetIntType(), false, false),
@@ -344,7 +344,7 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 // StatementFor.cpp:422–424 / StatementArrayOp.cpp:230 — body.Output(indent)
 // same as header (not indent+1). Unfair indent+1: "for\n        {" vs "for\n    {".
 func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	body := &Block{StmID: 7, Stmts: []Stmt{{
 		Kind: StmtReturn,
@@ -357,8 +357,8 @@ func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 		Then: body,
 	}}}
 	out := parent.Output(0)
-	if out == "" || HasError() {
-		t.Fatalf("Output empty/err: %q sticky=%v", out, HasError())
+	if out == "" || HasErrorSess(testAmbientSession) {
+		t.Fatalf("Output empty/err: %q sticky=%v", out, HasErrorSess(testAmbientSession))
 	}
 	lines := strings.Split(out, "\n")
 	var forLine, braceLine string
@@ -393,7 +393,7 @@ func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 
 // Statement.cpp:239,370–371 — sid starts 0; assign then increment.
 func TestAllocStmIDMatchesCppSid(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	currentSession().NextStmID = 0
 	if AllocStmID() != 0 {
 		t.Fatal("first stm_id must be 0")
@@ -411,7 +411,7 @@ func TestAllocStmIDMatchesCppSid(t *testing.T) {
 
 // Seed-2: func_1 body is block id 0; late id 577 (matches instrumented upstream).
 func TestSeed2BlockIDsMatchUpstream(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	currentSession().NextStmID = 0
 	opts := Defaults()
 	opts.Seed = 2

@@ -53,7 +53,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 }
 
 func TestStepHashOutput(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Seed = 2
 	opts.StepHashByStmt = true
@@ -71,7 +71,7 @@ func TestStepHashOutput(t *testing.T) {
 	if !strings.Contains(out, "void step_hash(int stmt_id)") {
 		t.Fatal("missing step_hash")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestStepHashNoInventDeclWithoutComputeHash(t *testing.T) {
@@ -116,11 +116,11 @@ func TestStepHashNoInventCallWithoutDef(t *testing.T) {
 	if strings.Contains(main, "csmith_compute_hash()") {
 		t.Fatal("must not invent hash call without def", main)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpressionCommaUsesEnv(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -140,7 +140,7 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 
 func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 	// WriteVar residual soft invent was invent soft-complete NoteWrite past Type-nil IsVolatile residual.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), FEffect: EmptyEffect()}
 	cg := WithFunc(f, EmptyEffect())
 	eff := EmptyEffect()
@@ -149,36 +149,36 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 	hole := &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	cg.NoteWrite(hole)
 	// WriteVar residual on Type-nil IsVolatile may sticky IncompleteEffect
-	if EffectComplete(*cg.EffectAccum) && !HasError() {
+	if EffectComplete(*cg.EffectAccum) && !HasErrorSess(testAmbientSession) {
 		// may still complete if IsVolatile non-residual on empty qfer
 	}
 	// Type-nil IsVolatile: Variable.IsVolatile uses Qfer only - no Type residual
 	// Use incomplete EffectAccum residual path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, EmptyEffect())
 	inc := IncompleteEffect()
 	cg2.EffectAccum = &inc
 	cg2.NoteWrite(CreateVariableScalars("g_y", GetIntType(), false, false))
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Incomplete EffectAccum NoteWrite must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNoteWriteNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	cg.NoteWrite(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoteWrite must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // CGContext.cpp:175–185 / 307–317 — NoteRead/NoteWrite are write_var/read_var:
 // both EffectAccum and EffectStm (not feffect).
 func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	eff := EmptyEffect()
@@ -192,7 +192,7 @@ func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 	if f.FEffect.IsRead(g) {
 		t.Fatal("NoteRead must not touch feffect")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.EffectStm = EmptyEffect()
 	w := CreateVariableScalars("g_2", GetIntType(), false, false)
 	cg.NoteWrite(w)
@@ -202,52 +202,52 @@ func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 	if f.FEffect.IsWritten(w) {
 		t.Fatal("NoteWrite must not touch feffect")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReadVarGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-complete read past Type-nil array field shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	// IsArray without AsArray GetCollective residual
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	cg.ReadVar(shell)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ReadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestWriteVarIsNonWritableResidualSticky(t *testing.T) {
 	// IsNonWritable residual soft invent was invent soft-complete write past incomplete NoWriteVars.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	cg.RW = &RWDirective{NoWriteVars: []*Variable{nil}}
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	cg.WriteVar(v)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoWriteVars hole WriteVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindVariableScopeIsGlobalResidualSticky(t *testing.T) {
 	// IsGlobal residual soft invent was invent global-scope past nil Variable already sticky.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EmptyCGContext().FindVariableScope(nil) != ScopeInactive {
 		t.Fatal("nil FindVariableScope must fail closed ScopeInactive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FindVariableScope must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete global
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	if EmptyCGContext().FindVariableScope(v) != ScopeGlobalVar {
 		t.Fatal("global FindVariableScope")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete FindVariableScope must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

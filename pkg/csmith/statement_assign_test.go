@@ -165,22 +165,22 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	// failed factories return empty Stmt (C++ nullptr), not incomplete Kind shells
 	// note: StmtAssign is iota 0 — distinguish success via stmtOK / payload
 	opts := Defaults()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// assign: nil cg
 	if stmtOK(MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), nil, GetIntType())) {
 		t.Fatal("nil cg assign")
 	}
 	// array op: nil vs sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if st := MakeRandomArrayOp(NewRng(1), opts, NewProbabilities(opts), nil, NewExprTables(opts), NewStatementThresholdTable(opts), nil); st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil arrayop invent %#v", st)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil vs/cg arrayop must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// goto: no FM (non-sticky soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
@@ -190,14 +190,14 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("goto without FM invent %#v", st)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM goto must stay non-sticky soft re-pick")
 	}
 }
 
 func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 	// incomplete Lhs mid-compound — sticky no invent empty Binary shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// SafeAssign path uses dummy flags; LhsAsExpression(nil Lhs.Var) fails sticky
 	lhs := &Lhs{Var: nil}
@@ -215,86 +215,86 @@ func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("nil Lhs compound must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Lhs mid-compound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAssignLhsIsVolatileResidualSticky(t *testing.T) {
 	// IsVolatile residual soft invent was invent non-vol soft-skip ccomp path past Lhs hole.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Lhs + nil LhsVar complete false
 	if assignLhsIsVolatile(&Stmt{Kind: StmtAssign, StmID: 1}) {
 		t.Fatal("no lhs must soft false not sticky")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("no lhs must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete Lhs (nil Var) residual sticky true
 	st := &Stmt{Kind: StmtAssign, StmID: 1, Lhs: &Lhs{}}
 	if !assignLhsIsVolatile(st) {
 		t.Fatal("nil Lhs.Var residual must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs.Var residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Stmt residual
 	if !assignLhsIsVolatile(nil) {
 		t.Fatal("nil Stmt must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Stmt assignLhsIsVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	// IsFloat residual soft invent was invent AssignSimple soft-success past Type-nil shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	tab := NewAssignOpsTable(opts)
 	// typ nil → skip simple/float filters → may pick compound
 	op := AssignOpsProbability(NewRng(1), opts, tab, (*Type)(nil))
 	_ = op
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil typ AssignOpsProbability must soft path no sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete float → simple
 	ft := GetSimpleType(EFloat)
 	if AssignOpsProbability(NewRng(1), opts, tab, ft) != AssignSimple {
 		t.Fatal("float typ must force AssignSimple")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete float AssignOpsProbability must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-simple → simple
 	pt := PointerTo(GetIntType())
 	if AssignOpsProbability(NewRng(1), opts, tab, pt) != AssignSimple {
 		t.Fatal("non-simple typ must force AssignSimple")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete pointer AssignOpsProbability must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Type IsFloat residual hygiene for assign make gate
 	if (*Type)(nil).IsFloat() {
 		t.Fatal("nil Type IsFloat must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsFloat must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T) {
 	// StatementAssign.cpp:190–203 — force match_exact when qf, always restore.
 	// Invent sticky process MatchExactQualifiers over-restricts later choose_var.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prev := ProcessOptionsSess(testAmbientSession)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
 	opts := Defaults()
@@ -323,7 +323,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	if ProcessOptionsSess(testAmbientSession).MatchExactQualifiers {
 		t.Fatal("MatchExactQualifiers must restore to false after MakeRandomAssignQfer with qf")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // StatementAssign.cpp:151–152 / 172–174 — after RHS quals, only accept_stricter=true.
@@ -331,7 +331,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 // which clears const. Early SetConst would change AcceptStricter matching for pointer Lhs
 // (seed-2 func_11 Lhs Select vs UP).
 func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	// Simulate RHS qualifiers: const int
@@ -348,8 +348,8 @@ func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 	}
 	// Lhs Select path: Restrict WRITE clears const
 	qfer.Restrict(AccessWrite, EmptyCGContext())
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if qfer.IsConsts[0] {
 		t.Fatal("restrict(WRITE) must clear const")
@@ -362,7 +362,7 @@ func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 // Gating clear on !callerQf left MatchExact Lhs seeking volatile storage while
 // UP cleared vol and re-drew Select (seed-2 nested ExpressionAssign / ^=).
 func TestCompoundAssignAlwaysClearsVolatileOnQfer(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Caller qf: volatile int (func param path)
 	qfer := NewCVQualifiers([]bool{false}, []bool{true})
 	if !qfer.IsVolatile() {

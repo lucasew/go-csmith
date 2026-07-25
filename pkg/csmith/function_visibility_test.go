@@ -23,11 +23,11 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	f.Stack = []*Block{body}
 	arr := CreateVariableScalars("l_1053", st, false, false)
 	if arr == nil {
-		t.Fatalf("CreateVariableScalars nil err=%v", GetError())
+		t.Fatalf("CreateVariableScalars nil err=%v", GetErrorSess(testAmbientSession))
 	}
 	arr.CreateFieldVars()
 	if len(arr.FieldVars) < 2 {
-		t.Fatalf("fields %d err=%v", len(arr.FieldVars), GetError())
+		t.Fatalf("fields %d err=%v", len(arr.FieldVars), GetErrorSess(testAmbientSession))
 	}
 	body.LocalVars = []*Variable{arr}
 	field := arr.FieldVars[1] // f3
@@ -47,16 +47,16 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	if f.IsVarOOS(field, body) {
 		t.Fatal("field of live stack aggregate must not be IsVarOOS")
 	}
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	// UpdateFactsForDest must not mark-dead pointers to the field
 	ptr := CreateVariableScalars("l_1226", PointerTo(GetSimpleType(EShort)), false, false)
 	factsIn := []*FactPointTo{MakeFactPointTo(ptr, field)}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(factsOut, ptr)
 	if got == nil {
@@ -65,5 +65,5 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	if got.IsDead() {
 		t.Fatalf("pointees to in-scope aggregate field must not be garbage: %+v", got.PointTo)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -5,7 +5,7 @@ import "testing"
 // TestCreateArrayVariablePointerPrimaryNullFact — VariableSelector.cpp:1364 + Fact.cpp:94–106.
 // Constant::make_random(pointer) is always "0"; AddNewVarFact must record null/may-null.
 func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	opts := Defaults()
 	probs := NewProbabilities(opts)
@@ -17,26 +17,26 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, probs, nil, nil, nil, "l_233", elem, init, q)
-	if av == nil || HasError() {
-		t.Fatalf("create err=%v", HasError())
+	if av == nil || HasErrorSess(testAmbientSession) {
+		t.Fatalf("create err=%v", HasErrorSess(testAmbientSession))
 	}
 	fm := NewFactMgr(nil)
 	fm.AddNewVarFact(&av.Variable)
-	if HasError() {
-		t.Fatal(HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(fm.GlobalFacts, &av.Variable)
 	if got == nil || !got.IsNull() {
 		t.Fatalf("primary pointer-0 must yield null/may-null, got %+v", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestPostLoopRestoresEntryMayNullNotOut — StatementFor.cpp:355–357.
 // post_loop installs map_facts_in[body], not map_facts_out. Entry may-null
 // (pointer-array init / self-back) must not be replaced by mid-gen definitive-only out.
 func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_54", ReturnType: GetIntType()}
 	ptType := PointerTo(GetSimpleType(EShort))
@@ -61,14 +61,14 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	if got == nil || !got.IsNull() {
 		t.Fatalf("post_loop must install map_in may-null (not map_out definitive): %+v", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestFindFixedPointAfterResetKeepsEntryMayNull — Block.cpp:703 facts_copy + 719 reset.
 // After reset_stm_fact_maps, re-enter find_fixed_point with the pre-loop facts_copy
 // (may-null from entry / prior self-back). map_facts_in must be reinstalled with it.
 func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	ptType := PointerTo(GetIntType())
@@ -94,11 +94,11 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	cg.EffectAccum = &eff
 	_, _, _, ok := FindFixedPointBlock(b, factsCopy, &cg, Defaults(), true)
 	if !ok {
-		t.Fatalf("FP after reset must succeed err=%v", HasError())
+		t.Fatalf("FP after reset must succeed err=%v", HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(fm.GetMapFactsIn(1), p)
 	if got == nil || !got.IsNull() {
 		t.Fatalf("map_in after FP must keep entry may-null: %+v", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

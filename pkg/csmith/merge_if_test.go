@@ -29,7 +29,7 @@ func TestFactPointToImplyJoin(t *testing.T) {
 func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
 	// soft invent: Join soft-skips nil PointTo and still absorbs later pointees
 	// fair: incomplete PointTo sticky fail closed (no partial join / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
@@ -39,38 +39,38 @@ func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
 	if cp.Join(hole) {
 		t.Fatal("Join must fail closed on nil pointee hole, not soft-skip")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Join nil pointee must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if len(cp.PointTo) != 1 || cp.PointTo[0] != a {
 		t.Fatal("Join must not partially absorb past hole", cp.PointTo)
 	}
 	if base.Imply(hole) {
 		t.Fatal("Imply must fail closed on other nil pointee")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Imply other nil pointee must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if hole.Imply(base) {
 		t.Fatal("Imply must fail closed on self nil pointee")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Imply self nil pointee must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if base.Equal(hole) || hole.Equal(base) {
 		t.Fatal("equal must fail closed on nil pointee")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("equal nil pointee must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMergeFactLattice(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
@@ -90,14 +90,14 @@ func TestMergeFactLattice(t *testing.T) {
 
 func TestMergeFactsNilAccumulatorSticky(t *testing.T) {
 	// Fact merge always has live accumulator; sticky no invent soft-skip join
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MergeFacts(nil, nil) {
 		t.Fatal("nil facts must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts MergeFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMergeFacts(t *testing.T) {
@@ -114,7 +114,7 @@ func TestMergeFacts(t *testing.T) {
 		t.Fatal("p joined")
 	}
 	// nil hole fails closed sticky — no invent skip partial join / soft re-pick past wipe
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{MakeFactPointTo(p, a), nil}
 	base := []*FactPointTo{MakeFactPointTo(q, a)}
 	if MergeFacts(&base, hole) {
@@ -123,10 +123,10 @@ func TestMergeFacts(t *testing.T) {
 	if FindRelatedPointTo(base, p) != nil {
 		t.Fatal("must not invent partial merge past hole")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete MergeFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// PointTo nil hole: Imply/Join residual soft invent was soft-continue merge later.
 	// Fair: sticky wipe IncompleteFactSlice whole MergeFacts.
 	brokenPT := &FactPointTo{Var: p, PointTo: []*Variable{a, nil}}
@@ -137,29 +137,29 @@ func TestMergeFacts(t *testing.T) {
 	if FactsComplete(base2) {
 		t.Fatal("PointTo nil hole must wipe IncompleteFactSlice, not invent complete merge")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("PointTo nil hole MergeFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MergeFactInto(facts, nil)) {
 		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact MergeFactInto must SetError sticky")
 	}
 	// MergeFactInto incomplete map marker stays non-sticky (soft re-pick); MergeFacts sticks.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MergeFactInto([]*FactPointTo{MakeFactPointTo(p, a), nil}, MakeFactPointTo(p, a))) {
 		t.Fatal("incomplete map MergeFactInto must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete map MergeFactInto must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHasEligibleVolatileVar(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	nv := CreateVariableScalars("g_n", GetIntType(), false, false)
 	if !HasEligibleVolatileVar([]*Variable{v, nv}, GetIntType(), AccessRead, EmptyCGContext()) {
@@ -173,10 +173,10 @@ func TestHasEligibleVolatileVar(t *testing.T) {
 	if HasEligibleVolatileVar([]*Variable{nil, v}, GetIntType(), AccessRead, EmptyCGContext()) {
 		t.Fatal("nil hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIfMergesFacts(t *testing.T) {

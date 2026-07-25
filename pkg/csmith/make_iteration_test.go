@@ -7,7 +7,7 @@ import (
 
 func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	// StatementFor.cpp:170 assert(fm); soft re-pick without FactMgr
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -19,17 +19,17 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	if MakeIteration(NewRng(1), opts, NewProbabilities(opts), vs, &cg) != nil {
 		t.Fatal("nil FM must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM MakeIteration must stay non-sticky soft re-pick")
 	}
 	// sticky without RNG
 	if MakeIteration(nil, opts, NewProbabilities(opts), vs, &cg) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeIteration must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
@@ -72,7 +72,7 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	// no must-use arrays → free loop control
 	var lc *LoopControl
 	for seed := uint64(1); seed < 30; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		lc = MakeIteration(NewRng(seed), opts, NewProbabilities(opts), vs, &cg)
 		if lc != nil {
 			break
@@ -198,7 +198,7 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 
 func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	// ArrayVariable* always live on must-use list; nil hole fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -219,14 +219,14 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	if MakeIteration(NewRng(2), opts, probs, vs, &cg) != nil {
 		t.Fatal("incomplete FindMustUseArrays must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete FindMustUseArrays must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -240,10 +240,10 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeIteration(NewRng(3), opts, probs, vs, &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeIteration")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
@@ -252,8 +252,8 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeIteration(NewRng(4), opts, probs, vs, &cg2) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeIteration")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

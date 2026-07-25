@@ -9,7 +9,7 @@ import "testing"
 // lack those subjects (remove_loop_local), merge_jump must not invent garbage
 // for them (FactMgr.cpp:575–579; seed-7 for 640 / l_1402).
 func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
 	bodyLoc := CreateVariableScalars("l_body", PointerTo(GetIntType()), false, false)
 	bodyLoc.InitExpr = &Expression{Term: TermVariable, Var: outer, ExprType: PointerTo(GetIntType())}
@@ -19,8 +19,8 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 	}
 	locals := []*Variable{bodyLoc}
 	out := DropFactSubjectsByVars(in, locals)
-	if !FactsComplete(out) || HasError() {
-		t.Fatalf("drop must complete: out complete=%v err=%v", FactsComplete(out), HasError())
+	if !FactsComplete(out) || HasErrorSess(testAmbientSession) {
+		t.Fatalf("drop must complete: out complete=%v err=%v", FactsComplete(out), HasErrorSess(testAmbientSession))
 	}
 	if FindRelatedPointTo(out, bodyLoc) != nil {
 		t.Fatal("body local subject must be dropped from entry env")
@@ -33,14 +33,14 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 	if len(same) != len(in) {
 		t.Fatal("nil vars must no-op")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestPostLoopBreakMergeNoInventBodyLocal —
 // StatementFor.cpp:355–367 post_loop: restore map_facts_in then merge break outs.
 // Body local in polluted map_in + break out without it must not invent garbage.
 func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	// for body with local l_body
@@ -73,7 +73,7 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 	}
 	out := fm.GetMapFactsOut(20)
 	if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
-		t.Fatalf("merge must succeed: err=%v", HasError())
+		t.Fatalf("merge must succeed: err=%v", HasErrorSess(testAmbientSession))
 	}
 	// l_body must not reappear as garbage invent
 	if f := FindRelatedPointTo(fm.GlobalFacts, lBody); f != nil {
@@ -96,5 +96,5 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 		t.Fatal("without drop, invent garbage is expected (documents FactMgr.cpp:575–579)")
 	}
 	_ = forSt
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

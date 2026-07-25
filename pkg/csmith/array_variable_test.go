@@ -6,7 +6,7 @@ import (
 )
 
 func TestCreateArrayVariableDimensions(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -29,32 +29,32 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 
 func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	// ArrayVariable.cpp:127–133 — assert type/void sticky; ERROR_GUARD after rnd_upto(99)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("void element must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeInt(0), q) != nil {
 		t.Fatal("nil element must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil element must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name must SetError sticky")
 	}
-	ClearError()
-	SetError(ErrGeneric)
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	SetErrorSess(testAmbientSession, ErrGeneric)
+	defer ClearErrorSess(testAmbientSession)
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("sticky error after dim draw must fail closed")
 	}
@@ -62,7 +62,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 
 func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	// ArrayVariable.cpp:154–157 — empty sizes when no dim fits; no invent [1]
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
@@ -78,7 +78,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 
 func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	env := &TypeEnv{Sess: testAmbientSession}
 	probs := NewProbabilities(opts)
@@ -98,7 +98,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 
 func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 	// Constant::make_random needs live Probabilities for aggregates — no invent tables
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxArrayDim = 1
 	opts.MaxArrayLenPerDim = 4
@@ -118,7 +118,7 @@ func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 
 func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	// ArrayVariable.cpp:179–184 — pointer + !strict_const → make_init_value, not Constant "0"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.StrictConstArrays = false
 	opts.MaxArrayDim = 1
@@ -129,7 +129,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	// without VS/CG: when alt init_num > 0 fail closed non-sticky soft re-pick (no invent Constant stand-in)
 	sawFail := false
 	for seed := uint64(1); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		av := CreateArrayVariable(NewRng(seed), opts, NewProbabilities(opts), nil, nil, nil, "g_a", pt, MakeInt(0), q)
 		if av == nil {
 			sawFail = true
@@ -142,7 +142,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	if !sawFail {
 		t.Fatal("expected some seeds to need make_init_value and fail closed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// with VS+CG: make_init_value path is live
 	vs := NewVariableSelector(opts)
 	vs.Probs = NewProbabilities(opts)
@@ -151,12 +151,12 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := CreateArrayVariable(NewRng(3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
 	if av == nil {
 		// make_init_value may ERROR_GUARD; not invent Constant "0"
 		// Clear residual sticky so later tests are not poisoned
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		return
 	}
 	for _, s := range av.InitValues {
@@ -164,7 +164,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 			t.Fatal("empty alt")
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayCDecl(t *testing.T) {
@@ -263,25 +263,25 @@ func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
 		Collective: parent,
 	}
 	item.AsArray = item
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if out := item.OutputAccess(); out != "" {
 		t.Fatalf("empty indices must fail closed, got %q", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty indices itemized OutputAccess must SetError sticky")
 	}
 	// Indices string path (ItemizeConstIndices) still works without IndexExprs
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	item.Indices = []string{"1", "2"}
 	if got := item.OutputAccess(); got != "g_a[1][2]" {
 		t.Fatal(got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:250 — assert(collective == 0) on the receiver sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -295,55 +295,55 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 	if parent.Itemize(NewRng(2)) == nil {
 		t.Fatal("parent collective may itemize again")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if item.Itemize(NewRng(3)) != nil {
 		t.Fatal("re-itemize of itemized must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("re-itemize of itemized must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if parent.ItemizeInto(nil, nil) != nil {
 		t.Fatal("nil RNG Itemize must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG Itemize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayCDeclTypeNoInventInt(t *testing.T) {
 	// ArrayVariable decl always has live type; sticky no invent "int"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (*ArrayVariable)(nil).CDeclType(); s != "" {
 		t.Fatal("nil av CDeclType must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av CDeclType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{Variable: Variable{Name: "g_a"}, Sizes: []int{2}}
 	if s := av.CDeclType(); s != "" {
 		t.Fatal("nil Type must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type CDeclType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := av.OutputDef(); s != "" {
 		t.Fatal("incomplete array def must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete OutputDef must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (*ArrayVariable)(nil).OutputDef(); s != "" {
 		t.Fatal("nil av OutputDef must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av OutputDef must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
@@ -355,57 +355,57 @@ func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 		Collective: parent,
 		IndexExprs: []*Expression{{Term: TermConstant}}, // nil Con → empty Output
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := item.OutputAccess(); s != "" {
 		t.Fatal("empty index Output must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty index Output must SetError sticky")
 	}
 	// incomplete IndexExprs hole fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	item.IndexExprs = []*Expression{nil}
 	if s := item.OutputAccess(); s != "" {
 		t.Fatal("nil IndexExprs hole must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IndexExprs hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	item.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0)}}
 	if s := item.OutputAccess(); s != "g_a[0]" {
 		t.Fatal(s)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputWithIndicesNoInventEmptyBracket(t *testing.T) {
 	// ArrayVariable.cpp:708 — cvs[i] always live; sticky no invent "g_a[]"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
 	if s := av.OutputWithIndices([]string{"i"}); s != "" {
 		t.Fatal("short ctrl must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("short ctrl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := av.OutputWithIndices([]string{"i", ""}); s != "" {
 		t.Fatal("empty ctrl name must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty ctrl name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := av.OutputWithIndices([]string{"i", "j"}); s != "g_a[i][j]" {
 		t.Fatal(s)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -415,10 +415,10 @@ func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	if av.OutputDef() != "" {
 		t.Fatal("missing init on brace path must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("missing init OutputDef must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputUpperBoundArray(t *testing.T) {
@@ -446,7 +446,7 @@ func TestOutputUpperBoundArray(t *testing.T) {
 
 func TestSetIndexExprNoSoftZero(t *testing.T) {
 	// ArrayVariable.cpp:227–231 — push/set Expression*; sticky no invent "0" for nil/empty
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -457,67 +457,67 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 	if len(av.Indices) != 0 {
 		t.Fatalf("nil AddIndexExpr must not invent slot, got %v", av.Indices)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AddIndexExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av.AddIndex("")
 	if len(av.Indices) != 0 {
 		t.Fatalf("empty AddIndex must not invent slot, got %v", av.Indices)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty AddIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// ArrayVariable always live; sticky no invent soft-skip add past hole
 	(*ArrayVariable)(nil).AddIndex("i")
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av AddIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*ArrayVariable)(nil).AddIndexExpr(&Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av AddIndexExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av.SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()})
 	if len(av.Indices) != 1 || av.Indices[0] != "3" {
 		t.Fatal(av.Indices)
 	}
 	// SetIndex past end without pad — sticky no invent empty holes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av2 := &ArrayVariable{Variable: Variable{Name: "g_b"}, Sizes: []int{2, 2}}
 	av2.SetIndex(1, "i")
 	if len(av2.Indices) != 0 {
 		t.Fatalf("SetIndex past end must fail closed, got %v", av2.Indices)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("SetIndex past end must SetError sticky")
 	}
 	// append at end only
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av2.SetIndex(0, "i")
 	av2.SetIndex(1, "j")
 	if len(av2.Indices) != 2 || av2.Indices[0] != "i" || av2.Indices[1] != "j" {
 		t.Fatalf("sequential SetIndex append: %v", av2.Indices)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// ArrayVariable always live; sticky (no invent soft-skip index set past hole)
 	(*ArrayVariable)(nil).SetIndex(0, "i")
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av SetIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*ArrayVariable)(nil).SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av SetIndexExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	// ArrayVariable.cpp:703–711 — cvs[i] only; no soft i/j/k invent
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
@@ -527,16 +527,16 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 		t.Fatal(got)
 	}
 	// undersized / empty ctrl: sticky fail closed empty (no invent letters or "g_a[][]")
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if got := av.OutputWithIndices(nil); got != "" {
 		t.Fatalf("no letter invent, got %q", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ctrl OutputWithIndices must SetError sticky")
 	}
 	// local non-NoLoop array: OutputInit short ctrl sticky (no soft letters)
 	// Array IsGlobal is Block==nil; attach a block so loop-initializer path is live.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	loc := &ArrayVariable{
 		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Init: MakeInt(0)},
 		Sizes:    []int{2, 3},
@@ -549,17 +549,17 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	if got := loc.OutputInit("    ", nil); got != "" {
 		t.Fatalf("want empty init without ctrl, got %q", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OutputInit nil ctrl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if got := loc.OutputInit("    ", []string{"i"}); got != "" {
 		t.Fatalf("want empty when ctrl short, got %q", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OutputInit short ctrl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestToUnsignedSimple(t *testing.T) {
@@ -586,29 +586,29 @@ func TestOutputIndexModuloSignedCast(t *testing.T) {
 		t.Fatal(got)
 	}
 	// incomplete index Output — sticky no invent "(( % 10)"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	bad := &Expression{Term: TermConstant}
 	if out := av.OutputIndexModulo(0, bad); out != "" {
 		t.Fatal("empty index Output must fail closed", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty index OutputIndexModulo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil index sticky empty (no invent bare modulo past incomplete type)
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "j", Type: nil}}
 	if out := av.OutputIndexModulo(0, hole); out != "" {
 		t.Fatal("Type-nil index OutputIndexModulo invent", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil index OutputIndexModulo must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputDefInitExprOutputResidualSticky(t *testing.T) {
 	// InitExpr.Output residual soft invent was soft-skip brace init invent complete def.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
@@ -621,34 +621,34 @@ func TestOutputDefInitExprOutputResidualSticky(t *testing.T) {
 	if s := av.OutputDef(); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed OutputDef, not invent brace", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("InitExpr Output residual OutputDef must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNoLoopInitializerNilSticky(t *testing.T) {
 	// Incomplete shell sticky no-loop true (no invent loop-init eligibility past hole).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*ArrayVariable)(nil).NoLoopInitializer() {
 		t.Fatal("nil NoLoopInitializer must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoLoopInitializer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(&ArrayVariable{Variable: Variable{Name: "g_a"}}).NoLoopInitializer() {
 		t.Fatal("Type-nil NoLoopInitializer must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil NoLoopInitializer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
 	// index Output residual soft invent was soft-continue later indices invent partial access.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType()},
@@ -662,16 +662,16 @@ func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
 	if s := item.OutputAccess(); s != "" {
 		t.Fatal("index Output residual must fail closed OutputAccess", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("index Output residual OutputAccess must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	// ArrayVariable.cpp:261–264 / Variable.cpp:350–355 — itemize expands field vars;
 	// names use ArrayVariable::Output (name[idx]…) + ".fN", not bare collective name.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
@@ -702,12 +702,12 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	if item.FieldVars[0].OutputC() != want0 {
 		t.Fatalf("field OutputC want %q got %q", want0, item.FieldVars[0].OutputC())
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 	// Variable.cpp:350–352 — isArray parent uses Output not bare name for field paths.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetSimpleType(EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
@@ -719,8 +719,8 @@ func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 	}
 	item.AsArray = item
 	item.CreateFieldVars()
-	if HasError() || len(item.FieldVars) != 1 {
-		t.Fatalf("fields err=%v n=%d", HasError(), len(item.FieldVars))
+	if HasErrorSess(testAmbientSession) || len(item.FieldVars) != 1 {
+		t.Fatalf("fields err=%v n=%d", HasErrorSess(testAmbientSession), len(item.FieldVars))
 	}
 	if item.FieldVars[0].Name != "g_42[1].f0" {
 		t.Fatalf("want g_42[1].f0 got %q", item.FieldVars[0].Name)
@@ -728,12 +728,12 @@ func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 	if item.FieldVars[0].OutputAddrOf(false) != "&g_42[1].f0" {
 		t.Fatalf("addr %q", item.FieldVars[0].OutputAddrOf(false))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
 	// CreateFieldVars residual soft invent was invent complete itemize shell past hole.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: nil, BitWidth: -1}, // incomplete field type
@@ -746,17 +746,17 @@ func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
 	if av.Itemize(NewRng(1)) != nil {
 		t.Fatal("CreateFieldVars residual must fail closed Itemize, not invent item")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateFieldVars residual Itemize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if av.ItemizeConstIndices([]int{0}, nil) != nil {
 		t.Fatal("CreateFieldVars residual must fail closed ItemizeConstIndices")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateFieldVars residual ItemizeConstIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSizeInBytesArray(t *testing.T) {
@@ -772,14 +772,14 @@ func TestSizeInBytesArray(t *testing.T) {
 
 func TestItemizeConstIndicesNilSticky(t *testing.T) {
 	// ArrayVariable always live at itemize; sticky no invent soft-skip past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ArrayVariable)(nil).ItemizeConstIndices([]int{0}, nil) != nil {
 		t.Fatal("nil ItemizeConstIndices must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ItemizeConstIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil shell sticky — no invent itemize soft-success past incomplete type
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: nil, IsArray: true, ArraySizes: []int{4}},
@@ -789,58 +789,58 @@ func TestItemizeConstIndicesNilSticky(t *testing.T) {
 	if av.ItemizeConstIndices([]int{0}, nil) != nil {
 		t.Fatal("Type-nil ItemizeConstIndices must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil ItemizeConstIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if av.ItemizeInto(NewRng(1), nil) != nil {
 		t.Fatal("Type-nil ItemizeInto must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil ItemizeInto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayVariableNilPredicatesSticky(t *testing.T) {
 	// ArrayVariable always live; sticky no invent dim0 / empty-size / not-global / zero-bytes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ArrayVariable)(nil).Dimension() != 0 {
 		t.Fatal("nil Dimension must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Dimension must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ArrayVariable)(nil).TotalSize() != 0 {
 		t.Fatal("nil TotalSize must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil TotalSize must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ArrayVariable)(nil).IsGlobal() {
 		t.Fatal("nil IsGlobal must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsGlobal must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ArrayVariable)(nil).SizeInBytesArray() != 0 {
 		t.Fatal("nil SizeInBytesArray must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SizeInBytesArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	avNoType := &ArrayVariable{Variable: Variable{Name: "g_a"}, Sizes: []int{2}}
 	if avNoType.SizeInBytesArray() != 0 {
 		t.Fatal("nil Type SizeInBytesArray must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type SizeInBytesArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestContainsBackEdgeDestParentOnly(t *testing.T) {
@@ -888,73 +888,73 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 		t.Fatal("two vars")
 	}
 	// incomplete IR fails closed -1 / nil (no invent leaf 0 or key-var 1)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CountExprKeyVar(nil) >= 0 {
 		t.Fatal("nil expr must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil expr CountExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CountExprKeyVar(&Expression{Term: TermVariable}) >= 0 {
 		t.Fatal("nil Var must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Var CountExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CountExprKeyVar(&Expression{Term: TermConstant}) >= 0 {
 		t.Fatal("nil Con must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Con CountExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil Constant sticky (no invent key-count 0 past hole)
 	if CountExprKeyVar(&Expression{Term: TermConstant, Con: &Constant{Value: "0"}}) >= 0 {
 		t.Fatal("Type-nil Con must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil Con CountExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CountExprKeyVar(&Expression{Term: TermFunction}) >= 0 {
 		t.Fatal("nil Invoke must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Invoke CountExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CountExprKeyVar(&Expression{Term: TermFunction, Invoke: &Invocation{
 		IsStd: true, Binary: "+", Args: []*Expression{ev, nil},
 	}}) >= 0 {
 		t.Fatal("nil arg hole must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil arg CountExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if FindExprKeyVar(&Expression{Term: TermFunction, Invoke: &Invocation{
 		IsStd: true, Binary: "+", Args: []*Expression{nil, c},
 	}}) != nil {
 		t.Fatal("nil arg FindExprKeyVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil arg FindExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil Variable sticky (no invent key soft-success past type hole)
 	if FindExprKeyVar(&Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}) != nil {
 		t.Fatal("Type-nil Var FindExprKeyVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil Var FindExprKeyVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsVariantKeyVars(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
@@ -991,12 +991,12 @@ func TestIsVariantKeyVars(t *testing.T) {
 	if a1.IsVariant(&a3.Variable) {
 		t.Fatal("different keys")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
 	// FindExprKeyVar residual soft invent was nil==nil invent variant-true past Type-nil key.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
@@ -1021,10 +1021,10 @@ func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
 	if a1.IsVariant(&a2.Variable) {
 		t.Fatal("FindExprKeyVar residual must fail closed not invent variant-true nil==nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindExprKeyVar residual IsVariant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Count residual soft invent was soft-continue Find invent variant
 	emptyCon := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual count
 	a3 := &ArrayVariable{
@@ -1037,10 +1037,10 @@ func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
 	if a3.IsVariant(&a3.Variable) {
 		t.Fatal("CountExprKeyVar residual must fail closed IsVariant")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CountExprKeyVar residual IsVariant must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeConstIndices(t *testing.T) {
@@ -1059,7 +1059,7 @@ func TestItemizeConstIndices(t *testing.T) {
 }
 
 func TestHasEligibleVolatileVarIncrements(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalization()
 	defer BookkeeperDoFinalization()
 	vol := CreateVariableScalars("g_v", GetIntType(), true, false)
@@ -1080,7 +1080,7 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 
 func TestSetIndexNoInventNilPad(t *testing.T) {
 	// IndexExprs lag Indices: sticky must not invent nil pad slots
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
 		Indices:  []string{"0", "1"},
@@ -1091,22 +1091,22 @@ func TestSetIndexNoInventNilPad(t *testing.T) {
 	if len(av.IndexExprs) > 0 && av.IndexExprs[0] == nil {
 		t.Fatal("must not invent nil pad at IndexExprs[0]")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IndexExprs lag SetIndex must SetError sticky")
 	}
 	// only append when index == len
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av.IndexExprs = nil
 	av.SetIndex(0, "0")
 	if len(av.IndexExprs) != 1 || av.IndexExprs[0] == nil {
 		t.Fatal("append at len must store live expr")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputWithIndicesGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was invent "[i]" access past empty name shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -1115,55 +1115,55 @@ func TestOutputWithIndicesGetActualNameResidualSticky(t *testing.T) {
 	if s := av.OutputWithIndices([]string{"i"}); s != "" {
 		t.Fatal("empty name residual must fail closed OutputWithIndices", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name residual OutputWithIndices must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := av.OutputLowerBound(); s != "" {
 		t.Fatal("empty name residual must fail closed OutputLowerBound", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name residual OutputLowerBound must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := av.OutputUpperBoundArray(); s != "" {
 		t.Fatal("empty name residual must fail closed OutputUpperBoundArray", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name residual OutputUpperBoundArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSizeInBytesArraySizeInBytesResidualSticky(t *testing.T) {
 	// SizeInBytes residual soft invent was invent soft-zero size past Type-nil shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: nil}, Sizes: []int{2}}
 	if av.SizeInBytesArray() != 0 {
 		t.Fatal("Type-nil SizeInBytesArray must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil SizeInBytesArray must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCDeclTypeCNameResidualSticky(t *testing.T) {
 	// CName residual soft invent was invent soft-empty decl past Type-nil shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: nil}, Sizes: []int{2}}
 	if av.CDeclType() != "" {
 		t.Fatal("Type-nil CDeclType must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil CDeclType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
 	// ExpressionVariable.cpp:210–216 — & + ArrayVariable::Output → &g_83[1]
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	parent := &ArrayVariable{
@@ -1184,13 +1184,13 @@ func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
 	if got != "&g_83[1]" {
 		t.Fatalf("got %q want &g_83[1]", got)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 	// ArrayVariable.cpp:512–521 + CVQualifiers.cpp:534–561 —
 	// storage-volatile pointer array: "int32_t * volatile g_38[1]" not "volatile int32_t* g_38[1]"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	pt := PointerTo(GetIntType())
 	av := &ArrayVariable{
@@ -1207,7 +1207,7 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 	}
 	av.AsArray = av
 	d := av.CDeclType()
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("sticky error on CDeclType")
 	}
 	want := "int32_t * volatile g_38[1]"
@@ -1225,7 +1225,7 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 
 func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 	// Variable.cpp:662–664 + OutputMgr.cpp:318 — ";/* VOLATILE GLOBAL name */"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	v.Init = MakeInt(0)
@@ -1241,7 +1241,7 @@ func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 func TestOutputInitNegativeConstParen(t *testing.T) {
 	// ArrayVariable.cpp:649 + Expression::to_string → Constant::Output
 	// Constant.cpp:532–536 — enclose negatives in parentheses.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Local array: IsGlobal for ArrayVariable is Block==nil (ArrayVariable.cpp:414–415).
 	blk := &Block{}
 	av := &ArrayVariable{
@@ -1260,8 +1260,8 @@ func TestOutputInitNegativeConstParen(t *testing.T) {
 		t.Fatalf("Init.Output got %q", got)
 	}
 	out := av.OutputInitOpts("", []string{"i"}, true)
-	if HasError() {
-		t.Fatalf("OutputInit sticky err=%v out=%q", HasError(), out)
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("OutputInit sticky err=%v out=%q", HasErrorSess(testAmbientSession), out)
 	}
 	if !strings.Contains(out, " = (-3L);") {
 		t.Fatalf("want paren-negative init, got %q", out)

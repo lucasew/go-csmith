@@ -18,7 +18,7 @@ func TestBooleanAttribute(t *testing.T) {
 }
 
 func TestAttributeGeneratorOutput(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 		&BooleanAttribute{Name: "used", Prob: 100},
@@ -31,31 +31,31 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 		t.Fatal(out)
 	}
 	// nil Attribute* hole sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	gHole := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}, nil}}
 	if gHole.Output(NewRng(1)) != "" {
 		t.Fatal("nil Attribute hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Attribute hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// AttributeGenerator always live; sticky empty (no invent soft-skip past hole)
 	if (*AttributeGenerator)(nil).Output(NewRng(1)) != "" {
 		t.Fatal("nil AttributeGenerator Output must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AttributeGenerator Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty Attributes complete empty
 	if (&AttributeGenerator{}).Output(NewRng(1)) != "" {
 		t.Fatal("empty Attributes must complete empty")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Attributes must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMultiChoiceAttribute(t *testing.T) {
@@ -81,105 +81,105 @@ func TestAlignedAttribute(t *testing.T) {
 		t.Fatal("want power of 2", s)
 	}
 	// sticky no soft invent alignment=1 when ctor left Alignment 0
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a0 := &AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 0}
 	if a0.MakeRandom(NewRng(1)) != "" {
 		t.Fatal("Alignment 0 must not invent aligned(1)")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Alignment 0 must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSectionAttributeNoInventName(t *testing.T) {
 	// Attribute name from ctor; sticky no invent "section" when empty
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := &SectionAttribute{Name: "", Prob: 100}
 	if s := a.MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("empty name must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty section name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAttributeNilReceiverMakeRandomSticky(t *testing.T) {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	r := NewRng(1)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*BooleanAttribute)(nil).MakeRandom(r) != "" {
 		t.Fatal("nil BooleanAttribute must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BooleanAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*MultiChoiceAttribute)(nil).MakeRandom(r) != "" {
 		t.Fatal("nil MultiChoiceAttribute must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MultiChoiceAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*AlignedAttribute)(nil).MakeRandom(r) != "" {
 		t.Fatal("nil AlignedAttribute must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AlignedAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*SectionAttribute)(nil).MakeRandom(r) != "" {
 		t.Fatal("nil SectionAttribute must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SectionAttribute must SetError sticky")
 	}
 	// typed-nil interface slot still hits MakeRandom sticky (not soft not-selected)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	var typedNil Attribute = (*BooleanAttribute)(nil)
 	if typedNil.MakeRandom(r) != "" {
 		t.Fatal("typed-nil Attribute interface must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("typed-nil Attribute interface must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAttributeNoInventEmptyName(t *testing.T) {
 	// Boolean / MultiChoice / Aligned require live name from ctor sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&BooleanAttribute{Name: "", Prob: 100}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("boolean empty name", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("boolean empty name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&MultiChoiceAttribute{Name: "", Prob: 100, Choices: []string{"a"}}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("multichoice empty name", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("multichoice empty name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("aligned empty name", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("aligned empty name must SetError sticky")
 	}
 	// empty choice slot sticky — no invent visibility("")
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{""}}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("empty choice must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty choice must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSectionAttribute(t *testing.T) {
@@ -192,50 +192,50 @@ func TestSectionAttribute(t *testing.T) {
 
 func TestAttributeNilRNGSticky(t *testing.T) {
 	// Attribute / generator always have process RNG; sticky no invent skip shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&BooleanAttribute{Name: "unused", Prob: 100}).MakeRandom(nil) != "" {
 		t.Fatal("nil RNG boolean must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG BooleanAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default"}}).MakeRandom(nil) != "" {
 		t.Fatal("nil RNG multichoice must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MultiChoiceAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: nil}).MakeRandom(NewRng(1)) != "" {
 		t.Fatal("empty choices must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty choices MultiChoiceAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}).MakeRandom(nil) != "" {
 		t.Fatal("nil RNG aligned must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG AlignedAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&SectionAttribute{Name: "section", Prob: 100}).MakeRandom(nil) != "" {
 		t.Fatal("nil RNG section must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG SectionAttribute must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}}}
 	if g.Output(nil) != "" {
 		t.Fatal("nil RNG generator Output must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG AttributeGenerator.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNewVarAttrGeneratorGated(t *testing.T) {
@@ -321,7 +321,7 @@ func TestGetEvalToSubexpsComma(t *testing.T) {
 
 func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	// incomplete IR must IncompleteExpressions sticky (not bare nil invent empty-complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cases := []*Expression{
 		{Term: TermCommaExpr},
 		{Term: TermAssignment},
@@ -331,35 +331,35 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 		nil,
 	}
 	for _, e := range cases {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		if ExpressionsComplete(GetEvalToSubexps(e)) {
 			t.Fatalf("incomplete eval must IncompleteExpressions, got complete for %#v", e)
 		}
-		if !HasError() {
+		if !HasErrorSess(testAmbientSession) {
 			t.Fatalf("incomplete eval must SetError sticky for %#v", e)
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil Constant shell sticky (no invent self-eval complete list)
 	if ExpressionsComplete(GetEvalToSubexps(&Expression{
 		Term: TermConstant, Con: &Constant{Value: "0"},
 	})) {
 		t.Fatal("Type-nil Constant must IncompleteExpressions")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil Constant GetEvalToSubexps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil Variable shell sticky (specials exempt)
 	if ExpressionsComplete(GetEvalToSubexps(&Expression{
 		Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil},
 	})) {
 		t.Fatal("Type-nil Variable must IncompleteExpressions")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil Variable GetEvalToSubexps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil LhsVar assign sticky
 	if ExpressionsComplete(GetEvalToSubexps(&Expression{
 		Term:   TermAssignment,
@@ -367,10 +367,10 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	})) {
 		t.Fatal("Type-nil LhsVar must IncompleteExpressions")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil LhsVar GetEvalToSubexps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHaveOverlappingFieldsUnion(t *testing.T) {
@@ -399,7 +399,7 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	// soft invent: FindUnionPointees nil → len==0 → no overlap success
 	// fair: incomplete facts/pointees fail closed sticky as overlap
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
@@ -410,10 +410,10 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	if VariablesComplete(FindUnionPointees(holeFacts, e1)) {
 		t.Fatal("FindUnionPointees incomplete must fail closed incomplete, not invent empty complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("FindUnionPointees incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete empty: non-pointer term → empty unions, no overlap
 	c := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	empty := FindUnionPointees(nil, c)
@@ -427,7 +427,7 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 
 func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	// GetContainerUnion residual soft invent was soft-continue later pointees invent empty unions.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// Type-nil parent ancestry: GetContainerUnion stickies ERROR
 	parent := &Variable{Name: "g_hole"} // Type nil
@@ -438,18 +438,18 @@ func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	if VariablesComplete(got) {
 		t.Fatal("GetContainerUnion residual must fail closed incomplete, not invent empty complete", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetContainerUnion residual FindUnionPointees must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual must also invent overlap (restrictive) not conflict-free
 	if !HaveOverlappingFields(e, e, facts) {
 		t.Fatal("GetContainerUnion residual HaveOverlappingFields must fail closed as overlap")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetContainerUnion residual HaveOverlappingFields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuiltinOutputSkipped(t *testing.T) {
@@ -497,7 +497,7 @@ func TestVisitFactsLhsCompoundRead(t *testing.T) {
 
 func TestAttributeGeneratorMakeRandomResidualSticky(t *testing.T) {
 	// MakeRandom residual soft invent was soft-continue later attrs invent partial __attribute__.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 		&BooleanAttribute{Name: "", Prob: 100}, // empty name residual sticky
@@ -505,8 +505,8 @@ func TestAttributeGeneratorMakeRandomResidualSticky(t *testing.T) {
 	if s := g.Output(NewRng(1)); s != "" {
 		t.Fatal("MakeRandom residual must fail closed AttributeGenerator.Output", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MakeRandom residual AttributeGenerator.Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

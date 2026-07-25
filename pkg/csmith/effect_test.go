@@ -15,89 +15,89 @@ func TestEmptyEffectSEFree(t *testing.T) {
 
 func TestSiblingUnionFieldGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent no-sibling soft-skip past array shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	// restrictive true on residual GetCollective
 	if !EmptyEffect().SiblingUnionFieldIsRead(shell) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsRead must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !EmptyEffect().SiblingUnionFieldIsWritten(shell) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsWritten must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsWritten must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestWriteVarSetResidualSticky(t *testing.T) {
 	// WriteVar residual soft invent was invent soft-continue later writes past nil hole mid set.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete vars list sticky IncompleteEffect
 	out := EmptyEffect().WriteVarSet([]*Variable{nil})
 	if EffectComplete(out) {
 		t.Fatal("nil var WriteVarSet must fail closed IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var WriteVarSet must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete base
 	out2 := IncompleteEffect().WriteVarSet([]*Variable{CreateVariableScalars("g_x", GetIntType(), false, false)})
 	if EffectComplete(out2) {
 		t.Fatal("incomplete base WriteVarSet must IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete base WriteVarSet must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsSideEffectFreeIncompleteResidualSticky(t *testing.T) {
 	// IsSideEffectFree residual soft invent was invent SE-free soft-skip past IncompleteEffect.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if IncompleteEffect().IsSideEffectFree() {
 		t.Fatal("IncompleteEffect IsSideEffectFree must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect IsSideEffectFree must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete pure is SE-free
 	if !EmptyEffect().IsSideEffectFree() {
 		t.Fatal("EmptyEffect must be SE-free")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete EmptyEffect IsSideEffectFree must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIncompleteEffectCloneResidualSticky(t *testing.T) {
 	// IncompleteEffect Clone residual soft invent was invent soft-complete snapshot past hole.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cp := IncompleteEffect().Clone()
 	if EffectComplete(cp) {
 		t.Fatal("IncompleteEffect Clone must stay IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect Clone must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete clone no sticky
 	e := EmptyEffect()
 	cp2 := e.Clone()
 	if !EffectComplete(cp2) {
 		t.Fatal("EmptyEffect Clone must complete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete Clone must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAccessEnumAndEmptyEffect(t *testing.T) {
@@ -113,7 +113,7 @@ func TestAccessEnumAndEmptyEffect(t *testing.T) {
 
 func TestNonEmptyIntersectionMatch(t *testing.T) {
 	// Effect.cpp:56–69 — Variable::match (identity / aggregate field)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
 	if NonEmptyIntersection([]*Variable{a}, []*Variable{b}) {
@@ -132,5 +132,5 @@ func TestNonEmptyIntersectionMatch(t *testing.T) {
 	if e1.HasRaceWith(e3) {
 		t.Fatal("disjoint no race")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

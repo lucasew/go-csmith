@@ -6,7 +6,7 @@ import (
 )
 
 func TestAddExternalEffectWithCallers(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
@@ -33,34 +33,34 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	if EffectComplete(got) || got.IsEmpty() || got.read[g] || got.written[g] {
 		t.Fatal("nil effect hole must fail closed IncompleteEffect", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil effect hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got2 := base.AddExternalEffectWithCallers(other, []*Block{nil, blk})
 	if EffectComplete(got2) || got2.written[g] || got2.written[loc] {
 		t.Fatal("nil call_chain hole must fail closed IncompleteEffect", got2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil call_chain hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete LocalVars on chain frame: no invent partial global merge
 	holeBlk := &Block{LocalVars: []*Variable{loc, nil}}
 	got3 := base.AddExternalEffectWithCallers(other, []*Block{holeBlk})
 	if EffectComplete(got3) || got3.written[g] || got3.written[loc] {
 		t.Fatal("incomplete stack on chain must fail closed IncompleteEffect", got3)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete stack chain must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVarVisible false → not found in Blocks → not OOS
 	// fair: StackScanComplete false → OOS true sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p, nil}
@@ -68,17 +68,17 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	if f.IsVarVisible(p, body) {
 		t.Fatal("incomplete Param must not invent visible")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Param IsVarVisible must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !f.IsVarOOS(p, body) {
 		t.Fatal("incomplete stack must fail closed OOS, not invent not-OOS")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete stack IsVarOOS must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Blocks hole residual: soft invent was soft-skip hole then not-OOS / invent match later.
 	// Fair: sticky OOS true fail closed (hole before match).
 	f2 := &Function{Name: "f2"}
@@ -89,14 +89,14 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	if !f2.IsVarOOS(loc, nil) {
 		t.Fatal("Blocks hole must fail closed OOS sticky")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Blocks hole IsVarOOS must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAddVisibleEffectUsesChain(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	if loc == nil {
@@ -127,40 +127,40 @@ func TestOutputVariableList(t *testing.T) {
 		t.Fatal("want vector order g_b then g_a", out)
 	}
 	// incomplete OutputDef — sticky no invent indent-only blank lines
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	broken := &Variable{Name: "g_x", Type: GetIntType()} // no init
 	if s := OutputVariableList([]*Variable{broken}, "    ", true); s != "" {
 		t.Fatal("empty defs must fail closed empty list", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty-def OutputVariableList must SetError sticky")
 	}
 	// incomplete entry fails whole list (no invent skip holes)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := OutputVariableList([]*Variable{a, broken}, "  ", true); s != "" {
 		t.Fatal("mixed incomplete must fail closed whole list", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("mixed incomplete OutputVariableList must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := OutputVariableList([]*Variable{a, nil}, "  ", true); s != "" {
 		t.Fatal("nil hole must fail closed whole list", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole OutputVariableList must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was scalar OutputDef path
 	// fair: sticky empty whole list
 	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
 	if s := OutputVariableList([]*Variable{arrShell}, "  ", true); s != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole list", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray OutputVariableList must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputGlobalVariables(t *testing.T) {
@@ -202,7 +202,7 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	// seed may fail; retry
 	var st *Stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 		cg2.EffectAccum = &eff
 		cg2.Types = vs.Types

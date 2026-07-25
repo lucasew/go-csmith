@@ -18,7 +18,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 	withAlts := 0
 	n8 := 0
 	for seed := uint64(1); seed <= 500; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		ResetArrayInitSeed()
 		r := NewRng(seed)
 		SetProcessRngSess(testAmbientSession, r)
@@ -32,7 +32,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 		r = NewRng(seed)
 		SetProcessRngSess(testAmbientSession, r)
 		av := CreateArrayVariable(r, opts, probs, vs, nil, blk, "l_arr", elem, init, NewCVQualifiers(nil, nil))
-		if av == nil || HasError() {
+		if av == nil || HasErrorSess(testAmbientSession) {
 			continue
 		}
 		total := 1
@@ -60,7 +60,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 // force_non_uniform with n=3 (not power-of-2) must vary indices and emit
 // more than one init token. ArrayVariable.cpp:433–437 seed formula.
 func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ResetArrayInitSeed()
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := GetSimpleType(EUInt)
@@ -78,8 +78,8 @@ func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
 	}
 	av.AsArray = av
 	def := av.OutputDef()
-	if def == "" || HasError() {
-		t.Fatalf("OutputDef fail err=%v", GetError())
+	if def == "" || HasErrorSess(testAmbientSession) {
+		t.Fatalf("OutputDef fail err=%v", GetErrorSess(testAmbientSession))
 	}
 	// With n=3, seed 0xABCDEF yields varied indices (not all A).
 	if !strings.Contains(def, "B") && !strings.Contains(def, "C") {

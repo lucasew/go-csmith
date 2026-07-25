@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestEffectHasGlobalAndUnionRead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	if g == nil {
 		t.Fatal("global")
@@ -26,37 +26,37 @@ func TestEffectHasGlobalAndUnionRead(t *testing.T) {
 	if !e2.UnionFieldIsRead() {
 		t.Fatal("union field read")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete UnionFieldIsRead must not sticky")
 	}
 	// IsInsideUnionField residual: Type-nil parent soft invent was soft-continue no-union-read.
 	// Fair: sticky union-read true.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parentHole := &Variable{Name: "g_u2"} // Type nil
 	fieldHole := &Variable{Name: "g_u2.f0", Type: GetIntType(), FieldVarOf: parentHole}
 	e3 := EmptyEffect().ReadVar(fieldHole)
 	if !e3.UnionFieldIsRead() {
 		t.Fatal("IsInsideUnionField residual UnionFieldIsRead must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsInsideUnionField residual UnionFieldIsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsReadPartially residual via Type-nil parent field walk.
 	if !EmptyEffect().IsReadPartially(fieldHole) {
 		t.Fatal("IsRead residual IsReadPartially must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsRead residual IsReadPartially must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !EmptyEffect().IsWrittenPartially(fieldHole) {
 		t.Fatal("IsWritten residual IsWrittenPartially must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsWritten residual IsWrittenPartially must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectUpdatePurity(t *testing.T) {
@@ -69,12 +69,12 @@ func TestEffectUpdatePurity(t *testing.T) {
 		t.Fatal("not pure after global")
 	}
 	// Effect always live; sticky no invent soft-skip purity update past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*Effect)(nil).UpdatePurity()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil UpdatePurity must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectConsolidate(t *testing.T) {
@@ -105,7 +105,7 @@ func TestEffectConsolidate(t *testing.T) {
 // re-push the field (is_read true via parent). Otherwise expand_struct_union_vars
 // in choose_visible_read_var duplicates field entries and inflates ok-list size.
 func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -119,7 +119,7 @@ func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
 
 	// Effect.cpp:117 — if (!is_read(v)) push; parent then field → field skipped
 	e := EmptyEffect().ReadVar(parent).ReadVar(f0).ReadVar(f1)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete ReadVar must not sticky")
 	}
 	reads := e.ReadVars()
@@ -132,7 +132,7 @@ func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
 
 	// field-first then parent: both present (is_read parent is exact only)
 	e2 := EmptyEffect().ReadVar(f0).ReadVar(parent)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("field-then-parent ReadVar must not sticky")
 	}
 	r2 := e2.ReadVars()
@@ -155,7 +155,7 @@ func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
 	base := EmptyEffect().ReadVar(parent)
 	other := EmptyEffect().ReadVar(f0)
 	merged := base.AddEffect(other)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("AddEffect must not sticky")
 	}
 	if len(merged.ReadVars()) != 1 || merged.ReadVars()[0] != parent {
@@ -164,13 +164,13 @@ func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
 
 	// WriteVar: is_written walks any parent (Effect.cpp:137–140 + 333–345)
 	ew := EmptyEffect().WriteVar(parent).WriteVar(f0)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVar must not sticky")
 	}
 	if len(ew.WrittenVars()) != 1 || ew.WrittenVars()[0] != parent {
 		t.Fatalf("only parent in write set after field write: %v", namesOf(ew.WrittenVars()))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func namesOf(vars []*Variable) []string {
@@ -187,69 +187,69 @@ func namesOf(vars []*Variable) []string {
 
 func TestEffectIsReadTypeNilParentSticky(t *testing.T) {
 	// Type-nil parent sticky read true (restrictive — no invent not-read soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_s"} // Type nil
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect()
 	if !e.IsRead(field) {
 		t.Fatal("Type-nil parent IsRead must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil parent sticky written true (mirrors IsRead; no invent not-written)
 	if !e.IsWritten(field) {
 		t.Fatal("Type-nil parent IsWritten must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsWritten must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete non-field not-read
 	v := CreateVariableScalars("g_i", GetIntType(), false, false)
 	if e.IsRead(v) {
 		t.Fatal("unrelated var must be not-read complete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete not-read must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if e.IsWritten(v) {
 		t.Fatal("unrelated var must be not-written complete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete not-written must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectSiblingTypeNilContainerSticky(t *testing.T) {
 	// Type-nil container GetContainerUnion stickies; Sibling must not invent no-sibling false
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect()
 	if !e.SiblingUnionFieldIsRead(field) {
 		t.Fatal("Type-nil container SiblingUnionFieldIsRead must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil container SiblingUnionFieldIsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !e.SiblingUnionFieldIsWritten(field) {
 		t.Fatal("Type-nil container SiblingUnionFieldIsWritten must fail closed true restrictive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil container SiblingUnionFieldIsWritten must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectConsolidateTypeNilParentSticky(t *testing.T) {
 	// Type-nil parent shell during consolidate: soft invent was leave-base complete.
 	// Fair: sticky IncompleteEffect fail closed.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_s"} // Type nil
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect().ReadVar(field)
@@ -257,16 +257,16 @@ func TestEffectConsolidateTypeNilParentSticky(t *testing.T) {
 	if EffectComplete(e) {
 		t.Fatal("Type-nil parent Consolidate must fail closed IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent Consolidate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	// soft invent: delete some fields then hit nil key mid-map under random order
 	// fair: incomplete sticky → IncompleteEffect (not invent partial consolidate / leave base complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := CreateVariableScalars("g_s", GetIntType(), true, false)
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect().ReadVar(parent).ReadVar(field)
@@ -278,86 +278,86 @@ func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	if e.IsEmpty() || e.IsPure() {
 		t.Fatal("IncompleteEffect must not invent empty/pure", e)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Consolidate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
 	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete Effect sticky
 	// (membership on incomplete is fail-closed true separately)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	w := IncompleteEffect().WriteVar(v)
 	if EffectComplete(w) {
 		t.Fatal("WriteVar incomplete base must stay IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVar incomplete base must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := IncompleteEffect().ReadVar(v)
 	if EffectComplete(r) {
 		t.Fatal("ReadVar incomplete base must stay IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ReadVar incomplete base must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EffectComplete(IncompleteEffect().AccessDerefVolatile(v, 1, true)) {
 		t.Fatal("AccessDerefVolatile incomplete base must stay incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AccessDerefVolatile incomplete base must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Clear incomplete base stays IncompleteEffect sticky (no invent wipe to empty pure)
 	inc := IncompleteEffect()
 	inc.Clear()
 	if EffectComplete(inc) {
 		t.Fatal("Clear incomplete base must stay IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Clear incomplete base must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Effect* always live at Clear/Consolidate; sticky no invent soft-skip past hole
 	(*Effect)(nil).Clear()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Effect Clear must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*Effect)(nil).Consolidate()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Effect Consolidate must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	// IsWritten/IsRead false on IncompleteEffect invents conflict-free / eligible
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	inc := IncompleteEffect()
 	if !inc.IsWritten(v) {
 		t.Fatal("incomplete IsWritten must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete IsWritten must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !inc.IsRead(v) {
 		t.Fatal("incomplete IsRead must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete IsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !inc.IsWrittenPartially(v) || !inc.IsReadPartially(v) {
 		t.Fatal("incomplete partial membership must fail closed true")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// aggregate field membership
 	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	parent := &Variable{Name: "g_s", Type: st}
@@ -368,7 +368,7 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	if !inc.FieldIsWritten(parent) || !inc.FieldIsRead(parent) {
 		t.Fatal("incomplete FieldIs* must fail closed true")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// sibling-union on incomplete effect
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -382,45 +382,45 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	if !inc.SiblingUnionFieldIsRead(uv.FieldVars[0]) || !inc.SiblingUnionFieldIsWritten(uv.FieldVars[0]) {
 		t.Fatal("incomplete SiblingUnion* must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete SiblingUnion* must SetError sticky")
 	}
 	// nil FieldVars hole sticky fail closed true
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	e := EmptyEffect()
 	hole := &Variable{Name: "g_h", Type: st, FieldVars: []*Variable{nil}}
-	if !e.FieldIsRead(hole) || !HasError() {
+	if !e.FieldIsRead(hole) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars hole FieldIsRead must fail closed sticky true")
 	}
-	ClearError()
-	if !e.FieldIsWritten(hole) || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if !e.FieldIsWritten(hole) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars hole FieldIsWritten must fail closed sticky true")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky true (no invent no-field-* soft-skip)
-	if !e.FieldIsRead(nil) || !HasError() {
+	if !e.FieldIsRead(nil) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable FieldIsRead must fail closed sticky true")
 	}
-	ClearError()
-	if !e.FieldIsWritten(nil) || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if !e.FieldIsWritten(nil) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable FieldIsWritten must fail closed sticky true")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil subject soft invent: IsAggregate residual ERROR+false → no field conflict
 	// fair: sticky true (restrictive) before classify
 	shell := &Variable{Name: "g_typeless"}
-	if !e.FieldIsRead(shell) || !HasError() {
+	if !e.FieldIsRead(shell) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil FieldIsRead must fail closed sticky true")
 	}
-	ClearError()
-	if !e.FieldIsWritten(shell) || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if !e.FieldIsWritten(shell) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil FieldIsWritten must fail closed sticky true")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEffectIsReadByName(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
 	e := EmptyEffect().ReadVar(v).WriteVar(v)
 	if !e.IsReadByName("g_x") || !e.IsWrittenByName("g_x") {
@@ -430,27 +430,27 @@ func TestEffectIsReadByName(t *testing.T) {
 		t.Fatal("missing")
 	}
 	// incomplete effect sticky by-name membership
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
 	if !inc.IsReadByName("g_x") || !inc.IsWrittenByName("g_x") {
 		t.Fatal("incomplete by-name must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete by-name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty name sticky true (no invent not-read / not-written soft-skip past hole)
 	if !e.IsReadByName("") || !e.IsWrittenByName("") {
 		t.Fatal("empty name by-name must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name by-name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestJoinVisits(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
@@ -471,20 +471,20 @@ func TestJoinVisits(t *testing.T) {
 	if f2.JoinVisits(MakeFactPointTo(p, TBDPtr)) {
 		t.Fatal("tbd other ignored")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete JoinVisits TBD-other ignore must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsTBDOnly residual soft invent was soft-continue join invent change.
 	// Fair: sticky no-change false. PointTo nil hole IsTBDOnly residual.
 	fHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	if fHole.JoinVisits(MakeFactPointTo(p, a)) {
 		t.Fatal("IsTBDOnly residual JoinVisits must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsTBDOnly residual JoinVisits must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// JoinVisitsInto
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
 	JoinVisitsInto(&facts, []*FactPointTo{MakeFactPointTo(p, b)})
@@ -492,12 +492,12 @@ func TestJoinVisits(t *testing.T) {
 	if fp == nil || !IsVariableInSet(fp.PointTo, b) {
 		t.Fatal(fp)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete JoinVisitsInto must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete maps fail closed sticky IncompleteFactSlice (not invent no-change complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	factsHole := []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if JoinVisitsInto(&factsHole, []*FactPointTo{MakeFactPointTo(p, b)}) {
 		t.Fatal("incomplete subject must fail closed false")
@@ -505,10 +505,10 @@ func TestJoinVisits(t *testing.T) {
 	if FactsComplete(factsHole) {
 		t.Fatal("incomplete subject must wipe IncompleteFactSlice", factsHole)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete subject JoinVisitsInto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
 	if JoinVisitsInto(&facts2, []*FactPointTo{MakeFactPointTo(p, b), nil}) {
 		t.Fatal("incomplete newFacts must fail closed false")
@@ -516,18 +516,18 @@ func TestJoinVisits(t *testing.T) {
 	if FactsComplete(facts2) {
 		t.Fatal("incomplete newFacts must wipe IncompleteFactSlice", facts2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete newFacts JoinVisitsInto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip join-visits past hole)
 	if JoinVisitsInto(nil, []*FactPointTo{MakeFactPointTo(p, b)}) {
 		t.Fatal("nil facts JoinVisitsInto must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts JoinVisitsInto must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSafeOpFlagsDummyAndFloat(t *testing.T) {
@@ -557,80 +557,80 @@ func TestSafeOpFlagsDummyAndFloat(t *testing.T) {
 }
 
 func TestIsPureIsEmptyIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
 	if inc.IsPure() {
 		t.Fatal("IncompleteEffect IsPure must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect IsPure must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if inc.IsSideEffectFree() {
 		t.Fatal("IncompleteEffect IsSideEffectFree must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect IsSideEffectFree must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if inc.IsEmpty() {
 		t.Fatal("IncompleteEffect IsEmpty must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect IsEmpty must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !EmptyEffect().IsPure() || !EmptyEffect().IsSideEffectFree() || !EmptyEffect().IsEmpty() {
 		t.Fatal("EmptyEffect pure SE-free empty")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("EmptyEffect predicates must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsTBDOnlyIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactPointTo)(nil).IsTBDOnly() {
 		t.Fatal("nil Fact IsTBDOnly must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact IsTBDOnly must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	if f.IsTBDOnly() {
 		t.Fatal("PointTo hole IsTBDOnly must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("PointTo hole IsTBDOnly must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReadWriteVarNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EffectComplete(EmptyEffect().WriteVar(nil)) {
 		t.Fatal("WriteVar nil must fail closed IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVar nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EffectComplete(EmptyEffect().ReadVar(nil)) {
 		t.Fatal("ReadVar nil must fail closed IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ReadVar nil must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestAccessDerefVolatileResidualSticky(t *testing.T) {
 	// IsVolatileAfterDeref residual soft invent was soft-continue peel invent complete SE-free.
 	// Qfer depth > deref so OOB non-sticky true is skipped; Type-nil peels sticky.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := &Variable{
 		Name: "g_p", Type: nil,
 		Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false}),
@@ -639,56 +639,56 @@ func TestAccessDerefVolatileResidualSticky(t *testing.T) {
 	if EffectComplete(out) {
 		t.Fatal("IsVolatileAfterDeref residual must fail closed IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVolatileAfterDeref residual AccessDerefVolatile must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete non-vol peel must stay SE-free complete
 	ok := CreateVariableScalars("g_i", GetIntType(), false, false)
 	e := EmptyEffect().AccessDerefVolatile(ok, 0, true)
 	if !EffectComplete(e) {
 		t.Fatal("complete AccessDerefVolatile level0 must stay complete")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete AccessDerefVolatile must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsReadIsStructResidualSticky(t *testing.T) {
 	// IsStruct residual soft invent was invent not-read soft-skip past Type-nil parent.
 	// Type-nil parent already sticky read true before IsStruct.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_s", Type: nil}
 	child := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect()
 	if !e.IsRead(child) {
 		t.Fatal("Type-nil parent IsRead must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFieldIsReadIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent no-field-read past Type-nil shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	hole := &Variable{Name: "g_x", Type: nil}
 	if !EmptyEffect().FieldIsRead(hole) {
 		t.Fatal("Type-nil FieldIsRead must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil FieldIsRead must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete non-aggregate
 	v := CreateVariableScalars("g_i", GetIntType(), false, false)
 	if EmptyEffect().FieldIsRead(v) {
 		t.Fatal("scalar FieldIsRead must be false")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete FieldIsRead must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

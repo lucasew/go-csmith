@@ -14,7 +14,7 @@ import "testing"
 // must_return), so that for is not is_loop_body and does not self-back-strip;
 // outer strip is a separate residual. This test pins the unwrapped contract.
 func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
@@ -77,7 +77,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 
 	// One gen-time walk leaves may-null on g77 (same as after if post_creation).
 	if !VisitFactsStatementIf(&ifSt, &cg, opts) {
-		t.Fatalf("gen VisitFacts if: err=%v", HasError())
+		t.Fatalf("gen VisitFacts if: err=%v", HasErrorSess(testAmbientSession))
 	}
 	if fg := FindRelatedPointTo(fm.GlobalFacts, g77); fg == nil || !fg.IsNull() {
 		t.Fatalf("after if, g77 must may-null, got %v", fg)
@@ -89,7 +89,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 
 	nBefore := len(body.Stmts)
 	body.PostCreationAnalysis(&cg, opts, pre, NewRng(1), nil)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if len(body.Stmts) != 0 {
 		t.Fatalf("Block.cpp:709–714: self-back may-null re-entry must strip if; before=%d after=%d",
 			nBefore, len(body.Stmts))
@@ -101,7 +101,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 // (Block.cpp:696–697). Null/else-deref inside such a body does not get
 // post_creation self-back strip (seed-17809 shape).
 func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 
@@ -173,7 +173,7 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	}
 	nBefore := len(body.Stmts)
 	body.PostCreationAnalysis(&cg, opts, pre, NewRng(1), nil)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if len(body.Stmts) != nBefore {
 		t.Fatalf("must_return loop body must not self-back-strip (is_loop_body false); before=%d after=%d",
 			nBefore, len(body.Stmts))

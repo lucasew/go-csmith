@@ -11,7 +11,7 @@ import "testing"
 // restores g_952.f8 but over-adds other IV reads (g_82.f7). Next: pure-shortcut
 // / PT lattice for g_325 so first FP sc=0 like UP (keep gen map_stm_effect).
 func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
@@ -53,11 +53,11 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 
 	var lc *LoopControl
 	for seed := uint64(1); seed < 500; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect()
 		*cg.EffectAccum = EmptyEffect()
 		lc = MakeIteration(NewRng(seed), opts, probs, vs, &cg)
-		if lc == nil || HasError() || lc.IV == nil {
+		if lc == nil || HasErrorSess(testAmbientSession) || lc.IV == nil {
 			continue
 		}
 		if lc.IV == iv || lc.IV.FieldVarOf == parent {
@@ -82,5 +82,5 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	if !got.IsRead(lc.IV) {
 		t.Fatal("post_loop map_stm_effect[for] must retain IV read from pre_effect")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

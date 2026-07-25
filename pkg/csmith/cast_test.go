@@ -16,7 +16,7 @@ func TestIsEquivalentSameSize(t *testing.T) {
 }
 
 func TestNeedsCastPointerBases(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	pi := PointerTo(GetIntType())
 	pc := PointerTo(GetSimpleType(EChar))
 	if !pi.NeedsCast(pc) && pi.BaseType().SizeInBytes() != pc.BaseType().SizeInBytes() {
@@ -31,14 +31,14 @@ func TestNeedsCastPointerBases(t *testing.T) {
 		t.Fatal("same no cast")
 	}
 	// incomplete Type sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).NeedsCast(pi) {
 		t.Fatal("nil NeedsCast must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NeedsCast must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpressionCastOutput(t *testing.T) {
@@ -58,7 +58,7 @@ func TestExpressionCastOutput(t *testing.T) {
 }
 
 func TestHasBitfields(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
 		{Type: GetIntType(), BitWidth: 3},
 	}}
@@ -71,10 +71,10 @@ func TestHasBitfields(t *testing.T) {
 	if st2.HasBitfields() {
 		t.Fatal("no bf")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete HasBitfields must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested HasBitfields residual: Type-nil deeper field soft invent was soft-continue later siblings.
 	// Fair: sticky has-bitfields true.
 	innerHole := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
@@ -85,27 +85,27 @@ func TestHasBitfields(t *testing.T) {
 	if !outer.HasBitfields() {
 		t.Fatal("nested residual HasBitfields must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual HasBitfields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested ContainPointerField residual same invent soft-continue pointer-free.
 	if !outer.ContainPointerField() {
 		t.Fatal("nested residual ContainPointerField must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual ContainPointerField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested HasIntField residual soft invent was soft-continue later fields invent has-int.
 	// Fair: sticky not-has-int false.
 	if outer.HasIntField() {
 		t.Fatal("nested residual HasIntField must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual HasIntField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckAndSetCast(t *testing.T) {
@@ -120,46 +120,46 @@ func TestCheckAndSetCast(t *testing.T) {
 		}
 	}
 	// Expression + desired Type always live; sticky no invent skip-cast soft-success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*Expression)(nil).CheckAndSetCast(want)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Expression CheckAndSetCast must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	e2 := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
 	e2.CheckAndSetCast(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil desired CheckAndSetCast must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GetTypeUncast sticky (no invent soft-skip cast past Type-nil shell)
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}
 	hole.CheckAndSetCast(want)
 	if hole.CastType != nil {
 		t.Fatal("Type-nil var must not invent cast")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil var CheckAndSetCast must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// NeedsCast residual soft invent was CastType set then invent complete cast success.
 	// Fair: sticky no CastType past NeedsCast residual true path (nil shells).
 	src := PointerTo(GetIntType())
 	if src.NeedsCast(nil) {
 		t.Fatal("NeedsCast nil other must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("NeedsCast nil other must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual true path: nil src base via NeedsCast on nil this
 	if (*Type)(nil).NeedsCast(want) {
 		t.Fatal("nil NeedsCast must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NeedsCast must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckAndSetCastOptsLangCPP(t *testing.T) {
@@ -198,7 +198,7 @@ func TestCheckAndSetCastViaInvokeGetType(t *testing.T) {
 
 func TestNeedsCastOnlySourcePointer(t *testing.T) {
 	// Type.cpp:1470 — only `this` must be pointer
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	pi := PointerTo(GetIntType())
 	// bases int vs char inequivalent → cast
 	if !pi.NeedsCast(GetSimpleType(EChar)) {
@@ -212,10 +212,10 @@ func TestNeedsCastOnlySourcePointer(t *testing.T) {
 	if pi.NeedsCast(GetIntType()) {
 		t.Fatal("int* base int equivalent to int")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete NeedsCast must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsPromotableRanks(t *testing.T) {
@@ -266,7 +266,7 @@ func TestIsConvertableFloatToIntForbidden(t *testing.T) {
 }
 
 func TestIsConvertablePtrStrictFloatAndCPP(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	pi := PointerTo(GetIntType())
 	pf := PointerTo(GetSimpleType(EFloat))
 	// same size usually float=4 int=4 → C allows by size
@@ -286,12 +286,12 @@ func TestIsConvertablePtrStrictFloatAndCPP(t *testing.T) {
 		t.Fatal("lang_cpp blocks")
 	}
 	// incomplete Type sticky not-convertable
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsConvertableOpts(pi, opts) {
 		t.Fatal("nil IsConvertableOpts must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsConvertableOpts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

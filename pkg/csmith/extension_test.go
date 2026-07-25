@@ -6,20 +6,20 @@ import (
 )
 
 func TestExtensionValueAndInitialize(t *testing.T) {
-	ClearError()
-	if NewExtensionValue(nil, "x") != nil || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if NewExtensionValue(nil, "x") != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type sticky")
 	}
-	ClearError()
-	if NewExtensionValue(GetIntType(), "") != nil || !HasError() {
+	ClearErrorSess(testAmbientSession)
+	if NewExtensionValue(GetIntType(), "") != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := NewRng(2)
 	probs := NewProbabilities(Defaults())
 	vals := AbsExtensionInitialize(3, r, probs)
-	if vals == nil || len(vals) != 3 || HasError() {
-		t.Fatal(len(vals), HasError())
+	if vals == nil || len(vals) != 3 || HasErrorSess(testAmbientSession) {
+		t.Fatal(len(vals), HasErrorSess(testAmbientSession))
 	}
 	if vals[0].Name != "x0" || vals[2].Name != "x2" {
 		t.Fatal(vals[0].Name, vals[2].Name)
@@ -31,12 +31,12 @@ func TestExtensionValueAndInitialize(t *testing.T) {
 }
 
 func TestAbsExtensionMakeInvocation(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1"}
 	ev := NewExtensionValue(GetIntType(), "x0")
 	inv := AbsExtensionMakeFuncInvocation(f, []*ExtensionValue{ev})
-	if inv == nil || HasError() {
-		t.Fatal(HasError())
+	if inv == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal(HasErrorSess(testAmbientSession))
 	}
 	out := inv.Output()
 	if !strings.Contains(out, "func_1") || !strings.Contains(out, "x0") {
@@ -49,10 +49,10 @@ func TestAbsExtensionMakeInvocation(t *testing.T) {
 }
 
 func TestExtensionMgrNullPath(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	DestroyExtension()
 	CreateExtension(Defaults())
-	if ExtensionActive() || HasError() {
+	if ExtensionActive() || HasErrorSess(testAmbientSession) {
 		t.Fatal("null extension")
 	}
 	if ExtensionMgrOutputHeader() != "" {
@@ -66,7 +66,7 @@ func TestExtensionMgrNullPath(t *testing.T) {
 		t.Fatal(init)
 	}
 	// klee with live RNG creates extension
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	o.Klee = true
 	o.Func1MaxParams = 2
@@ -74,8 +74,8 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	SetProcessRngSess(testAmbientSession, NewRng(1))
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(o))
 	CreateExtension(o)
-	if HasError() || !ExtensionActive() || ExtensionKind() != "klee" {
-		t.Fatal("klee create", HasError(), ExtensionKind())
+	if HasErrorSess(testAmbientSession) || !ExtensionActive() || ExtensionKind() != "klee" {
+		t.Fatal("klee create", HasErrorSess(testAmbientSession), ExtensionKind())
 	}
 	if !strings.Contains(ExtensionMgrOutputHeader(), "klee/klee.h") {
 		t.Fatal(ExtensionMgrOutputHeader())

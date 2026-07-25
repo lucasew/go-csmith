@@ -9,7 +9,7 @@ import (
 // constant init_value + array_var.is_aggregate() → type tmp = init; a[i] = tmp;
 // (cannot assign brace init directly to array member of struct/union).
 func TestArrayOpAggregateConstantTmp(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
@@ -39,8 +39,8 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		StmID:       1,
 	}
 	out := (&Block{Stmts: []Stmt{st}}).Output(0)
-	if HasError() || out == "" {
-		t.Fatalf("output empty/err: %q err=%v", out, HasError())
+	if HasErrorSess(testAmbientSession) || out == "" {
+		t.Fatalf("output empty/err: %q err=%v", out, HasErrorSess(testAmbientSession))
 	}
 	if !strings.Contains(out, "union U0 tmp = {0x818A33E5L};") {
 		t.Fatalf("want aggregate tmp init, got %q", out)
@@ -52,7 +52,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		t.Fatalf("must not invent direct brace assign to aggregate array member: %q", out)
 	}
 	// non-aggregate: direct assign (StatementArrayOp.cpp:248–254)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	avInt := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
 		Sizes:    []int{2},
@@ -76,14 +76,14 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		t.Fatalf("want direct scalar assign: %q", outInt)
 	}
 	// LhsVar missing (pre-fix invent): must not use aggregate path via soft guess
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	stNoLhs := st
 	stNoLhs.LhsVar = nil
 	outNo := (&Block{Stmts: []Stmt{stNoLhs}}).Output(0)
 	if strings.Contains(outNo, " tmp =") {
 		t.Fatalf("nil LhsVar must not invent aggregate tmp: %q", outNo)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
@@ -191,7 +191,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 
 func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	// StatementIf.cpp:69 — get_effect_stm().clear() on CGContext& before condition
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1

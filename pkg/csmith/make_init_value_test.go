@@ -6,7 +6,7 @@ import (
 )
 
 func TestMakeInitValueNonPointerConstant(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
@@ -18,10 +18,10 @@ func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil qfer must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil qfer must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeInitValuePointerAddressOf(t *testing.T) {
@@ -58,21 +58,21 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 
 func TestOutputDefInitExprResidualSticky(t *testing.T) {
 	// InitExpr.Output residual soft invent was soft-continue invent complete def.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	v.Init = nil
 	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
 	if s := v.OutputDef(false); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed OutputDef", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("InitExpr Output residual OutputDef must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestApplyInitExprOutputDef(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	pt := PointerTo(GetIntType())
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
@@ -85,15 +85,15 @@ func TestApplyInitExprOutputDef(t *testing.T) {
 	// Variable always live; sticky (no invent soft-skip init bind past hole)
 	// Nil init complete no-op
 	applyInitExpr(nil, &Expression{Term: TermConstant, Con: MakeInt(1)})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var applyInitExpr must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	applyInitExpr(pv, nil)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil init applyInitExpr must complete no-op")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateNewNonArrayGlobal(t *testing.T) {
@@ -120,7 +120,7 @@ func TestGenerateNewNonArrayGlobal(t *testing.T) {
 }
 
 func TestGetAllArrayVars(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
 	// live AsArray required (no invent complete pool of IsArray shells without AsArray)
 	av := &ArrayVariable{
@@ -140,10 +140,10 @@ func TestGetAllArrayVars(t *testing.T) {
 	if VariablesComplete(vs.GetAllArrayVars()) {
 		t.Fatal("Arrays nil hole must fail closed IncompleteVariables, not invent empty-complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Arrays nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray sticky incomplete pool
 	vs.Arrays = nil
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -151,10 +151,10 @@ func TestGetAllArrayVars(t *testing.T) {
 	if VariablesComplete(vs.GetAllArrayVars()) {
 		t.Fatal("IsArray without AsArray GetAllArrayVars must fail closed Incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray GetAllArrayVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
@@ -176,7 +176,7 @@ func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
 
 func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient must not invent create past holes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false
 	vs := NewVariableSelector(opts)
@@ -185,10 +185,10 @@ func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()), GetIntType(), q, nil, "l_x", NewRng(1)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed createAndInitialize")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {

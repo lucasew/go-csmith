@@ -6,7 +6,7 @@ import (
 )
 
 func TestTypeFromString(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if TypeFromString("Int") != GetIntType() {
 		t.Fatal("Int")
 	}
@@ -19,10 +19,10 @@ func TestTypeFromString(t *testing.T) {
 	if TypeFromString("NoSuch") != nil {
 		t.Fatal("bad")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown type string must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEnabledBuiltinKinds(t *testing.T) {
@@ -48,7 +48,7 @@ func TestEnabledBuiltinKinds(t *testing.T) {
 
 func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	// Function.cpp:350/355 — empty / mid Void fail closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "b"}
 	if GenerateParameterListFromString(f, "") {
 		t.Fatal("empty params")
@@ -56,10 +56,10 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	if VariablesComplete(f.Param) {
 		t.Fatal("empty params fail must IncompleteVariables Param, not empty-complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty params fail must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f2 := &Function{Name: "b2"}
 	if GenerateParameterListFromString(f2, "UInt, Void") {
 		t.Fatal("mid Void")
@@ -68,10 +68,10 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	if VariablesComplete(f2.Param) {
 		t.Fatal("mid Void fail must IncompleteVariables Param, not empty-complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("mid Void fail must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f3 := &Function{Name: "b3"}
 	if !GenerateParameterListFromString(f3, "Void") {
 		t.Fatal("sole Void ok")
@@ -83,7 +83,7 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 }
 
 func TestMakeBuiltinFunction(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Builtins = true
 	list := &FunctionList{}
@@ -102,34 +102,34 @@ func TestMakeBuiltinFunction(t *testing.T) {
 		t.Fatal("list")
 	}
 	// disabled kind — soft skip non-sticky (kind filter, not broken IR)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeBuiltinFunction(opts, nil, nil, list, nil, "Int; __builtin_clzs; (UShort); clang") != nil {
 		t.Fatal("clang should skip")
 	}
 	// empty name token — sticky no invent shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "Int; ; (UInt); x86") != nil {
 		t.Fatal("empty builtin name must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty builtin name must SetError sticky")
 	}
 	// Function.cpp always has RNG for random_qualifiers; sticky no invent fixed RV qfer
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeBuiltinFunction(opts, NewProbabilities(opts), nil, list, nil, "Int; __builtin_clz; (UInt); x86") != nil {
 		t.Fatal("nil RNG must not invent builtin")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "badformat") != nil {
 		t.Fatal("invalid format must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid format must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestInitializeBuiltinFunctions(t *testing.T) {
@@ -187,16 +187,16 @@ func TestHasRaceWith(t *testing.T) {
 		t.Fatal("clear")
 	}
 	// Clear must not invent wipe IncompleteEffect to empty pure — sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
 	inc.Clear()
 	if EffectComplete(inc) || inc.IsEmpty() || inc.IsPure() {
 		t.Fatal("Clear incomplete must stay IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Clear incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestChooseFuncCanPickBuiltin(t *testing.T) {

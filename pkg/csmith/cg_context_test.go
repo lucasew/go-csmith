@@ -4,7 +4,7 @@ import "testing"
 
 func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	// CGContext.cpp copy ctor deep-copies iv_bounds map
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv1 := CreateVariableScalars("i1", GetIntType(), false, false)
 	iv2 := CreateVariableScalars("i2", GetIntType(), false, false)
 	parent := EmptyCGContext()
@@ -35,12 +35,12 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	if !loop.InLoop() {
 		t.Fatal("FlagInLoop")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // Statement.cpp:612 — stm_visit_facts sets curr_blk = parent before visit_facts.
 func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	parent := &Block{Func: f, StmID: AllocStmID()}
 	st := &Stmt{Kind: StmtReturn, StmID: AllocStmID(), Expr: &Expression{
@@ -65,13 +65,13 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	if cg.CurrBlk != parent {
 		t.Fatalf("CurrBlk must be statement parent after validate, got %v want %v", cg.CurrBlk, parent)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // CGContext.cpp:95–105 — loop-body ctor: expr_depth=0, curr_rhs=nil, empty stm,
 // share EffectAccum, IN_LOOP, optional iv bound.
 func TestWithLoopBodyMatchesCtor(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
@@ -111,5 +111,5 @@ func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	if parent.ExprDepth != 9 || parent.CurrRHS != rhs {
 		t.Fatal("parent must not be mutated")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

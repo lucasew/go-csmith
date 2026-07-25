@@ -65,7 +65,7 @@ func TestCallerToCalleeHandoverTransitive(t *testing.T) {
 }
 
 func TestCallerToCalleeHandoverNilHole(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
@@ -74,38 +74,38 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactMgr + Func + inputs always live; sticky no invent soft-skip handover past hole
 	(*FactMgr)(nil).CallerToCalleeHandover(nil, &facts)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM CallerToCalleeHandover must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.CallerToCalleeHandover(nil, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil inputs CallerToCalleeHandover must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).RemoveRVFacts(&facts)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM RemoveRVFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.RemoveRVFacts(nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts RemoveRVFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	// FunctionInvocationUser.cpp:206 — global_facts = caller includes eUnionWrite;
 	// FactMgr.cpp:324–353 — partition keeps globals/params, drops pure stack subjects.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	callee := &Function{Name: "c", ReturnType: GetIntType()}
 	fm := NewFactMgr(callee)
 
@@ -142,12 +142,12 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
 		t.Fatal("stack-only union FactUnion must drop on handover", fm.UnionFacts)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete FilterUnionFactsForHandover must not sticky")
 	}
 
 	// transitive: global pointer to local union keeps local FactUnion
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(callee)
 	gp := CreateVariableScalars("g_p", PointerTo(ut), true, false)
 	fm2.UnionFacts = []*FactUnion{MakeFactUnion(lu, 1)}
@@ -158,7 +158,7 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	}
 
 	// Clone + renew round-trip (FunctionInvocationUser.cpp:206 + 221)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	callerUF := []*FactUnion{MakeFactUnion(gu, 0)}
 	cloned := CloneUnionFactSlice(callerUF)
 	if len(cloned) != 1 || FindRelatedUnion(cloned, gu) == nil {
@@ -182,8 +182,8 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 
 func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	// FactMgr.cpp:143–156 — OOS erase by subject match (FactUnion category too).
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -199,7 +199,7 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	if FindRelatedUnion(facts, gu) == nil || FindRelatedUnion(facts, lu) != nil {
 		t.Fatal("OOS must drop local keep global", facts)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete OOS must not sticky")
 	}
 	// FM path also drops UnionFacts
@@ -210,15 +210,15 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
 		t.Fatal("FM OOS must drop UnionFacts for OOS var", fm.UnionFacts)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	// FactMgr.cpp:141–156 + Block.cpp:690–693 — set_fact_out after OOS is full FactVec.
 	// Soft invent stored post-OOS point-to with live UnionFacts still holding body locals
 	// → map_union_out too large → same_facts false → extra full re-visits / over-strip.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -240,8 +240,8 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	outPT := CloneFactSlice(fm.GlobalFacts)
 	UpdateFactsForOOSVars(body.LocalVars, &outPT)
 	fm.SetMapFactsOutForBlock(body, outPT)
-	if HasError() {
-		t.Fatal("SetMapFactsOutForBlock sticky", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("SetMapFactsOutForBlock sticky", HasErrorSess(testAmbientSession))
 	}
 	// live UnionFacts must remain pre-OOS (post_creation keeps live during FP)
 	if FindRelatedUnion(fm.UnionFacts, lu) == nil {
@@ -254,13 +254,13 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	if FindRelatedUnion(gotU, gu) == nil {
 		t.Fatal("map_union_out must keep global union", gotU)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVariableInSet false → drop param from keep
 	// fair: VariablesComplete Param fails closed nil inputs sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	callee := &Function{Name: "c", ReturnType: GetIntType()}
 	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
 	callee.Param = []*Variable{p, nil}
@@ -271,14 +271,14 @@ func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("incomplete Param must fail closed nil inputs, not invent drop param", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Param must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVariablesCompleteAndIsVariableInSet(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
 	if !VariablesComplete([]*Variable{a, b}) || VariablesComplete([]*Variable{a, nil, b}) {
@@ -294,7 +294,7 @@ func TestVariablesCompleteAndIsVariableInSet(t *testing.T) {
 }
 
 func TestRemoveRVFactsNilHole(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	facts := []*FactPointTo{nil}
@@ -302,14 +302,14 @@ func TestRemoveRVFactsNilHole(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRemoveRVFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", RV: CreateVariableScalars("f_rv", GetIntType(), false, false)}
 	fm := NewFactMgr(f)
 	other := CreateVariableScalars("other_rv", GetIntType(), false, false)
@@ -333,8 +333,8 @@ func TestRemoveRVFactsMatchResidualSticky(t *testing.T) {
 	// Type-nil own RV: Match stickies residual ERROR+false.
 	// Soft invent was soft-continue drop then keep later non-RV complete filter.
 	// Fair: sticky wipe IncompleteFactSlice whole RemoveRVFacts.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", RV: &Variable{Name: "f_rv"}} // Type nil
 	fm := NewFactMgr(f)
 	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -347,10 +347,10 @@ func TestRemoveRVFactsMatchResidualSticky(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("Match residual must IncompleteFactSlice, not invent later non-RV keep")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Match residual RemoveRVFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputTab(t *testing.T) {

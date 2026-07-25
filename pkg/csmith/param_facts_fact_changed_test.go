@@ -9,7 +9,7 @@ import (
 // (FactMgr.cpp:397–403). Spurious FactChanged forced NeedsRevisit; for visit drops
 // make_iteration IV read while static feffect path keeps it (seed 1048… func_53 g_283).
 func TestAddParamFactsDoesNotSetFactChanged(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	fn := &Function{Name: "func_param", ReturnType: GetIntType()}
@@ -22,14 +22,14 @@ func TestAddParamFactsDoesNotSetFactChanged(t *testing.T) {
 	// abstract for pointer param from non-ptr may yield garbage — still a lattice write
 	facts := []*FactPointTo{}
 	fm.AddParamFacts([]*Expression{arg}, &facts)
-	if HasError() {
-		t.Fatal("AddParamFacts sticky", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("AddParamFacts sticky", HasErrorSess(testAmbientSession))
 	}
 	if fn.FactChanged {
 		t.Fatal("add_param_facts must not set fact_changed (FactMgr.cpp:108–114 Lhs* path)")
 	}
 	// StatementAssign path still sets FactChanged
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fn.FactChanged = false
 	if fm.UpdateFactForAssign(p, 0, arg) || len(fm.GlobalFacts) > 0 {
 		// if lattice changed, FactChanged must stick
@@ -37,19 +37,19 @@ func TestAddParamFactsDoesNotSetFactChanged(t *testing.T) {
 			t.Fatal("StatementAssign UpdateFactForAssign must set fact_changed when facts change")
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // Seed 10482453124604569829 — func_53 body is for(g_283=…); must use static feffect
 // path (no FactChanged from params alone) so caller func_14 reads include g_283.
 func TestSeed1048Func53NoSpuriousFactChanged(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Seed = 10482453124604569829
 	g := NewProgramGenerator(NewSession(opts))
 	out := g.GoGenerator()
 	if out == "" {
-		t.Fatal("empty program", HasError())
+		t.Fatal("empty program", HasErrorSess(testAmbientSession))
 	}
 	var f53 *Function
 	for _, f := range g.Funcs.Funcs {
@@ -95,5 +95,5 @@ func TestSeed1048Func53NoSpuriousFactChanged(t *testing.T) {
 	if !callerHas {
 		t.Fatal("func_14 FEffect must include g_283 from static feffect fold of func_53")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -16,20 +16,20 @@ func TestErrorCodesMatchUpstream(t *testing.T) {
 
 func TestErrorGetSetClear(t *testing.T) {
 	// Error::set_error / get_error; ClearError → SUCCESS
-	ClearError()
-	if GetError() != ErrSuccess || HasError() {
+	ClearErrorSess(testAmbientSession)
+	if GetErrorSess(testAmbientSession) != ErrSuccess || HasErrorSess(testAmbientSession) {
 		t.Fatal("ClearError must yield SUCCESS")
 	}
-	SetError(ErrGeneric)
-	if GetError() != ErrGeneric || !HasError() {
-		t.Fatal("SetError(ERROR) must sticky")
+	SetErrorSess(testAmbientSession, ErrGeneric)
+	if GetErrorSess(testAmbientSession) != ErrGeneric || !HasErrorSess(testAmbientSession) {
+		t.Fatal("SetErrorSess(testAmbientSession, ERROR) must sticky")
 	}
-	SetError(ErrExceedMaxDepth)
-	if GetError() != ErrExceedMaxDepth {
-		t.Fatalf("overwrite set: got %d", GetError())
+	SetErrorSess(testAmbientSession, ErrExceedMaxDepth)
+	if GetErrorSess(testAmbientSession) != ErrExceedMaxDepth {
+		t.Fatalf("overwrite set: got %d", GetErrorSess(testAmbientSession))
 	}
-	ClearError()
-	if GetError() != ErrSuccess {
+	ClearErrorSess(testAmbientSession)
+	if GetErrorSess(testAmbientSession) != ErrSuccess {
 		t.Fatal("ClearError after sticky")
 	}
 }

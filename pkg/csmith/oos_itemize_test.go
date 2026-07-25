@@ -42,17 +42,17 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 		t.Fatalf("p fact %+v", fp)
 	}
 	// nil fact hole fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fm2.UpdateFactsForOOSVars([]*Variable{loc})
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil fact hole must fail closed", fm2.GlobalFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestChooseOKVarItemizesArray(t *testing.T) {
@@ -100,30 +100,30 @@ func TestVariableMatchAggregate(t *testing.T) {
 }
 
 func TestMarkDeadVarNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalars("g_x", GetIntType(), false, false)) != nil {
 		t.Fatal("nil Fact MarkDeadVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact MarkDeadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	f := MakeFactPointTo(p, tgt)
 	if f.MarkDeadVar(nil) != nil {
 		t.Fatal("nil var MarkDeadVar must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var MarkDeadVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 	// FactPointTo.cpp:108–124 + find_field_variable_in_set: OOS aggregate marks
 	// field pointees (l_531.f0) as garbage — seed-30 g_113 held l_531.f0 live.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -149,13 +149,13 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 	if fp == nil || !fp.IsDead() {
 		t.Fatalf("OOS aggregate must garbage field pointee, got %+v", fp)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete path must not sticky")
 	}
 }
 
 func TestMarkFuncEndLocalsStructFieldPointee(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}

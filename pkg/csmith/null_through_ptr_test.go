@@ -14,7 +14,7 @@ import "testing"
 // is_valid_ptr fails. C++ post_creation FP strips the for; Go keeps it when
 // this transfer/merge path is wrong or skipped (shortcut).
 func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	i32 := GetIntType()
 	pt := PointerTo(i32)
@@ -36,13 +36,13 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	if IsValidPtr(g77, fm.GlobalFacts, 0, 0) {
 		t.Fatal("IsValidPtr must fail for null g_77")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // Then *p=null / else leaves q live → merge must may-null q (IsNull).
 // StatementIf.cpp: both arms from post-cond; merge outputs.
 func TestIfThenNullMergeMakesPointeeInvalid(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	i32 := GetIntType()
 	pt := PointerTo(i32)
@@ -71,5 +71,5 @@ func TestIfThenNullMergeMakesPointeeInvalid(t *testing.T) {
 	if IsValidPtr(g77, merged, 0, 0) {
 		t.Fatal("IsValidPtr must fail for may-null g_77")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

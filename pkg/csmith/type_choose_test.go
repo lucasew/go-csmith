@@ -6,7 +6,7 @@ import (
 )
 
 func TestChooseRandomFromAllTypes(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
@@ -34,7 +34,7 @@ func TestChooseRandomFromAllTypes(t *testing.T) {
 }
 
 func TestRandomReturnTypeUsesEnv(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
@@ -47,14 +47,14 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 		t.Fatal("void return")
 	}
 	// sticky no invent default int without RNG
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if RandomReturnType(nil, probs, env, opts) != nil {
 		t.Fatal("nil RNG RandomReturnType must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG RandomReturnType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomParamNoConstant(t *testing.T) {

@@ -4,17 +4,17 @@ import "testing"
 
 func TestLinearSequence(t *testing.T) {
 	// LinearSequence.cpp:45–81
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	s := NewLinearSequence(LinearSequenceDefaultSep)
 	s.InitSequence()
 	if s.SequenceLength() != 0 {
 		t.Fatal("empty")
 	}
 	// empty get_sequence sticky
-	if s.GetSequence() != "" || !HasError() {
+	if s.GetSequence() != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty sequence sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	s.AddNumber(3, 10, 0)
 	s.AddNumber(1, 10, 1)
 	s.AddNumber(7, 10, 2)
@@ -31,10 +31,10 @@ func TestLinearSequence(t *testing.T) {
 		t.Fatal("get_number always -1")
 	}
 	// missing pos sticky
-	if s.GetNumberByPos(9) != -1 || !HasError() {
+	if s.GetNumberByPos(9) != -1 || !HasErrorSess(testAmbientSession) {
 		t.Fatal("missing pos sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	s.Clear()
 	if s.SequenceLength() != 0 {
 		t.Fatal("clear")
@@ -42,10 +42,10 @@ func TestLinearSequence(t *testing.T) {
 	// nil sticky
 	var nilS *LinearSequence
 	nilS.AddNumber(1, 1, 0)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AddNumber sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSequenceFactory(t *testing.T) {

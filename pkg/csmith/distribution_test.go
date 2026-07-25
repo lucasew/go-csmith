@@ -66,19 +66,19 @@ func TestThresholdNumberToType(t *testing.T) {
 }
 
 func TestThresholdTableNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*ThresholdTable)(nil).Add(1, 2)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ThresholdTable Add must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*ThresholdTable)(nil).GetValue(0) != -1 {
 		t.Fatal("nil GetValue must return -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GetValue must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDistributionTableKeyToProb(t *testing.T) {
@@ -106,31 +106,31 @@ func TestDistributionTableKeyToProb(t *testing.T) {
 }
 
 func TestDistributionTableNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*DistributionTable)(nil).AddEntry(1, 10)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil DistributionTable AddEntry must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*DistributionTable)(nil).Max() != 0 {
 		t.Fatal("nil Max must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Max must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*DistributionTable)(nil).RndNumToKey(0) != -1 {
 		t.Fatal("nil RndNumToKey must return -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RndNumToKey must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*DistributionTable)(nil).KeyToProb(1) != 0 {
 		t.Fatal("nil KeyToProb must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil KeyToProb must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

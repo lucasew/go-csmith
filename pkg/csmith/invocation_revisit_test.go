@@ -20,7 +20,7 @@ func TestPermuteParamOrdersTwo(t *testing.T) {
 }
 
 func TestRenewFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	RenewFacts(&facts, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
@@ -42,10 +42,10 @@ func TestRenewFacts(t *testing.T) {
 	if FactsComplete(base) {
 		t.Fatal("incomplete renew must wipe facts incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete RenewFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete RenewFact target
 	facts2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	if RenewFact(&facts2, nil) {
@@ -54,10 +54,10 @@ func TestRenewFacts(t *testing.T) {
 	if FactsComplete(facts2) {
 		t.Fatal("nil nf renew must wipe incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil nf RenewFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FactPointTo.h:65–68 is_related is var identity only — not Variable.Match.
 	// Soft invent Match could replace an aggregate fact when renewing a field and
 	// leave the field's garbage fact in place (dangling on later check_read_var).
@@ -86,16 +86,16 @@ func TestRenewFacts(t *testing.T) {
 	if ft := FindRelatedPointTo(factsX, p); ft == nil || ft.IsDead() || len(ft.PointTo) != 1 || ft.PointTo[0] != tgt {
 		t.Fatalf("field must renew to tgt only: %+v", ft)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil-hole subject in map still fails closed sticky (FactsComplete false path)
 	factsHole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	if RenewFact(&factsHole, MakeFactPointTo(p, GarbagePtr)) {
 		t.Fatal("incomplete map RenewFact must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete map RenewFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestReturnFactRegistry(t *testing.T) {
@@ -119,7 +119,7 @@ func TestReturnFactRegistry(t *testing.T) {
 // → AddParamFacts left union params without FactUnion → nonreadable fields dropped
 // from choose_var (seed-213 p_34.f0 vs p_33.f0 pool).
 func TestSaveReturnUnionFactsRegistry(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
 	ut := &Type{isUnion: true, StructName: "U_ret", Fields: []StructField{
@@ -130,8 +130,8 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	fi := &Invocation{User: f}
 	uf := MakeFactUnion(rv, 0)
 	fi.SaveReturnUnionFacts([]*FactUnion{uf})
-	if HasError() {
-		t.Fatal("SaveReturnUnionFacts sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("SaveReturnUnionFacts sticky", GetErrorSess(testAmbientSession))
 	}
 	got := GetReturnUnionFactForInvocation(fi, rv)
 	if got == nil || got.LastWrittenFID != 0 {
@@ -144,12 +144,12 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	if !UnionFactsComplete(out) || len(out) != 1 || out[0].Var != param || out[0].LastWrittenFID != 0 {
 		t.Fatalf("FuncCall union transfer must use return registry: %+v", out)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	// incomplete maps sticky (no invent soft-skip hole and still register later)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
 	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
@@ -159,25 +159,25 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	if GetReturnFactForInvocation(fi, rv) != nil {
 		t.Fatal("incomplete SaveReturnFacts must not invent registry entry")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete SaveReturnFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete PointTo on matching fact sticky
 	fi.SaveReturnFacts([]*FactPointTo{{Var: rv, PointTo: []*Variable{nil}}})
 	if GetReturnFactForInvocation(fi, rv) != nil {
 		t.Fatal("incomplete PointTo must not invent registry")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete PointTo SaveReturnFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Match residual soft invent was soft-skip not-match then save later matching fact.
 	// Fair: Type-nil RV Match stickies residual then fail closed whole save.
 	// Use nil RV field already complete no-op; use RV with Match residual via nil other fact Var
 	// (FactsComplete rejects nil fact). Residual path: Match on complete then Add residual.
 	// Plant desynced registry so AddReturnFact stickies after first Match success.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	fiOK := &Invocation{User: &Function{Name: "h", RV: rv}}
 	currentSession().ReturnFactInvocations = []*Invocation{&Invocation{User: &Function{Name: "x"}}}
@@ -186,12 +186,12 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	if GetReturnFactForInvocation(fiOK, rv) != nil {
 		t.Fatal("desync Add residual must fail closed no invent registry")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("desync Add residual SaveReturnFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Invocation* registry slot sticky fail closed (no invent later match)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}
 	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
 	currentSession().ReturnFactInvocations = append([]*Invocation{nil}, currentSession().ReturnFactInvocations...)
@@ -199,19 +199,19 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	if GetReturnFactForInvocation(fi2, rv) != nil {
 		t.Fatal("nil inv registry hole must fail closed, not invent later match")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil inv registry GetReturnFact must SetError sticky")
 	}
 	// Add with hole must wipe sticky rather than soft-skip re-seed
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
 	if GetReturnFactForInvocation(fi2, rv) != nil {
 		t.Fatal("AddReturnFact over hole must wipe, not invent re-seed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddReturnFact over hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 }
 
@@ -232,13 +232,13 @@ func TestNeedsRevisit(t *testing.T) {
 }
 
 func TestGetQualifiers(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{IsStd: true}
 	q := fi.GetQualifiers()
 	if q.IsConst() || q.IsVolatile() {
 		t.Fatal(q)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("std Invoke GetQualifiers must not sticky")
 	}
 	rv := CreateVariableScalars("f_rv", GetIntType(), false, false)
@@ -248,24 +248,24 @@ func TestGetQualifiers(t *testing.T) {
 		t.Fatal("rv const")
 	}
 	// nil RV sticky empty qfer (no invent storage-level false/false shell)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi3 := &Invocation{User: &Function{Name: "f"}}
 	q3 := fi3.GetQualifiers()
 	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
 		t.Fatalf("nil RV must not invent qfer bits: %+v", q3)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RV GetQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil Invocation sticky empty
 	if q4 := (*Invocation)(nil).GetQualifiers(); len(q4.IsConsts) != 0 {
 		t.Fatal("nil Invocation GetQualifiers must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Invocation GetQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitUnorderedParamsMerges(t *testing.T) {
@@ -320,7 +320,7 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 	// multi-order merge: incomplete cur after second order fails closed
 	// plant via incomplete GlobalFacts mid-visit is hard; exercise MergeFacts path
 	// with two orders of constants — success baseline
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -343,7 +343,7 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 
 func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	fi := &Invocation{Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}}}
@@ -351,10 +351,10 @@ func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
 		t.Fatal("empty orders must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty orders VisitUnorderedParams must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactChangedOnAssign(t *testing.T) {
@@ -414,10 +414,10 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 	fm.SetMapStmEffect(100, EmptyEffect())
 	fi := &Invocation{User: callee}
 	facts := []*FactPointTo{}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ok := RevisitUserInvocation(fi, &facts, &cg, Defaults())
 	if !ok {
-		t.Fatalf("revisit ok=%v err=%v", ok, HasError())
+		t.Fatalf("revisit ok=%v err=%v", ok, HasErrorSess(testAmbientSession))
 	}
 	if callee.VisitedCnt < 1 {
 		t.Fatal("visited_cnt")
@@ -428,7 +428,7 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 // handover includes eUnionWrite. Soft invent left stale callee UnionFacts across
 // revisits (seed-7 ChooseOKVar / IsNonreadableField skew).
 func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Callee with empty body (always visits OK)
 	callee := &Function{
 		Name: "func_u", ReturnType: GetIntType(),
@@ -462,7 +462,7 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 	fi := &Invocation{User: callee}
 	facts := []*FactPointTo{}
 	if !RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
-		t.Fatalf("revisit ok expected err=%v", HasError())
+		t.Fatalf("revisit ok expected err=%v", HasErrorSess(testAmbientSession))
 	}
 	// After success, callee live UnionFacts must come from caller (f0), not stale f1
 	if !UnionFactsComplete(calFM.UnionFacts) {
@@ -480,14 +480,14 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 	if !found {
 		t.Fatalf("expected g_u union fact from caller after revisit, got %d unions", len(calFM.UnionFacts))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRevisitOOSsParamUnions(t *testing.T) {
 	// FunctionInvocationUser.cpp:344 — update_facts_for_oos_vars(func->param, inputs)
 	// Full FactVec includes eUnionWrite. Soft invent was PT-only OOS on work.
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -526,7 +526,7 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	// Pre-seed: put param on caller temporarily so install+filter retain it, then OOS drops.
 	callerFM.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(p, 0)}
 	if !RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
-		t.Fatalf("revisit expected ok err=%v", HasError())
+		t.Fatalf("revisit expected ok err=%v", HasErrorSess(testAmbientSession))
 	}
 	// After success, callee live UnionFacts must not still list the param subject
 	if FindRelatedUnion(calFM.UnionFacts, p) != nil {
@@ -540,11 +540,11 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	if uf := FindRelatedUnion(callerFM.UnionFacts, gu); uf == nil {
 		t.Fatal("caller must retain global union after revisit renew")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	callee := &Function{
 		Name: "func_v", ReturnType: GetIntType(),
 		Body: &Block{StmID: 201, Stmts: nil},
@@ -565,50 +565,50 @@ func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
 	if RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
 		t.Fatal("incomplete caller UnionFacts must fail closed revisit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete caller UnionFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Function)(nil).NeedsRevisit() {
 		t.Fatal("nil Function NeedsRevisit must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function NeedsRevisit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReferencedPtrs: []*Variable{nil}}
 	if !f.IsPointerReferenced() {
 		t.Fatal("incomplete ReferencedPtrs must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete ReferencedPtrs IsPointerReferenced must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestRenewFactNilFactsSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if RenewFact(nil, MakeFactPointTo(CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false), NullPtr)) {
 		t.Fatal("nil facts RenewFact must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts RenewFact must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestNeedsRevisitNilResidualSticky(t *testing.T) {
 	// NeedsRevisit residual soft invent was invent not-revisit soft-skip past nil Function.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Function)(nil).NeedsRevisit() {
 		t.Fatal("nil NeedsRevisit must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NeedsRevisit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

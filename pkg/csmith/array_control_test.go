@@ -30,7 +30,7 @@ func TestMakeRandomArrayControlLe(t *testing.T) {
 
 func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
 	// StatementFor.cpp:134 — rnd_flipcoin(50) ? eCmpLe : eCmpGe
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	foundLe, foundGe := false, false
 	for seed := uint64(1); seed < 80 && !(foundLe && foundGe); seed++ {
 		r0 := NewRng(seed)
@@ -54,7 +54,7 @@ func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
 	if !foundLe || !foundGe {
 		t.Fatalf("need both polarities: Le=%v Ge=%v", foundLe, foundGe)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
@@ -72,15 +72,15 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 		t.Fatalf("still 1 after no-oob %d", OOBCount())
 	}
 	// nil RNG sticky — no invent fixed array-loop control
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControl(nil, 8, false, 0)
 	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 || outBound != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v %d", init, limit, incr, testOp, incrOp, outBound)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomArrayControl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeIterationUsesMustUseArrays(t *testing.T) {
@@ -152,7 +152,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 }
 
 func TestCombineVariableSets(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	got := CombineVariableSets([]*Variable{a}, []*Variable{a, b})
@@ -164,10 +164,10 @@ func TestCombineVariableSets(t *testing.T) {
 	if VariablesComplete(bad) {
 		t.Fatal("nil hole must IncompleteVariables, not empty-complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete CombineVariableSets must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVectorFilterNilTableMatchesCPP(t *testing.T) {
@@ -199,7 +199,7 @@ func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// empty stack → CreateRandomArray cannot invent local array
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("nil select_array must fail closed whole array-loop, not soft-skip slots")
@@ -296,7 +296,7 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 
 func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 	// StatementFor.cpp:319+ — select_array always used; nil fails whole setup
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxArrayNumInLoop = 3
 	vs := NewVariableSelector(opts)
@@ -307,20 +307,20 @@ func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 	if got != nil {
 		t.Fatal("nil SelectArray must fail closed whole setup, not invent fewer arrays")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// sticky factory gates
 	if MakeRandomArrayLoopSetup(nil, opts, vs, EmptyCGContext()) != nil {
 		t.Fatal("nil RNG setup must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomArrayLoopSetup must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient / RW combine must sticky ERROR (no invent array loop soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -331,10 +331,10 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoop")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete NoReadVars on RW — MaxArrayNumInLoop=0 skips select; always hits combine
 	opts0 := Defaults()
 	opts0.MaxArrayNumInLoop = 0
@@ -345,21 +345,21 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomArrayLoop(NewRng(2), opts0, NewProbabilities(opts0), vs, NewExprTables(opts0), NewStatementThresholdTable(opts0), &cg2) != nil {
 		t.Fatal("incomplete RW NoReadVars must fail closed MakeRandomArrayLoop")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete RW lists must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if stmtOK(MakeRandomArrayOp(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayOp")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MakeRandomArrayOp must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	inc := IncompleteEffect()
@@ -368,26 +368,26 @@ func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
 	if MakeRandomArrayLoopSetup(NewRng(1), opts, vs, cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoopSetup")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVectorFilterNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*VectorFilter)(nil).MaxProb() != 0 {
 		t.Fatal("nil MaxProb must return 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MaxProb must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*VectorFilter)(nil).Filter(0) {
 		t.Fatal("nil Filter must reject-all true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Filter must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

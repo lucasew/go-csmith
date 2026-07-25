@@ -26,7 +26,7 @@ func TestMatchVarName(t *testing.T) {
 }
 
 func TestFindVarByName(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, v)
@@ -37,35 +37,35 @@ func TestFindVarByName(t *testing.T) {
 		t.Fatal("miss")
 	}
 	// nil VS sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*VariableSelector)(nil).FindVarByName("g_x") != nil {
 		t.Fatal("nil VS must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil VS FindVarByName must SetError sticky")
 	}
 	// empty name sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.FindVarByName("") != nil {
 		t.Fatal("empty name must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name FindVarByName must SetError sticky")
 	}
 	// nil hole sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs.AllVars = []*Variable{v, nil}
 	if vs.FindVarByName("g_y") != nil {
 		t.Fatal("nil hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole FindVarByName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsSeenName(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !IsSeenName([]string{"g_a"}, "g_a[0]") {
 		t.Fatal("seen")
 	}
@@ -76,18 +76,18 @@ func TestIsSeenName(t *testing.T) {
 	if IsSeenName([]string{"g_a"}, "") {
 		t.Fatal("empty name must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name IsSeenName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty seen entry sticky (no invent is-seen via bare "[" prefix)
 	if IsSeenName([]string{""}, "g_a[0]") {
 		t.Fatal("empty seen entry must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty seen entry IsSeenName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestItemizeArrayWithIV(t *testing.T) {
@@ -153,23 +153,23 @@ func TestOutputCallChain(t *testing.T) {
 		t.Fatal(s)
 	}
 	// incomplete frame sticky — no invent "?" / blank " in "
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.CallChain = []*Block{b1, {Func: nil}}
 	if out := cg.OutputCallChain(); out != "" {
 		t.Fatal("nil Func must fail closed call chain", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Func call chain must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.CallChain = []*Block{{Func: &Function{Name: ""}}}
 	if out := cg.OutputCallChain(); out != "" {
 		t.Fatal("empty func name must fail closed call chain", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty func name call chain must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVariableSelectorDoFinalization(t *testing.T) {
@@ -181,40 +181,40 @@ func TestVariableSelectorDoFinalization(t *testing.T) {
 		t.Fatal("cleared")
 	}
 	// VariableSelector always live; sticky no invent soft-skip finalization past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*VariableSelector)(nil).DoFinalization()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil DoFinalization must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMatchVarNameNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).MatchVarName("g_1") != nil {
 		t.Fatal("nil Variable MatchVarName must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable MatchVarName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty query soft miss
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if v.MatchVarName("") != nil {
 		t.Fatal("empty name MatchVarName must soft miss")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name MatchVarName must stay non-sticky soft miss")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was bare-name OutputC match on array path
 	// (Name identity is complete; query non-exact name hits array Output branch)
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if shell.MatchVarName("g_b[0]") != nil {
 		t.Fatal("IsArray without AsArray array-output MatchVarName must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray MatchVarName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func TestGetSNamePName(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetSName(PMoreStructUnionProb) != "more_struct_union_type_prob" {
 		t.Fatal(GetSName(PMoreStructUnionProb))
 	}
@@ -16,14 +16,14 @@ func TestGetSNamePName(t *testing.T) {
 	if !ok || pn != PInlineFunctionProb {
 		t.Fatal(pn, ok)
 	}
-	if _, ok := GetPName("nope"); ok || !HasError() {
+	if _, ok := GetPName("nope"); ok || !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDumpAndParseSingle(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := NewProbabilities(Defaults())
 	dump := p.DumpDefaultProbabilities()
 	if !strings.Contains(dump, "more_struct_union_type_prob=50") {
@@ -87,7 +87,7 @@ func TestParseStringIntArg(t *testing.T) {
 }
 
 func TestKleeCrestCoverageEmit(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	r := NewRng(2)
 	probs := NewProbabilities(Defaults())
 	vals := AbsExtensionInitialize(2, r, probs)
@@ -123,5 +123,5 @@ func TestKleeCrestCoverageEmit(t *testing.T) {
 	if !strings.Contains(inv, "for(test_index") || !strings.Contains(inv, "func_1();") {
 		t.Fatal(inv)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

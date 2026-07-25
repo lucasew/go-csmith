@@ -48,7 +48,7 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	// Function.cpp:633 — CGContext(this, effect_context, &accum) sets blk_depth(0)
 	// even when caller context is nested (blk_depth>0).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 5
@@ -65,8 +65,8 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	// Capture depth at body generation via a thin check: body must be buildable
 	// at MaxBlockDepth without inventing max-depth filter (would fail with depth 4 inherit).
 	callee.GenerateBody(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if callee.BuildState != BuildBuilt || callee.Body == nil {
 		t.Fatal(callee.BuildState, callee.Body)
@@ -75,12 +75,12 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	if prev.BlkDepth != 4 || prev.ExprDepth != 7 {
 		t.Fatalf("caller depth mutated: blk=%d expr=%d", prev.BlkDepth, prev.ExprDepth)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateBodyClearsIVBounds(t *testing.T) {
 	// Function.cpp:633 — new CGContext has empty iv_bounds, not caller's loops
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
@@ -107,7 +107,7 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 	if len(prev.IVBounds) != 1 {
 		t.Fatalf("caller IVBounds mutated: %v", prev.IVBounds)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
@@ -115,7 +115,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	// Function.cpp:679–685 known-params RW: empty must_reads/writes + external no-*.
 	// Soft invent was cg := prev keeping prev.RW.Must* so callee make_iteration
 	// took array_control (StatementFor.cpp:204–225) while upstream loop_control.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
@@ -155,8 +155,8 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgr()
 	callee.GenerateBodyWithKnownParams(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if callee.BuildState != BuildBuilt || callee.Body == nil {
 		t.Fatal(callee.BuildState, callee.Body)
@@ -171,8 +171,8 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	callee2.RV = CreateVariableQfer("func_3_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee2.ensurePairedFactMgr()
 	callee2.GenerateBody(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if callee2.BuildState != BuildBuilt {
 		t.Fatal(callee2.BuildState)
@@ -190,10 +190,10 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	// IV pool needs a non-array int
 	iv := CreateVariableScalars("g_77", GetIntType(), false, false)
 	vs.GlobalList = append(vs.GlobalList, iv)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	lc := MakeIteration(NewRng(5), opts, NewProbabilities(opts), vs, &cg)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if lc == nil {
 		t.Fatal("MakeIteration nil")
@@ -205,7 +205,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 		// Free control keeps InvalidIVBound (0 after assign in Go loop-control branch).
 		t.Fatalf("MakeIteration with empty-must RW must not take array bound, bound=%d", lc.Bound)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateBodyBuiltinDummy(t *testing.T) {
@@ -237,28 +237,28 @@ func TestGenerateBodyFailsClosedWithoutFactMgr(t *testing.T) {
 
 func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	// Function.cpp non-builtin make_random body always has process RNG
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_x", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
 	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
 	if f.Body != nil || f.BuildState != BuildUnbuilt {
 		t.Fatalf("nil RNG must not invent body/Built, state=%v body=%v", f.BuildState, f.Body != nil)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG GenerateBody must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Function always live; sticky (no invent soft-skip body gen past hole)
 	(*Function)(nil).GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function GenerateBody must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	// incomplete Param hole / mark_func_end must not invent Built or stuck Building
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -271,10 +271,10 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	if f.BuildState == BuildBuilding {
 		t.Fatal("must not leave stuck Building after fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Param nil hole must SetError")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil param soft invent: IsPointer residual ERROR+false skip TBD seed
 	// then soft-continue later params / partial makeup. Fair: sticky abort first.
 	fTy := &Function{
@@ -293,14 +293,14 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	if fTy.BuildState == BuildBuilding {
 		t.Fatal("Type-nil param must not leave stuck Building")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil param GenerateBody must SetError sticky")
 	}
 	// no invent partial TBD seed for later pointer param past Type-nil shell
 	if FindRelatedPointTo(fmTy.GlobalFacts, fTy.Param[1]) != nil {
 		t.Fatal("Type-nil param must not soft-seed later pointer TBD past hole")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts at mark_func_end when Blocks non-empty
 	f2 := &Function{Name: "func_v", ReturnType: GetIntType(), IsBuiltin: true}
 	fm2 := f2.ensurePairedFactMgr()
@@ -309,12 +309,12 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	if len(f2.Blocks) > 0 && (f2.BuildState == BuildBuilt || f2.IsBuilt) {
 		t.Fatal("incomplete GlobalFacts at mark_func_end must not invent Built")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateBodyIncompleteAmbientSticky(t *testing.T) {
 	// incomplete prev ambient must not invent Building/Built body under hole shells
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -325,10 +325,10 @@ func TestGenerateBodyIncompleteAmbientSticky(t *testing.T) {
 	if f.BuildState == BuildBuilt || f.IsBuilt || f.BuildState == BuildBuilding {
 		t.Fatal("incomplete EffectContext must not invent Built/Building")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
@@ -346,8 +346,8 @@ func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 }
 
 func TestMakeReturnConst(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.DepthProtect = true
 	probs := NewProbabilities(opts)
@@ -371,22 +371,22 @@ func TestMakeReturnConst(t *testing.T) {
 	if f3.RetConst != nil {
 		t.Fatal("nil probs must not invent aggregate ret_c")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil probs aggregate must ERROR_RETURN for GenerateBody")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil RNG — no invent "0"; sticky error for GenerateBody
 	f4 := &Function{Name: "n", ReturnType: GetIntType()}
 	f4.MakeReturnConst(opts, probs, nil)
-	if f4.RetConst != nil || !HasError() {
+	if f4.RetConst != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG must fail closed with sticky error")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionCommaNilLHSType(t *testing.T) {
 	// ExpressionComma lhs type nullptr → choose_random_nonvoid needs Type env
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)

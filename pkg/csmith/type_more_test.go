@@ -6,7 +6,7 @@ import (
 )
 
 func TestGetTypeFromString(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetTypeFromString("Int") != GetIntType() {
 		t.Fatal("Int")
 	}
@@ -19,10 +19,10 @@ func TestGetTypeFromString(t *testing.T) {
 	if GetTypeFromString("Nope") != nil {
 		t.Fatal("unknown")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown type string must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetIntType().TypeNameString() != "Int" {
 		t.Fatal(GetIntType().TypeNameString())
 	}
@@ -30,25 +30,25 @@ func TestGetTypeFromString(t *testing.T) {
 	if s := (&Type{simple: ESimpleType(99)}).TypeNameString(); s != "" {
 		t.Fatal("unknown simple TypeNameString invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown simple TypeNameString must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty struct/union tag sticky (parity with CName; no invent empty type-name)
 	if s := (&Type{isStruct: true, StructName: ""}).TypeNameString(); s != "" {
 		t.Fatal("empty struct tag TypeNameString invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty struct tag TypeNameString must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&Type{isUnion: true, StructName: ""}).TypeNameString(); s != "" {
 		t.Fatal("empty union tag TypeNameString invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty union tag TypeNameString must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (&Type{isStruct: true, StructName: "S0"}).TypeNameString() != "S0" {
 		t.Fatal("struct tag")
 	}
@@ -72,209 +72,209 @@ func TestSignedOverflowPossible(t *testing.T) {
 		t.Fatal("intSize 0 must fail closed false")
 	}
 	// Type* always live; sticky true (no invent overflow-free soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*Type)(nil).SignedOverflowPossible(4) {
 		t.Fatal("nil SignedOverflowPossible must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SignedOverflowPossible must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestTypeNilHardQuerySticky(t *testing.T) {
 	// Type* always live at hard query/emit; sticky no invent soft success past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).Simple() != EVoid {
 		t.Fatal("nil Simple must fail closed EVoid")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Simple must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).PtrType() != nil {
 		t.Fatal("nil PtrType must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PtrType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).ToUnsigned() != nil {
 		t.Fatal("nil ToUnsigned must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ToUnsigned must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*Type)(nil).ContainPointerField() {
 		t.Fatal("nil ContainPointerField must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ContainPointerField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*Type)(nil).HasBitfields() {
 		t.Fatal("nil HasBitfields must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasBitfields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*Type)(nil).HasPadding() {
 		t.Fatal("nil HasPadding must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasPadding must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsBitfieldIndex(0) {
 		t.Fatal("nil IsBitfieldIndex must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsBitfieldIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsUnamedPadding(0) {
 		t.Fatal("nil IsUnamedPadding must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsUnamedPadding must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsUnnamedPadding(0) {
 		t.Fatal("nil IsUnnamedPadding must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsUnnamedPadding must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (*Type)(nil).TypeNameString(); s != "" {
 		t.Fatal("nil TypeNameString invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil TypeNameString must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (*Type)(nil).PrintfDirective(); s != "" {
 		t.Fatal("nil PrintfDirective invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PrintfDirective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).HasIntField() {
 		t.Fatal("nil HasIntField must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasIntField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*Type)(nil).IsFullBitfieldsStruct() {
 		t.Fatal("nil IsFullBitfieldsStruct must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsFullBitfieldsStruct must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(*Type)(nil).IsSigned() {
 		t.Fatal("nil IsSigned must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsSigned must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsFloat() {
 		t.Fatal("nil IsFloat must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsFloat must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsSignedChar() {
 		t.Fatal("nil IsSignedChar must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsSignedChar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).Match(GetIntType(), MatchExact) {
 		t.Fatal("nil Match must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Match must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsPromotable(GetIntType()) {
 		t.Fatal("nil IsPromotable must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsPromotable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsEquivalent(GetIntType()) {
 		t.Fatal("nil IsEquivalent must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsEquivalent must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsDereferencedFrom(PointerTo(GetIntType())) {
 		t.Fatal("nil IsDereferencedFrom must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsDereferencedFrom must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsDerivable(GetIntType()) {
 		t.Fatal("nil IsDerivable must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsDerivable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {
 	// unknown simple — sticky no soft invent platform int size
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if n := (&Type{simple: ESimpleType(99)}).SizeInBytes(); n != 0 {
 		t.Fatal("unknown simple SizeInBytes invent", n)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown simple SizeInBytes must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSizeInBytesNilSticky(t *testing.T) {
 	// Type* always live at SizeInBytes; sticky no invent zero-size soft-skip
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if n := (*Type)(nil).SizeInBytes(); n != 0 {
 		t.Fatal("nil SizeInBytes invent", n)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SizeInBytes must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIndirectLevelBaseTypeNilSticky(t *testing.T) {
 	// Type* always live; sticky no invent level-0 / missing base soft-skip past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IndirectLevel() != 0 {
 		t.Fatal("nil IndirectLevel must fail closed 0")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IndirectLevel must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).BaseType() != nil {
 		t.Fatal("nil BaseType must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BaseType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete pointer still peels
 	p := PointerTo(GetIntType())
 	if p.IndirectLevel() != 1 {
@@ -283,10 +283,10 @@ func TestIndirectLevelBaseTypeNilSticky(t *testing.T) {
 	if p.BaseType() != GetIntType() {
 		t.Fatal(p.BaseType())
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete IndirectLevel/BaseType must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPrintfDirective(t *testing.T) {
@@ -316,43 +316,43 @@ func TestPrintfDirective(t *testing.T) {
 }
 
 func TestSizeofString(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetIntType().SizeofString() != "sizeof(int32_t)" {
 		t.Fatal(GetIntType().SizeofString())
 	}
 	// Type* always live; sticky no invent sizeof(void)/sizeof()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (*Type)(nil).SizeofString(); s != "" {
 		t.Fatal("nil sizeof invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SizeofString must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := (&Type{isStruct: true}).SizeofString(); s != "" {
 		t.Fatal("unnamed struct sizeof invent", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unnamed struct sizeof must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPointerToNoInventIntStar(t *testing.T) {
 	// Type.cpp find_pointer_type sticky — no soft invent int* for nil pointee
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if p := PointerTo(nil); p != nil {
 		t.Fatal("PointerTo(nil) must fail closed nil, got", p.CName())
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("PointerTo(nil) must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 	// Type.cpp fields[i]->printf_directive always live; sticky no invent empty holes
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{
 		isStruct:   true,
 		StructName: "S0",
@@ -364,10 +364,10 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 	if s := st.PrintfDirective(); s != "" {
 		t.Fatal("nil field type must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field type PrintfDirective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested residual soft invent was soft-continue later fields invent partial "{%d, {%d}}"
 	// nested aggregate with Type-nil field stickies nested PrintfDirective
 	nested := &Type{
@@ -390,10 +390,10 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 	if s := st2.PrintfDirective(); s != "" {
 		t.Fatal("nested residual must fail closed whole PrintfDirective, not invent partial", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual PrintfDirective must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHasAggregateAndLongLongField(t *testing.T) {
@@ -412,18 +412,18 @@ func TestHasAggregateAndLongLongField(t *testing.T) {
 		t.Fatal("agg")
 	}
 	// nil field Type sticky has-aggregate (no invent none / soft re-pick past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !HasAggregateField([]StructField{{Name: "f0", Type: nil}}) {
 		t.Fatal("nil field Type must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type HasAggregateField must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIsUnnamedPadding(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: 0},
 		{Name: "f1", Type: GetIntType(), BitWidth: 3},
@@ -438,29 +438,29 @@ func TestIsUnnamedPadding(t *testing.T) {
 	if st.IsBitfieldIndex(99) {
 		t.Fatal("OOB IsBitfieldIndex invent")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB IsBitfieldIndex must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if st.IsUnamedPadding(-1) {
 		t.Fatal("neg IsUnamedPadding invent")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB IsUnamedPadding must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil}}
 	if typesComplete(env.GetAllOKStructUnionTypes(false, false, false, true)) {
 		t.Fatal("nil type hole must fail closed incomplete, not invent empty complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete empty filter (no structs) is complete empty non-nil
 	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	ok := env2.GetAllOKStructUnionTypes(false, false, false, true)
@@ -471,48 +471,48 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 
 func TestGetSimpleTypeOOBNoInventInt(t *testing.T) {
 	// Type.cpp get_simple_type assert path — sticky, no invent eInt for invalid enum
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetSimpleType(ESimpleType(-1)) != nil {
 		t.Fatal("negative eSimpleType must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("negative eSimpleType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetSimpleType(ESimpleType(MaxSimpleTypes)) != nil {
 		t.Fatal("OOB eSimpleType must fail closed nil, not invent eInt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB eSimpleType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetSimpleType(ESimpleType(MaxSimpleTypes+99)) != nil {
 		t.Fatal("far OOB must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("far OOB must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetSimpleType(EInt) != GetIntType() {
 		t.Fatal("valid eInt must still resolve")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("valid eInt must not leave sticky error")
 	}
 }
 
 func TestFindTypeNilHole(t *testing.T) {
 	// Type* always live on AllTypes; no invent soft-skip hole then match later
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	intT := GetIntType()
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{nil, intT}}
 	if env.FindType(intT) != nil {
 		t.Fatal("nil AllTypes hole must fail closed FindType (not soft-skip to match)")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AllTypes hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete pool still finds
 	envOK := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleType(EShort), intT}}
 	if envOK.FindType(intT) != intT {
@@ -523,7 +523,7 @@ func TestFindTypeNilHole(t *testing.T) {
 func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 	// Type-nil field IsConstStructUnion stickies residual; soft invent was soft-skip then pick good.
 	// Fair: sticky IncompleteTypes fail closed whole filter.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: nil},
 	}}
@@ -534,28 +534,28 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 	if typesComplete(env.GetAllOKStructUnionTypes(true, false, false, true)) {
 		t.Fatal("IsConstStructUnion residual must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsConstStructUnion residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// needIntField HasIntField residual
 	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, good}}
 	if typesComplete(env2.GetAllOKStructUnionTypes(false, false, true, true)) {
 		t.Fatal("HasIntField residual must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasIntField residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// okStructUnionLTypes noVolatile residual
 	env3 := &TypeEnv{Sess: testAmbientSession, StructTypes: []*Type{broken, good}}
 	if typesComplete(okStructUnionLTypes(env3, true, true, false)) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVolatileStructUnion residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetAllOKStructUnionTypes(t *testing.T) {
@@ -611,14 +611,14 @@ func TestIfStructAssignOps(t *testing.T) {
 		}
 	}
 	// RNG always live under C++; sticky false (no invent no-assign-ops soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if IfStructWillHaveAssignOps(nil, opts, NewProbabilities(opts)) {
 		t.Fatal("nil RNG IfStructWillHaveAssignOps must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG IfStructWillHaveAssignOps must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMoreTypesProbabilityNilProbs(t *testing.T) {

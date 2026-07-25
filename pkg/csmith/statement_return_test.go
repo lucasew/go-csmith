@@ -43,7 +43,7 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// nil vs → ExpressionVariable soft nil (non-sticky) → empty return re-pick
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := MakeRandomReturn(NewRng(1), opts, nil, &cg)
 	if st.Expr != nil {
 		t.Fatal("nil vs must yield nullptr-style empty return")
@@ -51,25 +51,25 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("stmtOK must reject")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil vs MakeRandomReturn must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	// StatementReturn.cpp:58–59 — assert(fm); soft re-pick non-sticky without FactMgr
 	// (sticky poisons MakeRandomFor / generation when return path re-picks)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// sticky without RNG
 	if stmtOK(MakeRandomReturn(nil, opts, NewVariableSelector(opts), nil)) {
 		t.Fatal("nil RNG/cg must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomReturn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect())
@@ -77,7 +77,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	if st.Expr != nil {
 		t.Fatal("nil FM must fail closed empty return")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM MakeRandomReturn must stay non-sticky soft re-pick")
 	}
 	// nil RV non-sticky soft re-pick
@@ -88,14 +88,14 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	if st2.Expr != nil {
 		t.Fatal("nil RV must fail closed empty return")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RV MakeRandomReturn must stay non-sticky soft re-pick")
 	}
 }
 
 func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient/facts must sticky ERROR (no invent return soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
@@ -108,10 +108,10 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	if st.Expr != nil || stmtOK(st) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomReturn")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
@@ -119,16 +119,16 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	if st2.Expr != nil || stmtOK(st2) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomReturn")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCheckAndSetCastResidualNoInventReturnShell(t *testing.T) {
 	// Soft invent was CheckAndSetCast residual then invent StmtReturn complete shell.
 	// Fair: residual ERROR stickies; return path fail closed empty (no invent).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.LangCPP = true
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
@@ -136,22 +136,22 @@ func TestCheckAndSetCastResidualNoInventReturnShell(t *testing.T) {
 	if hole.CastType != nil {
 		t.Fatal("GetTypeUncast residual must not invent CastType")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CheckAndSetCast residual must SetError sticky")
 	}
 	// MakeRandomReturn pattern after cast residual: empty Stmt{}, not invent return
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		st := Stmt{}
 		if st.Kind == StmtReturn || stmtOK(st) {
 			t.Fatal("cast residual must not invent Return shell")
 		}
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	st := &Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
 	// no CurrentFunc
@@ -159,10 +159,10 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	if VisitFactsStatementReturn(st, &cg, opts) {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CurrentFunc return visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// CurrentFunc without RV
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -170,16 +170,16 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	if VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("nil RV must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RV return visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete path
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	if !VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("live return must visit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateReturnUsesVar(t *testing.T) {

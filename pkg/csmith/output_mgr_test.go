@@ -74,7 +74,7 @@ func TestFuncAttrFlagAndVolTestsMach(t *testing.T) {
 
 func TestSetVolTests(t *testing.T) {
 	// Historical CGOptions::set_vol_tests (csmith-2.1.0); pin header-only.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	if o.SetVolTests("arm") {
 		t.Fatal("invalid mach must fail closed")
@@ -90,15 +90,15 @@ func TestSetVolTests(t *testing.T) {
 	}
 	// nil Options sticky
 	var nilO *Options
-	if nilO.SetVolTests("x86") || !HasError() {
+	if nilO.SetVolTests("x86") || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SetVolTests sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputMgrHashHelpers(t *testing.T) {
 	// OutputMgr.cpp:200–208, 156–167, 352
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if OutputHashFuncDecl() != "void csmith_compute_hash(void);\n\n" {
 		t.Fatal(OutputHashFuncDecl())
 	}
@@ -121,10 +121,10 @@ func TestOutputMgrHashHelpers(t *testing.T) {
 	}
 	// incomplete id sticky
 	SetCurrFunc("only_this")
-	if OutputStepHashFuncInvocation(1, 0) != "" || !HasError() {
+	if OutputStepHashFuncInvocation(1, 0) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmt_id 0 sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if ReallyOutputLn() != "\n" || OutputLn() != "\n" {
 		t.Fatal("newline helpers")
 	}
@@ -132,7 +132,7 @@ func TestOutputMgrHashHelpers(t *testing.T) {
 
 func TestDefaultOutputMgrSplitPaths(t *testing.T) {
 	// DefaultOutputMgr.cpp:79–101, 207
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o := Defaults()
 	if IsSplit(o) {
 		t.Fatal("default not split")
@@ -142,10 +142,10 @@ func TestDefaultOutputMgrSplitPaths(t *testing.T) {
 		t.Fatal("split")
 	}
 	// empty dir sticky
-	if SplitOutputFilePath(o, 0) != "" || !HasError() {
+	if SplitOutputFilePath(o, 0) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty SplitFilesDir sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o.SplitFilesDir = "/tmp/csmith-split-test"
 	p := SplitOutputFilePath(o, 2)
 	if !strings.HasSuffix(p, "rnd_output2.c") {
@@ -155,10 +155,10 @@ func TestDefaultOutputMgrSplitPaths(t *testing.T) {
 		t.Fatal(SplitGlobalsHeaderPath(o))
 	}
 	// negative index sticky
-	if SplitOutputFilePath(o, -1) != "" || !HasError() {
+	if SplitOutputFilePath(o, -1) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("neg index")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	body := SplitGlobalsHeaderBody("extern int g;\n", "/* structs */\n")
 	if !strings.Contains(body, "#ifndef RND_GLOBALS_H") || !strings.Contains(body, "extern int g;") {
 		t.Fatal(body)
@@ -171,15 +171,15 @@ func TestDefaultOutputMgrSplitPaths(t *testing.T) {
 		t.Fatal(SplitPrimaryHeaderInclude())
 	}
 	// CreateOutputDir empty sticky
-	if CreateOutputDir("") || !HasError() {
+	if CreateOutputDir("") || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty dir sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestDFSCompactEmitGates(t *testing.T) {
 	// DFSOutputMgr.cpp:94–108
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if CompactOutputLn(true) != "" || CompactOutputLn(false) != "\n" {
 		t.Fatal("compact ln")
 	}

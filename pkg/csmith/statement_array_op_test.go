@@ -12,8 +12,8 @@ import (
 // Soft invent AllocStmID per nested dim shifted later block ids (seed-7 func_41:
 // 2D array-init → UP block 525 vs GO 526).
 func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -41,8 +41,8 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	currentSession().NextStmID = 200
 	before := currentSession().NextStmID
 	st := MakeRandomArrayInit(NewRng(7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
-	if HasError() {
-		t.Fatalf("MakeRandomArrayInit sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("MakeRandomArrayInit sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	if st.Kind != StmtArrayOp {
 		t.Fatalf("want StmtArrayOp got %v", st.Kind)
@@ -80,8 +80,8 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 // PreOutput on each shell duplicated lbl_N (seed 86: UP one lbl_1132 vs GO three
 // inside nested fors for 3D array-init). Nested shells skip PreOutput.
 func TestMultiDimArrayOpLabelOnce(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	// 3-dim shells: outer + 2 nested
 	iv0 := CreateVariableScalars("i", GetIntType(), false, false)
 	iv1 := CreateVariableScalars("j", GetIntType(), false, false)
@@ -113,8 +113,8 @@ func TestMultiDimArrayOpLabelOnce(t *testing.T) {
 	// or use SourceLabel when FM nil.
 	b := &Block{Stmts: []Stmt{outer}, EmitFM: nil}
 	out := b.outputStmtsOnly(0)
-	if HasError() || out == "" {
-		t.Fatalf("emit empty/err: %q err=%v", out, HasError())
+	if HasErrorSess(testAmbientSession) || out == "" {
+		t.Fatalf("emit empty/err: %q err=%v", out, HasErrorSess(testAmbientSession))
 	}
 	n := strings.Count(out, "lbl_1132:")
 	if n != 1 {
@@ -124,5 +124,5 @@ func TestMultiDimArrayOpLabelOnce(t *testing.T) {
 	if strings.Count(out, "for (") != 3 {
 		t.Fatalf("want 3 for headers, got %q", out)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

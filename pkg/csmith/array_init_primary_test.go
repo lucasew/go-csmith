@@ -8,7 +8,7 @@ import "testing"
 // first AbstractFactForAssign(nil rhs) → GarbagePtr, then merge alts still IsDead
 // (seed-10054 IsValidPtr fail on local pointer arrays during revisit).
 func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	i32 := GetIntType()
 	// pointee local: int32_t* shell
 	l118 := CreateVariableScalars("l_118", PointerTo(i32), false, false)
@@ -36,8 +36,8 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	av.InitExprs = []*Expression{addr, addr}
 
 	pt, _ := AbstractFactForVarInit(&av.Variable)
-	if HasError() {
-		t.Fatalf("abstract sticky %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("abstract sticky %v", HasErrorSess(testAmbientSession))
 	}
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("pt incomplete/len %v n=%d", FactsComplete(pt), len(pt))
@@ -56,12 +56,12 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	if !found {
 		t.Fatalf("want pointee l_118, got %+v", pt[0].PointTo)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // Nil InitExpr + InitExprs-only: promote InitExprs[0] as primary (no garbage-first).
 func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	i32 := GetIntType()
 	l118 := CreateVariableScalars("l_118", PointerTo(i32), false, false)
 	elem := PointerTo(PointerTo(i32))
@@ -76,8 +76,8 @@ func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
 	}
 	av.AsArray = av
 	pt, _ := AbstractFactForVarInit(&av.Variable)
-	if HasError() {
-		t.Fatalf("sticky err %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("sticky err %v", HasErrorSess(testAmbientSession))
 	}
 	if !FactsComplete(pt) || len(pt) != 1 {
 		t.Fatalf("want complete fact, complete=%v n=%d", FactsComplete(pt), len(pt))
@@ -85,5 +85,5 @@ func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
 	if pt[0].IsDead() || pt[0].IsNull() {
 		t.Fatalf("promoted primary must be pure live dead=%v null=%v", pt[0].IsDead(), pt[0].IsNull())
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -6,7 +6,7 @@ import (
 )
 
 func TestCreateFieldVars(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// Type.cpp GenerateSimpleTypes before make_random_struct_type / field choose
@@ -14,7 +14,7 @@ func TestCreateFieldVars(t *testing.T) {
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	if st == nil {
-		t.Fatal("MakeRandomStructType", HasError())
+		t.Fatal("MakeRandomStructType", HasErrorSess(testAmbientSession))
 	}
 	v := CreateVariableQfer("g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if v == nil || len(v.FieldVars) != len(st.Fields) {
@@ -42,7 +42,7 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 		{Name: "f1", Type: nil, BitWidth: -1}, // incomplete field type
 	}}
 	v := &Variable{Name: "g_bad", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v.CreateFieldVars()
 	if v.FieldVarsComplete() {
 		t.Fatal("CreateFieldVars fail must IncompleteVariables, not empty-complete nil")
@@ -50,20 +50,20 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	if VariablesComplete(v.FieldVars) {
 		t.Fatal("want IncompleteVariables marker")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateFieldVars fail must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable.cpp:338 assert aggregate sticky — no invent fields on scalar
 	scalar := CreateVariableScalars("g_i", GetIntType(), false, false)
 	scalar.CreateFieldVars()
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-aggregate CreateFieldVars must SetError sticky")
 	}
 	if len(scalar.FieldVars) != 0 {
 		t.Fatal("non-aggregate must not invent FieldVars", scalar.FieldVars)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested field create: Type-nil outermost top sticky fail (no invent make_random init)
 	// plant as field_var_of chain so top walk hits Type-nil container
 	top := &Variable{Name: "g_top"} // Type nil
@@ -75,10 +75,10 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	if nested.FieldVarsComplete() {
 		t.Fatal("Type-nil top CreateFieldVars must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil top CreateFieldVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHasFieldVarNilHole(t *testing.T) {
@@ -94,22 +94,22 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	// nested HasFieldVar residual: soft invent was soft-continue later field invent not-has-field.
 	// Fair: sticky fail closed false (FieldVarsComplete false already). Covered above.
 	// MarkDeadVar / OOS must not invent leave field pointees live past hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, child)}
 	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("OOS incomplete FieldVars must clear facts, not invent live pointee", facts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOS incomplete FieldVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsFrameVar false → empty frame set as complete
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
@@ -120,16 +120,16 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
 		t.Fatal("incomplete frame stack must fail closed incomplete, not invent empty complete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete frame stack must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindReachableFrameVarsIsVisibleResidualSticky(t *testing.T) {
 	// IsVisibleLocal residual soft invent was soft-skip not-frame then continue later pointee.
 	// Fair: sticky IncompleteVariables fail closed whole FindReachableFrameVars.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	// non-global local name
 	loc := &Variable{Name: "l_1", Type: GetIntType()}
@@ -146,14 +146,14 @@ func TestFindReachableFrameVarsIsVisibleResidualSticky(t *testing.T) {
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
 		t.Fatal("IsVisibleLocal residual must fail closed incomplete frame set")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVisibleLocal residual FindReachableFrameVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCollectExpandable(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
@@ -169,27 +169,27 @@ func TestCollectExpandable(t *testing.T) {
 	if VariablesComplete(v.CollectExpandable()) {
 		t.Fatal("nil field hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// special Type-nil complete expand as self only
 	got := NullPtr.CollectExpandable()
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != NullPtr {
 		t.Fatal("special CollectExpandable must stay complete self-only", got)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("special CollectExpandable must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// non-special Type-nil sticky IncompleteVariables (no invent expand pool past hole)
 	if VariablesComplete((&Variable{Name: "broken"}).CollectExpandable()) {
 		t.Fatal("Type-nil CollectExpandable must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil CollectExpandable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested CollectExpandable residual soft invent was soft-continue invent complete expand pool.
 	// Fair: sticky IncompleteVariables.
 	nestHole := &Variable{Name: "nest", Type: &Type{isStruct: true}, FieldVars: []*Variable{nil}}
@@ -200,10 +200,10 @@ func TestCollectExpandable(t *testing.T) {
 	if VariablesComplete(outer.CollectExpandable()) {
 		t.Fatal("nested residual CollectExpandable must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual CollectExpandable must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFieldVolatileOrFromParent(t *testing.T) {

@@ -14,7 +14,7 @@ func TestNewCtrlVarsNoInventDimOne(t *testing.T) {
 	}
 	// OutputArrayInitializers must not invent inits without matching ctrl decl
 	// (MaxArrayDim undersize is config soft re-pick — non-sticky empty)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxArrayDim = 0
 	av := &ArrayVariable{
@@ -25,7 +25,7 @@ func TestNewCtrlVarsNoInventDimOne(t *testing.T) {
 	if out := OutputArrayInitializers([]*Variable{&av.Variable}, opts, "    "); out != "" {
 		t.Fatal("must fail closed without ctrl decl", out)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("MaxArrayDim undersize must stay non-sticky config soft re-pick")
 	}
 	CtrlVarsDoFinalization()
@@ -55,29 +55,29 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	}
 	// Variable.cpp:806 — ctrl_vars[i] always live; nil fails closed sticky
 	broken := []*Variable{c1[0], nil}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if out := OutputArrayCtrlVars(broken, 2, ""); out != "" {
 		t.Fatal("nil ctrl slot must fail closed", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ctrl slot must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	emptyName := []*Variable{c1[0], {Name: "", Type: GetIntType()}}
 	if out := OutputArrayCtrlVars(emptyName, 2, ""); out != "" {
 		t.Fatal("empty ctrl name must fail closed", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty ctrl name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Variable.cpp:802 assert undersize — config soft re-pick non-sticky empty
 	// (sticky poisons Generate when array rank exceeds MaxArrayDim)
 	short := []*Variable{c1[0]}
 	if out := OutputArrayCtrlVars(short, 2, ""); out != "" {
 		t.Fatal("dimen > len(ctrl) must fail closed", out)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("dimen > len(ctrl) must stay non-sticky config soft re-pick")
 	}
 	CtrlVarsDoFinalization()
@@ -85,16 +85,16 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 		t.Fatal("cleared")
 	}
 	// incomplete last vector must IncompleteVariables sticky (not bare nil empty-complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = NewCtrlVars(2, false)
 	currentSession().CtrlVarsVectors[len(currentSession().CtrlVarsVectors)-1] = append(currentSession().CtrlVarsVectors[len(currentSession().CtrlVarsVectors)-1], nil)
 	if VariablesComplete(GetLastCtrlVars()) {
 		t.Fatal("incomplete last ctrl must IncompleteVariables")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete last ctrl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalization()
 }
 
@@ -141,23 +141,23 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 		t.Fatal(out)
 	}
 	// nil hole fails closed sticky (GetMaxArrayDimension + OutputArrayInitializers)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if GetMaxArrayDimension([]*Variable{v, nil}) >= 0 {
 		t.Fatal("nil hole GetMaxArrayDimension must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole GetMaxArrayDimension must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := OutputArrayInitializers([]*Variable{v, nil}, opts, "    "); s != "" {
 		t.Fatal("nil hole must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete loop-init (local non-const without init) fails closed sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	blk := &Block{}
 	loc := &ArrayVariable{
 		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
@@ -169,27 +169,27 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if s := OutputArrayInitializers([]*Variable{&loc.Variable}, opts, "    "); s != "" {
 		t.Fatal("incomplete array init must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete loop-init OutputArrayInitializers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable shell from
 	// ArraySizes then partial loop inits. Fair: sticky empty whole section.
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if GetMaxArrayDimension([]*Variable{shell}) >= 0 {
 		t.Fatal("IsArray without AsArray GetMaxArrayDimension must fail closed -1")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray GetMaxArrayDimension must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if s := OutputArrayInitializers([]*Variable{shell}, opts, "    "); s != "" {
 		t.Fatal("IsArray without AsArray must fail closed empty, not invent synthetic", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray OutputArrayInitializers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// NoLoopInitializer residual: Type-nil stickies true; soft invent was soft-skip then
 	// partial inits for later arrays. Fair: sticky fail closed whole section.
 	// Need live AsArray with Type-nil after GetMaxArrayDimension validation path.
@@ -210,10 +210,10 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if s := OutputArrayInitializers([]*Variable{&avBroken.Variable, &avGood.Variable}, opts, "    "); s != "" {
 		t.Fatal("NoLoopInitializer residual must fail closed empty", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("NoLoopInitializer residual OutputArrayInitializers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestOutputArrayInitializersBraceOnlyStillCtrlDecl — Variable.cpp:829–841 + 861–863.
@@ -222,7 +222,7 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 // Seed-2 func_67: "int i, j, k;" after l_137 brace init with no loop inits.
 func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 	CtrlVarsDoFinalization()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// local array with alt init_values → NoLoopInitializer true (brace path)
 	av := &ArrayVariable{
@@ -242,8 +242,8 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 		t.Fatal("brace-init local must NoLoopInitializer")
 	}
 	out := OutputArrayInitializers([]*Variable{&av.Variable}, opts, "    ")
-	if HasError() {
-		t.Fatal("brace-only OutputArrayInitializers must not sticky", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("brace-only OutputArrayInitializers must not sticky", GetErrorSess(testAmbientSession))
 	}
 	// still declare ctrl vars for dimen=2
 	if !strings.Contains(out, "int i, j;") {
@@ -256,21 +256,21 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 	// OutputVariableList for locals must chain OutputArrayInitializers
 	// Variable.cpp:861–863
 	CtrlVarsDoFinalization()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	list := OutputVariableList([]*Variable{&av.Variable}, "  ", false)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if !strings.Contains(list, "l_137") || !strings.Contains(list, "int i, j;") {
 		t.Fatalf("OutputVariableList locals must emit brace def + ctrl decl, got %q", list)
 	}
 	// Block.Output uses OutputVariableList — same contract
 	CtrlVarsDoFinalization()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	blk := &Block{LocalVars: []*Variable{&av.Variable}, StmID: 1}
 	bout := blk.Output(0)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if !strings.Contains(bout, "int i, j;") {
 		t.Fatalf("Block.Output brace-only local array must emit ctrl decl, got %q", bout)
@@ -279,19 +279,19 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 }
 
 func TestOutputForCommentNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).OutputForComment(false) != "" {
 		t.Fatal("nil Variable OutputForComment must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable OutputForComment must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).GetActualName(false) != "" {
 		t.Fatal("nil Variable GetActualName must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Variable GetActualName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

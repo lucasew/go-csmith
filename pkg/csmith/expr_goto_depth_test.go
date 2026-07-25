@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 func TestExpressionNotEquals(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(&Expression{Term: TermConstant, Con: MakeInt(1)}).NotEquals(0) {
 		t.Fatal("1 != 0")
 	}
@@ -13,14 +13,14 @@ func TestExpressionNotEquals(t *testing.T) {
 	if (&Expression{Term: TermVariable}).NotEquals(0) {
 		t.Fatal("var not_equals false")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete NotEquals paths must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpressionUseVar(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	w := CreateVariableScalars("g_2", GetIntType(), true, false)
 	e := &Expression{Term: TermVariable, Var: v}
@@ -48,28 +48,28 @@ func TestExpressionUseVar(t *testing.T) {
 	if !(&Expression{Term: TermFunction, Invoke: &Invocation{Args: []*Expression{nil}}}).UseVar(v) {
 		t.Fatal("nil arg hole must fail closed as uses")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil arg hole UseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(&Expression{Term: TermCommaExpr, CommaLHS: nil, CommaRHS: e}).UseVar(v) {
 		t.Fatal("nil comma side must fail closed as uses")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil comma side UseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if !(&Expression{Term: TermVariable, Var: nil}).UseVar(v) {
 		t.Fatal("nil TermVariable must fail closed as uses")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil TermVariable UseVar must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMustJumpUsesNotEquals(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	if !st.MustJump() {
 		t.Fatal("true const")
@@ -79,15 +79,15 @@ func TestMustJumpUsesNotEquals(t *testing.T) {
 		t.Fatal("false const")
 	}
 	// incomplete break without test sticky not-must-jump
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st.Expr = nil
 	if st.MustJump() {
 		t.Fatal("nil Expr MustJump must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Expr MustJump must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMinimalDepthTable(t *testing.T) {
@@ -121,13 +121,13 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 	defer func() {
 		RandomNumberDoFinalization()
 		ReinstallTestProcessSingletons()
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if DepthGuardByTypeFlag(opts, DtFunction, 0) != GoodDepth {
-		t.Fatal("dfs fresh engine GOOD", GetError())
+		t.Fatal("dfs fresh engine GOOD", GetErrorSess(testAmbientSession))
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete depth guard must not sticky")
 	}
 }
@@ -135,7 +135,7 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	// StatementGoto.cpp:390–398 — subset outs clear map_facts_in/out[dest] full FactVec
 	// (ePointTo + eUnionWrite). Soft invent was PT-only delete.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
@@ -165,7 +165,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 	}
 	if !VisitFactsStatementGoto(st, &cg, Defaults()) {
-		t.Fatal("visit", HasError())
+		t.Fatal("visit", HasErrorSess(testAmbientSession))
 	}
 	if _, ok := fm.MapFactsIn[10]; ok {
 		t.Fatal("dest PT in cleared")
@@ -183,7 +183,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 
 func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 	// fair sid: dest stm_id 0 is valid (StatementGoto.cpp no destID>0 invent)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p0", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a0", GetIntType(), true, false)
@@ -204,7 +204,7 @@ func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 	}
 	if !VisitFactsStatementGoto(st, &cg, Defaults()) {
-		t.Fatal("visit", HasError())
+		t.Fatal("visit", HasErrorSess(testAmbientSession))
 	}
 	if _, ok := fm.MapFactsIn[0]; ok {
 		t.Fatal("dest id 0 in must clear")
@@ -217,12 +217,12 @@ func TestExpressionToString(t *testing.T) {
 		t.Fatal(e.ToString())
 	}
 	// Expression always live; sticky empty via Output (no invent soft-skip past hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Expression)(nil).ToString() != "" {
 		t.Fatal("nil ToString must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ToString must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

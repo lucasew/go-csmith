@@ -97,14 +97,14 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	calFM.MapUnionFactsOut = map[int][]*FactUnion{20: {}, 99: {}}
 	retFacts = CloneFactSlice(calFM.MapFactsOut[20])
 	retUnions = []*FactUnion{}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) || FactsComplete(retFacts) {
 		t.Fatal("incomplete return out must fail closed AddBackReturnFacts", retFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete return out must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeFirstSetupInOutMaps(t *testing.T) {
@@ -169,7 +169,7 @@ func TestMakeRandomFunction(t *testing.T) {
 
 func TestMakeFirstERRORGuard(t *testing.T) {
 	// Function.cpp:445/453 ERROR_GUARD paths
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -181,11 +181,11 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 	}
 	// sticky error
 	seedTypesForTest(NewRng(2), opts, probs, vs, list)
-	SetError(ErrGeneric)
+	SetErrorSess(testAmbientSession, ErrGeneric)
 	if MakeFirst(NewRng(3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("sticky error")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// no invent Unbuilt success when body cannot generate
 	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("nil RNG must not invent first")
@@ -194,7 +194,7 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 
 func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	// AddNewVarFact(nil) no-ops — incomplete GlobalList must not invent partial FM seed + body
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
@@ -206,7 +206,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	if MakeFirst(NewRng(5), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// MakeRandomFunction same seed path
 	vs2 := NewVariableSelector(opts)
 	list2 := &FunctionList{}
@@ -216,7 +216,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	if MakeRandomFunction(NewRng(7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list2) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
@@ -269,7 +269,7 @@ func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
 
 func TestGenerateFunctionsNoInventNilFuncHole(t *testing.T) {
 	// Function* always live on Funcs; nil hole stops unbuilt-body loop
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxFuncs = 3
 	opts.MaxBlockSize = 1
@@ -293,5 +293,5 @@ func TestGenerateFunctionsNoInventNilFuncHole(t *testing.T) {
 	if unbuilt > 0 {
 		t.Fatalf("must not invent unbuilt past nil hole, unbuilt=%d", unbuilt)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

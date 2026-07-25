@@ -26,24 +26,24 @@ func TestGetContainerUnion(t *testing.T) {
 		t.Fatal("int")
 	}
 	// Variable always live; sticky nil (no invent no-container soft-skip)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).GetContainerUnion() != nil {
 		t.Fatal("nil GetContainerUnion must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GetContainerUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil on ancestry sticky (no invent skip hole as no-container)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
 	if field.GetContainerUnion() != nil {
 		t.Fatal("Type-nil parent GetContainerUnion must fail closed nil")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil parent GetContainerUnion must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSiblingUnionPartial(t *testing.T) {
@@ -74,7 +74,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 		t.Fatal("nil write key must fail closed true")
 	}
 	// incomplete FieldVars collective on written key fails closed sticky true
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: ut, IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -96,10 +96,10 @@ func TestSiblingUnionPartial(t *testing.T) {
 	if !e3.SiblingUnionFieldIsWritten(fld) {
 		t.Fatal("incomplete collective subject must fail closed true")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete collective SiblingUnionFieldIsWritten must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindDanglingGlobalPtrs(t *testing.T) {
@@ -122,16 +122,16 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	}
 	// incomplete GlobalFacts must IncompleteVariables DeadGlobals sticky
 	// (not invent empty-complete "no dangling")
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm.GlobalFacts = IncompleteFactSlice()
 	fm.FindDanglingGlobalPtrs(f)
 	if VariablesComplete(f.DeadGlobals) {
 		t.Fatal("incomplete facts must IncompleteVariables DeadGlobals")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsDead residual: PointTo nil hole stickies ERROR+true. Soft invent was append as
 	// dead then soft-continue later complete sibling into DeadGlobals. Fair: wipe incomplete.
 	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
@@ -145,10 +145,10 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	if VariablesComplete(f.DeadGlobals) {
 		t.Fatal("IsDead residual must IncompleteVariables DeadGlobals, not invent later dead")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsDead residual FindDanglingGlobalPtrs must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputPtrResets(t *testing.T) {
@@ -162,23 +162,23 @@ func TestOutputPtrResets(t *testing.T) {
 		t.Fatal("empty")
 	}
 	// incomplete list fails closed sticky (no invent soft-skip hole)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if OutputPtrResets([]*Variable{p, nil}, Defaults()) != "" {
 		t.Fatal("nil hole must fail closed whole resets")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole OutputPtrResets must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable shell
 	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
 	if OutputPtrResets([]*Variable{shell}, Defaults()) != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole resets")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray OutputPtrResets must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestStepHashBody(t *testing.T) {

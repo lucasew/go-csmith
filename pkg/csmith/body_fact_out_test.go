@@ -7,7 +7,7 @@ import "testing"
 // remaining pointees (params as garbage). Nested blocks (parent != nil) do not.
 // FunctionInvocationUser.cpp:212–221 — ret_facts = map_facts_out[body]; renew_facts.
 func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fn := &Function{Name: "func_x", ReturnType: GetIntType()}
 	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
 	if p == nil {
@@ -27,8 +27,8 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 		MakeFactPointTo(g, p),
 	}
 	fm.SetMapFactsOutForBlock(body, facts)
-	if HasError() {
-		t.Fatalf("sticky: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("sticky: %v", HasErrorSess(testAmbientSession))
 	}
 	out := fm.GetMapFactsOut(body.StmID)
 	if !FactsComplete(out) {
@@ -63,34 +63,34 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 		t.Fatal("global fact must remain")
 	}
 	// Nested block: parent non-nil — no remove_function_local_facts
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	inner := &Block{Func: fn, Parent: body, StmID: AllocStmID()}
 	facts2 := []*FactPointTo{
 		MakeFactPointTo(p, NullPtr),
 		MakeFactPointTo(g, p),
 	}
 	fm.SetMapFactsOutForBlock(inner, facts2)
-	if HasError() {
-		t.Fatalf("nested sticky: %v", HasError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("nested sticky: %v", HasErrorSess(testAmbientSession))
 	}
 	out2 := fm.GetMapFactsOut(inner.StmID)
 	if len(out2) != 2 {
 		t.Fatalf("nested block must store both facts, got %d", len(out2))
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSetMapFactsOutForBlockNilFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SetMapFactsOutForBlock(&Block{StmID: 1}, nil)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM must sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(&Function{Name: "f"})
 	fm.SetMapFactsOutForBlock(nil, []*FactPointTo{})
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block must sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

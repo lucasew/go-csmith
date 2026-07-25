@@ -10,7 +10,7 @@ import "testing"
 // map_facts_out[goto] kept live field instead of garbage → !imply only, full
 // VisitFacts still valid, for kept (seed 17809409409875472624 func_61).
 func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	st := &Type{
 		isStruct: true, StructName: "S0",
@@ -40,8 +40,8 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	if !f.IsVarOOS(f0, body) {
 		t.Fatal("field of later-sibling local must IsVarOOS at earlier dest parent")
 	}
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 
 	// Live stack aggregate field still not OOS
@@ -49,11 +49,11 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	if f.IsVarOOS(f0, body) {
 		t.Fatal("field of live stack aggregate must not be OOS")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	st := &Type{
 		isStruct: true, StructName: "S0",
@@ -76,8 +76,8 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 	factsIn := []*FactPointTo{MakeFactPointToSet(g77, []*Variable{g67, f0})}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)
-	if HasError() {
-		t.Fatalf("sticky: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(factsOut, g77)
 	if got == nil {
@@ -92,5 +92,5 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 		}
 		t.Fatalf("OOS field pointee must mark_dead; pts=%v", names)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

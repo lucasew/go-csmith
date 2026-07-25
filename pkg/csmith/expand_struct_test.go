@@ -66,21 +66,21 @@ func TestFactMgrForFunc(t *testing.T) {
 		t.Fatal("reuse")
 	}
 	// FactMgrMap + Function always live; sticky nil
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*FactMgrMap)(nil).ForFunc(f) != nil {
 		t.Fatal("nil map ForFunc must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil map ForFunc must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if m.ForFunc(nil) != nil {
 		t.Fatal("nil Function ForFunc must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function ForFunc must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestExpandStructUnionVars(t *testing.T) {
@@ -109,41 +109,41 @@ func TestExpandStructUnionVars(t *testing.T) {
 		t.Fatalf("keep aggregate: %+v", keep)
 	}
 	// nil candidate / field hole fails closed sticky incomplete (not invent empty complete)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{nil}, GetIntType())) {
 		t.Fatal("nil var hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	sv.FieldVars = append(sv.FieldVars, nil)
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{sv}, GetIntType())) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky incomplete (no invent keep shell as complete candidate)
 	hole := &Variable{Name: "g_hole", Type: nil}
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{hole}, GetIntType())) {
 		t.Fatal("Type-nil expand must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil expand must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was IsVirtual residual false soft-continue
 	// fair: sticky IncompleteVariables
 	arrShell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{arrShell}, GetIntType())) {
 		t.Fatal("IsArray without AsArray expand must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray ExpandStructUnionVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// FieldVarOf ancestry IsArray-without-AsArray: IsVirtual residual ERROR+false.
 	// Soft invent was soft-continue keep child then expand later good as complete pool.
 	// Fair: sticky IncompleteVariables whole expand.
@@ -153,10 +153,10 @@ func TestExpandStructUnionVars(t *testing.T) {
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{child, good}, GetIntType())) {
 		t.Fatal("IsVirtual ancestry residual must fail closed incomplete, not invent later good")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVirtual ancestry residual ExpandStructUnionVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestEagerCreateLocalStruct(t *testing.T) {
@@ -187,7 +187,7 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 
 func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	// Incomplete ambient / invalidVars must not invent soft re-pick create success
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
@@ -201,34 +201,34 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()), GetIntType(), &q, NewRng(5), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateGlobalStruct")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(5), MatchFlexible, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed EagerCreateGlobalStruct")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete invalidVars must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
 	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, IncompleteEffect()), GetIntType(), &q, NewRng(9), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateLocalStruct")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext local must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(9), MatchFlexible, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed EagerCreateLocalStruct")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete invalidVars local must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestSelectParentLocalExpandStruct(t *testing.T) {
@@ -267,9 +267,9 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	}
 	// sticky error after stack pick → ERROR_GUARD
 	f.Stack = []*Block{{}}
-	ClearError()
-	SetError(ErrGeneric)
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	SetErrorSess(testAmbientSession, ErrGeneric)
+	defer ClearErrorSess(testAmbientSession)
 	if vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRng(1), MatchFlexible) != nil {
 		t.Fatal("sticky error must fail SelectParentLocal")
 	}

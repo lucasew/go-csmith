@@ -18,15 +18,15 @@ func TestMakeRandomLoopControlRanges(t *testing.T) {
 		_ = incrOp
 	}
 	// nil RNG sticky — no invent fixed init/limit/incr shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	init, limit, incr, testOp, incrOp := MakeRandomLoopControl(nil, opts, true)
 	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v", init, limit, incr, testOp, incrOp)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomLoopControl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomIfHasBranches(t *testing.T) {
@@ -39,12 +39,12 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	// need a function for context
 	r := NewRng(2)
 	seedTypesForTest(r, opts, probs, vs, &list)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	if f == nil {
 		t.Fatal("MakeFirst")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Paired FactMgr + function body on stack (generation context)
 	fm := f.PairedFactMgr()
 	if fm == nil {
@@ -57,13 +57,13 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	// force if generation — soft re-pick seeds (make_random can miss)
 	var st *Stmt
 	for seed := uint64(11); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		st = MakeRandomIf(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st != nil && st.Kind == StmtIfElse && st.Then != nil && st.Else != nil && st.Expr != nil {
 			return
 		}
 	}
-	t.Fatalf("%+v err=%v", st, GetError())
+	t.Fatalf("%+v err=%v", st, GetErrorSess(testAmbientSession))
 }
 
 func TestMakeRandomForHasLoopAndBody(t *testing.T) {
@@ -94,23 +94,23 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 
 func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	// StatementFor.cpp always has RNG+CG sticky; nil FM soft re-pick
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg MakeRandomFor must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cgEmpty := EmptyCGContext()
 	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
 		t.Fatal("nil RNG")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomFor must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -118,7 +118,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatalf("nil FM must return nil, got %#v", st)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM MakeRandomFor must stay non-sticky soft re-pick")
 	}
 }
@@ -157,7 +157,7 @@ func TestGenerateCanEmitIfOrFor(t *testing.T) {
 // bodyEff snapshot (removed) left mid-body StatementGoto choose_visible_read_var
 // with fewer parent+body reads (seed-2 first_div 12693: ok_vars 11 vs UP 16).
 func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -195,5 +195,5 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	if !cg.EffectAccum.IsRead(pre) {
 		t.Fatal("parent EffectAccum must keep pre-for reads when body shares accum (C++ shared pointer)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

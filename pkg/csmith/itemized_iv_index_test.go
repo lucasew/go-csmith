@@ -6,8 +6,8 @@ import (
 )
 
 func TestItemizedIVAsIndexExpressionOutput(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_106", Type: GetIntType(), IsArray: true, ArraySizes: []int{5}},
 		Sizes:    []int{5},
@@ -15,19 +15,19 @@ func TestItemizedIVAsIndexExpressionOutput(t *testing.T) {
 	parent.AsArray = parent
 	item := parent.ItemizeConstIndices([]int{4}, nil)
 	if item == nil {
-		t.Fatal("itemize", GetError())
+		t.Fatal("itemize", GetErrorSess(testAmbientSession))
 	}
 	e := &Expression{Term: TermVariable, Var: &item.Variable, ExprType: GetIntType()}
 	got := e.Output()
 	if got != "g_106[4]" {
-		t.Fatalf("ExpressionVariable of itemized IV: got %q want g_106[4] err=%v", got, GetError())
+		t.Fatalf("ExpressionVariable of itemized IV: got %q want g_106[4] err=%v", got, GetErrorSess(testAmbientSession))
 	}
 }
 
 // VariableSelector.cpp:1492 — ExpressionVariable(*iv); Indices string must match Output.
 func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	// Fixed seed that may add offset; accept g_106[4] or (g_106[4] + N)
@@ -53,7 +53,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 	cg1.IVBounds = map[*Variable]int{&ivItem.Variable: 0}
 	got1 := vs.ItemizeArray(r, cg1, target1)
 	if got1 == nil {
-		t.Fatalf("ItemizeArray 1d: %v", GetError())
+		t.Fatalf("ItemizeArray 1d: %v", GetErrorSess(testAmbientSession))
 	}
 	out1 := got1.OutputAccess()
 	if !strings.Contains(out1, "g_106[4]") {

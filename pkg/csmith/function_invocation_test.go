@@ -6,7 +6,7 @@ import (
 )
 
 func TestReachMaxFunctions(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	var list FunctionList
@@ -19,16 +19,16 @@ func TestReachMaxFunctions(t *testing.T) {
 		t.Fatal("under max")
 	}
 	// nil Function* hole fails closed as at-max non-sticky (soft re-pick gate)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.MaxFuncs = 100
 	list.Funcs = []*Function{{Name: "a"}, nil}
 	if !ReachMaxFunctions(&list, opts) {
 		t.Fatal("nil hole must fail closed as at-max")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole ReachMaxFunctions must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
@@ -43,7 +43,7 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	// C++ always sets SafeOpFlags; Output uses safe_* only for arith/shift + SafeMath.
 	var fi *Invocation
 	for seed := uint64(1); seed < 100; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect())
 		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.IsStd && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
@@ -62,7 +62,7 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 
 func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	// incomplete EffectAccum after lhs must sticky ERROR (no invent RHS / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -80,10 +80,10 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	if fi != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBinaryInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts snapshot before RHS
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
@@ -94,15 +94,15 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	if fi2 != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBinaryInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky before choose/build
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -115,10 +115,10 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgr(f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	eff := EmptyEffect()
@@ -128,15 +128,15 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	// incomplete DerivedTypes must not invent scalar binary past HasPointerType hole
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -151,9 +151,9 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	// seed forces flipcoin(10) path when possible — try many seeds
 	var sawSticky bool
 	for seed := uint64(1); seed < 80; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())
-		if HasError() {
+		if HasErrorSess(testAmbientSession) {
 			sawSticky = true
 			if fi != nil {
 				t.Fatal("sticky incomplete DerivedTypes must not return binary inv")
@@ -162,14 +162,14 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 		}
 	}
 	// if no seed hit flipcoin(10), still verify HasPointerType sticky alone
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if env.HasPointerType() {
 		t.Fatal("incomplete DerivedTypes must fail HasPointerType")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasPointerType incomplete must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = sawSticky
 }
 
@@ -288,7 +288,7 @@ func TestGenerateNewParentLocal(t *testing.T) {
 
 func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	// Operands may recurse into comma (type nullptr) — seed full Type env
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -367,17 +367,17 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 
 func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	// FunctionInvocationUser::Output — param_value[i] always live; sticky no invent f(a, , c)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	callee := &Function{Name: "func_2", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt}
 	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	// empty callee name — sticky no invent "()"
 	if out := (&Invocation{User: &Function{Name: "", ReturnType: GetIntType()}, Args: nil}).Output(); out != "" {
 		t.Fatal("empty User.Name must fail closed, got", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty User.Name must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{
 		User: callee,
 		Args: []*Expression{a0, nil},
@@ -385,26 +385,26 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	if out := fi.Output(); out != "" {
 		t.Fatal("nil arg must fail closed empty, got", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil arg must SetError sticky")
 	}
 	// incomplete arg Output (nil Con) — sticky no invent empty slot
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi.Args = []*Expression{a0, {Term: TermConstant}}
 	if out := fi.Output(); out != "" {
 		t.Fatal("empty arg Output must fail closed, got", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty arg Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeInt(2)}}
 	out := fi.Output()
 	if out != "func_2(1, 2)" {
 		t.Fatal(out)
 	}
 	// binary incomplete operand Output sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	bin := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{
 		{Term: TermConstant, Con: MakeInt(1)},
 		{Term: TermConstant},
@@ -412,62 +412,62 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	if out := bin.Output(); out != "" {
 		t.Fatal("empty binary operand must fail closed", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty binary operand must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestInvocationOutputNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Invocation)(nil).Output() != "" {
 		t.Fatal("nil Invocation Output must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Invocation Output must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Failed stays non-sticky soft re-pick
 	if (&Invocation{Failed: true}).Output() != "" {
 		t.Fatal("Failed Invocation Output must fail closed empty")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("Failed Invocation Output must stay non-sticky soft re-pick")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Invocation always live; sticky (no invent soft-skip out-opts past hole)
 	(*Invocation)(nil).setOutOpts(Defaults())
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Invocation setOutOpts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomBinaryInvocationIsFloatResidualSticky(t *testing.T) {
 	// IsFloat residual soft invent was invent soft-continue binary pick past Type-nil shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).IsFloat() {
 		t.Fatal("nil Type IsFloat must fail closed false")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsFloat must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete float IsFloat true path no sticky
 	ft := GetSimpleType(EFloat)
 	if !ft.IsFloat() {
 		t.Fatal("EFloat IsFloat must true")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete EFloat IsFloat must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete int IsFloat false no sticky
 	if GetIntType().IsFloat() {
 		t.Fatal("int IsFloat must false")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete int IsFloat must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

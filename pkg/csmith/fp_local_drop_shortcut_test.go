@@ -11,7 +11,7 @@ import "testing"
 // Fair: drop body locals from current_inputs after each back-edge merge,
 // before ShortcutAnalysisBlock, so the lattice matches map_facts_in.
 func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_fp_local_drop"}
 	fm := NewFactMgr(f)
@@ -51,9 +51,9 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	// First call visitOnce=true forces full walk; second with false should shortcut
 	// if drop-before-shortcut makes same_facts match after first set_fact_in.
 	_, _, _, ok1 := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), true)
-	if !ok1 && HasError() {
+	if !ok1 && HasErrorSess(testAmbientSession) {
 		// may fail on empty body; still check map_in shape
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}
 	inAfter := fm.GetMapFactsIn(b.StmID)
 	if FindRelatedPointTo(inAfter, loc) != nil {
@@ -63,10 +63,10 @@ func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	fm.MapVisited[b.StmID] = true
 	// Simulate currentInputs after merge including local — Drop must make shortcut OK.
 	// Call FP again with entry; merge will reintroduce local from src out.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_, _, _, ok2 := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), false)
-	if HasError() {
-		t.Fatalf("sticky err after second FP: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("sticky err after second FP: %v", GetErrorSess(testAmbientSession))
 	}
 	// If drop-before-shortcut works, we should not spin 50 iterations pollution.
 	// Success: ok2 true (shortcut or converged full walk) without incomplete maps.

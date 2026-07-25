@@ -39,27 +39,27 @@ func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 	vs := NewVariableSelector(Defaults())
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g, nil}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if HashGlobalVariables(vs) != "" {
 		t.Fatal("nil GlobalList hole must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GlobalList hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	vs.GlobalList = []*Variable{g}
 	if HashGlobalVariablesWithUnionFacts(vs, IncompleteUnionFactSlice()) != "" {
 		t.Fatal("incomplete union facts must fail closed empty")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete union facts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHashGlobalVariablesHashOutputResidualSticky(t *testing.T) {
 	// hashOutput residual soft invent was soft-continue later globals invent partial hash.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
 	// IsArray without AsArray stickies hashOutput
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
@@ -68,19 +68,19 @@ func TestHashGlobalVariablesHashOutputResidualSticky(t *testing.T) {
 	if s := HashGlobalVariables(vs); s != "" {
 		t.Fatal("hashOutput residual must fail closed whole HashGlobalVariables, not invent partial", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("hashOutput residual HashGlobalVariables must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// residual mid-list must not invent hash of later complete globals only
 	vs.GlobalList = []*Variable{shell, good}
 	if s := HashGlobalVariables(vs); s != "" {
 		t.Fatal("early residual must fail closed before later globals", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("early residual HashGlobalVariables must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
@@ -101,7 +101,7 @@ func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
 }
 
 func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
@@ -121,7 +121,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	uv.Init = MakeInt(0)
 	g.VS.GlobalList = append(g.VS.GlobalList, uv)
 	g.GenerateFunctions()
-	ClearError() // generation may fail-closed other paths; hash path only needs VS+FM
+	ClearErrorSess(testAmbientSession) // generation may fail-closed other paths; hash path only needs VS+FM
 	// attach union fact on first func FM (or use generator FM after seed)
 	if len(g.Funcs.Funcs) > 0 {
 		fm := g.FactMgrs.ForFunc(g.Funcs.Funcs[0])
@@ -133,11 +133,11 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	if strings.Contains(out, "g_u.f1") {
 		t.Fatal("unread field hashed", out)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
@@ -159,12 +159,12 @@ func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 }
 
 func TestHashGlobalVariablesNilVSSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if HashGlobalVariables(nil) != "" {
 		t.Fatal("nil VS HashGlobalVariables must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil VS HashGlobalVariables must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

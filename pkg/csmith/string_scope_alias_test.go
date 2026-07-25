@@ -28,7 +28,7 @@ func TestGetSubstring(t *testing.T) {
 }
 
 func TestFindVariableScope(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if EmptyCGContext().FindVariableScope(g) != ScopeGlobalVar {
 		t.Fatal("global")
@@ -56,37 +56,37 @@ func TestFindVariableScope(t *testing.T) {
 	if cg.FindVariableScope(CreateVariableScalars("l_x", GetIntType(), false, false)) != ScopeInactive {
 		t.Fatal("inactive")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete FindVariableScope paths must not sticky")
 	}
 	// incomplete Param sticky ScopeInactive
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{p, nil}
 	if cg.FindVariableScope(loc) != ScopeInactive {
 		t.Fatal("Param hole must fail closed ScopeInactive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Param hole FindVariableScope must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{p}
 	// non-global without CurrentFunc sticky (no invent "not found" past missing frame)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if EmptyCGContext().FindVariableScope(loc) != ScopeInactive {
 		t.Fatal("nil CurrentFunc local must fail closed ScopeInactive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CurrentFunc FindVariableScope must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// global without CurrentFunc stays complete ScopeGlobalVar
 	if EmptyCGContext().FindVariableScope(g) != ScopeGlobalVar {
 		t.Fatal("global without CurrentFunc must stay ScopeGlobalVar")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("global without CurrentFunc must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Match residual: Type-nil param soft invent was soft-continue then later scope.
 	// Fair: sticky ScopeInactive.
 	holeParam := &Variable{Name: "p_hole", Type: nil}
@@ -94,10 +94,10 @@ func TestFindVariableScope(t *testing.T) {
 	if cg.FindVariableScope(p) != ScopeInactive {
 		t.Fatal("Match residual FindVariableScope must fail closed ScopeInactive")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Match residual FindVariableScope must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{p}
 }
 
@@ -121,18 +121,18 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	if UpdatePtrAliases([]*FactPointTo{MakeFactPointTo(broken, p)}, &ptrs, &aliases) {
 		t.Fatal("Type-nil subject must fail closed UpdatePtrAliases")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil subject UpdatePtrAliases must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if UpdatePtrAliases([]*FactPointTo{nil}, &ptrs, &aliases) {
 		t.Fatal("nil fact hole must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil fact hole UpdatePtrAliases must SetError sticky")
 	}
 	// residual hygiene — Aggregate / OutputStatistics are complete-path emit
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Aggregate from FactMgr
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = facts[:1]
@@ -149,23 +149,23 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 		t.Fatal(out)
 	}
 	// nil Function hole / missing FM fails closed sticky (clears aggregates)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	AggregateAllPointToSets([]*Function{f, nil}, fms)
 	if len(currentSession().AllPtrs) != 0 {
 		t.Fatal("nil hole must clear aggregates", currentSession().AllPtrs)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function hole must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	AggregateAllPointToSets([]*Function{f}, nil)
 	if len(currentSession().AllPtrs) != 0 {
 		t.Fatal("nil FactMgrMap must clear aggregates", currentSession().AllPtrs)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FactMgrMap must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete map_facts_out / GlobalFacts sticky clear (UpdatePtrAliases SetError)
 	fmBad := NewFactMgr(nil)
 	fmBad.GlobalFacts = []*FactPointTo{nil}
@@ -176,10 +176,10 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	if len(currentSession().AllPtrs) != 0 {
 		t.Fatal("incomplete GlobalFacts must clear aggregates", currentSession().AllPtrs)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts AggregateAllPointToSets must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ClearPointToAggregates()
 }
 

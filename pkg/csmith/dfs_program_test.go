@@ -4,13 +4,13 @@ import "testing"
 
 func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	// Finite debug sequence ends all_done after last choice.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	prevO := ProcessOptionsSess(testAmbientSession)
 	defer func() {
 		DoFinalization()
 		ReinstallTestProcessSingletons()
 		SetProcessOptionsSess(testAmbientSession, prevO)
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 	}()
 	o := Defaults()
 	o.DFSExhaustive = true
@@ -38,7 +38,7 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	// Rebuild with fresh generator for loop test
 	DoFinalization()
 	ReinstallTestProcessSingletons()
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	o.DFSDebugSequence = "0"
 	g = NewProgramGenerator(NewSession(o))
 	// Manually set all_done path: after debug sequence exhausted
@@ -46,14 +46,14 @@ func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	out := g.GoGeneratorDFSLoop()
 	// may be empty if generation fails; must not hang and must not invent on sticky DFS without engine
 	_ = out
-	if GetError() == ErrGeneric && g.Rng == nil {
+	if GetErrorSess(testAmbientSession) == ErrGeneric && g.Rng == nil {
 		t.Fatal("unexpected")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGetCountPrefixDFSAfterGood(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := &ProgramGenerator{Sess: testAmbientSession, OutputKind: OutputMgrKindDFS, GoodCount: 0}
 	if g.GetCountPrefix("n") != "p_0_n" {
 		t.Fatal(g.GetCountPrefix("n"))

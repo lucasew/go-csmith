@@ -77,7 +77,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 }
 
 func TestGetExternalNoWritesFromIV(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_i", GetIntType(), false, false)
 	cg := EmptyCGContext()
 	cg.AddIVBound(g, 10)
@@ -88,7 +88,7 @@ func TestGetExternalNoWritesFromIV(t *testing.T) {
 }
 
 func TestBuildCalleeRWDirective(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	rwd := cg.BuildCalleeRWDirective(nil)
@@ -117,7 +117,7 @@ func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	// soft invent: incomplete frame → nil RW (no restrictions)
 	// fair: inherit full NoWrite without inventing unrestricted nil; sticky
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -128,10 +128,10 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	if len(rwd.NoWriteVars) != 1 || rwd.NoWriteVars[0] != g {
 		t.Fatal(rwd)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete frame facts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsInvocationParams(t *testing.T) {
@@ -156,7 +156,7 @@ func TestVisitFactsInvocationParams(t *testing.T) {
 
 func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 	// Visit residual soft invent was soft-continue later args invent visit success.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}
 	fi := &Invocation{
@@ -171,15 +171,15 @@ func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 	if VisitFactsInvocation(fi, &cg, Defaults()) {
 		t.Fatal("arg visit residual must fail closed VisitFactsInvocation")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("arg visit residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	// FunctionInvocation.cpp:530–551 — always revisit user callees in visit_facts.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: nil}
@@ -198,14 +198,14 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
-		t.Fatalf("always-revisit empty body must ok err=%v", HasError())
+		t.Fatalf("always-revisit empty body must ok err=%v", HasErrorSess(testAmbientSession))
 	}
 	// body maps recorded by find_fixed_point
 	if !FactsComplete(fm.GetMapFactsIn(50)) && !FactsComplete(fm.GetMapFactsOut(50)) {
 		// empty complete is ok; incomplete would be wrong
 		t.Fatal("revisit must install complete body fact maps")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // FunctionInvocation.cpp:536–541 — visit_facts builds
@@ -216,7 +216,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 // visit (Lhs.cpp:318–328 overlap uses curr_rhs; effect_accum shares would
 // corrupt the outer StatementAssign analysis — seed-2 func_49 e37241).
 func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	g := CreateVariableScalars("g_overlap", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
@@ -244,19 +244,19 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	// Ambient write of g makes body assign fail for both — so clear ambient, only pollute accum/rhs.
 	cg.effectContext = EmptyEffect()
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
-		t.Fatalf("nested revisit with polluted parent CurrRHS/accum must still ok; err=%v", HasError())
+		t.Fatalf("nested revisit with polluted parent CurrRHS/accum must still ok; err=%v", HasErrorSess(testAmbientSession))
 	}
 	// Parent CurrRHS must remain set (new_context is a clone).
 	if cg.CurrRHS == nil || cg.CurrRHS.Var != g {
 		t.Fatal("parent CurrRHS must be unchanged after nested revisit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsInvocationConflict(t *testing.T) {
 	// Legacy name kept: ambient write conflict on static path removed with always-revisit.
 	// Soft analysis fail remains non-sticky (RevisitUserInvocation ClearError on body fail).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// body with *p write under may-null would fail; use incomplete as soft fail
@@ -275,7 +275,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 		t.Fatal("revisit of broken body must fail analysis")
 	}
 	// soft fail clears sticky ERROR
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFactMgrMapStmEffect(t *testing.T) {
@@ -300,7 +300,7 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 }
 
 func TestVisitFactsBlockRecordsMaps(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -326,7 +326,7 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 // TestVisitFactsInvocationIgnoresFailedFlag — FunctionInvocation.cpp:502–555.
 // visit_facts does not consult failed; generation-time Failed is not analysis fail.
 func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	fi := &Invocation{
 		Failed: true,
@@ -338,10 +338,10 @@ func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
 	cg := EmptyCGContext()
 	cg.EffectAccum = &eff
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
-		t.Fatalf("visit_facts must analyze despite Failed=true err=%v", HasError())
+		t.Fatalf("visit_facts must analyze despite Failed=true err=%v", HasErrorSess(testAmbientSession))
 	}
 	if !eff.IsRead(a) {
 		t.Fatal("must still visit args when Failed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

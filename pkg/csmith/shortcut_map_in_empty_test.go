@@ -8,7 +8,7 @@ import "testing"
 // of loop bodies on first post_creation find_fixed_point and rewriting gen
 // map_stm_effect (seed-90 nested-call IV reads dropped from caller feffect).
 func TestShortcutAnalysisBlockMissingMapInIsEmpty(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	b := &Block{Func: f, StmID: AllocStmID(), Looping: true, Stmts: []Stmt{}}
 	f.Body = b
@@ -24,10 +24,10 @@ func TestShortcutAnalysisBlockMissingMapInIsEmpty(t *testing.T) {
 	facts := []*FactPointTo{}
 	sc := ShortcutAnalysisBlock(b, &facts, &cg)
 	if sc != ShortcutOK {
-		t.Fatalf("missing map_in + empty inputs must ShortcutOK (C++ map[] empty), sc=%d err=%v", sc, GetError())
+		t.Fatalf("missing map_in + empty inputs must ShortcutOK (C++ map[] empty), sc=%d err=%v", sc, GetErrorSess(testAmbientSession))
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("must not sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

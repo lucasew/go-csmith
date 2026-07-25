@@ -35,7 +35,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 
 func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 	// suite hygiene: prior sticky tests leave residual ERROR; clear before complete emit
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// complete binary IR (live args) — no invent bare ";" for empty Output
 	fi := &Invocation{
 		IsStd:  true,
@@ -55,25 +55,25 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 		t.Fatal("still stub")
 	}
 	// incomplete invoke Output fails whole block (no invent soft-skip empty invoke)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	empty := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}}
 	out2 := (&Block{Stmts: []Stmt{empty}}).Output(0)
 	if out2 != "" {
 		t.Fatal("incomplete invoke must fail closed whole block", out2)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete among live stmts fails whole block (no invent skip hole)
 	good := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
 	out3 := (&Block{Stmts: []Stmt{empty, good}}).Output(0)
 	if out3 != "" {
 		t.Fatal("mixed incomplete must fail closed whole block", out3)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// StatementExpr.cpp:62–66 — failed invoke restores effect and facts
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxFuncs = 0 // force no new functions if possible
 	// ReachMaxFunctions with empty list and max 0
@@ -126,7 +126,7 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	//   fm->restore_facts(facts_copy);
 	// Soft invent was RestoreFacts(PT-only): UnionFacts kept post-call last_written_fid
 	// so IsNonreadableField over-filtered choose_var (seed-7 eligible pool half size).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -159,8 +159,8 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	}
 	// full restore (production path after fix)
 	fm.RestoreFactsPair(factsCopy, unionCopy)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil {
 		t.Fatalf("union restore: %#v", fm.UnionFacts)
@@ -177,7 +177,7 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	if !IsNonreadableField(f0, fm.UnionFacts) {
 		t.Fatal("PT-only RestoreFacts must leave mutated union last-write (hole)")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
@@ -215,21 +215,21 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 
 func TestMakeRandomExprStmtNilCGFailClosed(t *testing.T) {
 	// StatementExpr.cpp always has CGContext; sticky no invent Kind shell
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil)
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil cg invent %#v", st)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg MakeRandomExprStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st2 := MakeRandomExprStmt(nil, Defaults(), nil, nil, nil, ptrEmptyCG())
 	if st2.Kind != 0 || stmtOK(st2) {
 		t.Fatalf("nil RNG invent %#v", st2)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomExprStmt must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

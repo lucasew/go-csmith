@@ -30,15 +30,15 @@ func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
 	if VisitFactsStatementIf(&st, &cg, opts) {
 		t.Fatal("incomplete GlobalFacts must fail closed if visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete GlobalFacts if visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = p
 }
 
 func TestVisitFactsStatementIfMerge(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -81,7 +81,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(&st, &cg, Defaults()) {
-		t.Fatalf("visit if sticky=%v", HasError())
+		t.Fatalf("visit if sticky=%v", HasErrorSess(testAmbientSession))
 	}
 	// incomplete arm StmID must fail closed
 	st.Else.StmID = IncompleteStmID
@@ -89,7 +89,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 		t.Fatal("Else StmID 0 must fail closed")
 	}
 	// VisitFactsBlock under incomplete arm may set sticky ERROR — clear for suite
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// true must return → facts from else (pre) kept
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || !fp.IsNull() && len(fp.PointTo) > 0 && fp.PointTo[0] != a {
@@ -104,7 +104,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	// Incomplete parent EffectAccum → arm VisitFactsBlock / assign visit sticky false
 	// (no invent soft re-pick past incomplete parent accum as visit success).
 	// StatementIf.cpp:170–177 shares effect_accum (no forked MergeEffects path).
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	fm := NewFactMgr(nil)
@@ -127,10 +127,10 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	if VisitFactsStatementIf(&st, &cg, Defaults()) {
 		t.Fatal("incomplete EffectAccum must fail closed if visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectAccum if visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// incomplete then-arm GlobalFacts after arm visit sticky (plant via incomplete map effect
 	// is covered by early GlobalFacts path; both-must incomplete inputs covered above)
 	// nil arms sticky hard IR
@@ -143,15 +143,15 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	if VisitFactsStatementIf(&st2, &cg2, Defaults()) {
 		t.Fatal("nil Then must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Then VisitFactsStatementIf must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	// incomplete EffectStm sticky (no invent visit true / soft re-pick past holes)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -160,26 +160,26 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	if VisitFactsStatementJump(&Stmt{Kind: StmtBreak, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed jump visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm jump visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.EffectStm = IncompleteEffect()
 	if VisitFactsStmt(&Stmt{Kind: StmtLabel, StmID: 2}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed label visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm label visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg.EffectStm = IncompleteEffect()
 	if VisitFactsStatementExpr(&Stmt{Kind: StmtInvoke, StmID: 3, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed expr visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm expr visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Return
 	rv := CreateVariableScalars("g_rv", GetIntType(), false, false)
 	f.RV = rv
@@ -191,10 +191,10 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed return visit")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectStm return visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Assign
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	cg.EffectStm = IncompleteEffect()
@@ -205,12 +205,12 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed assign visit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
 	// IsPointingToLocals residual soft invent was soft-continue visit invent success.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
 	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
@@ -228,10 +228,10 @@ func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
 	if VisitFactsStatementReturn(st, &cg, opts) {
 		t.Fatal("IsPointingToLocals residual must fail closed return visit, not invent success")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsPointingToLocals residual VisitFactsStatementReturn must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // testForInit builds a simple StatementAssign init (StatementFor always has live init).
@@ -245,7 +245,7 @@ func testForInit(iv *Variable, n int) *Stmt {
 }
 
 func TestVisitFactsStatementForIV(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	if iv == nil {
 		t.Fatal("iv")
@@ -275,7 +275,7 @@ func TestVisitFactsStatementForIV(t *testing.T) {
 
 func TestVisitFactsStatementForRequiresInitStmt(t *testing.T) {
 	// StatementFor.cpp always has init StatementAssign — sticky without InitStmt
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	st := Stmt{
 		Kind: StmtFor,
@@ -288,10 +288,10 @@ func TestVisitFactsStatementForRequiresInitStmt(t *testing.T) {
 	if VisitFactsStatementFor(&st, &cg, Defaults()) {
 		t.Fatal("expected fail without InitStmt")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("missing InitStmt For visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputAssignAsExprSafeAdd(t *testing.T) {
@@ -347,7 +347,7 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 
 func TestMakePossibleCompoundAssignGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was soft-continue compound binary past Lhs hole.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -361,10 +361,10 @@ func TestMakePossibleCompoundAssignGetTypeResidualSticky(t *testing.T) {
 	if st.Kind != 0 || st.SafeFlags != nil || st.Rhs != nil {
 		t.Fatal("GetType residual must fail closed compound, not invent shell", st)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual makePossibleCompoundAssign must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakePossibleCompoundAssignNoSafeMathStillCanonizes(t *testing.T) {
@@ -417,7 +417,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 	// StatementFor.cpp:456 — inputs = map_facts_in[&body]
 	// incomplete body in after fixed-point must fail closed (not invent keep prior)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -447,12 +447,12 @@ func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 	if VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("incomplete GlobalFacts/body path must fail closed")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // StatementFor.cpp:445–449 — body.visit_facts on same CGContext; no invent IN_LOOP clone.
 func TestVisitFactsStatementForSameContextNoInventInLoop(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
@@ -474,7 +474,7 @@ func TestVisitFactsStatementForSameContextNoInventInLoop(t *testing.T) {
 	}
 	preFlags := cg.Flags
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
-		t.Fatalf("visit for: err=%v", HasError())
+		t.Fatalf("visit for: err=%v", HasErrorSess(testAmbientSession))
 	}
 	// Must not invent sticky IN_LOOP on parent after visit
 	if cg.Flags != preFlags {
@@ -484,11 +484,11 @@ func TestVisitFactsStatementForSameContextNoInventInLoop(t *testing.T) {
 	if _, ok := cg.IVBounds[iv]; ok {
 		t.Fatal("IV must be removed from iv_bounds after visit")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// StatementFor.cpp:456–458 — !must_return → map_facts_in[body], not merge post
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -622,8 +622,8 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 // StatementFor.cpp:465 + FactMgr.cpp:569–588 — break merge_jump_facts is full FactVec
 // (ePointTo + eUnionWrite). Soft invent was PT-only on the visit path.
 func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
-	ClearError()
-	defer ClearError()
+	ClearErrorSess(testAmbientSession)
+	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	ut := &Type{isUnion: true, Fields: []StructField{
@@ -651,7 +651,7 @@ func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
-		t.Fatal("visit", GetError())
+		t.Fatal("visit", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(fm.UnionFacts, uv)
 	if got == nil {
@@ -665,7 +665,7 @@ func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
 func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	// Statement::stm_id always live; StmID 0 + FM sticky
 	// (no invent visit success without map_stm_effect / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	fm := NewFactMgr(f)
@@ -679,7 +679,7 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 		t.Fatal("assign IncompleteStmID must fail closed")
 	}
 	// assign path may sticky via visit factories
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ret := &Stmt{
 		Kind: StmtReturn, StmID: IncompleteStmID,
 		Expr: &Expression{Term: TermVariable, Var: f.RV, ExprType: GetIntType()},
@@ -687,10 +687,10 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	if VisitFactsStatementReturn(ret, &cg, Defaults()) {
 		t.Fatal("return IncompleteStmID must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("return StmID 0 must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	body := &Block{StmID: IncompleteStmID, Func: f}
 	st := &Stmt{
@@ -702,20 +702,20 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 		t.Fatal("arrayop body StmID 0 must fail closed")
 	}
 	// body StmID 0 may set sticky ERROR via find_fixed_point — clear for suite
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	facts := []*FactPointTo{}
 	cg := EmptyCGContext()
 	if ValidateAndUpdateFacts(nil, &facts, &cg, Defaults(), nil) {
 		t.Fatal("nil st must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil st ValidateAndUpdateFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtLabel, StmID: 1}
 	fm := NewFactMgr(nil)
 	cg = EmptyCGContext().WithFactMgr(fm)
@@ -723,32 +723,32 @@ func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
 	if ValidateAndUpdateFacts(st, &hole, &cg, Defaults(), nil) {
 		t.Fatal("incomplete facts must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete facts ValidateAndUpdateFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nil facts out sticky
 	if ValidateAndUpdateFacts(st, nil, &cg, Defaults(), nil) {
 		t.Fatal("nil facts must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts ValidateAndUpdateFacts must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
 	// StatementArrayOp always has live ctrl_vars; nil Loop/IV sticky
 	// (no invent soft-skip dimension / soft re-pick past holes)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext()
 	if VisitFactsStatementArrayOp(&Stmt{Kind: StmtArrayOp, Then: &Block{}}, &cg, Defaults()) {
 		t.Fatal("nil Loop must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Loop ArrayOp visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VisitFactsStatementArrayOp(&Stmt{
 		Kind: StmtArrayOp,
 		Loop: &LoopControl{}, // IV nil
@@ -756,10 +756,10 @@ func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
 	}, &cg, Defaults()) {
 		t.Fatal("nil IV must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IV ArrayOp visit must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
@@ -849,7 +849,7 @@ func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 
 func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	// AddEffect residual soft invent was invent soft-continue else merge past incomplete then arm effect.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect())
@@ -870,10 +870,10 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	if EffectComplete(acc) {
 		t.Fatal("AddEffect incomplete base must stay IncompleteEffect")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddEffect incomplete base must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = opts
 	_ = cg
 	_ = st
@@ -883,7 +883,7 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 // On find_fixed_point failure, reset_effect_accum(pre_effect); do not leave
 // polluted EffectAccum for the outer StatementFor / validate path.
 func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -909,12 +909,12 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 	if !cg.EffectAccum.IsWritten(w) {
 		t.Fatal("EffectAccum must restore pre-effect write of g_w")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestVisitFactsBlockMarksVisitedOnSuccess — Block.cpp:478 map_visited[this]=true.
 func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -924,12 +924,12 @@ func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsBlock(b, &cg, Defaults()) {
-		t.Fatalf("empty block visit must succeed err=%v", HasError())
+		t.Fatalf("empty block visit must succeed err=%v", HasErrorSess(testAmbientSession))
 	}
 	if fm.MapVisited == nil || !fm.MapVisited[51] {
 		t.Fatal("map_visited[block] must be true after successful VisitFactsBlock")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestVisitFactsBlockPreservesMapVisitedForShortcut — Block.cpp:471–480.
@@ -938,7 +938,7 @@ func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 // Inventing delete(map_visited) caused extra full re-analysis of nested calls
 // (seed-2 func_49 VisitFacts ×5 then BUILD_REV fail / first_div e37241).
 func TestVisitFactsBlockPreservesMapVisitedForShortcut(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -955,18 +955,18 @@ func TestVisitFactsBlockPreservesMapVisitedForShortcut(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsBlock(body, &cg, Defaults()) {
-		t.Fatalf("VisitFactsBlock must succeed via shortcut/FP err=%v", HasError())
+		t.Fatalf("VisitFactsBlock must succeed via shortcut/FP err=%v", HasErrorSess(testAmbientSession))
 	}
 	if fm.MapVisited == nil || !fm.MapVisited[50] {
 		t.Fatal("map_visited[body] must remain true after visit_facts")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestVisitFactsBlockMergesBackEdgesWhenVisited — Block.cpp:526–536 when
 // map_visited[this]: merge map_facts_out of back edges into current inputs.
 func TestVisitFactsBlockMergesBackEdgesWhenVisited(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -987,10 +987,10 @@ func TestVisitFactsBlockMergesBackEdgesWhenVisited(t *testing.T) {
 	cg.EffectAccum = &eff
 	// Empty body: FP should complete (merge + analyze zero stmts).
 	if !VisitFactsBlock(body, &cg, Defaults()) {
-		t.Fatalf("empty looping body with back edge must FP err=%v", HasError())
+		t.Fatalf("empty looping body with back edge must FP err=%v", HasErrorSess(testAmbientSession))
 	}
 	if fm.MapVisited == nil || !fm.MapVisited[50] {
 		t.Fatal("map_visited[body] after success")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

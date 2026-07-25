@@ -55,18 +55,18 @@ func TestMakeRandomUnaryFloatPath(t *testing.T) {
 		t.Fatal("float unary always signed")
 	}
 	// SafeOpFlags.cpp:325 — assert no float unary; fail closed empty non-sticky (no invent int32)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if name := f.UnaryMinusFuncName(); name != "" {
 		t.Fatalf("float unary must fail closed, got %q", name)
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("float UnaryMinusFuncName must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomUnaryIntPath(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
 	f := MakeRandomUnary(NewRng(3), opts, NewProbabilities(opts), GetIntType(), nil, UnMinus)
@@ -84,55 +84,55 @@ func TestMakeRandomUnaryIntPath(t *testing.T) {
 
 func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
 	// sticky no soft invent default int32 name / SizeToken for nil flags
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	var f *SafeOpFlags
 	if f.UnaryMinusFuncName() != "" {
 		t.Fatal("nil flags must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil UnaryMinusFuncName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f.BinaryFuncName("+") != "" {
 		t.Fatal("nil BinaryFuncName must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BinaryFuncName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f.SizeToken() != "" {
 		t.Fatal("nil SizeToken must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SizeToken must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if f.LHSType() != nil || f.RHSType() != nil {
 		t.Fatal("nil LHS/RHS type must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil LHSType must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 	// invalid SafeOpSize → empty SizeToken; sticky no invent "(-()x)" / "(()a + ()b)"
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if unaryCastMinus("", "x") != "" || unaryCastMinus("int32_t", "") != "" {
 		t.Fatal("unary cast empty must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unary cast empty must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if binaryCastOp("", "a", "+", "b") != "" || binaryCastOp("int32_t", "a", "", "b") != "" {
 		t.Fatal("binary cast empty must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("binary cast empty must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
 		Args:        []*Expression{{Term: TermConstant, Con: MakeInt(1)}},
@@ -142,34 +142,34 @@ func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 	if out := fi.Output(); out != "" {
 		t.Fatal("invalid size unary cast must fail closed", out)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid size unary cast must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBinaryFuncNameInvalidSizeFailClosed(t *testing.T) {
 	// SafeOpFlags.cpp:239 assert invalid size; sticky no invent safe_add_func__s_s
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeOpSize(99)}
 	if got := f.BinaryFuncName("+"); got != "" {
 		t.Fatal("invalid size must fail closed BinaryFuncName", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid size BinaryFuncName must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if got := f.BinaryFuncName("<<"); got != "" {
 		t.Fatal("invalid size shift must fail closed", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid size shift must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBinaryFuncNameFloat(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat}
 	if got := f.BinaryFuncName("+"); got != "safe_add_func_float_f_f" {
 		t.Fatalf("add %q", got)
@@ -187,17 +187,17 @@ func TestBinaryFuncNameFloat(t *testing.T) {
 		t.Fatalf("mod should be empty for float, got %q", got)
 	}
 	// float mod empty is non-sticky (no wrapper, not broken IR)
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("float mod empty must stay non-sticky")
 	}
 	// float unary minus name non-sticky empty (cast emit fallthrough)
 	if f.UnaryMinusFuncName() != "" {
 		t.Fatal("float unary safe name must fail closed")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("float UnaryMinusFuncName must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {
@@ -267,7 +267,7 @@ func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
 // with no extra parens around the arg (param_value[0]->Output only).
 // Seed-2: (~(safe_unary_minus…)) not (~((safe_unary_minus…))).
 func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested: ~ applied to a safe unary-minus invocation
 	innerArg := &Expression{Term: TermConstant, Con: MakeInt(-10)}
 	minus := &Invocation{
@@ -311,7 +311,7 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 	if plus.Output() != "(+g_x)" {
 		t.Fatalf("ePlus want (+g_x) got %q", plus.Output())
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBinaryOutputIdentifyWrappers(t *testing.T) {
@@ -353,18 +353,18 @@ func TestUnaryEqualsIntFold(t *testing.T) {
 }
 
 func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
 	ft := GetSimpleType(EFloat)
 	f := MakeRandomBinaryKind(NewRng(2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
-		t.Fatal("MakeRandomBinaryKind nil", HasError(), GetError())
+		t.Fatal("MakeRandomBinaryKind nil", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
 	if f.Size == SafeFloat {
 		t.Fatal("float size without EnableFloat")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputWrapperH(t *testing.T) {

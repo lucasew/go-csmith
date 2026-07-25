@@ -82,16 +82,16 @@ func TestStatementFilterMaxFuncs(t *testing.T) {
 		t.Fatal("max")
 	}
 	// nil Function* hole fails closed as at-max non-sticky (soft re-pick gate)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.MaxFuncs = 100
 	list.Funcs = []*Function{{Name: "f", IsBuilt: true}, nil}
 	if !ReachMaxFunctions(list, opts) {
 		t.Fatal("nil hole must fail closed as at-max")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole ReachMaxFunctions must stay non-sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeFirstMarksBuilt(t *testing.T) {
@@ -117,7 +117,7 @@ func TestChooseFuncSkipsBuilding(t *testing.T) {
 
 func TestGenerateBodyIncompleteAmbientResidualSticky(t *testing.T) {
 	// incomplete ambient residual soft invent was invent Built shell past hole.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildUnbuilt}
 	prev := EmptyCGContext()
@@ -126,8 +126,8 @@ func TestGenerateBodyIncompleteAmbientResidualSticky(t *testing.T) {
 	if f.BuildState != BuildUnbuilt {
 		t.Fatal("incomplete ambient must leave Unbuilt", f.BuildState)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete ambient GenerateBody must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

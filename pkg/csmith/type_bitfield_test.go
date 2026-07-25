@@ -34,7 +34,7 @@ func TestMakeRandomStructTypeCanHaveBitfields(t *testing.T) {
 		st := MakeRandomStructType(NewRng(seed), opts, probs, &env, "S0")
 		if st == nil {
 			// ERROR_GUARD / empty field path fail closed — retry seed
-			ClearError()
+			ClearErrorSess(testAmbientSession)
 			continue
 		}
 		for _, f := range st.Fields {
@@ -56,7 +56,7 @@ func TestMakeRandomStructTypeFailClosedEmptyEnv(t *testing.T) {
 	// Type.cpp ERROR_RETURN / ERROR_GUARD — no soft invent nil-type fields
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty AllTypes → MakeOneStructField fails; whole struct abort
 	st := MakeRandomStructType(NewRng(1), opts, probs, &TypeEnv{Sess: testAmbientSession}, "Sempty")
 	if st != nil {
@@ -70,7 +70,7 @@ func TestMakeRandomStructTypeFailClosedEmptyEnv(t *testing.T) {
 }
 
 func TestBitfieldDeclEmit(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// craft struct with bitfield
@@ -100,19 +100,19 @@ func TestBitfieldDeclEmit(t *testing.T) {
 	if s := bad.OutputStructDecl(); s != "" {
 		t.Fatal("non-simple bitfield must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-simple bitfield OutputStructDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// empty sid sticky
 	anon := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	if s := anon.OutputStructDecl(); s != "" {
 		t.Fatal("empty StructName must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty StructName OutputStructDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	_ = probs
 	_ = opts
 }
@@ -121,7 +121,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 // zero-width bitfields do not advance j; non-bitfield names are always "f"<<j++, never
 // the raw creation slot Name (make_one uses i including padding — seed 118 f4 vs f3).
 func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	// Names deliberately wrong/raw-slot so emit must not trust them.
 	st := &Type{
@@ -137,8 +137,8 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 		},
 	}
 	decl := st.OutputStructDecl()
-	if decl == "" || HasError() {
-		t.Fatalf("decl empty/err: %q err=%v", decl, HasError())
+	if decl == "" || HasErrorSess(testAmbientSession) {
+		t.Fatalf("decl empty/err: %q err=%v", decl, HasErrorSess(testAmbientSession))
 	}
 	// Type.cpp:1851–1852 length==0 → " : 0;" no fN, j unchanged
 	if !strings.Contains(decl, " : 0;") {
@@ -152,7 +152,7 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 		t.Fatalf("must not invent raw-slot f5 after padding: %q", decl)
 	}
 	// union same contract
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
 		Fields: []StructField{
@@ -168,7 +168,7 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 	if strings.Contains(udecl, " f2;") {
 		t.Fatalf("union must not use raw-slot f2: %q", udecl)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestGenerateEmitsBitfieldSyntax(t *testing.T) {
@@ -193,7 +193,7 @@ func TestGenerateEmitsBitfieldSyntax(t *testing.T) {
 
 func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	// Type.cpp:641 — int_size()*8; IntSize 0 sticky fail closed (no invent maxLen=32)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.IntSize = 0
 	probs := NewProbabilities(opts)
@@ -201,11 +201,11 @@ func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	if f.Type != nil || f.BitWidth >= 0 {
 		t.Fatalf("IntSize 0 must fail closed, got %+v", f)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IntSize 0 MakeOneBitfield must SetError sticky")
 	}
 	// normal IntSize still works after ClearError
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts.IntSize = 4
 	f2 := MakeOneBitfield(NewRng(2), opts, probs, 0, true)
 	if f2.Type == nil || f2.BitWidth < 1 || f2.BitWidth > 32 {
@@ -227,26 +227,26 @@ func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
 }
 
 func TestOutputStructUnionDeclNilSticky(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).OutputStructDecl() != "" {
 		t.Fatal("nil Type OutputStructDecl must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type OutputStructDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if (*Type)(nil).OutputUnionDecl() != "" {
 		t.Fatal("nil Type OutputUnionDecl must fail closed")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type OutputUnionDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputStructDeclFieldTypeResidualSticky(t *testing.T) {
 	// OutputQualifiedType residual soft invent was soft-continue later fields invent partial struct.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
@@ -257,15 +257,15 @@ func TestOutputStructDeclFieldTypeResidualSticky(t *testing.T) {
 	if s := st.OutputStructDecl(); s != "" {
 		t.Fatal("field CName residual must fail closed OutputStructDecl", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("field CName residual OutputStructDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputUnionDeclFieldTypeResidualSticky(t *testing.T) {
 	// OutputQualifiedType residual soft invent was soft-continue invent partial union.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{
 		isUnion: true, StructName: "U0",
 		Fields: []StructField{
@@ -275,15 +275,15 @@ func TestOutputUnionDeclFieldTypeResidualSticky(t *testing.T) {
 	if s := ut.OutputUnionDecl(); s != "" {
 		t.Fatal("field CName residual must fail closed OutputUnionDecl", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("field CName residual OutputUnionDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestOutputStructDeclBitfieldIsSimpleResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent signed/unsigned past non-simple bitfield Type.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// pointer bitfield Type — IsSimple false without residual then SetError
 	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: 3},
@@ -291,8 +291,8 @@ func TestOutputStructDeclBitfieldIsSimpleResidualSticky(t *testing.T) {
 	if s := st.OutputStructDecl(); s != "" {
 		t.Fatal("non-simple bitfield must fail closed", s)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-simple bitfield OutputStructDecl must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

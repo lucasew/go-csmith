@@ -6,7 +6,7 @@ import "testing"
 // merge_pointees(p, 1) yields l_233; rhs null transfers; merge keeps may-null.
 // Upstream seed-2: UP_ABS_L233 null=1 lhs=l_236 indir=1 → e10107 lattice.
 func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := PointerTo(PointerTo(GetSimpleType(EShort))) // int16_t**
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
@@ -29,7 +29,7 @@ func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 		ExprType: elem,
 	}
 	if !fm.UpdateFactForAssign(p, 1, nullRHS) {
-		t.Fatalf("update *p=0 failed sticky=%v", HasError())
+		t.Fatalf("update *p=0 failed sticky=%v", HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedPointTo(fm.GlobalFacts, &arr.Variable)
 	if got == nil {
@@ -53,5 +53,5 @@ func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 	if !hasG {
 		t.Fatalf("must keep prior g_127 via merge, pts=%v", got.PointTo)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

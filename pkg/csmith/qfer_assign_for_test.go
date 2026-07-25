@@ -69,21 +69,21 @@ func TestMatchIndirect(t *testing.T) {
 		t.Fatal("indirect")
 	}
 	// multi-level address gap complete false (C++ return false, no assert)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	deep := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
 	shallow := NewCVQualifiers([]bool{false}, []bool{false})
 	// want deep vs shallow: deref = 1-3 = -2
 	if deep.MatchIndirect(shallow, false) {
 		t.Fatal("deref < -1 must fail closed false")
 	}
-	if HasError() {
+	if HasErrorSess(testAmbientSession) {
 		t.Fatal("deref < -1 MatchIndirect must stay non-sticky complete false")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestIndirectQualifiers(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
 	// address — push_back false,false
 	addr := q.IndirectQualifiers(-1)
@@ -97,20 +97,20 @@ func TestIndirectQualifiers(t *testing.T) {
 		t.Fatalf("%v", d.IsConsts)
 	}
 	// over-deref sticky empty (no invent partial pop)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	got := q.IndirectQualifiers(5)
 	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
 		t.Fatal("over-deref must fail closed empty", got)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("over-deref IndirectQualifiers must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindPointerFieldsNilHole(t *testing.T) {
 	// nil FieldVars hole sticky (no invent empty-complete pointer fields / soft re-pick)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	sv := &Variable{
 		Name: "s", Type: &Type{isStruct: true},
 		FieldVars: []*Variable{
@@ -121,17 +121,17 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 	if VariablesComplete(sv.FindPointerFields()) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars FindPointerFields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	if VariablesComplete(((*Variable)(nil)).FindPointerFields()) {
 		t.Fatal("nil subject FindPointerFields must fail closed incomplete")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil subject FindPointerFields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// Type-nil field soft invent: IsPointer/IsAggregate residual ERROR then skip as
 	// neither → complete empty (or later fields only). Fair: sticky Incomplete.
 	tyNil := &Variable{
@@ -145,10 +145,10 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 	if VariablesComplete(gotTy) {
 		t.Fatal("Type-nil field must fail closed incomplete, not soft-skip complete", gotTy)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil field FindPointerFields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// nested FindPointerFields residual soft invent was soft-continue later fields invent complete.
 	// Fair: sticky IncompleteVariables via nested Type-nil.
 	nestHole := &Variable{
@@ -167,10 +167,10 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 	if VariablesComplete(gotNest) {
 		t.Fatal("nested residual FindPointerFields must fail closed incomplete", gotNest)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual FindPointerFields must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestFindPointerFields(t *testing.T) {
@@ -217,7 +217,7 @@ func TestAbstractFactAggregatePointerFields(t *testing.T) {
 func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// missing body in must not invent keep prior GlobalFacts
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
@@ -237,11 +237,11 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("body StmID 0 must fail closed incomplete GlobalFacts")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
@@ -254,12 +254,12 @@ func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body MapFactsIn must fail closed nil GlobalFacts")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	// merge_jump_facts always; incomplete break out fails closed
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -288,12 +288,12 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("incomplete first break must not invent later break merge", fm2.GlobalFacts)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	// incomplete map_facts_in[body] must not invent RestoreFacts(pre) on must_return
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -307,11 +307,11 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body in must not invent must_return restore", fm.GlobalFacts)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostLoopAnalysisMustReturn(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -324,12 +324,12 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	if fp == nil || fp.IsNull() || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
 		t.Fatalf("want pre fact → a, got %+v", fp)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 	// MustReturn residual soft invent was soft-continue break-merge invent complete GlobalFacts.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -345,14 +345,14 @@ func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("MustReturn residual must fail closed incomplete GlobalFacts", fm.GlobalFacts)
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("MustReturn residual postLoopAnalysis must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestPostLoopAnalysisBreakMerge(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)

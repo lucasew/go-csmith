@@ -36,7 +36,7 @@ func TestExtendCallChain(t *testing.T) {
 // Soft invent set bodyCG.CurrentFunc=callee before generateBodyCore so
 // ExtendCallChain(prev) saw empty callee stack and omitted the caller frame.
 func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	caller := &Function{Name: "caller", ReturnType: GetIntType()}
 	callee := &Function{Name: "callee", ReturnType: GetIntType()}
 	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
@@ -62,7 +62,7 @@ func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
 	if len(bodyBad.CallChain) != 0 {
 		t.Fatalf("callee-as-prev must not invent a frame, got %v", bodyBad.CallChain)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildInvocationAndFunction(t *testing.T) {

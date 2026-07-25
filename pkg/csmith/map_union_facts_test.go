@@ -6,7 +6,7 @@ import "testing"
 // (ePointTo + eUnionWrite). post_loop assigns global_facts = map_facts_in[&body]
 // for both partitions so IsNonreadableField sees body-entry last-writes.
 func TestMapFactsInPairsUnionWrite(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -21,11 +21,11 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	}
 	entryU := MakeFactUnion(uv, 0)
 	if entryU == nil {
-		t.Fatal("MakeFactUnion entry", HasError())
+		t.Fatal("MakeFactUnion entry", HasErrorSess(testAmbientSession))
 	}
 	bodyU := MakeFactUnion(uv, FactUnionBottom)
 	if bodyU == nil {
-		t.Fatal("MakeFactUnion body", HasError())
+		t.Fatal("MakeFactUnion body", HasErrorSess(testAmbientSession))
 	}
 	p := CreateVariableScalars("g_p", GetIntType(), true, false)
 	pt := MakeFactPointTo(p, NullPtr)
@@ -40,7 +40,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	// post_loop: global_facts = map_facts_in[&body]
 	fm.AssignGlobalFactsFromMapIn(10)
 	if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
-		t.Fatal("assign from map_in incomplete", fm.GlobalFacts, fm.UnionFacts, HasError())
+		t.Fatal("assign from map_in incomplete", fm.GlobalFacts, fm.UnionFacts, HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(fm.UnionFacts, uv)
 	if got == nil || got.LastWrittenFID != 0 {
@@ -54,7 +54,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 
 // StatementFor.cpp:356–359 must_return restores full pre_facts FactVec.
 func TestRestoreFactsPairRewindsUnion(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -87,7 +87,7 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 
 // FactMgr.cpp:580–582 merge_jump_facts missing eUnionWrite → BOTTOM.
 func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
@@ -99,7 +99,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	live := []*FactUnion{MakeFactUnion(uv, 0)}
 	if !mergeJumpUnionFacts(&live, []*FactUnion{}) {
-		t.Fatal("merge failed", HasError())
+		t.Fatal("merge failed", HasErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(live, uv)
 	if got == nil || got.LastWrittenFID != FactUnionBottom {
@@ -113,7 +113,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 // Contract: dest map_in last=0 + empty goto_out unions → BOTTOM after merge_jump;
 // AssignGlobalFactsFromMapOut installs that lattice into live UnionFacts.
 func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -133,7 +133,7 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 	}
 	gotoOutU := []*FactUnion{} // missing subject
 	if !mergeJumpUnionFacts(&stmInU, gotoOutU) {
-		t.Fatal("merge_jump union", GetError())
+		t.Fatal("merge_jump union", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(stmInU, parent)
 	if got == nil || !got.IsBottom() {
@@ -146,12 +146,12 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{}
 	destID := 42
 	fm.SetMapFactsOutPair(destID, []*FactPointTo{}, stmInU)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	fm.AssignGlobalFactsFromMapOut(destID)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	live := FindRelatedUnion(fm.UnionFacts, parent)
 	if live == nil || !live.IsBottom() {
@@ -164,12 +164,12 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 	if !IsNonreadableField(parent.FieldVars[0], fm.UnionFacts) {
 		t.Fatal("BOTTOM must make f0 nonreadable for ChooseOKVar")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // FactMgr.cpp:450–482 eUnionWrite half of update_facts_for_dest.
 func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_dest", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -182,8 +182,8 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	in := []*FactUnion{MakeFactUnion(g, 0)}
 	var out []*FactUnion
 	UpdateUnionFactsForDest(in, &out, fn, body)
-	if HasError() {
-		t.Fatal(GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnion(out, g)
 	if got == nil || got.LastWrittenFID != 0 {
@@ -192,10 +192,10 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	// nil func fail closed
 	var out2 []*FactUnion
 	UpdateUnionFactsForDest(in, &out2, nil, body)
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil func must sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // TestSetMapFactsOutGotoDropsOOSUnionWrite — FactMgr.cpp:263–266.
@@ -206,7 +206,7 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 // 10613516242873274820: choose_visible nOk 36 vs UP 35; if (l_1156) vs
 // if (l_670.f0) because OOS l_1372.f0 stayed readable).
 func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -231,8 +231,8 @@ func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	}
 	// parent of goto is thenArm for stack/OOS
 	fm.SetMapFactsOutForStmtDest(sg, []*FactPointTo{}, thenArm, body)
-	if HasError() {
-		t.Fatalf("set_fact_out goto: %v", GetError())
+	if HasErrorSess(testAmbientSession) {
+		t.Fatalf("set_fact_out goto: %v", GetErrorSess(testAmbientSession))
 	}
 	outU := fm.GetMapUnionFactsOut(sg.StmID)
 	if !UnionFactsComplete(outU) {
@@ -251,12 +251,12 @@ func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	if !IsNonreadableField(loc.FieldVars[0], outU) {
 		t.Fatal("OOS local field must be nonreadable after goto map_out filter")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 // SetMapFactsOut pairs live UnionFacts (FactMgr.cpp set_fact_out full FactVec).
 func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}

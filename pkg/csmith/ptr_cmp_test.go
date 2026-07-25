@@ -21,7 +21,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	// is not stable — find any successful ptr_cmp.
 	var fi *Invocation
 	for seed := uint64(1); seed < 50; seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg2 := EmptyCGContext()
 		cg2.Types = env
 		eff2 := EmptyEffect()
@@ -54,7 +54,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	// FunctionInvocation.cpp:295–304 order:
 	//   F50 eq/ne → make_random_binary (F signed, F signed, U size) → choose_random_pointer_type
 	// eq polarity: flip true → ==, false → !=
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -87,7 +87,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	// Seed 1: find a seed where first flip is 1 → expect "=="
 	foundEq, foundNe := false, false
 	for seed := uint64(1); seed < 200 && !(foundEq && foundNe); seed++ {
-		ClearError()
+		ClearErrorSess(testAmbientSession)
 		cg := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
 		cg.Types = env
 		fi := MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, env)
@@ -113,7 +113,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	if !foundEq || !foundNe {
 		t.Fatalf("need both polarities in sample: eq=%v ne=%v", foundEq, foundNe)
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
@@ -153,25 +153,25 @@ func TestRecordPointerComparisonsGetType(t *testing.T) {
 func TestPtrCmpCastGetTypeResidualNoInventShell(t *testing.T) {
 	// Soft invent was left.GetType residual / CheckAndSetCast residual then invent PtrCmp inv.
 	// Fair: residual stickies fail closed before flags shell.
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.LangCPP = true
 	// Type-nil left GetType residual
 	left := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
 	lt := left.GetType()
-	if lt != nil || !HasError() {
+	if lt != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil left GetType must residual sticky nil")
 	}
 	// ptr-cmp path after GetType residual: fail closed (no invent inv shell)
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 	// CheckAndSetCast residual on incomplete right after live left type
 	rightHole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_r"}}
 	rightHole.CheckAndSetCastOpts(PointerTo(GetIntType()), opts)
 	if rightHole.CastType != nil {
 		t.Fatal("GetTypeUncast residual must not invent CastType on right")
 	}
-	if !HasError() {
+	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CheckAndSetCast residual must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }

@@ -21,7 +21,7 @@ func ReinstallTestProcessSingletons() {
 	InitScopeTable(opts)
 	InitSessionProbabilityTables(opts)
 	InitAttrGenerators(opts, ProcessProbabilitiesSess(testAmbientSession))
-	ClearError()
+	ClearErrorSess(testAmbientSession)
 }
 
 func TestMain(m *testing.M) {
