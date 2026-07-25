@@ -157,7 +157,7 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 		},
 		BuildState: BuildBuilt,
 	}
-	callee.FEffect = EmptyEffect().ReadVar(g)
+	callee.FEffect = EmptyEffect().ReadVarSess(testAmbientSession, g)
 	var fi *Invocation
 	for seed := uint64(3); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
@@ -367,13 +367,13 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	writeInner := EmptyEffect().WriteVar(innerLoc)
+	writeInner := EmptyEffect().WriteVarSess(testAmbientSession, innerLoc)
 	// Gen path: CurrentBlock (inner) — l_inner is frame of inner → folded
 	cg.AddVisibleEffectAt(writeInner, cg.CurrentBlock())
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("CurrentBlock handoff sticky: %v", HasErrorSess(testAmbientSession))
 	}
-	if !cg.EffectAccum.IsWritten(innerLoc) {
+	if !cg.EffectAccum.IsWrittenSess(testAmbientSession, innerLoc) {
 		t.Fatal("gen path CurrentBlock=inner must fold inner-frame write")
 	}
 	// Visit-style wrong block: AnalysisBlock (outer) alone — l_inner not on outer → not folded
@@ -383,7 +383,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("AnalysisBlock handoff sticky: %v", HasErrorSess(testAmbientSession))
 	}
-	if cg.EffectAccum.IsWritten(innerLoc) {
+	if cg.EffectAccum.IsWrittenSess(testAmbientSession, innerLoc) {
 		t.Fatal("AnalysisBlock=outer must not invent fold of inner-only frame write")
 	}
 	// Full BuildUserInvocation revisit with stale CurrBlk must still succeed (gen uses stack top)
@@ -440,7 +440,7 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 	cg.CurrRHS = rhsDummy
 	cg.EffectStm = EmptyEffect()
 	// Mark a write on EffectStm as if RHS gen ran
-	cg.EffectStm = cg.EffectStm.WriteVar(rhsDummy.Var)
+	cg.EffectStm = cg.EffectStm.WriteVarSess(testAmbientSession, rhsDummy.Var)
 	fi := BuildUserInvocation(NewRng(7), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee)
 	if fi == nil {
 		t.Fatal("BuildUserInvocation returned nil")
@@ -521,7 +521,7 @@ func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 		ReturnType: GetIntType(),
 		BuildState: BuildBuilt,
 		IsBuilt:    true,
-		FEffect:    EmptyEffect().ReadVar(g),
+		FEffect:    EmptyEffect().ReadVarSess(testAmbientSession, g),
 		// NeedsRevisit false — no FactChanged / ptrs
 	}
 	caller := &Function{Name: "func_1"}
@@ -536,7 +536,7 @@ func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 		t.Fatal("failed")
 	}
 	// static path: external effect of callee merged into accum (global read)
-	if !accum.IsRead(g) {
+	if !accum.IsReadSess(testAmbientSession, g) {
 		// AddExternalEffect only globals — g is global so should be visible
 		t.Log("accum may track via EffectStm; check FEffect path")
 	}

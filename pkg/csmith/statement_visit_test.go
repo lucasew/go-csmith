@@ -399,7 +399,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 	if !VisitFactsBlock(b, &cg, Defaults()) {
 		t.Fatal("block")
 	}
-	if !eff.IsWritten(v) {
+	if !eff.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("write")
 	}
 	// incomplete GlobalFacts fail closed
@@ -866,7 +866,7 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	cg.FM.SetMapStmEffect(elseB.StmID, EmptyEffect())
 	// Visit path may fail earlier on incomplete IR; ensure residual sticky somewhere
 	// Direct AddEffect residual
-	acc := IncompleteEffect().AddEffect(EmptyEffect())
+	acc := IncompleteEffect().AddEffectSess(testAmbientSession, EmptyEffect())
 	if EffectComplete(acc) {
 		t.Fatal("AddEffect incomplete base must stay IncompleteEffect")
 	}
@@ -897,7 +897,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	w := CreateVariableScalars("g_w", GetIntType(), false, false)
-	pre := EmptyEffect().WriteVar(w)
+	pre := EmptyEffect().WriteVarSess(testAmbientSession, w)
 	cg.EffectAccum = &pre
 	if VisitFactsBlock(b, &cg, Defaults()) {
 		t.Fatal("expected find_fixed_point fail on StmID 0")
@@ -906,7 +906,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 		t.Fatal("EffectAccum must remain non-nil")
 	}
 	// After fail, accum must match pre-effect snapshot (C++ reset_effect_accum)
-	if !cg.EffectAccum.IsWritten(w) {
+	if !cg.EffectAccum.IsWrittenSess(testAmbientSession, w) {
 		t.Fatal("EffectAccum must restore pre-effect write of g_w")
 	}
 	ClearErrorSess(testAmbientSession)

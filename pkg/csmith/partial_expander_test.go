@@ -114,7 +114,7 @@ func TestVisitFactsJumpStoresEffect(t *testing.T) {
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	cg.EffectStm = EmptyEffect().ReadVar(v)
+	cg.EffectStm = EmptyEffect().ReadVarSess(testAmbientSession, v)
 	st := &Stmt{
 		Kind: StmtBreak, StmID: 3,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -122,7 +122,7 @@ func TestVisitFactsJumpStoresEffect(t *testing.T) {
 	if !VisitFactsStatementJump(st, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	if !fm.GetMapStmEffect(3).IsRead(v) {
+	if !fm.GetMapStmEffect(3).IsReadSess(testAmbientSession, v) {
 		t.Fatal("effect")
 	}
 }

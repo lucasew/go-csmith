@@ -65,7 +65,7 @@ func MakeRandomIf(
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return nil
 			}
-			func1PreEffect = cg.EffectAccum.Clone()
+			func1PreEffect = cg.EffectAccum.CloneSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-if past Effect Clone residual
 			if sessHasError(cgSess(cg)) {
 				return nil
@@ -105,7 +105,7 @@ func MakeRandomIf(
 			return nil
 		}
 		if cg.EffectAccum != nil {
-			*cg.EffectAccum = func1PreEffect.Clone()
+			*cg.EffectAccum = func1PreEffect.CloneSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-restore past Effect Clone residual
 			if sessHasError(cgSess(cg)) {
 				return nil
@@ -114,7 +114,7 @@ func MakeRandomIf(
 		if !VisitFactsExpression(test, cg, opts) {
 			// StatementIf.cpp:84–88 — assert(ok) sticky; no invent soft re-pick past visit fail
 			if cg.EffectAccum != nil {
-				*cg.EffectAccum = func1PreEffect.Clone()
+				*cg.EffectAccum = func1PreEffect.CloneSess(cgSess(cg))
 			}
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -124,14 +124,14 @@ func MakeRandomIf(
 		// residual ERROR sticky — no invent if arms past condition visit residual true path
 		if sessHasError(cgSess(cg)) {
 			if cg.EffectAccum != nil {
-				*cg.EffectAccum = func1PreEffect.Clone()
+				*cg.EffectAccum = func1PreEffect.CloneSess(cgSess(cg))
 			}
 			return nil
 		}
 		// StatementIf.cpp:89 — global_facts = pre_facts (already in FM via visit on restored env)
 	}
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
-	condEff := cg.EffectStm.Clone()
+	condEff := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return nil

@@ -551,7 +551,7 @@ func MakeRandomFor(
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
-	preEffect := cg.EffectStm.Clone()
+	preEffect := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-for past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return nil

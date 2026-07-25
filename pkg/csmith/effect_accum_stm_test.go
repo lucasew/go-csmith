@@ -44,15 +44,15 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 			continue
 		}
 		checked++
-		for _, v := range cg.EffectStm.ReadVars() {
+		for _, v := range cg.EffectStm.ReadVarsSess(testAmbientSession) {
 			if v == nil {
 				continue
 			}
-			if !cg.EffectAccum.IsRead(v) {
+			if !cg.EffectAccum.IsReadSess(testAmbientSession, v) {
 				t.Fatalf("seed %d: EffectStm read %s not in EffectAccum (stm=%v accum=%v)",
 					seed, v.Name,
-					mapAccumNamesOf(cg.EffectStm.ReadVars()),
-					mapAccumNamesOf(cg.EffectAccum.ReadVars()))
+					mapAccumNamesOf(cg.EffectStm.ReadVarsSess(testAmbientSession)),
+					mapAccumNamesOf(cg.EffectAccum.ReadVarsSess(testAmbientSession)))
 			}
 		}
 	}

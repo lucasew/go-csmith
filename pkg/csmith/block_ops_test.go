@@ -209,7 +209,7 @@ func TestNeedNestedLoopMustJumpResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtBreak}}} // nil Expr
-	cg := EmptyCGContext().WithSession(testAmbientSession)                                            // RW nil would soft invent false after residual
+	cg := EmptyCGContext().WithSession(testAmbientSession)       // RW nil would soft invent false after residual
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("MustJump residual must fail closed true need-nested, not invent none")
 	}
@@ -269,19 +269,19 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 
 func TestEffectCloneIndependent(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	e := EmptyEffect().WriteVar(v)
-	c := e.Clone()
-	e = e.ReadVar(CreateVariableScalars("g_2", GetIntType(), false, false))
-	if c.IsRead(CreateVariableScalars("g_2", GetIntType(), false, false)) {
+	e := EmptyEffect().WriteVarSess(testAmbientSession, v)
+	c := e.CloneSess(testAmbientSession)
+	e = e.ReadVarSess(testAmbientSession, CreateVariableScalars("g_2", GetIntType(), false, false))
+	if c.IsReadSess(testAmbientSession, CreateVariableScalars("g_2", GetIntType(), false, false)) {
 		// different var ptr — just check written still
 	}
-	if !c.IsWritten(v) {
+	if !c.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("clone lost write")
 	}
 	// mutate original maps should not clear clone if deep
-	e2 := EmptyEffect().WriteVar(v)
-	c2 := e2.Clone()
-	_ = e2.WriteVar(CreateVariableScalars("g_3", GetIntType(), false, false))
+	e2 := EmptyEffect().WriteVarSess(testAmbientSession, v)
+	c2 := e2.CloneSess(testAmbientSession)
+	_ = e2.WriteVarSess(testAmbientSession, CreateVariableScalars("g_3", GetIntType(), false, false))
 	// e2.WriteVar returns new Effect; original e2 maps may be shared with...
 	// Clone deep-copies so c2.written is independent
 	if len(c2.written) != 1 {

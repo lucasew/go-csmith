@@ -170,27 +170,27 @@ func TestGenerateWithBuiltins(t *testing.T) {
 func TestHasRaceWith(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	e1 := EmptyEffect().ReadVar(a)
-	e2 := EmptyEffect().WriteVar(a)
-	if !e1.HasRaceWith(e2) {
+	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
+	e2 := EmptyEffect().WriteVarSess(testAmbientSession, a)
+	if !e1.HasRaceWithSess(testAmbientSession, e2) {
 		t.Fatal("race")
 	}
-	e3 := EmptyEffect().WriteVar(b)
-	if e1.HasRaceWith(e3) {
+	e3 := EmptyEffect().WriteVarSess(testAmbientSession, b)
+	if e1.HasRaceWithSess(testAmbientSession, e3) {
 		t.Fatal("no race")
 	}
-	if !EmptyEffect().IsEmpty() {
+	if !EmptyEffect().IsEmptySess(testAmbientSession) {
 		t.Fatal("empty")
 	}
-	e2.Clear()
-	if !e2.IsEmpty() {
+	e2.ClearSess(testAmbientSession)
+	if !e2.IsEmptySess(testAmbientSession) {
 		t.Fatal("clear")
 	}
 	// Clear must not invent wipe IncompleteEffect to empty pure — sticky
 	ClearErrorSess(testAmbientSession)
 	inc := IncompleteEffect()
-	inc.Clear()
-	if EffectComplete(inc) || inc.IsEmpty() || inc.IsPure() {
+	inc.ClearSess(testAmbientSession)
+	if EffectComplete(inc) || inc.IsEmptySess(testAmbientSession) || inc.IsPureSess(testAmbientSession) {
 		t.Fatal("Clear incomplete must stay IncompleteEffect")
 	}
 	if !HasErrorSess(testAmbientSession) {

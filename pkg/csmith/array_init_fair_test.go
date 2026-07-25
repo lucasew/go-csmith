@@ -206,7 +206,7 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	// FactMgr required when condition may build ExpressionAssign
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = vs.Types
-	cg.EffectStm = EmptyEffect().WriteVar(v)
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
 	st := MakeRandomIf(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
@@ -215,7 +215,7 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 		t.Fatal("branches")
 	}
 	// StatementIf.cpp:69 clear on CGContext& — pre-seed write must not survive on caller
-	if cg.EffectStm.IsWritten(v) {
+	if cg.EffectStm.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("effect_stm clear on *CGContext must drop pre-seed write")
 	}
 }

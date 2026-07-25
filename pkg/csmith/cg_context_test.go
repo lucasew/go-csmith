@@ -80,7 +80,7 @@ func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	parent.EffectAccum = &eff
 	parent.ExprDepth = 9
 	parent.CurrRHS = rhs
-	parent.EffectStm = EmptyEffect().WriteVar(iv)
+	parent.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, iv)
 	parent.Flags = FlagNoDanglingPtr
 	body := parent.WithLoopBody(parent.RW, iv, 4)
 	if !body.InLoop() {
@@ -98,7 +98,7 @@ func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	if body.EffectAccum != parent.EffectAccum {
 		t.Fatal("must share effect_accum pointer")
 	}
-	if len(body.EffectStm.WrittenVars()) != 0 {
+	if len(body.EffectStm.WrittenVarsSess(testAmbientSession)) != 0 {
 		t.Fatal("effect_stm must start empty")
 	}
 	if b, ok := body.IVBounds[iv]; !ok || b != 4 {

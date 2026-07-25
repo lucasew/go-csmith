@@ -11,7 +11,7 @@ func TestPtrModifiedInRhs(t *testing.T) {
 	lhs := &Lhs{Var: p, Type: GetIntType()} // *p
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// RHS wrote the pointer itself
-	cg.EffectStm = EmptyEffect().WriteVar(p)
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, p)
 	if !cg.PtrModifiedInRhs(lhs, nil) {
 		t.Fatal("ptr written")
 	}

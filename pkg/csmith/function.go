@@ -1310,7 +1310,6 @@ func (f *Function) OutputHeaderAliasOptsSess(s *Session, forceStatic bool, opts 
 	return b.String()
 }
 
-
 // OutputForwardDeclAlias mirrors Function::OutputForwardDeclAlias.
 // Function.cpp:555–559 — OutputHeaderAlias + ";".
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
@@ -1348,7 +1347,6 @@ func (f *Function) OutputForwardDeclAliasOptsSess(s *Session, forceStatic bool, 
 	}
 	return out + ";"
 }
-
 
 // Output emits a C function definition (minimal statements).
 // Function.cpp:565–598 — builtins emit nothing.

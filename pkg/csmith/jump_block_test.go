@@ -153,9 +153,9 @@ func TestOutputPtrResetsArray(t *testing.T) {
 
 func TestClearEffectStm(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	cg.EffectStm = EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), false, false))
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalars("g_x", GetIntType(), false, false))
 	cg.ClearEffectStm()
-	if !cg.EffectStm.IsSideEffectFree() {
+	if !cg.EffectStm.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("clear")
 	}
 }
@@ -176,7 +176,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	for i := range b1.Stmts {
 		fm.MapAccumEffect[b1.Stmts[i].StmID] = eff

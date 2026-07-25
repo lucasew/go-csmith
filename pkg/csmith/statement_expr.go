@@ -34,7 +34,7 @@ func MakeRandomExprStmt(
 	var preEffect Effect
 	if cg.EffectAccum != nil {
 		// pre-validated EffectComplete
-		preEffect = cg.EffectAccum.Clone()
+		preEffect = cg.EffectAccum.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-expr stmt past Effect Clone residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}

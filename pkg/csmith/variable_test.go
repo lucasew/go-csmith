@@ -561,8 +561,8 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 		t.Fatal("plain int non-vol")
 	}
 	// ReadVar of vol struct must clear SE-free
-	e := EmptyEffect().ReadVar(v)
-	if e.IsSideEffectFree() {
+	e := EmptyEffect().ReadVarSess(testAmbientSession, v)
+	if e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("ReadVar volatile struct must clear side_effect_free")
 	}
 }

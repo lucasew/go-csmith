@@ -490,8 +490,8 @@ func TestVisitFactsLhsCompoundRead(t *testing.T) {
 		t.Fatal("compound")
 	}
 	// compound should have read then write
-	if !eff.IsRead(v) || !eff.IsWritten(v) {
-		t.Fatal("rw", eff.IsRead(v), eff.IsWritten(v))
+	if !eff.IsReadSess(testAmbientSession, v) || !eff.IsWrittenSess(testAmbientSession, v) {
+		t.Fatal("rw", eff.IsReadSess(testAmbientSession, v), eff.IsWrittenSess(testAmbientSession, v))
 	}
 }
 

@@ -427,12 +427,12 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 			return ""
 		}
 		if isG {
-			rd := eff.IsRead(f.Var)
+			rd := eff.IsReadSess(fmSess(fm), f.Var)
 			// residual ERROR sticky — no invent soft-skip assert past IsRead residual
 			if sessHasError(fmSess(fm)) {
 				return ""
 			}
-			wr := eff.IsWritten(f.Var)
+			wr := eff.IsWrittenSess(fmSess(fm), f.Var)
 			// residual ERROR sticky — no invent soft-skip assert past IsWritten residual
 			if sessHasError(fmSess(fm)) {
 				return ""

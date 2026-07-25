@@ -501,7 +501,7 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 	if _, ok := fm.MapFactsOut[8]; !ok {
 		t.Fatal("facts out")
 	}
-	if !fm.MapVisited[8] && fm.GetMapStmEffect(8).IsEmpty() {
+	if !fm.MapVisited[8] && fm.GetMapStmEffect(8).IsEmptySess(testAmbientSession) {
 		// effect may be empty for const return; map_stm_effect should still be set
 	}
 	_ = fm.GetMapStmEffect(8)

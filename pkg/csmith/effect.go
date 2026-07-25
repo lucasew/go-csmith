@@ -80,9 +80,6 @@ func EffectComplete(e Effect) bool {
 
 // Clone mirrors Effect copy ctor with deep map copies (Go maps are shared refs).
 // Effect.cpp:84–89.
-func (e Effect) Clone() Effect {
-	return e.CloneSess(testAmbientSession)
-}
 
 func (e Effect) CloneSess(s *Session) Effect {
 	if e.incomplete {
@@ -130,9 +127,6 @@ func (e Effect) detachMaps() Effect {
 
 // IsPure mirrors Effect::is_pure.
 // Incomplete effects sticky not-pure (no invent pure success / soft re-pick past holes).
-func (e Effect) IsPure() bool {
-	return e.IsPureSess(testAmbientSession)
-}
 
 func (e Effect) IsPureSess(s *Session) bool {
 	if e.incomplete {
@@ -144,9 +138,6 @@ func (e Effect) IsPureSess(s *Session) bool {
 
 // IsSideEffectFree mirrors Effect::is_side_effect_free.
 // Incomplete effects sticky not SE-free (no invent SE-free success / soft re-pick past holes).
-func (e Effect) IsSideEffectFree() bool {
-	return e.IsSideEffectFreeSess(testAmbientSession)
-}
 
 func (e Effect) IsSideEffectFreeSess(s *Session) bool {
 	if e.incomplete {
@@ -163,9 +154,6 @@ func WithSideEffects() Effect {
 
 // AddExternalEffect mirrors Effect::add_external_effect — only global reads/writes.
 // Effect.cpp:192–215.
-func (e Effect) AddExternalEffect(other Effect) Effect {
-	return e.AddExternalEffectSess(testAmbientSession, other)
-}
 
 func (e Effect) AddExternalEffectSess(s *Session, other Effect) Effect {
 	return e.AddExternalEffectWithCallersSess(s, other, nil)
@@ -176,9 +164,6 @@ func (e Effect) AddExternalEffectSess(s *Session, other Effect) Effect {
 // Variable* always live in effect lists; nil hole fails closed sticky IncompleteEffect
 // (no invent partial external merge past holes / soft re-pick). Incomplete Param/LocalVars
 // on a frame also fails closed sticky (no invent not-on-chain via IsVarOnStack false past hole).
-func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
-	return e.AddExternalEffectWithCallersSess(testAmbientSession, other, callChain)
-}
 
 func (e Effect) AddExternalEffectWithCallersSess(s *Session, other Effect, callChain []*Block) Effect {
 	// incomplete effect maps / call chain fail closed sticky IncompleteEffect
@@ -277,10 +262,6 @@ func (e Effect) AddExternalEffectWithCallersSess(s *Session, other Effect, callC
 	return out
 }
 
-func varOnCallChain(v *Variable, chain []*Block) bool {
-	return varOnCallChainSess(testAmbientSession, v, chain)
-}
-
 func varOnCallChainSess(s *Session, v *Variable, chain []*Block) bool {
 	for _, b := range chain {
 		// chain pre-validated complete at AddExternalEffectWithCallers
@@ -309,9 +290,6 @@ func varOnCallChainSess(s *Session, v *Variable, chain []*Block) bool {
 
 // AddEffect mirrors Effect::add_effect(e) without LHS set merge.
 // Effect.cpp:157–186.
-func (e Effect) AddEffect(other Effect) Effect {
-	return e.AddEffectSess(testAmbientSession, other)
-}
 
 func (e Effect) AddEffectSess(s *Session, other Effect) Effect {
 	return e.AddEffectOptsSess(s, other, false)
@@ -322,9 +300,6 @@ func (e Effect) AddEffectSess(s *Session, other Effect) Effect {
 // !is_written on the destination (struct-parent coverage applies).
 // Variable* always live as map keys; incomplete either side fails closed sticky
 // IncompleteEffect (no invent leave-base empty-complete merge / soft re-pick past hole).
-func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
-	return e.AddEffectOptsSess(testAmbientSession, other, includeLHS)
-}
 
 func (e Effect) AddEffectOptsSess(s *Session, other Effect, includeLHS bool) Effect {
 	if !EffectComplete(e) || !EffectComplete(other) {
@@ -402,10 +377,6 @@ func (e Effect) AddEffectOptsSess(s *Session, other Effect, includeLHS bool) Eff
 // Variable* always live; incomplete list or base fails closed sticky IncompleteEffect
 // (no invent partial writes / soft re-pick leave-base empty-complete success).
 
-func (e Effect) WriteVarSet(vars []*Variable) Effect {
-	return e.WriteVarSetSess(testAmbientSession, vars)
-}
-
 func (e Effect) WriteVarSetSess(s *Session, vars []*Variable) Effect {
 	if !EffectComplete(e) || !VariablesComplete(vars) {
 		sessNoteError(s, ErrGeneric)
@@ -429,9 +400,6 @@ func (e Effect) WriteVarSetSess(s *Session, vars []*Variable) Effect {
 // SetLhsWriteVars mirrors Effect::set_lhs_write_vars from current write_vars.
 // Lhs.cpp:348–351 — after successful LHS visit.
 // Incomplete write map fails closed sticky IncompleteEffect (no invent empty lhsWrite).
-func (e Effect) SetLhsWriteVarsFromWritten() Effect {
-	return e.SetLhsWriteVarsFromWrittenSess(testAmbientSession)
-}
 
 func (e Effect) SetLhsWriteVarsFromWrittenSess(s *Session) Effect {
 	if !EffectComplete(e) {
@@ -460,9 +428,6 @@ func (e Effect) SetLhsWriteVarsFromWrittenSess(s *Session) Effect {
 // Incomplete effect / nil map keys fail closed sticky IncompleteVariables
 // (not bare nil invent empty-complete lhs set via VariablesComplete(nil)/len==0 —
 // assign merge uses incomplete as WriteVarSet input; soft re-pick past hole).
-func (e Effect) LhsWriteVars() []*Variable {
-	return e.LhsWriteVarsSess(testAmbientSession)
-}
 
 func (e Effect) LhsWriteVarsSess(s *Session) []*Variable {
 	if e.incomplete {
@@ -492,9 +457,6 @@ func (e Effect) LhsWriteVarsSess(s *Session) []*Variable {
 // !access_once; pure left unchanged (upstream "pure = pure").
 // Incomplete base / nil Variable sticky IncompleteEffect (no invent grow write map
 // / soft-skip identity past holes).
-func (e Effect) WriteVar(v *Variable) Effect {
-	return e.WriteVarSess(testAmbientSession, v)
-}
 
 func (e Effect) WriteVarSess(s *Session, v *Variable) Effect {
 	// Variable always live; sticky incomplete no invent identity no-op past hole
@@ -543,9 +505,6 @@ func (e Effect) WriteVarSess(s *Session, v *Variable) Effect {
 // otherwise duplicate field entries in choose_visible_read_var pools).
 // Incomplete base / nil Variable sticky IncompleteEffect (no invent grow read map
 // / soft-skip identity past holes).
-func (e Effect) ReadVar(v *Variable) Effect {
-	return e.ReadVarSess(testAmbientSession, v)
-}
 
 func (e Effect) ReadVarSess(s *Session, v *Variable) Effect {
 	// Variable always live; sticky incomplete no invent identity no-op past hole
@@ -598,9 +557,6 @@ func (e Effect) ReadVarSess(s *Session, v *Variable) Effect {
 // Incomplete effect sticky true (no invent not-written / conflict-free past holes).
 // Type-nil parent sticky written true (restrictive — no invent not-written /
 // conflict-free soft-skip past incomplete parent type shell; mirrors IsRead).
-func (e Effect) IsWritten(v *Variable) bool {
-	return e.IsWrittenSess(testAmbientSession, v)
-}
 
 func (e Effect) IsWrittenSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-written soft-skip
@@ -637,9 +593,6 @@ func (e Effect) IsWrittenSess(s *Session, v *Variable) bool {
 // ReadVars mirrors Effect::get_read_vars — insertion order (C++ vector).
 // Incomplete effect / nil map keys fail closed sticky IncompleteVariables
 // (no invent skip hole as absent read / soft re-pick empty-complete read set).
-func (e Effect) ReadVars() []*Variable {
-	return e.ReadVarsSess(testAmbientSession)
-}
 
 func (e Effect) ReadVarsSess(s *Session) []*Variable {
 	if e.incomplete {
@@ -663,9 +616,6 @@ func (e Effect) ReadVarsSess(s *Session) []*Variable {
 // WrittenVars mirrors Effect::get_write_vars — insertion order (C++ vector).
 // Incomplete effect / nil map keys fail closed sticky IncompleteVariables
 // (no invent skip hole as absent write / soft re-pick empty-complete write set).
-func (e Effect) WrittenVars() []*Variable {
-	return e.WrittenVarsSess(testAmbientSession)
-}
 
 func (e Effect) WrittenVarsSess(s *Session) []*Variable {
 	if e.incomplete {
@@ -689,9 +639,6 @@ func (e Effect) WrittenVarsSess(s *Session) []*Variable {
 // IsRead mirrors Effect::is_read — exact or struct parent (not union).
 // Effect.cpp:276–289.
 // Incomplete effect sticky true (no invent not-read / conflict-free past holes).
-func (e Effect) IsRead(v *Variable) bool {
-	return e.IsReadSess(testAmbientSession, v)
-}
 
 func (e Effect) IsReadSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-read soft-skip
@@ -742,9 +689,6 @@ func (e Effect) IsReadSess(s *Session, v *Variable) bool {
 // residual ERROR+false invents no-field-read / conflict-free past Type-nil shell).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
 // Incomplete effect fails closed as true sticky (incomplete marker soft re-pick banned).
-func (e Effect) FieldIsRead(v *Variable) bool {
-	return e.FieldIsReadSess(testAmbientSession, v)
-}
 
 func (e Effect) FieldIsReadSess(s *Session, v *Variable) bool {
 	if v == nil {
@@ -811,10 +755,6 @@ func (e Effect) FieldIsReadSess(s *Session, v *Variable) bool {
 // residual ERROR+false invents no-field-write / conflict-free past Type-nil shell).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
 // Incomplete effect sticky true (no invent no-field-write soft re-pick past holes).
-
-func (e Effect) FieldIsWritten(v *Variable) bool {
-	return e.FieldIsWrittenSess(testAmbientSession, v)
-}
 
 func (e Effect) FieldIsWrittenSess(s *Session, v *Variable) bool {
 	if v == nil {
@@ -894,9 +834,6 @@ func ancestryTypeHole(v *Variable) bool {
 // Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
 // Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
 // Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).
-func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
-	return e.SiblingUnionFieldIsReadSess(testAmbientSession, v)
-}
 
 func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent no-sibling soft-skip
@@ -969,10 +906,6 @@ func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 // Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
 // Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).
 
-func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
-	return e.SiblingUnionFieldIsWrittenSess(testAmbientSession, v)
-}
-
 func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent no-sibling soft-skip
 	if v == nil {
@@ -1038,13 +971,10 @@ func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 	return false
 }
 
-// NonEmptyIntersection mirrors Effect.cpp non_empty_intersection.
+// NonEmptyIntersectionSess mirrors Effect.cpp non_empty_intersection.
 // Effect.cpp:56–69 — any pair where va[i]->match(vb[j]) || vb[j]->match(va[i]).
 // Nil entries in either list fail closed sticky true (restrictive race).
-func NonEmptyIntersection(va, vb []*Variable) bool {
-	return NonEmptyIntersectionSess(testAmbientSession, va, vb)
-}
-
+// Non-Sess dual deleted — pass run bag or testAmbientSession explicitly.
 func NonEmptyIntersectionSess(s *Session, va, vb []*Variable) bool {
 	for _, a := range va {
 		for _, b := range vb {
@@ -1079,10 +1009,6 @@ func NonEmptyIntersectionSess(s *Session, va, vb []*Variable) bool {
 // Effect.cpp:480–484 — read∩write || write∩read || write∩write via non_empty_intersection.
 // Incomplete either side fails closed sticky as race (no invent race-free / soft re-pick).
 
-func (e Effect) HasRaceWith(other Effect) bool {
-	return e.HasRaceWithSess(testAmbientSession, other)
-}
-
 func (e Effect) HasRaceWithSess(s *Session, other Effect) bool {
 	if !EffectComplete(e) || !EffectComplete(other) {
 		sessNoteError(s, ErrGeneric)
@@ -1096,19 +1022,19 @@ func (e Effect) HasRaceWithSess(s *Session, other Effect) bool {
 	if sessHasError(s) {
 		return true
 	}
-	if NonEmptyIntersection(ra, wb) {
+	if NonEmptyIntersectionSess(s, ra, wb) {
 		return true
 	}
 	if sessHasError(s) {
 		return true
 	}
-	if NonEmptyIntersection(wa, rb) {
+	if NonEmptyIntersectionSess(s, wa, rb) {
 		return true
 	}
 	if sessHasError(s) {
 		return true
 	}
-	if NonEmptyIntersection(wa, wb) {
+	if NonEmptyIntersectionSess(s, wa, wb) {
 		return true
 	}
 	return sessHasError(s)
@@ -1117,10 +1043,6 @@ func (e Effect) HasRaceWithSess(s *Session, other Effect) bool {
 // IsEmpty mirrors Effect::is_empty — no reads and no writes.
 // Effect.cpp:490–492.
 // Incomplete sticky not-empty (no invent empty-complete free effect past holes).
-
-func (e Effect) IsEmpty() bool {
-	return e.IsEmptySess(testAmbientSession)
-}
 
 func (e Effect) IsEmptySess(s *Session) bool {
 	if e.incomplete {
@@ -1136,9 +1058,6 @@ func (e Effect) IsEmptySess(s *Session) bool {
 // Effect* always live at clear; sticky (no invent soft-skip clear past hole).
 // Incomplete base stays IncompleteEffect sticky (no invent wipe hole shell to empty pure
 // / soft re-pick past incomplete clear).
-func (e *Effect) Clear() {
-	e.ClearSess(testAmbientSession)
-}
 
 func (e *Effect) ClearSess(s *Session) {
 	if e == nil {
@@ -1157,9 +1076,6 @@ func (e *Effect) ClearSess(s *Session) {
 // Effect.cpp:124–135 — under strict_volatile_rule, clear SE-free if volatile after deref.
 // Incomplete base fails closed sticky IncompleteEffect (no invent SE-free tweak on hole shell).
 // Under strictVolatile, Variable always live; sticky IncompleteEffect (no invent SE-free skip).
-func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile bool) Effect {
-	return e.AccessDerefVolatileSess(testAmbientSession, v, derefLevel, strictVolatile)
-}
 
 func (e Effect) AccessDerefVolatileSess(s *Session, v *Variable, derefLevel int, strictVolatile bool) Effect {
 	if e.incomplete {
@@ -1196,9 +1112,6 @@ func (e Effect) AccessDerefVolatileSess(s *Session, v *Variable, derefLevel int,
 // IsReadPartially mirrors Effect::is_read_partially.
 // Effect.cpp:444–446.
 // Incomplete effect fails closed as true via IsRead/FieldIs*/Sibling* membership.
-func (e Effect) IsReadPartially(v *Variable) bool {
-	return e.IsReadPartiallySess(testAmbientSession, v)
-}
 
 func (e Effect) IsReadPartiallySess(s *Session, v *Variable) bool {
 	if e.IsReadSess(s, v) {
@@ -1237,10 +1150,6 @@ func (e Effect) IsReadPartiallySess(s *Session, v *Variable) bool {
 // Effect.cpp:448–451.
 // Incomplete effect fails closed as true via IsWritten/FieldIs*/Sibling* membership.}
 
-func (e Effect) IsWrittenPartially(v *Variable) bool {
-	return e.IsWrittenPartiallySess(testAmbientSession, v)
-}
-
 func (e Effect) IsWrittenPartiallySess(s *Session, v *Variable) bool {
 	if e.IsWrittenSess(s, v) {
 		// residual ERROR sticky — no invent partial-write true past IsWritten hole
@@ -1277,10 +1186,6 @@ func (e Effect) IsWrittenPartiallySess(s *Session, v *Variable) bool {
 // HasGlobalEffect mirrors Effect::has_global_effect.
 // Effect.cpp:543–562 — any global in read or write sets.
 // Incomplete effect / nil map keys sticky true (no invent pure / no-global success).
-
-func (e Effect) HasGlobalEffect() bool {
-	return e.HasGlobalEffectSess(testAmbientSession)
-}
 
 func (e Effect) HasGlobalEffectSess(s *Session) bool {
 	if e.incomplete {
@@ -1328,9 +1233,6 @@ func (e Effect) HasGlobalEffectSess(s *Session) bool {
 // UpdatePurity mirrors Effect::update_purity.
 // Effect.cpp:535–538 — pure cleared when has_global_effect.
 // Effect always live; sticky (no invent soft-skip purity update past hole).
-func (e *Effect) UpdatePurity() {
-	e.UpdatePuritySess(testAmbientSession)
-}
 
 func (e *Effect) UpdatePuritySess(s *Session) {
 	if e == nil {
@@ -1346,9 +1248,6 @@ func (e *Effect) UpdatePuritySess(s *Session) {
 // Effect.cpp:565–572 — any read var is_inside_union_field.
 // Incomplete effect / nil key fails closed as true (no invent none on
 // IncompleteEffect empty maps).
-func (e Effect) UnionFieldIsRead() bool {
-	return e.UnionFieldIsReadSess(testAmbientSession)
-}
 
 func (e Effect) UnionFieldIsReadSess(s *Session) bool {
 	if e.incomplete {
@@ -1391,9 +1290,6 @@ func effectMapKeysComplete(m map[*Variable]bool) bool {
 // Effect* always live; sticky (no invent soft-skip consolidate past hole).
 // Incomplete maps fail closed sticky IncompleteEffect (no invent partial deletes /
 // leave-base complete success past holes under random map order / soft re-pick).
-func (e *Effect) Consolidate() {
-	e.ConsolidateSess(testAmbientSession)
-}
 
 func (e *Effect) ConsolidateSess(s *Session) {
 	if e == nil {
@@ -1502,10 +1398,6 @@ func (e *Effect) ConsolidateSess(s *Session) {
 // Empty name sticky true (restrictive — no invent not-read soft-skip past incomplete
 // identifier query that would soft-match every empty-named var as non-hit).
 
-func (e Effect) IsReadByName(name string) bool {
-	return e.IsReadByNameSess(testAmbientSession, name)
-}
-
 func (e Effect) IsReadByNameSess(s *Session, name string) bool {
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as read (restrictive)
@@ -1532,9 +1424,6 @@ func (e Effect) IsReadByNameSess(s *Session, name string) bool {
 // Effect.cpp:351–364.
 // Incomplete effect / nil key sticky true (no invent not-written soft re-pick).
 // Empty name sticky true (restrictive — no invent not-written soft-skip past hole).
-func (e Effect) IsWrittenByName(name string) bool {
-	return e.IsWrittenByNameSess(testAmbientSession, name)
-}
 
 func (e Effect) IsWrittenByNameSess(s *Session, name string) bool {
 	if e.incomplete {
@@ -1562,9 +1451,6 @@ func (e Effect) IsWrittenByNameSess(s *Session, name string) bool {
 // Effect.cpp:507–529 — insertion-order read_vars/write_vars via OutputForComment;
 // then output_comment_line wraps "/* " + body + " */\n" (OutputMgr.cpp:314–320).
 // Incomplete effect / nil var fails closed sticky empty (no invent partial list).
-func (e Effect) CommentOutput() string {
-	return e.CommentOutputSess(testAmbientSession)
-}
 
 func (e Effect) CommentOutputSess(s *Session) string {
 	if e.incomplete {
@@ -1645,10 +1531,7 @@ func (e Effect) CommentOutputSess(s *Session) string {
 //
 // Uses is_read/is_written gates and preserves a-then-b insertion order (fair with
 // C++ vector merges that skip already-covered vars).
-
-func MergeEffects(a, b Effect) Effect {
-	return MergeEffectsSess(testAmbientSession, a, b)
-}
+// Non-Sess dual deleted — pass run bag or testAmbientSession explicitly.
 
 func MergeEffectsSess(s *Session, a, b Effect) Effect {
 	if !EffectComplete(a) || !EffectComplete(b) {

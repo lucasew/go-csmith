@@ -58,25 +58,25 @@ func TestGetLastStmStopsAtReturn(t *testing.T) {
 func TestSetAccumulatedEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	fm.SetMapStmEffect(1, EmptyEffect().WriteVar(v))
-	fm.SetMapStmEffect(2, EmptyEffect().ReadVar(v))
+	fm.SetMapStmEffect(1, EmptyEffect().WriteVarSess(testAmbientSession, v))
+	fm.SetMapStmEffect(2, EmptyEffect().ReadVarSess(testAmbientSession, v))
 	b := &Block{
 		StmID: 10,
 		Stmts: []Stmt{{StmID: 1}, {StmID: 2}},
 	}
 	eff := b.SetAccumulatedEffect(fm)
-	if !eff.IsWritten(v) || !eff.IsRead(v) {
+	if !eff.IsWrittenSess(testAmbientSession, v) || !eff.IsReadSess(testAmbientSession, v) {
 		t.Fatal("union")
 	}
-	if !fm.GetMapStmEffect(10).IsWritten(v) {
+	if !fm.GetMapStmEffect(10).IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("block effect")
 	}
 	// StmID 0 incomplete sticky — IncompleteEffect (not EmptyEffect invent pure/empty success)
 	ClearErrorSess(testAmbientSession)
 	b2 := &Block{StmID: 11, Stmts: []Stmt{{StmID: 1}, {StmID: IncompleteStmID}}}
-	fm.SetMapStmEffect(11, EmptyEffect().WriteVar(v))
+	fm.SetMapStmEffect(11, EmptyEffect().WriteVarSess(testAmbientSession, v))
 	eff2 := b2.SetAccumulatedEffect(fm)
-	if EffectComplete(eff2) || eff2.IsEmpty() || eff2.IsPure() {
+	if EffectComplete(eff2) || eff2.IsEmptySess(testAmbientSession) || eff2.IsPureSess(testAmbientSession) {
 		t.Fatal("StmID 0 must fail closed IncompleteEffect, not invent empty/pure", eff2)
 	}
 	if !HasErrorSess(testAmbientSession) {

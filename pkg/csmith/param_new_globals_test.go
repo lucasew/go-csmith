@@ -8,12 +8,12 @@ func TestMergeParamContext(t *testing.T) {
 	parent := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	parent.EffectAccum = &eff
-	paramAccum := EmptyEffect().ReadVar(a)
+	paramAccum := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	param := EmptyCGContext().WithSession(testAmbientSession)
 	param.EffectAccum = &paramAccum
 	param.ExprDepth = 3
 	parent.MergeParamContext(param, true)
-	if !eff.IsRead(a) {
+	if !eff.IsReadSess(testAmbientSession, a) {
 		t.Fatal("merged read")
 	}
 	if parent.ExprDepth != 3 {

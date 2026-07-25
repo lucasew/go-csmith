@@ -68,18 +68,18 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	if lc == nil || lc.IV == nil {
 		t.Skip("could not select struct-field IV")
 	}
-	if !cg.EffectStm.IsWritten(lc.IV) || !cg.EffectStm.IsRead(lc.IV) {
+	if !cg.EffectStm.IsWrittenSess(testAmbientSession, lc.IV) || !cg.EffectStm.IsReadSess(testAmbientSession, lc.IV) {
 		t.Fatalf("make_iteration must write+read IV, IsW=%v IsR=%v",
-			cg.EffectStm.IsWritten(lc.IV), cg.EffectStm.IsRead(lc.IV))
+			cg.EffectStm.IsWrittenSess(testAmbientSession, lc.IV), cg.EffectStm.IsReadSess(testAmbientSession, lc.IV))
 	}
 	body := &Block{Func: fn, StmID: AllocStmID()}
 	fm.SetMapStmEffect(body.StmID, EmptyEffect())
 	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, []*FactUnion{})
 	forSt := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
-	pre := cg.EffectStm.Clone()
+	pre := cg.EffectStm.CloneSess(testAmbientSession)
 	postLoopAnalysis(fm, forSt, body, []*FactPointTo{}, []*FactUnion{}, pre, &cg)
 	got := fm.GetMapStmEffect(forSt.StmID)
-	if !got.IsRead(lc.IV) {
+	if !got.IsReadSess(testAmbientSession, lc.IV) {
 		t.Fatal("post_loop map_stm_effect[for] must retain IV read from pre_effect")
 	}
 	ClearErrorSess(testAmbientSession)

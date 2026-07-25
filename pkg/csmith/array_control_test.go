@@ -279,7 +279,7 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// pre-seed effect_stm as dirty
-	cg.EffectStm = EmptyEffect().WriteVar(v)
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
 	st := MakeRandomFor(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil {
 		t.Fatal("nil")
@@ -289,7 +289,7 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 		t.Fatal("no loop")
 	}
 	// pre-seed write of unrelated v must not survive on caller's EffectStm
-	if cg.EffectStm.IsWritten(v) {
+	if cg.EffectStm.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("effect_stm clear on *CGContext must drop pre-seed write")
 	}
 }

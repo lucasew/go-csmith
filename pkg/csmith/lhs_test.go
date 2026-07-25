@@ -335,7 +335,7 @@ func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	cg.EffectStm = EmptyEffect().WriteVar(g)
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	// with only g written in stm, make may create another var or fail
 	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs != nil && lhs.Var == g {
@@ -380,9 +380,9 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	// not the pointer itself (Lhs.cpp:337–346 / CheckWriteVar).
 	hasWrite := false
 	if cg.EffectAccum != nil {
-		hasWrite = len(cg.EffectAccum.WrittenVars()) > 0 || len(cg.EffectAccum.LhsWriteVars()) > 0
+		hasWrite = len(cg.EffectAccum.WrittenVarsSess(testAmbientSession)) > 0 || len(cg.EffectAccum.LhsWriteVarsSess(testAmbientSession)) > 0
 	}
-	if !hasWrite && len(cg.EffectStm.WrittenVars()) == 0 {
+	if !hasWrite && len(cg.EffectStm.WrittenVarsSess(testAmbientSession)) == 0 {
 		t.Fatalf("expected write effect after lhs make (var %s indir=%d)", lhs.Var.Name, lhs.IndirectLevel())
 	}
 }
@@ -763,7 +763,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	cgElig := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cgElig.EffectAccum = &acc
 	_ = IsEligibleVar(&item.Variable, 0, AccessWrite, cgElig)
-	if !acc.IsRead(iv) {
+	if !acc.IsReadSess(testAmbientSession, iv) {
 		t.Fatal("precondition: is_eligible itemized must ReadVar index IV on effect_accum")
 	}
 
@@ -773,14 +773,14 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{ok}
 	vs.AllVars = []*Variable{ok}
-	eff := EmptyEffect().ReadVar(iv)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, iv)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs == nil || HasErrorSess(testAmbientSession) {
 		t.Fatalf("expected Lhs from l_ok-only pool err=%v", HasErrorSess(testAmbientSession))
 	}
-	if !cg.EffectAccum.IsRead(iv) {
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, iv) {
 		t.Fatal("filter-reject path must not wipe residual is_eligible effect_accum reads")
 	}
 }

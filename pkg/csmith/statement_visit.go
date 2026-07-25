@@ -207,7 +207,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		preEffect = cg.EffectAccum.Clone()
+		preEffect = cg.EffectAccum.CloneSess(cgSess(cg))
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
@@ -310,7 +310,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// StatementIf.cpp:169 — effect_stm after condition
-	condEff := cg.EffectStm.Clone()
+	condEff := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return false
@@ -653,7 +653,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 	}
-	eff := cg.EffectStm.Clone()
+	eff := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-for visit past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return false
@@ -904,7 +904,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
-			effCl := cg.EffectStm.Clone()
+			effCl := cg.EffectStm.CloneSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-map effect past IncompleteEffect Clone residual
 			if sessHasError(cgSess(cg)) {
 				return false
@@ -926,7 +926,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	if sessHasError(cgSess(cg)) {
 		return false
 	}
-	preStm := cg.EffectStm.Clone()
+	preStm := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-arrayop visit past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return false

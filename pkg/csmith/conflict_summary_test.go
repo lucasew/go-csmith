@@ -75,9 +75,9 @@ func TestInConflictReadWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	// context already wrote g
-	ctx := WithEffectContext(EmptyEffect().WriteVar(g)).WithSession(testAmbientSession)
+	ctx := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, g)).WithSession(testAmbientSession)
 	// callee reads g
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	if !ctx.InConflict(eff) {
 		t.Fatal("write then read conflict")
 	}
@@ -90,7 +90,7 @@ func TestInConflictReadWrite(t *testing.T) {
 func TestInConflictNoWrite(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
-	eff := EmptyEffect().WriteVar(g)
+	eff := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	if !cg.InConflict(eff) {
 		t.Fatal("no_write conflict")
 	}
@@ -142,10 +142,10 @@ func TestInConflictIncompleteEffectFailClosed(t *testing.T) {
 func TestChooseFuncContextSkipsConflict(t *testing.T) {
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	bad := &Function{Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
-	bad.FEffect = EmptyEffect().WriteVar(g)
+	bad.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	good := &Function{Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// context already wrote g → bad conflicts
-	cg := WithEffectContext(EmptyEffect().WriteVar(g)).WithSession(testAmbientSession)
+	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, g)).WithSession(testAmbientSession)
 	got := ChooseFuncContext(NewRng(2), []*Function{bad, good}, GetIntType(), nil, &cg, Defaults(), nil)
 	if got != good {
 		t.Fatalf("got %v", got)
@@ -159,12 +159,12 @@ func TestComputeSummaryReferencedPtrs(t *testing.T) {
 		{Kind: StmtAssign, LhsVar: p, Lhs: &Lhs{Var: p, Type: p.Type},
 			Expr: &Expression{Term: TermConstant, Con: &Constant{Type: p.Type, Value: "0"}}, AssignOp: AssignSimple},
 	}}
-	bodyEff := EmptyEffect().WriteVar(p)
+	bodyEff := EmptyEffect().WriteVarSess(testAmbientSession, p)
 	f.ComputeSummary(bodyEff)
 	if len(f.ReferencedPtrs) != 1 || f.ReferencedPtrs[0] != p {
 		t.Fatal(f.ReferencedPtrs)
 	}
-	if !f.FEffect.IsWritten(p) {
+	if !f.FEffect.IsWrittenSess(testAmbientSession, p) {
 		t.Fatal("feffect")
 	}
 	if f.UnionFieldRead {

@@ -68,7 +68,7 @@ func TestSeed1048Func53NoSpuriousFactChanged(t *testing.T) {
 		t.Fatal("func_53 NeedsRevisit must be false so build_invocation uses static feffect")
 	}
 	has283 := false
-	for _, v := range f53.FEffect.ReadVars() {
+	for _, v := range f53.FEffect.ReadVarsSess(testAmbientSession) {
 		if v != nil && v.Name == "g_283" {
 			has283 = true
 		}
@@ -87,7 +87,7 @@ func TestSeed1048Func53NoSpuriousFactChanged(t *testing.T) {
 		t.Fatal("no func_14")
 	}
 	callerHas := false
-	for _, v := range f14.FEffect.ReadVars() {
+	for _, v := range f14.FEffect.ReadVarsSess(testAmbientSession) {
 		if v != nil && v.Name == "g_283" {
 			callerHas = true
 		}

@@ -42,7 +42,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	f.Body = blk
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	var st Stmt
@@ -86,7 +86,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// accum already has g as read (choose pool); EffectStm empty before make
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.EffectStm = EmptyEffect()
@@ -95,7 +95,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 		blk.Stmts[0].SourceLabel = ""
 		cg.EffectStm = EmptyEffect()
 		// reset accum to only pre-read (no invent re-seed pollution)
-		pre := EmptyEffect().ReadVar(g)
+		pre := EmptyEffect().ReadVarSess(testAmbientSession, g)
 		cg.EffectAccum = &pre
 		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, blk)
 		if !stmtOK(st) || st.Expr == nil || st.Expr.Var != g {
@@ -103,12 +103,12 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 		}
 		found = true
 		// make_random must not push cond into effect_stm (C++ leaves stm cleared at 112)
-		if cg.EffectStm.IsRead(g) {
+		if cg.EffectStm.IsReadSess(testAmbientSession, g) {
 			t.Fatal("goto make_random must not invent read_var into EffectStm")
 		}
 		// EffectAccum should still be only the pre-existing read (not re-pushed as "new")
 		// IsRead stays true; SE-free unchanged for non-vol
-		if !cg.EffectAccum.IsRead(g) {
+		if !cg.EffectAccum.IsReadSess(testAmbientSession, g) {
 			t.Fatal("pre-existing accum read must remain")
 		}
 		break
@@ -213,13 +213,13 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 		Then: body,
 	}
 	// gen-style map_stm: IV read first (make_iteration read_var) then body
-	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
-	fm.SetMapStmEffect(body.StmID, EmptyEffect().ReadVar(bodyRead))
+	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVarSess(testAmbientSession, pollute).ReadVarSess(testAmbientSession, bodyRead))
+	fm.SetMapStmEffect(body.StmID, EmptyEffect().ReadVarSess(testAmbientSession, bodyRead))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	acc := EmptyEffect()
 	cg.EffectAccum = &acc
 	// pollution as after add_effect(map_accum[other]) on the forward path
-	cg.EffectStm = EmptyEffect().ReadVar(pollute)
+	cg.EffectStm = EmptyEffect().ReadVarSess(testAmbientSession, pollute)
 	facts := []*FactPointTo{}
 	if !StmVisitFacts(forSt, &facts, &cg, opts) {
 		t.Fatalf("StmVisitFacts for: err=%v", HasErrorSess(testAmbientSession))
@@ -228,8 +228,8 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	if !EffectComplete(got) {
 		t.Fatal("incomplete map_stm after StmVisitFacts")
 	}
-	reads := got.ReadVars()
-	if len(reads) == 0 || !got.IsRead(bodyRead) {
+	reads := got.ReadVarsSess(testAmbientSession)
+	if len(reads) == 0 || !got.IsReadSess(testAmbientSession, bodyRead) {
 		t.Fatalf("want body read g_16 in map_stm, got %v", mapAccumNamesOf(reads))
 	}
 	// clean visit: init is simple const assign (no IV read); body reads g_16 first
@@ -238,16 +238,16 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	}
 	// negative: VisitFactsStmt without clear keeps pollution in the pre-init snapshot
 	ClearErrorSess(testAmbientSession)
-	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVar(pollute).ReadVar(bodyRead))
+	fm.SetMapStmEffect(forSt.StmID, EmptyEffect().ReadVarSess(testAmbientSession, pollute).ReadVarSess(testAmbientSession, bodyRead))
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	acc2 := EmptyEffect()
 	cg2.EffectAccum = &acc2
-	cg2.EffectStm = EmptyEffect().ReadVar(pollute)
+	cg2.EffectStm = EmptyEffect().ReadVarSess(testAmbientSession, pollute)
 	if !VisitFactsStmt(forSt, &cg2, opts) {
 		t.Fatalf("VisitFactsStmt for: err=%v", HasErrorSess(testAmbientSession))
 	}
 	polluted := fm.GetMapStmEffect(forSt.StmID)
-	if !polluted.IsRead(pollute) {
+	if !polluted.IsReadSess(testAmbientSession, pollute) {
 		t.Fatal("precondition: VisitFactsStmt without clear should keep EffectStm pollution in map_stm")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -505,7 +505,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	// visible read var on accum for cond selection (back) / src accum (forward)
 	g := CreateVariableScalars("g_c", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, g)
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	// mark both stmts' accum as having read g so forward cond can choose
@@ -598,7 +598,7 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalars("g_c", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, g)
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	for i := range blk.Stmts {
 		id := blk.Stmts[i].StmID
 		fm.SetMapFactsIn(id, nil)
@@ -700,11 +700,11 @@ func TestSeed2GensymNamesMatchUpstreamAfterGotoFix(t *testing.T) {
 func TestResetEffectAccum(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
-	pre := EmptyEffect().ReadVar(v)
+	pre := EmptyEffect().ReadVarSess(testAmbientSession, v)
 	cg.EffectAccum = &Effect{}
-	*cg.EffectAccum = EmptyEffect().WriteVar(v)
+	*cg.EffectAccum = EmptyEffect().WriteVarSess(testAmbientSession, v)
 	cg.ResetEffectAccum(pre)
-	if !cg.EffectAccum.IsRead(v) || cg.EffectAccum.IsWritten(v) {
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, v) || cg.EffectAccum.IsWrittenSess(testAmbientSession, v) {
 		t.Fatalf("%+v", cg.EffectAccum)
 	}
 }
@@ -1045,7 +1045,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	fn.Body = curr
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.UnionFacts = liveUF // live would block f0
-	eff := EmptyEffect().ReadVar(f0)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, f0)
 	for i := range src.Stmts {
 		id := src.Stmts[i].StmID
 		fm.SetMapFactsIn(id, nil)

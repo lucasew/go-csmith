@@ -47,10 +47,10 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 func TestMergeEffectsMergesReads(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	e1 := EmptyEffect().ReadVar(a)
-	e2 := EmptyEffect().ReadVar(b)
-	m := MergeEffects(e1, e2)
-	if !m.IsRead(a) || !m.IsRead(b) {
+	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
+	e2 := EmptyEffect().ReadVarSess(testAmbientSession, b)
+	m := MergeEffectsSess(testAmbientSession, e1, e2)
+	if !m.IsReadSess(testAmbientSession, a) || !m.IsReadSess(testAmbientSession, b) {
 		t.Fatal("reads")
 	}
 }

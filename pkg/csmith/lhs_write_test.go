@@ -7,14 +7,14 @@ import (
 func TestLhsWriteVarsFromWritten(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	e := EmptyEffect().WriteVar(v)
-	e = e.SetLhsWriteVarsFromWritten()
-	got := e.LhsWriteVars()
+	e := EmptyEffect().WriteVarSess(testAmbientSession, v)
+	e = e.SetLhsWriteVarsFromWrittenSess(testAmbientSession)
+	got := e.LhsWriteVarsSess(testAmbientSession)
 	if len(got) != 1 || got[0] != v {
 		t.Fatal(got)
 	}
 	// IncompleteEffect must not invent empty-complete lhs set sticky
-	if VariablesComplete(IncompleteEffect().LhsWriteVars()) {
+	if VariablesComplete(IncompleteEffect().LhsWriteVarsSess(testAmbientSession)) {
 		t.Fatal("IncompleteEffect LhsWriteVars must IncompleteVariables")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -23,17 +23,17 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	hole := EmptyEffect()
 	hole.lhsWrite = map[*Variable]bool{nil: true}
-	if VariablesComplete(hole.LhsWriteVars()) {
+	if VariablesComplete(hole.LhsWriteVarsSess(testAmbientSession)) {
 		t.Fatal("nil lhsWrite key must IncompleteVariables")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhsWrite key must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !IncompleteEffect().HasGlobalEffect() {
+	if !IncompleteEffect().HasGlobalEffectSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect must fail closed HasGlobalEffect true")
 	}
-	if !IncompleteEffect().UnionFieldIsRead() {
+	if !IncompleteEffect().UnionFieldIsReadSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect must fail closed UnionFieldIsRead true")
 	}
 }
@@ -42,54 +42,54 @@ func TestWriteVarSet(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	e := EmptyEffect().WriteVarSet([]*Variable{a, b})
-	if !e.IsWritten(a) || !e.IsWritten(b) {
+	e := EmptyEffect().WriteVarSetSess(testAmbientSession, []*Variable{a, b})
+	if !e.IsWrittenSess(testAmbientSession, a) || !e.IsWrittenSess(testAmbientSession, b) {
 		t.Fatal("writes")
 	}
 }
 
 func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	other := EmptyEffect().WriteVar(v).SetLhsWriteVarsFromWritten()
+	other := EmptyEffect().WriteVarSess(testAmbientSession, v).SetLhsWriteVarsFromWrittenSess(testAmbientSession)
 	base := EmptyEffect()
-	merged := base.AddEffectOpts(other, true)
-	if len(merged.LhsWriteVars()) != 1 {
+	merged := base.AddEffectOptsSess(testAmbientSession, other, true)
+	if len(merged.LhsWriteVarsSess(testAmbientSession)) != 1 {
 		t.Fatal("lhs not merged")
 	}
-	merged2 := base.AddEffectOpts(other, false)
-	if len(merged2.LhsWriteVars()) != 0 {
+	merged2 := base.AddEffectOptsSess(testAmbientSession, other, false)
+	if len(merged2.LhsWriteVarsSess(testAmbientSession)) != 0 {
 		t.Fatal("lhs should skip")
 	}
 	// nil map key fails closed IncompleteEffect (not invent leave-base complete)
 	hole := EmptyEffect()
 	hole.written = map[*Variable]bool{nil: true}
-	got := base.ReadVar(v).AddEffectOpts(hole, false)
+	got := base.ReadVarSess(testAmbientSession, v).AddEffectOptsSess(testAmbientSession, hole, false)
 	if EffectComplete(got) {
 		t.Fatal("nil effect key merge must fail closed incomplete", got)
 	}
-	if got.IsPure() || got.IsSideEffectFree() || got.IsEmpty() {
+	if got.IsPureSess(testAmbientSession) || got.IsSideEffectFreeSess(testAmbientSession) || got.IsEmptySess(testAmbientSession) {
 		t.Fatal("IncompleteEffect must not invent pure/SE-free/empty", got)
 	}
 	// HasRaceWith / HasGlobalEffect nil keys fail closed as conflict/global
-	if !EmptyEffect().HasRaceWith(hole) {
+	if !EmptyEffect().HasRaceWithSess(testAmbientSession, hole) {
 		t.Fatal("nil write key must fail closed as race")
 	}
-	if !hole.HasGlobalEffect() {
+	if !hole.HasGlobalEffectSess(testAmbientSession) {
 		t.Fatal("nil write key must fail closed as global effect")
 	}
 	hole.read = map[*Variable]bool{nil: true}
-	if !hole.UnionFieldIsRead() {
+	if !hole.UnionFieldIsReadSess(testAmbientSession) {
 		t.Fatal("nil read key must fail closed as union field read")
 	}
 	ClearErrorSess(testAmbientSession)
-	if hole.CommentOutput() != "" {
+	if hole.CommentOutputSess(testAmbientSession) != "" {
 		t.Fatal("nil key CommentOutput must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil key CommentOutput must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if EffectComplete(EmptyEffect().WriteVarSet([]*Variable{v, nil})) {
+	if EffectComplete(EmptyEffect().WriteVarSetSess(testAmbientSession, []*Variable{v, nil})) {
 		t.Fatal("WriteVarSet nil hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -99,7 +99,7 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	c := EmptyEffect()
 	c.read = map[*Variable]bool{nil: true}
-	c.Consolidate()
+	c.ConsolidateSess(testAmbientSession)
 	if EffectComplete(c) {
 		t.Fatal("Consolidate incomplete must yield IncompleteEffect")
 	}
@@ -119,8 +119,8 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 	if !cg.VisitFactsLhs(lhs, Defaults()) {
 		t.Fatal("visit")
 	}
-	if len(cg.EffectAccum.LhsWriteVars()) != 1 {
-		t.Fatal("lhs write not set", cg.EffectAccum.LhsWriteVars())
+	if len(cg.EffectAccum.LhsWriteVarsSess(testAmbientSession)) != 1 {
+		t.Fatal("lhs write not set", cg.EffectAccum.LhsWriteVarsSess(testAmbientSession))
 	}
 }
 

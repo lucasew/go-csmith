@@ -200,7 +200,7 @@ func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
 	// mark partially written → filtered → CreateRandomArray may still run
-	eff := EmptyEffect().WriteVar(&av.Variable)
+	eff := EmptyEffect().WriteVarSess(testAmbientSession, &av.Variable)
 	cg := WithEffectContext(eff).WithSession(testAmbientSession)
 	// disable global create by turning off globals? CreateRandomArray uses globals
 	// ensure filter drops av: if CreateRandomArray returns different name ok

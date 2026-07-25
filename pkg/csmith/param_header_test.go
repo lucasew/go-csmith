@@ -17,7 +17,7 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 		StructName: "S0",
 		Fields:     []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}},
 	}
-	vs.Types = &TypeEnv{Sess: testAmbientSession, 
+	vs.Types = &TypeEnv{Sess: testAmbientSession,
 		AllTypes:    []*Type{st, GetIntType()},
 		StructTypes: []*Type{st},
 	}

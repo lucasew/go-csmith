@@ -592,7 +592,7 @@ func MakeRandomLhs(
 	// (shallow *EffectAccum shares maps and can corrupt the snapshot if later mutated).
 	var accumSave *Effect
 	if cg.EffectAccum != nil {
-		cp := cg.EffectAccum.Clone()
+		cp := cg.EffectAccum.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-LHS past Effect Clone residual
 		if sessHasError(cgSess(cg)) {
 			return nil
@@ -603,7 +603,7 @@ func MakeRandomLhs(
 		}
 		accumSave = &cp
 	}
-	stmSave := cg.EffectStm.Clone()
+	stmSave := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-LHS past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return nil
@@ -612,9 +612,9 @@ func MakeRandomLhs(
 	restore := func() {
 		// Lhs.cpp:135–139 — reset_effect_accum + reset_effect_stm
 		if accumSave != nil && cg.EffectAccum != nil {
-			*cg.EffectAccum = accumSave.Clone()
+			*cg.EffectAccum = accumSave.CloneSess(cgSess(cg))
 		}
-		cg.EffectStm = stmSave.Clone()
+		cg.EffectStm = stmSave.CloneSess(cgSess(cg))
 	}
 
 	// Lhs.cpp:70–140 — do { DEPTH_GUARD; select; filters; visit } while (true).

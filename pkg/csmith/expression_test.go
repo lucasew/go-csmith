@@ -617,7 +617,7 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 	if ev == nil || ev.Var == nil {
 		t.Skip("no expression variable")
 	}
-	if cg.EffectAccum != nil && !cg.EffectAccum.IsRead(ev.Var) && !cg.EffectStm.IsRead(ev.Var) {
+	if cg.EffectAccum != nil && !cg.EffectAccum.IsReadSess(testAmbientSession, ev.Var) && !cg.EffectStm.IsReadSess(testAmbientSession, ev.Var) {
 		t.Fatalf("expected read effect on var %s after visit_facts", ev.Var.Name)
 	}
 }

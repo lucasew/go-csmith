@@ -121,7 +121,7 @@ func ChooseVisibleReadVarOpts(
 	return ChooseVisibleReadVarOptsSess(testAmbientSession, r, b, readVars, typ, unionFacts, opts)
 }
 
-func ChooseVisibleReadVarOptsSess(s *Session, 
+func ChooseVisibleReadVarOptsSess(s *Session,
 	r *Rng,
 	b *Block,
 	readVars []*Variable,

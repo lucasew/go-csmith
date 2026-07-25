@@ -12,7 +12,7 @@ func TestCheckReadVarBasic(t *testing.T) {
 	if !cg.CheckReadVar(v, nil) {
 		t.Fatal("read ok")
 	}
-	if !eff.IsRead(v) {
+	if !eff.IsReadSess(testAmbientSession, v) {
 		t.Fatal("not recorded")
 	}
 }
@@ -112,7 +112,7 @@ func TestCheckReadVarVolatileNeedsSEFree(t *testing.T) {
 
 func TestCheckWriteVarPartialConflict(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	eff := EmptyEffect().WriteVar(v)
+	eff := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	cg := WithEffectContext(eff).WithSession(testAmbientSession)
 	if cg.CheckWriteVar(v, nil) {
 		t.Fatal("partial write conflict")
@@ -154,7 +154,7 @@ func TestVisitFactsLhsScalar(t *testing.T) {
 	if !cg.VisitFactsLhs(lhs, Defaults()) {
 		t.Fatal("visit")
 	}
-	if !eff.IsWritten(v) {
+	if !eff.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("write")
 	}
 }
@@ -285,18 +285,18 @@ func TestAccessDerefVolatile(t *testing.T) {
 		t.Fatal("qfer layout")
 	}
 	e := EmptyEffect()
-	e2 := e.AccessDerefVolatile(v, 1, true)
-	if e2.IsSideEffectFree() {
+	e2 := e.AccessDerefVolatileSess(testAmbientSession, v, 1, true)
+	if e2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("should clear SE-free")
 	}
 	// non-strict leaves SE-free
-	e3 := e.AccessDerefVolatile(v, 1, false)
-	if !e3.IsSideEffectFree() {
+	e3 := e.AccessDerefVolatileSess(testAmbientSession, v, 1, false)
+	if !e3.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-strict")
 	}
 	// under strictVolatile, Variable always live; sticky IncompleteEffect
 	ClearErrorSess(testAmbientSession)
-	if EffectComplete(e.AccessDerefVolatile(nil, 1, true)) {
+	if EffectComplete(e.AccessDerefVolatileSess(testAmbientSession, nil, 1, true)) {
 		t.Fatal("nil Variable strict AccessDerefVolatile must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -304,7 +304,7 @@ func TestAccessDerefVolatile(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-strict nil subject complete identity
-	if !EffectComplete(e.AccessDerefVolatile(nil, 1, false)) {
+	if !EffectComplete(e.AccessDerefVolatileSess(testAmbientSession, nil, 1, false)) {
 		t.Fatal("non-strict nil subject must stay complete identity")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -476,7 +476,7 @@ func TestReadIndicesVarRecordsRead(t *testing.T) {
 	if !cg.ReadIndices(&item.Variable, nil) {
 		t.Fatal("var index")
 	}
-	if !eff.IsRead(iv) {
+	if !eff.IsReadSess(testAmbientSession, iv) {
 		t.Fatal("IV should be read via index")
 	}
 }
@@ -541,7 +541,7 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 		t.Fatal("visit indices")
 	}
 	// IV written in ambient context → VisitFacts on index should fail CheckReadVar
-	cg2 := WithEffectContext(EmptyEffect().WriteVar(iv)).WithSession(testAmbientSession)
+	cg2 := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, iv)).WithSession(testAmbientSession)
 	if lhs.VisitIndices(&cg2, Defaults()) {
 		// may still pass if VisitFactsExpressionVariable is lenient — require failure when written partially
 		// CheckReadVar rejects IsWrittenPartially
@@ -595,14 +595,14 @@ func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
 	// incomplete call_chain must not invent partial external merge
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	e := EmptyEffect().WriteVar(g)
+	e := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.CallChain = []*Block{nil}
 	cg.AddVisibleEffectAt(e, &Block{StmID: 1})
 	// fail closed: accum unchanged + sticky error (no invent merge past hole)
-	if eff.IsWritten(g) {
+	if eff.IsWrittenSess(testAmbientSession, g) {
 		t.Fatal("nil CallChain hole must not invent external write merge")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -716,7 +716,7 @@ func TestAddEffectIncompleteFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectStm = IncompleteEffect()
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
-	cg.AddEffect(EmptyEffect().WriteVar(v), false)
+	cg.AddEffect(EmptyEffect().WriteVarSess(testAmbientSession, v), false)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddEffect incomplete stm must SetError")
 	}

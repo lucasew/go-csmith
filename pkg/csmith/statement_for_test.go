@@ -171,7 +171,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// Plant a read on the parent accum before for-body generation.
 	pre := CreateVariableScalars("pre_rd", GetIntType(), true, false)
-	accum := EmptyEffect().ReadVar(pre)
+	accum := EmptyEffect().ReadVarSess(testAmbientSession, pre)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &accum
 	// WithLoopBody / C++ loop-body ctor share EffectAccum pointer.
@@ -192,7 +192,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 		t.Fatal("parent EffectAccum must remain non-nil")
 	}
 	// Planted pre-read must survive (shared path never drops parent reads for a body copy)
-	if !cg.EffectAccum.IsRead(pre) {
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, pre) {
 		t.Fatal("parent EffectAccum must keep pre-for reads when body shares accum (C++ shared pointer)")
 	}
 	ClearErrorSess(testAmbientSession)

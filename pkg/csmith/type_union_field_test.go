@@ -48,7 +48,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 			t.Fatal("ptr type")
 		}
 	}
-	env := &TypeEnv{Sess: testAmbientSession, 
+	env := &TypeEnv{Sess: testAmbientSession,
 		StructTypes: []*Type{withPtr},
 		AllTypes:    []*Type{GetIntType(), withPtr},
 	}
@@ -132,7 +132,7 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 	plain := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	env := &TypeEnv{Sess: testAmbientSession, 
+	env := &TypeEnv{Sess: testAmbientSession,
 		StructTypes: []*Type{plain},
 		AllTypes:    []*Type{GetIntType(), plain},
 	}
@@ -161,9 +161,9 @@ func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	other := EmptyEffect().WriteVar(loc)
+	other := EmptyEffect().WriteVarSess(testAmbientSession, loc)
 	cg.AddVisibleEffectAt(other, blk)
-	if !cg.EffectAccum.IsWritten(loc) {
+	if !cg.EffectAccum.IsWrittenSess(testAmbientSession, loc) {
 		t.Fatal("frame write via callers")
 	}
 }

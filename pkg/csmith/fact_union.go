@@ -831,7 +831,7 @@ func RhsToLhsTransferUnion(
 	return RhsToLhsTransferUnionSess(testAmbientSession, unionFacts, ptFacts, lvars, rhs)
 }
 
-func RhsToLhsTransferUnionSess(s *Session, 
+func RhsToLhsTransferUnionSess(s *Session,
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
 	lvars []*Variable,
@@ -996,7 +996,7 @@ func AbstractFactUnionForAssign(
 	return AbstractFactUnionForAssignSess(testAmbientSession, unionFacts, ptFacts, lhs, lhsIndir, lhsWant, rhs)
 }
 
-func AbstractFactUnionForAssignSess(s *Session, 
+func AbstractFactUnionForAssignSess(s *Session,
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
 	lhs *Variable,

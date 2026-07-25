@@ -648,7 +648,7 @@ func MakeRandomBlock(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
-		preEffect = cg.EffectAccum.Clone()
+		preEffect = cg.EffectAccum.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-block past Effect Clone residual
 		if sessHasError(cgSess(cg)) {
 			abortBlockMakeSess(cgSess(cg), f, b)
@@ -1059,7 +1059,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				}
 				// reset accum to pre-block effect
 				if cg.EffectAccum != nil {
-					*cg.EffectAccum = preEffect.Clone()
+					*cg.EffectAccum = preEffect.CloneSess(cgSess(cg))
 					// residual ERROR sticky — no invent soft-reset past Effect Clone residual
 					if sessHasError(cgSess(cg)) {
 						fm.GlobalFacts = IncompleteFactSlice()
@@ -1543,7 +1543,7 @@ func makeRandomStmtForced(
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return Stmt{}
 			}
-			preEffect = cg.EffectAccum.Clone()
+			preEffect = cg.EffectAccum.CloneSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-stmt past Effect Clone residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}

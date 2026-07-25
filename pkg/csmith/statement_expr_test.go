@@ -83,12 +83,12 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	eff := EmptyEffect().WriteVar(p)
+	eff := EmptyEffect().WriteVarSess(testAmbientSession, p)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	cg.Funcs = list
 	// snapshot
-	preEff := eff.Clone()
+	preEff := eff.CloneSess(testAmbientSession)
 	preFacts := CloneFactSlice(fm.GlobalFacts)
 	// invoke may fail or succeed; if fail, empty Stmt + state restored
 	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg)
@@ -97,7 +97,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 		if st.Kind != 0 {
 			t.Fatalf("fail invents Kind shell %#v", st)
 		}
-		if !cg.EffectAccum.IsWritten(p) {
+		if !cg.EffectAccum.IsWrittenSess(testAmbientSession, p) {
 			t.Fatal("effect should still have pre write after restore or no change")
 		}
 		// facts restored (may equal pre)

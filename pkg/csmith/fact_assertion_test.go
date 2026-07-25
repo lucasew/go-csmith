@@ -161,7 +161,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
 	// function reads/writes p so fact is printed
-	f.FEffect = EmptyEffect().ReadVar(p).WriteVar(p)
+	f.FEffect = EmptyEffect().ReadVarSess(testAmbientSession, p).WriteVarSess(testAmbientSession, p)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(5, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(5, []*FactPointTo{MakeFactPointTo(p, tgt)})
@@ -221,7 +221,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	// Fair: sticky fail closed whole OutputAssertions.
 	shell := &Variable{Name: "g_arr", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
 	f3 := &Function{Name: "func_3", ReturnType: GetIntType()}
-	f3.FEffect = EmptyEffect().ReadVar(shell).WriteVar(shell).ReadVar(p).WriteVar(p)
+	f3.FEffect = EmptyEffect().ReadVarSess(testAmbientSession, shell).WriteVarSess(testAmbientSession, shell).ReadVarSess(testAmbientSession, p).WriteVarSess(testAmbientSession, p)
 	fm3 := NewFactMgrSess(testAmbientSession, f3)
 	// postCondition uses updated facts — in≠out so both appear; shell subject stickies emit
 	fm3.SetMapFactsIn(8, []*FactPointTo{MakeFactPointTo(shell, NullPtr), MakeFactPointTo(p, NullPtr)})
@@ -241,7 +241,7 @@ func TestPostOutputInBlock(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	tgt := CreateVariableScalars("g_2", GetIntType(), true, false)
-	f.FEffect = EmptyEffect().WriteVar(p).ReadVar(p)
+	f.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, p).ReadVarSess(testAmbientSession, p)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.SetMapFactsIn(7, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(7, []*FactPointTo{MakeFactPointTo(p, tgt)})

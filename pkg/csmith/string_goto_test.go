@@ -291,10 +291,10 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	fm.GlobalFacts = []*FactPointTo{}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	// force map accum effect for forward path cond
-	fm.MapAccumEffect = map[int]Effect{10: EmptyEffect().ReadVar(g)}
+	fm.MapAccumEffect = map[int]Effect{10: EmptyEffect().ReadVarSess(testAmbientSession, g)}
 	// plant globals for ChooseVisibleReadVar
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{g}

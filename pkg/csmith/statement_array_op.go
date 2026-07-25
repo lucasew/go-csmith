@@ -628,7 +628,7 @@ func MakeRandomArrayInit(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return Stmt{}
 		}
-		eff := cg.EffectStm.Clone()
+		eff := cg.EffectStm.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-map effect past IncompleteEffect Clone residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}

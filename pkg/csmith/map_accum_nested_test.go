@@ -24,14 +24,14 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 
 	fm.MapFactsIn = map[int][]*FactPointTo{st.StmID: {}}
 	fm.MapFactsOut = map[int][]*FactPointTo{st.StmID: {}}
-	fm.MapStmEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVar(g1).WriteVar(g1)}
-	fm.MapAccumEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVar(g1)} // sparse gen-time
+	fm.MapStmEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVarSess(testAmbientSession, g1).WriteVarSess(testAmbientSession, g1)}
+	fm.MapAccumEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVarSess(testAmbientSession, g1)} // sparse gen-time
 	fm.MapVisited = map[int]bool{st.StmID: true}
 	fm.MapUnionFactsIn = map[int][]*FactUnion{st.StmID: {}}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{st.StmID: {}}
 	fm.GlobalFacts = []*FactPointTo{}
 
-	live := EmptyEffect().ReadVar(g1).ReadVar(g2).ReadVar(g3)
+	live := EmptyEffect().ReadVarSess(testAmbientSession, g1).ReadVarSess(testAmbientSession, g2).ReadVarSess(testAmbientSession, g3)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &live
 	cg.EffectStm = EmptyEffect()
@@ -42,13 +42,13 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 		t.Fatalf("want ShortcutOK got %d err=%v", sc, HasErrorSess(testAmbientSession))
 	}
 	got := fm.GetMapAccumEffect(st.StmID)
-	names := mapAccumNamesOf(got.ReadVars())
-	if len(got.ReadVars()) < 3 {
+	names := mapAccumNamesOf(got.ReadVarsSess(testAmbientSession))
+	if len(got.ReadVarsSess(testAmbientSession)) < 3 {
 		t.Fatalf("shortcut must snapshot live accum reads, got %v", names)
 	}
 	// Must include g2/g3 from live before shortcut, not only gen-time g1
 	has := map[string]bool{}
-	for _, v := range got.ReadVars() {
+	for _, v := range got.ReadVarsSess(testAmbientSession) {
 		if v != nil {
 			has[v.Name] = true
 		}
@@ -71,12 +71,12 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 
 	// Assign with nil Lhs will fail visit — still must record map_accum
 	st := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
-	fm.MapAccumEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVar(g1)}
+	fm.MapAccumEffect = map[int]Effect{st.StmID: EmptyEffect().ReadVarSess(testAmbientSession, g1)}
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.MapUnionFactsIn = map[int][]*FactUnion{}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{}
 
-	live := EmptyEffect().ReadVar(g1).ReadVar(g2)
+	live := EmptyEffect().ReadVarSess(testAmbientSession, g1).ReadVarSess(testAmbientSession, g2)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &live
 	cg.EffectStm = EmptyEffect()
@@ -88,9 +88,9 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	}
 	// even on fail, map_accum should be live snapshot
 	got := fm.GetMapAccumEffect(st.StmID)
-	if len(got.ReadVars()) < 2 {
+	if len(got.ReadVarsSess(testAmbientSession)) < 2 {
 		t.Fatalf("StmVisitFacts must record live accum on fail: %v err=%v",
-			mapAccumNamesOf(got.ReadVars()), HasErrorSess(testAmbientSession))
+			mapAccumNamesOf(got.ReadVarsSess(testAmbientSession)), HasErrorSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -99,11 +99,11 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
-	live2 := EmptyEffect().ReadVar(g1)
-	stored := live2.Clone()
-	live2 = live2.ReadVar(g2)
-	if len(stored.ReadVars()) != 1 {
-		t.Fatalf("Clone store must stay frozen: %v", mapAccumNamesOf(stored.ReadVars()))
+	live2 := EmptyEffect().ReadVarSess(testAmbientSession, g1)
+	stored := live2.CloneSess(testAmbientSession)
+	live2 = live2.ReadVarSess(testAmbientSession, g2)
+	if len(stored.ReadVarsSess(testAmbientSession)) != 1 {
+		t.Fatalf("Clone store must stay frozen: %v", mapAccumNamesOf(stored.ReadVarsSess(testAmbientSession)))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -120,32 +120,32 @@ func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
 	g3 := CreateVariableScalars("g_3", GetIntType(), false, false)
 
-	live := EmptyEffect().WriteVar(g1).WriteVar(g2)
+	live := EmptyEffect().WriteVarSess(testAmbientSession, g1).WriteVarSess(testAmbientSession, g2)
 	id := AllocStmID()
 	fm.SetMapStmEffect(id, live)
 	// grow live after store — must not appear in map snapshot
-	live = live.WriteVar(g3)
+	live = live.WriteVarSess(testAmbientSession, g3)
 	got := fm.GetMapStmEffect(id)
-	if !got.IsWritten(g1) || !got.IsWritten(g2) {
+	if !got.IsWrittenSess(testAmbientSession, g1) || !got.IsWrittenSess(testAmbientSession, g2) {
 		t.Fatalf("stored map_stm_effect missing g1/g2")
 	}
-	if got.IsWritten(g3) {
+	if got.IsWrittenSess(testAmbientSession, g3) {
 		t.Fatalf("map_stm_effect must not see post-store WriteVar on live Effect: %v",
-			mapAccumNamesOf(got.WrittenVars()))
+			mapAccumNamesOf(got.WrittenVarsSess(testAmbientSession)))
 	}
 	// Get returns detached: mutating returned Effect must not change map
-	got2 := got.WriteVar(g3)
+	got2 := got.WriteVarSess(testAmbientSession, g3)
 	_ = got2
 	again := fm.GetMapStmEffect(id)
-	if again.IsWritten(g3) {
+	if again.IsWrittenSess(testAmbientSession, g3) {
 		t.Fatal("GetMapStmEffect must return detached copy (map not mutated by caller WriteVar)")
 	}
 	// Block accum merge must not leave shared maps between statements
 	id2 := AllocStmID()
-	fm.SetMapStmEffect(id2, EmptyEffect().WriteVar(g3))
-	merged := fm.GetMapStmEffect(id).AddEffect(fm.GetMapStmEffect(id2))
-	fm.SetMapStmEffect(id, EmptyEffect().WriteVar(g1)) // replace id entry
-	if !merged.IsWritten(g2) {
+	fm.SetMapStmEffect(id2, EmptyEffect().WriteVarSess(testAmbientSession, g3))
+	merged := fm.GetMapStmEffect(id).AddEffectSess(testAmbientSession, fm.GetMapStmEffect(id2))
+	fm.SetMapStmEffect(id, EmptyEffect().WriteVarSess(testAmbientSession, g1)) // replace id entry
+	if !merged.IsWrittenSess(testAmbientSession, g2) {
 		t.Fatal("merged snapshot must keep g2 after map entry replaced")
 	}
 	ClearErrorSess(testAmbientSession)

@@ -37,11 +37,11 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	}
 	// Manually plant map_stm and pre-seed map_accum as if a polluted second
 	// pass already ran: early's map_accum incorrectly lists late.
-	polluted := EmptyEffect().ReadVar(early).ReadVar(late).WriteVar(early)
-	fm.SetMapStmEffect(s0.StmID, EmptyEffect().WriteVar(early))
-	fm.SetMapStmEffect(s1.StmID, EmptyEffect().WriteVar(late))
+	polluted := EmptyEffect().ReadVarSess(testAmbientSession, early).ReadVarSess(testAmbientSession, late).WriteVarSess(testAmbientSession, early)
+	fm.SetMapStmEffect(s0.StmID, EmptyEffect().WriteVarSess(testAmbientSession, early))
+	fm.SetMapStmEffect(s1.StmID, EmptyEffect().WriteVarSess(testAmbientSession, late))
 	fm.SetMapAccumEffect(s0.StmID, polluted)
-	fm.SetMapAccumEffect(s1.StmID, EmptyEffect().ReadVar(late).WriteVar(late))
+	fm.SetMapAccumEffect(s1.StmID, EmptyEffect().ReadVarSess(testAmbientSession, late).WriteVarSess(testAmbientSession, late))
 
 	b := &Block{
 		Func: f, StmID: AllocStmID(), Looping: true,
@@ -56,9 +56,9 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	// Entry accum: only early (block pre_effect).
-	pre := EmptyEffect().ReadVar(early)
+	pre := EmptyEffect().ReadVarSess(testAmbientSession, early)
 	// Simulate dirty live accum from a prior full body walk.
-	dirty := EmptyEffect().ReadVar(early).ReadVar(late)
+	dirty := EmptyEffect().ReadVarSess(testAmbientSession, early).ReadVarSess(testAmbientSession, late)
 	d := dirty
 	cg.EffectAccum = &d
 	fm.GlobalFacts = []*FactPointTo{}
@@ -67,8 +67,8 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	// FindFixedPointBlock snapshots entryAccum from live (=dirty) at call time.
 	// PostCreation always reset_effect_accum(pre) first — mirror that.
 	cg.ResetEffectAccum(pre)
-	if !EffectComplete(*cg.EffectAccum) || cg.EffectAccum.IsRead(late) {
-		t.Fatalf("precondition: live accum must be pre-only; late=%v", cg.EffectAccum.IsRead(late))
+	if !EffectComplete(*cg.EffectAccum) || cg.EffectAccum.IsReadSess(testAmbientSession, late) {
+		t.Fatalf("precondition: live accum must be pre-only; late=%v", cg.EffectAccum.IsReadSess(testAmbientSession, late))
 	}
 
 	_, _, _, ok := FindFixedPointBlock(b, CloneFactSlice(entry), &cg, Defaults(), true)
@@ -79,7 +79,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	if !EffectComplete(acc0) {
 		// Minimal assign visit may fail closed incomplete — still ensure we did
 		// not keep the intentionally polluted late-read snapshot.
-		if EffectComplete(polluted) && fm.MapAccumEffect[s0.StmID].IsRead(late) {
+		if EffectComplete(polluted) && fm.MapAccumEffect[s0.StmID].IsReadSess(testAmbientSession, late) {
 			// If store was incomplete marker, fine; if complete and still has late, fail.
 			if EffectComplete(fm.MapAccumEffect[s0.StmID]) {
 				t.Fatal("polluted map_accum with g_late must not survive progressive rebuild")
@@ -87,7 +87,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 		}
 		return
 	}
-	if acc0.IsRead(late) {
+	if acc0.IsReadSess(testAmbientSession, late) {
 		t.Fatalf("s0 map_accum must not list g_late after progressive walk; reads=%v",
 			readNames(acc0))
 	}
@@ -95,7 +95,7 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 
 func readNames(e Effect) []string {
 	var out []string
-	for _, v := range e.ReadVars() {
+	for _, v := range e.ReadVarsSess(testAmbientSession) {
 		if v != nil {
 			out = append(out, v.Name)
 		}

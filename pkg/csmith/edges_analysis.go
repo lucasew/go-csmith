@@ -531,7 +531,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			fm.UnionFacts = preUnionWork
 			// Statement.cpp:1007 — reset_effect_accum(pre_effect)
 			if cg.EffectAccum != nil {
-				*cg.EffectAccum = preEffect.Clone()
+				*cg.EffectAccum = preEffect.CloneSess(cgSess(cg))
 				if sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()

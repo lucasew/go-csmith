@@ -361,9 +361,9 @@ func TestShortcutConflict(t *testing.T) {
 	fm.SetMapFactsIn(3, facts)
 	fm.SetMapFactsOut(3, facts)
 	// previous effect wrote g_x
-	fm.SetMapStmEffect(3, EmptyEffect().WriteVar(g))
+	fm.SetMapStmEffect(3, EmptyEffect().WriteVarSess(testAmbientSession, g))
 	// ambient context also wrote g_x → InConflict
-	cg := WithEffectContext(EmptyEffect().WriteVar(g)).WithSession(testAmbientSession)
+	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, g)).WithSession(testAmbientSession)
 	cg.FM = fm
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -469,8 +469,8 @@ func TestCGContextAddEffect(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	cg.AddEffect(EmptyEffect().WriteVar(v), false)
-	if !cg.AccumEffect().IsWritten(v) || !cg.EffectStm.IsWritten(v) {
+	cg.AddEffect(EmptyEffect().WriteVarSess(testAmbientSession, v), false)
+	if !cg.AccumEffect().IsWrittenSess(testAmbientSession, v) || !cg.EffectStm.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("add")
 	}
 }

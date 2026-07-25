@@ -1058,7 +1058,7 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
 		// pre-validated EffectComplete(*EffectAccum)
-		preEffect = cg.EffectAccum.Clone()
+		preEffect = cg.EffectAccum.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-snapshot past IncompleteEffect Clone residual
 		if sessHasError(cgSess(cg)) {
 			popStack()

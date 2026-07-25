@@ -5,12 +5,12 @@ import "testing"
 func TestAddExternalEffectGlobalsOnly(t *testing.T) {
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	l := CreateVariableScalars("l_1", GetIntType(), false, false)
-	e := EmptyEffect().WriteVar(g).WriteVar(l).ReadVar(g)
-	ext := EmptyEffect().AddExternalEffect(e)
-	if !ext.IsWritten(g) || ext.IsWritten(l) {
+	e := EmptyEffect().WriteVarSess(testAmbientSession, g).WriteVarSess(testAmbientSession, l).ReadVarSess(testAmbientSession, g)
+	ext := EmptyEffect().AddExternalEffectSess(testAmbientSession, e)
+	if !ext.IsWrittenSess(testAmbientSession, g) || ext.IsWrittenSess(testAmbientSession, l) {
 		t.Fatal("globals only")
 	}
-	if !ext.IsRead(g) {
+	if !ext.IsReadSess(testAmbientSession, g) {
 		t.Fatal("read g")
 	}
 }
@@ -96,16 +96,16 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
-	callee.FEffect = EmptyEffect().WriteVar(g)
+	callee.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	caller := &Function{Name: "a", ReturnType: GetIntType()}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	_ = BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
-	if !eff.IsWritten(g) {
+	if !eff.IsWrittenSess(testAmbientSession, g) {
 		t.Fatal("external write into accum")
 	}
-	if caller.FEffect.IsWritten(g) {
+	if caller.FEffect.IsWrittenSess(testAmbientSession, g) {
 		t.Fatal("built-callee call must not invent mid-call into caller FEffect")
 	}
 }

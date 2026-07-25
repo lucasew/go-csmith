@@ -100,11 +100,11 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	if g == nil {
 		t.Fatal("CreateVariableQfer nil", GetErrorSess(testAmbientSession))
 	}
-	f.FEffect = f.FEffect.ReadVar(g)
-	if !f.FEffect.IsRead(g) {
+	f.FEffect = f.FEffect.ReadVarSess(testAmbientSession, g)
+	if !f.FEffect.IsReadSess(testAmbientSession, g) {
 		t.Fatal("read")
 	}
-	out := f.FEffect.CommentOutput()
+	out := f.FEffect.CommentOutputSess(testAmbientSession)
 	if !strings.Contains(out, "reads :") || !strings.Contains(out, "g_1") {
 		t.Fatal(out)
 	}
@@ -115,12 +115,12 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	// empty actual name sticky fail closed (OutputForComment — no invent blank token)
 	anon := &Variable{Type: GetIntType()}
 	ClearErrorSess(testAmbientSession)
-	c := EmptyEffect().ReadVar(anon).WriteVar(g).CommentOutput()
+	c := EmptyEffect().ReadVarSess(testAmbientSession, anon).WriteVarSess(testAmbientSession, g).CommentOutputSess(testAmbientSession)
 	if c != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty-name read must fail closed CommentOutput", c)
 	}
 	ClearErrorSess(testAmbientSession)
-	onlyAnon := EmptyEffect().ReadVar(anon).CommentOutput()
+	onlyAnon := EmptyEffect().ReadVarSess(testAmbientSession, anon).CommentOutputSess(testAmbientSession)
 	if onlyAnon != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name only must fail closed", onlyAnon)
 	}

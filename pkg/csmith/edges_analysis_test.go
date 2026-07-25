@@ -436,8 +436,8 @@ func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
 	fm.SetMapFactsOut(1, entry)
 	fm.MapVisited = map[int]bool{1: true}
 	// prior block effect writes w; ambient effect_context writes w → InConflict
-	fm.SetMapStmEffect(1, EmptyEffect().WriteVar(w))
-	cg := WithEffectContext(EmptyEffect().WriteVar(w)).WithSession(testAmbientSession).WithFactMgr(fm)
+	fm.SetMapStmEffect(1, EmptyEffect().WriteVarSess(testAmbientSession, w))
+	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, w)).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// visitOnce false so shortcut is attempted; conflict must fall through
@@ -459,27 +459,27 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
-	if !fm.GetMapStmEffect(7).IsWritten(v) {
+	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVarSess(testAmbientSession, v), &cg, EmptyEffect())
+	if !fm.GetMapStmEffect(7).IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("effect")
 	}
 	// StmID 0 — no invent soft no-op that leaves effect unrecorded as success
 	st0 := &Stmt{Kind: StmtFor, StmID: IncompleteStmID}
-	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
+	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVarSess(testAmbientSession, v), &cg, EmptyEffect())
 	// GetMapStmEffect(IncompleteStmID) IncompleteEffect (IsWritten fail-closed true — use map entry probe)
 	if _, ok := fm.MapStmEffect[0]; ok {
 		t.Fatal("StmID 0 must not invent map effect key 0")
 	}
 	// GetMapStmEffect(IncompleteStmID) IncompleteEffect sticky — not invent empty pure default
 	ClearErrorSess(testAmbientSession)
-	if EffectComplete(fm.GetMapStmEffect(IncompleteStmID)) || fm.GetMapStmEffect(IncompleteStmID).IsEmpty() {
+	if EffectComplete(fm.GetMapStmEffect(IncompleteStmID)) || fm.GetMapStmEffect(IncompleteStmID).IsEmptySess(testAmbientSession) {
 		t.Fatal("StmID 0 GetMapStmEffect must IncompleteEffect")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 GetMapStmEffect must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if EffectComplete(fm.GetMapAccumEffect(IncompleteStmID)) || fm.GetMapAccumEffect(IncompleteStmID).IsPure() {
+	if EffectComplete(fm.GetMapAccumEffect(IncompleteStmID)) || fm.GetMapAccumEffect(IncompleteStmID).IsPureSess(testAmbientSession) {
 		t.Fatal("IncompleteStmID GetMapAccumEffect must IncompleteEffect")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -498,23 +498,23 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Statement + CGContext always live; sticky
 	// Nil FM / StmID≤0 stay non-sticky soft re-pick
-	SetAccumulatedEffectAfterBlock(nil, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
+	SetAccumulatedEffectAfterBlock(nil, EmptyEffect().WriteVarSess(testAmbientSession, v), &cg, EmptyEffect())
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil stmt SetAccumulatedEffectAfterBlock must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), nil, EmptyEffect())
+	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVarSess(testAmbientSession, v), nil, EmptyEffect())
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil cg SetAccumulatedEffectAfterBlock must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	cgNoFM := EmptyCGContext().WithSession(testAmbientSession)
-	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cgNoFM, EmptyEffect())
+	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVarSess(testAmbientSession, v), &cgNoFM, EmptyEffect())
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM SetAccumulatedEffectAfterBlock must stay non-sticky soft re-pick")
 	}
 	ClearErrorSess(testAmbientSession)
-	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
+	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVarSess(testAmbientSession, v), &cg, EmptyEffect())
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("StmID 0 SetAccumulatedEffectAfterBlock must stay non-sticky soft re-pick")
 	}

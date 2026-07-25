@@ -12,32 +12,32 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
 	// other has global + local write
-	other := EmptyEffect().WriteVar(g).WriteVar(loc)
+	other := EmptyEffect().WriteVarSess(testAmbientSession, g).WriteVarSess(testAmbientSession, loc)
 	// without chain: only global
-	e1 := EmptyEffect().AddExternalEffect(other)
-	if !e1.IsWritten(g) || e1.written[loc] {
+	e1 := EmptyEffect().AddExternalEffectSess(testAmbientSession, other)
+	if !e1.IsWrittenSess(testAmbientSession, g) || e1.written[loc] {
 		t.Fatal("globals only", e1)
 	}
 	// with chain containing loc: both
-	e2 := EmptyEffect().AddExternalEffectWithCallers(other, []*Block{blk})
-	if !e2.IsWritten(g) || !e2.written[loc] {
+	e2 := EmptyEffect().AddExternalEffectWithCallersSess(testAmbientSession, other, []*Block{blk})
+	if !e2.IsWrittenSess(testAmbientSession, g) || !e2.written[loc] {
 		t.Fatal("chain includes local", e2)
 	}
 	// nil effect hole / nil chain hole fails closed sticky IncompleteEffect
 	// (no invent leave-base empty-complete / partial merge)
 	// IncompleteEffect IsRead/IsWritten are fail-closed true — probe completeness / maps
-	base := EmptyEffect().ReadVar(g)
+	base := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	hole := EmptyEffect()
 	hole.written = map[*Variable]bool{nil: true, g: true}
-	got := base.AddExternalEffectWithCallers(hole, []*Block{blk})
-	if EffectComplete(got) || got.IsEmpty() || got.read[g] || got.written[g] {
+	got := base.AddExternalEffectWithCallersSess(testAmbientSession, hole, []*Block{blk})
+	if EffectComplete(got) || got.IsEmptySess(testAmbientSession) || got.read[g] || got.written[g] {
 		t.Fatal("nil effect hole must fail closed IncompleteEffect", got)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil effect hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	got2 := base.AddExternalEffectWithCallers(other, []*Block{nil, blk})
+	got2 := base.AddExternalEffectWithCallersSess(testAmbientSession, other, []*Block{nil, blk})
 	if EffectComplete(got2) || got2.written[g] || got2.written[loc] {
 		t.Fatal("nil call_chain hole must fail closed IncompleteEffect", got2)
 	}
@@ -47,7 +47,7 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete LocalVars on chain frame: no invent partial global merge
 	holeBlk := &Block{LocalVars: []*Variable{loc, nil}}
-	got3 := base.AddExternalEffectWithCallers(other, []*Block{holeBlk})
+	got3 := base.AddExternalEffectWithCallersSess(testAmbientSession, other, []*Block{holeBlk})
 	if EffectComplete(got3) || got3.written[g] || got3.written[loc] {
 		t.Fatal("incomplete stack on chain must fail closed IncompleteEffect", got3)
 	}
@@ -109,7 +109,7 @@ func TestAddVisibleEffectUsesChain(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
 	// call chain empty; current block has loc
-	other := EmptyEffect().WriteVar(loc)
+	other := EmptyEffect().WriteVarSess(testAmbientSession, loc)
 	cg.AddVisibleEffect(other)
 	if !cg.EffectAccum.written[loc] {
 		t.Fatal("visible local via current block")

@@ -263,7 +263,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	intStar := PointerTo(GetIntType())
-	envBad := &TypeEnv{Sess: testAmbientSession, 
+	envBad := &TypeEnv{Sess: testAmbientSession,
 		AllTypes:     []*Type{GetIntType(), nil},
 		DerivedTypes: []*Type{intStar, nil},
 	}
@@ -278,7 +278,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete derived only: when 20% path hits, fail closed (nil); never soft-skip hole
-	envDerived := &TypeEnv{Sess: testAmbientSession, 
+	envDerived := &TypeEnv{Sess: testAmbientSession,
 		AllTypes:     []*Type{GetIntType()},
 		DerivedTypes: []*Type{intStar, nil},
 	}

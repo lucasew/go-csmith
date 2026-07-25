@@ -629,7 +629,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	gExtra := CreateVariableScalars("g_extra", GetIntType(), true, false)
 	gKeep := CreateVariableScalars("g_keep", GetIntType(), true, false)
 	// Gen-time effect_stm already includes a global read from a nested call.
-	genEff := EmptyEffect().ReadVar(gKeep).ReadVar(gExtra)
+	genEff := EmptyEffect().ReadVarSess(testAmbientSession, gKeep).ReadVarSess(testAmbientSession, gExtra)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
@@ -661,8 +661,8 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 		t.Fatal("post_creation sticky", GetErrorSess(testAmbientSession))
 	}
 	got := fm.GetMapStmEffect(st.StmID)
-	if !got.IsRead(gExtra) || !got.IsRead(gKeep) {
-		t.Fatalf("gen-time reads must survive special validate: got reads=%v", got.ReadVars())
+	if !got.IsReadSess(testAmbientSession, gExtra) || !got.IsReadSess(testAmbientSession, gKeep) {
+		t.Fatalf("gen-time reads must survive special validate: got reads=%v", got.ReadVarsSess(testAmbientSession))
 	}
 }
 

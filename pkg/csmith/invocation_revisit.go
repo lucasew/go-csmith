@@ -940,7 +940,7 @@ func cloneEffectMapSess(s *Session, m map[int]Effect) map[int]Effect {
 	}
 	out := make(map[int]Effect, len(m))
 	for k, v := range m {
-		cp := v.Clone()
+		cp := v.CloneSess(s)
 		// residual ERROR sticky — no invent soft-clone map past IncompleteEffect residual
 		if sessHasError(s) {
 			return make(map[int]Effect)

@@ -126,8 +126,8 @@ func TestEffectReadVarsInsertionOrder(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_z", GetIntType(), false, false)
 	b := CreateVariableScalars("g_a", GetIntType(), false, false)
-	e := EmptyEffect().ReadVar(a).ReadVar(b)
-	rs := e.ReadVars()
+	e := EmptyEffect().ReadVarSess(testAmbientSession, a).ReadVarSess(testAmbientSession, b)
+	rs := e.ReadVarsSess(testAmbientSession)
 	if len(rs) != 2 || rs[0] != a || rs[1] != b {
 		t.Fatalf("want insertion order [g_z,g_a], got %v", rs)
 	}
@@ -136,12 +136,12 @@ func TestEffectReadVarsInsertionOrder(t *testing.T) {
 	// mark as struct for IsRead field inheritance
 	parent.Type = &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
-	e2 := EmptyEffect().ReadVar(parent).ReadVar(field)
-	rs2 := e2.ReadVars()
+	e2 := EmptyEffect().ReadVarSess(testAmbientSession, parent).ReadVarSess(testAmbientSession, field)
+	rs2 := e2.ReadVarsSess(testAmbientSession)
 	if len(rs2) != 1 || rs2[0] != parent {
 		t.Fatalf("field after parent must not re-push; got %v", rs2)
 	}
-	if !e2.IsRead(field) {
+	if !e2.IsReadSess(testAmbientSession, field) {
 		t.Fatal("IsRead(field) true via parent")
 	}
 }
@@ -161,7 +161,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	// seed a read so choose_visible may work
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
-	eff := EmptyEffect().ReadVar(g)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	// force back by trying many seeds
 	found := false
@@ -219,8 +219,8 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	f.Stack = []*Block{b2}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// map accum effect for forward path cond
-	fm.MapAccumEffect = map[int]Effect{1: EmptyEffect().ReadVar(g)}
-	eff := EmptyEffect().ReadVar(g)
+	fm.MapAccumEffect = map[int]Effect{1: EmptyEffect().ReadVarSess(testAmbientSession, g)}
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	seed := CreateVariableScalars("g_z", GetIntType(), false, false)
@@ -228,13 +228,13 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	cleared := false
 	for seedN := uint64(1); seedN < 40; seedN++ {
 		ClearErrorSess(testAmbientSession)
-		cg.EffectStm = EmptyEffect().WriteVar(seed)
+		cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, seed)
 		st := MakeRandomGoto(NewRng(seedN), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
 		if st.Expr == nil {
 			continue
 		}
 		// StatementGoto.cpp:112 — clear after other_stm pick
-		if cg.EffectStm.IsWritten(seed) {
+		if cg.EffectStm.IsWrittenSess(testAmbientSession, seed) {
 			t.Fatal("effect_stm should clear after other_stm pick")
 		}
 		cleared = true

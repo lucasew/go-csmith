@@ -16,11 +16,11 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
-	e := EmptyEffect().WriteVar(sv)
-	if !e.IsWritten(sv.FieldVars[0]) {
+	e := EmptyEffect().WriteVarSess(testAmbientSession, sv)
+	if !e.IsWrittenSess(testAmbientSession, sv.FieldVars[0]) {
 		t.Fatal("field should inherit parent write")
 	}
-	if !e.IsWrittenPartially(sv) {
+	if !e.IsWrittenPartiallySess(testAmbientSession, sv) {
 		t.Fatal("partial")
 	}
 }
@@ -79,7 +79,7 @@ func TestIsEligibleVarSEFreeVolatile(t *testing.T) {
 
 func TestIsEligibleVarWrittenConflict(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	cg := WithEffectContext(EmptyEffect().WriteVar(a)).WithSession(testAmbientSession)
+	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, a)).WithSession(testAmbientSession)
 	if IsEligibleVar(a, 0, AccessRead, cg) {
 		t.Fatal("written conflict")
 	}
@@ -126,7 +126,7 @@ func TestFindAllVisibleVars(t *testing.T) {
 func TestChooseVarSkipsIneligible(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	cg := WithEffectContext(EmptyEffect().WriteVar(a)).WithSession(testAmbientSession)
+	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, a)).WithSession(testAmbientSession)
 	// only b eligible
 	got := ChooseVar(NewRng(2), []*Variable{a, b}, AccessRead, cg, GetIntType(), MatchFlexible)
 	if got != b {
@@ -155,12 +155,12 @@ func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
 		t.Fatal("itemized read")
 	}
 	// IV written in context → read_indices fails → not eligible
-	cg := WithEffectContext(EmptyEffect().WriteVar(iv)).WithSession(testAmbientSession)
+	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, iv)).WithSession(testAmbientSession)
 	if IsEligibleVar(&item.Variable, 0, AccessRead, cg) {
 		t.Fatal("want reject when index IV written")
 	}
 	// collective itself written → reject after coll switch
-	cg2 := WithEffectContext(EmptyEffect().WriteVar(&parent.Variable)).WithSession(testAmbientSession)
+	cg2 := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, &parent.Variable)).WithSession(testAmbientSession)
 	if IsEligibleVar(&item.Variable, 0, AccessRead, cg2) {
 		t.Fatal("collective written")
 	}

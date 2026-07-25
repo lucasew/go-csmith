@@ -21,7 +21,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	f.Stack = []*Block{loop}
 	// StatementBreak.cpp:76 — clear effect_stm on CGContext& before condition
 	pre := CreateVariableScalars("g_pre", GetIntType(), false, false)
-	cg.EffectStm = EmptyEffect().WriteVar(pre)
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, pre)
 	st := MakeRandomBreak(NewRng(9), opts, vs, tables, &cg)
 	if st.Kind != StmtBreak {
 		t.Fatalf("%v", st.Kind)
@@ -32,7 +32,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 			t.Fatal("break test must be variable")
 		}
 	}
-	if cg.EffectStm.IsWritten(pre) {
+	if cg.EffectStm.IsWrittenSess(testAmbientSession, pre) {
 		t.Fatal("break must clear pre-seed effect_stm write on *CGContext")
 	}
 }

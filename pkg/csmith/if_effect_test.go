@@ -40,32 +40,32 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 func TestMergeEffectsUnion(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	e1 := EmptyEffect().WriteVar(a)
-	e2 := EmptyEffect().WriteVar(b)
+	e1 := EmptyEffect().WriteVarSess(testAmbientSession, a)
+	e2 := EmptyEffect().WriteVarSess(testAmbientSession, b)
 	// Effect.cpp:write_var — non-volatile write keeps SE-free true
-	if !e1.IsSideEffectFree() || !e2.IsSideEffectFree() {
+	if !e1.IsSideEffectFreeSess(testAmbientSession) || !e2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-volatile WriteVar must stay SE-free")
 	}
-	m := MergeEffects(e1, e2)
-	if !m.IsWritten(a) || !m.IsWritten(b) {
+	m := MergeEffectsSess(testAmbientSession, e1, e2)
+	if !m.IsWrittenSess(testAmbientSession, a) || !m.IsWrittenSess(testAmbientSession, b) {
 		t.Fatal("union")
 	}
 	// Effect.cpp:add_effect — side_effect_free &= e.side_effect_free only
 	// (not invent SE-free false for every write)
-	if !m.IsSideEffectFree() {
+	if !m.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("MergeEffects of non-vol writes must stay SE-free")
 	}
 	// volatile write clears SE-free on that arm → merge not SE-free
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
-	ev := EmptyEffect().WriteVar(v)
-	if ev.IsSideEffectFree() {
+	ev := EmptyEffect().WriteVarSess(testAmbientSession, v)
+	if ev.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("volatile WriteVar must clear SE-free")
 	}
-	mv := MergeEffects(e1, ev)
-	if mv.IsSideEffectFree() {
+	mv := MergeEffectsSess(testAmbientSession, e1, ev)
+	if mv.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("MergeEffects with volatile arm must not be SE-free")
 	}
-	if !mv.IsWritten(a) || !mv.IsWritten(v) {
+	if !mv.IsWrittenSess(testAmbientSession, a) || !mv.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("volatile merge must keep both writes")
 	}
 }
@@ -74,8 +74,8 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 	// incomplete arm must not invent pure/empty-complete merge success — sticky
 	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	ok := EmptyEffect().WriteVar(a)
-	m := MergeEffects(ok, IncompleteEffect())
+	ok := EmptyEffect().WriteVarSess(testAmbientSession, a)
+	m := MergeEffectsSess(testAmbientSession, ok, IncompleteEffect())
 	if EffectComplete(m) {
 		t.Fatal("incomplete b must fail closed MergeEffects")
 	}
@@ -83,7 +83,7 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 		t.Fatal("incomplete b MergeEffects must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	m2 := MergeEffects(IncompleteEffect(), ok)
+	m2 := MergeEffectsSess(testAmbientSession, IncompleteEffect(), ok)
 	if EffectComplete(m2) {
 		t.Fatal("incomplete a must fail closed MergeEffects")
 	}
@@ -94,7 +94,7 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 	// nil map key on complete-looking shell
 	bad := EmptyEffect()
 	bad.read = map[*Variable]bool{nil: true}
-	m3 := MergeEffects(ok, bad)
+	m3 := MergeEffectsSess(testAmbientSession, ok, bad)
 	if EffectComplete(m3) {
 		t.Fatal("nil key must fail closed MergeEffects")
 	}
@@ -294,22 +294,22 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = fn
 	// parent accum already observed g_outer (as if prior statements in the block)
-	eff := EmptyEffect().ReadVar(outer)
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, outer)
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, opts) {
 		t.Fatalf("visit if err=%v", HasErrorSess(testAmbientSession))
 	}
 	// After shared-arm visit, accum must include outer (pre) + both arm reads.
-	if cg.EffectAccum == nil || !cg.EffectAccum.IsRead(outer) {
+	if cg.EffectAccum == nil || !cg.EffectAccum.IsReadSess(testAmbientSession, outer) {
 		t.Fatal("shared effect_accum must keep pre-if outer read")
 	}
-	if !cg.EffectAccum.IsRead(inner) {
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, inner) {
 		t.Fatal("shared effect_accum must record true-arm read of g_inner")
 	}
 	// Nested then stmt map_accum must include pre-if history (not arm-local only).
 	thenAcc := fm.GetMapAccumEffect(thenRet.StmID)
-	if !EffectComplete(thenAcc) || !thenAcc.IsRead(outer) {
-		t.Fatalf("map_accum_effect[then] must include outer pre-history, reads=%v", thenAcc.ReadVars())
+	if !EffectComplete(thenAcc) || !thenAcc.IsReadSess(testAmbientSession, outer) {
+		t.Fatalf("map_accum_effect[then] must include outer pre-history, reads=%v", thenAcc.ReadVarsSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -449,7 +449,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	pre := CreateVariableScalars("pre_if_rd", GetIntType(), true, false)
 	g1 := CreateVariableScalars("g_if_arm", GetIntType(), true, false)
 	vs.GlobalList = append(vs.GlobalList, g1)
-	accum := EmptyEffect().ReadVar(pre)
+	accum := EmptyEffect().ReadVarSess(testAmbientSession, pre)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &accum
 	cg.Types = vs.Types
@@ -458,7 +458,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	if cg.EffectAccum == nil {
 		t.Fatal("parent EffectAccum must remain non-nil")
 	}
-	if !cg.EffectAccum.IsRead(pre) {
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, pre) {
 		t.Fatal("parent EffectAccum must keep pre-if reads when arms share accum")
 	}
 	// shared pointer: arm generation must not rebind parent to a private snapshot

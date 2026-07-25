@@ -149,7 +149,7 @@ func TestVisitFactsInvocationParams(t *testing.T) {
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	if !eff.IsRead(a) || !eff.IsRead(b) {
+	if !eff.IsReadSess(testAmbientSession, a) || !eff.IsReadSess(testAmbientSession, b) {
 		t.Fatal("reads")
 	}
 }
@@ -235,7 +235,7 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
 	cg.CurrentFunc = caller
 	// Outer assign-like pollution that must not reach nested Lhs visit.
-	outerEff := EmptyEffect().WriteVar(g)
+	outerEff := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	cg.EffectAccum = &outerEff
 	cg.CurrRHS = &Expression{Term: TermVariable, Var: g, ExprType: GetIntType()}
 	// Ambient context already has g written — nested body write of g would fail
@@ -281,13 +281,13 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 func TestFactMgrMapStmEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	eff := EmptyEffect().WriteVar(v)
+	eff := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	fm.SetMapStmEffect(3, eff)
 	got := fm.GetMapStmEffect(3)
-	if !got.IsWritten(v) {
+	if !got.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("map")
 	}
-	if fm.GetMapStmEffect(9).IsWritten(v) {
+	if fm.GetMapStmEffect(9).IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("empty")
 	}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -340,7 +340,7 @@ func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
 	if !VisitFactsInvocation(fi, &cg, Defaults()) {
 		t.Fatalf("visit_facts must analyze despite Failed=true err=%v", HasErrorSess(testAmbientSession))
 	}
-	if !eff.IsRead(a) {
+	if !eff.IsReadSess(testAmbientSession, a) {
 		t.Fatal("must still visit args when Failed")
 	}
 	ClearErrorSess(testAmbientSession)

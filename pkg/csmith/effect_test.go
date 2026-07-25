@@ -5,10 +5,10 @@ import "testing"
 func TestEmptyEffectSEFree(t *testing.T) {
 	// Effect::Effect default pure + side_effect_free
 	e := EmptyEffect()
-	if !e.IsPure() || !e.IsSideEffectFree() {
+	if !e.IsPureSess(testAmbientSession) || !e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("empty effect must be pure and SE-free")
 	}
-	if WithSideEffects().IsSideEffectFree() {
+	if WithSideEffects().IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("WithSideEffects must not be SE-free")
 	}
 }
@@ -18,14 +18,14 @@ func TestSiblingUnionFieldGetCollectiveResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	// restrictive true on residual GetCollective
-	if !EmptyEffect().SiblingUnionFieldIsRead(shell) {
+	if !EmptyEffect().SiblingUnionFieldIsReadSess(testAmbientSession, shell) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsRead must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsRead must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !EmptyEffect().SiblingUnionFieldIsWritten(shell) {
+	if !EmptyEffect().SiblingUnionFieldIsWrittenSess(testAmbientSession, shell) {
 		t.Fatal("GetCollective residual SiblingUnionFieldIsWritten must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -38,7 +38,7 @@ func TestWriteVarSetResidualSticky(t *testing.T) {
 	// WriteVar residual soft invent was invent soft-continue later writes past nil hole mid set.
 	ClearErrorSess(testAmbientSession)
 	// incomplete vars list sticky IncompleteEffect
-	out := EmptyEffect().WriteVarSet([]*Variable{nil})
+	out := EmptyEffect().WriteVarSetSess(testAmbientSession, []*Variable{nil})
 	if EffectComplete(out) {
 		t.Fatal("nil var WriteVarSet must fail closed IncompleteEffect")
 	}
@@ -47,7 +47,7 @@ func TestWriteVarSetResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete base
-	out2 := IncompleteEffect().WriteVarSet([]*Variable{CreateVariableScalars("g_x", GetIntType(), false, false)})
+	out2 := IncompleteEffect().WriteVarSetSess(testAmbientSession, []*Variable{CreateVariableScalars("g_x", GetIntType(), false, false)})
 	if EffectComplete(out2) {
 		t.Fatal("incomplete base WriteVarSet must IncompleteEffect")
 	}
@@ -60,7 +60,7 @@ func TestWriteVarSetResidualSticky(t *testing.T) {
 func TestIsSideEffectFreeIncompleteResidualSticky(t *testing.T) {
 	// IsSideEffectFree residual soft invent was invent SE-free soft-skip past IncompleteEffect.
 	ClearErrorSess(testAmbientSession)
-	if IncompleteEffect().IsSideEffectFree() {
+	if IncompleteEffect().IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("IncompleteEffect IsSideEffectFree must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -68,7 +68,7 @@ func TestIsSideEffectFreeIncompleteResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete pure is SE-free
-	if !EmptyEffect().IsSideEffectFree() {
+	if !EmptyEffect().IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("EmptyEffect must be SE-free")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -80,7 +80,7 @@ func TestIsSideEffectFreeIncompleteResidualSticky(t *testing.T) {
 func TestIncompleteEffectCloneResidualSticky(t *testing.T) {
 	// IncompleteEffect Clone residual soft invent was invent soft-complete snapshot past hole.
 	ClearErrorSess(testAmbientSession)
-	cp := IncompleteEffect().Clone()
+	cp := IncompleteEffect().CloneSess(testAmbientSession)
 	if EffectComplete(cp) {
 		t.Fatal("IncompleteEffect Clone must stay IncompleteEffect")
 	}
@@ -90,7 +90,7 @@ func TestIncompleteEffectCloneResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete clone no sticky
 	e := EmptyEffect()
-	cp2 := e.Clone()
+	cp2 := e.CloneSess(testAmbientSession)
 	if !EffectComplete(cp2) {
 		t.Fatal("EmptyEffect Clone must complete")
 	}
@@ -106,7 +106,7 @@ func TestAccessEnumAndEmptyEffect(t *testing.T) {
 		t.Fatalf("Access enum R=%d W=%d", AccessRead, AccessWrite)
 	}
 	e := EmptyEffect()
-	if !e.IsPure() || !e.IsSideEffectFree() || !e.IsEmpty() {
+	if !e.IsPureSess(testAmbientSession) || !e.IsSideEffectFreeSess(testAmbientSession) || !e.IsEmptySess(testAmbientSession) {
 		t.Fatal("empty_effect pure SE-free empty")
 	}
 }
@@ -116,20 +116,20 @@ func TestNonEmptyIntersectionMatch(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
-	if NonEmptyIntersection([]*Variable{a}, []*Variable{b}) {
+	if NonEmptyIntersectionSess(testAmbientSession, []*Variable{a}, []*Variable{b}) {
 		t.Fatal("distinct scalars no intersect")
 	}
-	if !NonEmptyIntersection([]*Variable{a}, []*Variable{a}) {
+	if !NonEmptyIntersectionSess(testAmbientSession, []*Variable{a}, []*Variable{a}) {
 		t.Fatal("identity intersect")
 	}
 	// write-write race via has_race_with
-	e1 := EmptyEffect().WriteVar(a)
-	e2 := EmptyEffect().WriteVar(a)
-	if !e1.HasRaceWith(e2) {
+	e1 := EmptyEffect().WriteVarSess(testAmbientSession, a)
+	e2 := EmptyEffect().WriteVarSess(testAmbientSession, a)
+	if !e1.HasRaceWithSess(testAmbientSession, e2) {
 		t.Fatal("write-write race")
 	}
-	e3 := EmptyEffect().ReadVar(b)
-	if e1.HasRaceWith(e3) {
+	e3 := EmptyEffect().ReadVarSess(testAmbientSession, b)
+	if e1.HasRaceWithSess(testAmbientSession, e3) {
 		t.Fatal("disjoint no race")
 	}
 	ClearErrorSess(testAmbientSession)

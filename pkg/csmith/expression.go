@@ -1492,13 +1492,13 @@ func makeExpressionVariableFlags(
 	// ExpressionVariable.cpp:67–69 — snapshot effects for visit_facts failure restore
 	var preAccum, preStm Effect
 	if cg.EffectAccum != nil {
-		preAccum = cg.EffectAccum.Clone()
+		preAccum = cg.EffectAccum.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-expr past EffectAccum Clone residual
 		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 	}
-	preStm = cg.EffectStm.Clone()
+	preStm = cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-expr past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return nil
@@ -2004,13 +2004,13 @@ func makeExpressionFuncall(
 	// ExpressionFuncall.cpp:75–78 — snapshot effects and facts for failed invocation
 	var preAccum Effect
 	if cg.EffectAccum != nil {
-		preAccum = cg.EffectAccum.Clone()
+		preAccum = cg.EffectAccum.CloneSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-funcall past EffectAccum Clone residual
 		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 	}
-	preStm := cg.EffectStm.Clone()
+	preStm := cg.EffectStm.CloneSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-funcall past EffectStm Clone residual
 	if sessHasError(cgSess(cg)) {
 		return nil

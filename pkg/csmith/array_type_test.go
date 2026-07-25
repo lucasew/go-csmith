@@ -61,27 +61,27 @@ func TestEffectWriteVar(t *testing.T) {
 	// Effect.cpp:137–146 — non-volatile write keeps pure and SE-free
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	e := EmptyEffect()
-	if !e.IsSideEffectFree() {
+	if !e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("empty")
 	}
-	e2 := e.WriteVar(v)
-	if !e2.IsWritten(v) {
+	e2 := e.WriteVarSess(testAmbientSession, v)
+	if !e2.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("not marked")
 	}
-	if !e2.IsSideEffectFree() || !e2.IsPure() {
+	if !e2.IsSideEffectFreeSess(testAmbientSession) || !e2.IsPureSess(testAmbientSession) {
 		t.Fatal("non-vol write keeps pure/SE-free")
 	}
 	// volatile write clears SE-free only
 	vv := CreateVariableScalars("g_v", GetIntType(), false, true)
-	e3 := EmptyEffect().WriteVar(vv)
-	if e3.IsSideEffectFree() {
+	e3 := EmptyEffect().WriteVarSess(testAmbientSession, vv)
+	if e3.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
 	}
-	if !e3.IsPure() {
+	if !e3.IsPureSess(testAmbientSession) {
 		t.Fatal("write does not clear pure")
 	}
 	// original unchanged
-	if !e.IsSideEffectFree() {
+	if !e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("value semantics")
 	}
 }
@@ -89,21 +89,21 @@ func TestEffectWriteVar(t *testing.T) {
 func TestEffectReadVarPurity(t *testing.T) {
 	// Effect.cpp:116–122
 	c := CreateVariableScalars("g_c", GetIntType(), true, false) // const non-vol
-	e := EmptyEffect().ReadVar(c)
-	if !e.IsPure() || !e.IsSideEffectFree() {
+	e := EmptyEffect().ReadVarSess(testAmbientSession, c)
+	if !e.IsPureSess(testAmbientSession) || !e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("const non-vol read pure+SE-free")
 	}
 	nv := CreateVariableScalars("g_nv", GetIntType(), false, false)
-	e2 := EmptyEffect().ReadVar(nv)
-	if e2.IsPure() {
+	e2 := EmptyEffect().ReadVarSess(testAmbientSession, nv)
+	if e2.IsPureSess(testAmbientSession) {
 		t.Fatal("non-const read not pure")
 	}
-	if !e2.IsSideEffectFree() {
+	if !e2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-vol read still SE-free")
 	}
 	vol := CreateVariableScalars("g_vol", GetIntType(), false, true)
-	e3 := EmptyEffect().ReadVar(vol)
-	if e3.IsSideEffectFree() || e3.IsPure() {
+	e3 := EmptyEffect().ReadVarSess(testAmbientSession, vol)
+	if e3.IsSideEffectFreeSess(testAmbientSession) || e3.IsPureSess(testAmbientSession) {
 		t.Fatal("vol read")
 	}
 }
@@ -495,7 +495,7 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st, GetIntType()}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// non-SE-free context
-	cg := WithFunc(f, EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), true, false))).WithSession(testAmbientSession)
+	cg := WithFunc(f, EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalars("g_x", GetIntType(), true, false))).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	// VariableSelector.cpp — no soft invent int elem; nil OK when AcceptType rejects
 	av := vs.CreateRandomArray(NewRng(3), cg)

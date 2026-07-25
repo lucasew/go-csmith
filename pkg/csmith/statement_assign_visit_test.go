@@ -34,7 +34,7 @@ func TestVisitFactsStatementAssignSimple(t *testing.T) {
 	if !VisitFactsStatementAssign(&st, &cg, Defaults()) {
 		t.Fatal("visit")
 	}
-	if !eff.IsWritten(v) {
+	if !eff.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("lhs write missing")
 	}
 }
@@ -106,10 +106,10 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 			indir = st.Lhs.IndirectLevel()
 		}
 		if indir == 0 {
-			if !eff.IsWritten(st.LhsVar) && !cg.EffectStm.IsWritten(st.LhsVar) {
+			if !eff.IsWrittenSess(testAmbientSession, st.LhsVar) && !cg.EffectStm.IsWrittenSess(testAmbientSession, st.LhsVar) {
 				t.Fatalf("expected write effect for scalar lhs %s", st.LhsVar.Name)
 			}
-		} else if len(eff.WrittenVars()) == 0 && len(cg.EffectStm.WrittenVars()) == 0 {
+		} else if len(eff.WrittenVarsSess(testAmbientSession)) == 0 && len(cg.EffectStm.WrittenVarsSess(testAmbientSession)) == 0 {
 			t.Fatalf("expected pointee write for deref lhs %s indir=%d", st.LhsVar.Name, indir)
 		}
 	}
@@ -129,8 +129,8 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 	if !VisitFactsExpression(e, &cg, Defaults()) {
 		t.Fatal("comma")
 	}
-	if !eff.IsRead(a) || !eff.IsRead(b) {
-		t.Fatal("reads", eff.IsRead(a), eff.IsRead(b))
+	if !eff.IsReadSess(testAmbientSession, a) || !eff.IsReadSess(testAmbientSession, b) {
+		t.Fatal("reads", eff.IsReadSess(testAmbientSession, a), eff.IsReadSess(testAmbientSession, b))
 	}
 	// incomplete TermConstant shell sticky (no invent visit / soft re-pick)
 	ClearErrorSess(testAmbientSession)
@@ -361,11 +361,11 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 		t.Fatal("VisitFactsLhs *p failed")
 	}
 	// Pointer itself must be read, not written
-	if eff.IsWritten(ptr) || cg.EffectStm.IsWritten(ptr) {
-		t.Fatalf("deref Lhs must not write pointer %s (writes=%v)", ptr.Name, eff.WrittenVars())
+	if eff.IsWrittenSess(testAmbientSession, ptr) || cg.EffectStm.IsWrittenSess(testAmbientSession, ptr) {
+		t.Fatalf("deref Lhs must not write pointer %s (writes=%v)", ptr.Name, eff.WrittenVarsSess(testAmbientSession))
 	}
-	if !eff.IsWritten(pointee) && !cg.EffectStm.IsWritten(pointee) {
-		t.Fatalf("expected write of pointee %s, writes=%v", pointee.Name, eff.WrittenVars())
+	if !eff.IsWrittenSess(testAmbientSession, pointee) && !cg.EffectStm.IsWrittenSess(testAmbientSession, pointee) {
+		t.Fatalf("expected write of pointee %s, writes=%v", pointee.Name, eff.WrittenVarsSess(testAmbientSession))
 	}
 }
 
@@ -436,7 +436,7 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	cg.EffectAccum = &eff
 	// Parent EffectStm pretends a sibling already wrote the intermediate pointer.
 	// If visit inherited this into rhs/lhs EffectStm, PtrModifiedInRhs would reject **p=.
-	cg.EffectStm = EmptyEffect().WriteVar(mid)
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, mid)
 	lhs := &Lhs{Var: ptr, Type: GetIntType()}
 	if lhs.IndirectLevel() != 2 {
 		t.Fatalf("precondition: want indir=2 got %d", lhs.IndirectLevel())

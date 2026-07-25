@@ -48,13 +48,13 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	}
 	iv := forSt.Loop.IV
 	ms := fm.GetMapStmEffect(forSt.StmID)
-	if !ms.IsWritten(iv) {
+	if !ms.IsWrittenSess(testAmbientSession, iv) {
 		t.Fatal("map_stm must write IV (init assign)")
 	}
-	if !ms.IsRead(iv) {
+	if !ms.IsReadSess(testAmbientSession, iv) {
 		t.Fatal("map_stm must read IV (make_iteration read_var) — StatementFor.cpp:194")
 	}
-	if cg.EffectAccum == nil || !cg.EffectAccum.IsRead(iv) {
+	if cg.EffectAccum == nil || !cg.EffectAccum.IsReadSess(testAmbientSession, iv) {
 		t.Fatal("effect_accum must read IV after make_iteration")
 	}
 	ClearErrorSess(testAmbientSession)

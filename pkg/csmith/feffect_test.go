@@ -15,15 +15,15 @@ func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
 	l := CreateVariableQfer("l_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg.NoteWrite(g)
 	cg.NoteWrite(l)
-	if f.FEffect.IsWritten(g) || f.FEffect.IsWritten(l) {
+	if f.FEffect.IsWrittenSess(testAmbientSession, g) || f.FEffect.IsWrittenSess(testAmbientSession, l) {
 		t.Fatal("NoteWrite must not invent mid-generation feffect updates")
 	}
 	// ComputeSummary still records globals from body effect
-	f.ComputeSummary(EmptyEffect().WriteVar(g))
-	if !f.FEffect.IsWritten(g) {
+	f.ComputeSummary(EmptyEffect().WriteVarSess(testAmbientSession, g))
+	if !f.FEffect.IsWrittenSess(testAmbientSession, g) {
 		t.Fatal("ComputeSummary must add external global write")
 	}
-	if f.FEffect.IsWritten(l) {
+	if f.FEffect.IsWrittenSess(testAmbientSession, l) {
 		t.Fatal("local must not enter feffect via AddExternalEffect")
 	}
 	_ = opts
@@ -32,7 +32,7 @@ func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
 func TestFunctionOutputFEffectComment(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), EmitConcise: false}
 	g := CreateVariableQfer("g_9", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	f.FEffect = f.FEffect.WriteVar(g)
+	f.FEffect = f.FEffect.WriteVarSess(testAmbientSession, g)
 	f.Body = &Block{}
 	out := f.Output()
 	if !strings.Contains(out, "writes:") || !strings.Contains(out, "g_9") {
@@ -66,8 +66,8 @@ func TestCommentOutputInsertionOrderAndFormat(t *testing.T) {
 	b := CreateVariableQfer("g_b", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	c := CreateVariableQfer("g_c", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	// insert b then a then c — not alphabetical
-	eff := EmptyEffect().ReadVar(b).ReadVar(a).ReadVar(c).WriteVar(c).WriteVar(a)
-	out := eff.CommentOutput()
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, b).ReadVarSess(testAmbientSession, a).ReadVarSess(testAmbientSession, c).WriteVarSess(testAmbientSession, c).WriteVarSess(testAmbientSession, a)
+	out := eff.CommentOutputSess(testAmbientSession)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete CommentOutput sticky")
 	}

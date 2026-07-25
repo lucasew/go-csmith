@@ -5,20 +5,20 @@ import "testing"
 func TestAddEffect(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	e1 := EmptyEffect().ReadVar(a)
-	e2 := EmptyEffect().WriteVar(b)
-	m := e1.AddEffect(e2)
-	if !m.IsRead(a) || !m.IsWritten(b) {
+	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
+	e2 := EmptyEffect().WriteVarSess(testAmbientSession, b)
+	m := e1.AddEffectSess(testAmbientSession, e2)
+	if !m.IsReadSess(testAmbientSession, a) || !m.IsWrittenSess(testAmbientSession, b) {
 		t.Fatal("union")
 	}
 	// non-vol write does not clear SE-free (Effect.cpp:144–145)
-	if !m.IsSideEffectFree() {
+	if !m.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-vol stays SE-free")
 	}
 	// volatile write in add_effect union clears SE-free
 	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
-	m2 := EmptyEffect().AddEffect(EmptyEffect().WriteVar(vol))
-	if m2.IsSideEffectFree() {
+	m2 := EmptyEffect().AddEffectSess(testAmbientSession, EmptyEffect().WriteVarSess(testAmbientSession, vol))
+	if m2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
 	}
 }
@@ -193,7 +193,7 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	// force ordered path by calling MakeRandomBinary many times? just unit-test restore logic
 	preLeft := EmptyEffect()
 	// simulate left write
-	*cg.EffectAccum = preLeft.WriteVar(a)
+	*cg.EffectAccum = preLeft.WriteVarSess(testAmbientSession, a)
 	postLeft := *cg.EffectAccum
 	*cg.EffectAccum = preLeft
 	// RHS read of a would be OK under preLeft (a not written in context)

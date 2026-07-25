@@ -319,7 +319,7 @@ func MakeRandomBinaryKind(
 	return MakeRandomBinaryKindSess(testAmbientSession, r, opts, probs, rvType, op1Type, op2Type, opKind, bop)
 }
 
-func MakeRandomBinaryKindSess(s *Session, 
+func MakeRandomBinaryKindSess(s *Session,
 	r *Rng,
 	opts Options,
 	probs *Probabilities,

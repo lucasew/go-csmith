@@ -35,10 +35,10 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	v := CreateVariableQfer("g_x", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg.NoteWrite(v)
 	// NoteWrite updates EffectAccum; non-vol write stays SE-free (Effect.cpp:144–145)
-	if !cg.AccumEffect().IsWritten(v) {
+	if !cg.AccumEffect().IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("not written")
 	}
-	if !cg.AccumEffect().IsSideEffectFree() {
+	if !cg.AccumEffect().IsSideEffectFreeSess(testAmbientSession) {
 		// may already have vol effects from block body
 	}
 	// volatile write clears SE-free
@@ -47,7 +47,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	cg2.EffectAccum = &eff2
 	vv := CreateVariableQfer("g_v", GetIntType(), NewCVQualifiers([]bool{false}, []bool{true}))
 	cg2.NoteWrite(vv)
-	if cg2.AccumEffect().IsSideEffectFree() {
+	if cg2.AccumEffect().IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
 	}
 }
@@ -186,20 +186,20 @@ func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 	cg.EffectStm = EmptyEffect()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg.NoteRead(g)
-	if !cg.EffectStm.IsRead(g) || !cg.EffectAccum.IsRead(g) {
+	if !cg.EffectStm.IsReadSess(testAmbientSession, g) || !cg.EffectAccum.IsReadSess(testAmbientSession, g) {
 		t.Fatal("NoteRead must update EffectStm and EffectAccum like read_var")
 	}
-	if f.FEffect.IsRead(g) {
+	if f.FEffect.IsReadSess(testAmbientSession, g) {
 		t.Fatal("NoteRead must not touch feffect")
 	}
 	ClearErrorSess(testAmbientSession)
 	cg.EffectStm = EmptyEffect()
 	w := CreateVariableScalars("g_2", GetIntType(), false, false)
 	cg.NoteWrite(w)
-	if !cg.EffectStm.IsWritten(w) || !cg.EffectAccum.IsWritten(w) {
+	if !cg.EffectStm.IsWrittenSess(testAmbientSession, w) || !cg.EffectAccum.IsWrittenSess(testAmbientSession, w) {
 		t.Fatal("NoteWrite must update EffectStm and EffectAccum like write_var")
 	}
-	if f.FEffect.IsWritten(w) {
+	if f.FEffect.IsWrittenSess(testAmbientSession, w) {
 		t.Fatal("NoteWrite must not touch feffect")
 	}
 	ClearErrorSess(testAmbientSession)
