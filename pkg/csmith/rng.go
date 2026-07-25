@@ -535,9 +535,6 @@ func ProcessGetSequenceSess(s *Session) string {
 
 // PureRndUpto mirrors pure_rnd_upto.
 // random.cpp:104–117 — n==0 → 0; !is_random switches to Default generator temporarily.
-func PureRndUpto(n uint32, f Filter) uint32 {
-	return PureRndUptoSess(testAmbientSession, n, f)
-}
 
 // PureRndUptoSess is PureRndUpto on an explicit session bag.
 func PureRndUptoSess(s *Session, n uint32, f Filter) uint32 {
@@ -555,9 +552,6 @@ func PureRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 
 // PureRndFlipcoin mirrors pure_rnd_flipcoin.
 // random.cpp:119–130.
-func PureRndFlipcoin(p uint32, f Filter) bool {
-	return PureRndFlipcoinSess(testAmbientSession, p, f)
-}
 
 // PureRndFlipcoinSess is PureRndFlipcoin on an explicit session bag.
 func PureRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
@@ -572,9 +566,6 @@ func PureRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 
 // PureRandomHexDigits mirrors PureRandomHexDigits.
 // random.cpp:79–89.
-func PureRandomHexDigits(num int) string {
-	return PureRandomHexDigitsSess(testAmbientSession, num)
-}
 
 // PureRandomHexDigitsSess is PureRandomHexDigits on an explicit session bag.
 func PureRandomHexDigitsSess(s *Session, num int) string {
@@ -589,9 +580,6 @@ func PureRandomHexDigitsSess(s *Session, num int) string {
 
 // PureRandomDigits mirrors PureRandomDigits.
 // random.cpp:91–102.
-func PureRandomDigits(num int) string {
-	return PureRandomDigitsSess(testAmbientSession, num)
-}
 
 // PureRandomDigitsSess is PureRandomDigits on an explicit session bag.
 func PureRandomDigitsSess(s *Session, num int) string {

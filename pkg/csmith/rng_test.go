@@ -349,7 +349,7 @@ func TestProcessRndWrappers(t *testing.T) {
 
 	r2 := NewRngSess(testAmbientSession, 2)
 	// pure_rnd_upto(n==0) short-circuits without draw
-	if PureRndUpto(0, nil) != 0 {
+	if PureRndUptoSess(testAmbientSession, 0, nil) != 0 {
 		t.Fatal("pure_rnd_upto(0) → 0")
 	}
 	// ProcessRndUpto matches Rng.RndUpto on same seed stream
@@ -368,7 +368,7 @@ func TestProcessRndWrappers(t *testing.T) {
 	if gotH != wantH {
 		t.Fatalf("hex: got %q want %q", gotH, wantH)
 	}
-	gotD := PureRandomDigits(3)
+	gotD := PureRandomDigitsSess(testAmbientSession, 3)
 	wantD := r2.RandomDigits(3)
 	if gotD != wantD {
 		t.Fatalf("digits: got %q want %q", gotD, wantD)
@@ -416,7 +416,7 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 		t.Fatal("GetRndNumGenerator")
 	}
 	r2 := NewRngSess(testAmbientSession, 2)
-	got := rn.RndUpto(10, nil)
+	got := rn.RndUptoSess(testAmbientSession, 10, nil)
 	want := r2.RndUpto(10)
 	if got != want {
 		t.Fatalf("rnd_upto via RandomNumber: got %d want %d", got, want)

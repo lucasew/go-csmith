@@ -16,11 +16,6 @@ func MakeRndNumGeneratorSess(s *Session, kind RngKind, seed uint64) *Rng {
 	return makeRndNumGeneratorWithOptsSess(s, kind, seed, sessOpts(s))
 }
 
-// makeRndNumGeneratorWithOpts is the factory used under session ownership.
-func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
-	return makeRndNumGeneratorWithOptsSess(testAmbientSession, kind, seed, opts)
-}
-
 // makeRndNumGeneratorWithOptsSess is the factory on an explicit session bag.
 func makeRndNumGeneratorWithOptsSess(s *Session, kind RngKind, seed uint64, opts Options) *Rng {
 	switch kind {
@@ -123,9 +118,6 @@ func RandomNumberDoFinalizationSess(s *Session) {
 // --- instance methods (RandomNumber.cpp:112–140) ---
 
 // GetPrefixedName mirrors RandomNumber::get_prefixed_name → curr_generator_.
-func (rn *RandomNumber) GetPrefixedName(name string) string {
-	return rn.GetPrefixedNameSess(testAmbientSession, name)
-}
 
 // GetPrefixedNameSess is GetPrefixedName with explicit session residual sticky.
 func (rn *RandomNumber) GetPrefixedNameSess(s *Session, name string) string {
@@ -140,9 +132,6 @@ func (rn *RandomNumber) GetPrefixedNameSess(s *Session, name string) string {
 }
 
 // TraceDepth mirrors RandomNumber::trace_depth.
-func (rn *RandomNumber) TraceDepth() string {
-	return rn.TraceDepthSess(testAmbientSession)
-}
 
 // TraceDepthSess is TraceDepth with explicit session residual sticky.
 func (rn *RandomNumber) TraceDepthSess(s *Session) string {
@@ -154,9 +143,6 @@ func (rn *RandomNumber) TraceDepthSess(s *Session) string {
 }
 
 // GetSequence mirrors RandomNumber::get_sequence.
-func (rn *RandomNumber) GetSequence() string {
-	return rn.GetSequenceSess(testAmbientSession)
-}
 
 // GetSequenceSess is GetSequence with explicit session residual sticky.
 func (rn *RandomNumber) GetSequenceSess(s *Session) string {
@@ -168,9 +154,6 @@ func (rn *RandomNumber) GetSequenceSess(s *Session) string {
 }
 
 // RndUpto mirrors RandomNumber::rnd_upto.
-func (rn *RandomNumber) RndUpto(n uint32, f Filter) uint32 {
-	return rn.RndUptoSess(testAmbientSession, n, f)
-}
 
 // RndUptoSess is RndUpto with explicit session residual sticky.
 func (rn *RandomNumber) RndUptoSess(s *Session, n uint32, f Filter) uint32 {
@@ -182,9 +165,6 @@ func (rn *RandomNumber) RndUptoSess(s *Session, n uint32, f Filter) uint32 {
 }
 
 // RndFlipcoin mirrors RandomNumber::rnd_flipcoin.
-func (rn *RandomNumber) RndFlipcoin(p uint32, f Filter) bool {
-	return rn.RndFlipcoinSess(testAmbientSession, p, f)
-}
 
 // RndFlipcoinSess is RndFlipcoin with explicit session residual sticky.
 func (rn *RandomNumber) RndFlipcoinSess(s *Session, p uint32, f Filter) bool {
@@ -196,9 +176,6 @@ func (rn *RandomNumber) RndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 }
 
 // RandomHexDigits mirrors RandomNumber::RandomHexDigits.
-func (rn *RandomNumber) RandomHexDigits(num int) string {
-	return rn.RandomHexDigitsSess(testAmbientSession, num)
-}
 
 // RandomHexDigitsSess is RandomHexDigits with explicit session residual sticky.
 func (rn *RandomNumber) RandomHexDigitsSess(s *Session, num int) string {
@@ -210,9 +187,6 @@ func (rn *RandomNumber) RandomHexDigitsSess(s *Session, num int) string {
 }
 
 // RandomDigits mirrors RandomNumber::RandomDigits.
-func (rn *RandomNumber) RandomDigits(num int) string {
-	return rn.RandomDigitsSess(testAmbientSession, num)
-}
 
 // RandomDigitsSess is RandomDigits with explicit session residual sticky.
 func (rn *RandomNumber) RandomDigitsSess(s *Session, num int) string {
@@ -224,9 +198,6 @@ func (rn *RandomNumber) RandomDigitsSess(s *Session, num int) string {
 }
 
 // Kind returns the active generator kind (Go helper for tests / Switch).
-func (rn *RandomNumber) Kind() RngKind {
-	return rn.KindSess(testAmbientSession)
-}
 
 // KindSess is Kind with explicit session residual sticky.
 func (rn *RandomNumber) KindSess(s *Session) RngKind {
