@@ -575,7 +575,7 @@ func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Con.Equals(num)
+		ok := e.Con.EqualsSess(s, num)
 		// residual ERROR sticky — no invent equal-true past Con.Equals residual hole
 		if sessHasError(s) {
 			return false
@@ -587,7 +587,7 @@ func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Invoke.EqualsInt(num)
+		ok := e.Invoke.EqualsIntSess(s, num)
 		// residual ERROR sticky — no invent equal-true past nested EqualsInt residual hole
 		if sessHasError(s) {
 			return false
@@ -599,7 +599,7 @@ func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.CommaRHS.EqualsInt(num)
+		ok := e.CommaRHS.EqualsIntSess(s, num)
 		// residual ERROR sticky — no invent equal-true past RHS EqualsInt residual hole
 		if sessHasError(s) {
 			return false
@@ -619,7 +619,7 @@ func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Assign.Expr.EqualsInt(num)
+		ok := e.Assign.Expr.EqualsIntSess(s, num)
 		// residual ERROR sticky — no invent equal-true past assign RHS residual hole
 		if sessHasError(s) {
 			return false
@@ -712,7 +712,7 @@ func (e *Expression) Is0Or1Sess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Invoke.Is0Or1()
+		ok := e.Invoke.Is0Or1Sess(s)
 		// residual ERROR sticky — no invent 0or1 true past nested Is0Or1 residual hole
 		if sessHasError(s) {
 			return false
@@ -724,7 +724,7 @@ func (e *Expression) Is0Or1Sess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.CommaRHS.Is0Or1()
+		ok := e.CommaRHS.Is0Or1Sess(s)
 		// residual ERROR sticky — no invent 0or1 true past RHS Is0Or1 residual hole
 		if sessHasError(s) {
 			return false
@@ -744,7 +744,7 @@ func (e *Expression) Is0Or1Sess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Assign.Expr.Is0Or1()
+		ok := e.Assign.Expr.Is0Or1Sess(s)
 		// residual ERROR sticky — no invent 0or1 true past assign RHS residual hole
 		if sessHasError(s) {
 			return false

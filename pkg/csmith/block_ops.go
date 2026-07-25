@@ -7,29 +7,30 @@ package csmith
 // Note: unlike must_return, does not require break_stms empty.
 // Block always live; sticky false (no invent not-must-break soft-skip past hole).
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
+	s := fmSess(fm)
 	if b == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(b.Stmts) == 0 {
 		return false
 	}
-	last := b.GetLastStm()
-	if last == nil || !last.MustReturn() {
+	last := b.GetLastStmSess(s)
+	if last == nil || !last.MustReturnSess(s) {
 		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn hole
-		if sessHasError(fmSess(fm)) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent must-return true past MustReturn hole
-	if sessHasError(fmSess(fm)) {
+	if sessHasError(s) {
 		return false
 	}
 	// Block.cpp:345–353 — same back-edge escape check as must_return
 	esc := b.hasEscapeBackEdge(fm)
 	// residual ERROR sticky — no invent no-escape soft-skip past CFG hole
-	if sessHasError(fmSess(fm)) {
+	if sessHasError(s) {
 		// incomplete CFG sticky restrictive must-return false (escape uncertain)
 		return false
 	}

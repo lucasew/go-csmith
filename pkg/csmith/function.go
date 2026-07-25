@@ -922,12 +922,12 @@ func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabil
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	simple := f.ReturnType.IsSimple()
+	simple := f.ReturnType.IsSimpleSess(s)
 	// residual ERROR sticky — no invent soft-ret past IsSimple residual
 	if sessHasError(s) {
 		return
 	}
-	if simple && f.ReturnType.Simple() == EVoid {
+	if simple && f.ReturnType.SimpleSess(s) == EVoid {
 		// need_return_stmt is false for void; fail closed if called wrongly
 		return
 	}
@@ -938,7 +938,7 @@ func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabil
 		return
 	}
 	// session probs; aggregate ret_c needs live tables (nil → fail closed, no invent)
-	f.RetConst = MakeRandom(f.ReturnType, opts, probs, r)
+	f.RetConst = MakeRandomSess(s, f.ReturnType, opts, probs, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
 	// sticky error so GenerateBody does not invent Built without ret_c
 	if sessHasError(s) || f.RetConst == nil {

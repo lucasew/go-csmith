@@ -1314,7 +1314,7 @@ func MakeRandomBinaryInvocation(
 				// Type always live after flags assert; SizeInBytes 0 is incomplete
 				// (no invent default 32-bit width)
 				if lhsTy != nil {
-					sb := lhsTy.SizeInBytes()
+					sb := lhsTy.SizeInBytesSess(cgSess(cg))
 					// residual ERROR sticky — no invent soft-shift const past SizeInBytes residual
 					if sessHasError(cgSess(cg)) {
 						return nil
@@ -1322,7 +1322,7 @@ func MakeRandomBinaryInvocation(
 					if sb > 0 {
 						bits := uint32(sb * 8)
 						// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
-						if c := MakeRandomUpto(bits, r); c != nil && !sessHasError(cgSess(cg)) {
+						if c := MakeRandomUptoSess(cgSess(cg), bits, r); c != nil && !sessHasError(cgSess(cg)) {
 							// FunctionInvocation.cpp:241–243 — Constant::make_random_upto as RHS.
 							// Not Expression::make_random — C++ does NOT bump expr_depth here
 							// (depth++ only in Expression.cpp:213–218 after make_random).
@@ -1344,11 +1344,11 @@ func MakeRandomBinaryInvocation(
 			// rhs->equals(0) || rhs->is_0_or_1() (all comparison Funcalls are is_0_or_1).
 			// Then rnd_upto(MAX_BINARY_OP, filter) rejecting mod/div/shifts.
 			if right != nil && !sessHasError(cgSess(cg)) && (op == BinMod || op == BinDiv) {
-				eq0 := right.EqualsInt(0)
+				eq0 := right.EqualsIntSess(cgSess(cg), 0)
 				if sessHasError(cgSess(cg)) {
 					return nil
 				}
-				is01 := right.Is0Or1()
+				is01 := right.Is0Or1Sess(cgSess(cg))
 				if sessHasError(cgSess(cg)) {
 					return nil
 				}

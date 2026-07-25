@@ -334,7 +334,7 @@ func (fi *Invocation) EqualsIntSess(s *Session, num int) bool {
 		}
 		a0 := fi.Args[0]
 		if num == 0 && fi.Unary == "!" {
-			if a0.NotEquals(0) {
+			if a0.NotEqualsSess(s, 0) {
 				// residual ERROR sticky — no invent equal-true past NotEquals residual hole
 				if sessHasError(s) {
 					return false

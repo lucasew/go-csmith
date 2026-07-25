@@ -77,7 +77,7 @@ func MakeRandomUptoSess(s *Session, limit uint32, r *Rng) *Constant {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	n := r.RndUpto(limit)
+	n := r.RndUptoSess(s, limit)
 	// Constant.cpp:432 — ERROR_GUARD(nullptr)
 	if sessHasError(s) {
 		return nil
@@ -93,17 +93,22 @@ func MakeInt(v int) *Constant {
 
 // MakeIntSess is MakeInt with Options from an explicit session bag.
 func MakeIntSess(s *Session, v int) *Constant {
-	return MakeIntOpts(v, sessOpts(s))
+	return MakeIntOptsSess(s, v, sessOpts(s))
 }
 
 // MakeIntOpts is make_int with explicit Options (library tests).
 func MakeIntOpts(v int, opts Options) *Constant {
-	s := strconv.Itoa(v)
+	return MakeIntOptsSess(nil, v, opts)
+}
+
+// MakeIntOptsSess is MakeIntOpts with sticky errors on bag s.
+func MakeIntOptsSess(s *Session, v int, opts Options) *Constant {
+	str := strconv.Itoa(v)
 	// Constant.cpp:475–478 — mark_mutable_const → "(v)"
 	if opts.MarkMutableConst {
-		s = "(" + s + ")"
+		str = "(" + str + ")"
 	}
-	return &Constant{Type: GetSimpleType(EInt), Value: s}
+	return &Constant{Type: GetSimpleTypeSess(s, EInt), Value: str}
 }
 
 // MakeRandomNonzero mirrors Constant::make_random_nonzero.

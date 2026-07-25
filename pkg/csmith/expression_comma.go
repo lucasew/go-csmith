@@ -86,7 +86,7 @@ func castIfNeeded(s *Session, exp *Expression) {
 	if sessHasError(s) {
 		return
 	}
-	if isPtr && exp.EqualsInt(0) {
+	if isPtr && exp.EqualsIntSess(s, 0) {
 		// residual ERROR sticky — no invent cast-true past EqualsInt residual hole
 		if sessHasError(s) {
 			return
