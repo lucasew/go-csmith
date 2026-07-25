@@ -670,9 +670,14 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 // Builtins without body skip. Incomplete expressions / stmt IR sticky clear counts —
 // no invent counting broken IR as leaf depth 0 / soft re-pick past holes.
 func StatExprDepths(funcs []*Function) {
-	sessBK(nil).exprDepthCnts = nil
+	StatExprDepthsSess(nil, funcs)
+}
+
+// StatExprDepthsSess is StatExprDepths writing expr depth counters on bag s.
+func StatExprDepthsSess(s *Session, funcs []*Function) {
+	sessBK(s).exprDepthCnts = nil
 	if !FunctionsComplete(funcs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for _, f := range funcs {
@@ -681,17 +686,17 @@ func StatExprDepths(funcs []*Function) {
 		}
 		// user func body always live after build; nil sticky clear
 		if f.Body == nil {
-			sessBK(nil).exprDepthCnts = nil
-			sessNoteError(nil, ErrGeneric)
+			sessBK(s).exprDepthCnts = nil
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		for i := range f.Body.Stmts {
 			var exprs []*Expression
 			if !collectStmtExprs(&f.Body.Stmts[i], &exprs) {
 				// collectStmtExprs may already sticky
-				sessBK(nil).exprDepthCnts = nil
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				sessBK(s).exprDepthCnts = nil
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return
 			}
@@ -699,13 +704,13 @@ func StatExprDepths(funcs []*Function) {
 				c := ExpressionComplexity(e)
 				if c < 0 {
 					// ExpressionComplexity may already sticky
-					sessBK(nil).exprDepthCnts = nil
-					if !sessHasError(nil) {
-						sessNoteError(nil, ErrGeneric)
+					sessBK(s).exprDepthCnts = nil
+					if !sessHasError(s) {
+						sessNoteError(s, ErrGeneric)
 					}
 					return
 				}
-				bk := sessBK(nil)
+				bk := sessBK(s)
 				IncrCounter(&bk.exprDepthCnts, c)
 			}
 		}
@@ -716,10 +721,15 @@ func StatExprDepths(funcs []*Function) {
 // Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
 // Incomplete Funcs / Block* holes fail closed sticky zero counts (no invent partial depths).
 func StatBlkDepths(funcs []*Function) int {
-	sessBK(nil).blkDepthCnts = nil
+	return StatBlkDepthsSess(nil, funcs)
+}
+
+// StatBlkDepthsSess is StatBlkDepths writing block depth counters on bag s.
+func StatBlkDepthsSess(s *Session, funcs []*Function) int {
+	sessBK(s).blkDepthCnts = nil
 	cnt := 0
 	if !FunctionsComplete(funcs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	incomplete := false
@@ -735,7 +745,7 @@ func StatBlkDepths(funcs []*Function) int {
 		if depth > 0 {
 			depth--
 		}
-		bk := sessBK(nil)
+		bk := sessBK(s)
 		IncrCounter(&bk.blkDepthCnts, depth)
 		cnt++
 		// get_blocks → recurse into Then/Else stmts with that block as parent
@@ -743,9 +753,9 @@ func StatBlkDepths(funcs []*Function) int {
 		for _, blk := range GetBlocksStmt(st) {
 			if blk == nil {
 				incomplete = true
-				sessBK(nil).blkDepthCnts = nil
+				sessBK(s).blkDepthCnts = nil
 				cnt = 0
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return
 			}
 			for i := range blk.Stmts {
@@ -760,8 +770,8 @@ func StatBlkDepths(funcs []*Function) int {
 		}
 		// user func body always live after build; nil sticky
 		if f.Body == nil {
-			sessBK(nil).blkDepthCnts = nil
-			sessNoteError(nil, ErrGeneric)
+			sessBK(s).blkDepthCnts = nil
+			sessNoteError(s, ErrGeneric)
 			return 0
 		}
 		// body is a Block; count its statements with parent=body
@@ -778,106 +788,123 @@ func StatBlkDepths(funcs []*Function) int {
 // OutputStatistics mirrors Bookkeeper::output_statistics.
 // Bookkeeper.cpp:167–192.
 func OutputStatistics(funcs []*Function, opts Options) string {
+	return OutputStatisticsSess(nil, funcs, opts)
+}
+
+// OutputStatisticsSess is OutputStatistics reading counters on bag s.
+func OutputStatisticsSess(s *Session, funcs []*Function, opts Options) string {
 	var b strings.Builder
-	outputStructUnionStatistics(&b, opts)
+	outputStructUnionStatisticsSess(s, &b, opts)
 	// residual ERROR sticky — no invent soft-continue later stats past residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString("\n")
-	outputExprStatistics(&b, funcs)
+	outputExprStatisticsSess(s, &b, funcs)
 	// residual ERROR sticky — no invent soft-continue later stats past StatExpr residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString("\n")
-	outputPointerStatistics(&b, nil)
+	outputPointerStatistics(&b, s)
 	// residual ERROR sticky — no invent soft-continue later stats past pointer residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString("\n")
-	outputVolatileAccessStatistics(&b)
-	if sessHasError(nil) {
+	outputVolatileAccessStatisticsSess(s, &b)
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString("\n")
-	outputJumpStatistics(&b)
-	if sessHasError(nil) {
+	outputJumpStatisticsSess(s, &b)
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString("\n")
-	outputStmtsStatistics(&b, funcs)
+	outputStmtsStatisticsSess(s, &b, funcs)
 	// residual ERROR sticky — no invent soft-continue later stats past StatBlk residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString("\n")
-	outputVarFreshness(&b)
-	if sessHasError(nil) {
+	outputVarFreshnessSess(s, &b)
+	if sessHasError(s) {
 		return ""
 	}
-	if sessBK(nil).relyOnIntSize {
+	if sessBK(s).relyOnIntSize {
 		b.WriteString("FYI: the random generator makes assumptions about the integer size. See platform.info for more details.\n")
 	}
-	if sessBK(nil).relyOnPtrSize {
+	if sessBK(s).relyOnPtrSize {
 		b.WriteString("FYI: the random generator makes assumptions about the pointer size. See platform.info for more details.\n")
 	}
-	formattedOutput(&b, "total OOB instances added: ", sessBK(nil).oobCnt)
+	formattedOutput(&b, "total OOB instances added: ", sessBK(s).oobCnt)
 	return b.String()
 }
 
 func outputStructUnionStatistics(b *strings.Builder, opts Options) {
-	maxD := len(sessBK(nil).structDepthCnts) - 1
+	outputStructUnionStatisticsSess(nil, b, opts)
+}
+
+func outputStructUnionStatisticsSess(s *Session, b *strings.Builder, opts Options) {
+	maxD := len(sessBK(s).structDepthCnts) - 1
 	if maxD < 0 {
 		maxD = 0
 	}
 	// empty vector → size()-1 wraps in C++; we emit 0
-	if len(sessBK(nil).structDepthCnts) == 0 {
+	if len(sessBK(s).structDepthCnts) == 0 {
 		formattedOutput(b, "max struct depth: ", -1) // size_t(-1) style when empty? C++ size 0 → (0-1)=max
 		// upstream: (struct_depth_cnts.size() - 1) as int when empty is -1
 	} else {
 		formattedOutput(b, "max struct depth: ", maxD)
 	}
 	b.WriteString("breakdown:\n")
-	for i, c := range sessBK(nil).structDepthCnts {
+	for i, c := range sessBK(s).structDepthCnts {
 		b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, c))
 	}
-	formattedOutput(b, "total union variables: ", sessBK(nil).unionVarCnt)
-	outputBitfields(b, opts)
+	formattedOutput(b, "total union variables: ", sessBK(s).unionVarCnt)
+	outputBitfieldsSess(s, b, opts)
 }
 
 func outputBitfields(b *strings.Builder, opts Options) {
+	outputBitfieldsSess(nil, b, opts)
+}
+
+func outputBitfieldsSess(s *Session, b *strings.Builder, opts Options) {
 	if !opts.Bitfields {
 		return
 	}
 	b.WriteString("\n")
-	formattedOutput(b, "non-zero bitfields defined in structs: ", sessBK(nil).bitfieldsInTotal)
-	formattedOutput(b, "zero bitfields defined in structs: ", sessBK(nil).unamedBitfieldsInTotal)
-	formattedOutput(b, "const bitfields defined in structs: ", sessBK(nil).constBitfieldsInTotal)
-	formattedOutput(b, "volatile bitfields defined in structs: ", sessBK(nil).volatileBitfieldsInTotal)
-	formattedOutput(b, "structs with bitfields in the program: ", CalcTotal(sessBK(nil).varsWithBitfields))
+	formattedOutput(b, "non-zero bitfields defined in structs: ", sessBK(s).bitfieldsInTotal)
+	formattedOutput(b, "zero bitfields defined in structs: ", sessBK(s).unamedBitfieldsInTotal)
+	formattedOutput(b, "const bitfields defined in structs: ", sessBK(s).constBitfieldsInTotal)
+	formattedOutput(b, "volatile bitfields defined in structs: ", sessBK(s).volatileBitfieldsInTotal)
+	formattedOutput(b, "structs with bitfields in the program: ", CalcTotal(sessBK(s).varsWithBitfields))
 	b.WriteString("breakdown:\n")
-	for i, c := range sessBK(nil).varsWithBitfields {
+	for i, c := range sessBK(s).varsWithBitfields {
 		b.WriteString(fmt.Sprintf("   indirect level: %d, occurrence: %d\n", i, c))
 	}
-	formattedOutput(b, "times a bitfields struct's address is taken: ", sessBK(nil).varsWithBitfieldsAddressTakenCnt)
-	formattedOutput(b, "times a bitfields struct is read: ", sessBK(nil).rhsBitfieldsStructsVarsCnt)
-	formattedOutput(b, "times a bitfields struct is write: ", sessBK(nil).lhsBitfieldsStructsVarsCnt)
-	formattedOutput(b, "times a bitfield is read: ", sessBK(nil).rhsBitfieldCnt)
-	formattedOutput(b, "times a bitfield is write: ", sessBK(nil).lhsBitfieldCnt)
+	formattedOutput(b, "times a bitfields struct's address is taken: ", sessBK(s).varsWithBitfieldsAddressTakenCnt)
+	formattedOutput(b, "times a bitfields struct is read: ", sessBK(s).rhsBitfieldsStructsVarsCnt)
+	formattedOutput(b, "times a bitfields struct is write: ", sessBK(s).lhsBitfieldsStructsVarsCnt)
+	formattedOutput(b, "times a bitfield is read: ", sessBK(s).rhsBitfieldCnt)
+	formattedOutput(b, "times a bitfield is write: ", sessBK(s).lhsBitfieldCnt)
 }
 
 func outputExprStatistics(b *strings.Builder, funcs []*Function) {
-	StatExprDepths(funcs)
-	maxD := len(sessBK(nil).exprDepthCnts) - 1
-	if len(sessBK(nil).exprDepthCnts) == 0 {
+	outputExprStatisticsSess(nil, b, funcs)
+}
+
+func outputExprStatisticsSess(s *Session, b *strings.Builder, funcs []*Function) {
+	StatExprDepthsSess(s, funcs)
+	maxD := len(sessBK(s).exprDepthCnts) - 1
+	if len(sessBK(s).exprDepthCnts) == 0 {
 		formattedOutput(b, "max expression depth: ", -1)
 	} else {
 		formattedOutput(b, "max expression depth: ", maxD)
 	}
 	b.WriteString("breakdown:\n")
-	for i, c := range sessBK(nil).exprDepthCnts {
+	for i, c := range sessBK(s).exprDepthCnts {
 		if c != 0 {
 			b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, c))
 		}
@@ -1000,37 +1027,49 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 }
 
 func outputVolatileAccessStatistics(b *strings.Builder) {
-	formattedOutput(b, "times a non-volatile is read: ", sessBK(nil).readNonVolatileCnt)
-	formattedOutput(b, "times a non-volatile is write: ", sessBK(nil).writeNonVolatileCnt)
-	formattedOutput(b, "times a volatile is read: ", sessBK(nil).readVolatileCnt)
-	formattedOutput(b, "   times read thru a pointer: ", sessBK(nil).readVolatileThruPtrCnt)
-	formattedOutput(b, "times a volatile is write: ", sessBK(nil).writeVolatileCnt)
-	formattedOutput(b, "   times written thru a pointer: ", sessBK(nil).writeVolatileThruPtrCnt)
-	total := sessBK(nil).readNonVolatileCnt + sessBK(nil).writeNonVolatileCnt + sessBK(nil).readVolatileCnt + sessBK(nil).writeVolatileCnt
+	outputVolatileAccessStatisticsSess(nil, b)
+}
+
+func outputVolatileAccessStatisticsSess(s *Session, b *strings.Builder) {
+	formattedOutput(b, "times a non-volatile is read: ", sessBK(s).readNonVolatileCnt)
+	formattedOutput(b, "times a non-volatile is write: ", sessBK(s).writeNonVolatileCnt)
+	formattedOutput(b, "times a volatile is read: ", sessBK(s).readVolatileCnt)
+	formattedOutput(b, "   times read thru a pointer: ", sessBK(s).readVolatileThruPtrCnt)
+	formattedOutput(b, "times a volatile is write: ", sessBK(s).writeVolatileCnt)
+	formattedOutput(b, "   times written thru a pointer: ", sessBK(s).writeVolatileThruPtrCnt)
+	total := sessBK(s).readNonVolatileCnt + sessBK(s).writeNonVolatileCnt + sessBK(s).readVolatileCnt + sessBK(s).writeVolatileCnt
 	percentage := 0.0
 	if total > 0 {
-		percentage = float64(sessBK(nil).readNonVolatileCnt+sessBK(nil).writeNonVolatileCnt) * 100.0 / float64(total)
+		percentage = float64(sessBK(s).readNonVolatileCnt+sessBK(s).writeNonVolatileCnt) * 100.0 / float64(total)
 	}
-	formattedOutputf(b, "times a volatile is available for access: ", float64(sessBK(nil).volatileAvail))
+	formattedOutputf(b, "times a volatile is available for access: ", float64(sessBK(s).volatileAvail))
 	formattedOutputf(b, "percentage of non-volatile access: ", percentage)
 }
 
 func outputJumpStatistics(b *strings.Builder) {
-	formattedOutput(b, "forward jumps: ", sessBK(nil).forwardJumpCnt)
-	formattedOutput(b, "backward jumps: ", sessBK(nil).backwardJumpCnt)
+	outputJumpStatisticsSess(nil, b)
+}
+
+func outputJumpStatisticsSess(s *Session, b *strings.Builder) {
+	formattedOutput(b, "forward jumps: ", sessBK(s).forwardJumpCnt)
+	formattedOutput(b, "backward jumps: ", sessBK(s).backwardJumpCnt)
 }
 
 func outputStmtsStatistics(b *strings.Builder, funcs []*Function) {
-	stmtCnt := StatBlkDepths(funcs)
+	outputStmtsStatisticsSess(nil, b, funcs)
+}
+
+func outputStmtsStatisticsSess(s *Session, b *strings.Builder, funcs []*Function) {
+	stmtCnt := StatBlkDepthsSess(s, funcs)
 	formattedOutput(b, "stmts: ", stmtCnt)
-	maxD := len(sessBK(nil).blkDepthCnts) - 1
-	if len(sessBK(nil).blkDepthCnts) == 0 {
+	maxD := len(sessBK(s).blkDepthCnts) - 1
+	if len(sessBK(s).blkDepthCnts) == 0 {
 		formattedOutput(b, "max block depth: ", -1)
 	} else {
 		formattedOutput(b, "max block depth: ", maxD)
 	}
 	b.WriteString("breakdown:\n")
-	for i, c := range sessBK(nil).blkDepthCnts {
+	for i, c := range sessBK(s).blkDepthCnts {
 		if c != 0 {
 			b.WriteString(fmt.Sprintf("   depth: %d, occurrence: %d\n", i, c))
 		}
@@ -1038,11 +1077,15 @@ func outputStmtsStatistics(b *strings.Builder, funcs []*Function) {
 }
 
 func outputVarFreshness(b *strings.Builder) {
-	total := sessBK(nil).useNewVarCnt + sessBK(nil).useOldVarCnt
+	outputVarFreshnessSess(nil, b)
+}
+
+func outputVarFreshnessSess(s *Session, b *strings.Builder) {
+	total := sessBK(s).useNewVarCnt + sessBK(s).useOldVarCnt
 	fresh, exist := 0.0, 0.0
 	if total > 0 {
-		fresh = float64(sessBK(nil).useNewVarCnt) * 100.0 / float64(total)
-		exist = float64(sessBK(nil).useOldVarCnt) * 100.0 / float64(total)
+		fresh = float64(sessBK(s).useNewVarCnt) * 100.0 / float64(total)
+		exist = float64(sessBK(s).useOldVarCnt) * 100.0 / float64(total)
 	}
 	formattedOutputf(b, "percentage a fresh-made variable is used: ", fresh)
 	formattedOutputf(b, "percentage an existing variable is used: ", exist)
@@ -1051,14 +1094,19 @@ func outputVarFreshness(b *strings.Builder) {
 // OutputTail mirrors OutputMgr::OutputTail — statistics comment after main.
 // OutputMgr.cpp:223–233.
 func OutputTail(funcs []*Function, opts Options) string {
+	return OutputTailSess(nil, funcs, opts)
+}
+
+// OutputTailSess is OutputTail reading statistics counters on bag s.
+func OutputTailSess(s *Session, funcs []*Function, opts Options) string {
 	if opts.Concise {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString("\n/************************ statistics *************************\n")
-	stats := OutputStatistics(funcs, opts)
+	stats := OutputStatisticsSess(s, funcs, opts)
 	// residual ERROR sticky — no invent soft-continue stats shell past residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString(stats)

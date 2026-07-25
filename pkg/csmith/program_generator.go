@@ -1370,7 +1370,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 		}
 		mainExtra.WriteString(m)
 	}
-	mainExtra.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
+	mainExtra.WriteString(OutputTailSess(g.Sess, g.Funcs.Funcs, g.Opts))
 	if g.hasErr() {
 		return nil
 	}
@@ -1549,7 +1549,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	}
 	b.WriteString(mainOut)
 	// DefaultOutputMgr.cpp:194 — OutputTail after main (statistics comment)
-	b.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
+	b.WriteString(OutputTailSess(g.Sess, g.Funcs.Funcs, g.Opts))
 	// residual ERROR sticky — no invent program past OutputTail residual hole
 	if g.hasErr() {
 		return ""
