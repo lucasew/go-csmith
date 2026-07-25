@@ -16,12 +16,16 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 
 // OutputVariableListOpts is OutputVariableList with explicit session Options.
 func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, opts Options) string {
+	return OutputVariableListSess(nil, vars, indent, forceStatic, opts)
+}
+
+func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceStatic bool, opts Options) string {
 	if len(vars) == 0 {
 		return ""
 	}
 	// incomplete list fails closed sticky (no invent skip holes / partial section)
 	if !VariablesComplete(vars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:858–860 — iterate vars in given order (not name-sorted)
@@ -31,7 +35,7 @@ func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, o
 		// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
 		// sticky (no invent scalar OutputDef for IsArray shell / soft re-pick partial list)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		var def string
@@ -40,16 +44,16 @@ func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, o
 			if v.AsArray.Collective != nil {
 				continue
 			}
-			def = v.AsArray.OutputDefOpts(opts)
+			def = v.AsArray.OutputDefSess(s, opts)
 		} else {
-			def = v.OutputDef(forceStatic)
+			def = v.OutputDefFullSess(s, forceStatic, false, false, nil)
 		}
 		// residual ERROR sticky — no invent soft-continue later vars past OutputDef residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if def == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString(indent)
@@ -63,16 +67,16 @@ func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, o
 	// even if every array uses brace init (no_loop_initializer true).
 	if !vars[0].IsGlobal() {
 		// residual ERROR sticky — no invent soft-skip initializers past IsGlobal residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		inits := OutputArrayInitializers(vars, opts, indent)
 		// residual ERROR sticky — no invent soft-return defs-only past OutputArrayInitializers residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		b.WriteString(inits)
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-success past IsGlobal residual true
 		return ""
 	}
@@ -88,9 +92,13 @@ func OutputGlobalVariables(vars []*Variable) string {
 
 // OutputGlobalVariablesOpts is OutputGlobalVariables with explicit session Options.
 func OutputGlobalVariablesOpts(vars []*Variable, opts Options) string {
-	body := OutputVariableListOpts(vars, "", true, opts)
+	return OutputGlobalVariablesSess(nil, vars, opts)
+}
+
+func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) string {
+	body := OutputVariableListSess(s, vars, "", true, opts)
 	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if body == "" {
@@ -99,7 +107,7 @@ func OutputGlobalVariablesOpts(vars []*Variable, opts Options) string {
 	var b strings.Builder
 	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
 	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString(hdr)
@@ -116,9 +124,13 @@ func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
 
 // OutputGlobalVariablesDeclsOpts is OutputGlobalVariablesDecls with explicit Options.
 func OutputGlobalVariablesDeclsOpts(vars []*Variable, prefix string, opts Options) string {
-	body := OutputVariableListOpts(vars, "", false, opts)
+	return OutputGlobalVariablesDeclsSess(nil, vars, prefix, opts)
+}
+
+func OutputGlobalVariablesDeclsSess(s *Session, vars []*Variable, prefix string, opts Options) string {
+	body := OutputVariableListSess(s, vars, "", false, opts)
 	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if body == "" {
@@ -127,7 +139,7 @@ func OutputGlobalVariablesDeclsOpts(vars []*Variable, prefix string, opts Option
 	var b strings.Builder
 	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
 	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	b.WriteString(hdr)

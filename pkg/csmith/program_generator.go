@@ -546,15 +546,15 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 	var decl string
 	if t.IsStruct() {
 		if structAttr != nil {
-			decl = t.OutputStructDeclWith(g.Rng, structAttr, g.Opts)
+			decl = t.OutputStructDeclWithSess(g.Sess, g.Rng, structAttr, g.Opts)
 		} else {
-			decl = t.OutputStructDeclWith(nil, nil, g.Opts)
+			decl = t.OutputStructDeclWithSess(g.Sess, nil, nil, g.Opts)
 		}
 	} else {
 		if unionAttr != nil {
-			decl = t.OutputUnionDeclWith(g.Rng, unionAttr, g.Opts)
+			decl = t.OutputUnionDeclWithSess(g.Sess, g.Rng, unionAttr, g.Opts)
 		} else {
-			decl = t.OutputUnionDeclWith(nil, nil, g.Opts)
+			decl = t.OutputUnionDeclWithSess(g.Sess, nil, nil, g.Opts)
 		}
 	}
 	if g.hasErr() {
@@ -1311,7 +1311,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	if g.VS != nil {
 		globals = g.VS.GlobalList
 	}
-	decls := OutputGlobalVariablesDeclsOpts(globals, "extern ", g.Opts)
+	decls := OutputGlobalVariablesDeclsSess(g.Sess, globals, "extern ", g.Opts)
 	if g.hasErr() {
 		return nil
 	}

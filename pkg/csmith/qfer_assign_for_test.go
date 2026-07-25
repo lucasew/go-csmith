@@ -23,7 +23,7 @@ func TestCVQualifiersMatch(t *testing.T) {
 	if !w.Match(b, true) {
 		t.Fatal("wild")
 	}
-	// process CGOptions::match_exact_qualifiers true → exact even with matchExact=false
+	// process CGOptions::match_exact_qualifiers true → Match(false) still exact via Options
 	po.MatchExactQualifiers = true
 	SetProcessOptions(po)
 	if a.Match(b, false) {

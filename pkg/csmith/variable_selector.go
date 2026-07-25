@@ -1379,7 +1379,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		}
 		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirect(v.Qfer, false) {
+			if !qfer.MatchIndirectOpts(v.Qfer, false, sessOpts(cg.Sess)) {
 				// residual ERROR sticky — no invent soft-continue past MatchIndirect hole
 				if sessHasError(cg.Sess) {
 					return false
@@ -1577,8 +1577,8 @@ func (vs *VariableSelector) SelectMustUseVar(
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
-			// qfer->match(v->qfer)
-			if !qfer.Match(v.Qfer, false) {
+			// qfer->match(v->qfer) — ORs opts.MatchExactQualifiers (assign force)
+			if !qfer.MatchOpts(v.Qfer, false, sessOpts(firstSess(vsSess(vs), cg.Sess))) {
 				// residual ERROR sticky — no invent soft-continue past Match hole
 				if sessHasError(vsSess(vs)) {
 					return nil
@@ -1801,7 +1801,7 @@ func ChooseVarFull(
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirect(x.Qfer, matchExact) {
+			if !qfer.MatchIndirectOpts(x.Qfer, matchExact, opts) {
 				// residual ERROR from MatchIndirect OOB/sticky — no invent soft-continue
 				if sessHasError(cg.Sess) {
 					return nil

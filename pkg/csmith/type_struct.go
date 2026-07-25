@@ -313,9 +313,13 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 
 // OutputStructDeclWith is OutputStructDeclOpts with explicit session Options (ccomp pack).
 func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
+	return t.OutputStructDeclWithSess(nil, r, attrs, opts)
+}
+
+func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
 	// Type* always live at struct emit; sticky no invent decl without it
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// non-struct: soft empty (callers use OutputUnionDecl for unions)
@@ -324,7 +328,7 @@ func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Opti
 	}
 	// Type.cpp always has sid name (S#); sticky no invent "struct  {"
 	if t.StructName == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -341,7 +345,7 @@ func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Opti
 	if attrs != nil && r != nil {
 		b.WriteString(attrs.Output(r))
 		// residual ERROR sticky — no invent soft-continue fields past attr residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
@@ -352,25 +356,25 @@ func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Opti
 		if f.BitWidth >= 0 {
 			if f.Type == nil {
 				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			if !f.Type.IsSimple() {
 				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			st := f.Type.Simple()
 			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			// Type.cpp:1868–1873 — eInt → signed; eUInt → unsigned; else assert(0) sticky
@@ -381,28 +385,28 @@ func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Opti
 			case EUInt:
 				signedKW = "unsigned"
 			default:
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("   ")
 			// Type.cpp:1867 — OutputFirstQuals
 			if f.Qfer.IsConst() {
 				// residual ERROR sticky — no invent soft-const past IsConst residual hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				b.WriteString("const ")
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
 				return ""
 			}
 			if f.Qfer.IsVolatile() {
 				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				b.WriteString("volatile ")
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue field past IsVolatile residual false
 				return ""
 			}
@@ -422,17 +426,17 @@ func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Opti
 		// non-bitfield: qualified type + fN
 		if f.Type == nil {
 			// Type.cpp always has field type sticky; no soft invent "int"
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// Type.cpp:1879–1880 — output_qualified_type always live; sticky no invent " fN;"
 		ty := f.Qfer.OutputQualifiedTypeOpts(f.Type, opts)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if ty == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString("   ")
@@ -846,9 +850,13 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 
 // OutputUnionDeclWith is OutputUnionDeclOpts with explicit session Options.
 func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
+	return t.OutputUnionDeclWithSess(nil, r, attrs, opts)
+}
+
+func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
 	// Type* always live at union emit; sticky no invent decl without it
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// non-union: soft empty
@@ -857,7 +865,7 @@ func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Optio
 	}
 	// Type.cpp always has sid name (U#); sticky no invent "union  {"
 	if t.StructName == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -866,7 +874,7 @@ func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Optio
 	if attrs != nil && r != nil {
 		b.WriteString(attrs.Output(r))
 		// residual ERROR sticky — no invent soft-continue fields past attr residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
@@ -876,24 +884,24 @@ func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Optio
 		if f.BitWidth >= 0 {
 			// unions rarely have bitfields; same assert rules as struct sticky
 			if f.Type == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			if !f.Type.IsSimple() {
 				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			st := f.Type.Simple()
 			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			var signedKW string
@@ -903,27 +911,27 @@ func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Optio
 			case EUInt:
 				signedKW = "unsigned"
 			default:
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("   ")
 			if f.Qfer.IsConst() {
 				// residual ERROR sticky — no invent soft-const past IsConst residual hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				b.WriteString("const ")
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
 				return ""
 			}
 			if f.Qfer.IsVolatile() {
 				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				b.WriteString("volatile ")
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue field past IsVolatile residual false
 				return ""
 			}
@@ -937,17 +945,17 @@ func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Optio
 			continue
 		}
 		if f.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// output_qualified_type always live sticky; no invent " fN;" without type
 		ty := f.Qfer.OutputQualifiedTypeOpts(f.Type, opts)
 		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if ty == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString("   ")

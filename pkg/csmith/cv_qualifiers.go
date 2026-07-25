@@ -231,11 +231,16 @@ func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
 	return true
 }
 
-// Match mirrors CVQualifiers::match.
-// CVQualifiers.cpp:137–152 — CGOptions::match_exact_qualifiers() is process-wide;
-// matchExact ORs with ProcessOptions so ChooseVarFull / select see session force.
-// Explicit matchExact=true still works for unit tests without SetProcessOptions.
+// Match mirrors CVQualifiers::match (ambient ProcessOptions for CGOptions bit).
+// Prefer MatchOpts with session Options when available.
 func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
+	return q.MatchOpts(other, matchExact, ProcessOptions())
+}
+
+// MatchOpts is Match with explicit session Options (match_exact_qualifiers process bit).
+// CVQualifiers.cpp:137–152 — matchExact ORs opts.MatchExactQualifiers (StatementAssign
+// forces that bit on the run bag; ChooseVarFull passes sessOpts(cg.Sess)).
+func (q CVQualifiers) MatchOpts(other CVQualifiers, matchExact bool, opts Options) bool {
 	if q.Wildcard {
 		return true
 	}
@@ -246,7 +251,7 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 		return false
 	}
 	// CVQualifiers.cpp:141–143 — if (CGOptions::match_exact_qualifiers())
-	if matchExact || sessOpts(nil).MatchExactQualifiers {
+	if matchExact || opts.MatchExactQualifiers {
 		return boolsEqual(q.IsConsts, other.IsConsts) && boolsEqual(q.IsVolatiles, other.IsVolatiles)
 	}
 	// both non-pointer (one level) → true
@@ -777,11 +782,16 @@ func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 	return out
 }
 
-// MatchIndirect mirrors CVQualifiers::match_indirect.
+// MatchIndirect mirrors CVQualifiers::match_indirect (ambient Options for exact bit).
+func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
+	return q.MatchIndirectOpts(other, matchExact, ProcessOptions())
+}
+
+// MatchIndirectOpts is MatchIndirect with explicit session Options.
 // CVQualifiers.cpp:155–166.
 // Unpaired const/vol depths sticky false (no invent match soft-skip past hole).
 // Multi-level address gap (deref < -1) is complete false (C++ returns false, no assert).
-func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
+func (q CVQualifiers) MatchIndirectOpts(other CVQualifiers, matchExact bool, opts Options) bool {
 	if q.Wildcard {
 		return true
 	}
@@ -791,7 +801,7 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 		return false
 	}
 	if len(q.IsConsts) == len(other.IsConsts) {
-		ok := q.Match(other, matchExact)
+		ok := q.MatchOpts(other, matchExact, opts)
 		// residual ERROR sticky — no invent soft-match past Match residual
 		if sessHasError(nil) {
 			return false
@@ -808,7 +818,7 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 	if sessHasError(nil) {
 		return false
 	}
-	ok := q.Match(ind, matchExact)
+	ok := q.MatchOpts(ind, matchExact, opts)
 	// residual ERROR sticky — no invent soft-match past Match residual after peel
 	if sessHasError(nil) {
 		return false
