@@ -23,7 +23,7 @@ func TestSafeAssign(t *testing.T) {
 }
 
 func TestVisitFactsStatementAssignSimple(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}

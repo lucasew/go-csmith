@@ -130,14 +130,14 @@ func TestSafeMathWrapperAllowed(t *testing.T) {
 }
 
 func TestSafeOpFlagsToIDStable(t *testing.T) {
-	ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
 	id1 := SafeOpFlagsToID("safe_add_func_int32_t_s_s")
 	id2 := SafeOpFlagsToID("safe_add_func_int32_t_s_s")
 	id3 := SafeOpFlagsToID("safe_sub_func_int32_t_s_s")
 	if id1 != id2 || id3 == id1 {
 		t.Fatal(id1, id2, id3)
 	}
-	ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
 }
 
 func TestStopByStmtForcesReturn(t *testing.T) {

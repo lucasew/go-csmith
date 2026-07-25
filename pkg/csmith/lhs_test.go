@@ -273,7 +273,7 @@ func TestExpressionVariableMultiLevelAddrFailClosed(t *testing.T) {
 
 func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)

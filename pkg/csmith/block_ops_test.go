@@ -599,21 +599,21 @@ func TestAddNewVarFactTo(t *testing.T) {
 	}
 	// no Init/InitExpr → C++ v->init nullptr → garbage via abstract; empty abstract
 	// when meta off fails closed without invent
-	ClearMetaFacts()
+	ClearMetaFactsSess(testAmbientSession)
 	currentSession().MetaFactPointToEnabled = false
 	var empty []*FactPointTo
 	AddNewVarFactTo(p, &empty)
 	if len(empty) != 0 {
 		t.Fatal("meta off must not invent", empty)
 	}
-	ClearMetaFacts()
+	ClearMetaFactsSess(testAmbientSession)
 }
 
 func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	// soft invent: skip nil FieldVars and still makeup later pointer fields
 	// fair: incomplete FieldVars clears *facts
 	currentSession().MetaFactPointToEnabled = true
-	defer ClearMetaFacts()
+	defer ClearMetaFactsSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "p", Type: PointerTo(GetIntType()), BitWidth: -1},

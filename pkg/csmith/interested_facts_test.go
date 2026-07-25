@@ -3,10 +3,10 @@ package csmith
 import "testing"
 
 func TestAddInterestedFactsGates(t *testing.T) {
-	defer ClearMetaFacts()
+	defer ClearMetaFactsSess(testAmbientSession)
 	// only point-to
 	AddInterestedFacts(FactCategoryPointTo)
-	if !MetaFactPointToEnabled() || MetaFactUnionEnabled() {
+	if !MetaFactPointToEnabledSess(testAmbientSession) || MetaFactUnionEnabledSess(testAmbientSession) {
 		t.Fatal("point only")
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
@@ -38,17 +38,17 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	}
 
 	// default both
-	ClearMetaFacts()
-	if !MetaFactPointToEnabled() || !MetaFactUnionEnabled() {
+	ClearMetaFactsSess(testAmbientSession)
+	if !MetaFactPointToEnabledSess(testAmbientSession) || !MetaFactUnionEnabledSess(testAmbientSession) {
 		t.Fatal("defaults")
 	}
 }
 
 func TestGenerateFunctionsCallsAddInterested(t *testing.T) {
-	defer ClearMetaFacts()
+	defer ClearMetaFactsSess(testAmbientSession)
 	// start with both off
 	AddInterestedFacts(0)
-	if MetaFactPointToEnabled() {
+	if MetaFactPointToEnabledSess(testAmbientSession) {
 		t.Fatal("should be off")
 	}
 	opts := Defaults()

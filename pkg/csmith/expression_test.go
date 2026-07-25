@@ -63,7 +63,7 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 }
 
 func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	f := NewVectorFilter(&tables.Expr)
@@ -458,11 +458,11 @@ func TestConstantGetField(t *testing.T) {
 
 func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
 	// Expression.cpp:104–105 — direct_expand_check(eInvoke) → eFunction
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !InitPartialExpander("invoke") {
 		t.Fatal("init")
 	}
-	defer ClearPartialExpander()
+	defer ClearPartialExpanderSess(testAmbientSession)
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	f := NewVectorFilter(&tables.Expr)

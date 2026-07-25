@@ -272,15 +272,8 @@ func DestroyExtensionSess(s *Session) {
 	s.CoverageSize = 0
 }
 
-// ExtensionActive is true when a non-null AbsExtension is installed.
-func ExtensionActive() bool { return ExtensionActiveSess(testAmbientSession) }
-
 // ExtensionActiveSess reports ExtensionActive on an explicit session bag.
 func ExtensionActiveSess(s *Session) bool { return sessOrAmbient(s).ExtensionActive }
-
-// ExtensionMgrGenerateValues mirrors ExtensionMgr::GenerateValues.
-// ExtensionMgr.cpp:84–88 — null → no-op; Klee/Crest empty; Coverage already built.
-func ExtensionMgrGenerateValues() { ExtensionMgrGenerateValuesSess(testAmbientSession) }
 
 // ExtensionMgrGenerateValuesSess is ExtensionMgrGenerateValues on an explicit bag.
 func ExtensionMgrGenerateValuesSess(s *Session) {
@@ -309,10 +302,6 @@ func ExtensionMgrGenerateFirstParameterListSess(s *Session, f *Function, vs *Var
 	}
 }
 
-// ExtensionMgrOutputHeader mirrors OutputHeader — null → empty.
-// ExtensionMgr.cpp:101–107.
-func ExtensionMgrOutputHeader() string { return ExtensionMgrOutputHeaderSess(testAmbientSession) }
-
 // ExtensionMgrOutputHeaderSess is ExtensionMgrOutputHeader on an explicit bag.
 func ExtensionMgrOutputHeaderSess(s *Session) string {
 	s = sessOrAmbient(s)
@@ -331,10 +320,6 @@ func ExtensionMgrOutputHeaderSess(s *Session) string {
 		return ""
 	}
 }
-
-// ExtensionMgrOutputTail mirrors OutputTail.
-// ExtensionMgr.cpp:109–115 — null → "    return 0;\n".
-func ExtensionMgrOutputTail() string { return ExtensionMgrOutputTailSess(testAmbientSession) }
 
 // ExtensionMgrOutputTailSess is ExtensionMgrOutputTail on an explicit bag.
 func ExtensionMgrOutputTailSess(s *Session) string {
@@ -410,14 +395,8 @@ func ExtensionMgrOutputFirstFunInvocationSess(s *Session, invokeOut string) stri
 	return AbsExtensionOutputFirstFunInvocationSess(s, invokeOut)
 }
 
-// ExtensionValues returns active extension values_ (may be nil).
-func ExtensionValues() []*ExtensionValue { return ExtensionValuesSess(testAmbientSession) }
-
 // ExtensionValuesSess returns ExtValues on an explicit session bag.
 func ExtensionValuesSess(s *Session) []*ExtensionValue { return sessOrAmbient(s).ExtValues }
-
-// ExtensionKind returns "klee"|"crest"|"coverage"|"" .
-func ExtensionKind() string { return ExtensionKindSess(testAmbientSession) }
 
 // ExtensionKindSess returns ExtKind on an explicit session bag.
 func ExtensionKindSess(s *Session) string { return sessOrAmbient(s).ExtKind }

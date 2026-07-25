@@ -105,12 +105,6 @@ func GetPNameSess(s *Session, sname string) (ProbName, bool) {
 	return p, true
 }
 
-// DestroyProcessProbabilities mirrors Probabilities::DestroyInstance.
-// Clears process singleton handle.
-func DestroyProcessProbabilities() {
-	DestroyProcessProbabilitiesSess(testAmbientSession)
-}
-
 // DestroyProcessProbabilitiesSess clears probabilities on an explicit session bag.
 func DestroyProcessProbabilitiesSess(s *Session) {
 	SetProcessProbabilitiesSess(s, nil)

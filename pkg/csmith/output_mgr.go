@@ -80,11 +80,6 @@ func MonitoredFuncsSess(s *Session) []string {
 	return append([]string(nil), s.MonitoredFuncs...)
 }
 
-// ClearMonitoredFuncs resets process monitored list (tests / finalization).
-func ClearMonitoredFuncs() {
-	ClearMonitoredFuncsSess(testAmbientSession)
-}
-
 // ClearMonitoredFuncsSess clears monitored list / curr func on an explicit session bag.
 func ClearMonitoredFuncsSess(s *Session) {
 	s = sessOrAmbient(s)
@@ -102,9 +97,6 @@ func SetCurrFunc(fname string) {
 func SetCurrFuncSess(s *Session, fname string) {
 	sessOrAmbient(s).CurrFunc = fname
 }
-
-// CurrFunc mirrors OutputMgr::curr_func_.
-func CurrFunc() string { return CurrFuncSess(testAmbientSession) }
 
 // CurrFuncSess returns curr_func_ on an explicit session bag.
 func CurrFuncSess(s *Session) string { return sessOrAmbient(s).CurrFunc }
@@ -617,9 +609,6 @@ func DFSOutputHeader(header string, compact bool) string {
 	}
 	return header
 }
-
-// DFSStructOutputPath mirrors DFSOutputMgr::struct_output_ path for structs file.
-func DFSStructOutputPath() string { return DFSStructOutputPathSess(testAmbientSession) }
 
 // DFSStructOutputPathSess is DFSStructOutputPath on an explicit session bag.
 func DFSStructOutputPathSess(s *Session) string {

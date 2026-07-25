@@ -403,8 +403,8 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// VariableSelector.cpp:301–303 — match_indirect; scalar non-exact Match is always true
 	// (CVQualifiers.cpp both len==1). Filter matters when level counts differ.
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
-	defer BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
+	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// int* var with 2-level qfer; desired qfer 1-level for int* type match_indirect
 	pt := PointerTo(GetIntType())
 	vol := CreateVariableScalars("g_p", pt, true, false)
@@ -422,7 +422,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// wildcard always matches
 	qw := NewCVQualifiers([]bool{true}, []bool{true})
 	qw.Wildcard = true
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qw, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("wildcard qfer must accept")
 	}
@@ -432,7 +432,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// IsArray without AsArray soft invent was residual soft-continue then true
 	// from later good volatile. Fair: sticky fail closed whole probe.
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	good := CreateVariableScalars("g_v", GetIntType(), true, false)
 	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {

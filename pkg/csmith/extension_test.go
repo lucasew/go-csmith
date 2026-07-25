@@ -52,14 +52,14 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	DestroyExtension()
 	CreateExtension(Defaults())
-	if ExtensionActive() || HasErrorSess(testAmbientSession) {
+	if ExtensionActiveSess(testAmbientSession) || HasErrorSess(testAmbientSession) {
 		t.Fatal("null extension")
 	}
-	if ExtensionMgrOutputHeader() != "" {
+	if ExtensionMgrOutputHeaderSess(testAmbientSession) != "" {
 		t.Fatal("header")
 	}
-	if ExtensionMgrOutputTail() != "    return 0;\n" {
-		t.Fatal(ExtensionMgrOutputTail())
+	if ExtensionMgrOutputTailSess(testAmbientSession) != "    return 0;\n" {
+		t.Fatal(ExtensionMgrOutputTailSess(testAmbientSession))
 	}
 	init := ExtensionMgrOutputInit(true)
 	if !strings.Contains(init, "argc") || !strings.Contains(init, "{") {
@@ -74,11 +74,11 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	SetProcessRngSess(testAmbientSession, NewRng(1))
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(o))
 	CreateExtension(o)
-	if HasErrorSess(testAmbientSession) || !ExtensionActive() || ExtensionKind() != "klee" {
-		t.Fatal("klee create", HasErrorSess(testAmbientSession), ExtensionKind())
+	if HasErrorSess(testAmbientSession) || !ExtensionActiveSess(testAmbientSession) || ExtensionKindSess(testAmbientSession) != "klee" {
+		t.Fatal("klee create", HasErrorSess(testAmbientSession), ExtensionKindSess(testAmbientSession))
 	}
-	if !strings.Contains(ExtensionMgrOutputHeader(), "klee/klee.h") {
-		t.Fatal(ExtensionMgrOutputHeader())
+	if !strings.Contains(ExtensionMgrOutputHeaderSess(testAmbientSession), "klee/klee.h") {
+		t.Fatal(ExtensionMgrOutputHeaderSess(testAmbientSession))
 	}
 	DestroyExtension()
 	ReinstallTestProcessSingletons()
@@ -86,12 +86,12 @@ func TestExtensionMgrNullPath(t *testing.T) {
 
 func TestInitPartialExpanderEmptyFail(t *testing.T) {
 	// C++ parse_options("") fails
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if InitPartialExpander("") {
 		t.Fatal("empty must fail")
 	}
 	// FromOptions empty still clears (not init)
-	if !InitPartialExpanderFromOptions(Defaults()) {
+	if !InitPartialExpanderFromOptionsSess(testAmbientSession, Defaults()) {
 		t.Fatal("from empty opts ok")
 	}
 }

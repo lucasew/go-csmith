@@ -10,16 +10,11 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - non-Sess helpers still hardcode ambient (bookkeeper Record*, effect
-//     method duals, statement_meta, …)
-//   - Rng.Sess routes non-Sess RndUpto/RndFlipcoin residual sticky to the run
-//     bag when set (session factories / NewProgramGenerator); else ambient
-//   - NewVariableSelector (unit-test only) installs ambient; Generate uses
-//     NewVariableSelectorProbs without ambient install + vs.Sess = run bag
-//   - EmptyCGContext/WithFunc/WithEffectContext leave Sess nil — callers
-//     WithSession(run bag) or WithSession(testAmbientSession)
-//   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag (no ambient install)
-//   - vsSess/envSess/fmSess/cgSess/gSess/rSess panic or ambient on nil owner
+//   - residual non-Sess duals: effect/CV/statement_meta method bridges,
+//     NewVariableSelector ambient install, rSess/vsSess/… nil→ambient
+//   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set
+//   - EmptyCGContext/WithFunc leave Sess nil — callers WithSession(…)
+//   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag
 //   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
@@ -28,7 +23,7 @@
 //
 // Concurrent Generate in one process is unsupported (upstream: one gen/process).
 // Fuzz workers are separate OS processes.
-// Generate is not fully pure while testAmbientSession + non-Sess ambient helpers remain.
+// Generate is not fully pure while testAmbientSession + residual duals remain.
 //
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith

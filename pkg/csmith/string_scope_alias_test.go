@@ -102,7 +102,7 @@ func TestFindVariableScope(t *testing.T) {
 }
 
 func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
-	ClearPointToAggregates()
+	ClearPointToAggregatesSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a), MakeFactPointTo(p, NullPtr)}
@@ -180,7 +180,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts AggregateAllPointToSets must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	ClearPointToAggregates()
+	ClearPointToAggregatesSess(testAmbientSession)
 }
 
 func TestInt2Str(t *testing.T) {

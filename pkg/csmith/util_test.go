@@ -84,12 +84,12 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 }
 
 func TestLogAnalysisFailAndEnclosers(t *testing.T) {
-	ClearAnalysisErrLog()
+	ClearAnalysisErrLogSess(testAmbientSession)
 	if LogAnalysisFail("x.y") {
 		t.Fatal("always false")
 	}
-	if !strings.Contains(AnalysisErrLog(), "Analysis failed at x.y") {
-		t.Fatal(AnalysisErrLog())
+	if !strings.Contains(AnalysisErrLogSess(testAmbientSession), "Analysis failed at x.y") {
+		t.Fatal(AnalysisErrLogSess(testAmbientSession))
 	}
 	out, ind := OutputOpenEncloser("{", 0)
 	if out != "{\n" || ind != 1 {
@@ -107,5 +107,5 @@ func TestLogAnalysisFailAndEnclosers(t *testing.T) {
 	if len(p) != 2 {
 		t.Fatal(p)
 	}
-	ClearAnalysisErrLog()
+	ClearAnalysisErrLogSess(testAmbientSession)
 }

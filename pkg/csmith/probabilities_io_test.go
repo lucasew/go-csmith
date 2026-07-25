@@ -49,7 +49,7 @@ func TestDumpAndParseSingle(t *testing.T) {
 	if _, ok := p2.ParseLine("[statement_prob,x=1]"); ok {
 		t.Fatal("group must fail")
 	}
-	DestroyProcessProbabilities()
+	DestroyProcessProbabilitiesSess(testAmbientSession)
 	if ProcessProbabilitiesSess(testAmbientSession) != nil {
 		t.Fatal("destroy")
 	}

@@ -39,26 +39,14 @@ func AddInterestedFactsSess(s *Session, interests int) {
 	s.MetaFactUnionEnabled = interests&FactCategoryUnionWrite != 0
 }
 
-// MetaFactPointToEnabled reports whether point-to analysis is active.
-func MetaFactPointToEnabled() bool { return MetaFactPointToEnabledSess(testAmbientSession) }
-
 // MetaFactPointToEnabledSess reports point-to meta flag on an explicit session bag.
 func MetaFactPointToEnabledSess(s *Session) bool {
 	return sessOrAmbient(s).MetaFactPointToEnabled
 }
 
-// MetaFactUnionEnabled reports whether union-write analysis is active.
-func MetaFactUnionEnabled() bool { return MetaFactUnionEnabledSess(testAmbientSession) }
-
 // MetaFactUnionEnabledSess reports union meta flag on an explicit session bag.
 func MetaFactUnionEnabledSess(s *Session) bool {
 	return sessOrAmbient(s).MetaFactUnionEnabled
-}
-
-// ClearMetaFacts restores default interested facts (both on).
-// Called from DoFinalization between generations.
-func ClearMetaFacts() {
-	ClearMetaFactsSess(testAmbientSession)
 }
 
 // ClearMetaFactsSess restores default meta flags on an explicit session bag.

@@ -2259,10 +2259,6 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 
 // ClearPointToAggregates resets all_ptrs / all_aliases (generation start).}
 
-func ClearPointToAggregates() {
-	ClearPointToAggregatesSess(testAmbientSession)
-}
-
 // ClearPointToAggregatesSess clears pointer aggregates on an explicit session bag.
 func ClearPointToAggregatesSess(s *Session) {
 	s = sessOrAmbient(s)

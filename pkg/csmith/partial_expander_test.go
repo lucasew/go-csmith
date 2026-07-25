@@ -3,14 +3,14 @@ package csmith
 import "testing"
 
 func TestPartialExpanderInactiveAllowsAll(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !ExpandCheck(StmtFor) || !ExpandCheck(StmtAssign) {
 		t.Fatal("inactive allows all")
 	}
 }
 
 func TestInitPartialExpanderAssignment(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !InitPartialExpander("assignment") {
 		t.Fatal("init")
 	}
@@ -22,19 +22,19 @@ func TestInitPartialExpanderAssignment(t *testing.T) {
 	if !ExpandCheck(StmtFor) {
 		t.Fatal("after first, mode off")
 	}
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 }
 
 func TestInitPartialExpanderForOnly(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !InitPartialExpander("for") {
 		t.Fatal("init")
 	}
 	// For allowed
-	if !DirectExpandCheck(StmtFor) {
+	if !DirectExpandCheckSess(testAmbientSession, StmtFor) {
 		t.Fatal("direct for")
 	}
-	if DirectExpandCheck(StmtAssign) {
+	if DirectExpandCheckSess(testAmbientSession, StmtAssign) {
 		t.Fatal("assign not set")
 	}
 	// ExpandCheck(For) succeeds and disables partial mode
@@ -49,58 +49,58 @@ func TestInitPartialExpanderForOnly(t *testing.T) {
 	if !currentSession().PartialExpands[MaxStatementType] {
 		t.Fatal("restored MAX")
 	}
-	if !DirectExpandCheck(StmtFor) || DirectExpandCheck(StmtAssign) {
+	if !DirectExpandCheckSess(testAmbientSession, StmtFor) || DirectExpandCheckSess(testAmbientSession, StmtAssign) {
 		t.Fatal("restored kinds")
 	}
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 }
 
 func TestInitPartialExpanderAll(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !InitPartialExpander("all") {
 		t.Fatal("all")
 	}
 	// "all" sets every kind true including MAX from init then MAX true again
-	if !DirectExpandCheck(StmtReturn) {
+	if !DirectExpandCheckSess(testAmbientSession, StmtReturn) {
 		t.Fatal("return")
 	}
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 }
 
 func TestInitPartialExpanderMulti(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !InitPartialExpander("if-else,return,invoke") {
 		t.Fatal("multi")
 	}
-	if !DirectExpandCheck(StmtIfElse) || !DirectExpandCheck(StmtReturn) || !DirectExpandCheck(StmtInvoke) {
+	if !DirectExpandCheckSess(testAmbientSession, StmtIfElse) || !DirectExpandCheckSess(testAmbientSession, StmtReturn) || !DirectExpandCheckSess(testAmbientSession, StmtInvoke) {
 		t.Fatal("kinds")
 	}
 	// assign allowed via invoke alias while MAX set
 	if !ExpandCheck(StmtAssign) {
 		t.Fatal("assign via invoke")
 	}
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 }
 
 func TestInitPartialExpanderBad(t *testing.T) {
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if InitPartialExpander("nope") {
 		t.Fatal("bad token")
 	}
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 }
 
 func TestInitFromOptions(t *testing.T) {
 	opts := Defaults()
 	opts.PartialExpand = "for,assignment"
-	if !InitPartialExpanderFromOptions(opts) {
+	if !InitPartialExpanderFromOptionsSess(testAmbientSession, opts) {
 		t.Fatal("opts")
 	}
-	if !DirectExpandCheck(StmtFor) || !DirectExpandCheck(StmtAssign) {
+	if !DirectExpandCheckSess(testAmbientSession, StmtFor) || !DirectExpandCheckSess(testAmbientSession, StmtAssign) {
 		t.Fatal("from opts")
 	}
 	opts.PartialExpand = ""
-	if !InitPartialExpanderFromOptions(opts) {
+	if !InitPartialExpanderFromOptionsSess(testAmbientSession, opts) {
 		t.Fatal("clear")
 	}
 	if currentSession().PartialExpands != nil {

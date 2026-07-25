@@ -845,9 +845,6 @@ func (av *ArrayVariable) AddIndexExprSess(s *Session, e *Expression) {
 // Session.ArrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
 // inside build_init_recursive. Advances across every array OutputDef (do not reset per array).
 
-// ResetArrayInitSeed restores the C++ static seed (tests / Finalization).
-func ResetArrayInitSeed() { ResetArrayInitSeedSess(testAmbientSession) }
-
 // ResetArrayInitSeedSess restores ArrayInitSeed on an explicit session bag.
 func ResetArrayInitSeedSess(s *Session) { sessOrAmbient(s).ArrayInitSeed = 0xABCDEF }
 

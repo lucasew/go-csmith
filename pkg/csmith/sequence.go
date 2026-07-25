@@ -207,9 +207,6 @@ func DestroySequencesSess(s *Session) {
 	sessOrAmbient(s).SequenceFactoryLive = nil
 }
 
-// CurrentSepChar mirrors SequenceFactory::current_sep_char.
-func CurrentSepChar() byte { return CurrentSepCharSess(testAmbientSession) }
-
 // CurrentSepCharSess returns the separator on an explicit session bag.
 func CurrentSepCharSess(s *Session) byte { return sessOrAmbient(s).SequenceFactorySep }
 

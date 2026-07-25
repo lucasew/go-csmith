@@ -219,8 +219,8 @@ func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {
 }
 
 func TestUnaryMinusOutputSafeAndIdentify(t *testing.T) {
-	ClearSafeOpWrapperNames()
-	defer ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
+	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
 	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
@@ -240,8 +240,8 @@ func TestUnaryMinusOutputSafeAndIdentify(t *testing.T) {
 }
 
 func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
-	ClearSafeOpWrapperNames()
-	defer ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
+	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
 	// pre-register so id is known; filter only id 1 — deny if id != 1
 	fname := "safe_unary_minus_func_int32_t_s"
 	id := SafeOpFlagsToID(fname)
@@ -315,8 +315,8 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 }
 
 func TestBinaryOutputIdentifyWrappers(t *testing.T) {
-	ClearSafeOpWrapperNames()
-	defer ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
+	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
 	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	a1 := &Expression{Term: TermConstant, Con: MakeInt(2)}
 	fi := &Invocation{
@@ -368,15 +368,15 @@ func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 }
 
 func TestOutputWrapperH(t *testing.T) {
-	ClearSafeOpWrapperNames()
-	defer ClearSafeOpWrapperNames()
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
+	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
 	if OutputWrapperH() != "#define N_WRAP 0\n" {
 		t.Fatal(OutputWrapperH())
 	}
 	_ = SafeOpFlagsToID("func_add_int32_t")
 	_ = SafeOpFlagsToID("func_sub_int32_t")
-	if WrapperNamesCount() != 2 {
-		t.Fatal(WrapperNamesCount())
+	if WrapperNamesCountSess(testAmbientSession) != 2 {
+		t.Fatal(WrapperNamesCountSess(testAmbientSession))
 	}
 	if OutputWrapperH() != "#define N_WRAP 2\n" {
 		t.Fatal(OutputWrapperH())

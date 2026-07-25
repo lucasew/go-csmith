@@ -14,7 +14,7 @@ func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	if g == nil {
 		t.Fatal("seed global")
 	}
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	// force scope toward global by using Select many times
 	reused := 0
 	created := 0

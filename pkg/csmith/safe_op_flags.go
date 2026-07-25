@@ -152,18 +152,10 @@ func SafeOpFlagsToIDSess(s *Session, fname string) int {
 	return len(s.WrapperNames)
 }
 
-// ClearSafeOpWrapperNames resets to_id registry (finalization/tests).
-func ClearSafeOpWrapperNames() {
-	ClearSafeOpWrapperNamesSess(testAmbientSession)
-}
-
 // ClearSafeOpWrapperNamesSess clears wrapper names on an explicit session bag.
 func ClearSafeOpWrapperNamesSess(s *Session) {
 	sessOrAmbient(s).WrapperNames = nil
 }
-
-// WrapperNamesCount mirrors SafeOpFlags::wrapper_names.size().
-func WrapperNamesCount() int { return WrapperNamesCountSess(testAmbientSession) }
 
 // WrapperNamesCountSess returns wrapper count on an explicit session bag.
 func WrapperNamesCountSess(s *Session) int { return len(sessOrAmbient(s).WrapperNames) }

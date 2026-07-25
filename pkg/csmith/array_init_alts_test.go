@@ -19,7 +19,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 	n8 := 0
 	for seed := uint64(1); seed <= 500; seed++ {
 		ClearErrorSess(testAmbientSession)
-		ResetArrayInitSeed()
+		ResetArrayInitSeedSess(testAmbientSession)
 		r := NewRng(seed)
 		SetProcessRngSess(testAmbientSession, r)
 		vs := NewVariableSelector(opts)
@@ -61,7 +61,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 // more than one init token. ArrayVariable.cpp:433–437 seed formula.
 func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	ResetArrayInitSeed()
+	ResetArrayInitSeedSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := GetSimpleType(EUInt)
 	av := &ArrayVariable{

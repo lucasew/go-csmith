@@ -76,16 +76,10 @@ func LogAnalysisFailSess(s *Session, msg string) bool {
 	return false
 }
 
-// AnalysisErrLog returns the accumulated analysis-fail log (tests / debug).
-func AnalysisErrLog() string { return AnalysisErrLogSess(testAmbientSession) }
-
 // AnalysisErrLogSess returns analysis errlog on an explicit session bag.
 func AnalysisErrLogSess(s *Session) string {
 	return sessOrAmbient(s).AnalysisErrLog.String()
 }
-
-// ClearAnalysisErrLog resets util errlog (finalization / tests).
-func ClearAnalysisErrLog() { ClearAnalysisErrLogSess(testAmbientSession) }
 
 // ClearAnalysisErrLogSess clears errlog on an explicit session bag.
 func ClearAnalysisErrLogSess(s *Session) { sessOrAmbient(s).AnalysisErrLog.Reset() }

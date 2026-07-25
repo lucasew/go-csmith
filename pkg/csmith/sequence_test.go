@@ -55,8 +55,8 @@ func TestSequenceFactory(t *testing.T) {
 	if s == nil || s.SepChar() != '_' {
 		t.Fatal("default sep")
 	}
-	if CurrentSepChar() != '_' {
-		t.Fatal(CurrentSepChar())
+	if CurrentSepCharSess(testAmbientSession) != '_' {
+		t.Fatal(CurrentSepCharSess(testAmbientSession))
 	}
 	s.AddNumber(0, 1, 0)
 	DestroySequences()

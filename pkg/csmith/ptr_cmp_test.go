@@ -16,7 +16,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	cg.Types = env
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	// Operands may soft-miss under sparse env; flags stream order changed so seed 5 alone
 	// is not stable — find any successful ptr_cmp.
 	var fi *Invocation
@@ -140,14 +140,14 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 }
 
 func TestRecordPointerComparisonsGetType(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	lhs := &Expression{Term: TermVariable, Var: p, ExprType: PointerTo(GetIntType())}
 	rhs := &Expression{
 		Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
 		ExprType: PointerTo(GetIntType()),
 	}
-	RecordPointerComparisons(lhs, rhs)
+	RecordPointerComparisonsSess(testAmbientSession, lhs, rhs)
 }
 
 func TestPtrCmpCastGetTypeResidualNoInventShell(t *testing.T) {

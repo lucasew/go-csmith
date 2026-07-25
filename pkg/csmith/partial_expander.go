@@ -123,12 +123,6 @@ func RestorePartialExpanderInitValuesSess(s *Session) {
 	}
 }
 
-// DirectExpandCheck mirrors PartialExpander::direct_expand_check.
-// PartialExpander.cpp:127–130.
-func DirectExpandCheck(t StatementType) bool {
-	return DirectExpandCheckSess(testAmbientSession, t)
-}
-
 // DirectExpandCheckSess is DirectExpandCheck on an explicit session bag.
 func DirectExpandCheckSess(s *Session, t StatementType) bool {
 	s = sessOrAmbient(s)
@@ -167,21 +161,11 @@ func ExpandCheckSess(s *Session, t StatementType) bool {
 	return rv
 }
 
-// ClearPartialExpander resets package state (tests / finalization).
-func ClearPartialExpander() {
-	ClearPartialExpanderSess(testAmbientSession)
-}
-
 // ClearPartialExpanderSess clears partial-expand state on an explicit session bag.
 func ClearPartialExpanderSess(s *Session) {
 	s = sessOrAmbient(s)
 	s.PartialExpands = nil
 	s.PartialExpandsBackup = nil
-}
-
-// InitPartialExpanderFromOptions wires CGOptions::partial_expand string.
-func InitPartialExpanderFromOptions(opts Options) bool {
-	return InitPartialExpanderFromOptionsSess(testAmbientSession, opts)
 }
 
 // InitPartialExpanderFromOptionsSess wires partial-expand on an explicit session bag.

@@ -28,8 +28,8 @@ func TestParseStringOptions(t *testing.T) {
 
 func TestMonitoredFuncs(t *testing.T) {
 	// OutputMgr.cpp:81–86
-	ClearMonitoredFuncs()
-	defer ClearMonitoredFuncs()
+	ClearMonitoredFuncsSess(testAmbientSession)
+	defer ClearMonitoredFuncsSess(testAmbientSession)
 	if !IsMonitoredFunc() {
 		t.Fatal("empty list → all monitored")
 	}
@@ -108,8 +108,8 @@ func TestOutputMgrHashHelpers(t *testing.T) {
 	if OutputHashFuncInvocation(1) != "    csmith_compute_hash();\n" {
 		t.Fatal(OutputHashFuncInvocation(1))
 	}
-	ClearMonitoredFuncs()
-	defer ClearMonitoredFuncs()
+	ClearMonitoredFuncsSess(testAmbientSession)
+	defer ClearMonitoredFuncsSess(testAmbientSession)
 	if got := OutputStepHashFuncInvocation(1, 7); got != "    step_hash(7);\n" {
 		t.Fatal(got)
 	}

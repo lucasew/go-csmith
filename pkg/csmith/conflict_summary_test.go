@@ -426,7 +426,7 @@ func TestDoFinalization(t *testing.T) {
 		SetProcessRngSess(testAmbientSession, prevR)
 		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
-	IncrCounter(&currentSession().BK.structDepthCnts, 1)
+	IncrCounterSess(testAmbientSession, &currentSession().BK.structDepthCnts, 1)
 	currentSession().NextStmID = 5
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	DoFinalizationSess(testAmbientSession)

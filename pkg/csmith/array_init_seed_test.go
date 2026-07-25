@@ -8,7 +8,7 @@ import (
 func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 	// ArrayVariable.cpp:429 static unsigned seed = 0xABCDEF across OutputDefs
 	ClearErrorSess(testAmbientSession)
-	ResetArrayInitSeed()
+	ResetArrayInitSeedSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 
 	// First array: size 1, pool {"A"} → one leaf, seed advances once
@@ -45,13 +45,13 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 	if s2 != want {
 		t.Fatalf("a2: got %q want %q (idx %d,%d)", s2, want, idx0, idx1)
 	}
-	ResetArrayInitSeed()
+	ResetArrayInitSeedSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 }
 
 func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	ResetArrayInitSeed()
+	ResetArrayInitSeedSess(testAmbientSession)
 	opts := Defaults()
 	opts.ForceNonUniformArrayInit = true
 	SetProcessOptionsSess(testAmbientSession, opts)
@@ -75,6 +75,6 @@ func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 	if currentSession().ArrayInitSeed <= seedAfter {
 		t.Fatal("static seed must advance across arrays")
 	}
-	ResetArrayInitSeed()
+	ResetArrayInitSeedSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 }

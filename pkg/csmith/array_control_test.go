@@ -59,8 +59,8 @@ func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
 
 func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	// StatementFor.cpp:157–158 — oob_cnt when oob flip hits
-	BookkeeperDoFinalization()
-	defer BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
+	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// 100% OOB
 	_, _, _, _, _, _ = MakeRandomArrayControl(NewRng(1), 8, false, 100)
 	if OOBCount() != 1 {

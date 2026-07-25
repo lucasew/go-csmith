@@ -17,14 +17,6 @@ func sessBK(s *Session) *bookkeeperState {
 	return &currentSession().BK
 }
 
-// IncrCounter mirrors incr_counter — grow vector and ++ at pos.
-// Bookkeeper.cpp:527–537.
-// Counters always live; sticky (no invent soft-skip stats past hole).
-// pos < 0 is complete no-op (out-of-range index, not hard IR).
-func IncrCounter(counters *[]int, pos int) {
-	IncrCounterSess(testAmbientSession, counters, pos)
-}
-
 // IncrCounterSess is IncrCounter with explicit session residual sticky.
 func IncrCounterSess(s *Session, counters *[]int, pos int) {
 	if counters == nil {
@@ -49,10 +41,6 @@ func CalcTotal(counters []int) int {
 	}
 	return total
 }
-
-// BookkeeperDoFinalization mirrors Bookkeeper::doFinalization.
-// Bookkeeper.cpp:116–126 (subset of cleared fields; full reset of all counters).
-func BookkeeperDoFinalization() { BookkeeperDoFinalizationSess(testAmbientSession) }
 
 // BookkeeperDoFinalizationSess clears bookkeeper counters on s (or ambient).
 func BookkeeperDoFinalizationSess(s *Session) {
@@ -140,10 +128,6 @@ func formattedOutputfSess(s *Session, b *strings.Builder, msg string, num float6
 	b.WriteString(fmt.Sprintf("%g\n", num))
 }
 
-// RecordAddressTaken mirrors Bookkeeper::record_address_taken.
-// Bookkeeper.cpp:324–334.
-func RecordAddressTaken(v *Variable) { RecordAddressTakenSess(testAmbientSession, v) }
-
 // RecordAddressTakenSess is RecordAddressTaken on an explicit session bag.
 func RecordAddressTakenSess(s *Session, v *Variable) {
 	// Bookkeeper.cpp:325–326 — assert(var); assert(var->type) sticky
@@ -164,12 +148,6 @@ func RecordAddressTakenSess(s *Session, v *Variable) {
 		// residual ERROR sticky — no invent soft-skip bitfield count past HasBitfields residual false
 		return
 	}
-}
-
-// RecordVolatileAccess mirrors Bookkeeper::record_volatile_access.
-// Bookkeeper.cpp:386–412.
-func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
-	RecordVolatileAccessSess(testAmbientSession, v, derefLevel, write)
 }
 
 // RecordVolatileAccessSess is RecordVolatileAccess on an explicit session bag.
@@ -214,12 +192,6 @@ func RecordVolatileAccessSess(s *Session, v *Variable, derefLevel int, write boo
 	}
 }
 
-// RecordBitfieldsReads mirrors Bookkeeper::record_bitfields_reads.
-// Bookkeeper.cpp:336–345.
-// RecordBitfieldsReads counts bitfield reads.
-// Variable + Type always live; sticky (no invent soft-skip bitfield read stats past hole).
-func RecordBitfieldsReads(v *Variable) { RecordBitfieldsReadsSess(testAmbientSession, v) }
-
 // RecordBitfieldsReadsSess is RecordBitfieldsReads on an explicit session bag.
 func RecordBitfieldsReadsSess(s *Session, v *Variable) {
 	if v == nil || v.Type == nil {
@@ -241,12 +213,6 @@ func RecordBitfieldsReadsSess(s *Session, v *Variable) {
 	}
 }
 
-// RecordBitfieldsWrites mirrors Bookkeeper::record_bitfields_writes.
-// Bookkeeper.cpp:347–356.
-// RecordBitfieldsWrites counts bitfield writes.
-// Variable + Type always live; sticky (no invent soft-skip bitfield write stats past hole).
-func RecordBitfieldsWrites(v *Variable) { RecordBitfieldsWritesSess(testAmbientSession, v) }
-
 // RecordBitfieldsWritesSess is RecordBitfieldsWrites on an explicit session bag.
 func RecordBitfieldsWritesSess(s *Session, v *Variable) {
 	if v == nil || v.Type == nil {
@@ -266,14 +232,6 @@ func RecordBitfieldsWritesSess(s *Session, v *Variable) {
 	if v.IsBitfield {
 		sessBK(s).lhsBitfieldCnt++
 	}
-}
-
-// RecordPointerComparisons mirrors Bookkeeper::record_pointer_comparisons.
-// Bookkeeper.cpp:361–382 — skip function terms; pointer types; null/ptr/addr counts.
-// RecordPointerComparisons counts pointer comparison kinds.
-// Expression operands always live; sticky (no invent soft-skip cmp stats past hole).
-func RecordPointerComparisons(lhs, rhs *Expression) {
-	RecordPointerComparisonsSess(testAmbientSession, lhs, rhs)
 }
 
 // RecordPointerComparisonsSess is RecordPointerComparisons on an explicit session bag.
@@ -331,10 +289,6 @@ func RecordPointerComparisonsSess(s *Session, lhs, rhs *Expression) {
 	}
 }
 
-// RecordVarsWithBitfields mirrors Bookkeeper::record_vars_with_bitfields.
-// Bookkeeper.cpp:464–474 — assert(type); base aggregate with bitfields.
-func RecordVarsWithBitfields(t *Type) { RecordVarsWithBitfieldsSess(testAmbientSession, t) }
-
 // RecordVarsWithBitfieldsSess is RecordVarsWithBitfields on an explicit session bag.
 func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 	// Bookkeeper.cpp:465 assert(type) sticky on nil; !has_bitfields is normal no-op
@@ -360,15 +314,6 @@ func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 	}
 	bk := sessBK(s)
 	IncrCounterSess(s, &bk.varsWithBitfields, level)
-}
-
-// RecordTypeWithBitfields mirrors Bookkeeper::record_type_with_bitfields.
-// Bookkeeper.cpp:476–499 — only when has_bitfields; count bitfield members.
-// RecordTypeWithBitfields counts bitfield members on aggregate types.
-// Type always live; sticky (no invent soft-skip bitfield stats past hole).
-// Non-aggregate is complete no-op.
-func RecordTypeWithBitfields(t *Type) {
-	RecordTypeWithBitfieldsSess(testAmbientSession, t)
 }
 
 // RecordTypeWithBitfieldsSess is RecordTypeWithBitfields on an explicit session bag.
@@ -442,12 +387,6 @@ func RecordTypeWithBitfieldsSess(s *Session, t *Type) {
 	}
 }
 
-// RecordVarCreated mirrors use_new_var path in VariableSelector::SelectVariable.
-// VariableSelector.cpp:1230–1236.
-// RecordVarCreated mirrors use_new_var bookkeeping on create.
-// Variable + Type always live; sticky (no invent soft-skip create stats past hole).
-func RecordVarCreated(v *Variable) { RecordVarCreatedSess(testAmbientSession, v) }
-
 // RecordVarCreatedSess is RecordVarCreated on an explicit session bag.
 func RecordVarCreatedSess(s *Session, v *Variable) {
 	if v == nil || v.Type == nil {
@@ -479,47 +418,25 @@ func RecordVarCreatedSess(s *Session, v *Variable) {
 	}
 }
 
-// RecordVarReused mirrors use_old_var_cnt++.
-// VariableSelector.cpp:1237–1238.
-func RecordVarReused() { RecordVarReusedSess(testAmbientSession) }
-
 // RecordVarReusedSess records on an explicit session bag.
 func RecordVarReusedSess(s *Session) {
 	sessBK(s).useOldVarCnt++
 }
 
-// RecordForwardJump mirrors Bookkeeper::forward_jump_cnt++.
-func RecordForwardJump() { RecordForwardJumpSess(testAmbientSession) }
-
 // RecordForwardJumpSess records on an explicit session bag.
 func RecordForwardJumpSess(s *Session) { sessBK(s).forwardJumpCnt++ }
-
-// RecordBackwardJump mirrors Bookkeeper::backward_jump_cnt++.
-func RecordBackwardJump() { RecordBackwardJumpSess(testAmbientSession) }
 
 // RecordBackwardJumpSess records on an explicit session bag.
 func RecordBackwardJumpSess(s *Session) { sessBK(s).backwardJumpCnt++ }
 
-// RecordPointerAvailForDeref mirrors Bookkeeper::pointer_avail_for_dereference++.
-// VariableSelector.cpp:416–419.
-func RecordPointerAvailForDeref() { RecordPointerAvailForDerefSess(testAmbientSession) }
-
 // RecordPointerAvailForDerefSess records on an explicit session bag.
 func RecordPointerAvailForDerefSess(s *Session) { sessBK(s).pointerAvailForDeref++ }
-
-// RecordVolatileAvail mirrors Bookkeeper::volatile_avail++.
-// VariableSelector.cpp:311 — has_eligible_volatile_var hit.
-func RecordVolatileAvail() { RecordVolatileAvailSess(testAmbientSession) }
 
 // RecordVolatileAvailSess records on an explicit session bag.
 func RecordVolatileAvailSess(s *Session) { sessBK(s).volatileAvail++ }
 
 // VolatileAvailCount returns volatile_avail (tests / statistics).
 func VolatileAvailCount() int { return sessBK(nil).volatileAvail }
-
-// RecordOOB mirrors Bookkeeper::oob_cnt++ when array_oob_prob fires.
-// StatementFor.cpp:157–158 — make_random_array_control.
-func RecordOOB() { RecordOOBSess(testAmbientSession) }
 
 // RecordOOBSess records on an explicit session bag.
 func RecordOOBSess(s *Session) { sessBK(s).oobCnt++ }

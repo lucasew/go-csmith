@@ -277,7 +277,7 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 
 func TestExpandCheckUnregisteredKindFailClosed(t *testing.T) {
 	// PartialExpander.cpp:137 — kinds not in expands_ map fail closed under partial mode
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 	if !InitPartialExpander("for") {
 		t.Fatal("init")
 	}
@@ -285,7 +285,7 @@ func TestExpandCheckUnregisteredKindFailClosed(t *testing.T) {
 	if ExpandCheck(StmtGoto) || ExpandCheck(StmtBreak) {
 		t.Fatal("unregistered kinds must not soft invent allow")
 	}
-	ClearPartialExpander()
+	ClearPartialExpanderSess(testAmbientSession)
 }
 
 func TestVariableCreationProbability10(t *testing.T) {

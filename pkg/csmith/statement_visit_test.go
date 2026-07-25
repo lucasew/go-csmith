@@ -39,7 +39,7 @@ func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
 
 func TestVisitFactsStatementIfMerge(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)

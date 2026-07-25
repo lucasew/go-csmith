@@ -1060,8 +1060,8 @@ func TestItemizeConstIndices(t *testing.T) {
 
 func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
-	defer BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
+	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	vol := CreateVariableScalars("g_v", GetIntType(), true, false)
 	vol.Qfer = NewCVQualifiers([]bool{false}, []bool{true})
 	// ensure IsVolatile true

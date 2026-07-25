@@ -8,9 +8,9 @@ import (
 func TestIncrCounterAndCalcTotal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	var c []int
-	IncrCounter(&c, 0)
-	IncrCounter(&c, 2)
-	IncrCounter(&c, 2)
+	IncrCounterSess(testAmbientSession, &c, 0)
+	IncrCounterSess(testAmbientSession, &c, 2)
+	IncrCounterSess(testAmbientSession, &c, 2)
 	if len(c) != 3 || c[0] != 1 || c[1] != 0 || c[2] != 2 {
 		t.Fatal(c)
 	}
@@ -18,13 +18,13 @@ func TestIncrCounterAndCalcTotal(t *testing.T) {
 		t.Fatal(CalcTotal(c))
 	}
 	// Counters always live; sticky (no invent soft-skip stats past hole)
-	IncrCounter(nil, 0)
+	IncrCounterSess(testAmbientSession, nil, 0)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil counters IncrCounter must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// pos < 0 complete no-op
-	IncrCounter(&c, -1)
+	IncrCounterSess(testAmbientSession, &c, -1)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("neg pos IncrCounter must complete no-op")
 	}
@@ -35,31 +35,31 @@ func TestIncrCounterAndCalcTotal(t *testing.T) {
 }
 
 func TestRecordAddressTaken(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	RecordAddressTaken(v)
+	RecordAddressTakenSess(testAmbientSession, v)
 	if !v.IsAddrTaken || currentSession().BK.addressTakenCnt != 1 {
 		t.Fatal(currentSession().BK.addressTakenCnt, v.IsAddrTaken)
 	}
 	// Bookkeeper.cpp:325–326 assert(var/type) sticky
-	RecordAddressTaken(nil)
+	RecordAddressTakenSess(testAmbientSession, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	RecordAddressTaken(&Variable{Name: "x", Type: nil})
+	RecordAddressTakenSess(testAmbientSession, &Variable{Name: "x", Type: nil})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// HasBitfields residual soft invent was soft-count / soft-skip complete stats.
 	// Fair: sticky stop (no invent partial bitfield address-taken count past hole).
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	holeTy := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
 	hv := &Variable{Name: "g_h", Type: holeTy}
 	before := currentSession().BK.varsWithBitfieldsAddressTakenCnt
-	RecordAddressTaken(hv)
+	RecordAddressTakenSess(testAmbientSession, hv)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasBitfields residual RecordAddressTaken must SetError sticky")
 	}
@@ -70,34 +70,34 @@ func TestRecordAddressTaken(t *testing.T) {
 }
 
 func TestRecordVolatileAccess(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
-	RecordVolatileAccess(v, 0, false)
+	RecordVolatileAccessSess(testAmbientSession, v, 0, false)
 	if currentSession().BK.readVolatileCnt != 1 {
 		t.Fatal(currentSession().BK.readVolatileCnt)
 	}
-	RecordVolatileAccess(v, 0, true)
+	RecordVolatileAccessSess(testAmbientSession, v, 0, true)
 	if currentSession().BK.writeVolatileCnt != 1 {
 		t.Fatal(currentSession().BK.writeVolatileCnt)
 	}
 	nv := CreateVariableScalars("g_n", GetIntType(), false, false)
-	RecordVolatileAccess(nv, 0, false)
+	RecordVolatileAccessSess(testAmbientSession, nv, 0, false)
 	if currentSession().BK.readNonVolatileCnt != 1 {
 		t.Fatal(currentSession().BK.readNonVolatileCnt)
 	}
 	// Bookkeeper.cpp:388 assert(var) sticky
-	RecordVolatileAccess(nil, 0, false)
+	RecordVolatileAccessSess(testAmbientSession, nil, 0, false)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsVolatileAfterDeref residual soft invent was soft-continue non-vol peel stats.
 	// Fair: sticky stop (Type-nil peel residual).
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	hole := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	beforeR := currentSession().BK.readVolatileCnt + currentSession().BK.readNonVolatileCnt
-	RecordVolatileAccess(hole, 0, false)
+	RecordVolatileAccessSess(testAmbientSession, hole, 0, false)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsVolatileAfterDeref residual RecordVolatileAccess must SetError sticky")
 	}
@@ -108,14 +108,14 @@ func TestRecordVolatileAccess(t *testing.T) {
 }
 
 func TestRecordJumpsAndVarFreshness(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	RecordForwardJump()
-	RecordBackwardJump()
-	RecordBackwardJump()
+	RecordForwardJumpSess(testAmbientSession)
+	RecordBackwardJumpSess(testAmbientSession)
+	RecordBackwardJumpSess(testAmbientSession)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	RecordVarCreated(v)
-	RecordVarReused()
+	RecordVarCreatedSess(testAmbientSession, v)
+	RecordVarReusedSess(testAmbientSession)
 	if currentSession().BK.forwardJumpCnt != 1 || currentSession().BK.backwardJumpCnt != 2 {
 		t.Fatal(currentSession().BK.forwardJumpCnt, currentSession().BK.backwardJumpCnt)
 	}
@@ -130,12 +130,12 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 		t.Fatal(out)
 	}
 	// Variable + Type always live; sticky (no invent soft-skip create stats past hole)
-	RecordVarCreated(nil)
+	RecordVarCreatedSess(testAmbientSession, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var RecordVarCreated must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	RecordVarCreated(&Variable{Name: "x", Type: nil})
+	RecordVarCreatedSess(testAmbientSession, &Variable{Name: "x", Type: nil})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type RecordVarCreated must SetError sticky")
 	}
@@ -154,32 +154,32 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 }
 
 func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	// Variable + Type always live; sticky
-	RecordBitfieldsReads(nil)
+	RecordBitfieldsReadsSess(testAmbientSession, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var RecordBitfieldsReads must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	RecordBitfieldsWrites(&Variable{Name: "x", Type: nil})
+	RecordBitfieldsWritesSess(testAmbientSession, &Variable{Name: "x", Type: nil})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type RecordBitfieldsWrites must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// Expression operands always live; sticky
-	RecordPointerComparisons(nil, &Expression{Term: TermConstant})
+	RecordPointerComparisonsSess(testAmbientSession, nil, &Expression{Term: TermConstant})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil lhs RecordPointerComparisons must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// HasBitfields residual soft invent was soft-count / soft-skip complete stats.
 	// Fair: sticky stop.
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	holeTy := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
 	beforeS := currentSession().BK.structsWithBitfields
-	RecordTypeWithBitfields(holeTy)
+	RecordTypeWithBitfieldsSess(testAmbientSession, holeTy)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasBitfields residual RecordTypeWithBitfields must SetError sticky")
 	}
@@ -188,12 +188,12 @@ func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type always live; sticky — non-aggregate complete no-op
-	RecordTypeWithBitfields(nil)
+	RecordTypeWithBitfieldsSess(testAmbientSession, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type RecordTypeWithBitfields must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	RecordTypeWithBitfields(GetIntType())
+	RecordTypeWithBitfieldsSess(testAmbientSession, GetIntType())
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-aggregate RecordTypeWithBitfields must complete no-op")
 	}
@@ -201,7 +201,7 @@ func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
 }
 
 func TestOutputTailStatistics(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	opts.Seed = 4
 	out, err := Generate(opts)
@@ -249,20 +249,20 @@ func TestOutputStatisticsStatResidualSticky(t *testing.T) {
 }
 
 func TestRecordPointerComparisons(t *testing.T) {
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	pt := PointerTo(GetIntType())
 	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_p", pt, false, false), ExprType: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}, ExprType: pt}
-	RecordPointerComparisons(lhs, rhs)
+	RecordPointerComparisonsSess(testAmbientSession, lhs, rhs)
 	if currentSession().BK.cmpPtrToNull != 1 {
 		t.Fatal(currentSession().BK.cmpPtrToNull)
 	}
 	// incomplete type IR sticky must not invent ptr-vs-ptr via level 0
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	broken := &Expression{Term: TermVariable, Var: &Variable{Name: "x"}, ExprType: pt}
 	good := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", pt, false, false), ExprType: pt}
-	RecordPointerComparisons(broken, good)
+	RecordPointerComparisonsSess(testAmbientSession, broken, good)
 	if currentSession().BK.cmpPtrToPtr != 0 || currentSession().BK.cmpPtrToAddr != 0 {
 		t.Fatal("incomplete IndirectLevel must not invent compare counts", currentSession().BK.cmpPtrToPtr, currentSession().BK.cmpPtrToAddr)
 	}
@@ -271,9 +271,9 @@ func TestRecordPointerComparisons(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// GetType residual soft invent was soft-skip non-pointer then invent complete stats no-op.
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	typeHole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
-	RecordPointerComparisons(typeHole, good)
+	RecordPointerComparisonsSess(testAmbientSession, typeHole, good)
 	if currentSession().BK.cmpPtrToNull != 0 || currentSession().BK.cmpPtrToPtr != 0 || currentSession().BK.cmpPtrToAddr != 0 {
 		t.Fatal("GetType residual must not invent compare counts", currentSession().BK.cmpPtrToNull, currentSession().BK.cmpPtrToPtr, currentSession().BK.cmpPtrToAddr)
 	}
@@ -285,7 +285,7 @@ func TestRecordPointerComparisons(t *testing.T) {
 
 func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
 	// Bookkeeper.cpp:128–140 — depth = get_blk_depth()-1 via Parent chain
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	outer := &Block{}
 	inner := &Block{Parent: outer}
 	outer.Parent = nil
@@ -353,7 +353,7 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 func TestStatExprDepthsForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs pushes test; soft invent skip would leave counts empty
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	test := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}},
@@ -401,14 +401,14 @@ func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
 func TestRecordVarCreatedStructDepthResidualSticky(t *testing.T) {
 	// StructDepth residual soft invent was invent soft-count depth/union past hole.
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	// Aggregate with nil field Type → StructDepth residual incompleteStructDepth + ERROR
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
 	v := &Variable{Name: "g_s", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	before := currentSession().BK.useNewVarCnt
-	RecordVarCreated(v)
+	RecordVarCreatedSess(testAmbientSession, v)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("StructDepth residual RecordVarCreated must SetError sticky")
 	}
@@ -417,36 +417,36 @@ func TestRecordVarCreatedStructDepthResidualSticky(t *testing.T) {
 		t.Fatal("counter regression")
 	}
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 }
 
 func TestRecordTypeWithBitfieldsIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent soft-count bitfields past non-aggregate.
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	// non-aggregate complete no-op
-	RecordTypeWithBitfields(GetIntType())
+	RecordTypeWithBitfieldsSess(testAmbientSession, GetIntType())
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete non-aggregate RecordTypeWithBitfields must not sticky")
 	}
 	// nil sticky
-	RecordTypeWithBitfields(nil)
+	RecordTypeWithBitfieldsSess(testAmbientSession, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RecordTypeWithBitfields must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 }
 
 func TestRecordPointerComparisonsIsPointerLikeResidualSticky(t *testing.T) {
 	// IsPointerLike residual soft invent was invent soft-skip then later cmp counts.
 	// Type-nil GetType residual already sticky; complete non-pointer soft-skip hygiene.
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
 	before := currentSession().BK.cmpPtrToNull + currentSession().BK.cmpPtrToPtr + currentSession().BK.cmpPtrToAddr
-	RecordPointerComparisons(a, b)
+	RecordPointerComparisonsSess(testAmbientSession, a, b)
 	// non-pointer soft skip no count
 	if currentSession().BK.cmpPtrToNull+currentSession().BK.cmpPtrToPtr+currentSession().BK.cmpPtrToAddr != before {
 		t.Fatal("non-pointer must not invent cmp counts")
@@ -458,10 +458,10 @@ func TestRecordPointerComparisonsIsPointerLikeResidualSticky(t *testing.T) {
 	// Type-nil GetType residual
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
 	ok := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)}
-	RecordPointerComparisons(hole, ok)
+	RecordPointerComparisonsSess(testAmbientSession, hole, ok)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual RecordPointerComparisons must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	BookkeeperDoFinalization()
+	BookkeeperDoFinalizationSess(testAmbientSession)
 }
