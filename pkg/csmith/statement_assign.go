@@ -828,7 +828,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 				}
 				return ""
 			}
-			id := SafeOpFlagsToID(fname)
+			id := SafeOpFlagsToIDSess(s, fname)
 			// don't use wrapper if filtered out by --safe-math-wrapper
 			if !SafeMathWrapperAllowed(opts, id) {
 				return OutputAssignSimple(st, wrapVol)

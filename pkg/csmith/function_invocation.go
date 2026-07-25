@@ -142,7 +142,7 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			out := fi.outputUnary(a0)
+			out := fi.outputUnarySess(s, a0)
 			// residual ERROR sticky — no invent soft-empty unary past outputUnary residual
 			if sessHasError(s) {
 				return ""
@@ -173,7 +173,7 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		out := fi.outputBinary(a0, a1)
+		out := fi.outputBinarySess(s, a0, a1)
 		// residual ERROR sticky — no invent soft-empty binary past outputBinary residual
 		if sessHasError(s) {
 			return ""
@@ -188,6 +188,11 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 // outputUnary mirrors FunctionInvocationUnary::Output.
 // FunctionInvocationUnary.cpp:192–243.
 func (fi *Invocation) outputUnary(a0 string) string {
+	return fi.outputUnarySess(nil, a0)
+}
+
+// outputUnarySess is outputUnary registering wrapper names on bag s.
+func (fi *Invocation) outputUnarySess(s *Session, a0 string) string {
 	// FunctionInvocationUnary.cpp:200–224 — eMinus + avoid_signed_overflow
 	if fi.Unary == "-" && fi.Safe != nil && fi.OutSafeMath {
 		// float size: standard minus (no safe unary float func)
@@ -198,9 +203,9 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		fname := fi.Safe.UnaryMinusFuncName()
 		// SafeOpFlags.cpp:325 assert / empty name → cast path (no invent wrapper name)
 		if fname == "" {
-			return unaryCastMinus(fi.Safe.SizeToken(), a0)
+			return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
 		}
-		id := SafeOpFlagsToID(fname)
+		id := SafeOpFlagsToIDSess(s, fname)
 		// FunctionInvocationUnary.cpp:208–218 — safe_math_wrapper filter
 		if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
 			var b strings.Builder
@@ -221,12 +226,12 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		}
 		// wrapper denied → cast + standard (need_cast fallthrough)
 		// FunctionInvocationUnary.cpp:226–239
-		return unaryCastMinus(fi.Safe.SizeToken(), a0)
+		return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
 	}
 	// FunctionInvocationUnary.cpp:229–240 — ePlus/eNot/eBitNot or non-safe minus
 	if fi.Unary == "-" && fi.Safe != nil && !fi.OutSafeMath {
 		// need_cast when Safe flags exist but avoid_signed_overflow off
-		return unaryCastMinus(fi.Safe.SizeToken(), a0)
+		return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
 	}
 	// FunctionInvocationUnary.cpp:192–242 — outer "(" + op + [cast] + arg.Output + ")"
 	// C++ does NOT wrap arg in extra parens after op (param_value[0]->Output only).
@@ -236,15 +241,19 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		return fmt.Sprintf("(%s%s)", fi.Unary, a0)
 	default:
 		// assert invalid operator — sticky no invent emit
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
 
 // unaryCastMinus is (-(size)arg); empty size token sticky fail closed (no invent "(-()x)").
 func unaryCastMinus(cast, a0 string) string {
+	return unaryCastMinusSess(nil, cast, a0)
+}
+
+func unaryCastMinusSess(s *Session, cast, a0 string) string {
 	if cast == "" || a0 == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("(-(%s)%s)", cast, a0)
@@ -253,6 +262,11 @@ func unaryCastMinus(cast, a0 string) string {
 // outputBinary mirrors FunctionInvocationBinary::Output.
 // FunctionInvocationBinary.cpp:350–426.
 func (fi *Invocation) outputBinary(a0, a1 string) string {
+	return fi.outputBinarySess(nil, a0, a1)
+}
+
+// outputBinarySess is outputBinary registering wrapper names on bag s.
+func (fi *Invocation) outputBinarySess(s *Session, a0, a1 string) string {
 	// FunctionInvocationBinary.cpp:357–361 — mutated array subscript add without flags
 	if fi.Binary == "+" && fi.Safe == nil {
 		return fmt.Sprintf("(%s + %s)", a0, a1)
@@ -260,7 +274,7 @@ func (fi *Invocation) outputBinary(a0, a1 string) string {
 	// FunctionInvocationBinary.cpp:363–399 — arith/shift + avoid_signed_overflow
 	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
 		if fname := fi.Safe.BinaryFuncName(fi.Binary); fname != "" {
-			id := SafeOpFlagsToID(fname)
+			id := SafeOpFlagsToIDSess(s, fname)
 			if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
 				var b strings.Builder
 				b.WriteString("(")
@@ -286,20 +300,24 @@ func (fi *Invocation) outputBinary(a0, a1 string) string {
 			}
 			// wrapper denied → cast both operands (need_cast fallthrough)
 			// FunctionInvocationBinary.cpp:400–414
-			return binaryCastOp(fi.Safe.SizeToken(), a0, fi.Binary, a1)
+			return binaryCastOpSess(s, fi.Safe.SizeToken(), a0, fi.Binary, a1)
 		}
 	}
 	// need_cast when Safe present but SafeMath off for arith/shift
 	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && !fi.OutSafeMath {
-		return binaryCastOp(fi.Safe.SizeToken(), a0, fi.Binary, a1)
+		return binaryCastOpSess(s, fi.Safe.SizeToken(), a0, fi.Binary, a1)
 	}
 	return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
 }
 
 // binaryCastOp is ((cast)a0 op (cast)a1); empty cast sticky fail closed (no invent "(()a + ()b)").
 func binaryCastOp(cast, a0, op, a1 string) string {
+	return binaryCastOpSess(nil, cast, a0, op, a1)
+}
+
+func binaryCastOpSess(s *Session, cast, a0, op, a1 string) string {
 	if cast == "" || a0 == "" || a1 == "" || op == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, op, cast, a1)
