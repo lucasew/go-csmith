@@ -55,11 +55,15 @@ func MakeFactUnionSess(s *Session, v *Variable, fid int) *FactUnion {
 // Incomplete MakeFactUnion sticky nil (no invent TOP shell past hole).}
 
 func MakeFactUnionTop(v *Variable) *FactUnion {
-	f := MakeFactUnion(v, FactUnionTop)
+	return MakeFactUnionTopSess(nil, v)
+}
+
+func MakeFactUnionTopSess(s *Session, v *Variable) *FactUnion {
+	f := MakeFactUnionSess(s, v, FactUnionTop)
 	if f == nil {
 		// MakeFactUnion may already sticky non-union/incomplete subject
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}
@@ -71,16 +75,20 @@ func MakeFactUnionTop(v *Variable) *FactUnion {
 // Incomplete IR fails closed sticky IncompleteUnionFactSlice (not bare nil —
 // UnionFactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).
 func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
+	return MakeFactUnionsSess(nil, vars, fid)
+}
+
+func MakeFactUnionsSess(s *Session, vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		f := MakeFactUnion(v, fid)
+		f := MakeFactUnionSess(s, v, fid)
 		// non-union subject is assert path — fail closed sticky whole batch
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		out = append(out, f)
@@ -91,15 +99,19 @@ func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 // FindRelatedUnion finds FactUnion for union variable v.
 // FactUnion* always live; nil hole fails closed (nil — no invent skip to later match).
 func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
+	return FindRelatedUnionSess(nil, facts, v)
+}
+
+func FindRelatedUnionSess(s *Session, facts []*FactUnion, v *Variable) *FactUnion {
 	// subject always live; sticky no invent miss / soft-skip nil key
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	for _, f := range facts {
 		// FactUnion* always live; sticky no invent skip hole to later match
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if f.Var == v {
@@ -111,8 +123,12 @@ func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
 
 // GetVar mirrors FactUnion::get_var.
 func (f *FactUnion) GetVar() *Variable {
+	return f.GetVarSess(nil)
+}
+
+func (f *FactUnion) GetVarSess(s *Session) *Variable {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return f.Var
@@ -120,12 +136,16 @@ func (f *FactUnion) GetVar() *Variable {
 
 // SetVar mirrors FactUnion::set_var.
 func (f *FactUnion) SetVar(v *Variable) {
+	f.SetVarSess(nil, v)
+}
+
+func (f *FactUnion) SetVarSess(s *Session, v *Variable) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	f.Var = v
@@ -133,8 +153,12 @@ func (f *FactUnion) SetVar(v *Variable) {
 
 // GetLastWrittenFID mirrors FactUnion::get_last_written_fid.
 func (f *FactUnion) GetLastWrittenFID() int {
+	return f.GetLastWrittenFIDSess(nil)
+}
+
+func (f *FactUnion) GetLastWrittenFIDSess(s *Session) int {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return FactUnionBottom
 	}
 	return f.LastWrittenFID
@@ -157,9 +181,13 @@ func (f *FactUnion) IsRelatedSess(s *Session, other *FactUnion) bool {
 // Incomplete FactUnion sticky false (no invent TOP / soft re-pick past hole).}
 
 func (f *FactUnion) IsTop() bool {
+	return f.IsTopSess(nil)
+}
+
+func (f *FactUnion) IsTopSess(s *Session) bool {
 	// FactUnion always live; sticky incomplete no invent TOP soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.LastWrittenFID == FactUnionTop
@@ -168,9 +196,13 @@ func (f *FactUnion) IsTop() bool {
 // IsBottom mirrors FactUnion::is_bottom.
 // Incomplete FactUnion sticky false (no invent BOTTOM / soft re-pick past hole).
 func (f *FactUnion) IsBottom() bool {
+	return f.IsBottomSess(nil)
+}
+
+func (f *FactUnion) IsBottomSess(s *Session) bool {
 	// FactUnion always live; sticky incomplete no invent BOTTOM soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.LastWrittenFID == FactUnionBottom
@@ -179,8 +211,12 @@ func (f *FactUnion) IsBottom() bool {
 // SetTop mirrors FactUnion::set_top.
 // Incomplete FactUnion sticky no-op (no invent soft-set TOP past missing shell).
 func (f *FactUnion) SetTop() {
+	f.SetTopSess(nil)
+}
+
+func (f *FactUnion) SetTopSess(s *Session) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	f.LastWrittenFID = FactUnionTop
@@ -189,8 +225,12 @@ func (f *FactUnion) SetTop() {
 // SetBottom mirrors FactUnion::set_bottom.
 // Incomplete FactUnion sticky no-op (no invent soft-set BOTTOM past missing shell).
 func (f *FactUnion) SetBottom() {
+	f.SetBottomSess(nil)
+}
+
+func (f *FactUnion) SetBottomSess(s *Session) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	f.LastWrittenFID = FactUnionBottom
@@ -199,9 +239,13 @@ func (f *FactUnion) SetBottom() {
 // Clone mirrors FactUnion::clone.
 // Incomplete FactUnion sticky nil (no invent empty clone shell past hole).
 func (f *FactUnion) Clone() *FactUnion {
+	return f.CloneSess(nil)
+}
+
+func (f *FactUnion) CloneSess(s *Session) *FactUnion {
 	// FactUnion always live; sticky incomplete no invent nil clone soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return &FactUnion{Var: f.Var, LastWrittenFID: f.LastWrittenFID}
@@ -211,9 +255,13 @@ func (f *FactUnion) Clone() *FactUnion {
 // FactUnion.cpp:195–201.
 // Incomplete FactUnion sticky false (no invent not-equal / soft re-pick past holes).
 func (f *FactUnion) Equal(other *FactUnion) bool {
+	return f.EqualSess(nil, other)
+}
+
+func (f *FactUnion) EqualSess(s *Session, other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent not-equal
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -226,34 +274,38 @@ func (f *FactUnion) Equal(other *FactUnion) bool {
 // FactUnion.cpp:249–259 — bottom implies all; equal fid implies; else false.
 // Incomplete FactUnion sticky false (no invent not-imply / soft re-pick past holes).
 func (f *FactUnion) Imply(other *FactUnion) bool {
+	return f.ImplySess(nil, other)
+}
+
+func (f *FactUnion) ImplySess(s *Session, other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent not-imply
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
 		return false
 	}
-	if f.IsBottom() {
+	if f.IsBottomSess(s) {
 		// residual ERROR sticky — no invent soft-imply past IsBottom residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past IsBottom residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
-	if other.IsBottom() {
+	if other.IsBottomSess(s) {
 		// residual ERROR sticky — no invent soft-imply past other IsBottom residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue past other IsBottom residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return f.LastWrittenFID == other.LastWrittenFID
@@ -365,20 +417,24 @@ func (f *FactUnion) GetLastWrittenTypeSess(s *Session) *Type {
 // FactUnion.cpp:272–275.}
 
 func (f *FactUnion) Output() string {
+	return f.OutputSess(nil)
+}
+
+func (f *FactUnion) OutputSess(s *Session) string {
 	if f == nil || f.Var == nil {
 		if f != nil && f.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
 	// var name always live; sticky no invent " last written field: N" without identifier
-	name := f.Var.GetActualName(false)
+	name := f.Var.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty union fact past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return name + " last written field: " + strconv.Itoa(f.LastWrittenFID)
@@ -407,11 +463,15 @@ func IncompleteUnionFactSlice() []*FactUnion {
 // FunctionInvocationUser.cpp:206 — global_facts = caller_fm->global_facts includes eUnionWrite.
 // Incomplete maps fail closed sticky IncompleteUnionFactSlice (no invent cleaned partial).
 func CloneUnionFactSlice(facts []*FactUnion) []*FactUnion {
+	return CloneUnionFactSliceSess(nil, facts)
+}
+
+func CloneUnionFactSliceSess(s *Session, facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, len(facts))
@@ -530,17 +590,21 @@ func RenewUnionFactsSess(s *Session, facts *[]*FactUnion, newFacts []*FactUnion)
 // are body map_facts_out after that filter — global union last-writes remain.}
 
 func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
+	return GlobalUnionFactsOnlySess(nil, facts)
+}
+
+func GlobalUnionFactsOnlySess(s *Session, facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, 0, len(facts))
 	for _, f := range facts {
-		isG := f.Var.IsGlobal()
-		if sessHasError(nil) {
+		isG := f.Var.IsGlobalSess(s)
+		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
 		if isG {
