@@ -1194,7 +1194,7 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 	// PickBinaryOp MAX / empty token — sticky no invent infix shell without live op
-	opStr := op.BinaryOpC()
+	opStr := op.BinaryOpCSess(cgSess(cg))
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
@@ -1355,13 +1355,13 @@ func MakeRandomBinaryInvocation(
 				if eq0 || is01 {
 					lhsF, rhsF := false, false
 					if lhsTy != nil {
-						lhsF = lhsTy.IsFloat()
+						lhsF = lhsTy.IsFloatSess(cgSess(cg))
 						if sessHasError(cgSess(cg)) {
 							return nil
 						}
 					}
 					if rhsTy != nil {
-						rhsF = rhsTy.IsFloat()
+						rhsF = rhsTy.IsFloatSess(cgSess(cg))
 						if sessHasError(cgSess(cg)) {
 							return nil
 						}
@@ -1374,7 +1374,7 @@ func MakeRandomBinaryInvocation(
 						if sessHasError(cgSess(cg)) {
 							return nil
 						}
-						opStr = op.BinaryOpC()
+						opStr = op.BinaryOpCSess(cgSess(cg))
 					}
 				}
 			}
@@ -1497,7 +1497,7 @@ func MakeRandomBinaryPtrComparison(
 	if r.RndFlipcoin(50) {
 		op = BinCmpEq
 	}
-	opStr := op.BinaryOpC()
+	opStr := op.BinaryOpCSess(cgSess(cg))
 	// FunctionInvocation.cpp:297–299 — SafeOpFlags::make_random_binary(get_int_type(),
 	// nullptr, nullptr, sOpBinary, op) BEFORE choose_random_pointer_type.
 	// Output for ptr_cmp still uses standard ==/!= (not safe_* wrappers), but the
@@ -1646,7 +1646,7 @@ func MakeBinary(
 		return nil
 	}
 	// invalid / MAX op — sticky no invent empty Binary token shell
-	opStr := op.BinaryOpC()
+	opStr := op.BinaryOpCSess(cg.Sess)
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
 		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
@@ -1721,8 +1721,8 @@ func MakeRandomUnaryInvocation(
 	unProbs := sessProbs(cgSess(cg))
 	// C++ unbounded do-while; cap high (no soft invent invalid float op)
 	for tries := 0; tries < 256; tries++ {
-		uop = PickUnaryOpProbs(r, opts, unProbs)
-		isF := typ.IsFloat()
+		uop = PickUnaryOpProbsSess(cgSess(cg), r, opts, unProbs)
+		isF := typ.IsFloatSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-continue unary pick past IsFloat residual
 		if sessHasError(cgSess(cg)) {
 			return nil
@@ -1736,7 +1736,7 @@ func MakeRandomUnaryInvocation(
 		return nil
 	}
 	// PickUnaryOp MAX / empty token — sticky no invent unary shell without live op
-	op := uop.UnaryOpC()
+	op := uop.UnaryOpCSess(cgSess(cg))
 	if int(uop) < 0 || int(uop) >= MaxUnaryOp || op == "" {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
@@ -1779,7 +1779,7 @@ func MakeRandomUnaryInvocation(
 // temp allocation. FunctionInvocationBinary.cpp:59–75 — always when flags && safe_ops;
 // no soft invent skip on !MathNoTmp or float size.
 func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags, op BinaryOp) (tmp1, tmp2 string) {
-	if flags == nil || !SafeOpsBinary(op.BinaryOpC()) {
+	if flags == nil || !SafeOpsBinary(op.BinaryOpCSess(cg.Sess)) {
 		return "", ""
 	}
 	// FunctionInvocationBinary.cpp:59–75 — no EffectComplete/FactsComplete gate before

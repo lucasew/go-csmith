@@ -558,7 +558,7 @@ func makePossibleCompoundAssign(
 		return st
 	}
 	// compound always maps to a live binary token; sticky no invent empty Binary shell
-	opStr := bop.BinaryOpC()
+	opStr := bop.BinaryOpCSess(cg.Sess)
 	if int(bop) < 0 || int(bop) >= MaxBinaryOp || opStr == "" {
 		sessNoteError(cg.Sess, ErrGeneric)
 		return Stmt{}

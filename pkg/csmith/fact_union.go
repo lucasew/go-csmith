@@ -706,7 +706,7 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 	// walk to the union field variable
 	// FactUnion.cpp:181–184 — for (; !is_union_field(); field_var_of); assert(is_union_field)
 	uf := v
-	for uf != nil && !uf.IsUnionField() {
+	for uf != nil && !uf.IsUnionFieldSess(s) {
 		// residual ERROR sticky — no invent soft-continue walk past IsUnionField residual
 		if sessHasError(s) {
 			return true

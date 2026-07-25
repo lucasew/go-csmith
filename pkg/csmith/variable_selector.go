@@ -158,7 +158,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		if v.IsVirtual() || v.IsVolatile() {
+		if v.IsVirtualSess(s) || v.IsVolatileSess(s) {
 			// residual ERROR sticky — no invent soft-continue then pick later past hole
 			if sessHasError(s) {
 				return nil
@@ -185,7 +185,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		if sessHasError(s) {
 			return nil
 		}
-		if !onStack && !v.IsGlobal() {
+		if !onStack && !v.IsGlobalSess(s) {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsGlobal hole
 			if sessHasError(s) {
 				return nil
@@ -196,7 +196,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		if sessHasError(s) {
 			return nil
 		}
-		nonread := IsNonreadableField(v, unionFacts)
+		nonread := IsNonreadableFieldSess(s, v, unionFacts)
 		// residual ERROR sticky — no invent soft-continue then pick later past hole
 		// (IsInsideUnionField may sticky residual true/false then soft-return)
 		if sessHasError(s) {
@@ -338,7 +338,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 				sessNoteError(vsSess(vs), ErrGeneric)
 				return nil
 			}
-			if iv.Type.IsFloat() {
+			if iv.Type.IsFloatSess(vsSess(vs)) {
 				// residual ERROR sticky — no invent soft-continue then pick later IV past IsFloat hole
 				if sessHasError(vsSess(vs)) {
 					return nil
@@ -350,7 +350,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 				return nil
 			}
 			// VariableSelector.cpp:1455–1456 — signed char index option
-			if !cgHasSignedCharIndex(vs) && iv.Type.IsSignedChar() {
+			if !cgHasSignedCharIndex(vs) && iv.Type.IsSignedCharSess(vsSess(vs)) {
 				// residual ERROR sticky — no invent soft-continue then pick later IV past IsSignedChar hole
 				if sessHasError(vsSess(vs)) {
 					return nil
@@ -1767,7 +1767,7 @@ func ChooseVarFull(
 			if noBitfield && v.IsBitfield {
 				continue
 			}
-			if noUnion && v.IsInsideUnionField() {
+			if noUnion && v.IsInsideUnionFieldSess(cg.Sess) {
 				// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
 				if sessHasError(cg.Sess) {
 					return nil
@@ -1782,12 +1782,12 @@ func ChooseVarFull(
 				return nil
 			}
 		}
-		return ChooseOKVar(r, ok)
+		return ChooseOKVarSess(cg.Sess, r, ok)
 	}
 	cands := vars
 	// VariableSelector.cpp:405–410 — expand when type simple/aggregate
 	if !noExpandStructUnion {
-		simple := want.IsSimple()
+		simple := want.IsSimpleSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-expand past IsSimple residual
 		if sessHasError(cg.Sess) {
 			return nil
@@ -1841,7 +1841,7 @@ func ChooseVarFull(
 		if noBitfield && x.IsBitfield {
 			continue
 		}
-		if noUnion && x.IsInsideUnionField() {
+		if noUnion && x.IsInsideUnionFieldSess(cg.Sess) {
 			// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
 			if sessHasError(cg.Sess) {
 				return nil
@@ -1950,7 +1950,7 @@ func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Op
 			}
 			if wantInd > lv {
 				// VariableSelector.cpp:490–494
-				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionField() {
+				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionFieldSess(s) {
 					// Type-nil ancestry stickies residual ERROR — no invent soft-continue bias
 					if sessHasError(s) {
 						return nil

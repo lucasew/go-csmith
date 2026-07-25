@@ -793,7 +793,7 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		}
 		return true
 	}
-	if v.IsArrayField() {
+	if v.IsArrayFieldSess(cgSess(c)) {
 		// residual ERROR sticky — no invent soft-continue field-walk past IsArrayField hole
 		if sessHasError(cgSess(c)) {
 			return false

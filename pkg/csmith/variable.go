@@ -2288,7 +2288,7 @@ func (v *Variable) IsInsideUnionFieldSess(s *Session) bool {
 		return false
 	}
 	for p := v; p != nil; p = p.FieldVarOf {
-		uf := p.IsUnionField()
+		uf := p.IsUnionFieldSess(s)
 		// residual ERROR sticky — no invent soft not-inside past IsUnionField residual
 		if sessHasError(s) {
 			return true
@@ -3080,7 +3080,7 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		if v.Type.IsFloat() {
+		if v.Type.IsFloatSess(s) {
 			// residual ERROR sticky — no invent crc_bytes past IsFloat residual hole
 			if sessHasError(s) {
 				return ""
@@ -3275,7 +3275,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 	// ArrayVariable.cpp:770–784 — transparent_crc each precomputed leaf
 	// (nested struct fields expand: .f0.f0 not top-level .f0 only — seed-51 g_359).
 	if useSimple {
-		isF := v.Type.IsFloat()
+		isF := v.Type.IsFloatSess(s)
 		// residual ERROR sticky — no invent soft-hash past IsFloat residual
 		if sessHasError(s) {
 			return ""
@@ -3291,7 +3291,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			isF := sub.Type.IsFloat()
+			isF := sub.Type.IsFloatSess(s)
 			// residual ERROR sticky — no invent soft-continue field hash past IsFloat residual
 			if sessHasError(s) {
 				return ""
