@@ -63,13 +63,13 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// 100% OOB
 	_, _, _, _, _, _ = MakeRandomArrayControlSess(testAmbientSession, NewRngSess(testAmbientSession, 1), 8, false, 100)
-	if OOBCount() != 1 {
-		t.Fatalf("oob %d", OOBCount())
+	if OOBCountSess(testAmbientSession) != 1 {
+		t.Fatalf("oob %d", OOBCountSess(testAmbientSession))
 	}
 	// 0% OOB
 	_, _, _, _, _, _ = MakeRandomArrayControlSess(testAmbientSession, NewRngSess(testAmbientSession, 2), 8, false, 0)
-	if OOBCount() != 1 {
-		t.Fatalf("still 1 after no-oob %d", OOBCount())
+	if OOBCountSess(testAmbientSession) != 1 {
+		t.Fatalf("still 1 after no-oob %d", OOBCountSess(testAmbientSession))
 	}
 	// nil RNG sticky — no invent fixed array-loop control
 	ClearErrorSess(testAmbientSession)

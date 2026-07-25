@@ -222,9 +222,12 @@ func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
 		tmp.EmitConcise = parent.EmitConcise
 		tmp.EmitDepthProtect = parent.EmitDepthProtect
 	}
-	s := testAmbientSession
+	// Prefer parent FactMgr bag; else throwaway session for library emit (no ambient write).
+	var s *Session
 	if parent != nil && parent.EmitFM != nil && parent.EmitFM.Sess != nil {
 		s = parent.EmitFM.Sess
+	} else {
+		s = NewSession(Defaults())
 	}
 	return tmp.outputStmtsOnlySess(s, indent, false, sessOpts(s))
 }

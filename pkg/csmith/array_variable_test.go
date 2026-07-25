@@ -1073,8 +1073,8 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 	if !HasEligibleVolatileVar([]*Variable{vol}, GetIntTypeSess(testAmbientSession), AccessRead, cg) {
 		t.Fatal("eligible")
 	}
-	if VolatileAvailCount() != 1 {
-		t.Fatal(VolatileAvailCount())
+	if VolatileAvailCountSess(testAmbientSession) != 1 {
+		t.Fatal(VolatileAvailCountSess(testAmbientSession))
 	}
 }
 

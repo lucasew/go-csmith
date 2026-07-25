@@ -9,12 +9,12 @@ import (
 
 // Bookkeeper counters live on Session.BK (session.go).
 
-// sessBK returns the bookkeeper counters for s, or the ambient session bag.
+// sessBK returns the bookkeeper counters for s. Nil s panics — no ambient dual-fill.
 func sessBK(s *Session) *bookkeeperState {
-	if s != nil {
-		return &s.BK
+	if s == nil {
+		panic("sessBK: nil Session (pass run bag or testAmbientSession)")
 	}
-	return &currentSession().BK
+	return &s.BK
 }
 
 // IncrCounterSess is IncrCounter with explicit session residual sticky.
@@ -427,14 +427,14 @@ func RecordPointerAvailForDerefSess(s *Session) { sessBK(s).pointerAvailForDeref
 // RecordVolatileAvailSess records on an explicit session bag.
 func RecordVolatileAvailSess(s *Session) { sessBK(s).volatileAvail++ }
 
-// VolatileAvailCount returns volatile_avail (tests / statistics).
-func VolatileAvailCount() int { return sessBK(nil).volatileAvail }
+// VolatileAvailCountSess returns volatile_avail on bag s.
+func VolatileAvailCountSess(s *Session) int { return sessBK(s).volatileAvail }
 
 // RecordOOBSess records on an explicit session bag.
 func RecordOOBSess(s *Session) { sessBK(s).oobCnt++ }
 
-// OOBCount returns oob_cnt (tests / statistics).
-func OOBCount() int { return sessBK(nil).oobCnt }
+// OOBCountSess returns oob_cnt on bag s.
+func OOBCountSess(s *Session) int { return sessBK(s).oobCnt }
 
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1

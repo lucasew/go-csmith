@@ -426,7 +426,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qw, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("wildcard qfer must accept")
 	}
-	if VolatileAvailCount() < 1 {
+	if VolatileAvailCountSess(testAmbientSession) < 1 {
 		t.Fatal("volatile_avail")
 	}
 	// IsArray without AsArray soft invent was residual soft-continue then true

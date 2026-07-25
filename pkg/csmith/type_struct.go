@@ -268,8 +268,9 @@ func CheckImplicitNontrivialAssignOpsSess(s *Session, opts Options, fields []Str
 // TypeEnv always live; sticky (no invent soft-skip type gen past hole).
 func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEnv) {
 	if env == nil {
-		// no TypeEnv bag — sticky on unit-test ambient (cannot envSess(nil))
-		sessNoteError(testAmbientSession, ErrGeneric)
+		// Nil-owner residual sticky via noteErrEnv (unit-test ambient only).
+		// Generate always passes env with Sess set.
+		noteErrEnv(nil, ErrGeneric)
 		return
 	}
 	// No ambient install — unit tests set TypeEnv.Sess; Generate sets Types.Sess.

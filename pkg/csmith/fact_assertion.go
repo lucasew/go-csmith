@@ -482,12 +482,10 @@ func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAtt
 		attr := st.LabelAttr
 		if attr == "" && emitLabelAttrs && attrRng != nil {
 			// Prefer emit bag s; FactMgr bag only when present (unit tests may omit FM).
+			// Prefer emit bag s; FactMgr bag when s unset (sessFromFM nil-fm → unit-test ambient).
 			attrSess := s
 			if attrSess == nil {
 				attrSess = sessFromFM(fm)
-			}
-			if attrSess == nil {
-				attrSess = testAmbientSession
 			}
 			if ag := EnsureLabelAttrGeneratorSess(attrSess); ag != nil {
 				attr = ag.OutputSess(attrSess, attrRng)

@@ -784,10 +784,14 @@ func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 	// when prob is 0, still include false for that axis only if we followed
 	// enumerator — upstream always enumerates both when elems added.
 	// Fair port: always all four combinations (exhaustive).
+	// Equal-length const/vol pairs — no residual sticky needed (no ambient bag).
 	var out []CVQualifiers
 	for _, c := range []bool{false, true} {
 		for _, v := range []bool{false, true} {
-			out = append(out, NewCVQualifiersSess(testAmbientSession, []bool{c}, []bool{v}))
+			out = append(out, CVQualifiers{
+				IsConsts:    []bool{c},
+				IsVolatiles: []bool{v},
+			})
 		}
 	}
 	return out

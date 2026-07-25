@@ -7,10 +7,8 @@ package csmith
 // Note: unlike must_return, does not require break_stms empty.
 // Block always live; sticky false (no invent not-must-break soft-skip past hole).
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
+	// sessFromFM: nil fm → unit-test ambient; live fm requires fm.Sess
 	s := sessFromFM(fm)
-	if s == nil {
-		s = testAmbientSession
-	}
 	if b == nil {
 		sessNoteError(s, ErrGeneric)
 		return false
@@ -677,8 +675,8 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 		}
 	}
 	// stm_labels registry when edge/func incomplete
-	// no invent empty label token from registry
-	if lab := lookupStmLabelSess(testAmbientSession, destStmID); lab != "" {
+	// no invent empty label token from registry — bag-local StmLabels (not ambient)
+	if lab := lookupStmLabelSess(sessFromFM(fm), destStmID); lab != "" {
 		return lab
 	}
 	return ""

@@ -741,10 +741,7 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 	}
 }
 
-// labelWalkSess prefers FactMgr bag; unit-test ambient when fm unset.
+// labelWalkSess returns fm.Sess (or unit-test ambient when fm is nil via sessFromFM).
 func labelWalkSess(fm *FactMgr) *Session {
-	if fm != nil {
-		return sessFromFM(fm)
-	}
-	return testAmbientSession
+	return sessFromFM(fm)
 }
