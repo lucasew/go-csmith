@@ -936,24 +936,28 @@ func (f *Function) returnTypeC() string {
 
 // returnTypeCOpts is returnTypeC with explicit session Options (const/volatile asserts).
 func (f *Function) returnTypeCOpts(opts Options) string {
+	return f.returnTypeCOptsSess(nil, opts)
+}
+
+func (f *Function) returnTypeCOptsSess(s *Session, opts Options) string {
 	// Function always live at emit; sticky no invent "void" without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if f.RV != nil {
 		// RV Type* always live when rv is present; Type-nil sticky incomplete
 		if f.RV.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		out := f.RV.Qfer.OutputQualifiedTypeOpts(f.RV.Type, opts)
 		// residual ERROR sticky — no invent soft-empty return past OutputQualifiedType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if out == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return out
@@ -961,23 +965,24 @@ func (f *Function) returnTypeCOpts(opts Options) string {
 	if f.ReturnType != nil {
 		cn := f.ReturnType.CName()
 		// residual ERROR sticky — no invent soft-empty return past CName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if cn == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return cn
 	}
 	// incomplete IR sticky — no invent void
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return ""
 }
 
 // paramListC emits parameter list with qualified types.
 // Function.cpp:501–512 — empty → void.
-// opts nil uses ProcessOptions for arg_structs/arg_unions asserts.
+// opts nil uses ProcessOptions for arg_structs/arg_unions asserts.}
+
 func (f *Function) paramListC() string {
 	return f.paramListCOpts(ProcessOptions())
 }
@@ -986,8 +991,12 @@ func (f *Function) paramListC() string {
 // Function always live at emit; nil shell sticky empty (no invent "void" param list
 // past missing Function IR). Empty Param is complete "void".
 func (f *Function) paramListCOpts(opts Options) string {
+	return f.paramListCOptsSess(nil, opts)
+}
+
+func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if len(f.Param) == 0 {
@@ -998,42 +1007,42 @@ func (f *Function) paramListCOpts(opts Options) string {
 	for i, p := range f.Param {
 		if p == nil || p.Type == nil {
 			// incomplete param IR sticky — fail closed (no invent type name)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions) sticky
 		if !opts.ArgStructs && p.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft-empty param past IsStruct residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue param past IsStruct residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if !opts.ArgUnions && p.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-empty param past IsUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue param past IsUnion residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// Variable always has live name + qualified type; sticky no invent "int " / " p"
 		ty := p.Qfer.OutputQualifiedTypeOpts(p.Type, opts)
 		// residual ERROR sticky — no invent soft-continue later params past OutputQualifiedType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if ty == "" || p.Name == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -1047,16 +1056,21 @@ func (f *Function) paramListCOpts(opts Options) string {
 }
 
 // OutputHeader mirrors Function::OutputHeader.
-// Function.cpp:516–531 — optional inline/static + qualified return + name(params).
+// Function.cpp:516–531 — optional inline/static + qualified return + name(params).}
+
 func (f *Function) OutputHeader(forceStatic bool) string {
 	return f.OutputHeaderOpts(forceStatic, ProcessOptions())
 }
 
 // OutputHeaderOpts is OutputHeader with explicit Options for return/arg struct/union asserts.
 func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
+	return f.OutputHeaderOptsSess(nil, forceStatic, opts)
+}
+
+func (f *Function) OutputHeaderOptsSess(s *Session, forceStatic bool, opts Options) string {
 	// Function always live at emit; sticky no invent "int (void)" without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Function.cpp:517–520 — assert no return struct/union when options off
@@ -1065,7 +1079,7 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	rt := f.ReturnType
 	if f.RV != nil {
 		if f.RV.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		rt = f.RV.Type
@@ -1073,52 +1087,52 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	if rt != nil {
 		if !opts.ReturnStructs && rt.IsStruct() {
 			// residual ERROR sticky — no invent soft-empty header past IsStruct residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue header past IsStruct residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if !opts.ReturnUnions && rt.IsUnion() {
 			// residual ERROR sticky — no invent soft-empty header past IsUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue header past IsUnion residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
 	// Function always has a live name; sticky no invent "int (void)" without name
 	if f.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	params := f.paramListCOpts(opts)
+	params := f.paramListCOptsSess(s, opts)
 	// residual ERROR sticky — no invent soft-empty header past paramList residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if params == "" {
 		// assert-path sticky fail closed on forbidden/incomplete params
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	rtName := f.returnTypeCOpts(opts)
+	rtName := f.returnTypeCOptsSess(s, opts)
 	// residual ERROR sticky — no invent soft-empty header past returnTypeC residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if rtName == "" {
 		// incomplete return type IR sticky — no invent void header
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1141,7 +1155,8 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 }
 
 // OutputForwardDecl emits a C prototype.
-// Function.cpp:555–561 — builtins emit nothing (compiler-provided).
+// Function.cpp:555–561 — builtins emit nothing (compiler-provided).}
+
 func (f *Function) OutputForwardDecl() string {
 	return f.OutputForwardDeclOpts(false, nil, false)
 }

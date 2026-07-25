@@ -49,31 +49,36 @@ type Variable struct {
 // Variable always has live name for emit; empty Name sticky (no invent empty
 // identifier soft-skip past incomplete name shell; callers previously sticky only).
 func (v *Variable) GetActualName(prefixName bool) string {
+	return v.GetActualNameSess(nil, prefixName)
+}
+
+func (v *Variable) GetActualNameSess(s *Session, prefixName bool) string {
 	// Variable* always live for name emit; sticky no invent empty identifier
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if v.IsGlobal() {
+	if v.IsGlobalSess(s) {
 		// residual ERROR sticky — no invent soft-prefix name past IsGlobal residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return GetPrefixedName(v.Name, prefixName)
 	}
 	// residual ERROR sticky — no invent soft-bare name past IsGlobal residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return v.Name
 }
 
 // GetPrefixedName mirrors get_prefixed_name (random.cpp:44–54).
-// DefaultRndNumGenerator returns name unchanged when prefix is on (DefaultRndNumGenerator.cpp:105–106).
+// DefaultRndNumGenerator returns name unchanged when prefix is on (DefaultRndNumGenerator.cpp:105–106).}
+
 func GetPrefixedName(name string, prefixName bool) string {
 	if !prefixName {
 		return name
@@ -332,65 +337,70 @@ func (v *Variable) OutputLhsC() string {
 // Itemized arrays use ArrayVariable::Output (indices) as LHS text.
 // Incomplete Variable sticky empty (no invent empty LHS soft-skip past hole).
 func (v *Variable) OutputLhsCOpts(prefixName bool) string {
+	return v.OutputLhsCOptsSess(nil, prefixName)
+}
+
+func (v *Variable) OutputLhsCOptsSess(s *Session, prefixName bool) string {
 	// Variable always live at LHS emit; sticky incomplete no invent empty token
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky
 	// (no invent bare-name LHS past broken array shell)
 	if v.IsArray && v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.AsArray != nil && v.AsArray.Collective != nil {
 		out := v.AsArray.OutputAccess()
 		// residual ERROR sticky — no invent soft-empty access past OutputAccess residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return out
 	}
-	name := v.GetActualName(prefixName)
+	name := v.GetActualNameSess(s, prefixName)
 	// residual ERROR sticky — no invent soft-empty name past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// sticky no invent VOL_LVAL(, T) / empty LHS identifier
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if v.UseVolRVal && v.IsVolatile() {
+	if v.UseVolRVal && v.IsVolatileSess(s) {
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// Lhs/Variable type->Output always live; sticky no invent "int"
 		if v.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		ty := v.Type.CName()
 		// residual ERROR sticky — no invent soft-wrap past CName residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if ty == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return "VOL_LVAL(" + name + ", " + ty + ")"
 	}
 	// residual ERROR sticky — no invent bare LHS past IsVolatile residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return name
 }
 
 // OutputAddrOf mirrors Variable::OutputAddrOf — always &actual_name (no VOL_RVAL).
-// Variable.cpp:707–710.
+// Variable.cpp:707–710.}
+
 func (v *Variable) OutputAddrOf(prefixName bool) string {
 	// Variable* always live; sticky no invent "&0" for nil
 	if v == nil {
@@ -950,15 +960,19 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 // IsGlobal mirrors Variable::is_global — name prefix "g_" (or field of global).
 // Incomplete Variable sticky false (no invent not-global soft-skip past hole).
 func (v *Variable) IsGlobal() bool {
+	return v.IsGlobalSess(nil)
+}
+
+func (v *Variable) IsGlobalSess(s *Session) bool {
 	// Variable always live; sticky incomplete no invent not-global soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if v.FieldVarOf != nil {
 		ok := v.FieldVarOf.IsGlobal()
 		// residual ERROR sticky — no invent not-global soft-skip past parent IsGlobal residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -971,17 +985,23 @@ func (v *Variable) IsGlobal() bool {
 }
 
 // IsLocal mirrors Variable::is_local — name prefix "l_".
-// Incomplete Variable sticky false (no invent not-local soft-skip past hole).
+// Incomplete Variable sticky false (no invent not-local soft-skip past hole).}
+
 func (v *Variable) IsLocal() bool {
+	return v.IsLocalSess(nil)
+}
+
+func (v *Variable) IsLocalSess(s *Session) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return len(v.Name) >= 2 && v.Name[0] == 'l' && v.Name[1] == '_'
 }
 
 // IsArgument mirrors Variable::is_argument — name prefix "p_".
-// Incomplete Variable sticky false (no invent not-arg soft-skip past hole).
+// Incomplete Variable sticky false (no invent not-arg soft-skip past hole).}
+
 func (v *Variable) IsArgument() bool {
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1018,75 +1038,79 @@ func (v *Variable) IsTmpVar() bool {
 // Variable.cpp:1061–1072 — union fields recurse; const null pointer init invalid.
 // Incomplete Variable/Type/init sticky false (no invent valid-volatile soft re-pick).
 func (v *Variable) IsValidVolatile() bool {
+	return v.IsValidVolatileSess(nil)
+}
+
+func (v *Variable) IsValidVolatileSess(s *Session) bool {
 	// Variable always live; sticky incomplete no invent valid-vol soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if v.IsInsideUnionField() {
+	if v.IsInsideUnionFieldSess(s) {
 		// residual ERROR sticky — no invent valid soft-skip past IsInsideUnionField hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
-		uv := v.GetContainerUnion()
+		uv := v.GetContainerUnionSess(s)
 		if uv == nil {
 			// residual ERROR sticky — no invent soft-continue past GetContainerUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			// Type-nil ancestry / incomplete container sticky invalid
 			// (use ancestryTypeHole — not residual global HasError alone)
 			if ancestryTypeHole(v) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return false
 			}
 			// complete IsInsideUnionField true but no container is broken IR sticky
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		// residual ERROR sticky — no invent container true past GetContainerUnion hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		ok := uv.IsValidVolatile()
 		// residual ERROR sticky — no invent valid soft-skip past nested IsValidVolatile hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	}
 	// residual ERROR sticky — no invent soft-continue non-union past IsInside residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	// Variable.cpp:1068 — assert(init); non-const / non-zero / non-pointer → valid
-	if !v.IsConst() {
+	if !v.IsConstSess(s) {
 		// residual ERROR sticky — no invent valid-true past IsConst residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue const path past IsConst residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if v.Type == nil {
 		// incomplete type sticky invalid for const vol check
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !v.Type.IsPointerLike() {
 		// residual ERROR sticky — no invent valid-true past IsPointerLike residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue pointer path past IsPointerLike residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	// const pointer: invalid when init is null (equals 0)
@@ -1094,18 +1118,18 @@ func (v *Variable) IsValidVolatile() bool {
 	if v.InitExpr != nil {
 		ok := v.InitExpr.NotEquals(0)
 		// residual ERROR sticky — no invent valid-true past NotEquals residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	}
 	if v.Init == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	ok := v.Init.NotEqualsZero()
 	// residual ERROR sticky — no invent valid-true past NotEqualsZero residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -1114,7 +1138,8 @@ func (v *Variable) IsValidVolatile() bool {
 // IsPackedAggregateFieldVar mirrors Variable::is_packed_aggregate_field_var.
 // Variable.cpp:307–312 — any ancestor field_var_of has packed aggregate type.
 // Incomplete Variable sticky false for nil shell; Type-nil ancestor sticky true
-// (restrictive — no invent not-packed soft-skip past incomplete parent type).
+// (restrictive — no invent not-packed soft-skip past incomplete parent type).}
+
 func (v *Variable) IsPackedAggregateFieldVar() bool {
 	// Variable always live; sticky incomplete no invent not-packed soft-skip
 	if v == nil {
@@ -1139,9 +1164,13 @@ func (v *Variable) IsPackedAggregateFieldVar() bool {
 // Incomplete parent FieldVars sticky true (restrictive — no invent not-packed
 // by soft-skipping FieldVars holes before this field).
 func (v *Variable) IsPackedAfterBitfield() bool {
+	return v.IsPackedAfterBitfieldSess(nil)
+}
+
+func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 	// Variable always live; non-field complete false
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if v.FieldVarOf == nil {
@@ -1151,18 +1180,18 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 	// incomplete parent Type sticky packed-after (restrictive — no invent
 	// not-packed soft-skip past Type-nil parent shell)
 	if parent.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	isStruct := parent.Type.IsStruct()
 	// residual ERROR sticky — no invent soft-continue packed path past IsStruct residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if isStruct && parent.Type.Packed {
 		if !parent.FieldVarsComplete() {
 			// incomplete parent FieldVars sticky packed-after (restrictive)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		for i, f := range parent.FieldVars {
@@ -1171,36 +1200,36 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 			}
 			if parent.Type.IsBitfieldIndex(i) {
 				// residual ERROR sticky — no invent packed-true past IsBitfieldIndex hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later siblings past IsBitfield residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			// incomplete sibling Type sticky packed-after (restrictive)
 			if f.Type == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
 			if f.Type.HasBitfields() {
 				// residual ERROR sticky — no invent packed-true past HasBitfields hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later siblings past HasBitfields residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
 	}
 	ok := parent.IsPackedAfterBitfield()
 	// residual ERROR sticky — no invent not-packed soft-skip past nested IsPackedAfterBitfield hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return ok
@@ -1210,7 +1239,8 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 // Variable.cpp:270–277 — field of an array variable (or recursive).
 // Incomplete Variable sticky false (no invent not-array-field soft-skip past hole).
 // Parent IsArray without AsArray sticky true (restrictive — no invent not-array-field
-// soft-skip past broken array parent shell).
+// soft-skip past broken array parent shell).}
+
 func (v *Variable) IsArrayField() bool {
 	// Variable.cpp:270–276 — if field_var_of recurse; else return isArray.
 	// Soft invent was return false when FieldVarOf==nil (missed top-level arrays).
@@ -1363,6 +1393,10 @@ func IsSeenName(seen []string, name string) bool {
 // IsConst mirrors Variable::is_const → is_const_after_deref(0).
 // Variable.cpp:517 — qfer const OR type is_const_struct_union (not qfer-only).
 func (v *Variable) IsConst() bool {
+	return v.IsConstSess(nil)
+}
+
+func (v *Variable) IsConstSess(s *Session) bool {
 	return v.IsConstAfterDeref(0)
 }
 
@@ -1370,13 +1404,19 @@ func (v *Variable) IsConst() bool {
 // Variable.cpp:519 — qfer volatile OR type is_volatile_struct_union (not qfer-only).
 // Missing struct/union field path left aggregates like S0 (volatile bitfields)
 // as non-vol: ReadVar/WriteVar kept side_effect_free; Expression chose Nonvoid
-// instead of NonvoidNonvolatile (seed2 first_div@9674 accepted volatile struct).
+// instead of NonvoidNonvolatile (seed2 first_div@9674 accepted volatile struct).}
+
 func (v *Variable) IsVolatile() bool {
+	return v.IsVolatileSess(nil)
+}
+
+func (v *Variable) IsVolatileSess(s *Session) bool {
 	return v.IsVolatileAfterDeref(0)
 }
 
 // IsFieldVar mirrors Variable::is_field_var.
-// Incomplete Variable sticky false (no invent not-field soft-skip past hole).
+// Incomplete Variable sticky false (no invent not-field soft-skip past hole).}
+
 func (v *Variable) IsFieldVar() bool {
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1419,38 +1459,42 @@ func (v *Variable) IsVisible(blk *Block) bool {
 // Variable* always live; nil FieldVarOf/Param/Local holes sticky false
 // (no invent not-visible soft-skip past holes).
 func (v *Variable) IsVisibleLocal(blk *Block) bool {
+	return v.IsVisibleLocalSess(nil, blk)
+}
+
+func (v *Variable) IsVisibleLocalSess(s *Session, blk *Block) bool {
 	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if blk == nil {
-		ok := v.IsGlobal()
+		ok := v.IsGlobalSess(s)
 		// residual ERROR sticky — no invent not-visible soft-skip past IsGlobal residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	}
 	if v.IsFieldVar() {
 		// residual ERROR sticky — no invent soft-continue field path past IsFieldVar residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		// FieldVarOf always live for field vars; nil sticky fail closed
 		if v.FieldVarOf == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := v.FieldVarOf.IsVisibleLocal(blk)
 		// residual ERROR sticky — no invent not-visible soft-skip past parent IsVisibleLocal hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	}
 	// residual ERROR sticky — no invent soft-continue non-field past IsFieldVar residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	// ArrayVariable.cpp:419–429 — parent block chain for array (collective or itemized)
@@ -1471,17 +1515,17 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 		for _, p := range f.Param {
 			if p == nil {
 				// incomplete Param sticky not-visible
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 			// Variable.cpp:490–494 — param[i]->match(this)
 			if p.Match(v) {
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return false
 				}
 				return true
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 		}
@@ -1490,17 +1534,17 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
 				// incomplete LocalVars sticky not-visible
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 			// Variable.cpp:497–500 — find_variable_in_set uses match()
 			if loc.Match(v) {
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return false
 				}
 				return true
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 		}
@@ -1510,7 +1554,8 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 
 // IsConstAfterDeref mirrors Variable::is_const_after_deref.
 // Variable.cpp:521–538.
-// Incomplete type / OOB peel sticky const (no invent non-const WRITE / soft re-pick).
+// Incomplete type / OOB peel sticky const (no invent non-const WRITE / soft re-pick).}
+
 func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 	// Variable always live; sticky incomplete no invent non-const soft-skip
 	if v == nil {
@@ -1700,20 +1745,24 @@ func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
 // Special null/garbage/tbd have Type nil by design — complete not-pointer.
 // Other Type-nil shells sticky (no invent not-pointer soft-skip past incomplete IR).
 func (v *Variable) IsPointer() bool {
+	return v.IsPointerSess(nil)
+}
+
+func (v *Variable) IsPointerSess(s *Session) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if IsSpecialPtr(v) {
 		return false
 	}
 	if v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	pt := v.Type.PtrType()
 	// residual ERROR sticky — no invent soft not-pointer past PtrType residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return pt != nil
@@ -1723,7 +1772,8 @@ func (v *Variable) IsPointer() bool {
 // Variable.cpp:280–288 — field recurses; array is virtual when collective==0
 // (parent array, not itemized member). Dummy null/garbage/tbd use IsSpecialPtr / Type==nil.
 // Incomplete Variable sticky false (no invent not-virtual soft-skip past hole).
-// IsArray without AsArray sticky false (no invent virtual-collective past broken shell).
+// IsArray without AsArray sticky false (no invent virtual-collective past broken shell).}
+
 func (v *Variable) IsVirtual() bool {
 	// Variable always live; sticky incomplete no invent not-virtual soft-skip
 	if v == nil {
@@ -1790,8 +1840,12 @@ func MakeDummyStaticVariable(name string) *Variable {
 // Incomplete FieldVars / missing parent / OOB field path fails closed sticky nil
 // (no invent return self as collective / soft re-pick past broken field map).
 func (v *Variable) GetCollective() *Variable {
+	return v.GetCollectiveSess(nil)
+}
+
+func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// ArrayVariable::get_collective override — must run before is_array_field path.
@@ -1799,7 +1853,7 @@ func (v *Variable) GetCollective() *Variable {
 	// C++ isArray always ArrayVariable*; missing AsArray sticky.
 	if v.IsArray || v.AsArray != nil {
 		if v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if v.AsArray.Collective != nil {
@@ -1811,7 +1865,7 @@ func (v *Variable) GetCollective() *Variable {
 	// is_array_field is true for top-level arrays too, but those took the override above.
 	isAF := v.IsArrayField()
 	// residual ERROR sticky — no invent soft-collective past IsArrayField residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if !isAF {
@@ -1824,26 +1878,26 @@ func (v *Variable) GetCollective() *Variable {
 	}
 	// Variable.cpp:589 assert(parent) — incomplete ancestry sticky
 	if parent == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky
 	// (no invent self-collective past broken array ancestor shell)
 	if parent.IsArray && parent.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// incomplete field IR on path or parent sticky (no invent soft self-collective)
-	if !v.FieldVarsComplete() || !parent.FieldVarsComplete() {
-		sessNoteError(nil, ErrGeneric)
+	if !v.FieldVarsCompleteSess(s) || !parent.FieldVarsComplete() {
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// if parent is already collective parent, this field is on collective
 	pColl := parent.GetCollective()
 	if pColl == nil {
 		// child already sticky when ancestry/fields incomplete
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}
@@ -1857,12 +1911,12 @@ func (v *Variable) GetCollective() *Variable {
 	for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
 		fid := cur.GetFieldID()
 		// residual ERROR sticky — no invent soft-collective past GetFieldID residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		// incomplete FieldVars → GetFieldID -1 — sticky (no invent self)
 		if fid < 0 {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		path = append([]int{fid}, path...)
@@ -1870,7 +1924,7 @@ func (v *Variable) GetCollective() *Variable {
 	for _, idx := range path {
 		// Variable.cpp:608 assert(index < coll->field_vars.size()) sticky
 		if coll == nil || !coll.FieldVarsComplete() || idx < 0 || idx >= len(coll.FieldVars) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		coll = coll.FieldVars[idx]
@@ -1879,7 +1933,8 @@ func (v *Variable) GetCollective() *Variable {
 }
 
 // GetSeqNum mirrors Variable::get_seq_num — digits after first '_'.
-// Variable.cpp:261–265 — assert('_' present); sticky no invent 0 on missing separator.
+// Variable.cpp:261–265 — assert('_' present); sticky no invent 0 on missing separator.}
+
 func (v *Variable) GetSeqNum() int {
 	// Variable always live with gensym name; sticky incomplete no invent 0
 	if v == nil {
@@ -1901,9 +1956,13 @@ func (v *Variable) GetSeqNum() int {
 // Special null/garbage/tbd have Type nil by design — complete not-match (unless identity).
 // Other Type-nil shells sticky (no invent not-match soft-skip past incomplete IR).
 func (v *Variable) Match(other *Variable) bool {
+	return v.MatchSess(nil, other)
+}
+
+func (v *Variable) MatchSess(s *Session, other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-match
 	if v == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if v == other {
@@ -1913,13 +1972,13 @@ func (v *Variable) Match(other *Variable) bool {
 		return false
 	}
 	if v.Type == nil || other.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if v.Type.IsAggregate() {
 		ok := v.HasFieldVar(other)
 		// residual ERROR sticky — no invent match/not-match soft-skip past HasFieldVar hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -1930,8 +1989,13 @@ func (v *Variable) Match(other *Variable) bool {
 // FieldVarsComplete reports nested FieldVars have no nil holes.
 // Incomplete aggregates must not invent not-has-field / not-match past a hole
 // for mark_dead_var and similar; callers fail closed when false.
-// Nil Variable is incomplete (false) — no invent empty-complete fields for missing shell.
+// Nil Variable is incomplete (false) — no invent empty-complete fields for missing shell.}
+
 func (v *Variable) FieldVarsComplete() bool {
+	return v.FieldVarsCompleteSess(nil)
+}
+
+func (v *Variable) FieldVarsCompleteSess(s *Session) bool {
 	// nil Variable is incomplete shell (not complete empty fields)
 	if v == nil {
 		return false
@@ -1946,7 +2010,8 @@ func (v *Variable) FieldVarsComplete() bool {
 
 // HasFieldVar mirrors Variable::has_field_var — other is this or nested field.
 // Variable* always live in FieldVars; incomplete shell/hole sticky false
-// (no invent skip hole and match a later field / soft re-pick past holes).
+// (no invent skip hole and match a later field / soft re-pick past holes).}
+
 func (v *Variable) HasFieldVar(other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-has-field
 	if v == nil || other == nil {
@@ -1984,8 +2049,12 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 // Special null/garbage/tbd have Type nil by design — complete no-container.
 // Other Type-nil ancestor sticky nil (no invent skip hole and miss a later union parent).
 func (v *Variable) GetContainerUnion() *Variable {
+	return v.GetContainerUnionSess(nil)
+}
+
+func (v *Variable) GetContainerUnionSess(s *Session) *Variable {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// specials: Type nil by design, never inside a union container
@@ -1998,18 +2067,18 @@ func (v *Variable) GetContainerUnion() *Variable {
 		}
 		if p.Type == nil {
 			// incomplete Type on ancestry sticky (no invent no-container past hole)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if p.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-container past IsUnion residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			return p
 		}
 		// residual ERROR sticky — no invent soft-continue walk past IsUnion residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 	}
@@ -2018,7 +2087,8 @@ func (v *Variable) GetContainerUnion() *Variable {
 
 // LooseMatch mirrors Variable::loose_match.
 // Variable.cpp:239–250 — match collective, or same container union.
-// Incomplete GetCollective fails closed sticky false (no invent match / soft re-pick).
+// Incomplete GetCollective fails closed sticky false (no invent match / soft re-pick).}
+
 func (v *Variable) LooseMatch(other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-loose-match
 	if v == nil || other == nil {
@@ -2086,14 +2156,18 @@ func (v *Variable) IsUnionField() bool {
 // Type-nil parent on chain sticky true (restrictive — no invent not-inside
 // soft-skip past incomplete union-field IR; IsUnionField alone stickies false).
 func (v *Variable) IsInsideUnionField() bool {
+	return v.IsInsideUnionFieldSess(nil)
+}
+
+func (v *Variable) IsInsideUnionFieldSess(s *Session) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for p := v; p != nil; p = p.FieldVarOf {
 		uf := p.IsUnionField()
 		// residual ERROR sticky — no invent soft not-inside past IsUnionField residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if uf {
@@ -2102,8 +2176,8 @@ func (v *Variable) IsInsideUnionField() bool {
 		// IsUnionField stickies Type-nil parent as false; incomplete ancestry
 		// must not invent not-inside after that soft false
 		if p.FieldVarOf != nil && !IsSpecialPtr(p.FieldVarOf) && p.FieldVarOf.Type == nil {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return true
 		}
@@ -2115,7 +2189,8 @@ func (v *Variable) IsInsideUnionField() bool {
 // Variable.cpp:323–333.
 // Variable always live; sticky -1 (no invent not-field soft-skip past hole).
 // Variable* always live in FieldVars; incomplete parent FieldVars sticky -1
-// (no invent skip hole and match a later sibling index / soft re-pick).
+// (no invent skip hole and match a later sibling index / soft re-pick).}
+
 func (v *Variable) GetFieldID() int {
 	if v == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -2146,50 +2221,54 @@ func (v *Variable) GetFieldID() int {
 // (no invent soft-skip shell as neither pointer nor aggregate then complete empty/partial).
 // Complete empty (no pointer fields) returns non-nil empty slice.
 func (v *Variable) FindPointerFields() []*Variable {
+	return v.FindPointerFieldsSess(nil)
+}
+
+func (v *Variable) FindPointerFieldsSess(s *Session) []*Variable {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
 	for _, f := range v.FieldVars {
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		// Type* always live for non-special field subjects; Type-nil sticky
 		// (IsPointer/IsAggregate residual ERROR still soft-skips as complete none)
 		if f.Type == nil {
 			if !IsSpecialPtr(f) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteVariables()
 			}
 			continue
 		}
 		if f.IsPointer() {
 			// residual ERROR sticky — no invent soft-include pointer past IsPointer hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteVariables()
 			}
 			out = append(out, f)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue aggregate past IsPointer residual false
 			return IncompleteVariables()
 		} else if f.IsAggregate() {
 			// residual ERROR sticky — no invent soft-continue nest past IsAggregate residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteVariables()
 			}
 			nested := f.FindPointerFields()
 			// incomplete nested FieldVars (empty complete is non-nil [])
 			if !VariablesComplete(nested) {
 				// nested already SetError sticky
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return IncompleteVariables()
 			}
 			out = append(out, nested...)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-skip field past IsAggregate residual false
 			return IncompleteVariables()
 		}
@@ -2201,7 +2280,8 @@ func (v *Variable) FindPointerFields() []*Variable {
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 // Incomplete field Types / make_random fail closed: FieldVars → IncompleteVariables
 // (not bare nil — FieldVarsComplete(nil)==true invents empty-complete zero fields
-// when type still has Fields / half-built list was wiped).
+// when type still has Fields / half-built list was wiped).}
+
 func (v *Variable) CreateFieldVars() {
 	v.CreateFieldVarsSess(nil)
 }

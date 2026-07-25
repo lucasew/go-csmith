@@ -152,36 +152,45 @@ func WithSideEffects() Effect {
 // AddExternalEffect mirrors Effect::add_external_effect — only global reads/writes.
 // Effect.cpp:192–215.
 func (e Effect) AddExternalEffect(other Effect) Effect {
-	return e.AddExternalEffectWithCallers(other, nil)
+	return e.AddExternalEffectSess(nil, other)
+}
+
+func (e Effect) AddExternalEffectSess(s *Session, other Effect) Effect {
+	return e.AddExternalEffectWithCallersSess(s, other, nil)
 }
 
 // AddExternalEffectWithCallers mirrors Effect::add_external_effect(e, call_chain).
 // Effect.cpp:221–269 — globals always; non-globals only if on a call_chain stack frame.
 // Variable* always live in effect lists; nil hole fails closed sticky IncompleteEffect
 // (no invent partial external merge past holes / soft re-pick). Incomplete Param/LocalVars
-// on a frame also fails closed sticky (no invent not-on-chain via IsVarOnStack false past hole).
+// on a frame also fails closed sticky (no invent not-on-chain via IsVarOnStack false past hole).}
+
 func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
+	return e.AddExternalEffectWithCallersSess(nil, other, callChain)
+}
+
+func (e Effect) AddExternalEffectWithCallersSess(s *Session, other Effect, callChain []*Block) Effect {
 	// incomplete effect maps / call chain fail closed sticky IncompleteEffect
 	// (no invent leave-base empty-complete success)
 	if !EffectComplete(e) || !EffectComplete(other) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	reads := other.ReadVars()
 	writes := other.WrittenVars()
 	if !VariablesComplete(reads) || !VariablesComplete(writes) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	if !BlocksComplete(callChain) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	for _, b := range callChain {
 		if !b.StackScanComplete() {
 			// residual ERROR sticky — no invent soft-merge past StackScan residual
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return IncompleteEffect()
 		}
@@ -190,31 +199,31 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 	for _, v := range reads {
 		if v.IsGlobal() {
 			// residual ERROR sticky — no invent soft-continue merge past IsGlobal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			out = out.ReadVar(v)
 			// residual ERROR sticky — no invent soft-continue later reads past ReadVar residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue merge past IsGlobal residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if varOnCallChain(v, callChain) {
 			// residual ERROR sticky — no invent soft-skip past IsVarOnStack hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			out = out.ReadVar(v)
 			// residual ERROR sticky — no invent soft-continue later reads past ReadVar residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent not-on-chain soft-skip past hole
 			return IncompleteEffect()
 		}
@@ -222,33 +231,33 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 	for _, v := range writes {
 		if v.IsGlobal() {
 			// residual ERROR sticky — no invent soft-continue merge past IsGlobal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			out = out.WriteVar(v)
 			// residual ERROR sticky — no invent soft-continue later writes past WriteVar residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			out.pure = false
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue merge past IsGlobal residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if varOnCallChain(v, callChain) {
 			// residual ERROR sticky — no invent soft-skip past IsVarOnStack hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			out = out.WriteVar(v)
 			// residual ERROR sticky — no invent soft-continue later writes past WriteVar residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			out.pure = false
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent not-on-chain soft-skip past hole
 			return IncompleteEffect()
 		}
@@ -286,30 +295,39 @@ func varOnCallChain(v *Variable, chain []*Block) bool {
 // AddEffect mirrors Effect::add_effect(e) without LHS set merge.
 // Effect.cpp:157–186.
 func (e Effect) AddEffect(other Effect) Effect {
-	return e.AddEffectOpts(other, false)
+	return e.AddEffectSess(nil, other)
+}
+
+func (e Effect) AddEffectSess(s *Session, other Effect) Effect {
+	return e.AddEffectOptsSess(s, other, false)
 }
 
 // AddEffectOpts mirrors Effect::add_effect(e, include_lhs_effects).
 // Effect.cpp:167–180 — push each of other's reads/writes only if !is_read /
 // !is_written on the destination (struct-parent coverage applies).
 // Variable* always live as map keys; incomplete either side fails closed sticky
-// IncompleteEffect (no invent leave-base empty-complete merge / soft re-pick past hole).
+// IncompleteEffect (no invent leave-base empty-complete merge / soft re-pick past hole).}
+
 func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
+	return e.AddEffectOptsSess(nil, other, includeLHS)
+}
+
+func (e Effect) AddEffectOptsSess(s *Session, other Effect, includeLHS bool) Effect {
 	if !EffectComplete(e) || !EffectComplete(other) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	out := e
 	// Effect.cpp:167–172 — for each other read: if (!is_read) push
 	reads := other.ReadVars()
 	if !VariablesComplete(reads) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	for _, v := range reads {
 		// Effect.cpp:169–171 — if (!is_read) push only; purity via pure &= e.pure below
 		already := out.IsRead(v)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if already {
@@ -326,12 +344,12 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 	// Effect.cpp:174–179 — for each other write: if (!is_written) push
 	writes := other.WrittenVars()
 	if !VariablesComplete(writes) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	for _, v := range writes {
 		already := out.IsWritten(v)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if already {
@@ -368,7 +386,8 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 // WriteVarSet mirrors Effect::write_var_set — write each var.
 // Effect.cpp:148–152.
 // Variable* always live; incomplete list or base fails closed sticky IncompleteEffect
-// (no invent partial writes / soft re-pick leave-base empty-complete success).
+// (no invent partial writes / soft re-pick leave-base empty-complete success).}
+
 func (e Effect) WriteVarSet(vars []*Variable) Effect {
 	if !EffectComplete(e) || !VariablesComplete(vars) {
 		sessNoteError(nil, ErrGeneric)
@@ -546,14 +565,18 @@ func (e Effect) ReadVar(v *Variable) Effect {
 // Type-nil parent sticky written true (restrictive — no invent not-written /
 // conflict-free soft-skip past incomplete parent type shell; mirrors IsRead).
 func (e Effect) IsWritten(v *Variable) bool {
+	return e.IsWrittenSess(nil, v)
+}
+
+func (e Effect) IsWrittenSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-written soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as written (restrictive)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if e.written[v] {
@@ -564,12 +587,12 @@ func (e Effect) IsWritten(v *Variable) bool {
 	// / conflict-free soft-skip past incomplete parent type shell)
 	if v.FieldVarOf != nil {
 		if v.FieldVarOf.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		ok := e.IsWritten(v.FieldVarOf)
+		ok := e.IsWrittenSess(s, v.FieldVarOf)
 		// residual ERROR sticky — no invent not-written soft-skip past nested IsWritten hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return ok
@@ -579,7 +602,8 @@ func (e Effect) IsWritten(v *Variable) bool {
 
 // ReadVars mirrors Effect::get_read_vars — insertion order (C++ vector).
 // Incomplete effect / nil map keys fail closed sticky IncompleteVariables
-// (no invent skip hole as absent read / soft re-pick empty-complete read set).
+// (no invent skip hole as absent read / soft re-pick empty-complete read set).}
+
 func (e Effect) ReadVars() []*Variable {
 	if e.incomplete {
 		sessNoteError(nil, ErrGeneric)
@@ -625,14 +649,18 @@ func (e Effect) WrittenVars() []*Variable {
 // Effect.cpp:276–289.
 // Incomplete effect sticky true (no invent not-read / conflict-free past holes).
 func (e Effect) IsRead(v *Variable) bool {
+	return e.IsReadSess(nil, v)
+}
+
+func (e Effect) IsReadSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-read soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as read (restrictive)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if e.read[v] {
@@ -643,23 +671,23 @@ func (e Effect) IsRead(v *Variable) bool {
 	// soft-skip past incomplete parent type shell)
 	if v.FieldVarOf != nil {
 		if v.FieldVarOf.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if v.FieldVarOf.Type.IsStruct() {
 			// residual ERROR sticky — no invent soft-continue struct-read past IsStruct residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
-			ok := e.IsRead(v.FieldVarOf)
+			ok := e.IsReadSess(s, v.FieldVarOf)
 			// residual ERROR sticky — no invent not-read soft-skip past nested IsRead hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return ok
 		}
 		// residual ERROR sticky — no invent not-read soft-skip past IsStruct residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -672,59 +700,64 @@ func (e Effect) IsRead(v *Variable) bool {
 // Type* always live for non-special subjects; Type-nil sticky true (IsAggregate
 // residual ERROR+false invents no-field-read / conflict-free past Type-nil shell).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
-// Incomplete effect fails closed as true sticky (incomplete marker soft re-pick banned).
+// Incomplete effect fails closed as true sticky (incomplete marker soft re-pick banned).}
+
 func (e Effect) FieldIsRead(v *Variable) bool {
+	return e.FieldIsReadSess(nil, v)
+}
+
+func (e Effect) FieldIsReadSess(s *Session, v *Variable) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// Type* always live for non-special subjects; Type-nil sticky true
 	// (no invent IsAggregate residual false as no-field-read past shell)
 	if !IsSpecialPtr(v) && v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if !v.IsAggregate() {
 		// residual ERROR sticky — no invent no-field-read soft-skip past IsAggregate residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue field scan past IsAggregate residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as field-read (restrictive)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, f := range v.FieldVars {
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if e.IsRead(f) {
+		if e.IsReadSess(s, f) {
 			// residual ERROR sticky — no invent field-read true past IsRead hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue nested past IsRead residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
-		if e.FieldIsRead(f) {
+		if e.FieldIsReadSess(s, f) {
 			// residual ERROR sticky — no invent field-read true past nested FieldIsRead hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past nested residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -737,59 +770,64 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 // Type* always live for non-special subjects; Type-nil sticky true (IsAggregate
 // residual ERROR+false invents no-field-write / conflict-free past Type-nil shell).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
-// Incomplete effect sticky true (no invent no-field-write soft re-pick past holes).
+// Incomplete effect sticky true (no invent no-field-write soft re-pick past holes).}
+
 func (e Effect) FieldIsWritten(v *Variable) bool {
+	return e.FieldIsWrittenSess(nil, v)
+}
+
+func (e Effect) FieldIsWrittenSess(s *Session, v *Variable) bool {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// Type* always live for non-special subjects; Type-nil sticky true
 	// (no invent IsAggregate residual false as no-field-write past shell)
 	if !IsSpecialPtr(v) && v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if !v.IsAggregate() {
 		// residual ERROR sticky — no invent no-field-write soft-skip past IsAggregate residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue field scan past IsAggregate residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as field-written (restrictive)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, f := range v.FieldVars {
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if e.IsWritten(f) {
+		if e.IsWrittenSess(s, f) {
 			// residual ERROR sticky — no invent field-written true past IsWritten hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue nested past IsWritten residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
-		if e.FieldIsWritten(f) {
+		if e.FieldIsWrittenSess(s, f) {
 			// residual ERROR sticky — no invent field-written true past nested FieldIsWritten hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue later fields past nested residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -797,7 +835,8 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 }
 
 // ancestryTypeHole reports Type-nil on FieldVarOf chain (excluding specials).
-// Used by SiblingUnionField* so residual global HasError cannot invent sibling-use.
+// Used by SiblingUnionField* so residual global HasError cannot invent sibling-use.}
+
 func ancestryTypeHole(v *Variable) bool {
 	for p := v; p != nil; p = p.FieldVarOf {
 		if IsSpecialPtr(p) {
@@ -816,35 +855,39 @@ func ancestryTypeHole(v *Variable) bool {
 // Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
 // Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).
 func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
+	return e.SiblingUnionFieldIsReadSess(nil, v)
+}
+
+func (e Effect) SiblingUnionFieldIsReadSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent no-sibling soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if e.incomplete {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	youColl := v.GetCollective()
 	// residual ERROR sticky — no invent soft no-sibling past GetCollective residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if youColl == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	you := youColl.GetContainerUnion()
 	// residual ERROR sticky — no invent soft no-sibling past GetContainerUnion residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if you == nil {
 		// Type-nil ancestry (not residual global HasError): restrictive true
 		// (no invent no-sibling / conflict-free past incomplete container shell)
 		if ancestryTypeHole(youColl) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return true
 		}
@@ -853,7 +896,7 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	}
 	for r := range e.read {
 		if r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if !e.read[r] {
@@ -861,16 +904,16 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 		}
 		rColl := r.GetCollective()
 		// residual ERROR sticky — no invent soft-continue later reads past GetCollective residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if rColl == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		me := rColl.GetContainerUnion()
 		// residual ERROR sticky — no invent soft-continue no-sibling past GetContainerUnion hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if me == you {
@@ -884,37 +927,42 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 // Effect.cpp:430–441.
 // Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
 // Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
-// Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).
+// Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).}
+
 func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
+	return e.SiblingUnionFieldIsWrittenSess(nil, v)
+}
+
+func (e Effect) SiblingUnionFieldIsWrittenSess(s *Session, v *Variable) bool {
 	// Variable always live; sticky incomplete no invent no-sibling soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if e.incomplete {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	youColl := v.GetCollective()
 	// residual ERROR sticky — no invent soft no-sibling past GetCollective residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if youColl == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	you := youColl.GetContainerUnion()
 	// residual ERROR sticky — no invent soft no-sibling past GetContainerUnion residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if you == nil {
 		// Type-nil ancestry (not residual global HasError): restrictive true
 		// (no invent no-sibling / conflict-free past incomplete container shell)
 		if ancestryTypeHole(youColl) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return true
 		}
@@ -923,7 +971,7 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	}
 	for w := range e.written {
 		if w == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if !e.written[w] {
@@ -931,16 +979,16 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 		}
 		wColl := w.GetCollective()
 		// residual ERROR sticky — no invent soft-continue later writes past GetCollective residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if wColl == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		me := wColl.GetContainerUnion()
 		// residual ERROR sticky — no invent soft-continue no-sibling past GetContainerUnion hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if me == you {
@@ -952,7 +1000,8 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 
 // NonEmptyIntersection mirrors Effect.cpp non_empty_intersection.
 // Effect.cpp:56–69 — any pair where va[i]->match(vb[j]) || vb[j]->match(va[i]).
-// Nil entries in either list fail closed sticky true (restrictive race).
+// Nil entries in either list fail closed sticky true (restrictive race).}
+
 func NonEmptyIntersection(va, vb []*Variable) bool {
 	return NonEmptyIntersectionSess(nil, va, vb)
 }
@@ -992,39 +1041,44 @@ func NonEmptyIntersectionSess(s *Session, va, vb []*Variable) bool {
 // Incomplete either side fails closed sticky as race (no invent race-free / soft re-pick).}
 
 func (e Effect) HasRaceWith(other Effect) bool {
+	return e.HasRaceWithSess(nil, other)
+}
+
+func (e Effect) HasRaceWithSess(s *Session, other Effect) bool {
 	if !EffectComplete(e) || !EffectComplete(other) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	ra, wa := e.ReadVars(), e.WrittenVars()
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	rb, wb := other.ReadVars(), other.WrittenVars()
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if NonEmptyIntersection(ra, wb) {
 		return true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if NonEmptyIntersection(wa, rb) {
 		return true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if NonEmptyIntersection(wa, wb) {
 		return true
 	}
-	return sessHasError(nil)
+	return sessHasError(s)
 }
 
 // IsEmpty mirrors Effect::is_empty — no reads and no writes.
 // Effect.cpp:490–492.
-// Incomplete sticky not-empty (no invent empty-complete free effect past holes).
+// Incomplete sticky not-empty (no invent empty-complete free effect past holes).}
+
 func (e Effect) IsEmpty() bool {
 	if e.incomplete {
 		// IncompleteEffect sticky not-empty (restrictive — no invent empty-complete)
@@ -1092,33 +1146,37 @@ func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile 
 // Effect.cpp:444–446.
 // Incomplete effect fails closed as true via IsRead/FieldIs*/Sibling* membership.
 func (e Effect) IsReadPartially(v *Variable) bool {
-	if e.IsRead(v) {
+	return e.IsReadPartiallySess(nil, v)
+}
+
+func (e Effect) IsReadPartiallySess(s *Session, v *Variable) bool {
+	if e.IsReadSess(s, v) {
 		// residual ERROR sticky — no invent partial-read true past IsRead hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue partial past IsRead residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
-	if e.FieldIsRead(v) {
-		if sessHasError(nil) {
+	if e.FieldIsReadSess(s, v) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
-	if e.SiblingUnionFieldIsRead(v) {
-		if sessHasError(nil) {
+	if e.SiblingUnionFieldIsReadSess(s, v) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return false
@@ -1126,35 +1184,40 @@ func (e Effect) IsReadPartially(v *Variable) bool {
 
 // IsWrittenPartially mirrors Effect::is_written_partially.
 // Effect.cpp:448–451.
-// Incomplete effect fails closed as true via IsWritten/FieldIs*/Sibling* membership.
+// Incomplete effect fails closed as true via IsWritten/FieldIs*/Sibling* membership.}
+
 func (e Effect) IsWrittenPartially(v *Variable) bool {
-	if e.IsWritten(v) {
+	return e.IsWrittenPartiallySess(nil, v)
+}
+
+func (e Effect) IsWrittenPartiallySess(s *Session, v *Variable) bool {
+	if e.IsWrittenSess(s, v) {
 		// residual ERROR sticky — no invent partial-write true past IsWritten hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue partial past IsWritten residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
-	if e.FieldIsWritten(v) {
-		if sessHasError(nil) {
+	if e.FieldIsWrittenSess(s, v) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
-	if e.SiblingUnionFieldIsWritten(v) {
-		if sessHasError(nil) {
+	if e.SiblingUnionFieldIsWrittenSess(s, v) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return false
@@ -1162,44 +1225,49 @@ func (e Effect) IsWrittenPartially(v *Variable) bool {
 
 // HasGlobalEffect mirrors Effect::has_global_effect.
 // Effect.cpp:543–562 — any global in read or write sets.
-// Incomplete effect / nil map keys sticky true (no invent pure / no-global success).
+// Incomplete effect / nil map keys sticky true (no invent pure / no-global success).}
+
 func (e Effect) HasGlobalEffect() bool {
+	return e.HasGlobalEffectSess(nil)
+}
+
+func (e Effect) HasGlobalEffectSess(s *Session) bool {
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as has-global (restrictive)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for v := range e.read {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.read[v] && v.IsGlobal() {
 			// residual ERROR sticky — no invent has-global true past IsGlobal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue no-global past IsGlobal residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
 	for v := range e.written {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if e.written[v] && v.IsGlobal() {
 			// residual ERROR sticky — no invent has-global true past IsGlobal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue no-global past IsGlobal residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -1208,7 +1276,8 @@ func (e Effect) HasGlobalEffect() bool {
 
 // UpdatePurity mirrors Effect::update_purity.
 // Effect.cpp:535–538 — pure cleared when has_global_effect.
-// Effect always live; sticky (no invent soft-skip purity update past hole).
+// Effect always live; sticky (no invent soft-skip purity update past hole).}
+
 func (e *Effect) UpdatePurity() {
 	if e == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1265,13 +1334,17 @@ func effectMapKeysComplete(m map[*Variable]bool) bool {
 // Incomplete maps fail closed sticky IncompleteEffect (no invent partial deletes /
 // leave-base complete success past holes under random map order / soft re-pick).
 func (e *Effect) Consolidate() {
+	e.ConsolidateSess(nil)
+}
+
+func (e *Effect) ConsolidateSess(s *Session) {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if e.incomplete || !effectMapKeysComplete(e.read) || !effectMapKeysComplete(e.written) {
 		*e = IncompleteEffect()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// remove field reads when parent is also read
@@ -1281,7 +1354,7 @@ func (e *Effect) Consolidate() {
 		}
 		if !v.IsFieldVar() {
 			// residual ERROR sticky — no invent soft-skip consolidate past IsFieldVar hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*e = IncompleteEffect()
 				return
 			}
@@ -1291,18 +1364,18 @@ func (e *Effect) Consolidate() {
 		// FieldVarOf always live for field vars; Type* always live for non-special parents
 		// Type-nil parent sticky IncompleteEffect (no invent leave-base complete past hole)
 		if parent == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			*e = IncompleteEffect()
 			return
 		}
 		if parent.Type == nil && !IsSpecialPtr(parent) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			*e = IncompleteEffect()
 			return
 		}
-		if e.IsRead(parent) {
+		if e.IsReadSess(s, parent) {
 			// residual ERROR sticky — no invent soft-delete past IsRead hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*e = IncompleteEffect()
 				return
 			}
@@ -1314,7 +1387,7 @@ func (e *Effect) Consolidate() {
 					break
 				}
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent leave-base complete past IsRead hole
 			*e = IncompleteEffect()
 			return
@@ -1327,7 +1400,7 @@ func (e *Effect) Consolidate() {
 		}
 		if !v.IsFieldVar() {
 			// residual ERROR sticky — no invent soft-skip consolidate past IsFieldVar hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*e = IncompleteEffect()
 				return
 			}
@@ -1335,18 +1408,18 @@ func (e *Effect) Consolidate() {
 		}
 		parent := v.FieldVarOf
 		if parent == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			*e = IncompleteEffect()
 			return
 		}
 		if parent.Type == nil && !IsSpecialPtr(parent) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			*e = IncompleteEffect()
 			return
 		}
-		if e.IsWritten(parent) {
+		if e.IsWrittenSess(s, parent) {
 			// residual ERROR sticky — no invent soft-delete past IsWritten hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*e = IncompleteEffect()
 				return
 			}
@@ -1357,7 +1430,7 @@ func (e *Effect) Consolidate() {
 					break
 				}
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent leave-base complete past IsWritten hole
 			*e = IncompleteEffect()
 			return
@@ -1369,7 +1442,8 @@ func (e *Effect) Consolidate() {
 // Effect.cpp:295–308.
 // Incomplete effect / nil key fails closed as true (no invent not-read).
 // Empty name sticky true (restrictive — no invent not-read soft-skip past incomplete
-// identifier query that would soft-match every empty-named var as non-hit).
+// identifier query that would soft-match every empty-named var as non-hit).}
+
 func (e Effect) IsReadByName(name string) bool {
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as read (restrictive)
@@ -1423,20 +1497,24 @@ func (e Effect) IsWrittenByName(name string) bool {
 // then output_comment_line wraps "/* " + body + " */\n" (OutputMgr.cpp:314–320).
 // Incomplete effect / nil var fails closed sticky empty (no invent partial list).
 func (e Effect) CommentOutput() string {
+	return e.CommentOutputSess(nil)
+}
+
+func (e Effect) CommentOutputSess(s *Session) string {
 	if e.incomplete {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// nil map keys incomplete sticky (no invent skip as absent / partial comment)
 	for v := range e.read {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
 	for v := range e.written {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -1446,21 +1524,21 @@ func (e Effect) CommentOutput() string {
 	ss.WriteString(" * reads :")
 	reads := e.ReadVars()
 	// residual ERROR sticky — no invent soft-list past ReadVars residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if !VariablesComplete(reads) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for _, v := range reads {
 		// Effect.cpp:518 — Variable::OutputForComment → get_actual_name()
 		name := v.OutputForComment(false)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if name == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		ss.WriteString(" ")
@@ -1469,20 +1547,20 @@ func (e Effect) CommentOutput() string {
 	ss.WriteString("\n")
 	ss.WriteString(" * writes:")
 	writes := e.WrittenVars()
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if !VariablesComplete(writes) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for _, v := range writes {
 		name := v.OutputForComment(false)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if name == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		ss.WriteString(" ")
@@ -1500,7 +1578,8 @@ func (e Effect) CommentOutput() string {
 // treat merged as success and poison parent accum as complete / soft re-pick).
 //
 // Uses is_read/is_written gates and preserves a-then-b insertion order (fair with
-// C++ vector merges that skip already-covered vars).
+// C++ vector merges that skip already-covered vars).}
+
 func MergeEffects(a, b Effect) Effect {
 	return MergeEffectsSess(nil, a, b)
 }

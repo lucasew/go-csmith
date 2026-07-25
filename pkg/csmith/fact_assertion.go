@@ -172,49 +172,53 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 // OutputCondition mirrors FactPointTo::Output — C expression for the fact.
 // FactPointTo.cpp:627–658.
 func (f *FactPointTo) OutputCondition() string {
+	return f.OutputConditionSess(nil)
+}
+
+func (f *FactPointTo) OutputConditionSess(s *Session) string {
 	// Fact subject always live; sticky no invent bare pointee compare without var
 	if f == nil || f.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	lhs := outputFactVar(f.Var)
 	// residual ERROR sticky — no invent soft-empty condition past outputFactVar residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// subject always live Output; sticky no invent " == 0" / " >= &" without lhs
 	if lhs == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var parts []string
 	for _, pointee := range f.PointTo {
 		// FactPointTo.cpp: point_to_vars[i] always live; sticky no invent skip nil holes
 		if pointee == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if pointee.IsArray || (pointee.AsArray != nil) {
 			// C++ isArray always ArrayVariable*; missing AsArray sticky
 			// (no invent bare-name bounds range form past broken array shell)
 			if pointee.IsArray && pointee.AsArray == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// range form: (p >= &lo && p <= &hi)
 			// OutputLower/UpperBound always live; sticky no invent "(p >= & && p <= &)"
 			lo := pointee.OutputLowerBound(false)
 			// residual ERROR sticky — no invent soft-continue hi past LowerBound residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			hi := pointee.OutputUpperBound(false)
 			// residual ERROR sticky — no invent soft-continue range past UpperBound residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if lo == "" || hi == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			parts = append(parts, "("+lhs+" >= &"+lo+" && "+lhs+" <= &"+hi+")")
@@ -232,11 +236,11 @@ func (f *FactPointTo) OutputCondition() string {
 			// pointee->Output always live name; sticky no invent bare "&"
 			nm := pointee.GetActualName(false)
 			// residual ERROR sticky — no invent soft-empty & past GetActualName residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if nm == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			rhs = "&" + nm
@@ -290,36 +294,40 @@ func outputFactVarSess(s *Session, v *Variable) string {
 // Fact.cpp:64–73 — assert(cond); comment-out if not assertable.}
 
 func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
+	return f.OutputAssertionSess(nil, stParent, indent)
+}
+
+func (f *FactPointTo) OutputAssertionSess(s *Session, stParent *Block, indent string) string {
 	// Fact* always live at assert emit; sticky no invent empty assert without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// TOP fact: no assert condition (complete empty success)
 	isTop := f.IsTop()
 	// residual ERROR sticky — no invent soft-empty assert past IsTop residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if isTop {
 		return ""
 	}
-	cond := f.OutputCondition()
+	cond := f.OutputConditionSess(s)
 	if cond == "" {
 		// incomplete condition IR sticky (OutputCondition may already SetError)
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
 	prefix := ""
 	if !f.IsAssertable(stParent) {
 		// residual ERROR sticky — no invent assert line past IsAssertable residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		prefix = "//"
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent live assert past IsAssertable residual true
 		return ""
 	}
@@ -327,7 +335,8 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 }
 
 // OutputAssertions mirrors FactMgr::output_assertions.
-// FactMgr.cpp:614–649 — post_condition uses updated final facts; filter unused globals.
+// FactMgr.cpp:614–649 — post_condition uses updated final facts; filter unused globals.}
+
 func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool) string {
 	// FactMgr + Statement always live for assertion emit; sticky no invent section without them
 	if fm == nil || st == nil {

@@ -62,16 +62,26 @@ func (q CVQualifiers) IsStorageVolatile() bool {
 
 // IsConst mirrors CVQualifiers::is_const → is_const_after_deref(0).
 func (q CVQualifiers) IsConst() bool {
+	return q.IsConstSess(nil)
+}
+
+func (q CVQualifiers) IsConstSess(s *Session) bool {
 	return q.IsConstAfterDeref(0)
 }
 
-// IsVolatile mirrors CVQualifiers::is_volatile → is_volatile_after_deref(0).
+// IsVolatile mirrors CVQualifiers::is_volatile → is_volatile_after_deref(0).}
+
 func (q CVQualifiers) IsVolatile() bool {
+	return q.IsVolatileSess(nil)
+}
+
+func (q CVQualifiers) IsVolatileSess(s *Session) bool {
 	return q.IsVolatileAfterDeref(0)
 }
 
 // Output mirrors CVQualifiers::output — debug dump of const/vol bit vectors.
-// CVQualifiers.cpp:653–662.
+// CVQualifiers.cpp:653–662.}
+
 func (q CVQualifiers) Output() string {
 	var b strings.Builder
 	for i, c := range q.IsConsts {
@@ -241,13 +251,17 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 // CVQualifiers.cpp:137–152 — matchExact ORs opts.MatchExactQualifiers (StatementAssign
 // forces that bit on the run bag; ChooseVarFull passes sessOpts(cg.Sess)).
 func (q CVQualifiers) MatchOpts(other CVQualifiers, matchExact bool, opts Options) bool {
+	return q.MatchOptsSess(nil, other, matchExact, opts)
+}
+
+func (q CVQualifiers) MatchOptsSess(s *Session, other CVQualifiers, matchExact bool, opts Options) bool {
 	if q.Wildcard {
 		return true
 	}
 	// CVQualifiers.cpp:148 — assert is_consts.size() == is_volatiles.size() sticky
 	// (no invent match/not-match soft-skip past unpaired depth shells)
 	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// CVQualifiers.cpp:141–143 — if (CGOptions::match_exact_qualifiers())
@@ -261,14 +275,14 @@ func (q CVQualifiers) MatchOpts(other CVQualifiers, matchExact bool, opts Option
 	if !q.AcceptStricter {
 		ok := q.StricterThan(other)
 		// residual ERROR sticky — no invent match true past StricterThan residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
 	}
 	ok := other.StricterThan(q)
 	// residual ERROR sticky — no invent match true past other StricterThan residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -276,7 +290,8 @@ func (q CVQualifiers) MatchOpts(other CVQualifiers, matchExact bool, opts Option
 
 // AddQualifiers mirrors CVQualifiers::add_qualifiers — push one level.
 // CVQualifiers.cpp:460–463.
-// CVQualifiers always live; sticky (no invent soft-skip add past hole).
+// CVQualifiers always live; sticky (no invent soft-skip add past hole).}
+
 func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
 	if q == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -743,11 +758,15 @@ func (q CVQualifiers) OutputFirstQuals() string {
 
 // OutputFirstQualsOpts is OutputFirstQuals with explicit session Options.
 func (q CVQualifiers) OutputFirstQualsOpts(opts Options) string {
+	return q.OutputFirstQualsOptsSess(nil, opts)
+}
+
+func (q CVQualifiers) OutputFirstQualsOptsSess(s *Session, opts Options) string {
 	var b strings.Builder
 	if len(q.IsConsts) > 0 && q.IsConsts[0] {
 		// CVQualifiers.cpp:641–642 — assert(consts()) sticky when bit set but option off
 		if !opts.Consts {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString("const ")
@@ -755,7 +774,7 @@ func (q CVQualifiers) OutputFirstQualsOpts(opts Options) string {
 	if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
 		// CVQualifiers.cpp:647–648 — assert(volatiles()) sticky when bit set but option off
 		if !opts.Volatiles {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString("volatile ")
@@ -765,7 +784,8 @@ func (q CVQualifiers) OutputFirstQualsOpts(opts Options) string {
 
 // GetAllQualifiers mirrors CVQualifiers::get_all_qualifiers.
 // CVQualifiers.cpp:617–637 — enumerate all const×volatile combos for one level.
-// Probabilities are ignored for enumeration (upstream uses them only for enumerator filter).
+// Probabilities are ignored for enumeration (upstream uses them only for enumerator filter).}
+
 func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 	_ = constProb
 	_ = volatileProb
@@ -792,18 +812,22 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 // Unpaired const/vol depths sticky false (no invent match soft-skip past hole).
 // Multi-level address gap (deref < -1) is complete false (C++ returns false, no assert).
 func (q CVQualifiers) MatchIndirectOpts(other CVQualifiers, matchExact bool, opts Options) bool {
+	return q.MatchIndirectOptsSess(nil, other, matchExact, opts)
+}
+
+func (q CVQualifiers) MatchIndirectOptsSess(s *Session, other CVQualifiers, matchExact bool, opts Options) bool {
 	if q.Wildcard {
 		return true
 	}
 	// both sides paired depths; unpaired sticky (Match also stickies)
 	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(q.IsConsts) == len(other.IsConsts) {
-		ok := q.MatchOpts(other, matchExact, opts)
+		ok := q.MatchOptsSess(s, other, matchExact, opts)
 		// residual ERROR sticky — no invent soft-match past Match residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -815,12 +839,12 @@ func (q CVQualifiers) MatchIndirectOpts(other CVQualifiers, matchExact bool, opt
 	}
 	ind := other.IndirectQualifiers(deref)
 	// residual ERROR sticky — no invent soft-match past IndirectQualifiers residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
-	ok := q.MatchOpts(ind, matchExact, opts)
+	ok := q.MatchOptsSess(s, ind, matchExact, opts)
 	// residual ERROR sticky — no invent soft-match past Match residual after peel
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -829,7 +853,8 @@ func (q CVQualifiers) MatchIndirectOpts(other CVQualifiers, matchExact bool, opt
 // SetConst mirrors CVQualifiers::set_const.
 // CVQualifiers.cpp:588–593 — is_consts[len - pos - 1] = is_const; pos default 0
 // is storage (last). No soft invent grow when empty or pos OOB.
-// CVQualifiers always live; sticky (no invent soft-skip set past hole).
+// CVQualifiers always live; sticky (no invent soft-skip set past hole).}
+
 func (q *CVQualifiers) SetConst(isConst bool, pos int) {
 	if q == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -911,21 +936,25 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 
 // OutputQualifiedTypeOpts is OutputQualifiedType with explicit session Options.
 func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
+	return q.OutputQualifiedTypeOptsSess(nil, t, opts)
+}
+
+func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Options) string {
 	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void" for nil type
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// CVQualifiers.cpp:533 — assert(sanity_check(t)); sticky no invent bare CName for bad layout
 	if !q.Wildcard && len(q.IsConsts) > 0 {
 		if !q.SanityCheck(t) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue bare type past SanityCheck residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
@@ -935,41 +964,41 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 		// bare type + single-level quals from storage
 		var b strings.Builder
 		// CVQualifiers.cpp:541–544 — assert(0) sticky if const bit without Consts option
-		if q.IsConst() {
+		if q.IsConstSess(s) {
 			// residual ERROR sticky — no invent soft-const past IsConst residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if !emitConst() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("const ")
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue past IsConst residual false
 			return ""
 		}
-		if q.IsVolatile() {
+		if q.IsVolatileSess(s) {
 			// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if !emitVol() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("volatile ")
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
 			return ""
 		}
 		cn := t.CName()
 		// residual ERROR sticky — no invent soft-empty type past CName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if cn == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// CVQualifiers.cpp:557–559 — base Output then trailing space before name/site
@@ -979,7 +1008,7 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 	}
 	base := t.BaseType()
 	// residual ERROR sticky — no invent soft-continue bare base past BaseType residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if base == nil {
@@ -989,31 +1018,31 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 	// CVQualifiers.cpp:534–561 — single-level loop: quals then base + " "
 	if t.IsSimple() || t.IsAggregate() {
 		// residual ERROR sticky — no invent soft-qual emit past IsSimple/IsAggregate residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		var b strings.Builder
 		if len(q.IsConsts) > 0 && q.IsConsts[0] {
 			if !emitConst() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("const ")
 		}
 		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
 			if !emitVol() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("volatile ")
 		}
 		cn := t.CName()
 		// residual ERROR sticky — no invent soft-empty type past CName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if cn == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString(cn)
@@ -1021,7 +1050,7 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 		return b.String()
 	}
 	// residual ERROR sticky — no invent soft-pointer qual emit past IsSimple/IsAggregate residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// pointer: const volatile base * const * ... (CVQualifiers.cpp:534–561)
@@ -1034,7 +1063,7 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 		// CVQualifiers.cpp:540–544 / 545–552 — assert sticky when bit set but option off
 		if q.IsConsts[i] {
 			if !emitConst() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			if i > 0 {
@@ -1044,7 +1073,7 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 		}
 		if i < len(q.IsVolatiles) && q.IsVolatiles[i] {
 			if !emitVol() {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// CVQualifiers.cpp:548–552 — if (i > 0) out << " " before volatile
@@ -1057,11 +1086,11 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 		if i == 0 {
 			cn := base.CName()
 			// residual ERROR sticky — no invent soft-empty pointer base past CName residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if cn == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString(cn)
@@ -1073,7 +1102,8 @@ func (q CVQualifiers) OutputQualifiedTypeOpts(t *Type, opts Options) string {
 
 // isVolatileOKOnOneLevel mirrors is_volatile_ok_on_one_level (CVQualifiers.cpp).
 // CVQualifiers.cpp:269–293 — non-C++ always OK; struct/union need has_assign_ops;
-// union with struct field (or nested bad union) forbids volatile.
+// union with struct field (or nested bad union) forbids volatile.}
+
 func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	return isVolatileOKOnOneLevelSess(nil, opts, t)
 }

@@ -84,9 +84,13 @@ func (l *Lhs) IndirectLevel() int {
 // (no invent treat broken Lhs as bare non-deref level 0 for visit/validate).
 // Incomplete shell sticky (callers that only use IndirectLevel still surface ERROR).
 func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
+	return l.IndirectLevelCompleteSess(nil)
+}
+
+func (l *Lhs) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 	// Lhs always live with Variable+Type; sticky incomplete no invent level 0 complete
 	if l == nil || l.Var == nil || l.Var.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	want := l.Type
@@ -94,42 +98,52 @@ func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
 		want = l.Var.Type
 	}
 	if want == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
 	lv := l.Var.Type.IndirectLevel()
 	// residual ERROR sticky — no invent level-0 past subject IndirectLevel residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0, false
 	}
 	lw := want.IndirectLevel()
 	// residual ERROR sticky — no invent level-0 past desired IndirectLevel residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0, false
 	}
 	return lv - lw, true
 }
 
-// GetVar mirrors Lhs::get_var.
+// GetVar mirrors Lhs::get_var.}
+
 func (l *Lhs) GetVar() *Variable {
+	return l.GetVarSess(nil)
+}
+
+func (l *Lhs) GetVarSess(s *Session) *Variable {
 	// Lhs always live; sticky no invent missing subject shell
 	if l == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// incomplete without Var sticky (no invent soft-skip missing lhs subject)
 	if l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return l.Var
 }
 
-// GetType mirrors Lhs::get_type.
+// GetType mirrors Lhs::get_type.}
+
 func (l *Lhs) GetType() *Type {
+	return l.GetTypeSess(nil)
+}
+
+func (l *Lhs) GetTypeSess(s *Session) *Type {
 	// Lhs always live; sticky no invent type shell without it
 	if l == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if l.Type != nil {
@@ -139,29 +153,34 @@ func (l *Lhs) GetType() *Type {
 		return l.Var.Type
 	}
 	// incomplete Lhs type IR sticky — no invent nil type soft-success
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return nil
 }
 
 // IsVolatile mirrors Lhs::is_volatile.
 // Lhs.cpp:220–222 — volatile after deref of indirect level.
 // Incomplete Lhs type IR fails closed sticky as volatile (restrictive — no invent
-// non-vol eligibility via invented level 0 / soft re-pick).
+// non-vol eligibility via invented level 0 / soft re-pick).}
+
 func (l *Lhs) IsVolatile() bool {
+	return l.IsVolatileSess(nil)
+}
+
+func (l *Lhs) IsVolatileSess(s *Session) bool {
 	// Lhs always live; sticky incomplete fails closed true (restrictive volatile)
 	// (no invent non-vol eligibility / soft re-pick past hole)
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	n, ok := l.IndirectLevelComplete()
+	n, ok := l.IndirectLevelCompleteSess(s)
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	vol := l.Var.IsVolatileAfterDeref(n)
 	// residual ERROR sticky — no invent non-vol soft-skip past IsVolatileAfterDeref residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return vol
@@ -170,35 +189,40 @@ func (l *Lhs) IsVolatile() bool {
 // GetQualifiers mirrors Lhs::get_qualifiers.
 // Lhs.cpp:197–202 — var.qfer.indirect_qualifiers(indirect).
 // Incomplete Lhs type IR fails closed sticky error + empty qfer (no invent
-// storage-level quals via invented level 0).
+// storage-level quals via invented level 0).}
+
 func (l *Lhs) GetQualifiers() CVQualifiers {
+	return l.GetQualifiersSess(nil)
+}
+
+func (l *Lhs) GetQualifiersSess(s *Session) CVQualifiers {
 	// Lhs always live; sticky incomplete empty qfer (no invent storage quals)
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	}
-	n, ok := l.IndirectLevelComplete()
+	n, ok := l.IndirectLevelCompleteSess(s)
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	}
 	q := l.Var.Qfer.IndirectQualifiers(n)
 	// residual ERROR sticky — no invent soft-quals past IndirectQualifiers residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return CVQualifiers{}
 	}
 	// Lhs.cpp:200 — assert(!qfer.is_const()); const LHS is broken IR
 	// sticky error for ERROR_GUARD callers; no soft invent strip of const / invent quals shell
 	if q.IsConst() {
 		// residual ERROR sticky — no invent soft-quals past IsConst residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return CVQualifiers{}
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// residual ERROR sticky — no invent soft-complete quals past IsConst residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return CVQualifiers{}
 	}
 	return q
@@ -206,26 +230,31 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 
 // GetLvars mirrors Lhs::get_lvars.
 // Lhs.cpp:181–185 — merge pointees of var at indirect level.
-// Incomplete Lhs type IR fails closed IncompleteVariables (no invent level-0 merge).
+// Incomplete Lhs type IR fails closed IncompleteVariables (no invent level-0 merge).}
+
 func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
+	return l.GetLvarsSess(nil, facts)
+}
+
+func (l *Lhs) GetLvarsSess(s *Session, facts []*FactPointTo) []*Variable {
 	if l == nil || l.Var == nil {
 		// incomplete Lhs fails closed sticky (no invent empty pointees / soft re-pick)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
-	n, ok := l.IndirectLevelComplete()
+	n, ok := l.IndirectLevelCompleteSess(s)
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	coll := l.Var.GetCollective()
 	// residual ERROR sticky — no invent soft-merge past GetCollective residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteVariables()
 	}
 	vars := MergePointeesOfPointer(coll, n, facts)
 	// residual ERROR sticky — no invent soft-merge past MergePointees residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteVariables()
 	}
 	return vars
@@ -237,28 +266,33 @@ func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 // empty-complete "no ptrs" via VariablesComplete(nil)/len==0).
 // Type* always live for non-special Var; Type-nil sticky IncompleteVariables
 // (IsPointer residual ERROR+false invents complete empty no-ptrs past shell).
-// Non-pointer live Var → complete empty nil.
+// Non-pointer live Var → complete empty nil.}
+
 func (l *Lhs) GetReferencedPtrs() []*Variable {
+	return l.GetReferencedPtrsSess(nil)
+}
+
+func (l *Lhs) GetReferencedPtrsSess(s *Session) []*Variable {
 	if l == nil || l.Var == nil {
 		// incomplete Lhs fails closed sticky (no invent empty-complete "no ptrs")
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	// Type* always live for non-special subjects; Type-nil sticky incomplete
 	// (no invent IsPointer residual false as complete empty no-ptrs)
 	if l.Var.Type == nil && !IsSpecialPtr(l.Var) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	if !l.Var.IsPointer() {
 		// residual ERROR sticky — no invent soft-empty no-ptrs past IsPointer residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		return nil
 	}
 	// residual ERROR sticky — no invent ptr list past IsPointer residual true path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteVariables()
 	}
 	return []*Variable{l.Var}
@@ -269,7 +303,8 @@ func (l *Lhs) GetReferencedPtrs() []*Variable {
 // (effect_context + effect_stm, null accum).
 // Incomplete Lhs / ambient / IndexExprs sticky (no invent soft-skip past holes).
 // IsArray without AsArray hard IR sticky false (no invent visit success as
-// "no array indices" past broken array shell — mirrors ReadIndices).
+// "no array indices" past broken array shell — mirrors ReadIndices).}
+
 func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	// Lhs.cpp:264+ — get_var()->get_array may be null → true without using cg
 	// incomplete Lhs shell sticky (visit always has live Lhs* in C++)

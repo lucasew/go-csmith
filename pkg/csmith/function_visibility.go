@@ -129,9 +129,13 @@ func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 // Incomplete Function/Variable/stack/Blocks sticky true OOS (no invent not-OOS
 // / soft re-pick past holes).
 func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
+	return f.IsVarOOSSess(nil, v, stParent)
+}
+
+func (f *Function) IsVarOOSSess(s *Session, v *Variable, stParent *Block) bool {
 	// Function + Variable always live; sticky incomplete OOS fail closed
 	if f == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		// nil Function: cannot be OOS local of unknown func — fail closed false
 		// would invent not-OOS; true OOS is safer for dead marking, but C++ has
 		// live Function*. Sticky false for nil shell (assert path).
@@ -140,20 +144,20 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	if !f.StackScanComplete(stParent) {
 		// incomplete stack sticky OOS (no invent not-OOS when scan short-circuits)
 		// residual ERROR sticky — no invent soft-OOS past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
 	if f.IsVarVisible(v, stParent) {
 		// residual ERROR sticky — no invent not-OOS past IsVarVisible hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue Blocks scan past IsVarVisible hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	// Function.cpp:217–220 — find_variable_in_set(blocks[i]->local_vars, var)
@@ -168,12 +172,12 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	for _, b := range f.Blocks {
 		if b == nil {
 			// incomplete Blocks sticky OOS
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		for _, loc := range b.LocalVars {
 			if loc == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
 			if loc == v {
@@ -182,17 +186,17 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 			// Variable.cpp:254–258 — aggregate match includes fields when both typed
 			if loc.Type != nil && v.Type != nil {
 				agg := loc.Type.IsAggregate()
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				if agg {
 					if loc.HasFieldVar(v) {
-						if sessHasError(nil) {
+						if sessHasError(s) {
 							return true
 						}
 						return true
 					}
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return true
 					}
 				}
@@ -212,7 +216,8 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 // both partitions wiped + SetError; walk stops (no invent keep merging later
 // returns after a failed merge).
 // Returns false when incomplete so callers do not invent success via
-// FactsComplete(nil)==true after a fail-closed wipe.
+// FactsComplete(nil)==true after a fail-closed wipe.}
+
 func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo, unions *[]*FactUnion) bool {
 	if b == nil || fm == nil || facts == nil || unions == nil {
 		if facts != nil {
