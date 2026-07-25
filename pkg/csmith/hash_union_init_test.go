@@ -21,7 +21,7 @@ func TestUnionWriteFactsForHashUsesLiveFirstFunc(t *testing.T) {
 	if !UnionFactsComplete(uf) || HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete", uf, HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
-	first := GetFirstFunction(&g.Funcs)
+	first := GetFirstFunctionSess(testAmbientSession, &g.Funcs)
 	if first == nil {
 		t.Fatal("no first function")
 	}

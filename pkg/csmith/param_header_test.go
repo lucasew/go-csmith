@@ -122,7 +122,7 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 		Name:       "func_p",
 		ReturnType: GetIntTypeSess(testAmbientSession),
 		Param: []*Variable{
-			{Name: "", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	if out := f.OutputHeaderSess(testAmbientSession, false); out != "" {
@@ -215,7 +215,7 @@ func TestParamListArgStructOptionResidualSticky(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	p := &Variable{Name: "p", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	p := &Variable{Name: "p", Type: st, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Param: []*Variable{p}}
 	if s := f.paramListCOptsSess(testAmbientSession, opts); s != "" {
 		t.Fatal("ArgStructs off must fail closed paramListC", s)

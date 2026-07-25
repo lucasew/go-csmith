@@ -10,7 +10,7 @@ func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	e := vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, nil, NewRngSess(testAmbientSession, 1))
 	if e == nil || e.Term != TermConstant || e.Con == nil {
 		t.Fatalf("want constant, got %#v", e)
@@ -29,7 +29,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	// force pointer path: RndFlipcoin(20) never true if we retry until address form
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// pre-create int global to take address of
-	qInt := NewCVQualifiers([]bool{false}, []bool{false})
+	qInt := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	iv := CreateVariableQferSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), qInt)
 	iv.Init = MakeIntSess(testAmbientSession, 0)
 	vs.GlobalList = append(vs.GlobalList, iv)
@@ -37,7 +37,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
-	qPtr := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	qPtr := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	// seed scan until we get ExpressionVariable &path (not constant 20% path)
 	var e *Expression
 	for seed := uint64(1); seed < 80; seed++ {
@@ -76,7 +76,7 @@ func TestApplyInitExprOutputDef(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
-	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false, false}, []bool{false, false}))
+	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false}))
 	applyInitExprSess(testAmbientSession, pv, &Expression{Term: TermVariable, Var: iv, ExprType: pt})
 	def := pv.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if !strings.Contains(def, "g_p") || !strings.Contains(def, "&") {
@@ -181,7 +181,7 @@ func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 	opts.Arrays = false
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts = opts
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), q, nil, "l_x", NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed createAndInitialize")
 	}
@@ -196,7 +196,7 @@ func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// empty GlobalList — pointer init must create addressable
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	// force pointer branch across seeds
 	found := false
 	for seed := uint64(1); seed < 100; seed++ {

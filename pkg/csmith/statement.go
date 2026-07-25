@@ -129,9 +129,7 @@ func IsCompound(t StatementType) bool {
 
 // GetType mirrors Statement::get_type — returns the eStatementType kind.
 // Incomplete Stmt sticky MaxStatementType.
-func (st *Stmt) GetType() StatementType {
-	return st.GetTypeSess(testAmbientSession)
-}
+// Non-Sess GetType deleted — pass run bag or testAmbientSession explicitly.
 
 // GetTypeSess is GetType with explicit session residual sticky.
 func (st *Stmt) GetTypeSess(s *Session) StatementType {

@@ -633,7 +633,7 @@ func TestAccessDerefVolatileResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	hole := &Variable{
 		Name: "g_p", Type: nil,
-		Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false}),
 	}
 	out := EmptyEffect().AccessDerefVolatileSess(testAmbientSession, hole, 1, true)
 	if EffectComplete(out) {

@@ -247,7 +247,7 @@ func (g *ProgramGenerator) Initialize() {
 	}
 	// re-init scope + assign ops from session opts (once-per-run tables)
 	InitScopeTableSess(s, g.Opts)
-	s.AssignOpsTab = NewAssignOpsTable(g.Opts)
+	s.AssignOpsTab = NewAssignOpsTableSess(gSess(g), g.Opts)
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).

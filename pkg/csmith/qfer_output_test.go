@@ -6,7 +6,7 @@ import (
 )
 
 func TestRestrictWrite(t *testing.T) {
-	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	q.Restrict(AccessWrite, EmptyCGContext().WithSession(testAmbientSession))
 	if q.IsConstSess(testAmbientSession) {
 		t.Fatal("const cleared")
@@ -15,7 +15,7 @@ func TestRestrictWrite(t *testing.T) {
 	if !q.IsVolatileSess(testAmbientSession) {
 		t.Fatal("vol kept se-free")
 	}
-	q2 := NewCVQualifiers([]bool{false}, []bool{true})
+	q2 := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	q2.Restrict(AccessRead, WithEffectContext(WithSideEffects()).WithSession(testAmbientSession))
 	if q2.IsVolatileSess(testAmbientSession) {
 		t.Fatal("vol cleared non-se-free")
@@ -25,7 +25,7 @@ func TestRestrictWrite(t *testing.T) {
 func TestRestrictIncompleteEffectSticky(t *testing.T) {
 	// Incomplete EffectContext must not invent clear-vol via IncompleteEffect SE-false
 	ClearErrorSess(testAmbientSession)
-	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	q.Restrict(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession))
 	if !q.IsConstSess(testAmbientSession) || !q.IsVolatileSess(testAmbientSession) {
 		t.Fatalf("incomplete ambient must not mutate qfer: const=%v vol=%v", q.IsConstSess(testAmbientSession), q.IsVolatileSess(testAmbientSession))
@@ -38,7 +38,7 @@ func TestRestrictIncompleteEffectSticky(t *testing.T) {
 
 func TestSetConstPosFromEnd(t *testing.T) {
 	// CVQualifiers.cpp:588–592 — set_const(v, pos) → is_consts[len-pos-1]
-	q := NewCVQualifiers([]bool{true, true}, []bool{false, false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true, true}, []bool{false, false})
 	q.SetConstSess(testAmbientSession, false, 0) // storage (last)
 	if q.IsConsts[1] || !q.IsConsts[0] {
 		t.Fatalf("pos0 clears last only: %v", q.IsConsts)
@@ -68,7 +68,7 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// pointee type for *p selection; qfer depth 1 for int
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// force create path: empty nonvol list; ExpandStruct with no struct types → fail
 	got := selectDerefPointer(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, cg, GetIntTypeSess(testAmbientSession), &q, AccessRead)
 	if got != nil && len(vs.GlobalList) > 0 {
@@ -85,7 +85,7 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 func TestOutputQualifiedTypeSimple(t *testing.T) {
 	// Defaults enable Consts/Volatiles
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	s := q.OutputQualifiedTypeSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if !strings.Contains(s, "const") || !strings.Contains(s, "volatile") || !strings.Contains(s, "int") {
 		t.Fatal(s)
@@ -101,7 +101,7 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 	opts.Volatiles = false
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, Defaults())
-	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	s := q.OutputQualifiedTypeSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if s != "" {
 		t.Fatalf("const bit without Consts option must fail closed empty, got %q", s)
@@ -115,7 +115,7 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 func TestOutputQualifiedTypeNoInventVoidForNil(t *testing.T) {
 	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void"
 	ClearErrorSess(testAmbientSession)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if s := q.OutputQualifiedTypeSess(testAmbientSession, nil); s != "" {
 		t.Fatal("nil type must fail closed empty, got", s)
 	}
@@ -160,7 +160,7 @@ func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
 func TestOutputDeclNoInventEmptyName(t *testing.T) {
 	// Variable always has live name; sticky no invent "int "
 	ClearErrorSess(testAmbientSession)
-	v := &Variable{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	v := &Variable{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	if out := v.OutputDeclSess(testAmbientSession, false, false); out != "" {
 		t.Fatal("empty name must fail closed decl", out)
 	}
@@ -176,7 +176,7 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	opts.ForceGlobalsStatic = true
 	g := NewProgramGenerator(NewSession(opts))
 	// global without init → OutputDef empty sticky
-	v := &Variable{Name: "g_x", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	v := &Variable{Name: "g_x", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	g.VS.GlobalList = []*Variable{v}
 	out := g.OutputGlobals()
 	if out != "" {
@@ -225,7 +225,7 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	// used aggregate emits decl body
 	g.clearErr()
 	st := &Type{isStruct: true, StructName: "S0", Used: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 	}}
 	g.Types.StructTypes = []*Type{st}
 	g.Types.AllTypes = []*Type{st}
@@ -236,7 +236,7 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	// unused inventory must not invent decl (only header)
 	g.clearErr()
 	stU := &Type{isStruct: true, StructName: "S1", Used: false, Fields: []StructField{
-		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 	}}
 	g.Types.StructTypes = []*Type{stU}
 	g.Types.AllTypes = []*Type{stU}
@@ -290,7 +290,7 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 	g.clearErr()
 	good := &Function{
 		Name: "func_1", AliasName: "func_1_alias", ReturnType: GetIntTypeSess(testAmbientSession),
-		RV:   CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:   CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})),
 		Body: &Block{}, IsBuilt: true, BuildState: BuildBuilt,
 	}
 	g.Funcs.Funcs = []*Function{good, nil}
@@ -314,9 +314,9 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 	// incomplete local OutputDef fails whole block sticky (no invent blank lines / partial)
 	ClearErrorSess(testAmbientSession)
 	b := &Block{LocalVars: []*Variable{
-		{Name: "l_x", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // no init
+		{Name: "l_x", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}, // no init
 	}}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if out != "" {
 		t.Fatal("incomplete local must fail closed whole block", out)
 	}
@@ -331,7 +331,7 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 	}
 	ok.Init = MakeIntSess(testAmbientSession, 1)
 	b2 := &Block{LocalVars: []*Variable{ok}}
-	if out2 := b2.Output(0); !strings.Contains(out2, "l_ok") {
+	if out2 := b2.OutputSess(testAmbientSession, 0); !strings.Contains(out2, "l_ok") {
 		t.Fatal(out2)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -340,7 +340,7 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	// Variable.cpp:1184 — name + directive always live sticky; hash empty name sticky
 	ClearErrorSess(testAmbientSession)
-	v := &Variable{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	v := &Variable{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	if s := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil); s != "" {
 		t.Fatal("empty name must fail closed dump", s)
 	}
@@ -356,7 +356,7 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// array dump/hash without name — no invent bare "[0]" / for ( = 0; …)
-	arr := &Variable{Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	arr := &Variable{Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	if s := arr.OutputValueDumpSess(testAmbientSession, "c ", 1, nil); s != "" {
 		t.Fatal("empty array name must fail closed dump", s)
 	}
@@ -390,7 +390,7 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	}}
 	arr2 := &Variable{
 		Name: "g_s", Type: agg, IsArray: true, ArraySizes: []int{1},
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	if s := hashArrayVariableSess(testAmbientSession, arr2, ctrl, nil); s != "" {
 		t.Fatal("field Type hole must fail closed hash", s)
@@ -408,7 +408,7 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	}}
 	arrU := &Variable{
 		Name: "g_u", Type: ut, IsArray: true, ArraySizes: []int{1},
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	holeFacts := []*FactUnion{nil}
 	if s := hashArrayVariableSess(testAmbientSession, arrU, ctrl, holeFacts); s != "" {
@@ -490,7 +490,7 @@ func TestVolWrapNoInventIntType(t *testing.T) {
 	}
 	// sticky no invent VOL_RVAL(, int) / VOL_LVAL(, int) with empty name
 	ClearErrorSess(testAmbientSession)
-	v2 := &Variable{Type: GetIntTypeSess(testAmbientSession), UseVolRVal: true, Qfer: NewCVQualifiers([]bool{false}, []bool{true})}
+	v2 := &Variable{Type: GetIntTypeSess(testAmbientSession), UseVolRVal: true, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})}
 	if out := v2.OutputCSess(testAmbientSession, false); out != "" {
 		t.Fatal("empty name VOL_RVAL must fail closed", out)
 	}
@@ -665,7 +665,7 @@ func TestVariableOutputDef(t *testing.T) {
 func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
 	// Variable.cpp:659 — assert(init); sticky no soft invent "= ;"
 	ClearErrorSess(testAmbientSession)
-	v := &Variable{Name: "g_u", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	v := &Variable{Name: "g_u", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	if v.OutputDefFullSess(testAmbientSession, true, false, false, nil) != "" {
 		t.Fatal("missing init must fail closed")
 	}
@@ -702,7 +702,7 @@ func TestOutputQualifiedTypeBadSanityFailClosed(t *testing.T) {
 	// pointer type needs 2-level qfer (indirect+1)
 	ClearErrorSess(testAmbientSession)
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	q := NewCVQualifiers([]bool{false}, []bool{false}) // too short
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}) // too short
 	if s := q.OutputQualifiedTypeSess(testAmbientSession, pt); s != "" {
 		t.Fatal("bad qfer layout must fail closed", s)
 	}
@@ -718,7 +718,7 @@ func TestOutputGlobalsUsesOutputDef(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	// force a global
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	_ = g.VS.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, g.Rng)
 	out := g.OutputGlobals()
 	if !strings.Contains(out, "static") || !strings.Contains(out, "g_") {
@@ -733,7 +733,7 @@ func TestOutputDeclOutputQualifiedTypeResidualSticky(t *testing.T) {
 	v := &Variable{
 		Name: "g_s",
 		Type: &Type{isStruct: true}, // CName residual
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	if s := v.OutputDeclSess(testAmbientSession, false, false); s != "" {
 		t.Fatal("CName residual must fail closed OutputDecl", s)
@@ -858,7 +858,7 @@ func TestOutputArrayInitForcedResidualSticky(t *testing.T) {
 func TestOutputQualifiedTypeCNameResidualSticky(t *testing.T) {
 	// CName residual soft invent was invent "const " / partial qualified type past hole.
 	ClearErrorSess(testAmbientSession)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if s := q.OutputQualifiedTypeSess(testAmbientSession, &Type{isStruct: true}); s != "" {
 		t.Fatal("CName residual must fail closed OutputQualifiedType", s)
 	}
@@ -894,8 +894,8 @@ func TestCtrlVarNamesGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was soft-continue invent partial name list.
 	ClearErrorSess(testAmbientSession)
 	ctrl := []*Variable{
-		{Name: "i", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-		{Name: "", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // residual
+		{Name: "i", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+		{Name: "", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}, // residual
 	}
 	if LabelsComplete(CtrlVarNamesSess(testAmbientSession, ctrl)) {
 		t.Fatal("empty name residual must fail closed IncompleteLabelsSlice")
@@ -932,7 +932,7 @@ func TestOutputGlobalVariablesListResidualSticky(t *testing.T) {
 	// OutputDef residual soft invent was invent section header past incomplete var.
 	ClearErrorSess(testAmbientSession)
 	// incomplete list sticky
-	if OutputGlobalVariables([]*Variable{nil}) != "" {
+	if OutputGlobalVariablesSess(testAmbientSession, []*Variable{nil}, sessOpts(testAmbientSession)) != "" {
 		t.Fatal("nil hole OutputGlobalVariables must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -940,7 +940,7 @@ func TestOutputGlobalVariablesListResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete empty
-	if OutputGlobalVariables(nil) != "" {
+	if OutputGlobalVariablesSess(testAmbientSession, nil, sessOpts(testAmbientSession)) != "" {
 		t.Fatal("empty OutputGlobalVariables must be empty")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -957,7 +957,7 @@ func TestOutputQualifiedTypeConstVolatilePointerDoubleSpace(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	pt := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))) // int32_t **
 	// depth 3: [obj, *, *] — outer pointer level both const+vol
-	q := NewCVQualifiers(
+	q := NewCVQualifiersSess(testAmbientSession,
 		[]bool{false, false, true},
 		[]bool{false, false, true},
 	)

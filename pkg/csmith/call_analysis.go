@@ -574,14 +574,14 @@ func CombineBranchFacts(st *Stmt, preFacts *[]*FactPointTo, preUnion *[]*FactUni
 		return
 	}
 
-	trueMust := st.Then.MustReturn()
+	trueMust := st.Then.MustReturnSess(fmSess(fm))
 	// residual ERROR sticky — no invent soft-continue branch-merge past Then MustReturn residual
 	if hasErrFM(fm) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
-	falseMust := st.Else.MustReturn()
+	falseMust := st.Else.MustReturnSess(fmSess(fm))
 	// residual ERROR sticky — no invent soft-continue branch-merge past Else MustReturn residual
 	if hasErrFM(fm) {
 		fm.GlobalFacts = IncompleteFactSlice()

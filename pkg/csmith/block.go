@@ -2107,9 +2107,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 }
 
 // Output emits C for the block with indent levels.
-func (b *Block) Output(indent int) string {
-	return b.OutputSess(testAmbientSession, indent)
-}
+// Non-Sess Output deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputSess is Output with Options/sticky from an explicit session bag.
 func (b *Block) OutputSess(s *Session, indent int) string {
@@ -2117,9 +2115,7 @@ func (b *Block) OutputSess(s *Session, indent int) string {
 }
 
 // OutputOpts is Block.Output with explicit session Options (no ambient ProcessOptions).
-func (b *Block) OutputOpts(indent int, opts Options) string {
-	return b.OutputOptsSess(testAmbientSession, indent, opts)
-}
+// Non-Sess OutputOpts deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputOptsSess is OutputOpts with sticky errors on bag s.
 func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
@@ -2178,13 +2174,13 @@ func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 			sb.WriteString(cn + " " + name + " = 0;\n")
 		}
 	}
-	// OutputVariableList(local_vars) — Variable.cpp:855–864
+	// OutputVariableListSess(s, local_vars, sessOpts(s)) — Variable.cpp:855–864
 	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
 	if !VariablesComplete(b.LocalVars) {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	// Block.cpp:268 — OutputVariableList(local_vars): defs then OutputArrayInitializers
+	// Block.cpp:268 — OutputVariableListSess(s, local_vars, sessOpts(s)): defs then OutputArrayInitializers
 	// for non-global lists (Variable.cpp:861–863). Do not invent a loopInits-only gate:
 	// C++ still emits "int i, j, k;" when every array is brace-init (seed-2 func_67).
 	if len(b.LocalVars) > 0 {

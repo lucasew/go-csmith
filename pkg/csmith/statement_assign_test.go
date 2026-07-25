@@ -8,8 +8,8 @@ import (
 func TestAssignOpsProbabilitySimpleWhenDisabled(t *testing.T) {
 	opts := Defaults()
 	opts.CompoundAssignment = false
-	tab := NewAssignOpsTable(opts)
-	op := AssignOpsProbability(NewRngSess(testAmbientSession, 2), opts, tab, GetIntTypeSess(testAmbientSession))
+	tab := NewAssignOpsTableSess(testAmbientSession, opts)
+	op := AssignOpsProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 2), opts, tab, GetIntTypeSess(testAmbientSession))
 	if op != AssignSimple {
 		t.Fatal(op)
 	}
@@ -17,11 +17,11 @@ func TestAssignOpsProbabilitySimpleWhenDisabled(t *testing.T) {
 
 func TestAssignOpsProbabilitySignedFiltersIncr(t *testing.T) {
 	opts := Defaults()
-	tab := NewAssignOpsTable(opts)
+	tab := NewAssignOpsTableSess(testAmbientSession, opts)
 	// many draws: never ++/-- on signed int
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 100; i++ {
-		op := AssignOpsProbability(r, opts, tab, GetIntTypeSess(testAmbientSession))
+		op := AssignOpsProbabilitySess(testAmbientSession, r, opts, tab, GetIntTypeSess(testAmbientSession))
 		if op.NeedNoRHS() {
 			t.Fatalf("signed should filter incr, got %v", op)
 		}
@@ -81,7 +81,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 func TestAssignOutputIncr(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignPostIncr, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
-	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "g_1++") {
 		t.Fatal(out)
 	}
@@ -115,10 +115,10 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed a volatile global so volatile qfer can select
-	vq := NewCVQualifiers([]bool{false}, []bool{true})
+	vq := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &vq, NewRngSess(testAmbientSession, 1))
 	// volatile-only WRITE qfer
-	q := NewCVQualifiers([]bool{false}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// should not panic; may fail to find var and return empty assign
@@ -225,7 +225,7 @@ func TestAssignLhsIsVolatileResidualSticky(t *testing.T) {
 	// IsVolatile residual soft invent was invent non-vol soft-skip ccomp path past Lhs hole.
 	ClearErrorSess(testAmbientSession)
 	// nil Lhs + nil LhsVar complete false
-	if assignLhsIsVolatile(&Stmt{Kind: StmtAssign, StmID: 1}) {
+	if assignLhsIsVolatileSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: 1}) {
 		t.Fatal("no lhs must soft false not sticky")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -234,7 +234,7 @@ func TestAssignLhsIsVolatileResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete Lhs (nil Var) residual sticky true
 	st := &Stmt{Kind: StmtAssign, StmID: 1, Lhs: &Lhs{}}
-	if !assignLhsIsVolatile(st) {
+	if !assignLhsIsVolatileSess(testAmbientSession, st) {
 		t.Fatal("nil Lhs.Var residual must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -242,7 +242,7 @@ func TestAssignLhsIsVolatileResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Stmt residual
-	if !assignLhsIsVolatile(nil) {
+	if !assignLhsIsVolatileSess(testAmbientSession, nil) {
 		t.Fatal("nil Stmt must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -255,9 +255,9 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	// IsFloat residual soft invent was invent AssignSimple soft-success past Type-nil shell.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	tab := NewAssignOpsTable(opts)
+	tab := NewAssignOpsTableSess(testAmbientSession, opts)
 	// typ nil → skip simple/float filters → may pick compound
-	op := AssignOpsProbability(NewRngSess(testAmbientSession, 1), opts, tab, (*Type)(nil))
+	op := AssignOpsProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, tab, (*Type)(nil))
 	_ = op
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("nil typ AssignOpsProbability must soft path no sticky")
@@ -265,7 +265,7 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete float → simple
 	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
-	if AssignOpsProbability(NewRngSess(testAmbientSession, 1), opts, tab, ft) != AssignSimple {
+	if AssignOpsProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, tab, ft) != AssignSimple {
 		t.Fatal("float typ must force AssignSimple")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -274,7 +274,7 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// non-simple → simple
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	if AssignOpsProbability(NewRngSess(testAmbientSession, 1), opts, tab, pt) != AssignSimple {
+	if AssignOpsProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, tab, pt) != AssignSimple {
 		t.Fatal("non-simple typ must force AssignSimple")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -314,7 +314,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// a failure that used to skip restore (StrictFloat GetType).
 	// Build a broken rhs by using incomplete effect on a nested path — instead
 	// directly set process exact and invoke Lhs-making assign that fails FM wipe.
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// Incomplete GlobalFacts after setup causes early fail at start — before exact set.
 	// Use Valid path then corrupt: call with StrictFloat and nil typ so SelectLType runs,
 	// then force HasError during strict float by… hard to hit GetType residual.
@@ -335,7 +335,7 @@ func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	// Simulate RHS qualifiers: const int
-	rhsQ := NewCVQualifiers([]bool{true}, []bool{false})
+	rhsQ := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})
 	// What StatementAssign does for !callerQf after expressionQualifiers:
 	qfer := rhsQ
 	qfer.AcceptStricter = true
@@ -364,7 +364,7 @@ func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 func TestCompoundAssignAlwaysClearsVolatileOnQfer(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Caller qf: volatile int (func param path)
-	qfer := NewCVQualifiers([]bool{false}, []bool{true})
+	qfer := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	if !qfer.IsVolatileSess(testAmbientSession) {
 		t.Fatal("setup: want volatile qfer")
 	}
@@ -375,9 +375,9 @@ func TestCompoundAssignAlwaysClearsVolatileOnQfer(t *testing.T) {
 	}
 	// Simple assign does not force this clear in StatementAssign (only compound
 	// / strict-vol residual path); contract is "compound always clears".
-	qfer2 := NewCVQualifiers([]bool{false}, []bool{true})
+	qfer2 := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	// multi-level pointer: set_volatile(false) only pos=0 (outermost storage)
-	qfer3 := NewCVQualifiers([]bool{false, false}, []bool{true, true})
+	qfer3 := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{true, true})
 	qfer3.SetVolatileSess(testAmbientSession, false, 0)
 	if qfer3.IsVolatiles[len(qfer3.IsVolatiles)-1] {
 		t.Fatal("set_volatile(false,0) must clear storage slot (last)")

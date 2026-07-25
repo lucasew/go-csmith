@@ -542,7 +542,7 @@ func NewCtrlVarsSess(s *Session, maxDim int, freshNames bool) []*Variable {
 		ctrl = append(ctrl, &Variable{
 			Name: nm,
 			Type: GetIntTypeSess(s),
-			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer: NewCVQualifiersSess(s, []bool{false}, []bool{false}),
 		})
 		name++
 	}
@@ -862,7 +862,7 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
+	qfer := NewCVQualifiersSess(s, []bool{isConst}, []bool{isVolatile})
 	// Variable.cpp:392–395 — non-union top: Constant::make_random(type); union top: 0
 	// Constant::make_random reads session CGOptions + Probabilities
 	var init *Constant
@@ -2349,7 +2349,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 			fail()
 			return
 		}
-		qfer := NewCVQualifiers(consts, vols)
+		qfer := NewCVQualifiersSess(s, consts, vols)
 		// Variable.cpp:363 — assert(var->qfer.sanity_check(var->type))
 		if !qfer.SanityCheckSess(s, f.Type) {
 			// residual ERROR sticky — no invent soft-field past SanityCheck residual

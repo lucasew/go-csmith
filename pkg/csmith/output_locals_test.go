@@ -11,7 +11,7 @@ func TestLocalOutputDef(t *testing.T) {
 	lv := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), true, false)
 	lv.Init = MakeIntSess(testAmbientSession, 2)
 	b.LocalVars = []*Variable{lv}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "const") || !strings.Contains(out, "l_1") || !strings.Contains(out, "2") {
 		t.Fatal(out)
 	}
@@ -26,7 +26,7 @@ func TestBlockOutputDefResidualSticky(t *testing.T) {
 	bad := CreateVariableScalarsSess(testAmbientSession, "l_bad", GetIntTypeSess(testAmbientSession), false, false)
 	bad.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil
 	b := &Block{LocalVars: []*Variable{good, bad}}
-	if s := b.Output(0); s != "" {
+	if s := b.OutputSess(testAmbientSession, 0); s != "" {
 		t.Fatal("OutputDef residual must fail closed whole Block.Output, not invent later locals", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -47,7 +47,7 @@ func TestBlockOutputInvokeResidualSticky(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}, // Type-nil residual
 	}
 	b := &Block{Stmts: []Stmt{good, bad}}
-	if s := b.Output(0); s != "" {
+	if s := b.OutputSess(testAmbientSession, 0); s != "" {
 		t.Fatal("invoke Output residual must fail closed whole Block.Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -119,7 +119,7 @@ func TestAddVisibleEffectUsesChain(t *testing.T) {
 func TestOutputVariableList(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
-	out := OutputVariableList([]*Variable{a, b}, "  ", true)
+	out := OutputVariableListSess(testAmbientSession, []*Variable{a, b}, "  ", true, sessOpts(testAmbientSession))
 	// Variable.cpp:858–860 — vector order (no invent name-sort)
 	ia := strings.Index(out, "g_a")
 	ib := strings.Index(out, "g_b")
@@ -129,7 +129,7 @@ func TestOutputVariableList(t *testing.T) {
 	// incomplete OutputDef — sticky no invent indent-only blank lines
 	ClearErrorSess(testAmbientSession)
 	broken := &Variable{Name: "g_x", Type: GetIntTypeSess(testAmbientSession)} // no init
-	if s := OutputVariableList([]*Variable{broken}, "    ", true); s != "" {
+	if s := OutputVariableListSess(testAmbientSession, []*Variable{broken}, "    ", true, sessOpts(testAmbientSession)); s != "" {
 		t.Fatal("empty defs must fail closed empty list", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -137,14 +137,14 @@ func TestOutputVariableList(t *testing.T) {
 	}
 	// incomplete entry fails whole list (no invent skip holes)
 	ClearErrorSess(testAmbientSession)
-	if s := OutputVariableList([]*Variable{a, broken}, "  ", true); s != "" {
+	if s := OutputVariableListSess(testAmbientSession, []*Variable{a, broken}, "  ", true, sessOpts(testAmbientSession)); s != "" {
 		t.Fatal("mixed incomplete must fail closed whole list", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("mixed incomplete OutputVariableList must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := OutputVariableList([]*Variable{a, nil}, "  ", true); s != "" {
+	if s := OutputVariableListSess(testAmbientSession, []*Variable{a, nil}, "  ", true, sessOpts(testAmbientSession)); s != "" {
 		t.Fatal("nil hole must fail closed whole list", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -154,7 +154,7 @@ func TestOutputVariableList(t *testing.T) {
 	// IsArray without AsArray soft invent was scalar OutputDef path
 	// fair: sticky empty whole list
 	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeIntSess(testAmbientSession, 0)}
-	if s := OutputVariableList([]*Variable{arrShell}, "  ", true); s != "" {
+	if s := OutputVariableListSess(testAmbientSession, []*Variable{arrShell}, "  ", true, sessOpts(testAmbientSession)); s != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole list", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -165,19 +165,19 @@ func TestOutputVariableList(t *testing.T) {
 
 func TestOutputGlobalVariables(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	out := OutputGlobalVariables([]*Variable{v})
+	out := OutputGlobalVariablesSess(testAmbientSession, []*Variable{v}, sessOpts(testAmbientSession))
 	if !strings.Contains(out, "GLOBAL VARIABLES") || !strings.Contains(out, "g_1") {
 		t.Fatal(out)
 	}
-	decl := OutputGlobalVariablesDecls([]*Variable{v}, "extern ")
+	decl := OutputGlobalVariablesDeclsSess(testAmbientSession, []*Variable{v}, "extern ", sessOpts(testAmbientSession))
 	if !strings.Contains(decl, "extern ") {
 		t.Fatal(decl)
 	}
 	// no invent section-only header when all defs empty
-	if s := OutputGlobalVariables([]*Variable{{Name: "g_x", Type: GetIntTypeSess(testAmbientSession)}}); s != "" {
+	if s := OutputGlobalVariablesSess(testAmbientSession, []*Variable{{Name: "g_x", Type: GetIntTypeSess(testAmbientSession)}}, sessOpts(testAmbientSession)); s != "" {
 		t.Fatal("empty globals must fail closed section", s)
 	}
-	if s := OutputGlobalVariablesDecls(nil, "extern "); s != "" {
+	if s := OutputGlobalVariablesDeclsSess(testAmbientSession, nil, "extern ", sessOpts(testAmbientSession)); s != "" {
 		t.Fatal("nil globals must fail closed section", s)
 	}
 }

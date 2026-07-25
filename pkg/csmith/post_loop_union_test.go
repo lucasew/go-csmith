@@ -12,10 +12,10 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	oldU := CreateVariableQferSess(testAmbientSession, "g_old", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	oldU := CreateVariableQferSess(testAmbientSession, "g_old", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	oldU.CreateFieldVarsSess(testAmbientSession)
 	oldU.Init = MakeIntSess(testAmbientSession, 0)
-	newU := CreateVariableQferSess(testAmbientSession, "g_new", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	newU := CreateVariableQferSess(testAmbientSession, "g_new", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	newU.CreateFieldVarsSess(testAmbientSession)
 	newU.Init = MakeIntSess(testAmbientSession, 0)
 	// preUnion (make_iteration snap) differs from map_in — must not clobber map_in
@@ -64,7 +64,7 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u_pc", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u_pc", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	entryU := MakeFactUnionSess(testAmbientSession, uv, 0)
 	bottomU := MakeFactUnionSess(testAmbientSession, uv, 0)

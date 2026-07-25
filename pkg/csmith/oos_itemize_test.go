@@ -57,7 +57,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 
 func TestChooseOKVarItemizesArray(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil || av.AsArray == nil {
 		t.Fatal("av")
 	}
@@ -90,7 +90,7 @@ func TestVariableMatchAggregate(t *testing.T) {
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
-	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Skip("no fields")
 	}

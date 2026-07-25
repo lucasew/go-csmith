@@ -14,12 +14,12 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	g88.CreateFieldVarsSess(testAmbientSession)
 	// pointer to union
-	l90 := CreateVariableQferSess(testAmbientSession, "l_90", PointerToSess(testAmbientSession, ut), NewCVQualifiers([]bool{false}, []bool{false}))
+	l90 := CreateVariableQferSess(testAmbientSession, "l_90", PointerToSess(testAmbientSession, ut), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// source union with last=f0
-	src := CreateVariableQferSess(testAmbientSession, "l_89", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	src := CreateVariableQferSess(testAmbientSession, "l_89", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	src.CreateFieldVarsSess(testAmbientSession)
 
 	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}

@@ -118,7 +118,7 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 	f.Stack = []*Block{blk}
 	f.Body = blk
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.Select(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, r, MatchFlexible)
 	if v == nil {
 		t.Fatal("nil")

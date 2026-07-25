@@ -189,7 +189,7 @@ func TestLabelAttrEmit(t *testing.T) {
 			Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		}},
 	}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "lbl_1:") || !strings.Contains(out, "hot") {
 		t.Fatal(out)
 	}
@@ -245,11 +245,11 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	// Block.cpp:313–331 — break_stms nonempty → not must_return
 	ret := Stmt{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	b := &Block{StmID: 1, Stmts: []Stmt{ret}, BreakStmIDs: []int{9}}
-	if b.MustReturn() {
+	if b.MustReturnSess(testAmbientSession) {
 		t.Fatal("break_stms blocks must_return")
 	}
 	b.BreakStmIDs = nil
-	if !b.MustReturn() {
+	if !b.MustReturnSess(testAmbientSession) {
 		t.Fatal("return last")
 	}
 	// continue edge into block escapes — CreateCFGEdge(src, block) stores DestStmID=block.StmID
@@ -257,7 +257,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	b.EmitFM = fm
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestBlock: b, DestStmID: b.StmID, BackLink: true}}
-	if b.MustReturn() {
+	if b.MustReturnSess(testAmbientSession) {
 		t.Fatal("back edge escapes")
 	}
 	// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm): DestStmID is the label
@@ -265,7 +265,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	// must_return (seed-79 double return / append_return).
 	ClearErrorSess(testAmbientSession)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 5, DestBlock: b, DestStmID: 2 /* labeled stmt */, BackLink: true}}
-	if !b.MustReturn() {
+	if !b.MustReturnSess(testAmbientSession) {
 		t.Fatal("goto-to-label edge must not escape block must_return")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -274,7 +274,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	// Block StmID 0 + FM sticky fail closed as escape (no invent "no back edge")
 	ClearErrorSess(testAmbientSession)
 	b0 := &Block{StmID: IncompleteStmID, Stmts: []Stmt{ret}, EmitFM: fm}
-	if b0.MustReturn() {
+	if b0.MustReturnSess(testAmbientSession) {
 		t.Fatal("block StmID 0 must fail closed not must_return")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -285,11 +285,11 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	b2 := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}, BreakStmIDs: []int{1}}
-	if b2.MustJump() {
+	if b2.MustJumpSess(testAmbientSession) {
 		t.Fatal("break_stms nonempty")
 	}
 	b2.BreakStmIDs = nil
-	if !b2.MustJump() {
+	if !b2.MustJumpSess(testAmbientSession) {
 		t.Fatal("true break must_jump")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -297,14 +297,14 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Block always live; sticky no invent not-must-return / not-must-jump soft-skip
-	if (*Block)(nil).MustReturn() {
+	if (*Block)(nil).MustReturnSess(testAmbientSession) {
 		t.Fatal("nil MustReturn must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MustReturn must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Block)(nil).MustJump() {
+	if (*Block)(nil).MustJumpSess(testAmbientSession) {
 		t.Fatal("nil MustJump must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -329,13 +329,13 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		AssignOp: AssignSimple,
 	}}}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "/* block id: 42 */") {
 		t.Fatal(out)
 	}
 	// concise skips comment body of OutputCommentLine when we gate EmitConcise
 	b.EmitConcise = true
-	out2 := b.Output(0)
+	out2 := b.OutputSess(testAmbientSession, 0)
 	if strings.Contains(out2, "block id:") {
 		t.Fatal("concise should skip block id", out2)
 	}
@@ -356,7 +356,7 @@ func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1},
 		Then: body,
 	}}}
-	out := parent.Output(0)
+	out := parent.OutputSess(testAmbientSession, 0)
 	if out == "" || HasErrorSess(testAmbientSession) {
 		t.Fatalf("Output empty/err: %q sticky=%v", out, HasErrorSess(testAmbientSession))
 	}

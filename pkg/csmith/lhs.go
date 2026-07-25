@@ -518,7 +518,7 @@ func MakeRandomLhs(
 		return nil
 	}
 	// Lhs.cpp:qfer from caller; default non-const non-vol storage
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(cgSess(cg), []bool{false}, []bool{false})
 	if qfer != nil {
 		q = *qfer
 	}

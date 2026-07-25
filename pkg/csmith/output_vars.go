@@ -10,14 +10,10 @@ import (
 // Variable.cpp:855–864 — OutputDef per var in vector order (no invent name-sort);
 // then for non-global lists OutputArrayInitializers (ctrl decl even when all brace-init).
 // Incomplete Variable* list fails closed sticky empty (no invent skip holes / partial section).
-func OutputVariableList(vars []*Variable, indent string, forceStatic bool) string {
-	return OutputVariableListSess(testAmbientSession, vars, indent, forceStatic, sessOpts(testAmbientSession))
-}
+// Non-Sess OutputVariableList deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputVariableListOpts is OutputVariableList with explicit session Options.
-func OutputVariableListOpts(vars []*Variable, indent string, forceStatic bool, opts Options) string {
-	return OutputVariableListSess(testAmbientSession, vars, indent, forceStatic, opts)
-}
+// Non-Sess OutputVariableListOpts deleted — pass run bag or testAmbientSession explicitly.
 
 func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceStatic bool, opts Options) string {
 	if len(vars) == 0 {
@@ -86,14 +82,10 @@ func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceSt
 // OutputGlobalVariables mirrors OutputGlobalVariables.
 // VariableSelector.cpp:1594–1601 — comment header + list (no access_once toggle).
 // no invent section header without any live global defs
-func OutputGlobalVariables(vars []*Variable) string {
-	return OutputGlobalVariablesSess(testAmbientSession, vars, sessOpts(testAmbientSession))
-}
+// Non-Sess OutputGlobalVariables deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputGlobalVariablesOpts is OutputGlobalVariables with explicit session Options.
-func OutputGlobalVariablesOpts(vars []*Variable, opts Options) string {
-	return OutputGlobalVariablesSess(testAmbientSession, vars, opts)
-}
+// Non-Sess OutputGlobalVariablesOpts deleted — pass run bag or testAmbientSession explicitly.
 
 func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) string {
 	body := OutputVariableListSess(s, vars, "", true, opts)
@@ -118,14 +110,10 @@ func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) strin
 // OutputGlobalVariablesDecls mirrors OutputGlobalVariablesDecls with optional prefix.
 // VariableSelector.cpp:1604–1612.
 // no invent section header without any live decls
-func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
-	return OutputGlobalVariablesDeclsSess(testAmbientSession, vars, prefix, sessOpts(testAmbientSession))
-}
+// Non-Sess OutputGlobalVariablesDecls deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputGlobalVariablesDeclsOpts is OutputGlobalVariablesDecls with explicit Options.
-func OutputGlobalVariablesDeclsOpts(vars []*Variable, prefix string, opts Options) string {
-	return OutputGlobalVariablesDeclsSess(testAmbientSession, vars, prefix, opts)
-}
+// Non-Sess OutputGlobalVariablesDeclsOpts deleted — pass run bag or testAmbientSession explicitly.
 
 func OutputGlobalVariablesDeclsSess(s *Session, vars []*Variable, prefix string, opts Options) string {
 	body := OutputVariableListSess(s, vars, "", false, opts)

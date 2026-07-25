@@ -11,12 +11,12 @@ func TestOutputAssignSimple(t *testing.T) {
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)},
 	}
-	out := OutputAssignSimple(st, false)
+	out := OutputAssignSimpleSess(testAmbientSession, st, false)
 	if !strings.Contains(out, "g_1") || !strings.Contains(out, "3") {
 		t.Fatal(out)
 	}
 	st.AssignOp = AssignPostIncr
-	out = OutputAssignSimple(st, false)
+	out = OutputAssignSimpleSess(testAmbientSession, st, false)
 	if !strings.Contains(out, "++") {
 		t.Fatal(out)
 	}
@@ -27,12 +27,12 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
-	if out := OutputAssignSimple(st, false); out != "" {
+	if out := OutputAssignSimpleSess(testAmbientSession, st, false); out != "" {
 		t.Fatal("nil Expr must fail closed", out)
 	}
 	ClearErrorSess(testAmbientSession)
 	st.Expr = &Expression{Term: TermConstant} // nil Con → empty Output sticky
-	if out := OutputAssignSimple(st, false); out != "" {
+	if out := OutputAssignSimpleSess(testAmbientSession, st, false); out != "" {
 		t.Fatal("empty RHS must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -42,7 +42,7 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st.AssignOp = AssignPreIncr
 	st.Expr = nil
-	if out := OutputAssignSimple(st, false); out != "++g_1" {
+	if out := OutputAssignSimpleSess(testAmbientSession, st, false); out != "++g_1" {
 		t.Fatal(out)
 	}
 	// AssignOpC — sticky no invent empty-name or empty-rhs shells
@@ -79,7 +79,7 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 	opts := Defaults()
 	opts.SafeMath = true
 	opts.CComp = true
-	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
+	if out := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts); out != "" {
 		t.Fatal("empty ccomp rhs must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -88,7 +88,7 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil Expr on simple assign sticky — no invent bare lhs
 	st2 := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
-	if out := OutputAssignAsExprOpts(st2, false, opts); out != "" {
+	if out := OutputAssignAsExprOptsSess(testAmbientSession, st2, false, opts); out != "" {
 		t.Fatal("nil Expr simple must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -106,13 +106,13 @@ func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
 		SafeFlags: flags,
 	}
 	opts := Defaults()
-	out := OutputAssignAsExprOpts(st, false, opts)
+	out := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts)
 	if !strings.Contains(out, "safe_add_") || !strings.Contains(out, "g_1 = ") {
 		t.Fatal(out)
 	}
 	// identify wrappers appends id
 	opts.IdentifyWrappers = true
-	out2 := OutputAssignAsExprOpts(st, false, opts)
+	out2 := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts)
 	if !strings.Contains(out2, ", ") {
 		t.Fatal(out2)
 	}
@@ -164,7 +164,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 	}
 	if !found && f.NeedReturnStmtSess(testAmbientSession) {
 		// post_creation may still add return
-		_ = b.MustReturn()
+		_ = b.MustReturnSess(testAmbientSession)
 	}
 }
 
@@ -180,7 +180,7 @@ func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 	}
 	opts := Defaults()
 	opts.CComp = true
-	out := OutputAssignAsExprOpts(st, false, opts)
+	out := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts)
 	// expect "g_v = g_v & 7" not "g_v &= 7"
 	if !strings.Contains(out, "=") || !strings.Contains(out, "&") {
 		t.Fatal(out)
@@ -193,7 +193,7 @@ func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 	}
 	// non-ccomp keeps compound form
 	opts.CComp = false
-	out2 := OutputAssignAsExprOpts(st, false, opts)
+	out2 := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts)
 	if !strings.Contains(out2, "&=") {
 		t.Fatal("non-ccomp compound", out2)
 	}
@@ -208,7 +208,7 @@ func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
 	}
 	opts := Defaults()
 	opts.CComp = true
-	out := OutputAssignAsExprOpts(st, false, opts)
+	out := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts)
 	if strings.Count(out, "g_v") != 1 {
 		// "g_v = 1" has one mention of g_v on lhs only for simple
 		if !strings.Contains(out, "g_v = 1") && !strings.Contains(out, "g_v = ") {
@@ -229,7 +229,7 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 	}
 	opts := Defaults()
 	opts.SafeMath = false
-	out := OutputAssignAsExprOpts(st, false, opts)
+	out := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts)
 	if strings.Contains(out, "safe_") {
 		t.Fatal("SafeMath off must not invent wrapper", out)
 	}
@@ -249,7 +249,7 @@ func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
 	}
 	opts := Defaults()
 	opts.SafeMath = true
-	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
+	if out := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts); out != "" {
 		t.Fatalf("unknown op with flags must fail closed, got %q", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -272,7 +272,7 @@ func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
 
 func TestOutputAssignSimpleNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if OutputAssignSimple(nil, false) != "" {
+	if OutputAssignSimpleSess(testAmbientSession, nil, false) != "" {
 		t.Fatal("nil OutputAssignSimple must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -284,21 +284,21 @@ func TestOutputAssignSimpleNilSticky(t *testing.T) {
 func TestOutputAssignAsExprNilSticky(t *testing.T) {
 	// Statement always live at OutputAsExpr; sticky no invent empty assign-as-expr shell
 	ClearErrorSess(testAmbientSession)
-	if OutputAssignAsExpr(nil, false) != "" {
+	if OutputAssignAsExprSess(testAmbientSession, nil, false) != "" {
 		t.Fatal("nil OutputAssignAsExpr must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputAssignAsExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if OutputAssignAsExprOpts(nil, false, Defaults()) != "" {
+	if OutputAssignAsExprOptsSess(testAmbientSession, nil, false, Defaults()) != "" {
 		t.Fatal("nil OutputAssignAsExprOpts must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputAssignAsExprOpts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if assignLhsText(nil, false) != "" {
+	if assignLhsTextSess(testAmbientSession, nil, false) != "" {
 		t.Fatal("nil assignLhsText must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -306,7 +306,7 @@ func TestOutputAssignAsExprNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Statement always live; sticky true (no invent non-vol soft-skip ccomp)
-	if !assignLhsIsVolatile(nil) {
+	if !assignLhsIsVolatileSess(testAmbientSession, nil) {
 		t.Fatal("nil assignLhsIsVolatile must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -314,7 +314,7 @@ func TestOutputAssignAsExprNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Expression always live at qfer seed; sticky nil
-	if expressionQualifiers(nil) != nil {
+	if expressionQualifiersSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil expressionQualifiers must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -339,7 +339,7 @@ func TestOutputAssignAsExprLhsOutputResidualSticky(t *testing.T) {
 		LhsVar: &item.Variable, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
-	if s := OutputAssignAsExpr(st, false); s != "" {
+	if s := OutputAssignAsExprSess(testAmbientSession, st, false); s != "" {
 		t.Fatal("Lhs Output residual must fail closed OutputAssignAsExpr", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -357,7 +357,7 @@ func TestOutputAssignAsExprRhsOutputResidualSticky(t *testing.T) {
 		AssignOp: AssignSimple,
 		Expr:     &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
 	}
-	if s := OutputAssignAsExpr(st, false); s != "" {
+	if s := OutputAssignAsExprSess(testAmbientSession, st, false); s != "" {
 		t.Fatal("RHS Output residual must fail closed OutputAssignAsExpr", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -370,7 +370,7 @@ func TestOutputAssignAsExprCCompVolatileResidualSticky(t *testing.T) {
 	// IsVolatile residual soft invent was invent ccomp rewrite past hole as complete.
 	ClearErrorSess(testAmbientSession)
 	// Type-nil Lhs → IsVolatile residual fail-closed true + sticky
-	v := &Variable{Name: "g_v", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{true})}
+	v := &Variable{Name: "g_v", Type: nil, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})}
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: nil},
 		AssignOp:  AssignBitAnd,
@@ -382,7 +382,7 @@ func TestOutputAssignAsExprCCompVolatileResidualSticky(t *testing.T) {
 	opts.SafeMath = true
 	// assignLhsText via Lhs.Output may residual first (IndirectLevel/GetType);
 	// either way whole OutputAssignAsExpr must fail closed sticky.
-	if s := OutputAssignAsExprOpts(st, false, opts); s != "" {
+	if s := OutputAssignAsExprOptsSess(testAmbientSession, st, false, opts); s != "" {
 		t.Fatal("IsVolatile/Lhs residual must fail closed ccomp rewrite", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

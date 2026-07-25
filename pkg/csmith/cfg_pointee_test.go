@@ -64,7 +64,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// need globals for break test expr
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	br := MakeRandomBreak(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTablesSess(testAmbientSession, opts), &cg)
 	if br.Kind != StmtBreak || br.StmID == 0 {
@@ -143,7 +143,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	// address-of init preserved
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	q := CreateVariableQferSess(testAmbientSession, "g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
+	q := CreateVariableQferSess(testAmbientSession, "g_q", pt, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	q.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	old2 := []*FactPointTo{}
 	MakeupNewVarFactsSess(testAmbientSession, &old2, []*FactPointTo{MakeFactPointToSess(testAmbientSession, q, GarbagePtr)})

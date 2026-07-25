@@ -302,7 +302,7 @@ func TestOutputAssignAsExprSafeAdd(t *testing.T) {
 		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 		AssignOp: AssignAdd, SafeFlags: flags,
 	}
-	out := OutputAssignAsExpr(&st, false)
+	out := OutputAssignAsExprSess(testAmbientSession, &st, false)
 	if !strings.Contains(out, "safe_add_") || !strings.Contains(out, "g_1 = ") {
 		t.Fatal(out)
 	}
@@ -336,7 +336,7 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	if len(st.Rhs.Invoke.Args) != 2 || st.Rhs.Invoke.Args[0] == nil || st.Rhs.Invoke.Args[0].Var != lhs.Var {
 		t.Fatal("lhs operand", st.Rhs.Invoke.Args)
 	}
-	if st.GetAssignRhs() != st.Rhs {
+	if st.GetAssignRhsSess(testAmbientSession) != st.Rhs {
 		t.Fatal("GetAssignRhs")
 	}
 	// expr (get_expr) remains original RHS
@@ -630,7 +630,7 @@ func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	body := &Block{StmID: 40, Func: f, Looping: true}

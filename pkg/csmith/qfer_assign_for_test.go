@@ -10,8 +10,8 @@ func TestCVQualifiersMatch(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, po)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
 
-	a := NewCVQualifiers([]bool{false}, []bool{false})
-	b := NewCVQualifiers([]bool{true}, []bool{false})
+	a := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
+	b := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})
 	// one-level → always match (non-exact)
 	if !a.MatchSess(testAmbientSession, b, false) {
 		t.Fatal("1-level")
@@ -42,7 +42,7 @@ func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
 	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	plain := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), false, false)
 	// const qfer wants exact match — volatile var should fail
-	q := NewCVQualifiers([]bool{true}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	got := ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{vol, plain}, AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, MatchFlexible, nil, false, false, false)
 	// neither matches exact const; plain is non-const non-vol
@@ -62,16 +62,16 @@ func TestMatchIndirect(t *testing.T) {
 	defer SetProcessOptionsSess(testAmbientSession, prev)
 
 	// wanted scalar qfer vs pointer var qfer (2 levels)
-	want := NewCVQualifiers([]bool{false}, []bool{false})
-	have := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	want := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
+	have := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	// deref = 2-1 = 1; match want with have.IndirectQualifiersSess(testAmbientSession, 1)
 	if !want.MatchIndirectSess(testAmbientSession, have, false) {
 		t.Fatal("indirect")
 	}
 	// multi-level address gap complete false (C++ return false, no assert)
 	ClearErrorSess(testAmbientSession)
-	deep := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
-	shallow := NewCVQualifiers([]bool{false}, []bool{false})
+	deep := NewCVQualifiersSess(testAmbientSession, []bool{false, false, false}, []bool{false, false, false})
+	shallow := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// want deep vs shallow: deref = 1-3 = -2
 	if deep.MatchIndirectSess(testAmbientSession, shallow, false) {
 		t.Fatal("deref < -1 must fail closed false")
@@ -84,7 +84,7 @@ func TestMatchIndirect(t *testing.T) {
 
 func TestIndirectQualifiers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true, false}, []bool{false, true})
 	// address — push_back false,false
 	addr := q.IndirectQualifiersSess(testAmbientSession, -1)
 	if len(addr.IsConsts) != 3 {
@@ -180,7 +180,7 @@ func TestFindPointerFields(t *testing.T) {
 	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	// inject a pointer field if none
-	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	ptrs := sv.FindPointerFieldsSess(testAmbientSession)
 	// may be empty for random struct
 	_ = ptrs

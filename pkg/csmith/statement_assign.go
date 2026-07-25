@@ -6,10 +6,7 @@ import "strings"
 
 // NewAssignOpsTable mirrors StatementAssign::InitProbabilityTable.
 // StatementAssign.cpp:68–81.
-func NewAssignOpsTable(opts Options) *DistributionTable {
-	// Construction path: residual bag unused (table always live).
-	return NewAssignOpsTableSess(testAmbientSession, opts)
-}
+// Non-Sess NewAssignOpsTable deleted — pass run bag or testAmbientSession explicitly.
 
 // NewAssignOpsTableSess builds assign-op distribution with explicit residual bag.
 func NewAssignOpsTableSess(s *Session, opts Options) *DistributionTable {
@@ -35,9 +32,7 @@ func NewAssignOpsTableSess(s *Session, opts Options) *DistributionTable {
 
 // AssignOpsProbability mirrors StatementAssign::AssignOpsProbability.
 // StatementAssign.cpp:84–106.
-func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *Type) AssignOp {
-	return AssignOpsProbabilitySess(testAmbientSession, r, opts, table, typ)
-}
+// Non-Sess AssignOpsProbability deleted — pass run bag or testAmbientSession explicitly.
 
 func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *DistributionTable, typ *Type) AssignOp {
 	if !opts.CompoundAssignment {
@@ -214,7 +209,7 @@ func MakeRandomAssignQfer(
 
 	var rhs *Expression
 	// StatementAssign.cpp:147–148 — qfer from caller or derived from RHS
-	qfer := NewCVQualifiers([]bool{false}, []bool{false})
+	qfer := NewCVQualifiersSess(cgSess(cg), []bool{false}, []bool{false})
 	qfer.Wildcard = true
 	callerQf := qf != nil
 	if callerQf {
@@ -648,9 +643,7 @@ func makePossibleCompoundAssign(
 // GetAssignRhs mirrors StatementAssign::get_rhs — canonized compound form when set.
 // StatementAssign.h:109; FactMgr::update_fact_for_assign(sa) uses get_rhs().
 // Incomplete Statement sticky nil (no invent soft-skip assign without RHS past hole).
-func (st *Stmt) GetAssignRhs() *Expression {
-	return st.GetAssignRhsSess(testAmbientSession)
-}
+// Non-Sess GetAssignRhs deleted — pass run bag or testAmbientSession explicitly.
 
 // GetAssignRhsSess is GetAssignRhs with explicit session residual sticky.
 func (st *Stmt) GetAssignRhsSess(s *Session) *Expression {
@@ -677,9 +670,7 @@ func gensymFromVS(vs *VariableSelector) *GenSym {
 // OutputAssignSimple mirrors StatementAssign::OutputSimple.
 // StatementAssign.cpp:515–537 — lhs op rhs or pre/post incr forms.
 // Incomplete Statement sticky empty (no invent empty assign shell past hole).
-func OutputAssignSimple(st *Stmt, wrapVol bool) string {
-	return OutputAssignSimpleSess(testAmbientSession, st, wrapVol)
-}
+// Non-Sess OutputAssignSimple deleted — pass run bag or testAmbientSession explicitly.
 
 func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 	// Statement always live at assign emit; sticky incomplete no invent empty token
@@ -716,9 +707,7 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 // assignLhsText resolves LHS text for assign emit.
 // Statement always live at assign emit; sticky empty (no invent bare RHS past hole).}
 
-func assignLhsText(st *Stmt, wrapVol bool) string {
-	return assignLhsTextSess(testAmbientSession, st, wrapVol)
-}
+// Non-Sess assignLhsText deleted — pass run bag or testAmbientSession explicitly.
 
 func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 	if st == nil {
@@ -752,9 +741,7 @@ func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 // Uses process CGOptions (identify_wrappers); no soft invent Defaults().
 // Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).}
 
-func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
-	return OutputAssignAsExprSess(testAmbientSession, st, wrapVol)
-}
+// Non-Sess OutputAssignAsExpr deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputAssignAsExprSess is OutputAssignAsExpr with Options/sticky from an explicit bag.
 func OutputAssignAsExprSess(s *Session, st *Stmt, wrapVol bool) string {
@@ -762,9 +749,7 @@ func OutputAssignAsExprSess(s *Session, st *Stmt, wrapVol bool) string {
 }
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.
-func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
-	return OutputAssignAsExprOptsSess(testAmbientSession, st, wrapVol, opts)
-}
+// Non-Sess OutputAssignAsExprOpts deleted — pass run bag or testAmbientSession explicitly.
 
 func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options) string {
 	// Statement always live at OutputAsExpr; sticky incomplete no invent empty token
@@ -888,9 +873,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 // assignLhsIsVolatile reports LHS volatile for OutputAsExpr ccomp rewrite.
 // StatementAssign.cpp:552 — lhs.is_volatile().
 // Statement always live; sticky true (no invent non-vol soft-skip ccomp path past hole).
-func assignLhsIsVolatile(st *Stmt) bool {
-	return assignLhsIsVolatileSess(testAmbientSession, st)
-}
+// Non-Sess assignLhsIsVolatile deleted — pass run bag or testAmbientSession explicitly.
 
 func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 	if st == nil {
@@ -920,9 +903,7 @@ func assignLhsIsVolatileSess(s *Session, st *Stmt) bool {
 // Uses Expression.GetQualifiers (ExpressionVariable/Assign/Funcall/Comma).
 // Expression always live at qfer seed; sticky nil (no invent empty seed past hole).
 
-func expressionQualifiers(e *Expression) *CVQualifiers {
-	return expressionQualifiersSess(testAmbientSession, e)
-}
+// Non-Sess expressionQualifiers deleted — pass run bag or testAmbientSession explicitly.
 
 // expressionQualifiersSess is expressionQualifiers with explicit session residual sticky.
 func expressionQualifiersSess(s *Session, e *Expression) *CVQualifiers {

@@ -52,7 +52,7 @@ func TestIsValidVolatile(t *testing.T) {
 	uv := &Variable{Name: "g_u2", Type: ut}
 	// container itself incomplete Type-nil for nested recurse path via GetContainerUnion
 	// IsInside residual already covered; also const Type-nil sticky invalid.
-	cBroken := &Variable{Name: "g_c", Type: nil, Qfer: NewCVQualifiers([]bool{true}, []bool{false})}
+	cBroken := &Variable{Name: "g_c", Type: nil, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})}
 	if cBroken.IsValidVolatileSess(testAmbientSession) {
 		t.Fatal("Type-nil const IsValidVolatile must fail closed false")
 	}

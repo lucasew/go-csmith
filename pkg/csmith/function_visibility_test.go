@@ -13,8 +13,8 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	f := &Function{Name: "func_30", ReturnType: GetIntTypeSess(testAmbientSession)}

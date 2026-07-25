@@ -127,13 +127,13 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0", Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
-			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f2", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{true})},
+			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EUShort), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f2", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})},
 			// raw slot i=3 — Name "f3" would be invent if emit used Name after pad skip
-			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
-			{Name: "f4", Type: GetSimpleTypeSess(testAmbientSession, EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
-			{Name: "f5", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
+			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: 0, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})},
+			{Name: "f4", Type: GetSimpleTypeSess(testAmbientSession, EUShort), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})},
+			{Name: "f5", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})},
 		},
 	}
 	decl := st.OutputStructDeclSess(testAmbientSession, nil, nil)
@@ -156,9 +156,9 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: 0, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	udecl := ut.OutputUnionDeclSess(testAmbientSession, nil, nil)
@@ -250,8 +250,8 @@ func TestOutputStructDeclFieldTypeResidualSticky(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // CName residual
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f1", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}, // CName residual
 		},
 	}
 	if s := st.OutputStructDeclSess(testAmbientSession, nil, nil); s != "" {
@@ -269,7 +269,7 @@ func TestOutputUnionDeclFieldTypeResidualSticky(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0",
 		Fields: []StructField{
-			{Name: "f0", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	if s := ut.OutputUnionDeclSess(testAmbientSession, nil, nil); s != "" {

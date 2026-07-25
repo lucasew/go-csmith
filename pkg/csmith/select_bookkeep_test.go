@@ -136,7 +136,7 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// int* global nonvol
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	vs.GlobalList = []*Variable{pv}
 	vs.GlobalNonvolatilesList = []*Variable{pv}
@@ -159,7 +159,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	vs.GlobalList = []*Variable{pv}
 	vs.GlobalNonvolatilesList = []*Variable{pv}

@@ -21,7 +21,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	g88.CreateFieldVarsSess(testAmbientSession)
 	if len(g88.FieldVars) < 2 {
 		t.Fatal("field_vars")

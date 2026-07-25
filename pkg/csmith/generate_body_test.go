@@ -29,7 +29,7 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 		ReturnType: GetIntTypeSess(testAmbientSession),
 		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)},
 	}
-	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	// handover facts empty for calFM from signature pairing
 	callee.GenerateBodyWithKnownParams(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), prev)
@@ -60,7 +60,7 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	prev.ExprDepth = 7
 	prev.Flags = FlagInLoop
 	callee := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession)}
-	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	// Capture depth at body generation via a thin check: body must be buildable
 	// at MaxBlockDepth without inventing max-depth filter (would fail with depth 4 inherit).
@@ -93,7 +93,7 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 		t.Fatal(prev.IVBounds)
 	}
 	callee := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession)}
-	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	callee.GenerateBody(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), prev)
 	// caller map still has IV; callee generation must not keep sharing that map
@@ -120,7 +120,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, nil, nil, "g_16", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("array")
@@ -143,7 +143,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	if rwd == nil {
 		t.Fatal("expect non-nil external RW from no-write on global array")
 	}
-	if got := rwd.FindMustUseArrays(); len(got) != 0 {
+	if got := rwd.FindMustUseArraysSess(testAmbientSession); len(got) != 0 {
 		t.Fatalf("BuildCalleeRW must not copy must-use arrays, got %d", len(got))
 	}
 	if len(rwd.NoWriteVars) == 0 {
@@ -152,7 +152,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 
 	// known-params path must install external no-* only (empty must).
 	callee := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession)}
-	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	callee.GenerateBodyWithKnownParams(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), prev)
 	if HasErrorSess(testAmbientSession) {
@@ -168,7 +168,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 
 	// GenerateBody (!knownParams): ctor leaves RW nil — never inherit must.
 	callee2 := &Function{Name: "func_3", ReturnType: GetIntTypeSess(testAmbientSession)}
-	callee2.RV = CreateVariableQferSess(testAmbientSession, "func_3_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee2.RV = CreateVariableQferSess(testAmbientSession, "func_3_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	_ = callee2.ensurePairedFactMgrSess(testAmbientSession)
 	callee2.GenerateBody(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), prev)
 	if HasErrorSess(testAmbientSession) {

@@ -27,7 +27,7 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 	}
 	// volatile aggregate rejected when not SE-free
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
-		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}), BitWidth: -1},
 	}}
 	// IsVolatileStructUnion may need field volatile
 	if cg2.AcceptType(st) && st.IsVolatileStructUnionSess(testAmbientSession) {
@@ -177,7 +177,7 @@ func TestReadUnionFieldForTestExpr(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{f0}
 	test := &Expression{Term: TermVariable, Var: f0, ExprType: GetIntTypeSess(testAmbientSession)}

@@ -35,11 +35,11 @@ func TestHashStructFields(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
-			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), BitWidth: -1},
 		},
 	}
-	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	out := v.HashOutputSess(testAmbientSession)
 	if !strings.Contains(out, "g_3.f0") || !strings.Contains(out, "g_3.f1") {
 		t.Fatal(out)
@@ -62,7 +62,7 @@ func TestHashArrayLoops(t *testing.T) {
 			Type:       GetIntTypeSess(testAmbientSession),
 			IsArray:    true,
 			ArraySizes: []int{3},
-			Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer:       NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{3},
 	}
@@ -109,7 +109,7 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	parent := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_62", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3},
-			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{2, 3},
 	}
@@ -117,7 +117,7 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	item := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_62", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3},
-			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{2, 3}, Collective: parent, Indices: []string{"1", "0"},
 	}
@@ -162,7 +162,7 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_336", Type: ut, IsArray: true, ArraySizes: []int{5},
-			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{5},
 	}
@@ -204,7 +204,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_x", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
-			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{2},
 	}

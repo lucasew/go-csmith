@@ -506,12 +506,12 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 
 	// StatementIf.cpp:185–196 — must_return pruning (full FactVec)
 	if cg.FM != nil {
-		trueMust := st.Then.MustReturn()
+		trueMust := st.Then.MustReturnSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-continue merge path past Then MustReturn residual
 		if hasErrCG(cg) {
 			return false
 		}
-		falseMust := st.Else.MustReturn()
+		falseMust := st.Else.MustReturnSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-continue merge path past Else MustReturn residual
 		if hasErrCG(cg) {
 			return false
@@ -702,7 +702,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			noteErrCG(cg, ErrGeneric)
 			return false
 		}
-		if st.Then.MustReturn() {
+		if st.Then.MustReturnSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent soft-continue pre-loop path past MustReturn residual true
 			if hasErrCG(cg) {
 				return false
@@ -943,7 +943,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			noteErrCG(cg, ErrGeneric)
 			return false
 		}
-		if inner.Then.MustReturn() {
+		if inner.Then.MustReturnSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent soft-continue pre-loop path past MustReturn residual true
 			if hasErrCG(cg) {
 				return false

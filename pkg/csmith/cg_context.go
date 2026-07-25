@@ -571,9 +571,7 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 // Variable* always live on must-use lists; nil hole sticky fails closed (nil out).
 // IsArray without AsArray sticky fails closed (no invent soft-skip broken array
 // as absent then complete empty must-use pool / soft re-pick past hole).
-func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
-	return rw.FindMustUseArraysSess(testAmbientSession)
-}
+// Non-Sess FindMustUseArrays deleted — pass run bag or testAmbientSession explicitly.
 
 // FindMustUseArraysSess is FindMustUseArrays with explicit session residual sticky.
 func (rw *RWDirective) FindMustUseArraysSess(s *Session) []*ArrayVariable {

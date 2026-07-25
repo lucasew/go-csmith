@@ -14,7 +14,7 @@ func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
 			{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	// old already implies new → keep old (must not join-to-BOTTOM)
 	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 3)}
@@ -48,7 +48,7 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 			{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// seed field-vars so IsUnion paths are live
 	uv.CreateFieldVarsSess(testAmbientSession)
 	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
@@ -81,7 +81,7 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 			{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	if len(uv.FieldVars) < 2 {
 		t.Fatal("field vars")
@@ -110,8 +110,8 @@ func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
 			{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	u0 := CreateVariableQferSess(testAmbientSession, "g_u0", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	u1 := CreateVariableQferSess(testAmbientSession, "g_u1", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	u0 := CreateVariableQferSess(testAmbientSession, "g_u0", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	u1 := CreateVariableQferSess(testAmbientSession, "g_u1", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	u0.CreateFieldVarsSess(testAmbientSession)
 	u1.CreateFieldVarsSess(testAmbientSession)
 	// pointer that may point to either union's f4 field parent via indir write is complex;
@@ -137,7 +137,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_721", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_721", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	if len(uv.FieldVars) < 2 {
 		t.Fatal("need f0 f1")

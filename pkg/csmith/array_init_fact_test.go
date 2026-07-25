@@ -14,7 +14,7 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
 	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)))
 	ie := &Expression{Term: TermVariable, Var: g, ExprType: elem}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "l_233", elem, nil, q)
 	if av == nil {
 		t.Fatal("create")

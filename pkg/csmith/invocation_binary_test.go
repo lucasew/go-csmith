@@ -124,7 +124,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	// Manual 2-field union (MakeRandomUnionType may emit 1-field).
 	i32 := GetIntTypeSess(testAmbientSession)
 	i64 := GetSimpleTypeSess(testAmbientSession, ELongLong)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	ut := &Type{
 		isUnion:    true,
 		StructName: "U_ord",
@@ -139,7 +139,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	}
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
 	// pointer to f1 so *p = … renews union last=f1
-	p := CreateVariableQferSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableQferSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, f1.Type), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// post-left lattice: last written f0
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
@@ -749,7 +749,7 @@ func TestInvocationOutputArgResidualSticky(t *testing.T) {
 			{Term: TermConstant, Con: &Constant{Value: "2"}}, // Type-nil residual
 		},
 	}
-	if s := fi.Output(); s != "" {
+	if s := fi.OutputSess(testAmbientSession); s != "" {
 		t.Fatal("arg Output residual must fail closed Invocation.Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -768,7 +768,7 @@ func TestInvocationBinaryOutputResidualSticky(t *testing.T) {
 			{Term: TermConstant, Con: &Constant{Value: "2"}}, // Type-nil residual
 		},
 	}
-	if s := fi.Output(); s != "" {
+	if s := fi.OutputSess(testAmbientSession); s != "" {
 		t.Fatal("a1 Output residual must fail closed binary Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -784,11 +784,11 @@ func TestChooseFuncContextMatchResidualTruePathSticky(t *testing.T) {
 	opts := Defaults()
 	f := &Function{
 		Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession),
-		RV:      &Variable{Name: "func_1_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		RV:      &Variable{Name: "func_1_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		FEffect: IncompleteEffect(),
 		IsBuilt: true, BuildState: BuildBuilt,
 	}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{f}, GetIntTypeSess(testAmbientSession), nil, &cg, opts, &q) != nil {
 		t.Fatal("Incomplete FEffect must fail closed ChooseFuncContext")

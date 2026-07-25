@@ -18,7 +18,7 @@ func TestOutputForwardDeclAlias(t *testing.T) {
 	f := &Function{
 		Name: "func_1", AliasName: "func_1_alias",
 		ReturnType: GetIntTypeSess(testAmbientSession),
-		RV:         CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:         CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})),
 	}
 	out := f.OutputForwardDeclAliasSess(testAmbientSession, true)
 	if !strings.Contains(out, "static ") ||
@@ -36,7 +36,7 @@ func TestOutputFunctionsEmitsAliasDecls(t *testing.T) {
 		Name: "func_1", AliasName: "func_1_alias",
 		ReturnType: GetIntTypeSess(testAmbientSession),
 		IsBuilt:    true, BuildState: BuildBuilt,
-		RV:   CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:   CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})),
 		Body: &Block{},
 	}}
 	out := g.OutputFunctions()

@@ -17,7 +17,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	}
 	// union fact should not be created when disabled
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	fm.AddNewVarFact(uv)
 	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv) != nil {
 		t.Fatal("union should be skipped")

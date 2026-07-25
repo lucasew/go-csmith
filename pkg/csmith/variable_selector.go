@@ -3322,7 +3322,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		return nil
 	}
 	// VariableSelector.cpp:1362–1363 — qfer.add_qualifiers(false, false)
-	qfer := NewCVQualifiers([]bool{false}, []bool{false})
+	qfer := NewCVQualifiersSess(vsSess(vs), []bool{false}, []bool{false})
 	// VariableSelector.cpp:1364 — Constant::make_random(type); ERROR_GUARD path
 	// no invent CreateArrayVariable with nil init when make_random fails
 	init := MakeRandomSess(sessFromVS(vs), elem, vs.Opts, vs.Probs, r)

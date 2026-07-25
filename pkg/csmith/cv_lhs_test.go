@@ -6,7 +6,7 @@ import (
 )
 
 func TestAddRemoveQualifiers(t *testing.T) {
-	q := NewCVQualifiers([]bool{true}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})
 	q.AddQualifiersSess(testAmbientSession, false, true)
 	if len(q.IsConsts) != 2 || !q.IsVolatiles[1] {
 		t.Fatal(q)
@@ -57,7 +57,7 @@ func TestAddRemoveQualifiers(t *testing.T) {
 func TestIndirectQualifiersMultiLevelAddrFailClosed(t *testing.T) {
 	// CVQualifiers.cpp:510 — assert(level == -1); multi-level & sticky → empty
 	ClearErrorSess(testAmbientSession)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	got := q.IndirectQualifiersSess(testAmbientSession, -2)
 	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
 		t.Fatal("multi-level address-of must fail closed empty")
@@ -83,7 +83,7 @@ func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 	opts.Volatiles = false
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
-	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	if s := q.OutputFirstQualsSess(testAmbientSession); s != "" {
 		t.Fatalf("want empty when options off, got %q", s)
 	}
@@ -105,7 +105,7 @@ func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 func TestNewCVQualifiersUnequalLenFailClosed(t *testing.T) {
 	// CVQualifiers.cpp:96 — sizes must match; sticky empty (no invent truncate)
 	ClearErrorSess(testAmbientSession)
-	q := NewCVQualifiers([]bool{true, false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true, false}, []bool{false})
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatal(q)
 	}
@@ -118,7 +118,7 @@ func TestNewCVQualifiersUnequalLenFailClosed(t *testing.T) {
 func TestSanityCheck(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// int: level 0 → need 1 qualifier slot
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if !q.SanityCheckSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("int")
 	}
@@ -127,7 +127,7 @@ func TestSanityCheck(t *testing.T) {
 	if q.SanityCheckSess(testAmbientSession, pt) {
 		t.Fatal("short qfer for ptr")
 	}
-	q2 := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	q2 := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	if !q2.SanityCheckSess(testAmbientSession, pt) {
 		t.Fatal("ptr ok")
 	}
@@ -144,7 +144,7 @@ func TestSanityCheck(t *testing.T) {
 func TestRandomAddQualifiers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	base := NewCVQualifiers([]bool{false}, []bool{false})
+	base := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	got := base.RandomAddQualifiersSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, probs, true)
 	if len(got.IsConsts) != 2 {
 		t.Fatal(len(got.IsConsts))
@@ -162,7 +162,7 @@ func TestRandomAddQualifiers(t *testing.T) {
 }
 
 func TestOutputFirstQuals(t *testing.T) {
-	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	s := q.OutputFirstQualsSess(testAmbientSession)
 	if s != "const volatile " {
 		t.Fatal(s)
@@ -199,7 +199,7 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 		t.Fatal(ptrs)
 	}
 	// qfer with 2 levels for pointer
-	p.Qfer = NewCVQualifiers([]bool{false, true}, []bool{false, false})
+	p.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{false, true}, []bool{false, false})
 	// indirect 1 → pop one → remaining [false]
 	q := lhs1.GetQualifiersSess(testAmbientSession)
 	if len(q.IsConsts) != 1 {
@@ -238,7 +238,7 @@ func TestLhsIsVolatileAfterDeref(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// volatile at storage (after one deref of pointer-to-vol?)
 	// IsVolatileAfterDeref(0) for bare uses Qfer
-	p.Qfer = NewCVQualifiers([]bool{false, true}, []bool{false, true})
+	p.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{false, true}, []bool{false, true})
 	// want int: indirect 1 → check volatile after deref 1
 	lhs := &Lhs{Var: p, Type: GetIntTypeSess(testAmbientSession)}
 	_ = lhs.IsVolatileSess(testAmbientSession) // exercise path
@@ -249,7 +249,7 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	// fair: incomplete sticky fails closed const/vol true
 	// 2-level non-vol qfer so Qfer path does not OOB-fail-closed as full vol first
 	ClearErrorSess(testAmbientSession)
-	v := &Variable{Name: "g_p", Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false})}
+	v := &Variable{Name: "g_p", Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})}
 	// Type nil
 	if !v.IsConstAfterDerefSess(testAmbientSession, 1) {
 		t.Fatal("nil Type must fail closed as const after deref")

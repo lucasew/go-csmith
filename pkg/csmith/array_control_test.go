@@ -87,7 +87,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("nil av")
@@ -121,7 +121,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = []int{5, 5}
 	av.ArraySizes = av.Sizes
@@ -145,7 +145,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	if st == nil || st.Loop == nil {
 		t.Fatal("for")
 	}
-	out := (&Block{Stmts: []Stmt{*st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{*st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "for (") {
 		t.Fatal(out)
 	}
@@ -182,7 +182,7 @@ func TestVectorFilterNilTableMatchesCPP(t *testing.T) {
 		t.Fatalf("nil ptable Lookup: got %d want identity 5", f.Lookup(5))
 	}
 	// empty FilterOut set → never rejects
-	if f.FilterSess(testAmbientSession, 0) {
+	if f.Filter(0) {
 		t.Fatal("empty FilterOut must not reject")
 	}
 }
@@ -213,7 +213,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// seed several arrays so select_array can pick
 	for i := 0; i < 3; i++ {
 		av := CreateArrayVariable(NewRngSess(testAmbientSession, uint64(10+i)), opts, NewProbabilities(opts), nil, nil, nil, "g_"+string(rune('a'+i)), GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)

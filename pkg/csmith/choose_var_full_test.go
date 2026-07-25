@@ -36,7 +36,7 @@ func TestChooseVarFullNoUnion(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 1 {
 		t.Fatal("need fields")
 	}
@@ -57,7 +57,7 @@ func TestChooseVarFullNoExpandKeepsStruct(t *testing.T) {
 			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// no expand + want int → struct itself does not match int
 	got := ChooseVarFull(NewRngSess(testAmbientSession, 1), []*Variable{sv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntTypeSess(testAmbientSession), nil, MatchFlexible, nil, false, true, false)
@@ -99,7 +99,7 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// nil facts → hash all (HashOutput path)
 	all := uv.HashOutputSess(testAmbientSession)
 	if !strings.Contains(all, "g_u.f0") || !strings.Contains(all, "g_u.f1") {
@@ -172,7 +172,7 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 1 {
 		t.Fatal("fields")
 	}

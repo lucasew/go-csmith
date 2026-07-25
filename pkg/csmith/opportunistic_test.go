@@ -277,16 +277,16 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	// force a volatile field if possible — check method on non-vol struct pointer
 	pt := PointerToSess(testAmbientSession, st)
-	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// if struct has no vol fields, partial is false
 	_ = v.IsPartialVolatileAfterDerefSess(testAmbientSession, 1)
 	// fully volatile pointer qfer → not partial
-	vv := CreateVariableQferSess(testAmbientSession, "g_pv", pt, NewCVQualifiers([]bool{false, false}, []bool{true, false}))
+	vv := CreateVariableQferSess(testAmbientSession, "g_pv", pt, NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{true, false}))
 	// IsVolatileAfterDeref(1) depends on qfer layout — just ensure no panic
 	_ = vv.IsPartialVolatileAfterDerefSess(testAmbientSession, 1)
 	// Type-nil residual soft invent was not-partial soft-skip. Fair: sticky partial true.
 	ClearErrorSess(testAmbientSession)
-	hole := &Variable{Name: "g_p_hole", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	hole := &Variable{Name: "g_p_hole", Type: nil, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	if !hole.IsPartialVolatileAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("Type-nil IsPartialVolatileAfterDeref must fail closed partial true")
 	}
@@ -297,7 +297,7 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	// IsVolatileStructUnion residual: Type-nil field soft invent was not-partial.
 	// Fair: sticky partial true. Use deref 0 on aggregate (qfer level 0 non-vol).
 	broken := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: nil, BitWidth: -1}}}
-	vs := &Variable{Name: "g_s_hole", Type: broken, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	vs := &Variable{Name: "g_s_hole", Type: broken, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	if !vs.IsPartialVolatileAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("IsVolatileStructUnion residual IsPartialVolatile must fail closed true")
 	}
@@ -312,7 +312,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	opts := Defaults()
 	opts.CompatibleCheck = true
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	if g == nil {
 		t.Fatal("g")
@@ -411,16 +411,16 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	if vol == nil {
 		t.Fatal("vol ptr")
 	}
-	vol.Qfer = NewCVQualifiers([]bool{false, false}, []bool{true, true}) // vol at both levels
+	vol.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{true, true}) // vol at both levels
 	// request only storage-level volatile (len 1) — match_indirect via indirect_qualifiers
 	// deref = 2-1 = 1 → other.IndirectQualifiers(1) → should still allow if eligible
-	qfer := NewCVQualifiers([]bool{false}, []bool{true})
+	qfer := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qfer, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		// may fail IsEligibleVar if effect rules; at least no panic
 		t.Log("eligible path optional under empty effect")
 	}
 	// wildcard always matches
-	qw := NewCVQualifiers([]bool{true}, []bool{true})
+	qw := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	qw.Wildcard = true
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qw, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {

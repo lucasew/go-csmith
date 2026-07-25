@@ -125,7 +125,7 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_ret", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	rv := CreateVariableQferSess(testAmbientSession, "rv", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	rv := CreateVariableQferSess(testAmbientSession, "rv", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	f := &Function{Name: "func_u", ReturnType: ut, RV: rv}
 	fi := &Invocation{User: f}
 	uf := MakeFactUnionSess(testAmbientSession, rv, 0)
@@ -138,7 +138,7 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 		t.Fatalf("registry must return eUnionWrite fact for rv, got %+v", got)
 	}
 	// transfer to param-like LHS uses registry, not ambient
-	param := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	param := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: ut}
 	out := RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{param}, rhs)
 	if !UnionFactsComplete(out) || len(out) != 1 || out[0].Var != param || out[0].LastWrittenFID != 0 {
@@ -496,8 +496,8 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	if ut == nil {
 		t.Skip("union")
 	}
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	p := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	p := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	callee := &Function{
 		Name: "func_p", ReturnType: GetIntTypeSess(testAmbientSession),
 		Body:        &Block{StmID: 300, Stmts: nil},

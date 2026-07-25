@@ -16,7 +16,7 @@ func TestEagerCreateGlobalStruct(t *testing.T) {
 		t.Skip("no structs")
 	}
 	// want int — eager create struct then field match
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 5), MatchFlexible)
 	// may fail if no int fields
 	if v != nil && v.Type != nil {
@@ -36,7 +36,7 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 	vs.Types = env
 	vs.Probs = probs
 	vs.Opts = opts
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// empty GlobalList → expand or create
 	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 7))
 	if v == nil {
@@ -89,7 +89,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
-	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("no fields")
 	}
@@ -175,7 +175,7 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 9), MatchFlexible)
 	if len(blk.LocalVars) == 0 {
 		t.Fatal("no local created")
@@ -197,7 +197,7 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	vs.Types = env
 	vs.Probs = probs
 	vs.Opts = opts
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 5), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateGlobalStruct")
 	}
@@ -244,7 +244,7 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	v := vs.SelectParentLocal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 11), MatchFlexible)
 	if v == nil {
@@ -258,7 +258,7 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	vs.Opts = opts
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// empty stack → fail closed (no soft invent param/global)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)

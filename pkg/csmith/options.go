@@ -141,7 +141,7 @@ func sessExprTables(s *Session) *ExprTables {
 // Non-Sess InitSessionProbabilityTables deleted — pass testAmbientSession from tests.
 func InitSessionProbabilityTablesSess(s *Session, opts Options) {
 	s = sessOrAmbient(s)
-	s.AssignOpsTab = NewAssignOpsTable(opts)
+	s.AssignOpsTab = NewAssignOpsTableSess(s, opts)
 	s.ExprTables = NewExprTablesSess(s, opts)
 	// Statement::InitProbabilityTable — share session probs statement table
 	if p := s.Probs; p != nil {

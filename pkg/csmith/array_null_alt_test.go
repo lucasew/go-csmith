@@ -15,7 +15,7 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	if init == nil || init.Value != "0" || init.Type == nil || !init.Type.IsPointerLikeSess(testAmbientSession) {
 		t.Fatalf("pointer MakeRandom: %+v", init)
 	}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, probs, nil, nil, nil, "l_233", elem, init, q)
 	if av == nil || HasErrorSess(testAmbientSession) {
 		t.Fatalf("create err=%v", HasErrorSess(testAmbientSession))

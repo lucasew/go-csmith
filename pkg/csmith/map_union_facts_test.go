@@ -15,7 +15,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	if ut == nil || !ut.IsUnionSess(testAmbientSession) {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if uv == nil || len(uv.FieldVars) < 1 {
 		t.Skip("fields")
 	}
@@ -63,7 +63,7 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if uv == nil {
 		t.Fatal("uv")
 	}
@@ -96,7 +96,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	live := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	if !mergeJumpUnionFactsSess(testAmbientSession, &live, []*FactUnion{}) {
 		t.Fatal("merge failed", HasErrorSess(testAmbientSession))
@@ -265,7 +265,7 @@ func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	fu := MakeFactUnionSess(testAmbientSession, uv, 0)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{}

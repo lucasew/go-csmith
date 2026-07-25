@@ -120,7 +120,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	// uses Constant::make_random so library test can omit VS/CGContext.
 	opts.StrictConstArrays = true
 	_ = GetNewCtrlVarsSess(testAmbientSession, opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -174,7 +174,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	f.Stack = []*Block{b1}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff

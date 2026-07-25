@@ -6,10 +6,10 @@ import (
 )
 
 func TestStmtReturnMustReturn(t *testing.T) {
-	if !(Stmt{Kind: StmtReturn}).MustReturn() {
+	if !(Stmt{Kind: StmtReturn}).MustReturnSess(testAmbientSession) {
 		t.Fatal("return must_return")
 	}
-	if (Stmt{Kind: StmtAssign}).MustReturn() {
+	if (Stmt{Kind: StmtAssign}).MustReturnSess(testAmbientSession) {
 		t.Fatal("assign")
 	}
 }
@@ -21,16 +21,16 @@ func TestIfMustReturnBothBranches(t *testing.T) {
 		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}},
 		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn}}},
 	}
-	if !st.MustReturn() {
+	if !st.MustReturnSess(testAmbientSession) {
 		t.Fatal("both return")
 	}
 	st.Else = &Block{Stmts: []Stmt{{Kind: StmtAssign}}}
-	if st.MustReturn() {
+	if st.MustReturnSess(testAmbientSession) {
 		t.Fatal("only then")
 	}
 	// incomplete if — nil arm fails closed (no invent must_return soft-skip hole)
 	st.Else = nil
-	if st.MustReturn() {
+	if st.MustReturnSess(testAmbientSession) {
 		t.Fatal("nil Else must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -47,10 +47,10 @@ func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
 	body := &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
 	for _, kind := range []StatementType{StmtFor, StmtArrayOp} {
 		st := Stmt{Kind: kind, Then: body}
-		if st.MustReturn() {
+		if st.MustReturnSess(testAmbientSession) {
 			t.Fatalf("%v MustReturn must be false (Statement.h default), body return ignored", kind)
 		}
-		if st.MustJump() {
+		if st.MustJumpSess(testAmbientSession) {
 			t.Fatalf("%v MustJump must be false (Statement.h default)", kind)
 		}
 		if HasErrorSess(testAmbientSession) {
@@ -62,13 +62,13 @@ func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
 		{Kind: StmtFor, Then: body},
 		{Kind: StmtAssign},
 	}}
-	if parent.MustReturn() {
+	if parent.MustReturnSess(testAmbientSession) {
 		t.Fatal("parent ending in assign must not must_return via for body")
 	}
 	// After only the for (as if Block stopped early on invent for.MustReturn):
 	// Block with last=for must not must_return either.
 	onlyFor := &Block{Stmts: []Stmt{{Kind: StmtFor, Then: body}}}
-	if onlyFor.MustReturn() {
+	if onlyFor.MustReturnSess(testAmbientSession) {
 		t.Fatal("block last=for must not must_return (for base false)")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -77,13 +77,13 @@ func TestForArrayOpMustReturnBaseFalse(t *testing.T) {
 func TestBlockMustReturnLast(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{Stmts: []Stmt{{Kind: StmtAssign}, {Kind: StmtReturn}}}
-	if !b.MustReturn() {
+	if !b.MustReturnSess(testAmbientSession) {
 		t.Fatal("last return")
 	}
 	b2 := &Block{Stmts: []Stmt{{Kind: StmtReturn}, {Kind: StmtLabel, SourceLabel: "x"}}}
 	// trailing label after return — still last non-label is return
 	// wait order is return then label — MustReturn skips labels from end, finds return
-	if !b2.MustReturn() {
+	if !b2.MustReturnSess(testAmbientSession) {
 		t.Fatal("label after return")
 	}
 }
@@ -132,7 +132,7 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := &Variable{
 		Name: "g_p", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{4},
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	if v.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("pointer array must not hash")
@@ -151,12 +151,12 @@ func TestHashGlobalVarsSharedIndices(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// live AsArray required for GetMaxArrayDimension / hashArrayVariable
 	ga := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		Sizes:    []int{2, 3},
 	}
 	ga.AsArray = ga
 	gb := &ArrayVariable{
-		Variable: Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Variable: Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		Sizes:    []int{4},
 	}
 	gb.AsArray = gb

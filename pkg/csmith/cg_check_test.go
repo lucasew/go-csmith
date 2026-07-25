@@ -279,7 +279,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 func TestAccessDerefVolatile(t *testing.T) {
 	// strict rule: volatile after deref clears SE-free
 	// IsVolatiles layout: index len-deref-1; for deref=1 need volatiles[0]=true
-	q := NewCVQualifiers([]bool{false, false}, []bool{true, false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{true, false})
 	v := CreateVariableQferSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), q)
 	if !v.IsVolatileAfterDerefSess(testAmbientSession, 1) {
 		t.Fatal("qfer layout")

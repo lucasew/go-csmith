@@ -7,7 +7,7 @@ import (
 
 func TestRandomFunctionName(t *testing.T) {
 	// Function.cpp:249 — util.cpp gensym process-wide; private GenSym ignored
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	if RandomFunctionNameSess(testAmbientSession, nil) != "func_1" || RandomFunctionNameSess(testAmbientSession, nil) != "func_2" {
 		t.Fatal("func gensym")
 	}

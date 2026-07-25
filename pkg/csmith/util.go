@@ -14,9 +14,7 @@ type GenSym struct {
 }
 
 // Gensym mirrors util.cpp gensym(basename) on the session counter.
-func Gensym(basename string) string {
-	return GensymSess(testAmbientSession, basename)
-}
+// Non-Sess Gensym deleted — pass run bag or testAmbientSession explicitly.
 
 // GensymSess is Gensym on an explicit session bag.
 func GensymSess(s *Session, basename string) string {
@@ -24,9 +22,7 @@ func GensymSess(s *Session, basename string) string {
 }
 
 // ResetDefaultGensym mirrors reset_gensym on the session counter.
-func ResetDefaultGensym() {
-	ResetDefaultGensymSess(testAmbientSession)
-}
+// Non-Sess ResetDefaultGensym deleted — pass run bag or testAmbientSession explicitly.
 
 // ResetDefaultGensymSess resets gensym on an explicit session bag.
 func ResetDefaultGensymSess(s *Session) {
@@ -44,9 +40,7 @@ func (g *GenSym) Reset() {
 // util.cpp: ss << basename; ss << ++gensym_count;
 // Nil receiver uses session GenSym (not a one-shot local counter).
 // empty basename is broken IR sticky — no invent bare "1"/"2" numeric names
-func (g *GenSym) Next(basename string) string {
-	return g.NextSess(testAmbientSession, basename)
-}
+// Non-Sess Next deleted — pass run bag or testAmbientSession explicitly.
 
 // NextSess is Next with explicit session residual sticky.
 func (g *GenSym) NextSess(s *Session, basename string) string {
@@ -63,9 +57,7 @@ func (g *GenSym) NextSess(s *Session, basename string) string {
 
 // LogAnalysisFail mirrors util.cpp log_analysis_fail.
 // util.cpp:76–79 — append to errlog; always returns false.
-func LogAnalysisFail(msg string) bool {
-	return LogAnalysisFailSess(testAmbientSession, msg)
-}
+// Non-Sess LogAnalysisFail deleted — pass run bag or testAmbientSession explicitly.
 
 // LogAnalysisFailSess logs analysis failure on an explicit session bag.
 func LogAnalysisFailSess(s *Session, msg string) bool {
@@ -109,9 +101,7 @@ func OutputOpenEncloser(symbol string, indent int) (out string, newIndent int) {
 
 // OutputCloseEncloser mirrors util.cpp output_close_encloser.
 // util.cpp:166–174 — optional newline, indent--, tab + symbol.
-func OutputCloseEncloser(symbol string, indent int, noNewline bool) (out string, newIndent int) {
-	return OutputCloseEncloserSess(testAmbientSession, symbol, indent, noNewline)
-}
+// Non-Sess OutputCloseEncloser deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputCloseEncloserSess is OutputCloseEncloser with explicit session residual sticky.
 func OutputCloseEncloserSess(s *Session, symbol string, indent int, noNewline bool) (out string, newIndent int) {

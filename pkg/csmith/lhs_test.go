@@ -32,7 +32,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	vs.Types = env
 	// seed an int* global — qfer depth must be indirect+1 (pointer: 2 levels)
 	p := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
-	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	pv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRngSess(testAmbientSession, 1))
 	if pv == nil {
 		t.Fatal("no ptr global")
@@ -110,7 +110,7 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	// soft invent was fall through soft select invent Lhs from good global.
 	shell := &Variable{
 		Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	rw2 := &RWDirective{MustWriteVars: []*Variable{shell, good}}
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw2)
@@ -136,7 +136,7 @@ func TestLhsOutputVolLval(t *testing.T) {
 
 func TestLhsIndirectLevel(t *testing.T) {
 	p := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	v := CreateVariableQferSess(testAmbientSession, "g_p", p, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_p", p, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
 	if lhs.IndirectLevelSess(testAmbientSession) != 1 {
 		t.Fatal(lhs.IndirectLevelSess(testAmbientSession))
@@ -240,7 +240,7 @@ func TestPickUnaryOp(t *testing.T) {
 
 func TestExpressionVariableDerefOutput(t *testing.T) {
 	p := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	v := CreateVariableQferSess(testAmbientSession, "g_1", p, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", p, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	out := e.OutputSess(testAmbientSession)
 	if out != "(*g_1)" {
@@ -281,7 +281,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	vs.Types = env
 	p := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	// pointer type needs two-level qfer for SanityCheck / MakeInitValue
-	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRngSess(testAmbientSession, 1))
 	ClearErrorSess(testAmbientSession) // sticky ERROR_GUARD on failed qfer/create must not poison Lhs make
 	// bump deref prob
@@ -351,7 +351,7 @@ func TestMakeRandomLhsUsesProvidedQferWildcard(t *testing.T) {
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	q.Wildcard = true
 	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntTypeSess(testAmbientSession), false, false, &q)
 	if lhs == nil {
@@ -618,7 +618,7 @@ func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// Type-nil Lhs + Type-nil Var → GetType residual
-	lhs := &Lhs{Var: &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, Type: nil, CompoundAssign: true}
+	lhs := &Lhs{Var: &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}, Type: nil, CompoundAssign: true}
 	if cg.VisitFactsLhs(lhs, opts) {
 		t.Fatal("GetType residual must fail closed VisitFactsLhs")
 	}

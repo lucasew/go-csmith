@@ -18,7 +18,7 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 	}
 	// Body flag may be set by set_depth_protect(true); emit still requires CGOptions.
 	b := &Block{Func: f, Stmts: []Stmt{st}, EmitDepthProtect: true}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	// DEPTH-- must appear before return
 	iDepth := strings.Index(out, "DEPTH--")
 	iRet := strings.Index(out, "return")
@@ -27,7 +27,7 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 	}
 	// default options must not invent DEPTH++/--
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	out2 := b.Output(0)
+	out2 := b.OutputSess(testAmbientSession, 0)
 	if strings.Contains(out2, "DEPTH") {
 		t.Fatal("depth_protect off must not invent DEPTH:", out2)
 	}
@@ -41,7 +41,7 @@ func TestArrayInitAggregateTmpEmit(t *testing.T) {
 			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	av := CreateVariableQferSess(testAmbientSession, "g_a", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateVariableQferSess(testAmbientSession, "g_a", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// fake constant aggregate
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: st, Value: "{1}"}, ExprType: st}
 	asg := Stmt{
@@ -51,7 +51,7 @@ func TestArrayInitAggregateTmpEmit(t *testing.T) {
 		Expr:        rhs,
 		AssignOp:    AssignSimple,
 	}
-	out := (&Block{Stmts: []Stmt{asg}}).Output(0)
+	out := (&Block{Stmts: []Stmt{asg}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "tmp") || !strings.Contains(out, "g_a[i] = tmp") {
 		t.Fatal(out)
 	}
@@ -60,7 +60,7 @@ func TestArrayInitAggregateTmpEmit(t *testing.T) {
 func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = []int{3}
 	vs.Arrays = []*ArrayVariable{av}
@@ -89,7 +89,7 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	opts.NoReturnDeadPointer = true
 	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
-	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))

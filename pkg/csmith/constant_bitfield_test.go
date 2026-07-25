@@ -118,9 +118,9 @@ func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {
 		isStruct:   true,
 		StructName: "Sbf",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "pad", Type: GetIntTypeSess(testAmbientSession), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "pad", Type: GetIntTypeSess(testAmbientSession), BitWidth: 0, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	c := MakeStructConstantSess(testAmbientSession, NewRngSess(testAmbientSession, 4), opts, probs, st)
@@ -137,7 +137,7 @@ func TestSelectGlobalFlexibleMatchesConvert(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// create a short global; SelectGlobal for int with Flexible may match if MatchFlexible allows
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	sh := GetSimpleTypeSess(testAmbientSession, EShort)
 	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), sh, &q, NewRngSess(testAmbientSession, 1))
 	if g == nil {

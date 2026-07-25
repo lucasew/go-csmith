@@ -71,17 +71,17 @@ func TestExpressionUseVar(t *testing.T) {
 func TestMustJumpUsesNotEquals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
-	if !st.MustJump() {
+	if !st.MustJumpSess(testAmbientSession) {
 		t.Fatal("true const")
 	}
 	st.Expr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
-	if st.MustJump() {
+	if st.MustJumpSess(testAmbientSession) {
 		t.Fatal("false const")
 	}
 	// incomplete break without test sticky not-must-jump
 	ClearErrorSess(testAmbientSession)
 	st.Expr = nil
-	if st.MustJump() {
+	if st.MustJumpSess(testAmbientSession) {
 		t.Fatal("nil Expr MustJump must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -148,7 +148,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	gu.Init = MakeIntSess(testAmbientSession, 0)
 	u := MakeFactUnionSess(testAmbientSession, gu, 0)
 	// dest has union lattice; prev/cur outs empty union (size match via PT only)

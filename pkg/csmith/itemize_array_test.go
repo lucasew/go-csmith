@@ -9,7 +9,7 @@ func TestIsPackedAggregateFieldVar(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Packed: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	parent := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	parent := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(parent.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
@@ -27,7 +27,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// size 8 so remain > 1 when bound is 0 → offset possible
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// force size
 	if av == nil {
 		t.Fatal("nil av")
@@ -196,7 +196,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
 	// mark partially written → filtered → CreateRandomArray may still run
@@ -217,11 +217,11 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
-	av2 := CreateArrayVariable(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av2 := CreateArrayVariable(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av, av2}
 	vs.GlobalList = []*Variable{&av.Variable, &av2.Variable}
 	// incomplete NoWriteVars hole stickies IsNonWritable residual during filter of av
@@ -254,7 +254,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}

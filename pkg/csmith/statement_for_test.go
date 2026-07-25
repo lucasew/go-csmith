@@ -84,7 +84,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	if st == nil || st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		t.Fatalf("%+v", st)
 	}
-	out := (&Block{Stmts: []Stmt{*st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{*st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "for (") {
 		t.Fatalf("output %q", out)
 	}

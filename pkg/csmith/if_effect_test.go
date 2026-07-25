@@ -21,7 +21,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// plant a known global
-	g1 := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	g1 := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	vs.GlobalList = []*Variable{g1}
 	st := MakeRandomIf(NewRngSess(testAmbientSession, 7), opts, probs, vs, tables, tab, &cg)
 	if st == nil || st.Then == nil || st.Else == nil {
@@ -31,7 +31,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	// (with only assigns, likely wrote)
 	_ = stmtTab
 	// structural: both arms have statements possibly
-	out := (&Block{Stmts: []Stmt{*st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{*st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "if (") || !strings.Contains(out, "else") {
 		t.Fatal(out)
 	}
@@ -106,7 +106,7 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 
 func TestArrayBuildInitRecursive(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}

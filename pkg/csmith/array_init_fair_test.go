@@ -14,7 +14,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	av := &ArrayVariable{
@@ -38,7 +38,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		Then:        &Block{}, // unused when ArrayAccess+Expr set
 		StmID:       1,
 	}
-	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{st}}).OutputSess(testAmbientSession, 0)
 	if HasErrorSess(testAmbientSession) || out == "" {
 		t.Fatalf("output empty/err: %q err=%v", out, HasErrorSess(testAmbientSession))
 	}
@@ -68,7 +68,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		Then:        &Block{},
 		StmID:       2,
 	}
-	outInt := (&Block{Stmts: []Stmt{stInt}}).Output(0)
+	outInt := (&Block{Stmts: []Stmt{stInt}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(outInt, " tmp =") {
 		t.Fatalf("scalar array must not invent tmp: %q", outInt)
 	}
@@ -79,7 +79,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	stNoLhs := st
 	stNoLhs.LhsVar = nil
-	outNo := (&Block{Stmts: []Stmt{stNoLhs}}).Output(0)
+	outNo := (&Block{Stmts: []Stmt{stNoLhs}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(outNo, " tmp =") {
 		t.Fatalf("nil LhsVar must not invent aggregate tmp: %q", outNo)
 	}
@@ -89,7 +89,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("nil av")
@@ -138,7 +138,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 		}
 	}
 	check(st)
-	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "for (") {
 		t.Fatal(out)
 	}
@@ -152,7 +152,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1 / [0]
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = nil
 	vs.Arrays = []*ArrayVariable{av}
@@ -172,7 +172,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	opts := Defaults()
 	// no float types in simple select — just ensure no panic with empty filter path
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = []int{4}
 	vs.Arrays = []*ArrayVariable{av}

@@ -95,7 +95,7 @@ func TestRecordVolatileAccess(t *testing.T) {
 	// IsVolatileAfterDeref residual soft invent was soft-continue non-vol peel stats.
 	// Fair: sticky stop (Type-nil peel residual).
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	hole := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	hole := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	beforeR := currentSession().BK.readVolatileCnt + currentSession().BK.readNonVolatileCnt
 	RecordVolatileAccessSess(testAmbientSession, hole, 0, false)
 	if !HasErrorSess(testAmbientSession) {
@@ -406,7 +406,7 @@ func TestRecordVarCreatedStructDepthResidualSticky(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	v := &Variable{Name: "g_s", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	v := &Variable{Name: "g_s", Type: st, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	before := currentSession().BK.useNewVarCnt
 	RecordVarCreatedSess(testAmbientSession, v)
 	if !HasErrorSess(testAmbientSession) {

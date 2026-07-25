@@ -32,7 +32,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 		t.Fatal("empty block")
 	}
 	// Verify NoteWrite works on shared accum
-	v := CreateVariableQferSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	cg.NoteWrite(v)
 	// NoteWrite updates EffectAccum; non-vol write stays SE-free (Effect.cpp:144–145)
 	if !cg.AccumEffect().IsWrittenSess(testAmbientSession, v) {
@@ -45,7 +45,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	eff2 := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg2.EffectAccum = &eff2
-	vv := CreateVariableQferSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{true}))
+	vv := CreateVariableQferSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}))
 	cg2.NoteWrite(vv)
 	if cg2.AccumEffect().IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
@@ -103,7 +103,7 @@ func TestStepHashNoInventCallWithoutDef(t *testing.T) {
 		Type:       GetIntTypeSess(testAmbientSession),
 		IsArray:    true,
 		ArraySizes: []int{2, 3},
-		Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer:       NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	g.VS.GlobalList = []*Variable{av}
 	if g.hashFuncDefReady() {
@@ -146,7 +146,7 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Type-nil Variable IsVolatile residual on WriteVar path
-	hole := &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	hole := &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	cg.NoteWrite(hole)
 	// WriteVar residual on Type-nil IsVolatile may sticky IncompleteEffect
 	if EffectComplete(*cg.EffectAccum) && !HasErrorSess(testAmbientSession) {

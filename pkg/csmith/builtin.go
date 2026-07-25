@@ -176,7 +176,7 @@ func GenerateParameterListFromStringSess(s *Session, f *Function, params string)
 			fail()
 			return false
 		}
-		q := NewCVQualifiers([]bool{false}, []bool{false})
+		q := NewCVQualifiersSess(s, []bool{false}, []bool{false})
 		name := "p_" + itoa(i+1)
 		// Function.cpp:359–360 — GenerateParameterVariable; assert(v)
 		v := CreateVariableQferSess(s, name, ty, q)

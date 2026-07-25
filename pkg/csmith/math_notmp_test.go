@@ -29,12 +29,12 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 	if fi == nil {
 		t.Skip("no math_notmp safe binary in sample")
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, fi.Tmp1) || !strings.Contains(out, "safe_") {
 		t.Fatal(out)
 	}
 	// block should list tmp decls when output
-	body := blk.Output(0)
+	body := blk.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(body, fi.Tmp1) {
 		// TmpVars only emitted if Output is on block that has them
 		if len(blk.TmpVars) == 0 {
@@ -56,7 +56,7 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 		"t_1": EInt,
 		"t_2": EShort,
 	}}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	i1 := strings.Index(out, "t_1")
 	i2 := strings.Index(out, "t_2")
 	i3 := strings.Index(out, "t_3")
@@ -66,7 +66,7 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	// empty tmp name — sticky fail closed whole block (no invent skip hole / partial tmp list)
 	ClearErrorSess(testAmbientSession)
 	b2 := &Block{TmpVars: map[string]ESimpleType{"": EInt, "t_ok": EInt}}
-	out2 := b2.Output(0)
+	out2 := b2.OutputSess(testAmbientSession, 0)
 	if out2 != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out2)
 	}
@@ -76,7 +76,7 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	// invalid eSimpleType — sticky fail closed (no invent "int" for OOB tmp type)
 	ClearErrorSess(testAmbientSession)
 	b3 := &Block{TmpVars: map[string]ESimpleType{"t_bad": ESimpleType(MaxSimpleTypes + 1)}}
-	if b3.Output(0) != "" {
+	if b3.OutputSess(testAmbientSession, 0) != "" {
 		t.Fatal("OOB tmp type must fail closed whole block")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -86,7 +86,7 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	// default !math_notmp: create-only, no decls (C++ OutputTmpVariableList gated)
 	opts.MathNoTmp = false
 	SetProcessOptionsSess(testAmbientSession, opts)
-	if strings.Contains((&Block{TmpVars: map[string]ESimpleType{"t_9": EInt}}).Output(0), "t_9") {
+	if strings.Contains((&Block{TmpVars: map[string]ESimpleType{"t_9": EInt}}).OutputSess(testAmbientSession, 0), "t_9") {
 		t.Fatal("!math_notmp must not emit tmp decls")
 	}
 }
@@ -96,7 +96,7 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	// NoteRead does not update feffect (Function.cpp:657 finalizes from body map).
 	// CommentOutput uses insertion-order read_vars via OutputForComment.
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
-	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if g == nil {
 		t.Fatal("CreateVariableQfer nil", GetErrorSess(testAmbientSession))
 	}

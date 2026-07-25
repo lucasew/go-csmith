@@ -14,7 +14,7 @@ func TestGetContainerUnion(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
@@ -55,7 +55,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("need union with 2+ fields")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 2 {
 		t.Skip("fields")
 	}
@@ -202,7 +202,7 @@ func TestLooseMatchUnion(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 2 {
 		t.Skip("fields")
 	}

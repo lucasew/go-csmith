@@ -19,7 +19,7 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	if n, ok := addr.IndirectLevelCompleteSess(testAmbientSession); !ok || n != -1 {
 		t.Fatalf("addr-of level want -1 got %d ok=%v", n, ok)
 	}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name:    "l_165",

@@ -15,7 +15,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	vs := NewVariableSelector(testAmbientSession, Defaults())
 	vs.GlobalList = []*Variable{uv}
 	// nil facts → all fields
@@ -116,7 +116,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// Constant init field 0 — AbstractFactUnion transfer for constant → MakeFactUnions
 	uv.Init = MakeIntSess(testAmbientSession, 0)
 	g.VS.GlobalList = append(g.VS.GlobalList, uv)

@@ -94,7 +94,7 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
 	// seed an int global as potential IV
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 1))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	lc := MakeIteration(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), vs, &cg)
@@ -130,7 +130,7 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 func TestMakeIterationArrayBoundPath(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	av.Sizes = []int{5}
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
@@ -167,7 +167,7 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")
 	}
-	out := (&Block{Stmts: []Stmt{*st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{*st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "for (") {
 		t.Fatal(out)
 	}

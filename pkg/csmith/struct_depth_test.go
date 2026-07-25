@@ -86,10 +86,10 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	env := &TypeEnv{Sess: testAmbientSession}
 	okt := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), BitWidth: -1},
 	}}
 	volt := &Type{isStruct: true, StructName: "S1", Fields: []StructField{
-		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}), BitWidth: -1},
 	}}
 	env.StructTypes = []*Type{okt, volt}
 	cands := okStructUnionLTypes(env, true, true, false)

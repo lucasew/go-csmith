@@ -119,14 +119,14 @@ func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
 func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 	// invalid SafeOpSize → empty SizeToken; sticky no invent "(-()x)" / "(()a + ()b)"
 	ClearErrorSess(testAmbientSession)
-	if unaryCastMinus("", "x") != "" || unaryCastMinus("int32_t", "") != "" {
+	if unaryCastMinusSess(testAmbientSession, "", "x") != "" || unaryCastMinusSess(testAmbientSession, "int32_t", "") != "" {
 		t.Fatal("unary cast empty must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unary cast empty must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if binaryCastOp("", "a", "+", "b") != "" || binaryCastOp("int32_t", "a", "", "b") != "" {
+	if binaryCastOpSess(testAmbientSession, "", "a", "+", "b") != "" || binaryCastOpSess(testAmbientSession, "int32_t", "a", "", "b") != "" {
 		t.Fatal("binary cast empty must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -139,7 +139,7 @@ func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 		Safe:        &SafeOpFlags{Size: SafeOpSize(99), Op1Signed: true},
 		OutSafeMath: false,
 	}
-	if out := fi.Output(); out != "" {
+	if out := fi.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("invalid size unary cast must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -209,7 +209,7 @@ func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {
 		Safe:        &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat},
 		OutSafeMath: true,
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if strings.Contains(out, "safe_") {
 		t.Fatalf("float unary must not use safe: %s", out)
 	}
@@ -229,7 +229,7 @@ func TestUnaryMinusOutputSafeAndIdentify(t *testing.T) {
 		OutSafeMath:         true,
 		OutIdentifyWrappers: true,
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, "safe_unary_minus_func_int32_t_s") {
 		t.Fatal(out)
 	}
@@ -254,7 +254,7 @@ func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
 		OutSafeMathWrappers: "99999", // deny all real ids
 	}
 	_ = id
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if strings.Contains(out, "safe_") {
 		t.Fatalf("wrapper denied should cast: %s", out)
 	}
@@ -281,7 +281,7 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 		IsStd: true, IsUnary: true, Unary: "~",
 		Args: []*Expression{innerExpr},
 	}
-	out := bitNot.Output()
+	out := bitNot.OutputSess(testAmbientSession)
 	// C++ shape: (~(safe_unary_minus_func_int8_t_s((-10L))))
 	if !strings.Contains(out, "safe_unary_minus_func_int8_t_s") {
 		t.Fatal(out)
@@ -299,7 +299,7 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 		IsStd: true, IsUnary: true, Unary: "!",
 		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
-	nout := not.Output()
+	nout := not.OutputSess(testAmbientSession)
 	if nout != "(!g_x)" {
 		t.Fatalf("eNot want (!g_x) got %q", nout)
 	}
@@ -308,8 +308,8 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 		IsStd: true, IsUnary: true, Unary: "+",
 		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
-	if plus.Output() != "(+g_x)" {
-		t.Fatalf("ePlus want (+g_x) got %q", plus.Output())
+	if plus.OutputSess(testAmbientSession) != "(+g_x)" {
+		t.Fatalf("ePlus want (+g_x) got %q", plus.OutputSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -326,7 +326,7 @@ func TestBinaryOutputIdentifyWrappers(t *testing.T) {
 		OutSafeMath:         true,
 		OutIdentifyWrappers: true,
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, "safe_add_func_int32_t_s_s") {
 		t.Fatal(out)
 	}

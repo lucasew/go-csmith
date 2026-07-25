@@ -5,7 +5,7 @@ import "testing"
 func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	// VariableSelector.cpp:332–337 — collective array must itemize(); no return bare
 	ClearErrorSess(testAmbientSession)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), Defaults(), NewProbabilities(Defaults()), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), Defaults(), NewProbabilities(Defaults()), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}
@@ -83,7 +83,7 @@ func TestChooseOKVarMatchTypeNilSticky(t *testing.T) {
 
 func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	// GenerateNewGlobal: gensym g_1, push GlobalList, random_qualifiers draws.
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	opts := Defaults()
 	// force scalar path — NewArrayVariableProb can flip to array (collective+member on list)
 	opts.Arrays = false
@@ -91,7 +91,7 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	tInt := GetSimpleTypeSess(testAmbientSession, EInt)
 	// Fixed qfer — no RNG for quals
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), tInt, &q, r)
 	if v == nil || v.Name != "g_1" {
 		t.Fatalf("name: %+v", v)
@@ -114,7 +114,7 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	opts.Arrays = false
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
@@ -154,12 +154,12 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 
 func TestMaxGlobalsFailClosed(t *testing.T) {
 	// Go MaxGlobals library cap — no invent unbounded GlobalList past limit
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false
 	opts.MaxGlobals = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	if v == nil {
 		t.Fatal("first global")
@@ -194,7 +194,7 @@ func TestDefaultsMaxGlobalsUnlimited(t *testing.T) {
 	// Defaults MaxGlobals=0: fair with VariableSelector.cpp (no GlobalList cap).
 	// Cap 80 used to soft-nil GenerateNewGlobal mid seed-2 (first_div e25774:
 	// UP createAndInitialize F20 NewArrayVariableProb vs Go Select U100).
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	opts := Defaults()
 	if opts.MaxGlobals != 0 {
 		t.Fatalf("Defaults.MaxGlobals want 0 (unlimited), got %d", opts.MaxGlobals)
@@ -204,7 +204,7 @@ func TestDefaultsMaxGlobalsUnlimited(t *testing.T) {
 	}
 	opts.Arrays = false
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// Past the old unfair default of 80 — still create (upstream has no cap).
 	for i := 0; i < 85; i++ {
 		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, uint64(100+i)))
@@ -220,7 +220,7 @@ func TestDefaultsMaxGlobalsUnlimited(t *testing.T) {
 func TestCreateArrayVariableEmptyNameFailClosed(t *testing.T) {
 	// name always live from gensym; no invent empty-name array shell
 	opts := Defaults()
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
@@ -229,7 +229,7 @@ func TestCreateArrayVariableEmptyNameFailClosed(t *testing.T) {
 func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky when CG is live
 	opts := Defaults()
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
@@ -259,11 +259,11 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 
 func TestSelectGlobalEmptyCreates(t *testing.T) {
 	// SelectGlobal empty → GenerateNewGlobal
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EInt), &q, r)
 	if v == nil || v.Name != "g_1" || len(vs.GlobalList) != 1 {
 		t.Fatalf("create on empty: %+v list=%d", v, len(vs.GlobalList))
@@ -273,7 +273,7 @@ func TestSelectGlobalEmptyCreates(t *testing.T) {
 func TestSelectGlobalChoosesExisting(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	a := CreateVariableQferSess(testAmbientSession, "g_1", GetSimpleTypeSess(testAmbientSession, EInt), q)
 	// non-convertible pointer won't match int under Flexible
 	b := CreateVariableQferSess(testAmbientSession, "g_2", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt)), q)
@@ -302,7 +302,7 @@ func TestSelectGlobalChoosesExisting(t *testing.T) {
 func TestSelectGlobalMultiMatchUpto(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	a := CreateVariableQferSess(testAmbientSession, "g_1", GetSimpleTypeSess(testAmbientSession, EInt), q)
 	b := CreateVariableQferSess(testAmbientSession, "g_2", GetSimpleTypeSess(testAmbientSession, EInt), q)
 	vs.GlobalList = []*Variable{a, b}
@@ -336,14 +336,14 @@ func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
 	opts := Defaults()
 	opts.Arrays = false
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	r := NewRngSess(testAmbientSession, 2)
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EInt), &q, r)
 	if v == nil || (v.Init == nil && v.InitExpr == nil) {
 		t.Fatal("MakeInitValue init")
 	}
 	// pointer qfer must be depth 2 (indirect_level+1); make_init asserts sanity_check
-	qPtr := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	qPtr := NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, false})
 	// pointer: make_init_value → Constant "0" (20%) or &visible Expression
 	vp := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt)), &qPtr, r)
 	if vp == nil || (vp.Init == nil && vp.InitExpr == nil) {
@@ -366,18 +366,18 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	vs := NewVariableSelectorProbs(opts, probs)
 	vs.Sess = testAmbientSession
 	// void → MakeRandom nil on array path → fail closed (no invent array shell)
-	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_x", NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EVoid), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "g_x", NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("void must fail closed")
 	}
 	ClearErrorSess(testAmbientSession)
-	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_y", nil) != nil {
+	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "g_y", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG createAndInitialize must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}), nil, "", NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "", NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("empty name must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -443,7 +443,7 @@ func TestMakeInitValueSelectLoopCtrlNilDepsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, nil, nil) != nil {
 		t.Fatal("nil RNG MakeInitValue must fail closed")
 	}
@@ -547,12 +547,12 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// nil qfer sanity: MakeInitValue requires non-nil qf
 	// createAndInitialize always builds qfer; force fail via void type
-	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_v", NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EVoid), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "g_v", NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("void must fail closed")
 	}
 	// nil RNG sticky
 	ClearErrorSess(testAmbientSession)
-	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_n", nil) != nil {
+	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "g_n", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

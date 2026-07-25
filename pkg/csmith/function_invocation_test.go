@@ -54,7 +54,7 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	if fi == nil {
 		t.Fatal("no safe-ops binary in sample")
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, "safe_") {
 		t.Fatalf("safe wrapper missing: %s", out)
 	}
@@ -308,7 +308,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	if fi.Binary != "==" && fi.Binary != "!=" {
 		t.Fatalf("op %s", fi.Binary)
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if out == "" {
 		t.Fatal("empty ptr cmp output")
 	}
@@ -371,7 +371,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	callee := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt}
 	a0 := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	// empty callee name — sticky no invent "()"
-	if out := (&Invocation{User: &Function{Name: "", ReturnType: GetIntTypeSess(testAmbientSession)}, Args: nil}).Output(); out != "" {
+	if out := (&Invocation{User: &Function{Name: "", ReturnType: GetIntTypeSess(testAmbientSession)}, Args: nil}).OutputSess(testAmbientSession); out != "" {
 		t.Fatal("empty User.Name must fail closed, got", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -382,7 +382,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 		User: callee,
 		Args: []*Expression{a0, nil},
 	}
-	if out := fi.Output(); out != "" {
+	if out := fi.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("nil arg must fail closed empty, got", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -391,7 +391,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	// incomplete arg Output (nil Con) — sticky no invent empty slot
 	ClearErrorSess(testAmbientSession)
 	fi.Args = []*Expression{a0, {Term: TermConstant}}
-	if out := fi.Output(); out != "" {
+	if out := fi.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("empty arg Output must fail closed, got", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -399,7 +399,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if out != "func_2(1, 2)" {
 		t.Fatal(out)
 	}
@@ -409,7 +409,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant},
 	}}
-	if out := bin.Output(); out != "" {
+	if out := bin.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("empty binary operand must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -420,7 +420,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 
 func TestInvocationOutputNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Invocation)(nil).Output() != "" {
+	if (*Invocation)(nil).OutputSess(testAmbientSession) != "" {
 		t.Fatal("nil Invocation Output must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -428,7 +428,7 @@ func TestInvocationOutputNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Failed stays non-sticky soft re-pick
-	if (&Invocation{Failed: true}).Output() != "" {
+	if (&Invocation{Failed: true}).OutputSess(testAmbientSession) != "" {
 		t.Fatal("Failed Invocation Output must fail closed empty")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -436,7 +436,7 @@ func TestInvocationOutputNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Invocation always live; sticky (no invent soft-skip out-opts past hole)
-	(*Invocation)(nil).setOutOpts(Defaults())
+	(*Invocation)(nil).setOutOptsSess(testAmbientSession, Defaults())
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Invocation setOutOpts must SetError sticky")
 	}

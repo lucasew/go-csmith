@@ -34,7 +34,7 @@ func TestCreateVariableRejectsVoid(t *testing.T) {
 		t.Fatal("nil type CreateVariableScalars must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateVariableWithInitSess(testAmbientSession, "g_n", nil, MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_n", nil, MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})) != nil {
 		t.Fatal("CreateVariableWithInit nil type")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -48,7 +48,7 @@ func TestCreateVariableRejectsVoid(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name CreateVariableScalars must stay non-sticky soft factory")
 	}
-	if CreateVariableWithInitSess(testAmbientSession, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})) != nil {
 		t.Fatal("empty name must fail closed CreateVariableWithInit")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -66,7 +66,7 @@ func TestCreateVariableErrorGuardAfterInit(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if CreateVariableWithInitSess(testAmbientSession, "g_e2", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_e2", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})) != nil {
 		t.Fatal("sticky error must fail CreateVariableWithInit after field expand")
 	}
 }
@@ -404,12 +404,12 @@ func TestIsValidVolatileInitExprResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// const volatile pointer with Type-nil InitExpr residual NotEquals
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{true, false}, []bool{true, false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiersSess(testAmbientSession, []bool{true, false}, []bool{true, false}))
 	if v == nil {
 		t.Fatal("create")
 	}
 	// ensure const+vol at storage level
-	v.Qfer = NewCVQualifiers([]bool{true}, []bool{true})
+	v.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{true})
 	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
 	v.Init = nil
 	if v.IsValidVolatileSess(testAmbientSession) {
@@ -516,7 +516,7 @@ func TestCreateVariableScalarsVoidIsSimpleResidualSticky(t *testing.T) {
 
 func TestCreateVariableWithInitVoidIsSimpleResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if CreateVariableWithInitSess(testAmbientSession, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), nil, NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), nil, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})) != nil {
 		t.Fatal("void CreateVariableWithInit must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -530,7 +530,7 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 	// type->is_volatile_struct_union(). Qfer-only IsVolatile missed S0-style
 	// aggregates (volatile bitfields, non-vol storage) and left side_effect_free.
 	ClearErrorSess(testAmbientSession)
-	volQ := NewCVQualifiers([]bool{false}, []bool{true}) // non-const, volatile field
+	volQ := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}) // non-const, volatile field
 	st := &Type{
 		isStruct:   true,
 		StructName: "S0",
@@ -548,7 +548,7 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 	}
 	// Force type (CreateVariableScalars may wrap)
 	v.Type = st
-	v.Qfer = NewCVQualifiers([]bool{false}, []bool{false})
+	v.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if !v.IsVolatileSess(testAmbientSession) {
 		t.Fatal("IsVolatile must true for volatile-field struct (qfer non-vol)")
 	}
@@ -571,8 +571,8 @@ func TestCreateFieldVarsStorageVolOnly(t *testing.T) {
 	// Variable.cpp:344–358 — create_field_vars ORs qfer.is_volatile() (storage),
 	// not Variable::is_volatile() (includes is_volatile_struct_union).
 	ClearErrorSess(testAmbientSession)
-	volField := NewCVQualifiers([]bool{false}, []bool{true})
-	plainField := NewCVQualifiers([]bool{false}, []bool{false})
+	volField := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
+	plainField := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	st := &Type{
 		isStruct:   true,
 		StructName: "S0",
@@ -587,7 +587,7 @@ func TestCreateFieldVarsStorageVolOnly(t *testing.T) {
 		t.Fatal("create")
 	}
 	v.Type = st
-	v.Qfer = NewCVQualifiers([]bool{false}, []bool{false})
+	v.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v.FieldVars = nil
 	ClearErrorSess(testAmbientSession)
 	v.CreateFieldVarsSess(testAmbientSession)

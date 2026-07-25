@@ -21,7 +21,7 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	f0 := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: v}
 	v.FieldVars = []*Variable{nil, f0}
 	if s := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil); s != "" {
@@ -35,7 +35,7 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "a", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if uv == nil {
 		t.Fatal("create union")
 	}
@@ -59,7 +59,7 @@ func TestOutputValueDumpStructFields(t *testing.T) {
 			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1},
 		},
 	}
-	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	out := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil)
 	if !strings.Contains(out, "g_s.f0") || !strings.Contains(out, "g_s.f1") {
 		t.Fatal(out)
@@ -78,7 +78,7 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	// no facts → nothing readable
 	if s := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, nil); s != "" {
 		t.Fatal("empty facts should dump no union fields", s)
@@ -108,7 +108,7 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
-			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{2},
 	}
@@ -166,7 +166,7 @@ func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
 		Variable: Variable{
 			Name: "g_s", Type: st, IsArray: true, ArraySizes: []int{1},
 			FieldVars: []*Variable{f0, f1},
-			Qfer:      NewCVQualifiers([]bool{false}, []bool{false}),
+			Qfer:      NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 		},
 		Sizes: []int{1},
 	}

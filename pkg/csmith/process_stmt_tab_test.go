@@ -54,7 +54,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 	// StatementAssign::assignOpsTable_ always live sticky; no invent NewAssignOpsTable
 	ClearErrorSess(testAmbientSession)
-	op := AssignOpsProbability(NewRngSess(testAmbientSession, 1), Defaults(), nil, GetIntTypeSess(testAmbientSession))
+	op := AssignOpsProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), Defaults(), nil, GetIntTypeSess(testAmbientSession))
 	if op != AssignOp(-1) {
 		t.Fatalf("want invalid op, got %v", op)
 	}
@@ -62,7 +62,7 @@ func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 		t.Fatal("nil table AssignOpsProbability must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if AssignOpsProbability(nil, Defaults(), NewAssignOpsTable(Defaults()), GetIntTypeSess(testAmbientSession)) != AssignOp(-1) {
+	if AssignOpsProbabilitySess(testAmbientSession, nil, Defaults(), NewAssignOpsTableSess(testAmbientSession, Defaults()), GetIntTypeSess(testAmbientSession)) != AssignOp(-1) {
 		t.Fatal("nil RNG AssignOpsProbability must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -122,7 +122,7 @@ func TestEnsureAttrGeneratorsNoInvent(t *testing.T) {
 		t.Fatal("must not invent generators without InitAttrGenerators")
 	}
 	// Output nil-safe
-	if EnsureVarAttrGeneratorSess(testAmbientSession).Output(NewRngSess(testAmbientSession, 1)) != "" {
+	if EnsureVarAttrGeneratorSess(testAmbientSession).OutputSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("nil Output must be empty")
 	}
 	opts := Defaults()

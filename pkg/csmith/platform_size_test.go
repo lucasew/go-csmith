@@ -44,10 +44,10 @@ func TestSizeInBytesUsesPlatform(t *testing.T) {
 
 func TestFieldVarsMarkBitfield(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Type: GetIntTypeSess(testAmbientSession), BitWidth: 5, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: 5, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 	}}
-	v := CreateVariableQferSess(testAmbientSession, "g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(v.FieldVars) != 2 {
 		t.Fatalf("fields %d", len(v.FieldVars))
 	}

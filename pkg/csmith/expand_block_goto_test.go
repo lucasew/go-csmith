@@ -321,7 +321,7 @@ func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 				Name:     "f0",
 				Type:     GetIntTypeSess(testAmbientSession),
 				BitWidth: -1,
-				Qfer:     NewCVQualifiers([]bool{false}, []bool{true}), // volatile
+				Qfer:     NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}), // volatile
 			},
 		},
 	}

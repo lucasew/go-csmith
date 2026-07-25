@@ -12,7 +12,7 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 	if st == nil {
 		t.Fatal("struct")
 	}
-	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
@@ -264,7 +264,7 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	v := vs.SelectParentParam(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 3), MatchFlexible)
 	if v == nil {
@@ -344,7 +344,7 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// VariableSelector.cpp:838–839 assert simple != void sticky
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EVoid), &q, nil, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("void type must fail closed MakeInitValue")
 	}
@@ -359,7 +359,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc

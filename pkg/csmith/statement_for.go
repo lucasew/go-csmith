@@ -666,7 +666,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// Entry eUnionWrite pollution was fixed by installing map_in unions before FP
 	// (Block::post_creation_analysis / block.go); do not re-clobber here.
 	// preUnion is still used by the must_return path below.
-	if body.MustReturn() {
+	if body.MustReturnSess(sessFromCG(cg)) {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
 		if hasErrCG(cg) {
 			fm.GlobalFacts = IncompleteFactSlice()

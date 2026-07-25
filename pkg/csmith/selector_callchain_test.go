@@ -12,7 +12,7 @@ func TestMatchVarName(t *testing.T) {
 	}
 	// struct field
 	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession)}}}
-	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
@@ -93,7 +93,7 @@ func TestIsSeenName(t *testing.T) {
 func TestItemizeArrayWithIV(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}

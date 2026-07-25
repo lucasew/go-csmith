@@ -175,7 +175,7 @@ func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	// body-out style entry: last field 0; return wrote field 1
 	bodyU := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}

@@ -76,7 +76,7 @@ func TestForSafeIncrEmit(t *testing.T) {
 	if !st.Loop.SafeIncr {
 		t.Fatal("expected SafeIncr when SafeMath")
 	}
-	out := (&Block{Stmts: []Stmt{*st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{*st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "safe_") && !strings.Contains(out, "for (") {
 		t.Fatal(out)
 	}

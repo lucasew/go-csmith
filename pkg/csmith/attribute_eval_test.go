@@ -8,11 +8,11 @@ import (
 
 func TestBooleanAttribute(t *testing.T) {
 	a := &BooleanAttribute{Name: "unused", Prob: 100}
-	if a.MakeRandom(NewRngSess(testAmbientSession, 1)) != "unused" {
+	if a.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "unused" {
 		t.Fatal("always")
 	}
 	a.Prob = 0
-	if a.MakeRandom(NewRngSess(testAmbientSession, 1)) != "" {
+	if a.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("never")
 	}
 }
@@ -23,7 +23,7 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 		&BooleanAttribute{Name: "unused", Prob: 100},
 		&BooleanAttribute{Name: "used", Prob: 100},
 	}}
-	out := g.Output(NewRngSess(testAmbientSession, 1))
+	out := g.OutputSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 	if !strings.Contains(out, "__attribute__((") || !strings.Contains(out, "unused") {
 		t.Fatal(out)
 	}
@@ -33,7 +33,7 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 	// nil Attribute* hole sticky
 	ClearErrorSess(testAmbientSession)
 	gHole := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}, nil}}
-	if gHole.Output(NewRngSess(testAmbientSession, 1)) != "" {
+	if gHole.OutputSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("nil Attribute hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -41,7 +41,7 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// AttributeGenerator always live; sticky empty (no invent soft-skip past hole)
-	if (*AttributeGenerator)(nil).Output(NewRngSess(testAmbientSession, 1)) != "" {
+	if (*AttributeGenerator)(nil).OutputSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("nil AttributeGenerator Output must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -49,7 +49,7 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty Attributes complete empty
-	if (&AttributeGenerator{}).Output(NewRngSess(testAmbientSession, 1)) != "" {
+	if (&AttributeGenerator{}).OutputSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("empty Attributes must complete empty")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -61,7 +61,7 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 func TestMultiChoiceAttribute(t *testing.T) {
 	// Attribute.cpp:66 — name("choice") with quotes
 	a := &MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default", "hidden"}}
-	s := a.MakeRandom(NewRngSess(testAmbientSession, 2))
+	s := a.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 2))
 	if !strings.HasPrefix(s, "visibility(\"") || !strings.HasSuffix(s, "\")") {
 		t.Fatal(s)
 	}
@@ -70,7 +70,7 @@ func TestMultiChoiceAttribute(t *testing.T) {
 func TestAlignedAttribute(t *testing.T) {
 	// Attribute.cpp:82–84 — aligned(1<<k)
 	a := &AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}
-	s := a.MakeRandom(NewRngSess(testAmbientSession, 2))
+	s := a.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 2))
 	if !strings.HasPrefix(s, "aligned(") || !strings.HasSuffix(s, ")") {
 		t.Fatal(s)
 	}
@@ -83,7 +83,7 @@ func TestAlignedAttribute(t *testing.T) {
 	// sticky no soft invent alignment=1 when ctor left Alignment 0
 	ClearErrorSess(testAmbientSession)
 	a0 := &AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 0}
-	if a0.MakeRandom(NewRngSess(testAmbientSession, 1)) != "" {
+	if a0.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("Alignment 0 must not invent aligned(1)")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -96,7 +96,7 @@ func TestSectionAttributeNoInventName(t *testing.T) {
 	// Attribute name from ctor; sticky no invent "section" when empty
 	ClearErrorSess(testAmbientSession)
 	a := &SectionAttribute{Name: "", Prob: 100}
-	if s := a.MakeRandom(NewRngSess(testAmbientSession, 1)); s != "" {
+	if s := a.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("empty name must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -109,28 +109,28 @@ func TestAttributeNilReceiverMakeRandomSticky(t *testing.T) {
 	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	r := NewRngSess(testAmbientSession, 1)
 	ClearErrorSess(testAmbientSession)
-	if (*BooleanAttribute)(nil).MakeRandom(r) != "" {
+	if (*BooleanAttribute)(nil).MakeRandomSess(testAmbientSession, r) != "" {
 		t.Fatal("nil BooleanAttribute must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BooleanAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*MultiChoiceAttribute)(nil).MakeRandom(r) != "" {
+	if (*MultiChoiceAttribute)(nil).MakeRandomSess(testAmbientSession, r) != "" {
 		t.Fatal("nil MultiChoiceAttribute must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil MultiChoiceAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*AlignedAttribute)(nil).MakeRandom(r) != "" {
+	if (*AlignedAttribute)(nil).MakeRandomSess(testAmbientSession, r) != "" {
 		t.Fatal("nil AlignedAttribute must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil AlignedAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*SectionAttribute)(nil).MakeRandom(r) != "" {
+	if (*SectionAttribute)(nil).MakeRandomSess(testAmbientSession, r) != "" {
 		t.Fatal("nil SectionAttribute must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -139,7 +139,7 @@ func TestAttributeNilReceiverMakeRandomSticky(t *testing.T) {
 	// typed-nil interface slot still hits MakeRandom sticky (not soft not-selected)
 	ClearErrorSess(testAmbientSession)
 	var typedNil Attribute = (*BooleanAttribute)(nil)
-	if typedNil.MakeRandom(r) != "" {
+	if typedNil.MakeRandomSess(testAmbientSession, r) != "" {
 		t.Fatal("typed-nil Attribute interface must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -151,21 +151,21 @@ func TestAttributeNilReceiverMakeRandomSticky(t *testing.T) {
 func TestAttributeNoInventEmptyName(t *testing.T) {
 	// Boolean / MultiChoice / Aligned require live name from ctor sticky
 	ClearErrorSess(testAmbientSession)
-	if s := (&BooleanAttribute{Name: "", Prob: 100}).MakeRandom(NewRngSess(testAmbientSession, 1)); s != "" {
+	if s := (&BooleanAttribute{Name: "", Prob: 100}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("boolean empty name", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("boolean empty name must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (&MultiChoiceAttribute{Name: "", Prob: 100, Choices: []string{"a"}}).MakeRandom(NewRngSess(testAmbientSession, 1)); s != "" {
+	if s := (&MultiChoiceAttribute{Name: "", Prob: 100, Choices: []string{"a"}}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("multichoice empty name", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("multichoice empty name must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandom(NewRngSess(testAmbientSession, 1)); s != "" {
+	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("aligned empty name", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -173,7 +173,7 @@ func TestAttributeNoInventEmptyName(t *testing.T) {
 	}
 	// empty choice slot sticky — no invent visibility("")
 	ClearErrorSess(testAmbientSession)
-	if s := (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{""}}).MakeRandom(NewRngSess(testAmbientSession, 1)); s != "" {
+	if s := (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{""}}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("empty choice must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -184,7 +184,7 @@ func TestAttributeNoInventEmptyName(t *testing.T) {
 
 func TestSectionAttribute(t *testing.T) {
 	a := &SectionAttribute{Name: "section", Prob: 100}
-	s := a.MakeRandom(NewRngSess(testAmbientSession, 3))
+	s := a.MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 3))
 	if !strings.HasPrefix(s, "section(\"usersection") || !strings.HasSuffix(s, "\")") {
 		t.Fatal(s)
 	}
@@ -193,35 +193,35 @@ func TestSectionAttribute(t *testing.T) {
 func TestAttributeNilRNGSticky(t *testing.T) {
 	// Attribute / generator always have process RNG; sticky no invent skip shells
 	ClearErrorSess(testAmbientSession)
-	if (&BooleanAttribute{Name: "unused", Prob: 100}).MakeRandom(nil) != "" {
+	if (&BooleanAttribute{Name: "unused", Prob: 100}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG boolean must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG BooleanAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default"}}).MakeRandom(nil) != "" {
+	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default"}}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG multichoice must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MultiChoiceAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: nil}).MakeRandom(NewRngSess(testAmbientSession, 1)) != "" {
+	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: nil}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("empty choices must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty choices MultiChoiceAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}).MakeRandom(nil) != "" {
+	if (&AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG aligned must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG AlignedAttribute must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&SectionAttribute{Name: "section", Prob: 100}).MakeRandom(nil) != "" {
+	if (&SectionAttribute{Name: "section", Prob: 100}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG section must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -229,7 +229,7 @@ func TestAttributeNilRNGSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	g := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}}}
-	if g.Output(nil) != "" {
+	if g.OutputSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG generator Output must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -378,7 +378,7 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: uv}
 	f1 := &Variable{Name: "g_u.f1", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{f0, f1}
@@ -502,7 +502,7 @@ func TestAttributeGeneratorMakeRandomResidualSticky(t *testing.T) {
 		&BooleanAttribute{Name: "unused", Prob: 100},
 		&BooleanAttribute{Name: "", Prob: 100}, // empty name residual sticky
 	}}
-	if s := g.Output(NewRngSess(testAmbientSession, 1)); s != "" {
+	if s := g.OutputSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("MakeRandom residual must fail closed AttributeGenerator.Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

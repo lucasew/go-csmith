@@ -38,7 +38,7 @@ func TestAbsExtensionMakeInvocation(t *testing.T) {
 	if inv == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal(HasErrorSess(testAmbientSession))
 	}
-	out := inv.Output()
+	out := inv.OutputSess(testAmbientSession)
 	if !strings.Contains(out, "func_1") || !strings.Contains(out, "x0") {
 		t.Fatal(out)
 	}

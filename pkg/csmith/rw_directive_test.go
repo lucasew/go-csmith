@@ -85,7 +85,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	if !b.EmitStepHash {
 		t.Fatal("StepHash+ComputeHash must set EmitStepHash")
 	}
-	out := b.Output(1)
+	out := b.OutputSess(testAmbientSession, 1)
 	if !strings.Contains(out, "step_hash(") {
 		t.Fatal(out)
 	}
@@ -103,7 +103,7 @@ func TestMakeRandomForIVBoundDuringBody(t *testing.T) {
 	// for body: IV is nonwritable via iv_bounds
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	iv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 5)

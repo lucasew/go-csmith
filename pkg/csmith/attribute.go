@@ -13,9 +13,8 @@ import (
 // Attribute.cpp: Attribute / BooleanAttribute / MultiChoiceAttribute /
 // AlignedAttribute / SectionAttribute.
 type Attribute interface {
-	// MakeRandom returns attribute text or "" if not selected.
-	MakeRandom(r *Rng) string
-	// MakeRandomSess is MakeRandom with explicit session residual sticky.
+	// MakeRandomSess returns attribute text or "" if not selected.
+	// Non-Sess MakeRandom deleted — pass run bag or testAmbientSession explicitly.
 	MakeRandomSess(s *Session, r *Rng) string
 }
 
@@ -37,9 +36,7 @@ type BooleanAttribute struct {
 }
 
 // MakeRandom implements Attribute.
-func (a *BooleanAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(testAmbientSession, r)
-}
+// Non-Sess MakeRandom deleted — pass run bag or testAmbientSession explicitly.
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
 func (a *BooleanAttribute) MakeRandomSess(s *Session, r *Rng) string {
@@ -73,9 +70,7 @@ type MultiChoiceAttribute struct {
 }
 
 // MakeRandom implements Attribute.
-func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(testAmbientSession, r)
-}
+// Non-Sess MakeRandom deleted — pass run bag or testAmbientSession explicitly.
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
 func (a *MultiChoiceAttribute) MakeRandomSess(s *Session, r *Rng) string {
@@ -116,9 +111,7 @@ type AlignedAttribute struct {
 }
 
 // MakeRandom implements Attribute.
-func (a *AlignedAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(testAmbientSession, r)
-}
+// Non-Sess MakeRandom deleted — pass run bag or testAmbientSession explicitly.
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
 func (a *AlignedAttribute) MakeRandomSess(s *Session, r *Rng) string {
@@ -165,9 +158,7 @@ type SectionAttribute struct {
 }
 
 // MakeRandom implements Attribute.
-func (a *SectionAttribute) MakeRandom(r *Rng) string {
-	return a.MakeRandomSess(testAmbientSession, r)
-}
+// Non-Sess MakeRandom deleted — pass run bag or testAmbientSession explicitly.
 
 // MakeRandomSess implements Attribute with explicit session residual sticky.
 func (a *SectionAttribute) MakeRandomSess(s *Session, r *Rng) string {
@@ -203,9 +194,7 @@ type AttributeGenerator struct {
 // Output mirrors AttributeGenerator::Output — " __attribute__((a, b))" or "".
 // AttributeGenerator always live at emit; sticky empty (no invent soft-skip past hole).
 // Empty Attributes is complete empty (not incomplete IR).
-func (g *AttributeGenerator) Output(r *Rng) string {
-	return g.OutputSess(testAmbientSession, r)
-}
+// Non-Sess Output deleted — pass run bag or testAmbientSession explicitly.
 
 // OutputSess is Output with explicit session residual sticky.
 func (g *AttributeGenerator) OutputSess(s *Session, r *Rng) string {

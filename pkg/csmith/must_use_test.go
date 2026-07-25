@@ -5,7 +5,7 @@ import "testing"
 func TestFindMustUseArrays(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -14,7 +14,7 @@ func TestFindMustUseArrays(t *testing.T) {
 		MustReadVars:  []*Variable{&av.Variable, sc},
 		MustWriteVars: []*Variable{&av.Variable},
 	}
-	got := rw.FindMustUseArrays()
+	got := rw.FindMustUseArraysSess(testAmbientSession)
 	if len(got) != 1 || got[0] != av {
 		t.Fatalf("%v", got)
 	}
@@ -24,7 +24,7 @@ func TestFindMustUseArrays(t *testing.T) {
 	// incomplete must-use list sticky
 	ClearErrorSess(testAmbientSession)
 	rw.MustReadVars = []*Variable{&av.Variable, nil}
-	if rw.FindMustUseArrays() != nil {
+	if rw.FindMustUseArraysSess(testAmbientSession) != nil {
 		t.Fatal("nil hole FindMustUseArrays must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -35,7 +35,7 @@ func TestFindMustUseArrays(t *testing.T) {
 	// fair: sticky nil fail closed
 	shell := &Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	rw2 := &RWDirective{MustReadVars: []*Variable{shell}}
-	if rw2.FindMustUseArrays() != nil {
+	if rw2.FindMustUseArraysSess(testAmbientSession) != nil {
 		t.Fatal("IsArray without AsArray FindMustUseArrays must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -171,7 +171,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	f.Stack = []*Block{blk}
 	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntTypeSess(testAmbientSession), false, false)
 	// ItemizeArray Type-nil IV residual: soft invent was try-next then pick good.
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -203,7 +203,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -272,7 +272,7 @@ func TestChooseVarQferFilter(t *testing.T) {
 	nv := CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntTypeSess(testAmbientSession), false, false)
 	// want non-vol qfer — MatchIndirect with 1-level always matches for non-exact
 	// use exact: non-vol wanted vs vol var
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// Match exact false for 1-level returns true always — skip
 	got := ChooseVarQfer(NewRngSess(testAmbientSession, 2), []*Variable{vol, nv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, MatchFlexible)
 	if got == nil {

@@ -8,17 +8,17 @@ import (
 func TestGensymSequence(t *testing.T) {
 	// util.cpp gensym: ++count appended to basename
 	var g GenSym
-	if g.Next("g_") != "g_1" {
+	if g.NextSess(testAmbientSession, "g_") != "g_1" {
 		t.Fatal("first gensym")
 	}
-	if g.Next("g_") != "g_2" {
+	if g.NextSess(testAmbientSession, "g_") != "g_2" {
 		t.Fatal("second gensym")
 	}
-	if g.Next("l_") != "l_3" {
+	if g.NextSess(testAmbientSession, "l_") != "l_3" {
 		t.Fatal("shared counter across basenames")
 	}
 	g.Reset()
-	if g.Next("g_") != "g_1" {
+	if g.NextSess(testAmbientSession, "g_") != "g_1" {
 		t.Fatal("reset")
 	}
 }
@@ -31,17 +31,17 @@ func TestDoFinalizationResetsGensym(t *testing.T) {
 		SetProcessRngSess(testAmbientSession, prevR)
 		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
-	ResetDefaultGensym()
-	_ = Gensym("g_")
+	ResetDefaultGensymSess(testAmbientSession)
+	_ = GensymSess(testAmbientSession, "g_")
 	DoFinalizationSess(testAmbientSession)
-	if Gensym("g_") != "g_1" {
+	if GensymSess(testAmbientSession, "g_") != "g_1" {
 		t.Fatal("DoFinalization must reset process gensym_count")
 	}
 }
 
 func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 	// Block.cpp:216–219 — always gensym("t_") process-wide; ignore private GenSym
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	b := &Block{}
 	a := b.CreateNewTmpVarSess(testAmbientSession, EInt)
 	c := b.CreateNewTmpVarSess(testAmbientSession, EShort)
@@ -58,7 +58,7 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 		t.Fatalf("process gensym sequence %q %q", x, y)
 	}
 	// g_/t_ share one util.cpp gensym_count
-	if Gensym("g_") != "g_5" {
+	if GensymSess(testAmbientSession, "g_") != "g_5" {
 		t.Fatal("shared counter with RandomGlobalName path")
 	}
 	// nil Block — sticky no invent bare t_N without registration
@@ -73,7 +73,7 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// empty gensym basename sticky — no invent bare "1"
 	ClearErrorSess(testAmbientSession)
-	if Gensym("") != "" {
+	if GensymSess(testAmbientSession, "") != "" {
 		t.Fatal("empty basename must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -84,7 +84,7 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 
 func TestLogAnalysisFailAndEnclosers(t *testing.T) {
 	ClearAnalysisErrLogSess(testAmbientSession)
-	if LogAnalysisFail("x.y") {
+	if LogAnalysisFailSess(testAmbientSession, "x.y") {
 		t.Fatal("always false")
 	}
 	if !strings.Contains(AnalysisErrLogSess(testAmbientSession), "Analysis failed at x.y") {
@@ -94,7 +94,7 @@ func TestLogAnalysisFailAndEnclosers(t *testing.T) {
 	if out != "{\n" || ind != 1 {
 		t.Fatal(out, ind)
 	}
-	close, ind2 := OutputCloseEncloser("}", ind, false)
+	close, ind2 := OutputCloseEncloserSess(testAmbientSession, "}", ind, false)
 	if !strings.Contains(close, "}") || ind2 != 0 {
 		t.Fatal(close, ind2)
 	}

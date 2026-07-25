@@ -94,7 +94,7 @@ func TestCreateFieldVarsUnion(t *testing.T) {
 		},
 	}
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if v == nil {
 		t.Fatal("CreateVariableQfer union", HasErrorSess(testAmbientSession))
 	}

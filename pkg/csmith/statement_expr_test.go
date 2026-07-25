@@ -47,7 +47,7 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 	}
 	st := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
 	b := &Block{Stmts: []Stmt{st}}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, ";") || !strings.Contains(out, "+") {
 		t.Fatal(out)
 	}
@@ -57,14 +57,14 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 	// incomplete invoke Output fails whole block (no invent soft-skip empty invoke)
 	ClearErrorSess(testAmbientSession)
 	empty := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}}
-	out2 := (&Block{Stmts: []Stmt{empty}}).Output(0)
+	out2 := (&Block{Stmts: []Stmt{empty}}).OutputSess(testAmbientSession, 0)
 	if out2 != "" {
 		t.Fatal("incomplete invoke must fail closed whole block", out2)
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete among live stmts fails whole block (no invent skip hole)
 	good := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
-	out3 := (&Block{Stmts: []Stmt{empty, good}}).Output(0)
+	out3 := (&Block{Stmts: []Stmt{empty, good}}).OutputSess(testAmbientSession, 0)
 	if out3 != "" {
 		t.Fatal("mixed incomplete must fail closed whole block", out3)
 	}
@@ -190,7 +190,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	// seed a built function to call
 	callee := &Function{
 		Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
-		RV:   CreateVariableQferSess(testAmbientSession, "func_x_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:   CreateVariableQferSess(testAmbientSession, "func_x_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})),
 		Body: &Block{},
 	}
 	list.Funcs = []*Function{callee}

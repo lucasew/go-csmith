@@ -17,10 +17,10 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f2", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EULongLong), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f2", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	av := &ArrayVariable{

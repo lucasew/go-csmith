@@ -46,7 +46,7 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 	tables := NewExprTablesSess(testAmbientSession, opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	e := func() *Expression {
 		c := EmptyCGContext().WithSession(testAmbientSession)
 		return MakeRandomExpression(r, opts, tables, vs, &c, GetSimpleTypeSess(testAmbientSession, EInt), &q, false, false, TermVariable, 0)
@@ -156,7 +156,7 @@ func TestExpressionGetQualifiersIndirect(t *testing.T) {
 	// Layout [ptr_level, storage]; deref pops storage (Lhs test: remaining [false])
 	ClearErrorSess(testAmbientSession)
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	q := NewCVQualifiers([]bool{false, true}, []bool{false, false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false, true}, []bool{false, false})
 	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	gq := e.GetQualifiersSess(testAmbientSession)
@@ -627,7 +627,7 @@ func TestSelectWithInvalidRejectsVolatileWhenImpure(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts = opts
-	vq := NewCVQualifiers([]bool{false}, []bool{true})
+	vq := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	vol := CreateVariableQferSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), vq)
 	vs.GlobalList = []*Variable{vol}
 	vs.AllVars = []*Variable{vol}
@@ -1045,7 +1045,7 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if makeExpressionVariableFlags(NewRngSess(testAmbientSession, 1), vs, &cg, GetIntTypeSess(testAmbientSession), &q, false, false) != nil {
 		t.Fatal("must-use Type-nil residual must fail closed makeExpressionVariable")
 	}
@@ -1056,7 +1056,7 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 	// IsArray without AsArray shell in must-use: same residual invent hole
 	shell := &Variable{
 		Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}),
 	}
 	rw2 := &RWDirective{MustReadVars: []*Variable{shell, good}}
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw2)

@@ -8,7 +8,7 @@ import (
 func TestItemizeConsumesRNGPerDim(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("create")
@@ -51,7 +51,7 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// VariableSelector.cpp:1386 — find_all_visible_vars only (GlobalList / local_vars)
 	a := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	b := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_2", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), q)
@@ -93,7 +93,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	if st.Loop == nil {
 		t.Fatal("incomplete arrayop/for without loop IR")
 	}
-	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{st}}).OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "for (") {
 		t.Fatal(out)
 	}
@@ -127,7 +127,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTableSess(testAmbientSession, opts)
 	// force multi-dim array
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("nil array")
@@ -148,7 +148,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	if st.Kind != StmtArrayOp || st.Loop == nil {
 		t.Fatalf("%+v", st)
 	}
-	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	out := (&Block{Stmts: []Stmt{st}}).OutputSess(testAmbientSession, 0)
 	// should have nested for and multi-index access
 	if strings.Count(out, "for (") < 2 && len(av.Sizes) >= 2 {
 		t.Log("dims", av.Sizes, out)
@@ -232,7 +232,7 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// Create without vs/blk registration (orphan array)
 	orphan := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if orphan == nil {

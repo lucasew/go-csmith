@@ -159,7 +159,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// seed a read so choose_visible may work
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff

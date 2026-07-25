@@ -74,7 +74,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	if fi == nil {
 		t.Fatal("expected Safe flags + arith/shift op")
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, "safe_") {
 		t.Fatalf("expected safe wrapper: %s", out)
 	}
@@ -100,7 +100,7 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	} else {
 		t.Fatal("OutSafeMath should mirror opts.SafeMath=false")
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if strings.Contains(out, "safe_") {
 		t.Fatalf("unexpected safe: %s", out)
 	}

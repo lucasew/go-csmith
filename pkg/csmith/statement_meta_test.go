@@ -384,7 +384,7 @@ func TestMustReturnIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// if with nil Then sticky not-must-return
 	st := Stmt{Kind: StmtIfElse, Then: nil, Else: &Block{}}
-	if st.MustReturn() {
+	if st.MustReturnSess(testAmbientSession) {
 		t.Fatal("nil Then MustReturn must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -396,7 +396,7 @@ func TestMustReturnIncompleteSticky(t *testing.T) {
 	thenHole := &Block{Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}}}
 	elseOK := &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
 	st2 := Stmt{Kind: StmtIfElse, Then: thenHole, Else: elseOK}
-	if st2.MustReturn() {
+	if st2.MustReturnSess(testAmbientSession) {
 		t.Fatal("nested MustReturn residual must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -406,7 +406,7 @@ func TestMustReturnIncompleteSticky(t *testing.T) {
 	// MustJump residual via nested MustReturn residual same invent soft-continue.
 	// Fair: sticky false.
 	st3 := Stmt{Kind: StmtIfElse, Then: thenHole, Else: elseOK}
-	if st3.MustJump() {
+	if st3.MustJumpSess(testAmbientSession) {
 		t.Fatal("nested MustJump residual must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

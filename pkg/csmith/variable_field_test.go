@@ -16,7 +16,7 @@ func TestCreateFieldVars(t *testing.T) {
 	if st == nil {
 		t.Fatal("MakeRandomStructType", HasErrorSess(testAmbientSession))
 	}
-	v := CreateVariableQferSess(testAmbientSession, "g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if v == nil || len(v.FieldVars) != len(st.Fields) {
 		t.Fatalf("fields %d want %d", len(v.FieldVars), len(st.Fields))
 	}
@@ -41,7 +41,7 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: nil, BitWidth: -1}, // incomplete field type
 	}}
-	v := &Variable{Name: "g_bad", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	v := &Variable{Name: "g_bad", Type: st, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	ClearErrorSess(testAmbientSession)
 	v.CreateFieldVarsSess(testAmbientSession)
 	if v.FieldVarsCompleteSess(testAmbientSession) {
@@ -70,7 +70,7 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	st2 := &Type{isStruct: true, StructName: "Snest", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	nested := &Variable{Name: "g_top.inner", Type: st2, FieldVarOf: top, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	nested := &Variable{Name: "g_top.inner", Type: st2, FieldVarOf: top, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})}
 	nested.CreateFieldVarsSess(testAmbientSession)
 	if nested.FieldVarsCompleteSess(testAmbientSession) {
 		t.Fatal("Type-nil top CreateFieldVars must IncompleteVariables")
@@ -159,7 +159,7 @@ func TestCollectExpandable(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 1), opts, probs, env)
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 5), opts, probs, env, "S0")
-	v := CreateVariableQferSess(testAmbientSession, "g_2", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_2", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	all := v.CollectExpandableSess(testAmbientSession)
 	if len(all) < 1+len(st.Fields) {
 		t.Fatal(len(all))
@@ -213,7 +213,7 @@ func TestFieldVolatileOrFromParent(t *testing.T) {
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 1), opts, probs, env)
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, env, "S0")
 	// parent volatile
-	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiers([]bool{false}, []bool{true}))
+	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}))
 	for _, f := range v.FieldVars {
 		if !f.IsVolatileSess(testAmbientSession) {
 			t.Fatalf("%s should inherit volatile", f.Name)

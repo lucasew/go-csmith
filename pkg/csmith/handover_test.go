@@ -118,12 +118,12 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 1 {
 		t.Skip("union type")
 	}
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if gu == nil {
 		t.Fatal("global union var")
 	}
 	// local union — dropped unless pointed-to by kept PT
-	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if lu == nil {
 		t.Fatal("local union var")
 	}
@@ -192,8 +192,8 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	if ut == nil {
 		t.Skip("union")
 	}
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	UpdateUnionFactsForOOSVarsSess(testAmbientSession, []*Variable{lu}, &facts)
 	if FindRelatedUnionSess(testAmbientSession, facts, gu) == nil || FindRelatedUnionSess(testAmbientSession, facts, lu) != nil {
@@ -227,8 +227,8 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	if ut == nil {
 		t.Skip("union")
 	}
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{StmID: 10, Func: f, LocalVars: []*Variable{lu}, Parent: &Block{StmID: 1, Func: f}}

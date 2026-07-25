@@ -128,7 +128,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0", Packed: true, Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	decl := st.OutputStructDeclSess(testAmbientSession, nil, nil)

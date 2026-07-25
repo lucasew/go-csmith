@@ -17,7 +17,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	// Prefer multi-dim so nested shells exist
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {

@@ -42,7 +42,7 @@ func TestChooseRandomNonvoidNonvolatile(t *testing.T) {
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 3), opts, probs, env)
 	// inject volatile struct
 	volt := &Type{isStruct: true, StructName: "SV", Fields: []StructField{
-		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}), BitWidth: -1},
 	}}
 	env.AllTypes = append(env.AllTypes, volt)
 	r := NewRngSess(testAmbientSession, 4)

@@ -262,7 +262,7 @@ func TestGetProbFilterMissingSticky(t *testing.T) {
 
 func TestProbabilityFilterNilReceiver(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if !(*ProbabilityFilter)(nil).Filter(0) {
+	if !(*ProbabilityFilter)(nil).FilterSess(testAmbientSession, 0) {
 		t.Fatal("nil ProbabilityFilter must reject")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -9,7 +9,7 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil || av.DimensionSess(testAmbientSession) < 1 {
 		t.Fatal(av)
@@ -31,7 +31,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	// ArrayVariable.cpp:127–133 — assert type/void sticky; ERROR_GUARD after rnd_upto(99)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
@@ -67,7 +67,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
 	opts.MaxArrayLength = 0
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -87,7 +87,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	if st == nil || !st.IsStructSess(testAmbientSession) {
 		t.Skip("no struct")
 	}
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, probs, nil, nil, nil, "g_s", st, MakeRandomSess(testAmbientSession, st, opts, probs, NewRngSess(testAmbientSession, 4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, probs, nil, nil, nil, "g_s", st, MakeRandomSess(testAmbientSession, st, opts, probs, NewRngSess(testAmbientSession, 4)), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -107,7 +107,7 @@ func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// large init_num path still must not invent aggregate alt values without probs
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, nil, nil, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, nil, nil, nil, nil, "g_s", st, nil, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -124,7 +124,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	opts.MaxArrayDim = 1
 	opts.MaxArrayLenPerDim = 8
 	opts.MaxArrayLength = 8
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// without VS/CG: when alt init_num > 0 fail closed non-sticky soft re-pick (no invent Constant stand-in)
 	sawFail := false
@@ -208,7 +208,7 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 	// hack probs
 	vs.Probs.single[PNewArrayVariableProb] = 100
 	r := NewRngSess(testAmbientSession, 2)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.createAndInitialize(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), q, nil, "g_9", r)
 	if v == nil || !v.IsArray {
 		t.Fatalf("%+v arrays=%d", v, len(vs.Arrays))
@@ -673,8 +673,8 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	// names use ArrayVariable::Output (name[idx]…) + ".fN", not bare collective name.
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 	}}
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: st, IsArray: true, ArraySizes: []int{3}},
@@ -709,7 +709,7 @@ func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 	// Variable.cpp:350–352 — isArray parent uses Output not bare name for field paths.
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EULongLong), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 	}}
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_42", Type: st, IsArray: true, ArraySizes: []int{2}},
@@ -1063,7 +1063,7 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), true, false)
-	vol.Qfer = NewCVQualifiers([]bool{false}, []bool{true})
+	vol.Qfer = NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})
 	// ensure IsVolatile true
 	if !vol.IsVolatileSess(testAmbientSession) {
 		// set storage volatile
@@ -1199,7 +1199,7 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 			Type:       pt,
 			IsArray:    true,
 			ArraySizes: []int{1},
-			Qfer:       NewCVQualifiers([]bool{false, false}, []bool{false, true}),
+			Qfer:       NewCVQualifiersSess(testAmbientSession, []bool{false, false}, []bool{false, true}),
 			Init:       &Constant{Type: pt, Value: "0"},
 		},
 		Sizes:      []int{1},

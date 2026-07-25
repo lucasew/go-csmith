@@ -37,7 +37,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	if fi == nil || fi.Safe == nil {
 		t.Skip("no safe binary in sample")
 	}
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, "safe_") {
 		t.Fatal(out)
 	}

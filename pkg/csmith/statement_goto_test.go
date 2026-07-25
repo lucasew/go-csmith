@@ -161,7 +161,7 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 	}
 	// nil nextLabel → process gensym; no invent fixed "lbl_1"
 	GotoLabelsDoFinalizationSess(testAmbientSession)
-	ResetDefaultGensym()
+	ResetDefaultGensymSess(testAmbientSession)
 	g1 := LabelForGotoDestSess(testAmbientSession, 7, nil)
 	g2 := LabelForGotoDestSess(testAmbientSession, 8, nil)
 	if g1 == "" || g2 == "" || g1 == g2 {
@@ -375,7 +375,7 @@ func TestMakeBinaryForCompare(t *testing.T) {
 		t.Fatal("cmp type")
 	}
 	// Output is standard cmp (not safe_ops arith)
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if strings.Contains(out, "safe_") {
 		t.Fatal(out)
 	}
@@ -1005,7 +1005,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 1 {
 		t.Skip("fields")
 	}
@@ -1115,7 +1115,7 @@ func TestGotoOkStmsPointerNotStmID(t *testing.T) {
 		if dest != nil && s == dest {
 			continue
 		}
-		if s.MustReturn() {
+		if s.MustReturnSess(testAmbientSession) {
 			continue
 		}
 		okStms = append(okStms, i)

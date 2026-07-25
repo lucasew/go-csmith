@@ -256,7 +256,7 @@ func TestPostOutputInBlock(t *testing.T) {
 			AssignOp: AssignSimple,
 		}},
 	}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "assert") {
 		t.Fatal(out)
 	}
@@ -370,7 +370,7 @@ func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
 				AssignOp: AssignSimple},
 		},
 	}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "lbl_x:") {
 		t.Fatal(out)
 	}

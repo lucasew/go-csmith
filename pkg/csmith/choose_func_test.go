@@ -44,13 +44,13 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 func TestArrayNoLoopInitializer(t *testing.T) {
 	opts := Defaults()
 	// global → true
-	g := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if g == nil || !g.NoLoopInitializerSess(testAmbientSession) {
 		t.Fatal("global must no-loop")
 	}
 	// local with no multi inits: force empty InitValues
 	blk := &Block{}
-	loc := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, blk, "l_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiers([]bool{false}, []bool{false}))
+	loc := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, blk, "l_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if loc == nil {
 		t.Fatal("nil local")
 	}
@@ -82,10 +82,10 @@ func TestChooseFuncContextQferWildcard(t *testing.T) {
 	// Function.cpp:294–295 — qfer when set; Wildcard accepts any RV qfer
 	good := &Function{
 		Name: "good", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
-		RV:      &Variable{Name: "good_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
+		RV:      &Variable{Name: "good_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true})},
 		FEffect: EmptyEffect(),
 	}
-	wild := NewCVQualifiers([]bool{false}, []bool{false})
+	wild := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	wild.Wildcard = true
 	got := ChooseFuncContext(NewRngSess(testAmbientSession, 2), []*Function{good}, GetIntTypeSess(testAmbientSession), nil, nil, Defaults(), &wild)
 	if got != good {
@@ -97,14 +97,14 @@ func TestChooseFuncContextNilRVQferFailClosed(t *testing.T) {
 	// RV always live after Function create; nil RV with qfer filter must not soft-skip
 	good := &Function{
 		Name: "good", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
-		RV:      &Variable{Name: "good_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		RV:      &Variable{Name: "good_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		FEffect: EmptyEffect(),
 	}
 	noRV := &Function{
 		Name: "bad", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
 		RV: nil, FEffect: EmptyEffect(),
 	}
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	ClearErrorSess(testAmbientSession)
 	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{good, noRV}, GetIntTypeSess(testAmbientSession), nil, nil, Defaults(), &q) != nil {
 		t.Fatal("nil RV among candidates must fail closed whole choose")
@@ -189,12 +189,12 @@ func TestChooseFuncContextMatchResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	good := &Function{
 		Name: "good", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
-		RV:      &Variable{Name: "good_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		RV:      &Variable{Name: "good_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		FEffect: EmptyEffect(),
 	}
 	broken := &Function{
 		Name: "broken", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
-		RV:      &Variable{Name: "broken_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		RV:      &Variable{Name: "broken_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		FEffect: EmptyEffect(),
 	}
 	// request qfer with unpaired const/vol depths → Match SetError

@@ -11,9 +11,7 @@ package csmith
 // For/ArrayOp: body may contain return, but Statement::must_return stays false, so
 // Block::make_random continues siblings after a for/array-op (seed-2 e13830: Go used
 // to stop the parent block when the for body returned → stack n=4 vs upstream n=5).
-func (st Stmt) MustReturn() bool {
-	return st.MustReturnSess(testAmbientSession)
-}
+// Non-Sess MustReturn deleted — pass run bag or testAmbientSession explicitly.
 
 func (st Stmt) MustReturnSess(s *Session) bool {
 	switch st.Kind {
@@ -55,9 +53,7 @@ func (st Stmt) MustReturnSess(s *Session) bool {
 // StatementIf: both branches must_jump; Block: last stm.
 // Incomplete get_blocks sticky false (no invent not-must-jump soft re-pick past holes).}
 
-func (st Stmt) MustJump() bool {
-	return st.MustJumpSess(testAmbientSession)
-}
+// Non-Sess MustJump deleted — pass run bag or testAmbientSession explicitly.
 
 func (st Stmt) MustJumpSess(s *Session) bool {
 	if st.MustReturnSess(s) {
@@ -120,9 +116,7 @@ func (st Stmt) MustJumpSess(s *Session) bool {
 // Uses b.EmitFM for CFG when set; prefer MustReturnWithFM during DFA.
 // Block always live; sticky false (no invent not-must-return soft-skip past hole).
 
-func (b *Block) MustReturn() bool {
-	return b.MustReturnSess(testAmbientSession)
-}
+// Non-Sess MustReturn deleted — pass run bag or testAmbientSession explicitly.
 
 // MustReturnSess is MustReturn with explicit session residual sticky.
 func (b *Block) MustReturnSess(s *Session) bool {
@@ -180,9 +174,7 @@ func (b *Block) MustReturnWithFMSess(s *Session, fm *FactMgr) bool {
 // MustJump mirrors Block::must_jump.
 // Block.cpp:336–341 — last must_jump and break_stms empty.
 // Block always live; sticky false (no invent not-must-jump soft-skip past hole).
-func (b *Block) MustJump() bool {
-	return b.MustJumpSess(testAmbientSession)
-}
+// Non-Sess MustJump deleted — pass run bag or testAmbientSession explicitly.
 
 // MustJumpSess is MustJump with explicit session residual sticky.
 func (b *Block) MustJumpSess(s *Session) bool {

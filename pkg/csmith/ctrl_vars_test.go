@@ -129,7 +129,7 @@ func TestOutputForComment(t *testing.T) {
 func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -203,7 +203,7 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	avBroken.AsArray = avBroken
 	// GetMaxArrayDimension uses AsArray.Sizes — Type nil still dims from sizes
 	// NoLoopInitializer(av) Type nil stickies residual true → soft-skip invent next
-	avGood := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	avGood := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if avGood == nil {
 		t.Fatal("good array")
 	}
@@ -257,7 +257,7 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 	// Variable.cpp:861–863
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	list := OutputVariableList([]*Variable{&av.Variable}, "  ", false)
+	list := OutputVariableListSess(testAmbientSession, []*Variable{&av.Variable}, "  ", false, sessOpts(testAmbientSession))
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
@@ -268,7 +268,7 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	blk := &Block{LocalVars: []*Variable{&av.Variable}, StmID: 1}
-	bout := blk.Output(0)
+	bout := blk.OutputSess(testAmbientSession, 0)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}

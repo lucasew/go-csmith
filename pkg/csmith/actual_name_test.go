@@ -117,7 +117,7 @@ func TestBlockNoInventIndentOnlyIncompleteStmt(t *testing.T) {
 	// incomplete break sticky must not invent whitespace-only indented line
 	ClearErrorSess(testAmbientSession)
 	b := &Block{Stmts: []Stmt{{Kind: StmtBreak}}} // no Expr
-	out := b.Output(1)
+	out := b.OutputSess(testAmbientSession, 1)
 	// incomplete stmt fails whole Output sticky empty (no invent bare break / indent-only)
 	if out != "" {
 		t.Fatal("incomplete break must fail closed whole block", out)
@@ -170,7 +170,7 @@ func TestOutputGlobalsVolatileArrayNoComment(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
-			Qfer: NewCVQualifiers([]bool{false}, []bool{true}),
+			Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{true}),
 			Init: MakeIntSess(testAmbientSession, 0),
 		},
 		Sizes: []int{2},

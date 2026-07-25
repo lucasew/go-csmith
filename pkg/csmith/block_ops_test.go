@@ -383,7 +383,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 		t.Fatal(b)
 	}
 	if len(b.Stmts) != 0 {
-		t.Fatal("dummy empty", b.Output(0))
+		t.Fatal("dummy empty", b.OutputSess(testAmbientSession, 0))
 	}
 	if !fm.MapVisited[b.StmID] {
 		t.Fatal("visited")
@@ -503,11 +503,11 @@ func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 
 func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	// Block.cpp always live this; no invent empty braces for nil
-	if out := (*Block)(nil).Output(0); out != "" {
+	if out := (*Block)(nil).OutputSess(testAmbientSession, 0); out != "" {
 		t.Fatal("nil block must fail closed empty, got", out)
 	}
 	// empty live block still emits braces
-	if out := (&Block{}).Output(0); !strings.Contains(out, "{") || !strings.Contains(out, "}") {
+	if out := (&Block{}).OutputSess(testAmbientSession, 0); !strings.Contains(out, "{") || !strings.Contains(out, "}") {
 		t.Fatal("empty live block", out)
 	}
 	// macro_tmp_vars name+type always live; sticky no invent partial tmp list
@@ -519,7 +519,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	defer SetProcessOptionsSess(testAmbientSession, prevO)
 	ClearErrorSess(testAmbientSession)
 	b := &Block{TmpVars: map[string]ESimpleType{"": EInt}}
-	if out := b.Output(0); out != "" {
+	if out := b.OutputSess(testAmbientSession, 0); out != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -529,7 +529,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	b2 := &Block{LocalVars: []*Variable{loc, nil}}
-	if out := b2.Output(0); out != "" {
+	if out := b2.OutputSess(testAmbientSession, 0); out != "" {
 		t.Fatal("LocalVars hole must fail closed whole block", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -540,7 +540,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	// fair: sticky empty whole block (no invent partial def emit)
 	arrShell := &Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	b3 := &Block{LocalVars: []*Variable{arrShell}}
-	if out := b3.Output(0); out != "" {
+	if out := b3.OutputSess(testAmbientSession, 0); out != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole block", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -560,7 +560,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 			{Kind: StmtAssign, StmID: 2, LhsVar: good, Expr: &Expression{Term: TermVariable, Var: good, ExprType: GetIntTypeSess(testAmbientSession)}},
 		},
 	}
-	if out := b4.Output(0); out != "" {
+	if out := b4.OutputSess(testAmbientSession, 0); out != "" {
 		t.Fatal("PreOutput residual must fail closed whole block", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -619,7 +619,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 		{Name: "p", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: -1},
 		{Name: "q", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: -1},
 	}}
-	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if v == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateVariableQfer struct with pointer fields", v, HasErrorSess(testAmbientSession))
 	}
@@ -914,8 +914,8 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	if b == nil {
 		t.Fatal("nil")
 	}
-	if f.NeedReturnStmtSess(testAmbientSession) && !b.MustReturn() {
-		t.Fatal("missing return after post_creation", b.Output(0))
+	if f.NeedReturnStmtSess(testAmbientSession) && !b.MustReturnSess(testAmbientSession) {
+		t.Fatal("missing return after post_creation", b.OutputSess(testAmbientSession, 0))
 	}
 }
 
@@ -1065,7 +1065,7 @@ func TestGetDimension(t *testing.T) {
 		t.Fatal("scalar")
 	}
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -1089,7 +1089,7 @@ func TestGetDimension(t *testing.T) {
 
 func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_m", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_m", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	av.Sizes = []int{2, 3}
 	// via AsArray on Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -1460,9 +1460,9 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	opts := Defaults()
 	// ProcessAssignOpsTable required past FM gate
 	prevTab := ProcessAssignOpsTableSess(testAmbientSession)
-	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTable(opts))
+	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTableSess(testAmbientSession, opts))
 	defer SetProcessAssignOpsTableSess(testAmbientSession, prevTab)
-	cq := NewCVQualifiers([]bool{true}, []bool{false})
+	cq := NewCVQualifiersSess(testAmbientSession, []bool{true}, []bool{false})
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: cq},
 	}}
@@ -1499,7 +1499,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	// IsVolatileStructUnion residual under StrictVolatileRule soft invent was soft-continue RHS.
 	optsSV := Defaults()
 	optsSV.StrictVolatileRule = true
-	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTable(optsSV))
+	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTableSess(testAmbientSession, optsSV))
 	got3 := MakeRandomAssign(NewRngSess(testAmbientSession, 1), optsSV, NewProbabilities(optsSV), NewVariableSelector(testAmbientSession, optsSV), NewExprTablesSess(testAmbientSession, optsSV), &cg, hole)
 	if stmtOK(got3) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed assign")
@@ -1949,9 +1949,9 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_fp", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	lu.Init = MakeIntSess(testAmbientSession, 0)
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	gu.Init = MakeIntSess(testAmbientSession, 0)
 	entry := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	mid := MakeFactPointToSetSess(testAmbientSession, p, []*Variable{tgt, NullPtr})
@@ -2010,7 +2010,7 @@ func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_nr", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if !lu.FieldVarsCompleteSess(testAmbientSession) || len(lu.FieldVars) == 0 {
 		t.Fatal("union field_vars")
 	}
@@ -2200,8 +2200,8 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	param := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fn.Param = []*Variable{param}
-	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// Nested no-FP block: parent != nil so map_out keeps full post-OOS without
 	// remove_function_local; live must OOS lu but not invent map_out install.
@@ -2251,7 +2251,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	// Function-body no-FP: live must NOT apply remove_function_local (param subject stays).
 	// map_out for parent==nil does strip params.
 	ClearErrorSess(testAmbientSession)
-	bodyLoc := CreateVariableQferSess(testAmbientSession, "l_bu", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	bodyLoc := CreateVariableQferSess(testAmbientSession, "l_bu", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	bodyAsg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmIDSess(testAmbientSession),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},

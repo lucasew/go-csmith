@@ -40,7 +40,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 func TestBreakOutputIsIfBreak(t *testing.T) {
 	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermVariable, Var: &Variable{Name: "g_1", Type: GetIntTypeSess(testAmbientSession)}}}
 	b := &Block{Stmts: []Stmt{st}}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "if (") || !strings.Contains(out, "break;") {
 		t.Fatal(out)
 	}
@@ -77,7 +77,7 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 		t.Fatal("test Output residual forHeaderOutput must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	out := (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc}}}).Output(0)
+	out := (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "for") {
 		t.Fatal("for without body/IR must not invent header", out)
 	}
@@ -88,13 +88,13 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	if forHeaderOutputSess(testAmbientSession, lc2) == "" {
 		t.Fatal("complete IR must emit header")
 	}
-	out = (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc2}}}).Output(0)
+	out = (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc2}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "for") {
 		t.Fatal("for without body must not invent header-only", out)
 	}
 	// ArrayOp header without Then
 	ClearErrorSess(testAmbientSession)
-	out = (&Block{Stmts: []Stmt{{Kind: StmtArrayOp, Loop: lc}}}).Output(0)
+	out = (&Block{Stmts: []Stmt{{Kind: StmtArrayOp, Loop: lc}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "for") {
 		t.Fatal("arrayop without body must not invent header", out)
 	}
@@ -138,15 +138,15 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 
 func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
 	// StatementBreak/Continue/Goto/If always have live test Expression*; no invent if ()
-	out := (&Block{Stmts: []Stmt{{Kind: StmtBreak}}}).Output(0)
+	out := (&Block{Stmts: []Stmt{{Kind: StmtBreak}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "break") || strings.Contains(out, "if (") {
 		t.Fatal("incomplete break must not invent if () break", out)
 	}
-	out = (&Block{Stmts: []Stmt{{Kind: StmtContinue}}}).Output(0)
+	out = (&Block{Stmts: []Stmt{{Kind: StmtContinue}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "continue") || strings.Contains(out, "if (") {
 		t.Fatal("incomplete continue must not invent if () continue", out)
 	}
-	out = (&Block{Stmts: []Stmt{{Kind: StmtGoto, Label: "lbl"}}}).Output(0)
+	out = (&Block{Stmts: []Stmt{{Kind: StmtGoto, Label: "lbl"}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "goto") || strings.Contains(out, "if (") {
 		t.Fatal("incomplete goto must not invent if () goto", out)
 	}
@@ -155,11 +155,11 @@ func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
 		Kind: StmtIfElse,
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{},
-	}}}).Output(0)
+	}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "if (") {
 		t.Fatal("if without else must not invent partial if", out)
 	}
-	out = (&Block{Stmts: []Stmt{{Kind: StmtReturn}}}).Output(0)
+	out = (&Block{Stmts: []Stmt{{Kind: StmtReturn}}}).OutputSess(testAmbientSession, 0)
 	if strings.Contains(out, "return") {
 		t.Fatal("incomplete return must not invent bare return;", out)
 	}

@@ -17,9 +17,7 @@ type CVQualifiers struct {
 // NewCVQualifiers mirrors CVQualifiers(const vector<bool>&, const vector<bool>&).
 // CVQualifiers.cpp:96 — assert(is_consts.size() == is_volatiles.size()) when both non-empty.
 // Mismatched depths sticky empty (no invent truncated paired qfer / soft re-pick past hole).
-func NewCVQualifiers(consts, vols []bool) CVQualifiers {
-	return NewCVQualifiersSess(testAmbientSession, consts, vols)
-}
+// Non-Sess NewCVQualifiers deleted — pass run bag or testAmbientSession explicitly.
 
 func NewCVQualifiersSess(s *Session, consts, vols []bool) CVQualifiers {
 	// C++ vectors always equal length at construction; mismatch is broken IR sticky
@@ -398,9 +396,7 @@ func (q CVQualifiers) SanityCheckSess(s *Session, t *Type) bool {
 // CVQualifiers::match and random_looser_consts — Go Match already ORs process;
 // these random_* helpers must too (seed-2 e9060: choose exact-miss then
 // RandomLooserConsts F50 while UP skipped flips under match_exact).
-func processMatchExactQualifiers(opts Options) bool {
-	return processMatchExactQualifiersSess(testAmbientSession, opts)
-}
+// Non-Sess processMatchExactQualifiers deleted — pass run bag or testAmbientSession explicitly.
 
 // processMatchExactQualifiersSess ORs bag opts with explicit opts (StatementAssign
 // forces MatchExactQualifiers on the run bag; ambient only when s is nil).
@@ -602,7 +598,7 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	}
 	// CVQualifiers.cpp:209 — ERROR_GUARD after random_*_volatiles
 	if hasErrCG(&cg) {
-		return NewCVQualifiers(nil, vols)
+		return NewCVQualifiersSess(rSess(r), nil, vols)
 	}
 	if !noVolatile {
 		seFree := cg.EffectContext().IsSideEffectFreeSess(sessFromCG(&cg))
@@ -617,7 +613,7 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	MakeScalarVolatiles(opts, vols)
 	// CVQualifiers.cpp:215 — ERROR_GUARD
 	if hasErrCG(&cg) {
-		return NewCVQualifiers(nil, vols)
+		return NewCVQualifiersSess(rSess(r), nil, vols)
 	}
 
 	var consts []bool
@@ -629,12 +625,12 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	MakeScalarConsts(opts, consts)
 	// CVQualifiers.cpp:219 — ERROR_GUARD after random_*_consts
 	if hasErrCG(&cg) {
-		return NewCVQualifiers(consts, vols)
+		return NewCVQualifiersSess(rSess(r), consts, vols)
 	}
 	if access == AccessWrite && len(consts) > 0 {
 		consts[len(consts)-1] = false
 	}
-	return NewCVQualifiers(consts, vols)
+	return NewCVQualifiersSess(rSess(r), consts, vols)
 }
 
 // RandomLooseQualifiers mirrors CVQualifiers::random_loose_qualifiers.
@@ -690,7 +686,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	if access == AccessWrite && len(consts) > 0 {
 		consts[len(consts)-1] = false
 	}
-	out := NewCVQualifiers(consts, vols)
+	out := NewCVQualifiersSess(rSess(r), consts, vols)
 	// residual ERROR sticky — no invent soft-qfer past NewCVQualifiers residual (mismatch)
 	if hasErrCG(&cg) {
 		return CVQualifiers{}
@@ -791,7 +787,7 @@ func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 	var out []CVQualifiers
 	for _, c := range []bool{false, true} {
 		for _, v := range []bool{false, true} {
-			out = append(out, NewCVQualifiers([]bool{c}, []bool{v}))
+			out = append(out, NewCVQualifiersSess(testAmbientSession, []bool{c}, []bool{v}))
 		}
 	}
 	return out
@@ -1093,9 +1089,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 // CVQualifiers.cpp:269–293 — non-C++ always OK; struct/union need has_assign_ops;
 // union with struct field (or nested bad union) forbids volatile.}
 
-func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
-	return isVolatileOKOnOneLevelSess(testAmbientSession, opts, t)
-}
+// Non-Sess isVolatileOKOnOneLevel deleted — pass run bag or testAmbientSession explicitly.
 
 func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
 	if !opts.LangCPP {
@@ -1229,7 +1223,7 @@ func RandomQualifiersForType(
 		return CVQualifiers{}
 	}
 	for tmp != nil {
-		volatileOK := isVolatileOKOnOneLevel(opts, tmp)
+		volatileOK := isVolatileOKOnOneLevelSess(rSess(r), opts, tmp)
 		// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
 		if hasErrCG(&cg) {
 			return CVQualifiers{}
@@ -1261,7 +1255,7 @@ func RandomQualifiersForType(
 	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
-	volOK1 := isVolatileOKOnOneLevel(opts, t)
+	volOK1 := isVolatileOKOnOneLevelSess(rSess(r), opts, t)
 	// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
 	if hasErrCG(&cg) {
 		return CVQualifiers{}
@@ -1289,7 +1283,7 @@ func RandomQualifiersForType(
 	}
 	MakeScalarVolatiles(opts, isVolatiles)
 	MakeScalarConsts(opts, isConsts)
-	return NewCVQualifiers(isConsts, isVolatiles)
+	return NewCVQualifiersSess(rSess(r), isConsts, isVolatiles)
 }
 
 // RandomQualifiersDefaultProbs mirrors
@@ -1320,9 +1314,7 @@ func RandomQualifiersDefaultProbs(
 
 // RandomQualifiersNoContextNoVolatile mirrors CVQualifiers::random_qualifiers(const Type *t)
 // → READ, empty context, no_volatile=true.
-func RandomQualifiersNoContextNoVolatile(t *Type, opts Options, probs *Probabilities, r *Rng) CVQualifiers {
-	return RandomQualifiersNoContextNoVolatileSess(testAmbientSession, t, opts, probs, r)
-}
+// Non-Sess RandomQualifiersNoContextNoVolatile deleted — pass run bag or testAmbientSession explicitly.
 
 // RandomQualifiersNoContextNoVolatileSess is RandomQualifiersNoContextNoVolatile with bag sticky.
 func RandomQualifiersNoContextNoVolatileSess(s *Session, t *Type, opts Options, probs *Probabilities, r *Rng) CVQualifiers {

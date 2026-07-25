@@ -42,7 +42,7 @@ func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
 	v := vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	if v == nil || len(f.NewGlobals) != 1 || f.NewGlobals[0] != v {
 		t.Fatalf("%v %v", v, f.NewGlobals)

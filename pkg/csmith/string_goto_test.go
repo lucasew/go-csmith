@@ -98,13 +98,13 @@ func TestSplitIntString(t *testing.T) {
 
 func TestBreakupAssigns(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	vs, vals := BreakupAssigns("a = 1; b=2;")
+	vs, vals := BreakupAssignsSess(testAmbientSession, "a = 1; b=2;")
 	if len(vs) != 2 || vs[0] != "a" || vals[0] != "1" || vs[1] != "b" || vals[1] != "2" {
 		t.Fatal(vs, vals)
 	}
 	// StringUtils.cpp:222 assert(pair.size()==2); sticky no soft invent skip
 	ClearErrorSess(testAmbientSession)
-	vs, vals = BreakupAssigns("a=1; broken; c=3")
+	vs, vals = BreakupAssignsSess(testAmbientSession, "a=1; broken; c=3")
 	if vs != nil || vals != nil {
 		t.Fatal("malformed assign must fail whole parse")
 	}
@@ -166,7 +166,7 @@ func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
 			AssignOp: AssignSimple,
 			Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}},
 	}}
-	out := b.Output(0)
+	out := b.OutputSess(testAmbientSession, 0)
 	if !strings.Contains(out, "lbl_x:") {
 		t.Fatal(out)
 	}
@@ -201,7 +201,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); vars[i] always live
 	// incomplete entry fails whole emit sticky (no invent skip holes / partial list)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableWithInitSess(testAmbientSession, "l_miss", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableWithInitSess(testAmbientSession, "l_miss", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	v.Name = "l_miss"
 	good := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntTypeSess(testAmbientSession), false, false)
 	good.Name = "l_ok"
@@ -248,7 +248,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 func TestVariableInitOutput(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); sticky no soft invent "0" when missing
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableWithInitSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableWithInitSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if variableInitOutputSess(testAmbientSession, v) != "" {
 		t.Fatal("nil init must not invent 0", variableInitOutputSess(testAmbientSession, v))
 	}

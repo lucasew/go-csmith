@@ -25,7 +25,7 @@ func TestFilterDisableDefaultInvalidatesRandom(t *testing.T) {
 		t.Fatal("after disable(fDefault), valid_filter false in random mode")
 	}
 	// VectorFilter.cpp:59–60 — invalid filter never rejects
-	if f.FilterSess(testAmbientSession, 0) || f.FilterSess(testAmbientSession, 99) {
+	if f.Filter(0) || f.Filter(99) {
 		t.Fatal("invalid filter must return false (accept)")
 	}
 	f.Enable(FilterKindDefault)
@@ -54,10 +54,10 @@ func TestVectorFilterFilterOutWithItems(t *testing.T) {
 	// VectorFilter.cpp:58–66 FilterOut: reject if in set
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterItemsSess(testAmbientSession, []int{3, 7}, FilterModeOut)
-	if !f.FilterSess(testAmbientSession, 3) {
+	if !f.Filter(3) {
 		t.Fatal("FilterOut must reject 3")
 	}
-	if f.FilterSess(testAmbientSession, 4) {
+	if f.Filter(4) {
 		t.Fatal("FilterOut must accept 4")
 	}
 }
@@ -66,10 +66,10 @@ func TestVectorFilterKeepMode(t *testing.T) {
 	// Keep: reject if NOT in set
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterItemsSess(testAmbientSession, []int{3}, FilterModeKeep)
-	if f.FilterSess(testAmbientSession, 3) {
+	if f.Filter(3) {
 		t.Fatal("Keep must accept 3")
 	}
-	if !f.FilterSess(testAmbientSession, 4) {
+	if !f.Filter(4) {
 		t.Fatal("Keep must reject 4")
 	}
 }
@@ -92,11 +92,11 @@ func TestVectorFilterLookupWithTable(t *testing.T) {
 	f := NewVectorFilterSess(testAmbientSession, tab)
 	f.AddSess(testAmbientSession, 10) // filter out key 10
 	// raw 0 → key 10 → reject
-	if !f.FilterSess(testAmbientSession, 0) {
+	if !f.Filter(0) {
 		t.Fatal("raw 0 → key 10 should reject")
 	}
 	// raw 50 → key 20 → accept
-	if f.FilterSess(testAmbientSession, 50) {
+	if f.Filter(50) {
 		t.Fatal("raw 50 → key 20 should accept")
 	}
 	if f.MaxProb() != 100 {

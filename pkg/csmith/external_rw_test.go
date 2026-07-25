@@ -35,7 +35,7 @@ func TestGetExternalNoReadsWrites(t *testing.T) {
 
 func TestFindMustUseArraysNilHole(t *testing.T) {
 	rw := &RWDirective{MustReadVars: []*Variable{nil}}
-	if rw.FindMustUseArrays() != nil {
+	if rw.FindMustUseArraysSess(testAmbientSession) != nil {
 		t.Fatal("nil must-use hole must fail closed")
 	}
 }

@@ -15,7 +15,7 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	f := &Function{Name: "func_61", ReturnType: GetIntTypeSess(testAmbientSession)}
@@ -58,7 +58,7 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})},
 		},
 	}
 	f := &Function{Name: "func_61", ReturnType: GetIntTypeSess(testAmbientSession)}

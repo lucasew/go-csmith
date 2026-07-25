@@ -131,7 +131,7 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 		t.Fatal("visited_cnt")
 	}
 	// output is a call
-	out := fi.Output()
+	out := fi.OutputSess(testAmbientSession)
 	if !strings.Contains(out, fi.User.Name+"(") {
 		t.Fatal(out)
 	}
@@ -488,7 +488,7 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 func TestGetFirstFunction(t *testing.T) {
 	// nil/empty list is complete miss (isolated BuildUserInvocation passes nil list)
 	ClearErrorSess(testAmbientSession)
-	if GetFirstFunction(nil) != nil {
+	if GetFirstFunctionSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil list")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -498,12 +498,12 @@ func TestGetFirstFunction(t *testing.T) {
 	a := &Function{Name: "func_1"}
 	b := &Function{Name: "func_2"}
 	list := &FunctionList{Funcs: []*Function{a, b}}
-	if GetFirstFunction(list) != a {
+	if GetFirstFunctionSess(testAmbientSession, list) != a {
 		t.Fatal("want first")
 	}
 	// nil hole at [0] sticky (no invent scan later)
 	ClearErrorSess(testAmbientSession)
-	if GetFirstFunction(&FunctionList{Funcs: []*Function{nil, b}}) != nil {
+	if GetFirstFunctionSess(testAmbientSession, &FunctionList{Funcs: []*Function{nil, b}}) != nil {
 		t.Fatal("nil first hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -41,7 +41,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
 		t.Skip("fields")
 	}
@@ -102,7 +102,7 @@ func TestIsNonreadableField(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 2 {
 		t.Skip("fields")
 	}
@@ -166,7 +166,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 1 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
 		t.Skip("fields")
 	}
