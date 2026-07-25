@@ -418,9 +418,13 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 // Label resolution: Statement.cpp:908–914 — find_jump_sources only (gotos[0]->label).
 // SourceLabel is generation-side dest mirror used when FactMgr is absent (no CFG).
 func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
+	return PreOutputSess(nil, st, fm, emitStepHash, emitLabelAttrs, attrRng, indent)
+}
+
+func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
 	// Statement always live at pre_output; sticky incomplete no invent empty pre shell
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return "", false
 	}
 	label := ""
@@ -429,7 +433,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		// Statement::stm_id always live under FM; StmID 0 sticky fail closed
 		// (no invent SourceLabel / step_hash soft-fallback for incomplete id)
 		if StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return "", false
 		}
 		srcs := fm.FindJumpSources(st.StmID)
@@ -437,8 +441,8 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		// empty non-nil = no gotos (do not fall back to SourceLabel)
 		if srcs == nil {
 			// incomplete CFG sticky — no invent step_hash soft-fallback past hole
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return "", false
 		}
@@ -448,7 +452,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 			if label == "" && fm.Func != nil {
 				src := FindStmtByID(fm.Func, srcs[0])
 				// residual ERROR sticky — no invent soft-continue label/SourceLabel past FindStmt hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return "", false
 				}
 				if src != nil {
@@ -475,7 +479,7 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 				attr = ag.Output(attrRng)
 			}
 			// residual ERROR sticky — no invent soft-continue label past attr residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return "", false
 			}
 		}

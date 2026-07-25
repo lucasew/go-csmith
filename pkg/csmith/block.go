@@ -1715,7 +1715,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 		var pre string
 		var isGotoTarget bool
 		if !skipPre {
-			pre, isGotoTarget = PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
+			pre, isGotoTarget = PreOutputSess(s, &st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
 			// residual ERROR sticky — no invent soft-continue stmt emit past PreOutput hole
 			if sessHasError(s) {
 				return ""
@@ -1788,7 +1788,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			// StatementAssign::OutputAsExpr — CGOptions::identify_wrappers process-wide
 			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
 			// no soft invent Defaults() / force IdentifyWrappers=false
-			asExpr := OutputAssignAsExprOpts(&st, wrap, opts)
+			asExpr := OutputAssignAsExprOptsSess(s, &st, wrap, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past OutputAssign residual
 			if sessHasError(s) {
 				return ""

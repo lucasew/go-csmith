@@ -1773,7 +1773,7 @@ func (e *Expression) outputBodyOptsSess(s *Session, opts Options) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		return e.Con.OutputOpts(opts)
+		return e.Con.OutputOptsSess(s, opts)
 	case TermVariable:
 		if e.Var == nil {
 			sessNoteError(s, ErrGeneric)
@@ -1781,10 +1781,10 @@ func (e *Expression) outputBodyOptsSess(s *Session, opts Options) string {
 		}
 		// ExpressionVariable::Output — *…var or &var from indirect level.
 		// ExpressionVariable.cpp:202–219 — base is Variable::Output (VOL_RVAL/ACCESS_ONCE).
-		return outputExpressionVariableOpts(e.Var, e.ExprType, opts)
+		return outputExpressionVariableOptsSess(s, e.Var, e.ExprType, opts)
 	case TermFunction:
 		if e.Invoke != nil {
-			out := e.Invoke.OutputOpts(opts)
+			out := e.Invoke.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-empty call past Invoke Output residual
 			if sessHasError(s) {
 				return ""
@@ -1797,7 +1797,7 @@ func (e *Expression) outputBodyOptsSess(s *Session, opts Options) string {
 		if e.Assign != nil {
 			// ExpressionAssign::Output → (assign as expr)
 			wrap := e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal
-			as := OutputAssignAsExprOpts(e.Assign, wrap, opts)
+			as := OutputAssignAsExprOptsSess(s, e.Assign, wrap, opts)
 			// residual ERROR sticky — no invent soft-empty assign expr past Output residual
 			if sessHasError(s) {
 				return ""

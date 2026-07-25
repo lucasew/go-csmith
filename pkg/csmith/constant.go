@@ -215,13 +215,18 @@ func (c *Constant) Output() string {
 
 // OutputOpts is Output with explicit session Options (lang_cpp nullptr).
 func (c *Constant) OutputOpts(opts Options) string {
+	return c.OutputOptsSess(nil, opts)
+}
+
+// OutputOptsSess is OutputOpts with sticky errors on bag s.
+func (c *Constant) OutputOptsSess(s *Session, opts Options) string {
 	if c == nil || c.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// empty value sticky (no invent bare token)
 	if c.Value == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// negative numbers in parentheses
@@ -231,7 +236,7 @@ func (c *Constant) OutputOpts(opts Options) string {
 	// pointer zero
 	if c.Type.PtrType() != nil {
 		// residual ERROR sticky — no invent soft-null past PtrType residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if c.Equals(0) {
@@ -240,7 +245,7 @@ func (c *Constant) OutputOpts(opts Options) string {
 			}
 			return "(void*)" + c.Value
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		return ""
 	}
 	return c.Value

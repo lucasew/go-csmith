@@ -386,7 +386,12 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 // these random_* helpers must too (seed-2 e9060: choose exact-miss then
 // RandomLooserConsts F50 while UP skipped flips under match_exact).
 func processMatchExactQualifiers(opts Options) bool {
-	return opts.MatchExactQualifiers || sessOpts(nil).MatchExactQualifiers
+	// Prefer explicit opts (StatementAssign forces opts + cg.Sess.Opts).
+	// Ambient OR only when opts false — unit tests that SetProcessOptions alone.
+	if opts.MatchExactQualifiers {
+		return true
+	}
+	return sessOpts(nil).MatchExactQualifiers
 }
 
 // RandomStricterConsts mirrors CVQualifiers::random_stricter_consts.

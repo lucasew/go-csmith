@@ -251,66 +251,70 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 // ArrayVariable::Output overrides Variable::Output for itemized members
 // (ArrayVariable.cpp:539–571) — name + indices, no VOL_RVAL wrap.
 func (v *Variable) OutputCOptsWith(prefixName bool, opts Options) string {
+	return v.OutputCOptsWithSess(nil, prefixName, opts)
+}
+
+func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options) string {
 	// Variable* always live at Output; sticky no invent empty C name without it
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky
 	// (no invent bare-name Output past broken array shell)
 	if v.IsArray && v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:539 — virtual Output for array (itemized or collective)
 	if v.AsArray != nil && v.AsArray.Collective != nil {
 		out := v.AsArray.OutputAccess()
 		// residual ERROR sticky — no invent soft-empty access past OutputAccess residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return out
 	}
 	name := v.GetActualName(prefixName)
 	// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// Variable always has live get_actual_name; sticky no invent VOL_RVAL(, T) / ACCESS_ONCE()
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.UseVolRVal && v.IsVolatile() {
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// Variable.cpp:690–693 — type->Output always live; sticky no invent "int"
 		if v.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		ty := v.Type.CName()
 		// residual ERROR sticky — no invent soft-wrap past CName residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if ty == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return "VOL_RVAL(" + name + ", " + ty + ")"
 	}
 	// residual ERROR sticky — no invent bare name past IsVolatile residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// Variable.cpp:694–696 — CGOptions::access_once() && isAccessOnce && !isAddrTaken
 	// sticky when IsAccessOnce but option off (assert enabled; no invent silent skip wrap)
 	if v.IsAccessOnce && !v.IsAddrTaken {
 		if !opts.AccessOnce {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return "ACCESS_ONCE(" + name + ")"

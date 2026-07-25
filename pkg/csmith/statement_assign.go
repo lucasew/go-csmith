@@ -750,16 +750,20 @@ func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.
 func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
+	return OutputAssignAsExprOptsSess(nil, st, wrapVol, opts)
+}
+
+func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options) string {
 	// Statement always live at OutputAsExpr; sticky incomplete no invent empty token
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	lhs := assignLhsText(st, wrapVol)
 	if lhs == "" {
 		// incomplete LHS IR sticky — no invent bare RHS / safe rewrite
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -767,15 +771,15 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	// sticky no invent "0" / bare lhs when Expr missing or Output empty
 	var rhs string
 	if st.Expr != nil {
-		rhs = st.Expr.Output()
+		rhs = st.Expr.OutputOptsSess(s, opts)
 		// residual ERROR sticky — no invent soft-empty RHS past Output residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
 	if !st.AssignOp.NeedNoRHS() && (st.Expr == nil || rhs == "") {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -790,13 +794,13 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok && opts.CComp {
 				if assignLhsIsVolatile(st) {
 					// residual ERROR sticky — no invent ccomp rewrite past IsVolatile residual
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return ""
 					}
 					return lhs + " = " + lhs + " " + bop.BinaryOpC() + " " + rhs
 				}
 				// residual ERROR sticky — no invent non-vol soft path past IsVolatile residual false
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 			}
@@ -813,14 +817,14 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			bop, ok := st.AssignOp.CompoundToBinaryOps()
 			if !ok {
 				// incomplete IR sticky — no invent OutputSimple for broken compound map
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			fname := st.SafeFlags.BinaryFuncName(bop.BinaryOpC())
 			if fname == "" {
 				// SafeOpFlags.cpp assert empty name sticky; no invent bare +=
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return ""
 			}
@@ -831,8 +835,8 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			}
 			// StatementAssign.cpp:595–598 — expr.Output always (live Expression*)
 			if rhs == "" && !st.AssignOp.NeedNoRHS() {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return ""
 			}
@@ -861,7 +865,7 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			return b.String()
 		default:
 			// StatementAssign.cpp:618–619 — assert(false) sticky; no soft invent OutputSimple
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}

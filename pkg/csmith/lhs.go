@@ -414,8 +414,12 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 
 // outputExpressionVariableOpts is outputExpressionVariable with access_once Options.
 func outputExpressionVariableOpts(v *Variable, want *Type, opts Options) string {
+	return outputExpressionVariableOptsSess(nil, v, want, opts)
+}
+
+func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts Options) string {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	ind := 0
@@ -426,24 +430,24 @@ func outputExpressionVariableOpts(v *Variable, want *Type, opts Options) string 
 		}
 		vi := v.Type.IndirectLevel()
 		// residual ERROR sticky — no invent soft-level past IndirectLevel residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		wi := wt.IndirectLevel()
 		// residual ERROR sticky — no invent soft-level past want IndirectLevel residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		ind = vi - wi
 	}
-	base := v.OutputCOptsWith(false, opts)
+	base := v.OutputCOptsWithSess(s, false, opts)
 	// residual ERROR sticky — no invent soft-empty base past OutputC residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// ExpressionVariable always has live var Output; sticky no invent "(***)" / "&" without base
 	if base == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if ind > 0 {
@@ -453,12 +457,12 @@ func outputExpressionVariableOpts(v *Variable, want *Type, opts Options) string 
 		// ExpressionVariable.cpp:210–216 — assert(indirect_level == -1); out << "&"; var.Output(out)
 		// var.Output is ArrayVariable::Output for itemized members (name[index]…), not bare get_actual_name.
 		if ind != -1 {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// base already from v.OutputC() above (includes itemized indices)
 		if base == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return "&" + base

@@ -67,9 +67,13 @@ func (fi *Invocation) Output() string {
 
 // OutputOpts is Output with explicit session Options (arg / wrapper emit).
 func (fi *Invocation) OutputOpts(opts Options) string {
+	return fi.OutputOptsSess(nil, opts)
+}
+
+func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 	// FunctionInvocation always live at Output; sticky no invent empty call without it
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Failed invocations are not emitted (ExpressionFuncall replaces with var).
@@ -81,23 +85,23 @@ func (fi *Invocation) OutputOpts(opts Options) string {
 		// FunctionInvocationUser::Output — func name + param_value[i] always live
 		// sticky no invent "()" / empty slots "f(a, , c)" or soft "0" for nil/empty args
 		if fi.User.Name == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		var parts []string
 		for _, a := range fi.Args {
 			if a == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			out := a.OutputOpts(opts)
+			out := a.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue later args past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if out == "" {
 				// incomplete arg IR — sticky fail closed whole call
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			parts = append(parts, out)
@@ -122,62 +126,62 @@ func (fi *Invocation) OutputOpts(opts Options) string {
 			case "+", "-", "!", "~":
 			default:
 				// FunctionInvocationUnary.cpp:197 assert invalid operator sticky
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			if len(fi.Args) < 1 || fi.Args[0] == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			a0 := fi.Args[0].OutputOpts(opts)
+			a0 := fi.Args[0].OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-empty unary past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if a0 == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			out := fi.outputUnary(a0)
 			// residual ERROR sticky — no invent soft-empty unary past outputUnary residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			return out
 		}
 		// binary: need two live args with non-empty Output
 		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if _, ok := BinaryOpFromString(fi.Binary); !ok && fi.Binary != "+" {
 			// invalid op sticky (except bare + for array mutate without flags)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		a0 := fi.Args[0].OutputOpts(opts)
+		a0 := fi.Args[0].OutputOptsSess(s, opts)
 		// residual ERROR sticky — no invent soft-continue a1 past a0 Output residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
-		a1 := fi.Args[1].OutputOpts(opts)
+		a1 := fi.Args[1].OutputOptsSess(s, opts)
 		// residual ERROR sticky — no invent soft-empty binary past a1 Output residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if a0 == "" || a1 == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		out := fi.outputBinary(a0, a1)
 		// residual ERROR sticky — no invent soft-empty binary past outputBinary residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return out
 	}
 	// incomplete non-user non-std shell sticky
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return ""
 }
 
