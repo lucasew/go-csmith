@@ -796,7 +796,7 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 	for _, v := range vs.GlobalList {
 		// pre-validated VariablesComplete
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
-		part := v.hashOutputOpts(ctrl, unionFacts, sessOpts(vs.Sess))
+		part := v.hashOutputOptsSess(vs.Sess, ctrl, unionFacts, sessOpts(vs.Sess))
 		// residual ERROR sticky — no invent soft-continue later globals past hash residual hole
 		if has() {
 			return ""
@@ -938,7 +938,7 @@ func (g *ProgramGenerator) OutputMain() string {
 				g.noteErr(ErrGeneric)
 				return ""
 			}
-			dump := v.OutputValueDump("checksum ", 1, endUnion)
+			dump := v.OutputValueDumpSess(g.Sess, "checksum ", 1, endUnion)
 			if dump == "" && g.hasErr() {
 				return ""
 			}
@@ -1558,7 +1558,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	// Library-first: append N_WRAP definition as a trailing section for consumers.
 	if g.Opts.IdentifyWrappers {
 		b.WriteString("\n/* --- wrapper.h (identify_wrappers) ---\n")
-		b.WriteString(OutputWrapperH())
+		b.WriteString(OutputWrapperHSess(g.Sess))
 		// residual ERROR sticky — no invent program past OutputWrapperH residual hole
 		if g.hasErr() {
 			return ""
@@ -1666,5 +1666,5 @@ func (g *ProgramGenerator) WrapperHeader() string {
 	if !g.Opts.IdentifyWrappers {
 		return ""
 	}
-	return OutputWrapperH()
+	return OutputWrapperHSess(g.Sess)
 }

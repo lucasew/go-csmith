@@ -391,16 +391,19 @@ func TestGoGeneratorIdentifyWrappers(t *testing.T) {
 	opts.MaxBlockSize = 2
 	opts.MaxBlockDepth = 2
 	// force some safe math usage by generating
-	ClearSafeOpWrapperNames()
-	defer ClearSafeOpWrapperNames()
-	// pre-register so N_WRAP non-zero even if gen avoids safe ops
-	_ = SafeOpFlagsToID("func_add_int32_t")
-	g := NewProgramGenerator(NewSession(opts))
+	sess := NewSession(opts)
+	ClearSafeOpWrapperNamesSess(sess)
+	// pre-register on the run bag so N_WRAP non-zero even if gen avoids safe ops
+	_ = SafeOpFlagsToIDSess(sess, "func_add_int32_t")
+	g := NewProgramGenerator(sess)
 	out := g.GoGenerator()
 	if !strings.Contains(out, "wrapper.h") || !strings.Contains(out, "N_WRAP") {
 		t.Fatal(out[len(out)-200:])
 	}
-	if g.WrapperHeader() != OutputWrapperH() {
+	if g.WrapperHeader() != OutputWrapperHSess(g.Sess) {
 		t.Fatal(g.WrapperHeader())
+	}
+	if !strings.Contains(out, "#define N_WRAP 1") && !strings.Contains(out, "#define N_WRAP ") {
+		t.Fatal("wrapper section must emit N_WRAP from run bag", out[len(out)-200:])
 	}
 }

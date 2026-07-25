@@ -156,7 +156,12 @@ func WrapperNamesCountSess(s *Session) int { return len(sessOrAmbient(s).Wrapper
 // OutputWrapperH mirrors DefaultProgramGenerator identify_wrappers wrapper.h body.
 // DefaultProgramGenerator.cpp:73–77 — #define N_WRAP <count>.
 func OutputWrapperH() string {
-	return "#define N_WRAP " + itoa(WrapperNamesCount()) + "\n"
+	return OutputWrapperHSess(nil)
+}
+
+// OutputWrapperHSess is OutputWrapperH reading wrapper names on bag s.
+func OutputWrapperHSess(s *Session) string {
+	return "#define N_WRAP " + itoa(WrapperNamesCountSess(s)) + "\n"
 }
 
 // SafeOpKind mirrors SafeOpKind for make_random_binary / make_random_unary.

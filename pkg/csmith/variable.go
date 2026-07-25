@@ -2393,41 +2393,46 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 // Variable.cpp:1173–1203 — printf checksum lines for simples; recurse aggregates;
 // arrays expand all index combinations; unions only readable fields.
 func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*FactUnion) string {
+	return v.OutputValueDumpSess(nil, prefix, indent, unionFacts)
+}
+
+// OutputValueDumpSess is OutputValueDump with sticky errors on bag s.
+func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, unionFacts []*FactUnion) string {
 	// Variable + Type always live at dump emit; sticky no invent empty dump shell
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky (no invent scalar
 	// dump / soft-skip expand past broken array shell)
 	if v.IsArray && v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
 	virt := v.IsVirtual()
 	// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if virt {
 		// field of virtual array is broken IR sticky for this path
 		if v.IsFieldVar() {
 			// residual ERROR sticky — no invent soft-continue dump past IsFieldVar residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// residual ERROR sticky — no invent soft-continue dump past IsFieldVar residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if v.IsArray || (v.AsArray != nil && len(v.AsArray.Sizes) > 0) {
-			return outputValueDumpArray(v, prefix, indent, unionFacts)
+			return outputValueDumpArraySess(s, v, prefix, indent, unionFacts)
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual false
 		return ""
 	}
@@ -2436,35 +2441,35 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		// no invent printf with empty name/directive
 		name := v.GetActualName(false)
 		// residual ERROR sticky — no invent dump past GetActualName residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		dir := v.Type.PrintfDirective()
 		// residual ERROR sticky — no invent dump past PrintfDirective residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if name == "" || dir == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	if v.Type.IsStruct() {
 		// residual ERROR sticky — no invent soft-dump past IsStruct residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// incomplete FieldVars sticky whole dump (no invent soft-skip hole)
 		if !v.FieldVarsComplete() {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		var b strings.Builder
 		for _, f := range v.FieldVars {
-			part := f.OutputValueDump(prefix, indent, unionFacts)
+			part := f.OutputValueDumpSess(s, prefix, indent, unionFacts)
 			// residual ERROR sticky — no invent partial field dump past hard IR hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			b.WriteString(part)
@@ -2472,17 +2477,17 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		return b.String()
 	}
 	// residual ERROR sticky — no invent soft-continue past IsStruct residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if v.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-dump past IsUnion residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// incomplete FieldVars sticky whole dump
 		if !v.FieldVarsComplete() {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		var b strings.Builder
@@ -2490,18 +2495,18 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 			// Variable.cpp:1195–1200 — FactUnion::is_field_readable (program end facts)
 			if !IsFieldReadable(v, i, unionFacts) {
 				// residual ERROR sticky — no invent soft-skip then partial dump past hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			part := f.OutputValueDump(prefix, indent, unionFacts)
+			part := f.OutputValueDumpSess(s, prefix, indent, unionFacts)
 			// residual ERROR sticky — no invent partial field dump past hard IR hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			b.WriteString(part)
@@ -2513,8 +2518,8 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		name := v.GetActualName(false)
 		dir := v.Type.PrintfDirective()
 		if name == "" || dir == "" {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
@@ -2528,8 +2533,13 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 // Variable always live; sticky empty (no invent soft-skip dump past hole).
 // Zero-rank ArraySizes is complete empty (not incomplete IR).
 func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
+	return outputValueDumpArraySess(nil, v, prefix, indent, unionFacts)
+}
+
+// outputValueDumpArraySess is outputValueDumpArray with sticky errors on bag s.
+func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if len(v.ArraySizes) == 0 {
@@ -2538,16 +2548,16 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 	// base name always live sticky; no invent printf with bare "[0]" access
 	base := v.GetActualName(false)
 	// residual ERROR sticky — no invent soft-empty dump past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if base == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Type always live for dump dispatch; sticky no invent empty dump past Type-nil shell
 	if v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	all := expandWithinRanges(v.ArraySizes)
@@ -2560,13 +2570,13 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 		}
 		if v.Type.IsSimple() {
 			// residual ERROR sticky — no invent soft-dump past IsSimple residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			dir := v.Type.PrintfDirective()
 			if dir == "" {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return ""
 			}
@@ -2574,41 +2584,41 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue past IsSimple residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if v.Type.IsAggregate() && len(v.FieldVars) > 0 {
 			// residual ERROR sticky — no invent soft-dump past IsAggregate residual true
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			// dump fields with indexed prefix path via synthetic names
 			// Variable* always live in FieldVars; nil hole sticky whole dump
 			for fi, f := range v.FieldVars {
 				if f == nil || f.Type == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return ""
 				}
 				if v.Type.IsUnion() && !IsFieldReadable(v, fi, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial dump past hole
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return ""
 					}
 					continue
 				}
 				// residual ERROR sticky — no invent soft-continue past IsFieldReadable/IsUnion residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				if !f.Type.IsSimple() {
 					// residual ERROR sticky — no invent soft-skip field past IsSimple residual
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return ""
 					}
 					continue
 				}
 				// residual ERROR sticky — no invent soft-continue field dump past IsSimple residual true
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				// field name is typically g_a.f0 — replace base with indexed access
@@ -2624,11 +2634,11 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 				dir := f.Type.PrintfDirective()
 				if dir == "" {
 					// residual ERROR sticky — no invent soft-skip then partial dump past hole
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return ""
 					}
 					// empty directive without residual: fail closed whole dump (no invent skip field)
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return ""
 				}
 				b.WriteString(OutputTab(indent) + "printf(\"" + prefix + acc + " = " + dir + "\\n\", " + acc + ");\n")
@@ -2746,42 +2756,47 @@ func (v *Variable) CollectExpandable() []*Variable {
 // mutating the package ctrl-var pool when no last set exists.
 // unionFacts nil → hash all union fields (no FactMgr); non-nil → IsFieldReadable.
 func (v *Variable) HashOutput() string {
-	return v.hashOutputOpts(nil, nil, ProcessOptions())
+	return v.hashOutputOptsSess(nil, nil, nil, ProcessOptions())
 }
 
 // HashOutputWithUnionFacts is HashOutput with FactUnion last-write filtering.
 func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
-	return v.hashOutputOpts(nil, unionFacts, ProcessOptions())
+	return v.hashOutputOptsSess(nil, nil, unionFacts, ProcessOptions())
 }
 
 func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
-	return v.hashOutputOpts(ctrl, unionFacts, ProcessOptions())
+	return v.hashOutputOptsSess(nil, ctrl, unionFacts, ProcessOptions())
 }
 
 // hashOutputOpts is hashOutput with explicit Options (array post_incr etc.).
 func (v *Variable) hashOutputOpts(ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
+	return v.hashOutputOptsSess(nil, ctrl, unionFacts, opts)
+}
+
+// hashOutputOptsSess is hashOutputOpts with sticky errors on bag s.
+func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
 	// Variable + Type always live at hash emit; sticky incomplete no invent empty hash
 	if v == nil || v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// C++ isArray always ArrayVariable*; missing AsArray sticky (no invent
 	// hash-array expand from ArraySizes alone past broken shell)
 	if v.IsArray && v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.IsArray && len(v.ArraySizes) > 0 {
-		return hashArrayVariableOpts(v, ctrl, unionFacts, opts)
+		return hashArrayVariableOptsSess(s, v, ctrl, unionFacts, opts)
 	}
 	if v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// incomplete FieldVars fails closed sticky whole hash (no invent soft-skip hole)
 		if !v.FieldVarsComplete() {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		var b strings.Builder
@@ -2789,27 +2804,27 @@ func (v *Variable) hashOutputOpts(ctrl []*Variable, unionFacts []*FactUnion, opt
 			// Variable.cpp:893–898 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
 				// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				if !IsFieldReadable(v, i, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial hash past hole
-					if sessHasError(nil) {
+					if sessHasError(s) {
 						return ""
 					}
 					continue
 				}
 				// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 				return ""
 			}
-			part := f.hashOutputOpts(ctrl, unionFacts, opts)
+			part := f.hashOutputOptsSess(s, ctrl, unionFacts, opts)
 			// residual ERROR sticky — no invent partial field hash past hard IR hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			b.WriteString(part)
@@ -2817,33 +2832,33 @@ func (v *Variable) hashOutputOpts(ctrl []*Variable, unionFacts []*FactUnion, opt
 		return b.String()
 	}
 	// residual ERROR sticky — no invent soft-continue scalar hash past IsAggregate residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if v.Type.IsSimple() {
 		// residual ERROR sticky — no invent soft-hash past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// Variable.cpp:900–920 — name always live sticky; no invent empty transparent_crc
 		name := v.GetActualName(false)
 		// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if name == "" || v.Name == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if v.Type.IsFloat() {
 			// residual ERROR sticky — no invent crc_bytes past IsFloat residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			return "    transparent_crc_bytes (&" + name + ", sizeof(" + name + "), \"" + v.Name + "\", print_hash_value);\n"
 		}
 		// residual ERROR sticky — no invent transparent_crc past IsFloat residual false path
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return "    transparent_crc(" + name + ", \"" + v.Name + "\", print_hash_value);\n"
@@ -2856,6 +2871,10 @@ func (v *Variable) hashOutputOpts(ctrl []*Variable, unionFacts []*FactUnion, opt
 // ArrayVariable.cpp:729–737 — unreadable union fields → indices for
 // Type::get_int_subfield_names (j after padding skip; Type.cpp:1622–1634).
 func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
+	return hashArrayUnionExcludedFieldsSess(nil, v, unionFacts)
+}
+
+func hashArrayUnionExcludedFieldsSess(s *Session, v *Variable, unionFacts []*FactUnion) []int {
 	if v == nil || v.Type == nil || !v.Type.IsUnion() || unionFacts == nil {
 		return nil
 	}
@@ -2868,11 +2887,11 @@ func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
 		}
 		if !IsFieldReadable(v, i, unionFacts) {
 			// residual ERROR sticky — no invent soft-skip then partial array hash past hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			excluded = append(excluded, j)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			return nil
 		}
 		j++
@@ -2895,19 +2914,23 @@ func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
 // Variable always live; sticky empty (no invent soft-skip hash past hole).
 // Zero-rank / no payload is complete empty (not incomplete IR shell).
 func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
-	return hashArrayVariableOpts(v, ctrl, unionFacts, ProcessOptions())
+	return hashArrayVariableOptsSess(nil, v, ctrl, unionFacts, ProcessOptions())
 }
 
 func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
+	return hashArrayVariableOptsSess(nil, v, ctrl, unionFacts, opts)
+}
+
+func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:722–723 — if (collective != 0) return;
 	// GlobalList holds collective + itemized; only collective emits hash loops.
 	// AsArray always live when IsArray at hashOutput entry; missing → sticky.
 	if v.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.AsArray.Collective != nil {
@@ -2924,27 +2947,27 @@ func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnio
 		useSimple bool
 	)
 	if v.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.Type.IsSimple() {
 		// residual ERROR sticky — no invent soft-payload past IsSimple residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		useSimple = true
 	} else if v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
-		excluded := hashArrayUnionExcludedFields(v, unionFacts)
-		if sessHasError(nil) {
+		excluded := hashArrayUnionExcludedFieldsSess(s, v, unionFacts)
+		if sessHasError(s) {
 			return ""
 		}
 		// Type.cpp:1615–1636 — flatten nested simple leaves
 		subs = v.Type.GetIntSubfieldNames("", excluded)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// ArrayVariable.cpp:742–744 — if (field_names.size() == 0) return;
@@ -2956,38 +2979,38 @@ func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnio
 		return ""
 	}
 	if ctrl == nil {
-		ctrl = GetLastCtrlVars()
+		ctrl = GetLastCtrlVarsSess(s)
 	}
 	if len(ctrl) < len(v.ArraySizes) {
 		// C++ assumes last_ctrl_vars sized for dimension after OutputArrayInitializers sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// array name always live sticky; no invent transparent_crc([i], …) / for ( = 0; …)
 	access := v.GetActualName(false)
 	// residual ERROR sticky — no invent soft-empty hash past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if access == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	names := make([]string, len(v.ArraySizes))
 	for i := range v.ArraySizes {
 		if ctrl[i] == nil {
 			// incomplete ctrl IR sticky — no invent empty index id
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		names[i] = ctrl[i].GetActualName(false)
 		// residual ERROR sticky — no invent soft-continue later indices past GetActualName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if names[i] == "" {
 			// ctrl get_actual_name always live sticky; no invent empty index id
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -3020,7 +3043,7 @@ func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnio
 	if useSimple {
 		isF := v.Type.IsFloat()
 		// residual ERROR sticky — no invent soft-hash past IsFloat residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if isF {
@@ -3031,12 +3054,12 @@ func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnio
 	} else {
 		for _, sub := range subs {
 			if sub.Type == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			isF := sub.Type.IsFloat()
 			// residual ERROR sticky — no invent soft-continue field hash past IsFloat residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			fn := sub.Name
