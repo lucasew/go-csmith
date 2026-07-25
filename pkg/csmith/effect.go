@@ -1453,6 +1453,12 @@ func (e Effect) IsWrittenByNameSess(s *Session, name string) bool {
 // Incomplete effect / nil var fails closed sticky empty (no invent partial list).
 
 func (e Effect) CommentOutputSess(s *Session) string {
+	return e.CommentOutputOptsSess(s, false, false)
+}
+
+// CommentOutputOptsSess is CommentOutput with quiet/concise for the wrap line
+// (OutputMgr::output_comment_line: quiet|concise → blank only).
+func (e Effect) CommentOutputOptsSess(s *Session, quiet, concise bool) string {
 	if e.incomplete {
 		sessNoteError(s, ErrGeneric)
 		return ""
@@ -1519,8 +1525,8 @@ func (e Effect) CommentOutputSess(s *Session) string {
 		ss.WriteString(name)
 	}
 	ss.WriteString("\n")
-	// OutputMgr.cpp:318 — "/* " + comment + " */" + newline
-	return OutputCommentLineSess(s, ss.String(), false, false)
+	// OutputMgr.cpp:314–320 — quiet|concise → blank line only
+	return OutputCommentLineSess(s, ss.String(), quiet, concise)
 }
 
 // MergeEffects combines two post-branch effects (union of reads/writes; SE-free only if both are).

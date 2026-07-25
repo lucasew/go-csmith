@@ -653,10 +653,12 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 	}
 	item.AsArray = item
 	for _, idx := range constIndices {
+		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
+		// not make_int: mark_mutable_const must not wrap index literals as "(n)".
 		is := fmt.Sprintf("%d", idx)
 		item.Indices = append(item.Indices, is)
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeIntSess(bag, idx), ExprType: GetIntTypeSess(bag),
+			Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(bag), Value: is}, ExprType: GetIntTypeSess(bag),
 		})
 	}
 	// ArrayVariable.cpp:288–291 — type always live; type->is_aggregate()
@@ -1232,11 +1234,12 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 		if sz > 0 {
 			idx = int(r.RndUptoSess(s, uint32(sz)))
 		}
+		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
+		// not make_int: mark_mutable_const must not wrap index literals as "(n)".
 		idxStr := fmt.Sprintf("%d", idx)
 		item.Indices = append(item.Indices, idxStr)
-		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeIntSess(s, idx), ExprType: GetIntTypeSess(s),
+			Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(s), Value: idxStr}, ExprType: GetIntTypeSess(s),
 		})
 	}
 	// ArrayVariable.cpp:261–264 — type always live; only expand aggregate itemized

@@ -1303,11 +1303,12 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 		return ""
 	}
 	s := ""
-	// Function.cpp:567 — output_comment_line separator
-	s += OutputCommentLineSess(sess, "------------------------------------------", false, f.EmitConcise)
-	// Function.cpp:568–570 — feffect.Output when !concise
-	if !f.EmitConcise {
-		s += f.FEffect.CommentOutputSess(sess)
+	// Function.cpp:567 — output_comment_line separator (quiet|concise → blank line only)
+	quiet, concise := opts.Quiet, opts.Concise || f.EmitConcise
+	s += OutputCommentLineSess(sess, "------------------------------------------", quiet, concise)
+	// Function.cpp:568–570 — feffect.Output when !concise; wrap still quiet-suppresses
+	if !concise {
+		s += f.FEffect.CommentOutputOptsSess(sess, quiet, concise)
 		// residual ERROR sticky — no invent soft-continue past CommentOutput residual
 		if sessHasError(sess) {
 			return ""

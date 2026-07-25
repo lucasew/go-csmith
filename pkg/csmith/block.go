@@ -2130,14 +2130,10 @@ func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 	pad := strings.Repeat("    ", indent)
 	inner := strings.Repeat("    ", indent+1)
 	var sb strings.Builder
-	// Block.cpp:250–253 — "{ " + /* block id: stm_id */
+	// Block.cpp:250–253 — "{ " + output_comment_line("block id: stm_id")
+	// quiet|concise → blank only (OutputMgr.cpp:314–320)
 	sb.WriteString(pad + "{ ")
-	if b.EmitConcise {
-		sb.WriteString("\n")
-	} else {
-		// OutputMgr::output_comment_line — skip when quiet/concise (EmitConcise)
-		sb.WriteString(OutputCommentLineSess(s, "block id: "+Int2Str(b.StmID), false, false))
-	}
+	sb.WriteString(OutputCommentLineSess(s, "block id: "+Int2Str(b.StmID), opts.Quiet, opts.Concise || b.EmitConcise))
 	// Block.cpp:255–257 — CGOptions::depth_protect(), not Block::depth_protect flag.
 	// Function sets body->set_depth_protect(true) always; emit still gates on CGOptions.
 	if opts.DepthProtect {
