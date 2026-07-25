@@ -450,14 +450,14 @@ func TestRandomQualifiersPointerDrawOrderSeed2(t *testing.T) {
 	// Independent replay of flip order
 	r2 := NewRngSess(testAmbientSession, 2)
 	// pointee vol, const
-	pv := r2.RndFlipcoin(50)
-	pc := r2.RndFlipcoin(50)
+	pv := r2.RndFlipcoinSess(testAmbientSession, 50)
+	pc := r2.RndFlipcoinSess(testAmbientSession, 50)
 	if pv && pc && !opts.AllowConstVolatile {
 		pc = false
 	}
 	// storage vol, const
-	sv := r2.RndFlipcoin(50)
-	sc := r2.RndFlipcoin(50)
+	sv := r2.RndFlipcoinSess(testAmbientSession, 50)
+	sc := r2.RndFlipcoinSess(testAmbientSession, 50)
 	if sv && sc && !opts.AllowConstVolatile {
 		sc = false
 	}

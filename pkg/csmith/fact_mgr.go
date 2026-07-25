@@ -147,7 +147,7 @@ func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 	if os.Getenv("CSMITH_DEBUG_FACTS") != "" && factHasL233MayNull(sessFromFM(fm), fm.GlobalFacts) && !factHasL233MayNull(sessFromFM(fm), facts) {
 		depth := uint64(0)
 		if r := sessRng(sessFromFM(fm)); r != nil {
-			depth = r.RandDepth()
+			depth = r.RandDepthSess(sessFromFM(fm))
 		}
 		fn := "?"
 		if fm.Func != nil {

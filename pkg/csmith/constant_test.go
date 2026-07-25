@@ -12,8 +12,8 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 	if c.Value != "0" {
 		t.Fatalf("pointer const: %q", c.Value)
 	}
-	if r.RandDepth() != 0 {
-		t.Fatalf("pointer must not consume RNG, depth=%d", r.RandDepth())
+	if r.RandDepthSess(testAmbientSession) != 0 {
+		t.Fatalf("pointer must not consume RNG, depth=%d", r.RandDepthSess(testAmbientSession))
 	}
 }
 
@@ -62,11 +62,11 @@ func TestMakeRandomIntHexPathSeed2(t *testing.T) {
 	// Find a seed where first flipcoin(50) is false for eInt hex path.
 	for seed := uint64(0); seed < 200; seed++ {
 		r := NewRngSess(testAmbientSession, seed)
-		if r.RndFlipcoin(50) {
+		if r.RndFlipcoinSess(testAmbientSession, 50) {
 			continue // small path
 		}
 		// hex path: RandomHexDigits(8) then + L
-		hex := r.RandomHexDigits(8)
+		hex := r.RandomHexDigitsSess(testAmbientSession, 8)
 		want := "0x" + hex + "L"
 		r2 := NewRngSess(testAmbientSession, seed)
 		c := MakeRandomSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r2)
@@ -82,15 +82,15 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 	opts := Defaults()
 	for seed := uint64(0); seed < 200; seed++ {
 		r := NewRngSess(testAmbientSession, seed)
-		if !r.RndFlipcoin(50) {
+		if !r.RndFlipcoinSess(testAmbientSession, 50) {
 			continue // need small path
 		}
 		// second flip + upto
 		var num int
-		if r.RndFlipcoin(50) {
-			num = int(r.RndUpto(3)) - 1
+		if r.RndFlipcoinSess(testAmbientSession, 50) {
+			num = int(r.RndUptoSess(testAmbientSession, 3)) - 1
 		} else {
-			num = int(r.RndUpto(20)) - 10
+			num = int(r.RndUptoSess(testAmbientSession, 20)) - 10
 		}
 		want := formatSmallConstantSess(testAmbientSession, EInt, num, opts)
 		r2 := NewRngSess(testAmbientSession, seed)
@@ -310,13 +310,13 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
 	// AbsRndNumGenerator always has live RNG sticky
 	ClearErrorSess(testAmbientSession)
-	if NewRngSess(testAmbientSession, 1).RandomHexDigits(0) != "" {
+	if NewRngSess(testAmbientSession, 1).RandomHexDigitsSess(testAmbientSession, 0) != "" {
 		t.Fatal("num<=0 returns empty non-sticky")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("num<=0 must not SetError")
 	}
-	if (*Rng)(nil).RandomHexDigits(4) != "" {
+	if (*Rng)(nil).RandomHexDigitsSess(testAmbientSession, 4) != "" {
 		t.Fatal("nil RNG must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {

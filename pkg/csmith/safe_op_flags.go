@@ -249,7 +249,7 @@ func MakeRandomUnarySess(s *Session, r *Rng, opts Options, probs *Probabilities,
 	if rvFloat {
 		f.Op1Signed = true
 	} else {
-		f.Op1Signed = r.RndFlipcoin(sigProb)
+		f.Op1Signed = r.RndFlipcoinSess(s, sigProb)
 	}
 	f.Op2Signed = f.Op1Signed
 	if rvFloat {
@@ -306,7 +306,7 @@ func MakeRandomBinaryKindSess(s *Session,
 	if rvFloat {
 		f.Op1Signed = true
 	} else {
-		f.Op1Signed = r.RndFlipcoin(sigProb)
+		f.Op1Signed = r.RndFlipcoinSess(s, sigProb)
 	}
 
 	// SafeOpFlags.cpp:193–201 — op2 for binary; assign copies op1
@@ -314,7 +314,7 @@ func MakeRandomBinaryKindSess(s *Session,
 		if rvFloat {
 			f.Op2Signed = true
 		} else {
-			f.Op2Signed = r.RndFlipcoin(sigProb)
+			f.Op2Signed = r.RndFlipcoinSess(s, sigProb)
 		}
 	} else {
 		f.Op2Signed = f.Op1Signed

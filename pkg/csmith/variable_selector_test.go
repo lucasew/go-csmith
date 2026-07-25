@@ -56,7 +56,7 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	}
 	// seed2 first RndUpto(3) = 1959434203 % 3
 	r := NewRngSess(testAmbientSession, 2)
-	wantIdx := int(r.RndUpto(3))
+	wantIdx := int(r.RndUptoSess(testAmbientSession, 3))
 	r2 := NewRngSess(testAmbientSession, 2)
 	got := ChooseOKVar(r2, []*Variable{a, b, c})
 	want := []*Variable{a, b, c}[wantIdx]
@@ -309,7 +309,7 @@ func TestSelectGlobalMultiMatchUpto(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	// First upto(2) = 1959434203 % 2
 	rProbe := NewRngSess(testAmbientSession, 2)
-	idx := int(rProbe.RndUpto(2))
+	idx := int(rProbe.RndUptoSess(testAmbientSession, 2))
 	got := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EInt), &q, r)
 	want := []*Variable{a, b}[idx]
 	if got != want {
@@ -326,8 +326,8 @@ func TestGenerateNewGlobalRandomQferConsumesRNG(t *testing.T) {
 	if v == nil || v.Init == nil || v.Init.Value == "" {
 		t.Fatalf("init missing: %+v", v)
 	}
-	if r.RandDepth() < 2 {
-		t.Fatalf("expected qfer+const RNG, depth=%d", r.RandDepth())
+	if r.RandDepthSess(testAmbientSession) < 2 {
+		t.Fatalf("expected qfer+const RNG, depth=%d", r.RandDepthSess(testAmbientSession))
 	}
 }
 

@@ -89,7 +89,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 		if dimen > ivDepth {
 			return true
 		}
-		if dimen == ivDepth && r.RndFlipcoin(10) {
+		if dimen == ivDepth && r.RndFlipcoinSess(sessFromCG(&cg), 10) {
 			return true
 		}
 		return false

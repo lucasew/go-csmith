@@ -17,22 +17,22 @@ func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
 	}
 	// Same seed: range const must burn U(wantB)+F like manual draws
 	rManual := NewRngSess(testAmbientSession, 1)
-	_ = rManual.RndUpto(uint32(wantB))
-	_ = rManual.RndFlipcoin(50)
+	_ = rManual.RndUptoSess(testAmbientSession, uint32(wantB))
+	_ = rManual.RndFlipcoinSess(testAmbientSession, 50)
 	rGen := NewRngSess(testAmbientSession, 1)
 	s := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 15, opts, rGen)
 	if s == "" || HasErrorSess(testAmbientSession) {
 		t.Fatal("range const", s, GetErrorSess(testAmbientSession))
 	}
-	if rGen.RandDepth() != rManual.RandDepth() {
-		t.Fatalf("depth want %d (U%d+F) got %d — integer shift would use U128", rManual.RandDepth(), wantB, rGen.RandDepth())
+	if rGen.RandDepthSess(testAmbientSession) != rManual.RandDepthSess(testAmbientSession) {
+		t.Fatalf("depth want %d (U%d+F) got %d — integer shift would use U128", rManual.RandDepthSess(testAmbientSession), wantB, rGen.RandDepthSess(testAmbientSession))
 	}
 	// Contrast: U128 stream diverges from U181 after first draw with same raw
 	r128 := NewRngSess(testAmbientSession, 1)
-	_ = r128.RndUpto(128)
+	_ = r128.RndUptoSess(testAmbientSession, 128)
 	r181 := NewRngSess(testAmbientSession, 1)
-	_ = r181.RndUpto(uint32(wantB))
-	if r128.Genrand() == 0 && r181.Genrand() == 0 {
+	_ = r181.RndUptoSess(testAmbientSession, uint32(wantB))
+	if r128.GenrandSess(testAmbientSession) == 0 && r181.GenrandSess(testAmbientSession) == 0 {
 		// not a meaningful assert; just ensure wantB != 128
 	}
 	if wantB == 128 {
@@ -59,8 +59,8 @@ func TestGenerateRandomConstantInRangeSignPolarity(t *testing.T) {
 	opts := Defaults()
 	// bound=8 → b=pow(2,4)=16
 	r := NewRngSess(testAmbientSession, 2)
-	num := int(r.RndUpto(16))
-	pos := r.RndFlipcoin(50)
+	num := int(r.RndUptoSess(testAmbientSession, 16))
+	pos := r.RndFlipcoinSess(testAmbientSession, 50)
 	want := strconv.Itoa(num)
 	if !pos {
 		want = "-" + want

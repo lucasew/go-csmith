@@ -179,7 +179,7 @@ func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
 	if g == nil || g.OutputKind != OutputMgrKindDFS {
 		t.Fatal(g)
 	}
-	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
+	if g.Rng == nil || g.Rng.KindSess(testAmbientSession) != RngKindDFS {
 		t.Fatal("DFS rng", g.Rng)
 	}
 	// Output mgr kind is on the session bag (not ambient after construction).

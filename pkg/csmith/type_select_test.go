@@ -287,7 +287,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		r := NewRngSess(testAmbientSession, seed)
 		// peek same flip as MakeRandomPointerType first coin
-		if !r.RndFlipcoin(20) {
+		if !r.RndFlipcoinSess(testAmbientSession, 20) {
 			continue
 		}
 		// re-run full make with same seed — first flip true → derived incomplete → nil
@@ -464,7 +464,7 @@ func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
 	found := false
 	for seed := uint64(0); seed < 200; seed++ {
 		r := NewRngSess(testAmbientSession, seed)
-		if r.RndFlipcoin(20) {
+		if r.RndFlipcoinSess(testAmbientSession, 20) {
 			// this seed's first draw is heads — MakeRandomPointerType must still return
 			ClearErrorSess(testAmbientSession)
 			p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs)

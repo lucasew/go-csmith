@@ -449,7 +449,7 @@ func (q CVQualifiers) RandomStricterConstsSess(s *Session, r *Rng, opts Options,
 			}
 			return out
 		}
-		out = append(out, r.RndFlipcoin(uint32(p)))
+		out = append(out, r.RndFlipcoinSess(s, uint32(p)))
 	}
 	return out
 }
@@ -490,7 +490,7 @@ func (q CVQualifiers) RandomStricterVolatilesSess(s *Session, r *Rng, opts Optio
 			MakeScalarVolatiles(opts, out)
 			return out
 		}
-		out = append(out, r.RndFlipcoin(uint32(p)))
+		out = append(out, r.RndFlipcoinSess(s, uint32(p)))
 	}
 	MakeScalarVolatiles(opts, out)
 	return out
@@ -526,7 +526,7 @@ func (q CVQualifiers) RandomLooserConstsSess(s *Session, r *Rng, opts Options, p
 			}
 			return out
 		}
-		out = append(out, r.RndFlipcoin(uint32(p)))
+		out = append(out, r.RndFlipcoinSess(s, uint32(p)))
 	}
 	return out
 }
@@ -562,7 +562,7 @@ func (q CVQualifiers) RandomLooserVolatilesSess(s *Session, r *Rng, opts Options
 			MakeScalarVolatiles(opts, out)
 			return out
 		}
-		out = append(out, r.RndFlipcoin(uint32(p)))
+		out = append(out, r.RndFlipcoinSess(s, uint32(p)))
 	}
 	MakeScalarVolatiles(opts, out)
 	return out
@@ -728,7 +728,7 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 		if sessHasError(s) {
 			return q
 		}
-		isConst = r.RndFlipcoin(uint32(p))
+		isConst = r.RndFlipcoinSess(s, uint32(p))
 	}
 	isVol := false
 	if !noVolatile && opts.VolatilePointers && probs != nil {
@@ -737,7 +737,7 @@ func (q CVQualifiers) RandomAddQualifiersSess(s *Session, r *Rng, opts Options, 
 		if sessHasError(s) {
 			return q
 		}
-		isVol = r.RndFlipcoin(uint32(p))
+		isVol = r.RndFlipcoinSess(s, uint32(p))
 	}
 	out.AddQualifiersSess(s, isConst, isVol)
 	// residual ERROR sticky — no invent soft-add level past AddQualifiers residual
@@ -1237,9 +1237,9 @@ func RandomQualifiersForType(
 		isVolatile := false
 		if volatileOK {
 			// rnd_flipcoin(volatile_prob)
-			isVolatile = r.RndFlipcoin(volatileProb)
+			isVolatile = r.RndFlipcoinSess(sessFromCG(&cg), volatileProb)
 		}
-		isConst := r.RndFlipcoin(constProb)
+		isConst := r.RndFlipcoinSess(sessFromCG(&cg), constProb)
 		if isVolatile && isConst && !opts.AllowConstVolatile {
 			isConst = false
 		}
@@ -1270,11 +1270,11 @@ func RandomQualifiersForType(
 	constOK := access != AccessWrite
 	isVolatile := false
 	if volatileOK {
-		isVolatile = r.RndFlipcoin(volatileProb)
+		isVolatile = r.RndFlipcoinSess(sessFromCG(&cg), volatileProb)
 	}
 	isConst := false
 	if constOK {
-		isConst = r.RndFlipcoin(constProb)
+		isConst = r.RndFlipcoinSess(sessFromCG(&cg), constProb)
 	}
 	if isVolatile && isConst && !opts.AllowConstVolatile {
 		isConst = false

@@ -379,7 +379,7 @@ func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts
 		if p < 0 {
 			p = 0
 		}
-		if r.RndFlipcoin(uint32(p)) {
+		if r.RndFlipcoinSess(s, uint32(p)) {
 			ret = 2
 		} else {
 			return 0
@@ -405,7 +405,7 @@ func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts
 		if p < 0 {
 			p = 0
 		}
-		if r.RndFlipcoin(uint32(p)) {
+		if r.RndFlipcoinSess(s, uint32(p)) {
 			ret = 2
 		} else {
 			return 0

@@ -106,7 +106,7 @@ func MakeRandomArrayOp(
 		return Stmt{}
 	}
 	// StatementArrayOp.cpp:77–80 — rnd_flipcoin(5); ERROR_GUARD
-	aryInit := r.RndFlipcoin(5)
+	aryInit := r.RndFlipcoinSess(sessFromCG(cg), 5)
 	if hasErrCG(cg) {
 		return Stmt{}
 	}
@@ -155,7 +155,7 @@ func MakeRandomArrayLoop(
 	if maxN < 0 {
 		maxN = 0
 	}
-	n := int(r.RndUpto(uint32(maxN)))
+	n := int(r.RndUptoSess(sessFromCG(cg), uint32(maxN)))
 	if hasErrCG(cg) {
 		return nil
 	}
@@ -247,7 +247,7 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 	if maxN < 0 {
 		maxN = 0
 	}
-	n := int(r.RndUpto(uint32(maxN)))
+	n := int(r.RndUptoSess(sessFromCG(&cg), uint32(maxN)))
 	out := make([]*ArrayVariable, 0, n)
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, cg)
@@ -257,7 +257,7 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 		}
 		out = append(out, av)
 		// access choice 0/1/2 burns RNG (must_read / must_write / both)
-		_ = r.RndUpto(3)
+		_ = r.RndUptoSess(sessFromCG(&cg), 3)
 		if hasErrCG(&cg) {
 			return nil
 		}

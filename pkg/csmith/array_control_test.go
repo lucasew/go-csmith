@@ -35,8 +35,8 @@ func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
 	for seed := uint64(1); seed < 80 && !(foundLe && foundGe); seed++ {
 		r0 := NewRngSess(testAmbientSession, seed)
 		// skip oob flip (prob 0 still draws)
-		_ = r0.RndFlipcoin(0)
-		wantLe := r0.RndFlipcoin(50)
+		_ = r0.RndFlipcoinSess(testAmbientSession, 0)
+		wantLe := r0.RndFlipcoinSess(testAmbientSession, 50)
 		_, _, _, testOp, _, _ := MakeRandomArrayControl(NewRngSess(testAmbientSession, seed), 10, true, 0)
 		if wantLe && testOp != BinCmpLe {
 			t.Fatalf("seed %d flip true must be Le got %v", seed, testOp)

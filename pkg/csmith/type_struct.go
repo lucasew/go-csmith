@@ -89,7 +89,7 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 		sessNoteError(s, ErrGeneric)
 		return fail
 	}
-	sign := r.RndFlipcoin(uint32(probs.SingleSess(s, PBitFieldsSignedProb)))
+	sign := r.RndFlipcoinSess(s, uint32(probs.SingleSess(s, PBitFieldsSignedProb)))
 	if sessHasError(s) {
 		return fail
 	}
@@ -105,7 +105,7 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 	if sessHasError(s) {
 		return fail
 	}
-	length := int(r.RndUpto(uint32(maxLen)))
+	length := int(r.RndUptoSess(s, uint32(maxLen)))
 	if sessHasError(s) {
 		return fail
 	}
@@ -114,7 +114,7 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 		if maxLen <= 2 {
 			length = 1
 		} else {
-			length = int(r.RndUpto(uint32(maxLen-1))) + 1
+			length = int(r.RndUptoSess(s, uint32(maxLen-1))) + 1
 			if sessHasError(s) {
 				return fail
 			}
@@ -145,7 +145,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	fieldCnt := maxCnt
 	if !opts.FixedStructFields {
 		// rnd_upto(max_cnt)+1; max 0 → RndUpto(0)+1 = 1 (matches C++ when max is 0)
-		fieldCnt = int(r.RndUpto(uint32(maxCnt))) + 1
+		fieldCnt = int(r.RndUptoSess(sessFromEnv(env), uint32(maxCnt))) + 1
 	}
 	if fieldCnt < 1 {
 		// fixed + max 0 → empty type IR; sticky no invent zero-field struct shell
@@ -158,7 +158,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	}
 	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
 	// Type.cpp:1086–1088 — ERROR_GUARD after flip
-	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PBitFieldsCreationProb)))
+	fullBitfields := opts.Bitfields && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PBitFieldsCreationProb)))
 	if hasErrEnv(env) {
 		return nil
 	}
@@ -168,7 +168,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		var f StructField
 		if fullBitfields {
 			// make_full_bitfields_struct_fields: ScalarFieldInFullBitFieldsProb → normal else bitfield
-			if r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PScalarFieldInFullBitFieldsProb))) {
+			if r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PScalarFieldInFullBitFieldsProb))) {
 				if hasErrEnv(env) {
 					return nil
 				}
@@ -181,7 +181,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 				f = MakeOneBitfieldSess(sessFromEnv(env), r, opts, probs, i, prevZero)
 				prevZero = f.Type != nil && f.BitWidth == 0
 			}
-		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PBitFieldInNormalStructProb))) {
+		} else if opts.Bitfields && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PBitFieldInNormalStructProb))) {
 			// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
 			if hasErrEnv(env) {
 				return nil
@@ -207,7 +207,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		if opts.CComp && (HasAggregateFieldSess(sessFromEnv(env), fields) || HasLongLongFieldSess(sessFromEnv(env), fields)) {
 			// leave packed false
 		} else {
-			packed = r.RndFlipcoin(50)
+			packed = r.RndFlipcoinSess(sessFromEnv(env), 50)
 			if hasErrEnv(env) {
 				return nil
 			}
@@ -543,14 +543,14 @@ func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Op
 		return ""
 	}
 	// pure_rnd_upto(b); C++ unsigned int domain (random mode == RndUpto)
-	num := int(r.RndUpto(uint32(b)))
+	num := int(r.RndUptoSess(s, uint32(b)))
 	// Constant.cpp:230–236 — eInt:
 	//   flag = pure_rnd_flipcoin(50); if (flag) oss << num; else oss << "-" << num;
 	// true → positive; false → negative (not the inverse).
 	// Constant.cpp:241–243 — eUInt: non-negative only (no flip)
 	var oss string
 	if st == EInt {
-		if r.RndFlipcoin(50) {
+		if r.RndFlipcoinSess(s, 50) {
 			oss = strconv.Itoa(num)
 		} else {
 			oss = "-" + strconv.Itoa(num)
@@ -672,7 +672,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	}
 	// Type.cpp:677–680 — bitfield when bitfields && !ccomp && flipcoin(BitFieldInNormalStructProb)
 	// bitfield path uses traced rnd_flipcoin (not pure_rnd)
-	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PBitFieldInNormalStructProb))) {
+	if opts.Bitfields && !opts.CComp && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PBitFieldInNormalStructProb))) {
 		if hasErrEnv(env) {
 			return StructField{}
 		}
@@ -743,11 +743,11 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	// (same stream as ProcessRng during Generate; unit tests pass local Rng).
 	var ft *Type
 	for tries := 0; tries < 256; tries++ {
-		if len(structTypes) > 0 && r.RndFlipcoin(15) {
+		if len(structTypes) > 0 && r.RndFlipcoinSess(sessFromEnv(env), 15) {
 			if hasErrEnv(env) {
 				return StructField{}
 			}
-			ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
+			ft = structTypes[r.RndUptoSess(sessFromEnv(env), uint32(len(structTypes)))]
 			if hasErrEnv(env) {
 				return StructField{}
 			}
@@ -759,7 +759,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		if len(nonStruct) == 0 {
 			break
 		}
-		cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
+		cand := nonStruct[r.RndUptoSess(sessFromEnv(env), uint32(len(nonStruct)))]
 		if hasErrEnv(env) {
 			return StructField{}
 		}
@@ -810,7 +810,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if maxCnt < 0 {
 		maxCnt = 0
 	}
-	fieldCnt := int(r.RndUpto(uint32(maxCnt))) + 1
+	fieldCnt := int(r.RndUptoSess(sessFromEnv(env), uint32(maxCnt))) + 1
 	// Type.cpp:1136 — ERROR_GUARD after field_cnt
 	if hasErrEnv(env) {
 		return nil

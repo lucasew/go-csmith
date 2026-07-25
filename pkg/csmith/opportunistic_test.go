@@ -43,33 +43,33 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	// null, prob 0 → 0; FactPointTo.cpp:455 still rnd_flipcoin(0)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	rNull := NewRngSess(testAmbientSession, 1)
-	d0 := rNull.RandDepth()
+	d0 := rNull.RandDepthSess(testAmbientSession)
 	if OpportunisticValidateSess(testAmbientSession, rNull, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
 		t.Fatal("null blocked")
 	}
-	if rNull.RandDepth() != d0+1 {
-		t.Fatalf("null p=0 must still flipcoin once: depth %d → %d", d0, rNull.RandDepth())
+	if rNull.RandDepthSess(testAmbientSession) != d0+1 {
+		t.Fatalf("null p=0 must still flipcoin once: depth %d → %d", d0, rNull.RandDepthSess(testAmbientSession))
 	}
 	// live target → 1 (no flip when not null/dead)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	facts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)}
 	rLive := NewRngSess(testAmbientSession, 1)
-	dLive := rLive.RandDepth()
+	dLive := rLive.RandDepthSess(testAmbientSession)
 	if OpportunisticValidateSess(testAmbientSession, rLive, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 1 {
 		t.Fatal("live")
 	}
-	if rLive.RandDepth() != dLive {
-		t.Fatalf("live pointees must not flipcoin: depth %d → %d", dLive, rLive.RandDepth())
+	if rLive.RandDepthSess(testAmbientSession) != dLive {
+		t.Fatalf("live pointees must not flipcoin: depth %d → %d", dLive, rLive.RandDepthSess(testAmbientSession))
 	}
 	// garbage, prob 0 → 0; FactPointTo.cpp:464 still rnd_flipcoin(0)
 	facts = []*FactPointTo{NewFactPointToSess(testAmbientSession, p)}
 	rDead := NewRngSess(testAmbientSession, 1)
-	dDead := rDead.RandDepth()
+	dDead := rDead.RandDepthSess(testAmbientSession)
 	if OpportunisticValidateSess(testAmbientSession, rDead, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
 		t.Fatal("dead blocked")
 	}
-	if rDead.RandDepth() != dDead+1 {
-		t.Fatalf("dead p=0 must still flipcoin once: depth %d → %d", dDead, rDead.RandDepth())
+	if rDead.RandDepthSess(testAmbientSession) != dDead+1 {
+		t.Fatalf("dead p=0 must still flipcoin once: depth %d → %d", dDead, rDead.RandDepthSess(testAmbientSession))
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete dead blocked must not sticky")

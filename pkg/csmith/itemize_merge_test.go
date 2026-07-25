@@ -83,24 +83,24 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	// may-null on collective (post_loop / merge lattice)
 	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, &coll.Variable, []*Variable{NullPtr, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)})}
 	r := NewRngSess(testAmbientSession, 1)
-	d0 := r.RandDepth()
+	d0 := r.RandDepthSess(testAmbientSession)
 	// need one more indir than var for validate to check null
 	got := OpportunisticValidateSess(testAmbientSession, r, &item.Variable, GetIntTypeSess(testAmbientSession), facts, 0, 0)
 	if got != 0 {
 		t.Fatalf("may-null + null_prob=0 must reject, got %d", got)
 	}
-	if r.RandDepth() != d0+1 {
-		t.Fatalf("must still flipcoin(null_prob=0): depth %d → %d", d0, r.RandDepth())
+	if r.RandDepthSess(testAmbientSession) != d0+1 {
+		t.Fatalf("must still flipcoin(null_prob=0): depth %d → %d", d0, r.RandDepthSess(testAmbientSession))
 	}
 	// pure non-null: no flipcoin
 	live := []*FactPointTo{MakeFactPointToSess(testAmbientSession, &coll.Variable, CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false))}
 	r2 := NewRngSess(testAmbientSession, 1)
-	d1 := r2.RandDepth()
+	d1 := r2.RandDepthSess(testAmbientSession)
 	if OpportunisticValidateSess(testAmbientSession, r2, &item.Variable, GetIntTypeSess(testAmbientSession), live, 0, 0) != 1 {
 		t.Fatal("pure live must accept without null flip")
 	}
-	if r2.RandDepth() != d1 {
-		t.Fatalf("pure live must not flipcoin: depth %d → %d", d1, r2.RandDepth())
+	if r2.RandDepthSess(testAmbientSession) != d1 {
+		t.Fatalf("pure live must not flipcoin: depth %d → %d", d1, r2.RandDepthSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)
 }

@@ -1682,7 +1682,7 @@ func IfStructWillHaveAssignOpsSess(s *Session, r *Rng, opts Options, probs *Prob
 	if probs != nil {
 		p = probs.SingleSess(s, PRegularVolatileProb)
 	}
-	return r.RndFlipcoin(uint32(p))
+	return r.RndFlipcoinSess(s, uint32(p))
 }
 
 // IfUnionWillHaveAssignOps mirrors Type::if_union_will_have_assign_ops.

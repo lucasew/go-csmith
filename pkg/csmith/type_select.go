@@ -230,7 +230,7 @@ func ChooseRandomStructUnionTypeSess(s *Session, r *Rng, ok []*Type) *Type {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	rv := ok[r.RndUpto(uint32(len(ok)))]
+	rv := ok[r.RndUptoSess(s, uint32(len(ok)))]
 	// Type.cpp:526 — ERROR_GUARD(0)
 	if sessHasError(s) {
 		return nil
@@ -310,7 +310,7 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
-	p := env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
+	p := env.DerivedTypes[r.RndUptoSess(sessFromEnv(env), uint32(len(env.DerivedTypes)))]
 	// Type.cpp:538 — ERROR_GUARD(nullptr)
 	if hasErrEnv(env) {
 		return nil
@@ -610,7 +610,7 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 	// (that desyncs the stream vs C++ which still draws).
 	// Type* always live on derived_types; nil hole fails closed (no invent skip hole
 	// and fall through to choose_random as if derived were empty).
-	if r.RndFlipcoin(20) {
+	if r.RndFlipcoinSess(sessFromEnv(env), 20) {
 		// Type.cpp:1146 — ERROR_GUARD after flipcoin
 		if hasErrEnv(env) {
 			return nil
@@ -620,7 +620,7 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 				noteErrEnv(env, ErrGeneric)
 				return nil
 			}
-			idx := r.RndUpto(uint32(len(env.DerivedTypes)))
+			idx := r.RndUptoSess(sessFromEnv(env), uint32(len(env.DerivedTypes)))
 			// Type.cpp:1149 ERROR_GUARD after rnd_upto
 			if hasErrEnv(env) {
 				return nil
@@ -684,7 +684,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	}
 	var typ *Type
 	// Type.cpp:1609–1614 — pointer as LType (simple assign only); ERROR_GUARD after flip + make
-	if op == AssignSimple && probs != nil && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PPointerAsLTypeProb))) {
+	if op == AssignSimple && probs != nil && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PPointerAsLTypeProb))) {
 		// Type.cpp:1610 — ERROR_GUARD(nullptr) after flipcoin
 		if hasErrEnv(env) {
 			return nil
@@ -708,7 +708,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
-		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PStructAsLTypeProb))) {
+		if len(cands) > 0 && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PStructAsLTypeProb))) {
 			if hasErrEnv(env) {
 				return nil
 			}
@@ -723,7 +723,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 
 	// Type.cpp:1628–1633 — float as LType
 	if typ == nil && AssignOpWorksForFloat(op) && probs != nil &&
-		r.RndFlipcoin(uint32(probs.SingleSess(sessFromEnv(env), PFloatAsLTypeProb))) {
+		r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PFloatAsLTypeProb))) {
 		if hasErrEnv(env) {
 			return nil
 		}

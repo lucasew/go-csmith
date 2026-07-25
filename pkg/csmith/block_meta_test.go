@@ -111,7 +111,7 @@ func TestRandomParentBlock(t *testing.T) {
 	}
 	// with global_variables: domain size is 1 (nil) + chain length
 	rN := NewRngSess(testAmbientSession, 2)
-	d0 := rN.RandDepth()
+	d0 := rN.RandDepthSess(testAmbientSession)
 	_ = inner.RandomParentBlock(rN, true)
 	// one U draw with n == 3 for [nil, inner, outer]
 	// (cannot read n from depth alone; polarity: without global never returns nil)
@@ -158,16 +158,16 @@ func TestRandomParentBlockDomainWithGlobals(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 11)
 	// Manually mirror domain: [nil, inner, outer]
 	// After one RandomParentBlock(true), depth must advance by 1
-	d0 := r.RandDepth()
+	d0 := r.RandDepthSess(testAmbientSession)
 	_ = inner.RandomParentBlock(r, true)
-	if r.RandDepth() != d0+1 {
-		t.Fatalf("one upto draw expected: %d → %d", d0, r.RandDepth())
+	if r.RandDepthSess(testAmbientSession) != d0+1 {
+		t.Fatalf("one upto draw expected: %d → %d", d0, r.RandDepthSess(testAmbientSession))
 	}
 	// without global domain is 2
 	r2 := NewRngSess(testAmbientSession, 11)
-	d1 := r2.RandDepth()
+	d1 := r2.RandDepthSess(testAmbientSession)
 	_ = inner.RandomParentBlock(r2, false)
-	if r2.RandDepth() != d1+1 {
+	if r2.RandDepthSess(testAmbientSession) != d1+1 {
 		t.Fatal("one upto")
 	}
 	// Same seed, same raw, different n → different v is possible; both consume one draw.

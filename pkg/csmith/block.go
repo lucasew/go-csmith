@@ -381,7 +381,7 @@ func (b *Block) RandomParentBlockSess(s *Session, r *Rng, allowGlobal bool) *Blo
 	if len(blks) == 0 {
 		return nil
 	}
-	idx := r.RndUpto(uint32(len(blks)))
+	idx := r.RndUptoSess(s, uint32(len(blks)))
 	// Block.cpp:306 ERROR_GUARD
 	if sessHasError(s) {
 		return nil

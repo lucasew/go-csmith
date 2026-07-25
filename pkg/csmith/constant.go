@@ -467,13 +467,13 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 
 	var v string
 	// pure_rnd_flipcoin(50) — in random mode == rnd_flipcoin(50)
-	if r.RndFlipcoin(50) {
+	if r.RndFlipcoinSess(s, 50) {
 		// small integer / small float path (Constant.cpp:318–361)
 		var num int
-		if r.RndFlipcoin(50) {
-			num = int(r.RndUpto(3)) - 1
+		if r.RndFlipcoinSess(s, 50) {
+			num = int(r.RndUptoSess(s, 3)) - 1
 		} else {
-			num = int(r.RndUpto(20)) - 10
+			num = int(r.RndUptoSess(s, 20)) - 10
 		}
 		// Constant.cpp:346–348 — eFloat → GenerateSmallRandomFloatHexConstant(num)
 		if st == EFloat {
@@ -529,11 +529,11 @@ func generateSmallRandomFloatHexConstantSess(s *Session, num int, r *Rng) string
 	}
 	pm := "+1"
 	// pure_rnd_flipcoin(50) — random mode == rnd_flipcoin(50)
-	if !r.RndFlipcoin(50) {
+	if !r.RndFlipcoinSess(s, 50) {
 		pm = "-1"
 	}
 	// Constant.cpp:215 — num << "." << RandomHexDigits(1)
-	return sign + "0x" + strconv.Itoa(abs) + "." + r.RandomHexDigits(1) + "p" + pm
+	return sign + "0x" + strconv.Itoa(abs) + "." + r.RandomHexDigitsSess(s, 1) + "p" + pm
 }
 
 func formatSmallConstantSess(s *Session, st ESimpleType, num int, opts Options) string {
@@ -631,10 +631,10 @@ func maybeBinaryConstantSess(s *Session, opts Options, r *Rng, nHex int, suffix 
 		sessNoteError(s, ErrGeneric)
 		return "", false
 	}
-	if !r.RndFlipcoin(binaryConstProbSess(s)) {
+	if !r.RndFlipcoinSess(s, binaryConstProbSess(s)) {
 		return "", false
 	}
-	hex := r.RandomHexDigits(nHex)
+	hex := r.RandomHexDigitsSess(s, nHex)
 	bin := HexToBinarySess(s, hex)
 	if bin == "" {
 		return "", true
@@ -647,7 +647,7 @@ func generateRandomCharConstant(s *Session, opts Options, r *Rng) string {
 	if s, ok := maybeBinaryConstantSess(s, opts, r, 2, ""); ok {
 		return s
 	}
-	hex := r.RandomHexDigits(2)
+	hex := r.RandomHexDigitsSess(s, 2)
 	if opts.CComp || !opts.LongLong {
 		return "0x" + hex
 	}
@@ -659,7 +659,7 @@ func generateRandomIntConstant(s *Session, opts Options, r *Rng) string {
 	if s, ok := maybeBinaryConstantSess(s, opts, r, 8, ""); ok {
 		return s
 	}
-	hex := r.RandomHexDigits(8)
+	hex := r.RandomHexDigitsSess(s, 8)
 	if opts.CComp || !opts.LongLong {
 		return "0x" + hex
 	}
@@ -671,7 +671,7 @@ func generateRandomShortConstant(s *Session, opts Options, r *Rng) string {
 	if s, ok := maybeBinaryConstantSess(s, opts, r, 4, ""); ok {
 		return s
 	}
-	hex := r.RandomHexDigits(4)
+	hex := r.RandomHexDigitsSess(s, 4)
 	if opts.CComp || !opts.LongLong {
 		return "0x" + hex
 	}
@@ -683,7 +683,7 @@ func generateRandomLongConstant(s *Session, opts Options, r *Rng) string {
 	if s, ok := maybeBinaryConstantSess(s, opts, r, 8, ""); ok {
 		return s
 	}
-	hex := r.RandomHexDigits(8)
+	hex := r.RandomHexDigitsSess(s, 8)
 	if !opts.LongLong {
 		return "0x" + hex
 	}
@@ -695,7 +695,7 @@ func generateRandomLongLongConstant(s *Session, opts Options, r *Rng) string {
 	if s, ok := maybeBinaryConstantSess(s, opts, r, 16, "LL"); ok {
 		return s
 	}
-	hex := r.RandomHexDigits(16)
+	hex := r.RandomHexDigitsSess(s, 16)
 	return "0x" + hex + "LL"
 }
 
@@ -704,7 +704,7 @@ func generateRandomInt128Constant(s *Session, opts Options, r *Rng) string {
 	if s, ok := maybeBinaryConstantSess(s, opts, r, 16, ""); ok {
 		return s
 	}
-	hex := r.RandomHexDigits(16)
+	hex := r.RandomHexDigitsSess(s, 16)
 	return "0x" + hex
 }
 
@@ -717,11 +717,11 @@ func generateRandomFloatHexConstantSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	exp := int(r.RndUpto(100))
+	exp := int(r.RndUptoSess(s, 100))
 	sign := "+"
 	// pure_rnd_flipcoin(50) — random mode == rnd_flipcoin(50)
-	if !r.RndFlipcoin(50) {
+	if !r.RndFlipcoinSess(s, 50) {
 		sign = "-"
 	}
-	return fmt.Sprintf("0x%s.%sp%s%d", r.RandomHexDigits(1), r.RandomHexDigits(6), sign, exp)
+	return fmt.Sprintf("0x%s.%sp%s%d", r.RandomHexDigitsSess(s, 1), r.RandomHexDigitsSess(s, 6), sign, exp)
 }

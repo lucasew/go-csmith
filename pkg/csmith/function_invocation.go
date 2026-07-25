@@ -529,7 +529,7 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 	if r == nil {
 		return false
 	}
-	return r.RndFlipcoin(80)
+	return r.RndFlipcoinSess(rSess(r), 80)
 }
 
 // GetFirstFunction mirrors GetFirstFunction — first entry in FuncList / func_1.
@@ -1148,7 +1148,7 @@ func MakeRandomBinaryInvocation(
 	// PickBinaryOp when ptr comparison fails (seed-2 e9211: UP U18 after matched
 	// ptr-cmp events meant Go was on a different post-success path; fall-through
 	// also invents scalar binary C++ never takes after a failed ptr-cmp attempt).
-	if r.RndFlipcoin(10) {
+	if r.RndFlipcoinSess(sessFromCG(cg), 10) {
 		var env *TypeEnv
 		if vs != nil {
 			env = vs.Types
@@ -1309,7 +1309,7 @@ func MakeRandomBinaryInvocation(
 				shiftNonConst = p.SingleSess(sessFromCG(cg), PShiftByNonConstantProb)
 			}
 			// not_constant = flip; constant path when !not_constant
-			if !r.RndFlipcoin(uint32(shiftNonConst)) {
+			if !r.RndFlipcoinSess(sessFromCG(cg), uint32(shiftNonConst)) {
 				// FunctionInvocation.cpp:241 — make_random_upto(lhs_type->SizeInBytes() * 8)
 				// Type always live after flags assert; SizeInBytes 0 is incomplete
 				// (no invent default 32-bit width)
@@ -1494,7 +1494,7 @@ func MakeRandomBinaryPtrComparison(
 	// FunctionInvocation.cpp:295–296 — rnd_flipcoin(50) ? eCmpEq : eCmpNe
 	// (true → ==, false → !=). Do not invert polarity.
 	op := BinCmpNe
-	if r.RndFlipcoin(50) {
+	if r.RndFlipcoinSess(sessFromCG(cg), 50) {
 		op = BinCmpEq
 	}
 	opStr := op.BinaryOpCSess(sessFromCG(cg))
@@ -1939,7 +1939,7 @@ func MakeRandomInvocation(
 	if !stdFunc {
 		var callee *Function
 		// FunctionInvocation.cpp:87 — pure_rnd_flipcoin(50) (random mode == rnd)
-		if r.RndFlipcoin(50) && list != nil {
+		if r.RndFlipcoinSess(sessFromCG(cg), 50) && list != nil {
 			// Function.cpp:choose_func with in_conflict / strict_volatile / qfer
 			callee = ChooseFuncContext(r, list.Funcs, matchType, cg.CurrentFunc, cg, opts, qfer)
 		}
@@ -1995,7 +1995,7 @@ func MakeRandomInvocation(
 			noteErrCG(cg, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
-		stdUnary := r.RndFlipcoin(uint32(probs.SingleSess(sessFromCG(cg), PStdUnaryFuncProb)))
+		stdUnary := r.RndFlipcoinSess(sessFromCG(cg), uint32(probs.SingleSess(sessFromCG(cg), PStdUnaryFuncProb)))
 		// FunctionInvocation.cpp ERROR_GUARD after flipcoin
 		if hasErrCG(cg) {
 			return &Invocation{Failed: true}

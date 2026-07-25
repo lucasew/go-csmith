@@ -119,10 +119,10 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	st := ChooseRandomNonvoidSimpleSess(testAmbientSession, r, p)
 	// Manual: try v = raw%14 until not filtered.
 	r2 := NewRngSess(testAmbientSession, 2)
-	raw := r2.Genrand()
+	raw := r2.GenrandSess(testAmbientSession)
 	v := raw % 14
 	for p.SimpleTypeWeightSess(testAmbientSession, int(v)) == 0 {
-		raw = r2.Genrand()
+		raw = r2.GenrandSess(testAmbientSession)
 		v = raw % 14
 	}
 	if st != ESimpleType(v) {

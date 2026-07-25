@@ -78,7 +78,7 @@ func CreateArrayVariable(
 	}
 	// dimension: 1d 60%, 2d 30%, … via rnd_upto(99)+1 stepping
 	// ArrayVariable.cpp:131–144
-	num := int(r.RndUpto(99)) + 1
+	num := int(r.RndUptoSess(sessFromCG(cg), 99)) + 1
 	// ArrayVariable.cpp:133 — ERROR_GUARD(nullptr)
 	if hasErrCG(cg) {
 		return nil
@@ -102,7 +102,7 @@ func CreateArrayVariable(
 	sizes := make([]int, 0, dimension)
 	total := 1
 	for i := 0; i < dimension; i++ {
-		dimen := int(r.RndUpto(uint32(opts.MaxArrayLenPerDim))) + 1
+		dimen := int(r.RndUptoSess(sessFromCG(cg), uint32(opts.MaxArrayLenPerDim))) + 1
 		// ArrayVariable.cpp:149–150 — rnd_upto(max_len_per_dim)+1; ERROR_GUARD
 		if hasErrCG(cg) {
 			return nil
@@ -156,7 +156,7 @@ func CreateArrayVariable(
 	if pr := sessRng(sessFromCG(cg)); pr != nil && pr == r {
 		initNum = int(PureRndUptoSess(sessFromCG(cg), half, nil))
 	} else {
-		initNum = int(r.RndUpto(half))
+		initNum = int(r.RndUptoSess(rSess(r), half))
 	}
 	for i := 0; i < initNum; i++ {
 		// ArrayVariable.cpp:177–185
@@ -1211,7 +1211,7 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 	for _, sz := range av.Sizes {
 		idx := 0
 		if sz > 0 {
-			idx = int(r.RndUpto(uint32(sz)))
+			idx = int(r.RndUptoSess(s, uint32(sz)))
 		}
 		idxStr := fmt.Sprintf("%d", idx)
 		item.Indices = append(item.Indices, idxStr)

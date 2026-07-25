@@ -645,7 +645,7 @@ func MakeRandomLhs(
 			if derefProb < 0 {
 				derefProb = 0
 			}
-			if r.RndFlipcoin(uint32(derefProb)) {
+			if r.RndFlipcoinSess(sessFromCG(cg), uint32(derefProb)) {
 				v = selectDerefPointerInv(r, opts, probs, vs, *cg, typ, &q, AccessWrite, dummy)
 				// residual ERROR sticky — no invent soft-continue past deref select hole
 				if hasErrCG(cg) {

@@ -68,16 +68,16 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	// Use Rng depth only through the flag section via a harness that stops early:
 	// Compare two runs: pure MakeRandomBinaryKind depth vs full ptr-cmp prefix.
 	rFlags := NewRngSess(testAmbientSession, 7)
-	d0 := rFlags.RandDepth()
+	d0 := rFlags.RandDepthSess(testAmbientSession)
 	// eq/ne draw alone
-	eqFlip := rFlags.RndFlipcoin(50)
+	eqFlip := rFlags.RndFlipcoinSess(testAmbientSession, 50)
 	_ = eqFlip
 	flags := MakeRandomBinaryKindSess(testAmbientSession, rFlags, opts, probs, GetIntTypeSess(testAmbientSession), nil, nil, SafeOpBinary, BinCmpEq)
 	if flags == nil {
 		t.Fatal("flags")
 	}
 	// after eq + op1 + op2 + size: depth +1 +2 flip +1 upto (filter may re-roll size)
-	flagDepth := rFlags.RandDepth() - d0
+	flagDepth := rFlags.RandDepthSess(testAmbientSession) - d0
 	if flagDepth < 4 {
 		t.Fatalf("expected at least eq+2signed+size draws, got depth delta %d", flagDepth)
 	}
@@ -96,7 +96,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 		}
 		// Replay first flip alone with same seed
 		r0 := NewRngSess(testAmbientSession, seed)
-		wantEq := r0.RndFlipcoin(50)
+		wantEq := r0.RndFlipcoinSess(testAmbientSession, 50)
 		if wantEq && fi.Binary == "==" {
 			foundEq = true
 		}

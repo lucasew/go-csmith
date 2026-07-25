@@ -436,7 +436,7 @@ func FindGoodJumpBlockSess(s *Session, r *Rng, blocks []*Block, curr *Block, asD
 	// pre-validated BlocksComplete
 	blks := append([]*Block(nil), blocks...)
 	for len(blks) > 0 {
-		idx := int(r.RndUpto(uint32(len(blks))))
+		idx := int(r.RndUptoSess(s, uint32(len(blks))))
 		// StatementGoto.cpp:326 ERROR_GUARD
 		if sessHasError(s) {
 			return nil
@@ -531,7 +531,7 @@ func MakeRandomGoto(
 	}
 
 	// 40% prefer back-edge (StatementGoto.cpp:73–84)
-	wantBack := r.RndFlipcoin(40)
+	wantBack := r.RndFlipcoinSess(sessFromCG(cg), 40)
 	// StatementGoto.cpp:74 ERROR_GUARD
 	if hasErrCG(cg) {
 		return makeGotoFailed()
@@ -596,7 +596,7 @@ func MakeRandomGoto(
 		// StatementGoto.cpp:109–212 — empty ok_stms → fall through to nullptr
 		return makeGotoFailed()
 	}
-	ti := okStms[r.RndUpto(uint32(len(okStms)))]
+	ti := okStms[r.RndUptoSess(sessFromCG(cg), uint32(len(okStms)))]
 	// StatementGoto.cpp:110 ERROR_GUARD
 	if hasErrCG(cg) {
 		return makeGotoFailed()

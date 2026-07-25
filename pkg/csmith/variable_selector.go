@@ -417,7 +417,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		}
 		remain := dimenLen - boundOf[v]
 		if remain > 1 {
-			off := int(r.RndUpto(uint32(remain)))
+			off := int(r.RndUptoSess(sessFromVS(vs), uint32(remain)))
 			if off > 0 {
 				offExpr := &Expression{
 					Term: TermConstant, Con: MakeIntSess(sessFromVS(vs), off), ExprType: GetIntTypeSess(sessFromCG(&cg)),
@@ -545,7 +545,7 @@ func ChooseOKVarSess(s *Session, r *Rng, vars []*Variable) *Variable {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		idx := r.RndUpto(uint32(n))
+		idx := r.RndUptoSess(s, uint32(n))
 		// VariableSelector.cpp:327 ERROR_GUARD
 		if sessHasError(s) {
 			return nil
@@ -1094,7 +1094,7 @@ func (vs *VariableSelector) MakeInitValue(
 	if hasErrVS(vs) {
 		return nil
 	}
-	if !ptrLike || r.RndFlipcoin(20) {
+	if !ptrLike || r.RndFlipcoinSess(sessFromCG(&cg), 20) {
 		// VariableSelector.cpp:837 ERROR_GUARD
 		if hasErrVS(vs) {
 			return nil
@@ -1693,7 +1693,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if out != nil {
 			// 75% erase from must-use list (VariableSelector.cpp:1552–1555)
 			// C++ always has RNG for flip; no invent forced erase without draw
-			if r != nil && r.RndFlipcoin(75) {
+			if r != nil && r.RndFlipcoinSess(sessFromVS(vs), 75) {
 				*list = append((*list)[:i], (*list)[i+1:]...)
 			}
 			return out
@@ -2201,7 +2201,7 @@ func (vs *VariableSelector) createAndInitialize(
 	if !vs.Opts.Arrays {
 		arrProb = 0
 	}
-	if r.RndFlipcoin(arrProb) {
+	if r.RndFlipcoinSess(sessFromCG(&cg), arrProb) {
 		// VariableSelector.cpp:526–529 — strict_const → Constant::make_random; else make_init_value
 		var init *Constant
 		var ie *Expression
@@ -2496,7 +2496,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		return nil
 	}
 	if !volQ {
-		if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.SingleSess(sessFromVS(vs), PAccessOnceVariableProb))) {
+		if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoinSess(sessFromCG(&cg), uint32(vs.Probs.SingleSess(sessFromVS(vs), PAccessOnceVariableProb))) {
 			v.IsAccessOnce = true
 		}
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
@@ -2616,7 +2616,7 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 	if len(cands) == 0 {
 		return typ
 	}
-	st := cands[r.RndUpto(uint32(len(cands)))]
+	st := cands[r.RndUptoSess(sessFromEnv(env), uint32(len(cands)))]
 	if st == nil {
 		noteErrEnv(env, ErrGeneric)
 		return nil
@@ -2843,7 +2843,7 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 	}
 	// VariableSelector.cpp:966–972 — has_pointer_type() && flipcoin(40)
 	// no soft invent MakeRandomPointerType when choose returns nil
-	rndPtr := r.RndFlipcoin(40)
+	rndPtr := r.RndFlipcoinSess(sessFromVS(vs), 40)
 	if hasErrVS(vs) {
 		return nil
 	}
@@ -3251,7 +3251,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	if n == 1 {
 		return arrayVars[0]
 	}
-	idx := r.RndUpto(uint32(n))
+	idx := r.RndUptoSess(sessFromVS(vs), uint32(n))
 	// VariableSelector.cpp:1434 ERROR_GUARD(nullptr)
 	if hasErrVS(vs) {
 		return nil
@@ -3281,7 +3281,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		return nil
 	}
 	// VariableSelector.cpp:1341–1342 — global_variables && rnd_flipcoin(25); ERROR_GUARD
-	asGlobal := vs.Opts.GlobalVariables && r.RndFlipcoin(25)
+	asGlobal := vs.Opts.GlobalVariables && r.RndFlipcoinSess(sessFromCG(&cg), 25)
 	if hasErrVS(vs) {
 		return nil
 	}
@@ -3305,7 +3305,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			return nil
 		}
 		name = vs.RandomLocalName()
-		idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
+		idx := r.RndUptoSess(sessFromCG(&cg), uint32(len(cg.CurrentFunc.Stack)))
 		if hasErrVS(vs) {
 			return nil
 		}
@@ -3725,7 +3725,7 @@ func (vs *VariableSelector) SelectParentLocalInv(
 		return nil
 	}
 	// VariableSelector.cpp:1001–1003 — rnd_upto(stack.size()); ERROR_GUARD(nullptr)
-	blk := stack[r.RndUpto(uint32(len(stack)))]
+	blk := stack[r.RndUptoSess(sessFromCG(&cg), uint32(len(stack)))]
 	if hasErrVS(vs) {
 		return nil
 	}
@@ -3921,7 +3921,7 @@ func (vs *VariableSelector) GenerateNewVariable(
 		}
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			// VariableSelector.cpp:1116–1117 — rnd_upto(func.stack.size()); ERROR_GUARD
-			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]
+			blk := cg.CurrentFunc.Stack[r.RndUptoSess(sessFromCG(&cg), uint32(len(cg.CurrentFunc.Stack)))]
 			if hasErrVS(vs) {
 				return nil
 			}

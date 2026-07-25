@@ -172,13 +172,13 @@ func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
 	}()
 	ClearErrorSess(testAmbientSession)
 	// burn some process draws so depth moves
-	before := r.RandDepth()
+	before := r.RandDepthSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if v == nil || v.Init == nil {
 		t.Fatal("want init")
 	}
-	if r.RandDepth() <= before {
-		t.Fatalf("CreateVariable must burn process RNG (depth %d → %d)", before, r.RandDepth())
+	if r.RandDepthSess(testAmbientSession) <= before {
+		t.Fatalf("CreateVariable must burn process RNG (depth %d → %d)", before, r.RandDepthSess(testAmbientSession))
 	}
 }
 

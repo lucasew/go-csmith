@@ -58,7 +58,7 @@ func (a *BooleanAttribute) MakeRandomSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if r.RndFlipcoin(uint32(clampProb(a.Prob))) {
+	if r.RndFlipcoinSess(s, uint32(clampProb(a.Prob))) {
 		return a.Name
 	}
 	return ""
@@ -94,10 +94,10 @@ func (a *MultiChoiceAttribute) MakeRandomSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
+	if !r.RndFlipcoinSess(s, uint32(clampProb(a.Prob))) {
 		return ""
 	}
-	i := int(r.RndUpto(uint32(len(a.Choices))))
+	i := int(r.RndUptoSess(s, uint32(len(a.Choices))))
 	// Attribute.cpp:66 — name + "(\"" + choice + "\")"; choice always live string
 	// sticky no invent name("") for empty choice slot
 	if a.Choices[i] == "" {
@@ -137,7 +137,7 @@ func (a *AlignedAttribute) MakeRandomSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
+	if !r.RndFlipcoinSess(s, uint32(clampProb(a.Prob))) {
 		return ""
 	}
 	// Attribute.cpp:82–84 — 1 << rnd_upto(alignment); alignment from ctor (no invent 1)
@@ -147,7 +147,7 @@ func (a *AlignedAttribute) MakeRandomSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	exp := int(r.RndUpto(uint32(n)))
+	exp := int(r.RndUptoSess(s, uint32(n)))
 	if exp < 0 {
 		exp = 0
 	}
@@ -181,7 +181,7 @@ func (a *SectionAttribute) MakeRandomSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
+	if !r.RndFlipcoinSess(s, uint32(clampProb(a.Prob))) {
 		return ""
 	}
 	// Attribute.cpp:97–99 — rnd_upto(10); name from ctor sticky (no invent "section")
@@ -189,7 +189,7 @@ func (a *SectionAttribute) MakeRandomSess(s *Session, r *Rng) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	n := int(r.RndUpto(10))
+	n := int(r.RndUptoSess(s, 10))
 	name := a.Name
 	return fmt.Sprintf("%s(\"usersection%d\")", name, n)
 }

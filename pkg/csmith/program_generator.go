@@ -1573,13 +1573,13 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
+	if g.Rng == nil || g.Rng.KindSess(sessFromG(g)) != RngKindDFS {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
 	g.Initialize()
 	// re-assert DFS after Initialize (re-creates RNG)
-	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
+	if g.Rng == nil || g.Rng.KindSess(sessFromG(g)) != RngKindDFS {
 		g.noteErr(ErrGeneric)
 		return ""
 	}

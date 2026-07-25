@@ -43,29 +43,29 @@ func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) 
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if r.RndFlipcoin(50) {
+	if r.RndFlipcoinSess(s, 50) {
 		init = 0
 	} else {
-		init = int(r.RndUpto(60)) - 30
+		init = int(r.RndUptoSess(s, 60)) - 30
 	}
 	if ivSigned {
-		limit = int(r.RndUpto(60)) - 30
+		limit = int(r.RndUptoSess(s, 60)) - 30
 	} else {
-		limit = int(r.RndUpto(60)) + 1
+		limit = int(r.RndUptoSess(s, 60)) + 1
 	}
 	tOps := []BinaryOp{BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe}
-	testOp = tOps[r.RndUpto(uint32(len(tOps)))]
+	testOp = tOps[r.RndUptoSess(s, uint32(len(tOps)))]
 	// StatementFor.cpp:79 — ERROR_RETURN after test_op pick
 	if sessHasError(s) {
 		return
 	}
 
-	if r.RndFlipcoin(50) {
+	if r.RndFlipcoinSess(s, 50) {
 		// StatementFor.cpp:82 — ERROR_RETURN after flip into +=/-= branch
 		if sessHasError(s) {
 			return
 		}
-		incr = int(r.RndUpto(10))
+		incr = int(r.RndUptoSess(s, 10))
 		if testOp == BinCmpNe && incr > 1 {
 			// avoid infinite loop: limit = (limit-init)/incr*incr + init
 			if incr != 0 {
@@ -95,13 +95,13 @@ func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) 
 		}
 		// ++/-- pre or post
 		if (limit < init) || (limit == init && testOp == BinCmpGe) {
-			if r.RndFlipcoin(50) {
+			if r.RndFlipcoinSess(s, 50) {
 				incrOp = AssignPreDecr
 			} else {
 				incrOp = AssignPostDecr
 			}
 		} else {
-			if r.RndFlipcoin(50) {
+			if r.RndFlipcoinSess(s, 50) {
 				incrOp = AssignPreIncr
 			} else {
 				incrOp = AssignPostIncr
@@ -140,7 +140,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 		return 0, 0, 0, 0, 0, 0
 	}
 	// StatementFor.cpp:133 — pure_rnd_flipcoin(array_oob_prob) (random mode == rnd)
-	oob := r.RndFlipcoin(uint32(oobProb))
+	oob := r.RndFlipcoinSess(s, uint32(oobProb))
 	if oob {
 		// StatementFor.cpp:157–158 — Bookkeeper::oob_cnt++
 		RecordOOBSess(s)
@@ -149,7 +149,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 	//   test_op = is_signed ? (rnd_flipcoin(50) ? eCmpLe : eCmpGe) : eCmpLe
 	// flip true → Le, false → Ge (do not invert; seed-2 e364 was Ge path extra draws)
 	if isSigned {
-		if r.RndFlipcoin(50) {
+		if r.RndFlipcoinSess(s, 50) {
 			testOp = BinCmpLe
 		} else {
 			testOp = BinCmpGe
@@ -161,7 +161,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 		// StatementFor.cpp:135–146 — increment from near 0
 		if oob {
 			init = -1000
-		} else if r.RndFlipcoin(50) {
+		} else if r.RndFlipcoinSess(s, 50) {
 			init = 0
 		} else {
 			// pure_rnd_upto(bound/2); RndUpto(0) returns 0 (no soft invent skip)
@@ -169,12 +169,12 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 			if half < 1 {
 				init = 0
 			} else {
-				init = int(r.RndUpto(uint32(half)))
+				init = int(r.RndUptoSess(s, uint32(half)))
 			}
 		}
 		limit = bound
 		incrOp = AssignAdd
-		if r.RndFlipcoin(50) {
+		if r.RndFlipcoinSess(s, 50) {
 			incr = 1
 		} else {
 			// pure_rnd_upto(bound/4); no soft invent q=1 when bound/4==0
@@ -182,7 +182,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 			if q < 1 {
 				incr = 0
 			} else {
-				incr = int(r.RndUpto(uint32(q)))
+				incr = int(r.RndUptoSess(s, uint32(q)))
 			}
 		}
 		// StatementFor.cpp:144–145 — if (incr == 0) incr = 1
@@ -193,34 +193,34 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 		outBound = ((bound-init)/incr)*incr + init
 	} else {
 		// StatementFor.cpp:147–156 — decrement from near last index
-		if r.RndFlipcoin(50) {
+		if r.RndFlipcoinSess(s, 50) {
 			init = bound
 		} else {
 			// pure_rnd_upto(bound/2); no soft invent skip rng when 0
 			off := 0
 			if bound/2 > 0 {
-				off = int(r.RndUpto(uint32(bound / 2)))
+				off = int(r.RndUptoSess(s, uint32(bound / 2)))
 			}
 			init = bound - off
 		}
 		if oob {
 			limit = -1000
-		} else if r.RndFlipcoin(50) {
+		} else if r.RndFlipcoinSess(s, 50) {
 			limit = 0
 		} else {
 			if bound/2 > 0 {
-				limit = int(r.RndUpto(uint32(bound / 2)))
+				limit = int(r.RndUptoSess(s, uint32(bound / 2)))
 			}
 		}
 		incrOp = AssignSub
-		if r.RndFlipcoin(50) {
+		if r.RndFlipcoinSess(s, 50) {
 			incr = 1
 		} else {
 			q := bound / 4
 			if q < 1 {
 				incr = 0
 			} else {
-				incr = int(r.RndUpto(uint32(q)))
+				incr = int(r.RndUptoSess(s, uint32(q)))
 			}
 		}
 		if incr == 0 {

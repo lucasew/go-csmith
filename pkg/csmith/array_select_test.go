@@ -14,7 +14,7 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 		t.Fatal("create")
 	}
 	r2 := NewRngSess(testAmbientSession, 5)
-	before := r2.RandDepth()
+	before := r2.RandDepthSess(testAmbientSession)
 	item := av.ItemizeIntoSess(testAmbientSession, r2, nil)
 	if item == nil || item.Collective != av {
 		t.Fatal(item)
@@ -22,9 +22,9 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 	if len(item.Indices) != av.DimensionSess(testAmbientSession) {
 		t.Fatalf("indices %v dims %d", item.Indices, av.DimensionSess(testAmbientSession))
 	}
-	if r2.RandDepth() != before+uint64(av.DimensionSess(testAmbientSession)) {
+	if r2.RandDepthSess(testAmbientSession) != before+uint64(av.DimensionSess(testAmbientSession)) {
 		// each dim one RndUpto
-		if r2.RandDepth() < before {
+		if r2.RandDepthSess(testAmbientSession) < before {
 			t.Fatal("depth")
 		}
 	}
@@ -241,13 +241,13 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	vs.Arrays = []*ArrayVariable{orphan}
 	// GlobalList empty → must not pick orphan; create_random_array draws flipcoin(25)
 	r := NewRngSess(testAmbientSession, 7)
-	d0 := r.RandDepth()
+	d0 := r.RandDepthSess(testAmbientSession)
 	got := vs.SelectArray(r, EmptyCGContext().WithSession(testAmbientSession))
 	if got == orphan {
 		t.Fatal("must not invent select from vs.Arrays without visibility")
 	}
 	// create path: at least F25 when globals enabled
-	if r.RandDepth() <= d0 {
+	if r.RandDepthSess(testAmbientSession) <= d0 {
 		t.Fatal("empty visible must draw create_random_array RNG")
 	}
 	ClearErrorSess(testAmbientSession)

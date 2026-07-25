@@ -109,7 +109,7 @@ func TestBlockProbabilityMatchesDisabledKeepFilter(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	r := NewRngSess(testAmbientSession, 2)
 	// first genrand % 4 == 1959434203 % 4
-	want := int(NewRngSess(testAmbientSession, 2).RndUpto(4))
+	want := int(NewRngSess(testAmbientSession, 2).RndUptoSess(testAmbientSession, 4))
 	r = NewRngSess(testAmbientSession, 2)
 	got := BlockProbability(4, r)
 	if got != want {
