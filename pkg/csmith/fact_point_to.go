@@ -182,15 +182,20 @@ func (f *FactPointTo) Empty() bool {
 // IsRelated mirrors Fact::is_related for PointTo — same category + same subject var.
 // Fact.h:81–83.
 func (f *FactPointTo) IsRelated(other *FactPointTo) bool {
+	return f.IsRelatedSess(nil, other)
+}
+
+func (f *FactPointTo) IsRelatedSess(s *Session, other *FactPointTo) bool {
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.Var == other.Var
 }
 
 // FindRelatedPointTo mirrors find_related_fact for ePointTo (var identity).
-// Fact* always live; nil hole fails closed (nil — no invent skip to later match).
+// Fact* always live; nil hole fails closed (nil — no invent skip to later match).}
+
 func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 	// subject always live; sticky no invent miss / soft-skip nil key
 	if p == nil {
@@ -1186,36 +1191,40 @@ func (f *FactPointTo) Join(other *FactPointTo) bool {
 // clear TBD-only self before absorbing concrete pointees.
 // Nil shells sticky; Join already sticky on PointTo holes.
 func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
+	return f.JoinVisitsSess(nil, other)
+}
+
+func (f *FactPointTo) JoinVisitsSess(s *Session, other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
 		if f == nil || other == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return false
 	}
 	if other.IsTBDOnly() {
 		// residual ERROR sticky — no invent ignore-TBD soft-skip past IsTBDOnly hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue join past other IsTBDOnly residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if f.IsTBDOnly() {
 		// residual ERROR sticky — no invent clear-TBD past IsTBDOnly hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		f.PointTo = nil
-	} else if sessHasError(nil) {
+	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-continue join past self IsTBDOnly residual false
 		return false
 	}
 	ok := f.Join(other)
 	// residual ERROR sticky — no invent join-change soft-skip past Join hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -1225,7 +1234,8 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 // Used when combining results of multiple visits to the same function.
 // Incomplete maps fail closed sticky: *facts = IncompleteFactSlice(), false
 // (no invent no-change success via FactsComplete(nil) or soft re-pick past wipe).
-// facts always live; sticky (no invent soft-skip join-visits past hole).
+// facts always live; sticky (no invent soft-skip join-visits past hole).}
+
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	return JoinVisitsIntoSess(nil, facts, newFacts)
 }
@@ -1504,13 +1514,17 @@ func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 // Incomplete FieldVars on v fails closed (nil — no invent leave stack field
 // pointees live because HasFieldVar returned false past a hole).
 func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
+	return f.MarkDeadVarSess(nil, v)
+}
+
+func (f *FactPointTo) MarkDeadVarSess(s *Session, v *Variable) *FactPointTo {
 	// Fact + subject always live; sticky no invent leave pointees live past hole
 	if f == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if !v.FieldVarsComplete() {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	set := append([]*Variable(nil), f.PointTo...)
@@ -1518,7 +1532,7 @@ func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 	for i, p := range set {
 		// PointTo hole sticky — no invent skip dead-mark past incomplete set
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if p == v {
@@ -1527,14 +1541,14 @@ func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 		}
 		if v.HasFieldVar(p) {
 			// residual ERROR sticky — no invent dead-pos true past HasFieldVar hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
 			pos = i
 			break
 		}
 		// residual ERROR sticky — no invent soft-continue later pointees past HasField residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if p.FieldVarOf != nil && isAncestorField(p, v) {
@@ -1560,7 +1574,8 @@ func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 	return MakeFactPointToSet(f.Var, set)
 }
 
-// isAncestorField reports whether field is under root via FieldVarOf chain.
+// isAncestorField reports whether field is under root via FieldVarOf chain.}
+
 func isAncestorField(field, root *Variable) bool {
 	for field != nil {
 		if field == root {
@@ -1576,9 +1591,13 @@ func isAncestorField(field, root *Variable) bool {
 // MarkFuncEndLocals marks pointees that are locals as garbage/dead at function end.
 // Variable* always live in locals/PointTo; nil hole fails closed (nil fact).
 func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
+	return f.MarkFuncEndLocalsSess(nil, locals)
+}
+
+func (f *FactPointTo) MarkFuncEndLocalsSess(s *Session, locals []*Variable) *FactPointTo {
 	// Fact always live; sticky no invent leave stack pointees live without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// empty locals: soft no-op (nothing to mark dead)
@@ -1589,17 +1608,17 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	for _, l := range locals {
 		// incomplete locals fails closed sticky (no invent "no change" past hole)
 		if l == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		localSet[l] = true
 		exp := l.CollectExpandable()
 		// residual ERROR sticky — no invent soft-mark past CollectExpandable residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if !VariablesComplete(exp) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		for _, fv := range exp {
@@ -1611,7 +1630,7 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	for _, p := range set {
 		// incomplete PointTo fails closed sticky (no invent soft-skip as no change)
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if p == GarbagePtr {
@@ -1646,11 +1665,16 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 // MarkFuncEnd marks stack pointees as garbage at function end.
 // Variable* always live in PointTo; nil hole fails closed (nil fact).
 // Incomplete Param/LocalVars stack lists fail closed (nil — no invent leave
-// stack pointees live because IsVarOnStack returned false past a hole).
+// stack pointees live because IsVarOnStack returned false past a hole).}
+
 func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
+	return f.MarkFuncEndSess(nil, fn, stParent)
+}
+
+func (f *FactPointTo) MarkFuncEndSess(s *Session, fn *Function, stParent *Block) *FactPointTo {
 	// Fact always live; sticky no invent leave stack pointees live past hole
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// no function scope: complete no-op (nothing to mark dead) — non-sticky
@@ -1662,8 +1686,8 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	// incomplete stack lists fail closed sticky (no invent leave stack pointees live)
 	if !fn.StackScanComplete(stParent) {
 		// residual ERROR sticky — no invent soft-mark dead past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}
@@ -1671,7 +1695,7 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	hasGarbage := false
 	for _, p := range set {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if p == GarbagePtr {
@@ -1688,7 +1712,7 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 		onStack := fn.IsVarOnStack(v, stParent)
 		// residual ERROR sticky — no invent soft-skip stack scan past hard IR hole
 		// (IsVarOnStack may sticky residual false then leave later stack pointees live)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		if !onStack {
@@ -1713,7 +1737,8 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 // FactMgr.cpp:196–204.
 // Fact* always live; incomplete facts or stack lists fail closed (nil facts —
 // no invent partial mark / leave stack pointees live past Param/LocalVars holes).
-// facts slice always live; sticky (no invent soft-skip mark past hole).
+// facts slice always live; sticky (no invent soft-skip mark past hole).}
+
 func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	MarkFuncEndOnFactsSess(nil, facts, fn, stParent)
 }

@@ -235,8 +235,12 @@ func (e *dfsEngine) revisitNode(state *dfsSearchState, localPos, bound int, f Fi
 // DFSRndNumGenerator.cpp:238–348.
 // Returns choice in [0,bound) or -1 on backtrack/error (error sticky).
 func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
+	return r.dfsRandomChoiceSess(nil, bound, f, invalid)
+}
+
+func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int) int {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	e := r.dfs
@@ -250,18 +254,18 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 	}
 	if bound <= 0 {
 		// undefined domain sticky (no invent fixed 0 choice)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 
 	e.currentPos++
 	if e.useDebugSequence {
 		if e.seq == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		rv := e.seq.GetNumberByPos(e.currentPos)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return -1
 		}
 		if f != nil {
@@ -275,12 +279,12 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 
 	localPos := e.currentPos
 	if e.currentPos >= e.maxDepth || e.decisionDepth >= e.maxDepth {
-		sessNoteError(nil, ErrExceedMaxDepth)
+		sessNoteError(s, ErrExceedMaxDepth)
 		return -1
 	}
 	// states always sized to maxDepth at construction
 	if e.currentPos < 0 || e.currentPos >= len(e.states) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	state := &e.states[e.currentPos]
@@ -299,7 +303,7 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 			state.value = v
 			e.currentPos = localPos
 			e.decisionDepth = localDecision
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return -1
 			}
 			if !(v < bound && ((f != nil && f.Filter(uint32(v))) || filterInvalidNums(invalid, v))) {
@@ -317,15 +321,15 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 			if e.decisionDepth < 0 {
 				e.allDone = true
 			}
-			sessNoteError(nil, ErrBacktracking)
+			sessNoteError(s, ErrBacktracking)
 			return -1
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return -1
 		}
 		rv := state.value
 		if e.seq == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		e.seq.AddNumber(rv, bound, localPos)
@@ -343,7 +347,7 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 		for i := e.decisionDepth; i < e.maxDepth; i++ {
 			e.states[i].value = 0
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return -1
 		}
 		e.decisionDepth = e.currentPos
@@ -361,16 +365,16 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 		if e.decisionDepth < 0 {
 			e.allDone = true
 		}
-		sessNoteError(nil, ErrBacktracking)
+		sessNoteError(s, ErrBacktracking)
 		return -1
 	}
 
 	state.value = v
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return -1
 	}
 	if e.seq == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	e.seq.AddNumber(v, bound, localPos)
@@ -378,7 +382,8 @@ func (r *Rng) dfsRandomChoice(bound int, f Filter, invalid []int) int {
 }
 
 // DFSLogDepth mirrors log_depth.
-// DFSRndNumGenerator.cpp:351–365.
+// DFSRndNumGenerator.cpp:351–365.}
+
 func (r *Rng) DFSLogDepth(d int, where, log string) {
 	if r == nil || r.dfs == nil {
 		sessNoteError(nil, ErrGeneric)

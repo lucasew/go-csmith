@@ -91,29 +91,33 @@ func (f *FactPointTo) Output() string {
 // Incomplete Param/LocalVars / PointTo holes fail closed sticky as invisible
 // (no invent "all visible" / soft re-pick past holes).
 func (f *FactPointTo) HasInvisible(stParent *Block) bool {
+	return f.HasInvisibleSess(nil, stParent)
+}
+
+func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 	if f == nil || f.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if stParent != nil && !stParent.StackScanComplete() {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if !f.Var.IsVisible(stParent) {
 		// residual ERROR sticky — no invent invisible true past IsVisible hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue visible scan past IsVisible residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	for _, p := range f.PointTo {
 		// Variable* always live in PointTo; nil hole sticky as invisible
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if IsSpecialPtr(p) {
@@ -121,13 +125,13 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 		}
 		if !p.IsVisible(stParent) {
 			// residual ERROR sticky — no invent invisible true past pointee IsVisible hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue visible past pointee residual false path
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -137,7 +141,8 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 // IsAssertable mirrors FactPointTo::is_assertable.
 // FactPointTo.cpp:661–666 — no array subject; no garbage/tbd; no invisible.
 // Incomplete PointTo fails closed sticky not-assertable (no invent skip GarbagePtr
-// / soft re-pick past hole via IsVariableInSet false membership).
+// / soft re-pick past hole via IsVariableInSet false membership).}
+
 func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	if f == nil || f.Var == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -234,7 +239,7 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 			rhs = "0"
 		default:
 			// pointee->Output always live name; sticky no invent bare "&"
-			nm := pointee.GetActualName(false)
+			nm := pointee.GetActualNameSess(s, false)
 			// residual ERROR sticky — no invent soft-empty & past GetActualName residual
 			if sessHasError(s) {
 				return ""

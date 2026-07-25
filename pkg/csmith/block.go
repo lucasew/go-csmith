@@ -119,28 +119,42 @@ type Block struct {
 // BlockSize mirrors Block::block_size.
 // Block.h:85 — CGOptions::max_block_size captured at construction.
 func (b *Block) BlockSize() int {
+	return b.BlockSizeSess(nil)
+}
+
+func (b *Block) BlockSizeSess(s *Session) int {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	return b.blockSize
 }
 
 // GetDepthProtect mirrors Block::get_depth_protect.
-// Block.h:76.
+// Block.h:76.}
+
 func (b *Block) GetDepthProtect() bool {
+	return b.GetDepthProtectSess(nil)
+}
+
+func (b *Block) GetDepthProtectSess(s *Session) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return b.EmitDepthProtect
 }
 
 // SetDepthProtect mirrors Block::set_depth_protect — returns new value.
-// Block.h:72–74.
+// Block.h:72–74.}
+
 func (b *Block) SetDepthProtect(v bool) bool {
+	return b.SetDepthProtectSess(nil, v)
+}
+
+func (b *Block) SetDepthProtectSess(s *Session, v bool) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	b.EmitDepthProtect = v
@@ -148,10 +162,15 @@ func (b *Block) SetDepthProtect(v bool) bool {
 }
 
 // PushStmt mirrors stms.push_back for a complete Statement.
-// Incomplete Stmt Kind sticky (no invent append hole).
+// Incomplete Stmt Kind sticky (no invent append hole).}
+
 func (b *Block) PushStmt(st Stmt) {
+	b.PushStmtSess(nil, st)
+}
+
+func (b *Block) PushStmtSess(s *Session, st Stmt) {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	b.Stmts = append(b.Stmts, st)
@@ -159,7 +178,8 @@ func (b *Block) PushStmt(st Stmt) {
 
 // FindBlockByID mirrors find_block_by_id.
 // Block.cpp:69–83 — scan non-builtin Function::blocks for stm_id.
-// Incomplete funcs sticky nil.
+// Incomplete funcs sticky nil.}
+
 func FindBlockByID(funcs []*Function, blkID int) *Block {
 	if !FunctionsComplete(funcs) {
 		sessNoteError(nil, ErrGeneric)
@@ -216,9 +236,13 @@ func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
 // Block.cpp:336–346 — last stmt, but stop early if return encountered.
 // Incomplete Block sticky nil (no invent soft-skip empty last / soft re-pick past hole).
 func (b *Block) GetLastStm() *Stmt {
+	return b.GetLastStmSess(nil)
+}
+
+func (b *Block) GetLastStmSess(s *Session) *Stmt {
 	// Block always live; sticky incomplete no invent nil last soft-skip
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if len(b.Stmts) == 0 {
@@ -236,35 +260,40 @@ func (b *Block) GetLastStm() *Stmt {
 
 // FromTailToHead mirrors Block::from_tail_to_head.
 // Block.cpp:362–372 — looping body may fall through to head if last does not must_jump.
-// Incomplete Block/last sticky false (no invent fall-through / soft re-pick past holes).
+// Incomplete Block/last sticky false (no invent fall-through / soft re-pick past holes).}
+
 func (b *Block) FromTailToHead() bool {
+	return b.FromTailToHeadSess(nil)
+}
+
+func (b *Block) FromTailToHeadSess(s *Session) bool {
 	// Block always live; sticky incomplete no invent fall-through soft-skip
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !b.Looping || len(b.Stmts) == 0 {
 		return false
 	}
-	s := b.GetLastStm()
-	if s == nil {
+	last := b.GetLastStmSess(s)
+	if last == nil {
 		// incomplete last stmt sticky no fall-through
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue fall-through past GetLastStm residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
-	if s.MustJump() {
+	if last.MustJumpSess(s) {
 		// residual ERROR sticky — no invent no-fall-through true past MustJump residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent fall-through true past MustJump residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return true
@@ -274,7 +303,8 @@ func (b *Block) FromTailToHead() bool {
 // Block.cpp:571–580 — union of map_stm_effect for each statement.
 // Statement::stm_id always live after create; StmID 0 is incomplete IR.
 // Incomplete stmts / effects fail closed sticky IncompleteEffect (not EmptyEffect —
-// IsEmpty/pure invent empty-complete block accum past StmID 0 soft-skip).
+// IsEmpty/pure invent empty-complete block accum past StmID 0 soft-skip).}
+
 func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 	if b == nil || fm == nil {
 		sessNoteError(fmSess(fm), ErrGeneric)
@@ -322,13 +352,17 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 // rnd_upto(blks.size()). C++ uses CGOptions::global_variables() for the nil slot
 // (StatementArrayOp::make_random_array_init always hits this with defaults).
 func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
+	return b.RandomParentBlockSess(nil, r, allowGlobal)
+}
+
+func (b *Block) RandomParentBlockSess(s *Session, r *Rng, allowGlobal bool) *Block {
 	// Block.cpp:295–308 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
 	// sticky only on nil RNG (live this); nil receiver is broken call non-sticky
 	if b == nil {
 		return nil
 	}
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var blks []*Block
@@ -344,7 +378,7 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 	}
 	idx := r.RndUpto(uint32(len(blks)))
 	// Block.cpp:306 ERROR_GUARD
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	return blks[idx]
@@ -352,7 +386,8 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 
 // MustBreakOrReturn mirrors Block::must_break_or_return without FactMgr.
 // Block.cpp:342–357 — last must_return (not must_jump) unless escape back-edge.
-// Prefer MustBreakOrReturnFull(fm) when CFG is available.
+// Prefer MustBreakOrReturnFull(fm) when CFG is available.}
+
 func (b *Block) MustBreakOrReturn() bool {
 	return b.MustBreakOrReturnFull(b.EmitFM)
 }
@@ -362,8 +397,12 @@ func (b *Block) MustBreakOrReturn() bool {
 // Block always live at stack scan; nil shell sticky false (no invent incomplete-scan
 // soft-miss without ERROR so soft re-pick cannot treat hole as clean incomplete).
 func (b *Block) StackScanComplete() bool {
+	return b.StackScanCompleteSess(nil)
+}
+
+func (b *Block) StackScanCompleteSess(s *Session) bool {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	f := b.Func
@@ -391,18 +430,23 @@ func (b *Block) StackScanComplete() bool {
 // Block.cpp:443–456 — params + local_vars chain.
 // IsVarOnStack reports whether v is a param or local visible on this block chain.
 // Incomplete Block/Variable/Param/LocalVars sticky false (no invent not-on-stack
-// / soft re-pick past holes).
+// / soft re-pick past holes).}
+
 func (b *Block) IsVarOnStack(v *Variable) bool {
+	return b.IsVarOnStackSess(nil, v)
+}
+
+func (b *Block) IsVarOnStackSess(s *Session, v *Variable) bool {
 	// Block + Variable always live; sticky incomplete no invent not-on-stack
 	if b == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !b.StackScanComplete() {
+	if !b.StackScanCompleteSess(s) {
 		// incomplete Param/LocalVars sticky fail closed not-on-stack
 		// residual ERROR sticky — no invent soft not-on-stack past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return false
 	}
@@ -414,18 +458,18 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 		for _, p := range f.Param {
 			// Param live after StackScanComplete; nil hole already sticky above
 			if p == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
-			if p.Match(v) {
+			if p.MatchSess(s, v) {
 				// residual ERROR sticky — no invent on-stack true past Match hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 		}
@@ -433,21 +477,21 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 	for bb := b; bb != nil; bb = bb.Parent {
 		for _, loc := range bb.LocalVars {
 			if loc == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 			if loc == v {
 				return true
 			}
-			if loc.Match(v) {
+			if loc.MatchSess(s, v) {
 				// residual ERROR sticky — no invent on-stack true past Match hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 		}
@@ -458,7 +502,8 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
 // Block.cpp:216–219 — always gensym("t_") (util.cpp process-wide gensym_count);
 // no invent VS.Sym private counter (that desynced t_ from g_/l_/func_).
-// sym is ignored; kept for call-site compatibility.
+// sym is ignored; kept for call-site compatibility.}
+
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	return b.CreateNewTmpVarSess(nil, st)
 }

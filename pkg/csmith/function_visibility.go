@@ -31,34 +31,38 @@ func (f *Function) StackScanComplete(stParent *Block) bool {
 // Incomplete Function/Variable/Param/LocalVars sticky false (no invent not-on-stack
 // / soft re-pick past holes).
 func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
+	return f.IsVarOnStackSess(nil, v, stParent)
+}
+
+func (f *Function) IsVarOnStackSess(s *Session, v *Variable, stParent *Block) bool {
 	// Function + Variable always live; sticky incomplete no invent not-on-stack
 	if f == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !f.StackScanComplete(stParent) {
 		// incomplete Param/LocalVars sticky fail closed not-on-stack
 		// residual ERROR sticky — no invent soft not-on-stack past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return false
 	}
 	for _, p := range f.Param {
 		// Param live after StackScanComplete; nil hole already sticky above
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if p.Match(v) {
+		if p.MatchSess(s, v) {
 			// residual ERROR sticky — no invent on-stack true past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue then true later past Match hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 	}
@@ -72,18 +76,18 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 	for b := stParent; b != nil; b = b.Parent {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
-			if loc.Match(v) {
+			if loc.MatchSess(s, v) {
 				// residual ERROR sticky — no invent on-stack true past Match hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 		}
@@ -93,7 +97,8 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 
 // IsVarVisible mirrors Function::is_var_visible.
 // Function.cpp:204–205 — global or on stack at statement.
-// Incomplete Variable sticky false; incomplete stack via IsVarOnStack sticky.
+// Incomplete Variable sticky false; incomplete stack via IsVarOnStack sticky.}
+
 func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {

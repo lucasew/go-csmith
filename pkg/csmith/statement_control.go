@@ -12,6 +12,10 @@ package csmith
 // Block::make_random continues siblings after a for/array-op (seed-2 e13830: Go used
 // to stop the parent block when the for body returned → stack n=4 vs upstream n=5).
 func (st Stmt) MustReturn() bool {
+	return st.MustReturnSess(nil)
+}
+
+func (st Stmt) MustReturnSess(s *Session) bool {
 	switch st.Kind {
 	case StmtReturn:
 		return true
@@ -20,23 +24,23 @@ func (st Stmt) MustReturn() bool {
 		blks := GetBlocksStmt(&st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
 			// incomplete arms sticky not-must-return (no invent soft-skip missing arm)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if !blks[0].MustReturn() {
 			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue false-arm past Then residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		ok := blks[1].MustReturn()
 		// residual ERROR sticky — no invent must-return true past Else residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -49,17 +53,22 @@ func (st Stmt) MustReturn() bool {
 // MustJump mirrors Statement::must_jump — transfer of control always taken.
 // Break/Continue/Goto: true only when test.not_equals(0); variable tests → false.
 // StatementIf: both branches must_jump; Block: last stm.
-// Incomplete get_blocks sticky false (no invent not-must-jump soft re-pick past holes).
+// Incomplete get_blocks sticky false (no invent not-must-jump soft re-pick past holes).}
+
 func (st Stmt) MustJump() bool {
-	if st.MustReturn() {
+	return st.MustJumpSess(nil)
+}
+
+func (st Stmt) MustJumpSess(s *Session) bool {
+	if st.MustReturnSess(s) {
 		// residual ERROR sticky — no invent must-jump true past MustReturn residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue jump kinds past MustReturn residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	switch st.Kind {
@@ -67,12 +76,12 @@ func (st Stmt) MustJump() bool {
 		// Expression::not_equals(0) — Constant only; other terms false
 		// incomplete test Expr sticky not-must-jump (no invent always-jump)
 		if st.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		ok := st.Expr.NotEquals(0)
 		// residual ERROR sticky — no invent must-jump true past NotEquals residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -80,23 +89,23 @@ func (st Stmt) MustJump() bool {
 		blks := GetBlocksStmt(&st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
 			// StatementIf always both arms; incomplete sticky not-must-jump
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if !blks[0].MustJump() {
 			// residual ERROR sticky — no invent soft-continue false-arm past Then residual false
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue false-arm past Then residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		ok := blks[1].MustJump()
 		// residual ERROR sticky — no invent must-jump true past Else residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return ok
@@ -109,7 +118,8 @@ func (st Stmt) MustJump() bool {
 // MustReturn mirrors Block::must_return.
 // Block.cpp:313–331 — last must_return, no break_stms, no escape via back edges.
 // Uses b.EmitFM for CFG when set; prefer MustReturnWithFM during DFA.
-// Block always live; sticky false (no invent not-must-return soft-skip past hole).
+// Block always live; sticky false (no invent not-must-return soft-skip past hole).}
+
 func (b *Block) MustReturn() bool {
 	if b == nil {
 		sessNoteError(nil, ErrGeneric)

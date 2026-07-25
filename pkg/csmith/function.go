@@ -884,8 +884,12 @@ func (f *Function) generateBodyCore(
 // Function always live; sticky (no invent soft-skip ret_c past hole).
 // DepthProtect off / no return needed is complete no-op.
 func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
+	f.MakeReturnConstSess(nil, opts, probs, r)
+}
+
+func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabilities, r *Rng) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !opts.DepthProtect || !f.NeedReturnStmt() {
@@ -894,12 +898,12 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	// Function.cpp:610–612 — assert(return_type); assert simple != eVoid
 	if f.ReturnType == nil {
 		// assert(return_type) — sticky error for GenerateBody ERROR_RETURN
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	simple := f.ReturnType.IsSimple()
 	// residual ERROR sticky — no invent soft-ret past IsSimple residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	if simple && f.ReturnType.Simple() == EVoid {
@@ -909,17 +913,17 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	// Function.cpp:612 — Constant::make_random; no invent "0" on nil RNG/fail
 	if r == nil {
 		// C++ always has process RNG; fail closed with ERROR_RETURN semantics
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// session probs; aggregate ret_c needs live tables (nil → fail closed, no invent)
 	f.RetConst = MakeRandom(f.ReturnType, opts, probs, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
 	// sticky error so GenerateBody does not invent Built without ret_c
-	if sessHasError(nil) || f.RetConst == nil {
+	if sessHasError(s) || f.RetConst == nil {
 		f.RetConst = nil
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return
 	}
@@ -929,7 +933,8 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 // Function always has return_type in C++; no soft invent "void" when missing.
 // RV present with Type-nil sticky (no invent fall through to ReturnType / void past
 // incomplete return-variable type shell).
-// Ambient ProcessOptions bridge; emit paths prefer returnTypeCOpts.
+// Ambient ProcessOptions bridge; emit paths prefer returnTypeCOpts.}
+
 func (f *Function) returnTypeC() string {
 	return f.returnTypeCOpts(ProcessOptions())
 }

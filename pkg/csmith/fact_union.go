@@ -142,15 +142,20 @@ func (f *FactUnion) GetLastWrittenFID() int {
 
 // IsRelated mirrors Fact::is_related for Union — same subject var.
 func (f *FactUnion) IsRelated(other *FactUnion) bool {
+	return f.IsRelatedSess(nil, other)
+}
+
+func (f *FactUnion) IsRelatedSess(s *Session, other *FactUnion) bool {
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.Var == other.Var
 }
 
 // IsTop mirrors FactUnion::is_top.
-// Incomplete FactUnion sticky false (no invent TOP / soft re-pick past hole).
+// Incomplete FactUnion sticky false (no invent TOP / soft re-pick past hole).}
+
 func (f *FactUnion) IsTop() bool {
 	// FactUnion always live; sticky incomplete no invent TOP soft-skip
 	if f == nil {
@@ -258,9 +263,13 @@ func (f *FactUnion) Imply(other *FactUnion) bool {
 // FactUnion.cpp:207–221.
 // Incomplete FactUnion sticky false (no invent join no-op / soft re-pick past holes).
 func (f *FactUnion) Join(other *FactUnion) bool {
+	return f.JoinSess(nil, other)
+}
+
+func (f *FactUnion) JoinSess(s *Session, other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent join no-op success
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -268,24 +277,24 @@ func (f *FactUnion) Join(other *FactUnion) bool {
 	}
 	if f.Imply(other) {
 		// residual ERROR sticky — no invent join no-op true past Imply hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue join past Imply residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if other.Imply(f) {
 		// residual ERROR sticky — no invent absorb past other.Imply hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		f.LastWrittenFID = other.LastWrittenFID
 	} else {
 		// residual ERROR sticky — no invent soft-set BOTTOM past other.Imply residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		f.SetBottom()
@@ -296,20 +305,25 @@ func (f *FactUnion) Join(other *FactUnion) bool {
 // GetLastWrittenType mirrors FactUnion::get_last_written_type.
 // FactUnion.cpp:63–71.
 // FactUnion + Var always live; sticky nil (no invent soft-skip past hole).
-// Top/bottom are complete no-type (not incomplete IR).
+// Top/bottom are complete no-type (not incomplete IR).}
+
 func (f *FactUnion) GetLastWrittenType() *Type {
+	return f.GetLastWrittenTypeSess(nil)
+}
+
+func (f *FactUnion) GetLastWrittenTypeSess(s *Session) *Type {
 	if f == nil || f.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	isTop := f.IsTop()
 	// residual ERROR sticky — no invent soft-nil type past IsTop residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	isBot := f.IsBottom()
 	// residual ERROR sticky — no invent soft-nil type past IsBottom residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	if isTop || isBot {
@@ -317,38 +331,39 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 	}
 	// FactUnion.cpp:65 — assert(var->type && eUnion) sticky; fail closed nil if not union
 	if f.Var.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if !f.Var.Type.IsUnion() {
 		// residual ERROR sticky — no invent soft-nil type past IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-type past IsUnion residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	fid := f.LastWrittenFID
 	// FactUnion.cpp:68–69 — assert fid in [0, field_vars.size()) sticky
 	if fid < 0 || fid >= len(f.Var.FieldVars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	fv := f.Var.FieldVars[fid]
 	// field Variable* always live; sticky no invent nil type via hole
 	if fv == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return fv.Type
 }
 
 // Output mirrors FactUnion::Output.
-// FactUnion.cpp:272–275.
+// FactUnion.cpp:272–275.}
+
 func (f *FactUnion) Output() string {
 	if f == nil || f.Var == nil {
 		if f != nil && f.Var == nil {

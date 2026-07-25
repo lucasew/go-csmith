@@ -213,7 +213,7 @@ func (l *Lhs) GetQualifiersSess(s *Session) CVQualifiers {
 	}
 	// Lhs.cpp:200 — assert(!qfer.is_const()); const LHS is broken IR
 	// sticky error for ERROR_GUARD callers; no soft invent strip of const / invent quals shell
-	if q.IsConst() {
+	if q.IsConstSess(s) {
 		// residual ERROR sticky — no invent soft-quals past IsConst residual true
 		if sessHasError(s) {
 			return CVQualifiers{}
@@ -247,7 +247,7 @@ func (l *Lhs) GetLvarsSess(s *Session, facts []*FactPointTo) []*Variable {
 		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
-	coll := l.Var.GetCollective()
+	coll := l.Var.GetCollectiveSess(s)
 	// residual ERROR sticky — no invent soft-merge past GetCollective residual hole
 	if sessHasError(s) {
 		return IncompleteVariables()
@@ -284,7 +284,7 @@ func (l *Lhs) GetReferencedPtrsSess(s *Session) []*Variable {
 		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
-	if !l.Var.IsPointer() {
+	if !l.Var.IsPointerSess(s) {
 		// residual ERROR sticky — no invent soft-empty no-ptrs past IsPointer residual false
 		if sessHasError(s) {
 			return IncompleteVariables()
@@ -396,45 +396,49 @@ func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
 // Output mirrors Lhs::Output — ExpressionVariable shape, optional VOL_LVAL wrap.
 // Lhs.cpp:207–218.
 func (l *Lhs) Output(wrapVolatiles bool) string {
+	return l.OutputSess(nil, wrapVolatiles)
+}
+
+func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 	// Lhs always live with Var at emit; sticky no invent empty LHS without them
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ExpressionVariable::Output for (var, type)
 	ev := outputExpressionVariable(l.Var, l.Type)
 	// residual ERROR sticky — no invent soft-empty LHS past outputExpressionVariable residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
-	if wrapVolatiles && l.Var.IsVolatile() {
+	if wrapVolatiles && l.Var.IsVolatileSess(s) {
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// Lhs.cpp:211–216 — type->Output always live; sticky no invent "int"
-		t := l.GetType()
+		t := l.GetTypeSess(s)
 		// residual ERROR sticky — no invent soft-wrap past GetType residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if t == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		ty := t.CName()
 		// residual ERROR sticky — no invent soft-wrap past CName residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if ty == "" || ev == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return "VOL_LVAL(" + ev + ", " + ty + ")"
 	}
 	// residual ERROR sticky — no invent bare LHS past IsVolatile residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return ev
@@ -442,7 +446,8 @@ func (l *Lhs) Output(wrapVolatiles bool) string {
 
 // outputExpressionVariable mirrors ExpressionVariable::Output without cast.
 // ExpressionVariable.cpp:202–219 — (*…)/& + Variable::Output.
-// Ambient ProcessOptions bridge; emit prefers outputExpressionVariableOpts.
+// Ambient ProcessOptions bridge; emit prefers outputExpressionVariableOpts.}
+
 func outputExpressionVariable(v *Variable, want *Type) string {
 	return outputExpressionVariableOpts(v, want, ProcessOptions())
 }

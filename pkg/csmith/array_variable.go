@@ -258,76 +258,85 @@ func (av *ArrayVariable) CDeclType() string {
 
 // CDeclTypeOpts is CDeclType with explicit session Options (const/volatile asserts).
 func (av *ArrayVariable) CDeclTypeOpts(opts Options) string {
+	return av.CDeclTypeOptsSess(nil, opts)
+}
+
+func (av *ArrayVariable) CDeclTypeOptsSess(s *Session, opts Options) string {
 	// ArrayVariable / Variable decl always has live type; sticky (no invent "int")
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if av.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:517 — output_qualified_type(out)
 	ty := av.Qfer.OutputQualifiedTypeOpts(av.Type, opts)
 	// residual ERROR sticky — no invent soft-empty decl past OutputQualifiedType residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if ty == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:518 — get_actual_name(); no invent space (type already spaced)
-	name := av.GetActualName(false)
+	name := av.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(ty)
 	b.WriteString(name)
-	for _, s := range av.Sizes {
-		b.WriteString(fmt.Sprintf("[%d]", s))
+	for _, str := range av.Sizes {
+		b.WriteString(fmt.Sprintf("[%d]", str))
 	}
 	return b.String()
 }
 
 // NoLoopInitializer mirrors ArrayVariable::no_loop_initializer.
 // ArrayVariable.cpp:429–435 — struct/union, const, global, or multi init_values.
-// Incomplete ArrayVariable/Type sticky true (no invent loop-init eligibility past holes).
+// Incomplete ArrayVariable/Type sticky true (no invent loop-init eligibility past holes).}
+
 func (av *ArrayVariable) NoLoopInitializer() bool {
+	return av.NoLoopInitializerSess(nil)
+}
+
+func (av *ArrayVariable) NoLoopInitializerSess(s *Session) bool {
 	// ArrayVariable always live with Type; sticky incomplete no invent loop-init OK
 	if av == nil || av.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if av.Type.IsAggregate() {
 		return true
 	}
-	if av.IsConst() {
+	if av.IsConstSess(s) {
 		// residual ERROR sticky — no invent no-loop true past IsConst residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue no-loop past IsConst residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
-	if av.IsGlobal() {
+	if av.IsGlobalSess(s) {
 		// residual ERROR sticky — no invent no-loop true past IsGlobal residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue no-loop past IsGlobal residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return len(av.InitValues) > 0
@@ -336,7 +345,8 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 // CountExprKeyVar mirrors count_expr_key_var (ArrayVariable.cpp:66–90).
 // Variable: 1; Constant: 0; user call: 2; unary: recurse; binary: sum.
 // Incomplete IR fails closed sticky as -1 (no invent constant-0 / var-1 / soft re-pick
-// variant match past broken shells).
+// variant match past broken shells).}
+
 func CountExprKeyVar(e *Expression) int {
 	return CountExprKeyVarSess(nil, e)
 }
@@ -503,9 +513,13 @@ func FindExprKeyVarSess(s *Session, e *Expression) *Variable {
 // string Indices match as complete variant; no invent mixed expr/string dual path).}
 
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
+	return av.IsVariantSess(nil, other)
+}
+
+func (av *ArrayVariable) IsVariantSess(s *Session, other *Variable) bool {
 	// both ArrayVariable shells always live; sticky incomplete no invent not-variant
 	if av == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !other.IsArray {
@@ -514,7 +528,7 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	ov := other.AsArray
 	if ov == nil {
 		// incomplete array flag without AsArray sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// both must be itemized (collective non-nil) under the same collective
@@ -526,7 +540,7 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	}
 	// incomplete IndexExprs holes — sticky fail closed before string soft-fallback
 	if !ExpressionsComplete(av.IndexExprs) || !ExpressionsComplete(ov.IndexExprs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// Expression* path when either side has IndexExprs — both must use same complete list
@@ -540,12 +554,12 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 			// ArrayVariable.cpp:403–405 — Expression path; live Expression* only
 			ce := CountExprKeyVarSess(nil, e)
 			// residual ERROR sticky — no invent soft-continue count past residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			coe := CountExprKeyVarSess(nil, oe)
 			// residual ERROR sticky — no invent soft-continue count past oe residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			if ce != 1 || coe != 1 {
@@ -553,12 +567,12 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 			}
 			ke := FindExprKeyVarSess(nil, e)
 			// residual ERROR sticky — no invent soft-continue key match past residual hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			koe := FindExprKeyVarSess(nil, oe)
 			// residual ERROR sticky — no invent soft-continue key match past oe residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return false
 			}
 			// both residual-nil soft invent was invent variant-true (nil==nil)
@@ -584,7 +598,8 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 // ItemizeConstIndices mirrors ArrayVariable::itemize(const vector<int>&).
 // ArrayVariable.cpp:280–295 — fixed const indices; create_field_vars for aggregates.
 // ArrayVariable always live; sticky nil (no invent itemize soft-skip past hole).
-// Itemized member (Collective set) is complete soft miss (not incomplete IR).
+// Itemized member (Collective set) is complete soft miss (not incomplete IR).}
+
 func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSelector) *ArrayVariable {
 	if av == nil {
 		sessNoteError(vsSess(vs), ErrGeneric)
@@ -683,32 +698,36 @@ func (av *ArrayVariable) SetIndex(index int, expr string) {
 // ArrayVariable.cpp:229–231 — stores Expression*; emit string from Output only.
 // ArrayVariable always live; sticky (no invent soft-skip index set past hole).
 func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
+	av.SetIndexExprSess(nil, index, e)
+}
+
+func (av *ArrayVariable) SetIndexExprSess(s *Session, index int, e *Expression) {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if index < 0 || e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// sticky no soft invent "0" for nil/empty Output (C++ uses Expression* directly)
-	s := e.Output()
+	str := e.Output()
 	// residual ERROR sticky — no invent soft-continue set-index past Output residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
-	if s == "" {
-		sessNoteError(nil, ErrGeneric)
+	if str == "" {
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// C++ indices[index] — sticky no invent empty pad holes past end
 	if index > len(av.IndexExprs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if index == len(av.IndexExprs) {
 		av.IndexExprs = append(av.IndexExprs, e)
-		av.Indices = append(av.Indices, s)
+		av.Indices = append(av.Indices, str)
 		return
 	}
 	av.IndexExprs[index] = e
@@ -719,14 +738,15 @@ func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
 		av.Indices = append(av.Indices, "")
 	}
 	if index < len(av.Indices) {
-		av.Indices[index] = s
+		av.Indices[index] = str
 	} else if index == len(av.Indices) {
-		av.Indices = append(av.Indices, s)
+		av.Indices = append(av.Indices, str)
 	}
 }
 
 // AddIndex mirrors ArrayVariable::add_index (string helper).
-// ArrayVariable always live; sticky (no invent soft-skip add past hole).
+// ArrayVariable always live; sticky (no invent soft-skip add past hole).}
+
 func (av *ArrayVariable) AddIndex(expr string) {
 	if av == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -891,10 +911,15 @@ func (av *ArrayVariable) OutputDef() string {
 
 // OutputDefOpts is OutputDef with explicit session Options (ambient ArrayInitSeed bag).
 func (av *ArrayVariable) OutputDefOpts(opts Options) string {
+	return av.OutputDefOptsSess(nil, opts)
+}
+
+func (av *ArrayVariable) OutputDefOptsSess(s *Session, opts Options) string {
 	return av.OutputDefSess(nil, opts)
 }
 
-// OutputDefSess is OutputDef with seed bag + Options (force_non_uniform init).
+// OutputDefSess is OutputDef with seed bag + Options (force_non_uniform init).}
+
 func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 	// ArrayVariable always live at OutputDef; sticky no invent empty def shell
 	if av == nil {
@@ -1001,30 +1026,35 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 // OutputLowerBound mirrors ArrayVariable::OutputLowerBound — name[0][0]….
 // ArrayVariable.cpp:694–700.
 func (av *ArrayVariable) OutputLowerBound() string {
+	return av.OutputLowerBoundSess(nil)
+}
+
+func (av *ArrayVariable) OutputLowerBoundSess(s *Session) string {
 	// ArrayVariable always live at bound emit; sticky no invent empty bounds
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live sticky
-	name := av.GetActualName(false)
+	name := av.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty lower past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	s := name
+	str := name
 	for range av.Sizes {
-		s += "[0]"
+		str += "[0]"
 	}
-	return s
+	return str
 }
 
 // OutputWithIndices mirrors ArrayVariable::output_with_indices.
-// ArrayVariable.cpp:703–711 — cvs[i]->Output only (no letter-name invent).
+// ArrayVariable.cpp:703–711 — cvs[i]->Output only (no letter-name invent).}
+
 func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 	return av.OutputWithIndicesSess(nil, ctrl)
 }
@@ -1177,6 +1207,10 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 // ItemizeInto is Itemize with optional VariableSelector for AllVars registration.
 // ArrayVariable.cpp:251–252 — VariableSelector::AllVars.push_back(av).
 func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariable {
+	return av.ItemizeIntoSess(nil, r, vs)
+}
+
+func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelector) *ArrayVariable {
 	// ArrayVariable::itemize (void) — ArrayVariable.cpp:249–278
 	if av == nil || r == nil {
 		// nil receiver/RNG incomplete sticky (no invent itemize without live array/rng)
@@ -1213,8 +1247,8 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 		if sz > 0 {
 			idx = int(r.RndUpto(uint32(sz)))
 		}
-		s := fmt.Sprintf("%d", idx)
-		item.Indices = append(item.Indices, s)
+		idxStr := fmt.Sprintf("%d", idx)
+		item.Indices = append(item.Indices, idxStr)
 		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
 		item.IndexExprs = append(item.IndexExprs, &Expression{
 			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
@@ -1241,7 +1275,8 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 
 // SizeInBytesArray mirrors ArrayVariable::size_in_bytes.
 // ArrayVariable.cpp:241–247 — elem size × product of dimensions.
-// ArrayVariable/Type always live; sticky 0 (no invent zero-size soft-skip past hole).
+// ArrayVariable/Type always live; sticky 0 (no invent zero-size soft-skip past hole).}
+
 func (av *ArrayVariable) SizeInBytesArray() int {
 	if av == nil || av.Type == nil {
 		sessNoteError(nil, ErrGeneric)
@@ -1265,19 +1300,23 @@ func (av *ArrayVariable) SizeInBytesArray() int {
 // C++ assert(!indices.empty()) then indices[i]->Output; always `if (1)` path
 // (not signed-cast % size). No sizes-only invent and no soft "[0]".
 func (av *ArrayVariable) OutputAccess() string {
+	return av.OutputAccessSess(nil)
+}
+
+func (av *ArrayVariable) OutputAccessSess(s *Session) string {
 	// ArrayVariable always live at Output; sticky no invent empty access shell
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := av.GetActualName(false)
+	name := av.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if name == "" {
 		// name always live; sticky no invent bare indices without identifier
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if av.Collective == nil {
@@ -1287,12 +1326,12 @@ func (av *ArrayVariable) OutputAccess() string {
 	// IndexExprs preferred (Expression::Output); Indices is const-itemize string form.
 	if len(av.IndexExprs) == 0 && len(av.Indices) == 0 {
 		// sticky fail closed — no soft invent bare collective name for broken itemized IR
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// incomplete IndexExprs fails closed sticky whole access (no invent soft-skip hole mid indices)
 	if !ExpressionsComplete(av.IndexExprs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1303,11 +1342,11 @@ func (av *ArrayVariable) OutputAccess() string {
 			// sticky no invent empty brackets "[]" for empty index Output
 			idx := e.Output()
 			// residual ERROR sticky — no invent soft-continue later indices past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if idx == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString("[")
@@ -1316,40 +1355,45 @@ func (av *ArrayVariable) OutputAccess() string {
 		}
 		return b.String()
 	}
-	for _, s := range av.Indices {
+	for _, idxStr := range av.Indices {
 		// const-itemize string indices always non-empty in C++
-		if s == "" {
-			sessNoteError(nil, ErrGeneric)
+		if idxStr == "" {
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString("[")
-		b.WriteString(s)
+		b.WriteString(idxStr)
 		b.WriteString("]")
 	}
 	return b.String()
 }
 
 // OutputUpperBoundArray mirrors ArrayVariable::OutputUpperBound — name[size-1]….
-// ArrayVariable.cpp:572–577 — always (sizes[i] - 1); no soft invent "0" for empty dims.
+// ArrayVariable.cpp:572–577 — always (sizes[i] - 1); no soft invent "0" for empty dims.}
+
 func (av *ArrayVariable) OutputUpperBoundArray() string {
+	return av.OutputUpperBoundArraySess(nil)
+}
+
+func (av *ArrayVariable) OutputUpperBoundArraySess(s *Session) string {
 	// ArrayVariable always live at bound emit; sticky no invent empty upper bound
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := av.GetActualName(false)
+	name := av.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty upper past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if name == "" {
 		// name always live; sticky no invent bare "[n]" bounds
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if len(av.Sizes) == 0 {
 		// sticky no invent bare name without dimensions
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1363,12 +1407,17 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 
 // OutputIndexModulo is the dead-code branch of ArrayVariable::Output when
 // index may be out of range (signed cast + % size). Kept for completeness;
-// live C++ path uses `if (1)` always. ArrayVariable.cpp:553–568.
+// live C++ path uses `if (1)` always. ArrayVariable.cpp:553–568.}
+
 func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
+	return av.OutputIndexModuloSess(nil, i, idx)
+}
+
+func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expression) string {
 	// dead path; C++ would dereference indices[i] — sticky no soft invent "0"
 	if av == nil || idx == nil {
 		if av != nil && idx == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -1378,55 +1427,55 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 	}
 	body := idx.Output()
 	// residual ERROR sticky — no invent soft-empty modulo past Output residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// index Output always live; sticky no invent "(( % n)" empty shell
 	if body == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// index Type* always live for signed cast path; Type-nil sticky empty
 	// (no invent bare modulo soft-success past incomplete index type shell)
-	t := idx.GetType()
+	t := idx.GetTypeSess(s)
 	// residual ERROR sticky — no invent soft-empty modulo past GetType residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// cast signed index type to unsigned before %
 	if t.IsSigned() {
 		// residual ERROR sticky — no invent cast path past IsSigned residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		u := t.ToUnsigned()
 		if u == nil {
 			// incomplete to_unsigned sticky — no invent bare modulo past hole
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
 		// residual ERROR sticky — no invent cast path past ToUnsigned residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		cn := u.CName()
 		if cn == "" {
 			// incomplete unsigned CName sticky — no invent bare cast shell
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
 		return fmt.Sprintf("((%s)(%s) %% %d)", cn, body, size)
 	}
 	// residual ERROR sticky — no invent bare modulo past IsSigned residual false path
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return fmt.Sprintf("((%s) %% %d)", body, size)
@@ -1434,7 +1483,8 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 
 // RndMutate mirrors ArrayVariable::rnd_mutate.
 // ArrayVariable.cpp:336–337 — assert(0 && "invalid call to rnd_mutate"); dead API.
-// Fail closed sticky: always nil (no invent variant/offset mutation / soft re-pick).
+// Fail closed sticky: always nil (no invent variant/offset mutation / soft re-pick).}
+
 func (av *ArrayVariable) RndMutate(r *Rng) *ArrayVariable {
 	_ = r
 	sessNoteError(nil, ErrGeneric)
