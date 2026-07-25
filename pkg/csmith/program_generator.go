@@ -139,9 +139,7 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	if s == nil {
 		return nil
 	}
-	// Construction writes only s via *Sess APIs (no activateSession). Tests that
-	// need Process* ambient for later package helpers still call Generate or
-	// activate via GoGenerator.
+	// Construction writes only s via *Sess APIs (no ambient install).
 	opts := s.Opts
 	// CGOptions on the session bag (field write; Process* bridge follows active s).
 	s.Opts = opts
@@ -234,8 +232,8 @@ func (g *ProgramGenerator) Initialize() {
 		s = sessOrAmbient(nil)
 		g.Sess = s
 	}
-	// DoFinalizationSess(s) clears only the generator bag — ambient unit-test
-	// ProcessRng/defaultSession is preserved without activateSession.
+	// DoFinalizationSess(s) clears only the generator bag — quarantined unit-test
+	// testAmbientSession / ProcessRng are preserved (Generate never writes them).
 	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
 	// Finalization::doFinalization subset for a fresh generation
@@ -1028,7 +1026,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 	var ctrlDecl string
 	if dimen > 0 {
 		ctrl := GetNewCtrlVarsSess(g.Sess, g.Opts)
-		ctrlDecl = OutputArrayCtrlVars(ctrl, dimen, "    ")
+		ctrlDecl = OutputArrayCtrlVarsSess(g.Sess, ctrl, dimen, "    ")
 		if ctrlDecl == "" {
 			// incomplete ctrl IR — fail closed empty (call sites use hashFuncDefReady;
 			// config undersize soft; broken name sticky inside OutputArrayCtrlVars)
@@ -1404,7 +1402,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	// Bag-local: g.Sess / cg.Sess on mid-gen paths; no activateSession dual-install.
+	// Bag-local: g.Sess / cg.Sess on mid-gen paths; no ambient dual-install.
 	// Unit tests that still call Process* ambient must install their own bag.
 	g.Initialize()
 	var b strings.Builder
@@ -1585,7 +1583,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
-	// Bag-local: g.Sess on mid-gen paths; no activateSession dual-install.
+	// Bag-local: g.Sess on mid-gen paths; no ambient dual-install.
 	if g.OutputKind != OutputMgrKindDFS && !g.Opts.DFSExhaustive {
 		g.noteErr(ErrGeneric)
 		return ""

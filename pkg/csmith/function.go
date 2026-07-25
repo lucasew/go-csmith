@@ -913,7 +913,7 @@ func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabil
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !opts.DepthProtect || !f.NeedReturnStmt() {
+	if !opts.DepthProtect || !f.NeedReturnStmtSess(s) {
 		return
 	}
 	// Function.cpp:610–612 — assert(return_type); assert simple != eVoid

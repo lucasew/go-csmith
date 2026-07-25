@@ -37,9 +37,9 @@ func HasError() bool { return HasErrorSess(nil) }
 // HasErrorSess reports sticky error on an explicit session bag.
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
-// sessNoteError writes GenError on s when non-nil; nil s targets ambient bag
-// (defaultSession / activeSession) for residual hang-prevention on Filter loops.
-// Prefer explicit s so pure sessions do not depend on activateSession.
+// sessNoteError writes GenError on s when non-nil; nil s targets the quarantined
+// unit-test ambient bag (testAmbientSession) for residual hang-prevention on
+// Filter loops. Prefer explicit s so pure Generate paths never touch ambient.
 func sessNoteError(s *Session, code int) {
 	if s != nil {
 		s.GenError = code
@@ -48,10 +48,9 @@ func sessNoteError(s *Session, code int) {
 	sessOrAmbient(nil).GenError = code
 }
 
-// sessHasError reports sticky error on s when non-nil, else ambient.
-// Prefer explicit s for pure-session ERROR_GUARD; ambient dual-read remains for
-// residual Filter hang-prevention when sessNoteError(nil) wrote Process* bag
-// under activateSession, and for unit tests (SetError/HasError).
+// sessHasError reports sticky error on s when non-nil, else unit-test ambient.
+// Prefer explicit s for pure-session ERROR_GUARD; ambient nil path is for unit
+// tests (SetError/HasError) and residual Filter hang-prevention only.
 func sessHasError(s *Session) bool {
 	if s != nil {
 		return s.GenError != ErrSuccess

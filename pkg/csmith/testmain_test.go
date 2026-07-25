@@ -9,12 +9,11 @@ import (
 // C++ DefaultRndNumGenerator + Probabilities during unit tests — no invent private
 // nextCreateVarRng stream. Tests that need a clean slate call ReinstallTestProcessSingletons.
 //
-// ReinstallTestProcessSingletons replaces defaultSession with a fresh bag (all
-// mutable state session-local) then re-seeds Options/Rng/Probabilities/tables.
+// ReinstallTestProcessSingletons replaces the quarantined testAmbientSession with a
+// fresh bag then re-seeds Options/Rng/Probabilities/tables. Generate never uses this bag.
 func ReinstallTestProcessSingletons() {
-	// Drop any Generate-scoped session; replace unit-test bag entirely.
-	activeSession = nil
-	defaultSession = newSession()
+	// Replace unit-test ambient bag entirely (Generate is bag-local; no dual-install).
+	testAmbientSession = newSession()
 	opts := Defaults()
 	SetProcessOptions(opts)
 	SetProcessRng(NewRng(1))

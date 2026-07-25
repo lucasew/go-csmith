@@ -35,6 +35,9 @@ func TestPureGenStrictResidual(t *testing.T) {
 					t.Fatalf("%v\n%s", r, debug.Stack())
 				}
 			}()
+			// Marker on quarantined ambient: Generate must not write testAmbientSession.
+			marker := 0xC0FFEE ^ int(seed)
+			testAmbientSession.NextStmID = marker
 			out, err := s.Generate(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -42,8 +45,9 @@ func TestPureGenStrictResidual(t *testing.T) {
 			if out == "" {
 				t.Fatal("empty program")
 			}
-			if activeSession != nil {
-				t.Fatal("Generate must not leave activeSession installed")
+			if testAmbientSession.NextStmID != marker {
+				t.Fatalf("Generate mutated testAmbientSession.NextStmID: got %d want %d",
+					testAmbientSession.NextStmID, marker)
 			}
 			t.Logf("pure gen ok seed=%d len=%d", seed, len(out))
 		})

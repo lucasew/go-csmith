@@ -4,13 +4,16 @@
 //
 //	out, err := NewSession(opts).Generate(ctx)
 //
-// Rule: no package-level vars hold generation mutables (only on *Session).
-// Read-only package data: const tables, name maps, builtin lists, simpleTypes.
+// Rule: generation mutables live only on *Session. Generate is bag-local
+// (g.Sess / cg.Sess); it never installs or writes the unit-test ambient bag.
 //
-// Temporary bridge: while the call graph still uses Process*/SetError helpers,
-// Generate activates this Session for the duration of the call only (no residual
-// active session after return). Next layers pass *Session / g.Sess / cg.Sess
-// and delete activeSession.
+// Quarantined ambient (unit tests only):
+//   - testAmbientSession + Process*/SetError(nil) bridges for legacy unit tests
+//   - pureGenStrict package flag (meta lock toggled by Generate for residual panic)
+//
+// Read-only package data: const tables, name maps, builtin lists, simpleTypes
+// (note: simpleTypes[].Used is still process-static like C++ and reset in
+// TypeDoFinalizationSess — remaining Generate impurity vs concurrent runs).
 //
 // Concurrent Generate in one process is unsupported (upstream: one gen/process).
 // Fuzz workers are separate OS processes.
@@ -153,13 +156,10 @@ type bookkeeperState struct {
 	relyOnPtrSize                    bool
 }
 
-// defaultSession is the bag used by unit tests outside Generate.
-// It is still a heap object, not "generation state spilled into package vars".
-var defaultSession = newSession()
-
-// activeSession is the only remaining package-level write for the Process* bridge.
-// TODO: pass *Session explicitly and delete this.
-var activeSession *Session
+// testAmbientSession is the quarantined Process* bag for unit tests outside
+// Generate. Generate never installs or writes this object (pureGenStrict panics
+// on residual sessOrAmbient(nil)). Delete once unit tests pass explicit *Session.
+var testAmbientSession = newSession()
 
 func newSession() *Session {
 	s := &Session{
@@ -176,23 +176,25 @@ func newSession() *Session {
 	return s
 }
 
+// currentSession returns the quarantined unit-test ambient bag.
+// Not used by Generate (bag-local s / g.Sess / cg.Sess only).
 func currentSession() *Session {
-	if activeSession != nil {
-		return activeSession
-	}
-	return defaultSession
+	return testAmbientSession
 }
 
-// sessOrAmbient returns s when non-nil, else the ambient Process* bag.
-// Prefer explicit *Session from Generate / cg.Sess / g.Sess; nil is the bridge.
+// pureGenStrict is package meta state: when true, sessOrAmbient(nil) panics so
+// residual Process* sites cannot write testAmbientSession mid-Generate.
+// Generate toggles this for the run (still a process-global write — impure).
+// Next purity step: remove the toggle by deleting ambient Process* entirely.
 var pureGenStrict bool
 
+// sessOrAmbient returns s when non-nil, else the quarantined unit-test bag.
+// Prefer explicit *Session from Generate / cg.Sess / g.Sess; nil is test-only.
 func sessOrAmbient(s *Session) *Session {
 	if s != nil {
 		return s
 	}
-	// pureGenStrict: panic on any nil bag even under activateSession so residual
-	// Process*/sessHasError(nil) call sites remain visible during probe tests.
+	// pureGenStrict: panic on residual Process*/sessHasError(nil) mid-Generate.
 	if pureGenStrict {
 		panic("residual ambient sessOrAmbient(nil)")
 	}
@@ -207,26 +209,13 @@ func firstSess(a, b *Session) *Session {
 	return b
 }
 
-// activateSession makes s the Process* target until restore.
-func activateSession(s *Session) (restore func()) {
-	prev := activeSession
-	activeSession = s
-	return func() { activeSession = prev }
-}
-
-// BeginGenerateSession installs a fresh empty session (tests that need ambient
-// Process* without NewSession.Generate). Prefer NewSession(opts).Generate.
-func BeginGenerateSession() (restore func()) {
-	return activateSession(newSession())
-}
-
-// NewSession constructs a pure run bag with the given options (no globals written).
+// NewSession constructs a pure run bag with the given options (no ambient write).
 func NewSession(opts Options) *Session {
 	s := newSession()
 	s.Opts = opts
 	return s
 }
 
-// CurrentSession returns the active session bag (tests / migration helpers).
-// Prefer holding *Session from NewSession rather than this ambient accessor.
+// CurrentSession returns the quarantined unit-test ambient bag.
+// Prefer holding *Session from NewSession; do not use from Generate paths.
 func CurrentSession() *Session { return currentSession() }

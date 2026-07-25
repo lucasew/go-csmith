@@ -30,7 +30,7 @@ func SetProcessOptions(o Options) { SetProcessOptionsSess(nil, o) }
 func SetProcessOptionsSess(s *Session, o Options) { sessOrAmbient(s).Opts = o }
 
 // ProcessOptions returns the active session Options (CGOptions mirror).
-// Safe default is Defaults() on defaultSession until SetProcessOptions is called.
+// Safe default is Defaults() on testAmbientSession until SetProcessOptions is called.
 func ProcessOptions() Options { return ProcessOptionsSess(nil) }
 
 // ProcessOptionsSess returns Options on an explicit session bag.

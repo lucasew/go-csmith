@@ -41,20 +41,24 @@ func TestGenerateSequentialMultiSeedIsolated(t *testing.T) {
 	}
 }
 
-// NewSession.Generate is the pure entry: explicit bag, no residual ambient session.
+// NewSession.Generate is the pure entry: explicit bag, never writes testAmbientSession.
 func TestNewSessionGeneratePureEntry(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 2
 	s := NewSession(opts)
-	if activeSession != nil {
-		t.Fatal("NewSession must not install ambient activeSession")
-	}
+	ambientBefore := testAmbientSession
+	marker := 0xBEEF
+	testAmbientSession.NextStmID = marker
 	out, err := s.Generate(context.Background())
 	if err != nil || out == "" {
 		t.Fatalf("Generate: err=%v empty=%v", err, out == "")
 	}
-	if activeSession != nil {
-		t.Fatal("after Generate, ambient activeSession must be cleared")
+	if testAmbientSession != ambientBefore {
+		t.Fatal("Generate must not replace testAmbientSession")
+	}
+	if testAmbientSession.NextStmID != marker {
+		t.Fatalf("Generate mutated testAmbientSession.NextStmID: got %d want %d",
+			testAmbientSession.NextStmID, marker)
 	}
 	if s.ProgramGen == nil || s.ProgramGen.Sess != s {
 		t.Fatal("ProgramGenerator.Sess must point at the run session")
@@ -66,5 +70,8 @@ func TestNewSessionGeneratePureEntry(t *testing.T) {
 	}
 	if out2 != out {
 		t.Fatal("second Generate on same Session+opts diverged")
+	}
+	if testAmbientSession.NextStmID != marker {
+		t.Fatal("second Generate mutated testAmbientSession")
 	}
 }

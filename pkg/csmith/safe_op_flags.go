@@ -140,7 +140,7 @@ func SafeOpFlagsToID(fname string) int {
 }
 
 // SafeOpFlagsToIDSess is SafeOpFlagsToID on an explicit session bag.
-// Nil s uses ambient bag (unit tests / residual Process* under activateSession).
+// Nil s uses quarantined unit-test ambient bag (testAmbientSession).
 func SafeOpFlagsToIDSess(s *Session, fname string) int {
 	s = sessOrAmbient(s)
 	for i, n := range s.WrapperNames {
