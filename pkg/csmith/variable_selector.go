@@ -23,15 +23,15 @@ type VariableSelector struct {
 	Arrays []*ArrayVariable
 }
 
-// vsSess returns vs.Sess. Nil vs → unit-test ambient. Non-nil vs with unset
-// Sess lazy-installs ambient on the object (visible as vs.Sess == testAmbientSession).
-// Generate always overwrites VS.Sess with the run bag before draws.
+// vsSess returns vs.Sess. Nil vs → unit-test ambient.
+// Non-nil vs must have Sess set (NewVariableSelector / NewProgramGenerator);
+// unset Sess panics — no silent dual-fill on a half-built VS.
 func vsSess(vs *VariableSelector) *Session {
 	if vs == nil {
 		return testAmbientSession
 	}
 	if vs.Sess == nil {
-		vs.Sess = testAmbientSession
+		panic("vsSess: Sess unset (use NewVariableSelector or set VS.Sess)")
 	}
 	return vs.Sess
 }

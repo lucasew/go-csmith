@@ -10,9 +10,10 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession + Process*/SetError bridges for legacy unit tests
-//   - constructors + vsSess/envSess/fmSess install/return ambient when unset
-//   - sessOrAmbient(nil) / sessNoteError(nil) / sessOpts(nil) / sessProbs(nil)
-//     / sessRng(nil) panics (must pass an explicit bag)
+//   - NewVariableSelector / NewFactMgr / cgSess install ambient when needed
+//   - vsSess panics if VS.Sess unset (must construct via NewVariableSelector)
+//   - envSess/fmSess still lazy-install for TypeEnv{}/FactMgr{} unit shells
+//   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
 // (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not

@@ -71,14 +71,17 @@ func (c CGContext) WithSession(s *Session) CGContext {
 	return c
 }
 
-// cgSess returns c.Sess when set; else the quarantined unit-test ambient bag.
-// Pass &cg for by-value CGContext params. Zero-value CGContext{} still falls
-// back (ubiquitous in unit tests); constructors install ambient Sess when possible.
+// cgSess returns c.Sess. Nil c → unit-test ambient. Non-nil c with unset Sess
+// lazy-installs ambient on the context (Generate uses WithSession / sets Sess).
+// Pass &cg for by-value CGContext params.
 func cgSess(c *CGContext) *Session {
-	if c != nil && c.Sess != nil {
-		return c.Sess
+	if c == nil {
+		return testAmbientSession
 	}
-	return testAmbientSession
+	if c.Sess == nil {
+		c.Sess = testAmbientSession
+	}
+	return c.Sess
 }
 
 // EffectContext mirrors CGContext::get_effect_context.

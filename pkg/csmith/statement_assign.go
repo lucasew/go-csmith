@@ -369,34 +369,16 @@ func MakeRandomAssignQfer(
 	// for CVQualifiers::match / choose_var; restore after Lhs.
 	// Must restore on every early return (no invent sticky MatchExactQualifiers
 	// that over-restricts later choose_var qfer match — seed-2 OK-list shrink).
-	// Prefer run bag: force local opts + cg.Sess.Opts (ChooseVarFull → sessOpts(cg.Sess)).
-	// Ambient SetProcessOptions only when cg.Sess is nil (unit tests without a run bag).
+	// Bag-local: opts + cgSess(cg).Opts (ChooseVarFull → sessOpts). No ProcessOptions dual-path.
 	prevExact := opts.MatchExactQualifiers
-	var prevSessExact bool
-	var prevProc Options
-	usedAmbientExact := false
-	if cg.Sess != nil {
-		prevSessExact = cgSess(cg).Opts.MatchExactQualifiers
-	}
 	if callerQf {
 		opts.MatchExactQualifiers = true
-		if cg.Sess != nil {
-			cgSess(cg).Opts.MatchExactQualifiers = true
-		} else {
-			prevProc = ProcessOptions()
-			po := prevProc
-			po.MatchExactQualifiers = true
-			SetProcessOptions(po)
-			usedAmbientExact = true
-		}
+		bag := cgSess(cg)
+		prevBagExact := bag.Opts.MatchExactQualifiers
+		bag.Opts.MatchExactQualifiers = true
 		defer func() {
 			opts.MatchExactQualifiers = prevExact
-			if cg.Sess != nil {
-				cgSess(cg).Opts.MatchExactQualifiers = prevSessExact
-			}
-			if usedAmbientExact {
-				SetProcessOptions(prevProc)
-			}
+			bag.Opts.MatchExactQualifiers = prevBagExact
 		}()
 	}
 	// StatementAssign.cpp:195–200 — strict_float uses RHS type for Lhs

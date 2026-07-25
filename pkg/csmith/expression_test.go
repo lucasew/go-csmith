@@ -815,7 +815,7 @@ func TestMakeRandomExpressionNoInventSessionProbs(t *testing.T) {
 		t.Fatalf("simple const without vs: %+v", e)
 	}
 	// vs with nil Probs: same simple path; must not invent session tables
-	vs := &VariableSelector{Opts: opts}
+	vs := &VariableSelector{Opts: opts, Sess: testAmbientSession}
 	e2 := MakeRandomExpression(NewRng(1), opts, tables, vs, &cg, GetIntType(), nil, true, false, TermConstant, 0)
 	if e2 == nil || e2.Term != TermConstant {
 		t.Fatalf("simple const with nil vs.Probs: %+v", e2)
