@@ -1555,7 +1555,7 @@ func (v *Variable) IsVisibleLocalSess(s *Session, blk *Block) bool {
 		}
 		return ok
 	}
-	if v.IsFieldVar() {
+	if v.IsFieldVarSess(s) {
 		// residual ERROR sticky — no invent soft-continue field path past IsFieldVar residual
 		if sessHasError(s) {
 			return false
@@ -1565,7 +1565,7 @@ func (v *Variable) IsVisibleLocalSess(s *Session, blk *Block) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := v.FieldVarOf.IsVisibleLocal(blk)
+		ok := v.FieldVarOf.IsVisibleLocalSess(s, blk)
 		// residual ERROR sticky — no invent not-visible soft-skip past parent IsVisibleLocal hole
 		if sessHasError(s) {
 			return false
@@ -2629,7 +2629,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 	}
 	if virt {
 		// field of virtual array is broken IR sticky for this path
-		if v.IsFieldVar() {
+		if v.IsFieldVarSess(s) {
 			// residual ERROR sticky — no invent soft-continue dump past IsFieldVar residual
 			if sessHasError(s) {
 				return ""

@@ -338,7 +338,7 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 			sessNoteError(fmSess(fm), ErrGeneric)
 			return inc
 		}
-		eff = eff.AddEffect(se)
+		eff = eff.AddEffectSess(fmSess(fm), se)
 		if !EffectComplete(eff) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)

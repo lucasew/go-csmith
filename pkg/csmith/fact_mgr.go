@@ -206,7 +206,7 @@ func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts
 	if fm.MapUnionFactsIn == nil {
 		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
 	}
-	fm.MapFactsIn[stmID] = storeFactMapEntry(facts)
+	fm.MapFactsIn[stmID] = storeFactMapEntrySess(fmSess(fm), facts)
 	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntrySess(fmSess(fm), unionFacts)
 }
 
@@ -314,7 +314,7 @@ func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFact
 	if fm.MapUnionFactsOut == nil {
 		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
-	fm.MapFactsOut[stmID] = storeFactMapEntry(facts)
+	fm.MapFactsOut[stmID] = storeFactMapEntrySess(fmSess(fm), facts)
 	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntrySess(fmSess(fm), unionFacts)
 }
 
@@ -323,10 +323,14 @@ func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFact
 // were stored as bare nil; incomplete uses a nil-hole slice (FactsComplete false).
 // Complete empty uses a non-nil empty slice (FactsComplete true).
 func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
+	return storeFactMapEntrySess(nil, facts)
+}
+
+func storeFactMapEntrySess(s *Session, facts []*FactPointTo) []*FactPointTo {
 	if !FactsComplete(facts) {
 		return IncompleteFactSlice()
 	}
-	cl := CloneFactSlice(facts)
+	cl := CloneFactSliceSess(s, facts)
 	if cl == nil {
 		return []*FactPointTo{}
 	}
@@ -429,7 +433,7 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
-	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_in_assign")
+	fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), pt), "auto_map_in_assign")
 	// Deep install: live lattice must not alias map_facts_in FactUnion objects
 	// (renew/join replace or mutate; maps must retain historical arm/entry lattice).
 	cl := CloneUnionFactSliceDeepSess(fmSess(fm), un)
@@ -471,7 +475,7 @@ func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
-	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_out_assign")
+	fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), pt), "auto_map_out_assign")
 	cl := CloneUnionFactSliceDeepSess(fmSess(fm), un)
 	if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -629,7 +633,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
-	cp := CloneFactSlice(facts)
+	cp := CloneFactSliceSess(fmSess(fm), facts)
 	// FactMgr.cpp:257–274 — set_fact_out filters full FactVec (ePointTo + eUnionWrite).
 	// Soft invent was PT-only RemoveLoopLocalFacts / RemoveFunctionLocalFacts then
 	// SetMapFactsOut pairing unfiltered live UnionFacts → continue/break map_out kept
@@ -1529,14 +1533,14 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 				failClosedWipe(id, 0)
 				return
 			}
-			fm.MapFactsInFinal[id] = storeFactMapEntry(facts)
+			fm.MapFactsInFinal[id] = storeFactMapEntrySess(fmSess(fm), facts)
 		}
 		for id, facts := range fm.MapFactsOut {
 			if !FactsComplete(facts) {
 				failClosedWipe(0, id)
 				return
 			}
-			fm.MapFactsOutFinal[id] = storeFactMapEntry(facts)
+			fm.MapFactsOutFinal[id] = storeFactMapEntrySess(fmSess(fm), facts)
 		}
 		return
 	}
@@ -1558,7 +1562,7 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			failClosedWipe(id, 0)
 			return
 		}
-		fm.MapFactsInFinal[id] = storeFactMapEntry(facts1)
+		fm.MapFactsInFinal[id] = storeFactMapEntrySess(fmSess(fm), facts1)
 	}
 	for id, facts2 := range fm.MapFactsOut {
 		facts1 := fm.MapFactsOutFinal[id]
@@ -1574,7 +1578,7 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			failClosedWipe(0, id)
 			return
 		}
-		fm.MapFactsOutFinal[id] = storeFactMapEntry(facts1)
+		fm.MapFactsOutFinal[id] = storeFactMapEntrySess(fmSess(fm), facts1)
 	}
 }
 
@@ -1624,10 +1628,10 @@ func (fm *FactMgr) BackupStmFactMaps(
 	}
 	if !StmIDUnset(st.StmID) {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
-			factsIn[st.StmID] = storeFactMapEntry(in)
+			factsIn[st.StmID] = storeFactMapEntrySess(fmSess(fm), in)
 		}
 		if out, ok := fm.MapFactsOut[st.StmID]; ok {
-			factsOut[st.StmID] = storeFactMapEntry(out)
+			factsOut[st.StmID] = storeFactMapEntrySess(fmSess(fm), out)
 		}
 		if in, ok := fm.MapUnionFactsIn[st.StmID]; ok {
 			unionIn[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
@@ -1651,10 +1655,10 @@ func (fm *FactMgr) backupBlockFactMaps(
 	}
 	if !StmIDUnset(b.StmID) {
 		if in, ok := fm.MapFactsIn[b.StmID]; ok {
-			factsIn[b.StmID] = storeFactMapEntry(in)
+			factsIn[b.StmID] = storeFactMapEntrySess(fmSess(fm), in)
 		}
 		if out, ok := fm.MapFactsOut[b.StmID]; ok {
-			factsOut[b.StmID] = storeFactMapEntry(out)
+			factsOut[b.StmID] = storeFactMapEntrySess(fmSess(fm), out)
 		}
 		if in, ok := fm.MapUnionFactsIn[b.StmID]; ok {
 			unionIn[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
@@ -1722,12 +1726,12 @@ func (fm *FactMgr) RestoreStmFactMaps(
 	}
 	if !StmIDUnset(st.StmID) {
 		if in, ok := factsIn[st.StmID]; ok {
-			fm.MapFactsIn[st.StmID] = storeFactMapEntry(in)
+			fm.MapFactsIn[st.StmID] = storeFactMapEntrySess(fmSess(fm), in)
 		} else {
 			delete(fm.MapFactsIn, st.StmID)
 		}
 		if out, ok := factsOut[st.StmID]; ok {
-			fm.MapFactsOut[st.StmID] = storeFactMapEntry(out)
+			fm.MapFactsOut[st.StmID] = storeFactMapEntrySess(fmSess(fm), out)
 		} else {
 			delete(fm.MapFactsOut, st.StmID)
 		}
@@ -1757,12 +1761,12 @@ func (fm *FactMgr) restoreBlockFactMaps(
 	}
 	if !StmIDUnset(b.StmID) {
 		if in, ok := factsIn[b.StmID]; ok {
-			fm.MapFactsIn[b.StmID] = storeFactMapEntry(in)
+			fm.MapFactsIn[b.StmID] = storeFactMapEntrySess(fmSess(fm), in)
 		} else {
 			delete(fm.MapFactsIn, b.StmID)
 		}
 		if out, ok := factsOut[b.StmID]; ok {
-			fm.MapFactsOut[b.StmID] = storeFactMapEntry(out)
+			fm.MapFactsOut[b.StmID] = storeFactMapEntrySess(fmSess(fm), out)
 		} else {
 			delete(fm.MapFactsOut, b.StmID)
 		}
@@ -1917,7 +1921,7 @@ func RemoveLoopLocalFactsSess(s *Session, facts []*FactPointTo, blk *Block) []*F
 		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	out := CloneFactSlice(facts)
+	out := CloneFactSliceSess(s, facts)
 	// incomplete clone is hole marker sticky (not bare nil invent empty complete)
 	if !FactsComplete(out) {
 		sessNoteError(s, ErrGeneric)
@@ -4233,7 +4237,7 @@ func (fm *FactMgr) SanityCheckMap() {
 				return
 			}
 			v := f.Var
-			if v.IsVisible(parent) {
+			if v.IsVisibleSess(fmSess(fm), parent) {
 				if sessHasError(fmSess(fm)) {
 					return
 				}
@@ -4262,12 +4266,12 @@ func (fm *FactMgr) SanityCheckMap() {
 				return
 			}
 			v := f.Var
-			vis := v.IsVisible(parent)
+			vis := v.IsVisibleSess(fmSess(fm), parent)
 			if sessHasError(fmSess(fm)) {
 				return
 			}
 			if !vis && fm.Func != nil && fm.Func.RV != nil {
-				if fm.Func.RV.Match(v) {
+				if fm.Func.RV.MatchSess(fmSess(fm), v) {
 					if sessHasError(fmSess(fm)) {
 						return
 					}

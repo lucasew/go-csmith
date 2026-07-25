@@ -479,7 +479,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			return false
 		}
-		acc := condEff.AddEffect(thenE)
+		acc := condEff.AddEffectSess(cgSess(cg), thenE)
 		// residual ERROR sticky — no invent soft-continue else merge past then AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -488,7 +488,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		acc = acc.AddEffect(elseE)
+		acc = acc.AddEffectSess(cgSess(cg), elseE)
 		// residual ERROR sticky — no invent soft-continue set-map past else AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			return false

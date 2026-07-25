@@ -350,7 +350,7 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	}
 	// Lhs.cpp:273–276 — combine context + stm as ambient; no accum
 	// Incomplete ambient sticky (no invent index visit under incomplete context)
-	eff := cg.EffectContext().AddEffect(cg.EffectStm)
+	eff := cg.EffectContext().AddEffectSess(cgSess(cg), cg.EffectStm)
 	// residual ERROR sticky — no invent soft-continue index visit past AddEffect residual
 	if sessHasError(cgSess(cg)) {
 		return false

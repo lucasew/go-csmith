@@ -1410,7 +1410,7 @@ func (e *Effect) ConsolidateSess(s *Session) {
 		if !e.read[v] {
 			continue
 		}
-		if !v.IsFieldVar() {
+		if !v.IsFieldVarSess(s) {
 			// residual ERROR sticky — no invent soft-skip consolidate past IsFieldVar hole
 			if sessHasError(s) {
 				*e = IncompleteEffect()
@@ -1456,7 +1456,7 @@ func (e *Effect) ConsolidateSess(s *Session) {
 		if !e.written[v] {
 			continue
 		}
-		if !v.IsFieldVar() {
+		if !v.IsFieldVarSess(s) {
 			// residual ERROR sticky — no invent soft-skip consolidate past IsFieldVar hole
 			if sessHasError(s) {
 				*e = IncompleteEffect()

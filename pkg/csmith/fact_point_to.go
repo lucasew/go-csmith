@@ -2113,7 +2113,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 		return true
 	}
 	if indirection == -1 {
-		ok := v.IsVisibleLocal(b)
+		ok := v.IsVisibleLocalSess(s, b)
 		// residual ERROR sticky — no invent not-local soft-skip past IsVisibleLocal hole
 		if sessHasError(s) {
 			return true
@@ -2140,7 +2140,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 	// FactPointTo.cpp:506–508 — array / array-field subjects use collective for fact lookup
 	// (itemized members share the collective's points-to; without this, FindRelatedPointTo
 	// misses and as_return/no_return_dead_ptr wrongly allows local-pointing array elems).
-	isAF := v.IsArrayField()
+	isAF := v.IsArrayFieldSess(s)
 	if sessHasError(s) {
 		return true
 	}
@@ -2194,7 +2194,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if p.IsVisibleLocal(b) {
+		if p.IsVisibleLocalSess(s, b) {
 			// residual ERROR sticky — no invent pointing-true past IsVisibleLocal hole
 			if sessHasError(s) {
 				return true
@@ -2234,7 +2234,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 					if IsSpecialPtr(n) {
 						continue
 					}
-					if n.IsVisibleLocal(b) {
+					if n.IsVisibleLocalSess(s, b) {
 						// residual ERROR sticky — no invent pointing-true past nested IsVisibleLocal hole
 						if sessHasError(s) {
 							return true

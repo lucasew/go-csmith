@@ -1610,7 +1610,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 			return nil
 		}
 		// is_visible (VariableSelector.cpp:1523)
-		if !v.IsVisible(blk) {
+		if !v.IsVisibleSess(vsSess(vs), blk) {
 			// residual ERROR sticky — no invent soft-continue then pick later past hole
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -3125,78 +3125,79 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return true
 		}
 		// VariableSelector.cpp:1393–1412
-		if cg.EffectContext().IsReadPartially(&av.Variable) ||
-			cg.EffectContext().IsWrittenPartially(&av.Variable) {
+		sBag := firstSess(vsSess(vs), cg.Sess)
+		if cg.EffectContext().IsReadPartiallySess(sBag, &av.Variable) ||
+			cg.EffectContext().IsWrittenPartiallySess(sBag, &av.Variable) {
 			// residual ERROR sticky — no invent soft-skip past partial-RW hole then pick another
-			if sessHasError(vsSess(vs)) {
+			if sessHasError(sBag) {
 				return false
 			}
 			return true
 		}
-		seFree := cg.EffectContext().IsSideEffectFreeSess(cg.Sess)
+		seFree := cg.EffectContext().IsSideEffectFreeSess(sBag)
 		// residual ERROR sticky — no invent soft-continue keep past IsSideEffectFree residual
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(sBag) {
 			return false
 		}
-		if !seFree && av.IsVolatile() {
+		if !seFree && av.IsVolatileSess(sBag) {
 			// residual ERROR sticky — no invent soft-skip past IsVolatile hole
-			if sessHasError(vsSess(vs)) {
+			if sessHasError(sBag) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsVolatile residual false
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(sBag) {
 			return false
 		}
-		if av.IsConst() {
+		if av.IsConstSess(sBag) {
 			// residual ERROR sticky — no invent soft-skip past IsConst hole
-			if sessHasError(vsSess(vs)) {
+			if sessHasError(sBag) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsConst residual false
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(sBag) {
 			return false
 		}
 		if cg.IsNonWritable(&av.Variable) {
 			// residual ERROR sticky — no invent soft-skip past IsNonWritable hole then pick another
-			if sessHasError(vsSess(vs)) {
+			if sessHasError(sBag) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsNonWritable residual false
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(sBag) {
 			return false
 		}
 		// VariableSelector.cpp:1405 — av->type->is_const_struct_union() always live Type*
 		// Type-nil sticky fail whole select (no invent soft-skip past hole then pick another)
 		if av.Type == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			sessNoteError(sBag, ErrGeneric)
 			return false
 		}
-		if av.Type.IsConstStructUnion() {
+		if av.Type.IsConstStructUnionSess(sBag) {
 			// residual ERROR sticky — no invent soft-skip then pick later past IsConstStructUnion hole
-			if sessHasError(vsSess(vs)) {
+			if sessHasError(sBag) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent keep array past IsConstStructUnion residual false
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(sBag) {
 			return false
 		}
-		if vs.Opts.StrictVolatileRule && av.IsVolatile() {
+		if vs.Opts.StrictVolatileRule && av.IsVolatileSess(sBag) {
 			// residual ERROR sticky — no invent soft-skip past strict-vol hole
-			if sessHasError(vsSess(vs)) {
+			if sessHasError(sBag) {
 				return false
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue keep past strict IsVolatile residual false
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(sBag) {
 			return false
 		}
 		seen[av] = true

@@ -265,7 +265,7 @@ func CollectInitSkippedVarsSess(s *Session, src *Block, destParent *Block) []*Va
 			skipped = append(skipped, v)
 			continue
 		}
-		visible := v.IsVisibleLocal(src)
+		visible := v.IsVisibleLocalSess(s, src)
 		// residual ERROR sticky — no invent complete skip list past IsVisibleLocal hard IR hole
 		if sessHasError(s) {
 			return IncompleteVariables()

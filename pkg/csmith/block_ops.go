@@ -810,7 +810,7 @@ func (b *Block) AppendNestedLoop(
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
-		merged := be.AddEffect(stE)
+		merged := be.AddEffectSess(cgSess(cg), stE)
 		// residual ERROR sticky — no invent soft-complete for fold past AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
@@ -933,7 +933,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
-		merged := be.AddEffect(stE)
+		merged := be.AddEffectSess(cgSess(cg), stE)
 		// residual ERROR sticky — no invent soft-complete return fold past AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
@@ -1197,7 +1197,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if !UnionFactsComplete(outU) {
 		return ShortcutNone
 	}
-	*facts = CloneFactSlice(out)
+	*facts = CloneFactSliceSess(cgSess(cg), out)
 	clU := CloneUnionFactSliceDeepSess(cgSess(cg), outU)
 	if !UnionFactsComplete(clU) {
 		return ShortcutNone

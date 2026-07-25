@@ -133,7 +133,7 @@ func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !f.Var.IsVisible(stParent) {
+	if !f.Var.IsVisibleSess(s, stParent) {
 		// residual ERROR sticky — no invent invisible true past IsVisible hole
 		if sessHasError(s) {
 			return true
@@ -153,7 +153,7 @@ func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 		if IsSpecialPtr(p) {
 			continue
 		}
-		if !p.IsVisible(stParent) {
+		if !p.IsVisibleSess(s, stParent) {
 			// residual ERROR sticky — no invent invisible true past pointee IsVisible hole
 			if sessHasError(s) {
 				return true

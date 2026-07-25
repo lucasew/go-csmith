@@ -258,7 +258,7 @@ func MakeRandomAssignQfer(
 			}
 		}
 		if op != AssignSimple {
-			runningEff = runningEff.AddEffect(rhsAccum)
+			runningEff = runningEff.AddEffectSess(cgSess(cg), rhsAccum)
 			// residual ERROR sticky — no invent soft-continue compound past AddEffect residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
@@ -272,7 +272,7 @@ func MakeRandomAssignQfer(
 			qfer.SetVolatile(false, 0)
 		}
 		// StatementAssign.cpp:161 — always fold RHS into running under strict_volatile
-		runningEff = runningEff.AddEffect(rhsAccum)
+		runningEff = runningEff.AddEffectSess(cgSess(cg), rhsAccum)
 		// residual ERROR sticky — no invent soft-continue strict-vol past AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
@@ -310,7 +310,7 @@ func MakeRandomAssignQfer(
 			}
 		}
 		if op != AssignSimple {
-			runningEff = runningEff.AddEffect(rhsAccum)
+			runningEff = runningEff.AddEffectSess(cgSess(cg), rhsAccum)
 			// residual ERROR sticky — no invent soft-continue compound past AddEffect residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
@@ -1075,7 +1075,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			// Incomplete param accum sticky (no invent visit more args under incomplete)
-			running = running.AddEffect(paramAccum)
+			running = running.AddEffectSess(cgSess(cg), paramAccum)
 			// residual ERROR sticky — no invent soft-continue later args past AddEffect residual
 			if sessHasError(cgSess(cg)) {
 				return false
@@ -1231,7 +1231,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementAssign.cpp:372–375 — compound: LHS sees RHS effect
 	// Incomplete folds sticky (no invent LHS visit under incomplete running)
 	if st.AssignOp != AssignSimple {
-		runningEff = runningEff.AddEffect(rhsAccum)
+		runningEff = runningEff.AddEffectSess(cgSess(cg), rhsAccum)
 		// residual ERROR sticky — no invent soft-continue LHS visit past AddEffect residual
 		if sessHasError(cgSess(cg)) {
 			return false

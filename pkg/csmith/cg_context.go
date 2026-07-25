@@ -1620,7 +1620,7 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		}
 		return false
 	}
-	if v.IsVisibleLocal(b) {
+	if v.IsVisibleLocalSess(c.Sess, b) {
 		// residual ERROR sticky — no invent frame-true past IsVisibleLocal hole
 		if sessHasError(c.Sess) {
 			return false
@@ -1641,7 +1641,7 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 			}
 			return false
 		}
-		if v.IsVisibleLocal(cb) {
+		if v.IsVisibleLocalSess(c.Sess, cb) {
 			if sessHasError(c.Sess) {
 				return false
 			}
