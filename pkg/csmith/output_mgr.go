@@ -158,12 +158,17 @@ func OutputHashFuncInvocation(indent int) string {
 // OutputStepHashFuncInvocation mirrors OutputMgr::OutputStepHashFuncInvocation.
 // OutputMgr.cpp:161–167 — only when is_monitored_func; else soft empty.
 func OutputStepHashFuncInvocation(indent, stmtID int) string {
-	if !IsMonitoredFunc() {
+	return OutputStepHashFuncInvocationSess(nil, indent, stmtID)
+}
+
+// OutputStepHashFuncInvocationSess is OutputStepHashFuncInvocation with explicit session residual sticky.
+func OutputStepHashFuncInvocationSess(s *Session, indent, stmtID int) string {
+	if !IsMonitoredFuncSess(s) {
 		return ""
 	}
 	// incomplete stmt id sticky (no invent step_hash(0) shell)
 	if stmtID <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return OutputTab(indent) + StepHashFuncName + "(" + Int2Str(stmtID) + ");\n"
@@ -177,8 +182,13 @@ func IsSplit(opts Options) bool { return opts.MaxSplitFiles > 0 }
 // DefaultOutputMgr.cpp:99–101 → platform create_dir.
 // Empty dir sticky false (no invent cwd as success).
 func CreateOutputDir(dir string) bool {
+	return CreateOutputDirSess(nil, dir)
+}
+
+// CreateOutputDirSess is CreateOutputDir with explicit session residual sticky.
+func CreateOutputDirSess(s *Session, dir string) bool {
 	if dir == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return CreateDir(dir)
@@ -188,14 +198,19 @@ func CreateOutputDir(dir string) bool {
 // DefaultOutputMgr.cpp:79–85 — split_files_dir/rnd_output{N}.c (dir_sep = OS separator).
 // Empty split dir sticky "" (no invent relative bare name).
 func SplitOutputFilePath(opts Options, num int) string {
+	return SplitOutputFilePathSess(nil, opts, num)
+}
+
+// SplitOutputFilePathSess is SplitOutputFilePath with explicit session residual sticky.
+func SplitOutputFilePathSess(s *Session, opts Options, num int) string {
 	dir := strings.TrimSpace(opts.SplitFilesDir)
 	if dir == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// incomplete negative index sticky (no invent rnd_output-1.c)
 	if num < 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	name := fmt.Sprintf("%s%d.c", SplitFilenamePrefix, num)
@@ -205,9 +220,14 @@ func SplitOutputFilePath(opts Options, num int) string {
 // SplitGlobalsHeaderPath is DefaultOutputMgr::OutputGlobals header path.
 // DefaultOutputMgr.cpp:104–105 — split_files_dir/rnd_globals.h.
 func SplitGlobalsHeaderPath(opts Options) string {
+	return SplitGlobalsHeaderPathSess(nil, opts)
+}
+
+// SplitGlobalsHeaderPathSess is SplitGlobalsHeaderPath with explicit session residual sticky.
+func SplitGlobalsHeaderPathSess(s *Session, opts Options) string {
 	dir := strings.TrimSpace(opts.SplitFilesDir)
 	if dir == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return filepath.Join(dir, SplitGlobalHeader+".h")
@@ -315,7 +335,7 @@ func CreateDefaultOutputMgrSess(s *Session, opts Options) bool {
 	}
 	paths := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		p := SplitOutputFilePath(opts, i)
+		p := SplitOutputFilePathSess(s, opts, i)
 		if p == "" || sessHasError(s) {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
@@ -420,11 +440,16 @@ func GetMainOutPathSess(s *Session, opts Options) string {
 // DefaultOutputMgr.cpp:148 / 159 — index = pure_rnd_upto(size).
 // nFiles==0 sticky -1 (no invent index 0 into empty outs).
 func PureRndUptoIndex(nFiles int) int {
+	return PureRndUptoIndexSess(nil, nFiles)
+}
+
+// PureRndUptoIndexSess is PureRndUptoIndex with explicit session residual sticky.
+func PureRndUptoIndexSess(s *Session, nFiles int) int {
 	if nFiles <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
-	return int(PureRndUpto(uint32(nFiles), nil))
+	return int(PureRndUptoSess(s, uint32(nFiles), nil))
 }
 
 // RandomOutputVarDefs mirrors DefaultOutputMgr::RandomOutputVarDefs pure assignment.
@@ -450,7 +475,7 @@ func RandomOutputVarDefsOptsSess(s *Session, globals []*Variable, nFiles int, fo
 	}
 	out := make([]string, nFiles)
 	for _, v := range globals {
-		idx := PureRndUptoIndex(nFiles)
+		idx := PureRndUptoIndexSess(s, nFiles)
 		if idx < 0 || sessHasError(s) {
 			return nil
 		}
@@ -504,7 +529,7 @@ func RandomOutputFuncDefsOptsSess(s *Session, funcs []*Function, nFiles int, for
 		if f.IsBuiltin {
 			continue
 		}
-		idx := PureRndUptoIndex(nFiles)
+		idx := PureRndUptoIndexSess(s, nFiles)
 		if idx < 0 || sessHasError(s) {
 			return nil
 		}
@@ -553,11 +578,16 @@ func RandomOutputDefsOptsSess(s *Session, globals []*Variable, funcs []*Function
 
 // SplitAllHeadersContent mirrors DefaultOutputMgr::OutputAllHeaders for N files.
 // DefaultOutputMgr.cpp:120–141 — secondary preambles; primary include; all get forwards.
-// forwards is OutputForwardDeclarations text (same into every file).}
+// forwards is OutputForwardDeclarations text (same into every file).
 
 func SplitAllHeadersContent(nFiles int, paranoid bool, forwards string) []string {
+	return SplitAllHeadersContentSess(nil, nFiles, paranoid, forwards)
+}
+
+// SplitAllHeadersContentSess is SplitAllHeadersContent with explicit session residual sticky.
+func SplitAllHeadersContentSess(s *Session, nFiles int, paranoid bool, forwards string) []string {
 	if nFiles <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	out := make([]string, nFiles)

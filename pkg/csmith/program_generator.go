@@ -1315,7 +1315,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 		return nil
 	}
 	n := g.Opts.MaxSplitFiles
-	paths := ProcessSplitPaths()
+	paths := ProcessSplitPathsSess(g.Sess)
 	if len(paths) != n {
 		g.noteErr(ErrGeneric)
 		return nil
@@ -1333,7 +1333,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	if g.hasErr() {
 		return nil
 	}
-	hdrPath := SplitGlobalsHeaderPath(g.Opts)
+	hdrPath := SplitGlobalsHeaderPathSess(g.Sess, g.Opts)
 	if hdrPath == "" || g.hasErr() {
 		return nil
 	}
@@ -1345,7 +1345,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 	if g.hasErr() {
 		return nil
 	}
-	headers := SplitAllHeadersContent(n, g.Opts.Paranoid, forwards)
+	headers := SplitAllHeadersContentSess(g.Sess, n, g.Opts.Paranoid, forwards)
 	if headers == nil || g.hasErr() {
 		return nil
 	}
