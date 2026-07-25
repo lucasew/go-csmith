@@ -175,62 +175,97 @@ func (rn *RandomNumber) GetPrefixedNameSess(s *Session, name string) string {
 
 // TraceDepth mirrors RandomNumber::trace_depth.
 func (rn *RandomNumber) TraceDepth() string {
+	return rn.TraceDepthSess(nil)
+}
+
+// TraceDepthSess is TraceDepth with explicit session residual sticky.
+func (rn *RandomNumber) TraceDepthSess(s *Session) string {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return rn.curr.TraceDepth()
+	return rn.curr.TraceDepthSess(s)
 }
 
 // GetSequence mirrors RandomNumber::get_sequence.
 func (rn *RandomNumber) GetSequence() string {
+	return rn.GetSequenceSess(nil)
+}
+
+// GetSequenceSess is GetSequence with explicit session residual sticky.
+func (rn *RandomNumber) GetSequenceSess(s *Session) string {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return rn.curr.GetSequence()
+	return rn.curr.GetSequenceSess(s)
 }
 
 // RndUpto mirrors RandomNumber::rnd_upto.
 func (rn *RandomNumber) RndUpto(n uint32, f Filter) uint32 {
+	return rn.RndUptoSess(nil, n, f)
+}
+
+// RndUptoSess is RndUpto with explicit session residual sticky.
+func (rn *RandomNumber) RndUptoSess(s *Session, n uint32, f Filter) uint32 {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
-	return rn.curr.RndUptoFilter(n, f)
+	return rn.curr.RndUptoFilterSess(s, n, f)
 }
 
 // RndFlipcoin mirrors RandomNumber::rnd_flipcoin.
 func (rn *RandomNumber) RndFlipcoin(p uint32, f Filter) bool {
+	return rn.RndFlipcoinSess(nil, p, f)
+}
+
+// RndFlipcoinSess is RndFlipcoin with explicit session residual sticky.
+func (rn *RandomNumber) RndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	return rn.curr.RndFlipcoinFilter(p, f)
+	return rn.curr.RndFlipcoinFilterSess(s, p, f)
 }
 
 // RandomHexDigits mirrors RandomNumber::RandomHexDigits.
 func (rn *RandomNumber) RandomHexDigits(num int) string {
+	return rn.RandomHexDigitsSess(nil, num)
+}
+
+// RandomHexDigitsSess is RandomHexDigits with explicit session residual sticky.
+func (rn *RandomNumber) RandomHexDigitsSess(s *Session, num int) string {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return rn.curr.RandomHexDigits(num)
+	return rn.curr.RandomHexDigitsSess(s, num)
 }
 
 // RandomDigits mirrors RandomNumber::RandomDigits.
 func (rn *RandomNumber) RandomDigits(num int) string {
+	return rn.RandomDigitsSess(nil, num)
+}
+
+// RandomDigitsSess is RandomDigits with explicit session residual sticky.
+func (rn *RandomNumber) RandomDigitsSess(s *Session, num int) string {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return rn.curr.RandomDigits(num)
+	return rn.curr.RandomDigitsSess(s, num)
 }
 
 // Kind returns the active generator kind (Go helper for tests / Switch).
 func (rn *RandomNumber) Kind() RngKind {
+	return rn.KindSess(nil)
+}
+
+// KindSess is Kind with explicit session residual sticky.
+func (rn *RandomNumber) KindSess(s *Session) RngKind {
 	if rn == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return RngKindDefault
 	}
 	return rn.currKind
