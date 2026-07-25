@@ -455,7 +455,7 @@ func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPoint
 	for _, f := range *facts {
 		drop := false
 		for _, v := range vars {
-			if v.Match(f.Var) {
+			if v.MatchSess(s, f.Var) {
 				// residual ERROR sticky — no invent drop-true past Match hole
 				if sessHasError(s) {
 					*facts = IncompleteFactSlice()
@@ -479,7 +479,7 @@ func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPoint
 	for i, f := range out {
 		cur := f
 		for _, v := range vars {
-			if nf := cur.MarkDeadVar(v); nf != nil {
+			if nf := cur.MarkDeadVarSess(s, v); nf != nil {
 				// residual ERROR sticky — no invent mark-dead success past MarkDeadVar hole
 				if sessHasError(s) {
 					*facts = IncompleteFactSlice()

@@ -341,7 +341,7 @@ func (e *Expression) GetTypeUncastSess(s *Session) *Type {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		ty := e.Invoke.GetType()
+		ty := e.Invoke.GetTypeSess(s)
 		// residual ERROR sticky — no invent invoke type past GetType residual hole
 		if sessHasError(s) {
 			return nil
@@ -366,7 +366,7 @@ func (e *Expression) GetTypeUncastSess(s *Session) *Type {
 			return nil
 		}
 		if e.Assign.Lhs != nil {
-			t := e.Assign.Lhs.GetType()
+			t := e.Assign.Lhs.GetTypeSess(s)
 			// residual ERROR sticky — no invent assign type past Lhs GetType residual hole
 			if sessHasError(s) {
 				return nil

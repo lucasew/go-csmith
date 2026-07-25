@@ -457,7 +457,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	if item.Type.IsAggregate() {
+	if item.Type.IsAggregateSess(vsSess(vs)) {
 		// residual ERROR sticky — no invent soft-continue expand past IsAggregate residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -1076,7 +1076,7 @@ func (vs *VariableSelector) MakeInitValue(
 	qfer.AcceptStricter = false
 
 	// VariableSelector.cpp:836–841 — non-pointer or 20% chance → constant
-	ptrLike := t.IsPointerLike()
+	ptrLike := t.IsPointerLikeSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-init path past IsPointerLike residual
 	if sessHasError(vsSess(vs)) {
 		return nil
@@ -1087,7 +1087,7 @@ func (vs *VariableSelector) MakeInitValue(
 			return nil
 		}
 		// VariableSelector.cpp:838–839 — assert simple != void sticky
-		simple := t.IsSimple()
+		simple := t.IsSimpleSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-const past IsSimple residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -1171,12 +1171,12 @@ func (vs *VariableSelector) MakeInitValue(
 		qferDeref.RemoveQualifiers(1)
 		qferDeref.AcceptStricter = false
 		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
-		isPtrLike := pointee.IsPointerLike()
+		isPtrLike := pointee.IsPointerLikeSess(firstSess(vsSess(vs), cg.Sess))
 		// residual ERROR sticky — no invent soft-useLocal past IsPointerLike residual
 		if sessHasError(vsSess(vs)) {
 			return nil
 		}
-		isVol := qferDeref.IsVolatile()
+		isVol := qferDeref.IsVolatileSess(firstSess(vsSess(vs), cg.Sess))
 		// residual ERROR sticky — no invent soft-useLocal past IsVolatile residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -1792,7 +1792,7 @@ func ChooseVarFull(
 		if sessHasError(cg.Sess) {
 			return nil
 		}
-		agg := want.IsAggregate()
+		agg := want.IsAggregateSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-expand past IsAggregate residual
 		if sessHasError(cg.Sess) {
 			return nil
@@ -2058,13 +2058,13 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 	}
 	// expand aggregates when want is simple or aggregate (choose_var:403–406)
 	cands := vars
-	simple := want.IsSimple()
+	simple := want.IsSimpleSess(s)
 	// residual ERROR sticky — no invent soft-expand past IsSimple residual
 	if sessHasError(s) {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	agg := want.IsAggregate()
+	agg := want.IsAggregateSess(s)
 	// residual ERROR sticky — no invent soft-expand past IsAggregate residual
 	if sessHasError(s) {
 		return nil
@@ -2083,7 +2083,7 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		if skipConst && x.IsConst() {
+		if skipConst && x.IsConstSess(s) {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsConst hole
 			if sessHasError(s) {
 				return nil
@@ -2376,7 +2376,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
 	// VariableSelector.cpp:600–602 — no access_once on NonArray path
-	volQ := varQfer.IsVolatile()
+	volQ := varQfer.IsVolatileSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-register past qfer IsVolatile residual
 	if sessHasError(vsSess(vs)) {
 		return nil
@@ -2477,7 +2477,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
 	// VariableSelector.cpp:567–572 — access_once only for non-volatile globals
-	volQ := varQfer.IsVolatile()
+	volQ := varQfer.IsVolatileSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-register past qfer IsVolatile residual
 	if sessHasError(vsSess(vs)) {
 		return nil
@@ -2490,7 +2490,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	}
 	// wrap_volatiles → VOL_RVAL on Output
 	if vs.Opts.WrapVolatiles {
-		vol := v.IsVolatile()
+		vol := v.IsVolatileSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -2572,7 +2572,7 @@ func (vs *VariableSelector) SelectGlobalMT(
 		return nil
 	}
 	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
-	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
+	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatileSess(vsSess(vs))
 	// VariableSelector.cpp:690 — random_type_from_type(type, no_volatile) defaults strict_simple=false
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol, false)
 	// VariableSelector.cpp:691–693 — ERROR_GUARD(nullptr); no soft invent keep original type
@@ -2848,7 +2848,7 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 		return nil
 	}
 	// VariableSelector.cpp:973–974 assert non-void simple sticky
-	simple := t.IsSimple()
+	simple := t.IsSimpleSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-param past IsSimple residual
 	if sessHasError(vsSess(vs)) {
 		return nil
@@ -3075,7 +3075,7 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	}
 	// wrap_volatiles for Output
 	if vs.Opts.WrapVolatiles {
-		vol := v.IsVolatile()
+		vol := v.IsVolatileSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -3371,7 +3371,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	// ArrayVariable.cpp:190–191 — CreateArrayVariable already registered GlobalList/local
 	// VariableSelector.cpp:1371–1377 — DFA facts + new_globals (not a second list push)
 	if asGlobal {
-		vol := av.IsVolatile()
+		vol := av.IsVolatileSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-register array past IsVolatile residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -3622,7 +3622,7 @@ func (vs *VariableSelector) SelectWithInvalid(
 			return nil
 		}
 		if !seFree {
-			vol := v.IsVolatile()
+			vol := v.IsVolatileSess(vsSess(vs))
 			// residual ERROR sticky — no invent soft-null past IsVolatile residual
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -3741,7 +3741,7 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type no_vol
 	matchT := t
 	if t != nil {
-		simple := t.IsSimple()
+		simple := t.IsSimpleSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-match past IsSimple residual
 		if sessHasError(vsSess(vs)) {
 			return nil

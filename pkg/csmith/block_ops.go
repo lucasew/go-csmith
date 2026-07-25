@@ -48,8 +48,8 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	if !b.Looping {
 		return false
 	}
-	s := b.GetLastStm()
-	if s != nil && s.MustJump() {
+	s := b.GetLastStmSess(cg.Sess)
+	if s != nil && s.MustJumpSess(cg.Sess) {
 		return false
 	}
 	// residual ERROR sticky — no invent not-must-jump soft-skip past MustJump hole

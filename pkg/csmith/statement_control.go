@@ -21,7 +21,7 @@ func (st Stmt) MustReturnSess(s *Session) bool {
 		return true
 	case StmtIfElse:
 		// StatementIf — if_true.must_return() && if_false.must_return()
-		blks := GetBlocksStmt(&st)
+		blks := GetBlocksStmtSess(s, &st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
 			// incomplete arms sticky not-must-return (no invent soft-skip missing arm)
 			sessNoteError(s, ErrGeneric)
@@ -79,14 +79,14 @@ func (st Stmt) MustJumpSess(s *Session) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := st.Expr.NotEquals(0)
+		ok := st.Expr.NotEqualsSess(s, 0)
 		// residual ERROR sticky — no invent must-jump true past NotEquals residual hole
 		if sessHasError(s) {
 			return false
 		}
 		return ok
 	case StmtIfElse:
-		blks := GetBlocksStmt(&st)
+		blks := GetBlocksStmtSess(s, &st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
 			// StatementIf always both arms; incomplete sticky not-must-jump
 			sessNoteError(s, ErrGeneric)

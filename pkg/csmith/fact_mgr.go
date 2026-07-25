@@ -675,8 +675,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	switch st.Kind {
 	case StmtContinue, StmtBreak:
 		// FactMgr.cpp:257–262 — remove_loop_local_facts(s, facts_copy) full FactVec
-		cp = RemoveLoopLocalFactsForStmt(cp, st, blk)
-		outU = RemoveLoopLocalUnionFactsForStmt(outU, st, blk)
+		cp = RemoveLoopLocalFactsForStmtSess(fmSess(fm), cp, st, blk)
+		outU = RemoveLoopLocalUnionFactsForStmtSess(fmSess(fm), outU, st, blk)
 	case StmtReturn:
 		// FactMgr.cpp:268–270 — remove_function_local_facts(facts_copy, s)
 		// stack check uses s->parent (blk); no invent f.Body-only walk
@@ -1941,11 +1941,16 @@ func RemoveLoopLocalFactsSess(s *Session, facts []*FactPointTo, blk *Block) []*F
 // RemoveLoopLocalFactsForStmt mirrors remove_loop_local_facts(Statement*).
 // FactMgr.cpp:603–605 — block stmt uses itself; else use parent.
 func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) []*FactPointTo {
+	return RemoveLoopLocalFactsForStmtSess(nil, facts, st, parent)
+}
+
+// RemoveLoopLocalFactsForStmtSess is RemoveLoopLocalFactsForStmt on bag s.
+func RemoveLoopLocalFactsForStmtSess(s *Session, facts []*FactPointTo, st *Stmt, parent *Block) []*FactPointTo {
 	b := parent
 	if st != nil && st.Kind == StmtBlock && st.Then != nil {
 		b = st.Then
 	}
-	return RemoveLoopLocalFactsSess(nil, facts, b)
+	return RemoveLoopLocalFactsSess(s, facts, b)
 }
 
 // RemoveLoopLocalUnionFacts is the eUnionWrite half of remove_loop_local_facts.
@@ -1995,11 +2000,16 @@ func RemoveLoopLocalUnionFactsSess(s *Session, facts []*FactUnion, blk *Block) [
 // RemoveLoopLocalUnionFactsForStmt is remove_loop_local_facts eUnionWrite for Statement*.
 // FactMgr.cpp:603–605 — block stmt uses itself; else use parent.
 func RemoveLoopLocalUnionFactsForStmt(facts []*FactUnion, st *Stmt, parent *Block) []*FactUnion {
+	return RemoveLoopLocalUnionFactsForStmtSess(nil, facts, st, parent)
+}
+
+// RemoveLoopLocalUnionFactsForStmtSess is RemoveLoopLocalUnionFactsForStmt on bag s.
+func RemoveLoopLocalUnionFactsForStmtSess(s *Session, facts []*FactUnion, st *Stmt, parent *Block) []*FactUnion {
 	b := parent
 	if st != nil && st.Kind == StmtBlock && st.Then != nil {
 		b = st.Then
 	}
-	return RemoveLoopLocalUnionFactsSess(nil, facts, b)
+	return RemoveLoopLocalUnionFactsSess(s, facts, b)
 }
 
 // collectLoopLocalVars walks blk → parents until a looping block (inclusive).

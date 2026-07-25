@@ -1593,7 +1593,7 @@ func (f *FactPointTo) MarkDeadVarSess(s *Session, v *Variable) *FactPointTo {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	if !v.FieldVarsComplete() {
+	if !v.FieldVarsCompleteSess(s) {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
@@ -1609,7 +1609,7 @@ func (f *FactPointTo) MarkDeadVarSess(s *Session, v *Variable) *FactPointTo {
 			pos = i
 			break
 		}
-		if v.HasFieldVar(p) {
+		if v.HasFieldVarSess(s, p) {
 			// residual ERROR sticky — no invent dead-pos true past HasFieldVar hole
 			if sessHasError(s) {
 				return nil
