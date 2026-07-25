@@ -982,7 +982,7 @@ func (f *Function) returnTypeCOptsSess(s *Session, opts Options) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		out := f.RV.Qfer.OutputQualifiedTypeOpts(f.RV.Type, opts)
+		out := f.RV.Qfer.OutputQualifiedTypeOptsSess(s, f.RV.Type, opts)
 		// residual ERROR sticky — no invent soft-empty return past OutputQualifiedType residual
 		if sessHasError(s) {
 			return ""
@@ -994,7 +994,7 @@ func (f *Function) returnTypeCOptsSess(s *Session, opts Options) string {
 		return out
 	}
 	if f.ReturnType != nil {
-		cn := f.ReturnType.CName()
+		cn := f.ReturnType.CNameSess(s)
 		// residual ERROR sticky — no invent soft-empty return past CName residual
 		if sessHasError(s) {
 			return ""
@@ -1072,7 +1072,7 @@ func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 			return ""
 		}
 		// Variable always has live name + qualified type; sticky no invent "int " / " p"
-		ty := p.Qfer.OutputQualifiedTypeOpts(p.Type, opts)
+		ty := p.Qfer.OutputQualifiedTypeOptsSess(s, p.Type, opts)
 		// residual ERROR sticky — no invent soft-continue later params past OutputQualifiedType residual
 		if sessHasError(s) {
 			return ""
@@ -1397,7 +1397,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 	s += OutputCommentLineSess(sess, "------------------------------------------", false, f.EmitConcise)
 	// Function.cpp:568–570 — feffect.Output when !concise
 	if !f.EmitConcise {
-		s += f.FEffect.CommentOutput()
+		s += f.FEffect.CommentOutputSess(sess)
 		// residual ERROR sticky — no invent soft-continue past CommentOutput residual
 		if sessHasError(sess) {
 			return ""

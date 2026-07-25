@@ -65,7 +65,7 @@ func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceSt
 	// Variable.cpp:861–863 — if (!vars.empty() && !vars[0]->is_global())
 	// OutputArrayInitializers: declares int i,j,k… whenever any array dim > 0,
 	// even if every array uses brace init (no_loop_initializer true).
-	if !vars[0].IsGlobal() {
+	if !vars[0].IsGlobalSess(s) {
 		// residual ERROR sticky — no invent soft-skip initializers past IsGlobal residual
 		if sessHasError(s) {
 			return ""

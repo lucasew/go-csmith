@@ -673,7 +673,7 @@ func CtrlVarNamesSess(s *Session, ctrl []*Variable) []string {
 	}
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
-		name := v.GetActualName(false)
+		name := v.GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent soft-continue later names past GetActualName residual
 		if sessHasError(s) {
 			return IncompleteLabelsSlice()
@@ -714,7 +714,7 @@ func OutputArrayCtrlVarsSess(s *Session, ctrl []*Variable, dimen int, indent str
 	}
 	for i := 0; i < dimen; i++ {
 		// Variable.cpp:806 — get_actual_name always live; sticky no invent "int i, ;"
-		nm := ctrl[i].GetActualName(false)
+		nm := ctrl[i].GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent soft-continue later ctrl past GetActualName residual
 		if sessHasError(s) {
 			return ""
@@ -730,7 +730,7 @@ func OutputArrayCtrlVarsSess(s *Session, ctrl []*Variable, dimen int, indent str
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		nm := ctrl[i].GetActualName(false)
+		nm := ctrl[i].GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
 		if sessHasError(s) {
 			return ""
@@ -828,7 +828,7 @@ func OutputArrayInitializersSess(s *Session, vars []*Variable, opts Options, ind
 		if av.Collective != nil {
 			continue
 		}
-		if av.NoLoopInitializer() {
+		if av.NoLoopInitializerSess(s) {
 			// residual ERROR sticky — no invent soft-skip then partial inits past hole
 			if sessHasError(s) {
 				return ""

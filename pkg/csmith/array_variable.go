@@ -1109,7 +1109,7 @@ func (av *ArrayVariable) OutputWithIndicesSess(s *Session, ctrl []string) string
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := av.GetActualName(false)
+	name := av.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
 	if sessHasError(s) {
 		return ""
@@ -1161,7 +1161,7 @@ func (av *ArrayVariable) OutputInitOptsSess(s *Session, indent string, ctrl []st
 		return ""
 	}
 	// no_loop_initializer: soft empty (brace def path used instead)
-	if av.NoLoopInitializer() {
+	if av.NoLoopInitializerSess(s) {
 		// residual ERROR sticky — no invent empty soft-success past NoLoopInitializer residual
 		if sessHasError(s) {
 			return ""
