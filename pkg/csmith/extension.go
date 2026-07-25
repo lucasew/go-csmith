@@ -130,20 +130,29 @@ func AbsExtensionOutputFirstFunInvocation(invokeOut string) string {
 // AbsExtension.cpp:81–90 — GenerateParameterVariable per value into func.Params.
 // Incomplete func/values/VS sticky false.
 func AbsExtensionGenerateFirstParameterList(f *Function, values []*ExtensionValue, vs *VariableSelector) bool {
+	var s *Session
+	if vs != nil {
+		s = vs.Sess
+	}
+	return AbsExtensionGenerateFirstParameterListSess(s, f, values, vs)
+}
+
+// AbsExtensionGenerateFirstParameterListSess is AbsExtensionGenerateFirstParameterList on bag s.
+func AbsExtensionGenerateFirstParameterListSess(s *Session, f *Function, values []*ExtensionValue, vs *VariableSelector) bool {
 	if f == nil || vs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for _, ev := range values {
 		q := ev.Qfer
 		v := vs.GenerateParameterVariableTyped(ev.Type, q)
-		if v == nil || sessHasError(nil) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if v == nil || sessHasError(s) {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return false
 		}
@@ -156,21 +165,26 @@ func AbsExtensionGenerateFirstParameterList(f *Function, values []*ExtensionValu
 // AbsExtension.cpp:64–78 — FunctionInvocationUser with ExpressionVariable params.
 // Incomplete sticky nil.
 func AbsExtensionMakeFuncInvocation(f *Function, values []*ExtensionValue) *Invocation {
+	return AbsExtensionMakeFuncInvocationSess(nil, f, values)
+}
+
+// AbsExtensionMakeFuncInvocationSess is AbsExtensionMakeFuncInvocation on bag s.
+func AbsExtensionMakeFuncInvocationSess(s *Session, f *Function, values []*ExtensionValue) *Invocation {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Build a FunctionInvocationUser with fixed ExpressionVariable params.
 	fi := &Invocation{User: f}
 	for _, ev := range values {
 		// VariableSelector::new_variable(name, type, null init, qfer)
-		v := CreateVariableScalars(ev.Name, ev.Type, false, false)
+		v := CreateVariableScalarsSess(s, ev.Name, ev.Type, false, false)
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		v.Qfer = ev.Qfer
@@ -271,7 +285,7 @@ func ExtensionMgrGenerateFirstParameterListSess(s *Session, f *Function, vs *Var
 	if !s.ExtensionActive {
 		return
 	}
-	if !AbsExtensionGenerateFirstParameterList(f, s.ExtValues, vs) {
+	if !AbsExtensionGenerateFirstParameterListSess(s, f, s.ExtValues, vs) {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
 		}

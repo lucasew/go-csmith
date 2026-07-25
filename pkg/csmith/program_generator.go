@@ -293,7 +293,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	AddInterestedFactsSess(g.Sess, interests)
 	// Function.cpp:792–793 — initialize_builtin_functions when builtins on
 	if g.Opts.Builtins {
-		InitializeBuiltinFunctions(g.Opts, g.Probs, g.Rng, &g.Funcs, g.FactMgrs)
+		InitializeBuiltinFunctionsSess(g.Sess, g.Opts, g.Probs, g.Rng, &g.Funcs, g.FactMgrs)
 	}
 	// Function.cpp:796–797 — make_first; ERROR_RETURN
 	first := MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)

@@ -123,13 +123,18 @@ func EnabledBuiltin(opts Options, kinds string) bool {
 // Prefer MakeDummyBlockCG when CGContext is available (fact_in + post_creation).
 // Block.cpp:95–110 — empty block, stack push/pop, fact_in, post_creation_analysis.
 func MakeDummyBlock(f *Function) *Block {
+	return MakeDummyBlockSess(nil, f)
+}
+
+// MakeDummyBlockSess is MakeDummyBlock allocating StmID on bag s.
+func MakeDummyBlockSess(s *Session, f *Function) *Block {
 	// Block always has live Function; sticky no invent dummy body without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Library path without CGContext: still register block (no soft invent body stmts)
-	b := &Block{Func: f, blockSize: 0, StmID: AllocStmID()}
+	b := &Block{Func: f, blockSize: 0, StmID: AllocStmIDSess(s)}
 	f.Blocks = append(f.Blocks, b)
 	return b
 }
@@ -188,6 +193,14 @@ func GenerateParameterListFromString(f *Function, params string) bool {
 // MakeBuiltinFunction mirrors Function::make_builtin_function.
 // Function.cpp:734–771.
 func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap, line string) *Function {
+	return MakeBuiltinFunctionSess(nil, opts, probs, r, list, fmMap, line)
+}
+
+// MakeBuiltinFunctionSess is MakeBuiltinFunction with StmID / sticky on bag s.
+func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap, line string) *Function {
+	if s == nil && fmMap != nil {
+		s = fmMap.Sess
+	}
 	parts := SplitString(line, ';')
 	// trim each
 	for i := range parts {
@@ -203,24 +216,24 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 		}
 	} else {
 		// Function.cpp:744 — assert(0 && "Invalid builtin function format!") sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	ty := TypeFromString(parts[0])
 	if ty == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	name := parts[1]
 	// Function.cpp always has live name token; sticky (no invent empty-name builtin shell)
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// Function.cpp:752 — CVQualifiers::random_qualifiers always has process RNG
 	// sticky — no invent fixed non-const RV / NewProbabilities when session missing
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	f := &Function{
@@ -233,15 +246,15 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 	if f.RV == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// params from ( ... )
 	paramStr := GetSubstring(parts[2], '(', ')')
 	// Function.cpp:345+ — assert-path on bad param list; sticky no soft invent empty params
 	if !GenerateParameterListFromString(f, paramStr) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return nil
 	}
@@ -253,7 +266,7 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	_ = fm
 	// dummy body (no random generation for builtins)
 	// Block.cpp:97 assert(curr_func) — f is live
-	f.Body = MakeDummyBlock(f)
+	f.Body = MakeDummyBlockSess(s, f)
 	f.ComputeSummary(EmptyEffect())
 	f.BuildState = BuildBuilt
 	f.IsBuilt = true
@@ -266,12 +279,20 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 // InitializeBuiltinFunctions mirrors Function::initialize_builtin_functions.
 // Function.cpp:700–732.
 func InitializeBuiltinFunctions(opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap) int {
+	return InitializeBuiltinFunctionsSess(nil, opts, probs, r, list, fmMap)
+}
+
+// InitializeBuiltinFunctionsSess is InitializeBuiltinFunctions on bag s.
+func InitializeBuiltinFunctionsSess(s *Session, opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap) int {
+	if s == nil && fmMap != nil {
+		s = fmMap.Sess
+	}
 	if !opts.Builtins {
 		return 0
 	}
 	n := 0
 	for _, line := range builtinFunctionStrings {
-		if MakeBuiltinFunction(opts, probs, r, list, fmMap, line) != nil {
+		if MakeBuiltinFunctionSess(s, opts, probs, r, list, fmMap, line) != nil {
 			n++
 		}
 	}
