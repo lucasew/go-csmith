@@ -487,7 +487,7 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		// entries so post-left still holds the pre-RHS FactUnion* (same as C++
 		// Fact* vector copy). Deep clone would freeze post-left at post-left
 		// values but is not required for merge_facts semantics.
-		afterLeftUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
+		afterLeftUnion = CloneUnionFactSliceSess(sessFromCG(cg), cg.FM.UnionFacts)
 		if hasErrCG(cg) || !UnionFactsComplete(afterLeftUnion) {
 			if !hasErrCG(cg) {
 				noteErrCG(cg, ErrGeneric)

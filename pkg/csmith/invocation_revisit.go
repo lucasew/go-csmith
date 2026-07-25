@@ -681,7 +681,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 			noteErrCG(cg, ErrGeneric)
 			return false
 		}
-		clU := CloneUnionFactSlice(cg.FM.UnionFacts)
+		clU := CloneUnionFactSliceSess(sessFromCG(cg), cg.FM.UnionFacts)
 		if hasErrCG(cg) || !UnionFactsComplete(clU) {
 			restore()
 			if !hasErrCG(cg) {

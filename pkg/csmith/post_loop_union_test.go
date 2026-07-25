@@ -19,12 +19,12 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	newU.CreateFieldVarsSess(testAmbientSession)
 	newU.Init = MakeIntSess(testAmbientSession, 0)
 	// preUnion (make_iteration snap) differs from map_in — must not clobber map_in
-	preU := []*FactUnion{MakeFactUnion(oldU, 0)}
+	preU := []*FactUnion{MakeFactUnionSess(testAmbientSession, oldU, 0)}
 	// map_in after fair FP: old last_write 4 + body-created new global
-	mapIn := []*FactUnion{MakeFactUnion(oldU, 4), MakeFactUnion(newU, 0)}
+	mapIn := []*FactUnion{MakeFactUnionSess(testAmbientSession, oldU, 4), MakeFactUnionSess(testAmbientSession, newU, 0)}
 	body := &Block{Func: f, Looping: true, StmID: AllocStmID()}
 	fm.SetMapFactsInPair(body.StmID, []*FactPointTo{}, mapIn)
-	fm.UnionFacts = CloneUnionFactSliceDeep(mapIn)
+	fm.UnionFacts = CloneUnionFactSliceDeepSess(testAmbientSession, mapIn)
 	fm.GlobalFacts = []*FactPointTo{}
 	if fm.MapStmEffect == nil {
 		fm.MapStmEffect = make(map[int]Effect)
@@ -36,11 +36,11 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	gotOld := FindRelatedUnion(fm.UnionFacts, oldU)
+	gotOld := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, oldU)
 	if gotOld == nil || gotOld.LastWrittenFID != 4 {
 		t.Fatalf("non-must_return must keep map_in last_write 4, got %#v", gotOld)
 	}
-	gotNew := FindRelatedUnion(fm.UnionFacts, newU)
+	gotNew := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, newU)
 	if gotNew == nil {
 		t.Fatal("map_in body-created union must remain")
 	}
@@ -66,12 +66,12 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u_pc", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
-	entryU := MakeFactUnion(uv, 0)
-	bottomU := MakeFactUnion(uv, 0)
+	entryU := MakeFactUnionSess(testAmbientSession, uv, 0)
+	bottomU := MakeFactUnionSess(testAmbientSession, uv, 0)
 	if entryU == nil || bottomU == nil {
 		t.Fatal("facts")
 	}
-	bottomU.SetBottom()
+	bottomU.SetBottomSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// outer function body (non-looping) so post_creation does not append return
 	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
@@ -98,11 +98,11 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	}
 	// map_facts_in must retain entry last=0 (no self-back merge of BOTTOM live)
 	inU := fm.GetMapUnionFactsIn(body.StmID)
-	got := FindRelatedUnion(inU, uv)
+	got := FindRelatedUnionSess(testAmbientSession, inU, uv)
 	if got == nil {
 		t.Fatal("map_in must keep union subject")
 	}
-	if got.IsBottom() || got.LastWrittenFID != 0 {
+	if got.IsBottomSess(testAmbientSession) || got.LastWrittenFID != 0 {
 		t.Fatalf("post_creation FP must seed from map_in entry last=0, got %#v", got)
 	}
 }

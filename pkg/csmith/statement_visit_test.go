@@ -643,21 +643,21 @@ func TestVisitFactsStatementForMergesBreakUnionWrite(t *testing.T) {
 		Then: body,
 	}
 	// live last=f0; break arm last=f1 → join BOTTOM (FactUnion.cpp merge_jump_facts)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 12, PostDest: true}}
-	fm.SetMapFactsOutPair(99, []*FactPointTo{}, []*FactUnion{MakeFactUnion(uv, 1)})
+	fm.SetMapFactsOutPair(99, []*FactPointTo{}, []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 1)})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("visit", GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(fm.UnionFacts, uv)
+	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
 	if got == nil {
 		t.Fatal("missing union after break merge")
 	}
-	if !got.IsBottom() {
+	if !got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("break last=f1 join live last=f0 must BOTTOM, got %#v", got)
 	}
 }

@@ -261,8 +261,8 @@ func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	entryU := MakeFactUnion(parent, 0)
-	exitU := MakeFactUnion(parent, 1)
+	entryU := MakeFactUnionSess(testAmbientSession, parent, 0)
+	exitU := MakeFactUnionSess(testAmbientSession, parent, 1)
 	if entryU == nil || exitU == nil {
 		t.Fatal("MakeFactUnion")
 	}
@@ -954,8 +954,8 @@ func TestRemoveLoopLocalUnionFactsDropsParentLocals(t *testing.T) {
 	// continue lives in inner; walk collects inner + parent (l_810) + loop locals
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)})
 	fm.UnionFacts = []*FactUnion{
-		MakeFactUnion(CreateVariableScalarsSess(testAmbientSession, "g_25", ut, true, false), 0),
-		MakeFactUnion(l810, 0),
+		MakeFactUnionSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_25", ut, true, false), 0),
+		MakeFactUnionSess(testAmbientSession, l810, 0),
 	}
 	cont := &Stmt{Kind: StmtContinue, StmID: 379}
 	fm.SetMapFactsOutForStmt(cont, []*FactPointTo{}, inner)
@@ -966,11 +966,11 @@ func TestRemoveLoopLocalUnionFactsDropsParentLocals(t *testing.T) {
 	if !UnionFactsComplete(outU) {
 		t.Fatal("map_union_out incomplete", outU)
 	}
-	if FindRelatedUnion(outU, l810) != nil {
+	if FindRelatedUnionSess(testAmbientSession, outU, l810) != nil {
 		t.Fatalf("continue map_out must OOS parent-block union l_810, got %v", outU)
 	}
 	// global union subject must remain
-	if FindRelatedUnion(outU, fm.UnionFacts[0].Var) == nil {
+	if FindRelatedUnionSess(testAmbientSession, outU, fm.UnionFacts[0].Var) == nil {
 		t.Fatal("must keep non-loop-local union subject", outU)
 	}
 }

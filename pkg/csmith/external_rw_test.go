@@ -46,7 +46,7 @@ func TestFindRelatedPointToNilHole(t *testing.T) {
 	if FindRelatedPointTo(facts, p) != nil {
 		t.Fatal("nil fact hole must fail closed (no invent skip to later)")
 	}
-	if FindRelatedUnion([]*FactUnion{nil}, p) != nil {
+	if FindRelatedUnionSess(testAmbientSession, []*FactUnion{nil}, p) != nil {
 		t.Fatal("nil union fact hole must fail closed")
 	}
 }

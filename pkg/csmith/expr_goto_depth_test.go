@@ -150,7 +150,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	}}
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	gu.Init = MakeIntSess(testAmbientSession, 0)
-	u := MakeFactUnion(gu, 0)
+	u := MakeFactUnionSess(testAmbientSession, gu, 0)
 	// dest has union lattice; prev/cur outs empty union (size match via PT only)
 	fm.MapUnionFactsIn = map[int][]*FactUnion{10: {u}}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{10: {u}}

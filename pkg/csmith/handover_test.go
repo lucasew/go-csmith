@@ -128,18 +128,18 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 		t.Fatal("local union var")
 	}
 	fm.UnionFacts = []*FactUnion{
-		MakeFactUnion(gu, 0),
-		MakeFactUnion(lu, 0),
+		MakeFactUnionSess(testAmbientSession, gu, 0),
+		MakeFactUnionSess(testAmbientSession, lu, 0),
 	}
 	// empty keepPT (no transitive) — only globals/params
 	fm.FilterUnionFactsForHandover([]*FactPointTo{})
 	if !UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("complete handover filter must stay complete", fm.UnionFacts)
 	}
-	if FindRelatedUnion(fm.UnionFacts, gu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, gu) == nil {
 		t.Fatal("global union FactUnion must survive handover")
 	}
-	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, lu) != nil {
 		t.Fatal("stack-only union FactUnion must drop on handover", fm.UnionFacts)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -150,32 +150,32 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, callee)
 	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, ut), true, false)
-	fm2.UnionFacts = []*FactUnion{MakeFactUnion(lu, 1)}
+	fm2.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, lu, 1)}
 	keepPT := []*FactPointTo{MakeFactPointTo(gp, lu)}
 	fm2.FilterUnionFactsForHandover(keepPT)
-	if FindRelatedUnion(fm2.UnionFacts, lu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, fm2.UnionFacts, lu) == nil {
 		t.Fatal("pointee local union FactUnion must survive transitive keep", fm2.UnionFacts)
 	}
 
 	// Clone + renew round-trip (FunctionInvocationUser.cpp:206 + 221)
 	ClearErrorSess(testAmbientSession)
-	callerUF := []*FactUnion{MakeFactUnion(gu, 0)}
-	cloned := CloneUnionFactSlice(callerUF)
-	if len(cloned) != 1 || FindRelatedUnion(cloned, gu) == nil {
+	callerUF := []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0)}
+	cloned := CloneUnionFactSliceSess(testAmbientSession, callerUF)
+	if len(cloned) != 1 || FindRelatedUnionSess(testAmbientSession, cloned, gu) == nil {
 		t.Fatal("CloneUnionFactSlice", cloned)
 	}
 	// callee wrote field 1 on global
-	retUF := []*FactUnion{MakeFactUnion(gu, 1)}
-	if !RenewUnionFacts(&callerUF, retUF) {
+	retUF := []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 1)}
+	if !RenewUnionFactsSess(testAmbientSession, &callerUF, retUF) {
 		t.Fatal("RenewUnionFacts should change")
 	}
-	if FindRelatedUnion(callerUF, gu).LastWrittenFID != 1 {
+	if FindRelatedUnionSess(testAmbientSession, callerUF, gu).LastWrittenFID != 1 {
 		t.Fatal("renew last-write", callerUF)
 	}
 	// GlobalUnionFactsOnly drops locals
-	mixed := []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
-	onlyG := GlobalUnionFactsOnly(mixed)
-	if FindRelatedUnion(onlyG, gu) == nil || FindRelatedUnion(onlyG, lu) != nil {
+	mixed := []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
+	onlyG := GlobalUnionFactsOnlySess(testAmbientSession, mixed)
+	if FindRelatedUnionSess(testAmbientSession, onlyG, gu) == nil || FindRelatedUnionSess(testAmbientSession, onlyG, lu) != nil {
 		t.Fatal("GlobalUnionFactsOnly", onlyG)
 	}
 }
@@ -194,9 +194,9 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	}
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	facts := []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	UpdateUnionFactsForOOSVars([]*Variable{lu}, &facts)
-	if FindRelatedUnion(facts, gu) == nil || FindRelatedUnion(facts, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, facts, gu) == nil || FindRelatedUnionSess(testAmbientSession, facts, lu) != nil {
 		t.Fatal("OOS must drop local keep global", facts)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -205,9 +205,9 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	// FM path also drops UnionFacts
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	fm.UpdateFactsForOOSVars([]*Variable{lu})
-	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, lu) != nil {
 		t.Fatal("FM OOS must drop UnionFacts for OOS var", fm.UnionFacts)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -235,7 +235,7 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	f.Body = body
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	// Nested block: OOS locals only (parent != nil skips remove_function_local)
 	outPT := CloneFactSlice(fm.GlobalFacts)
 	UpdateFactsForOOSVars(body.LocalVars, &outPT)
@@ -244,14 +244,14 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 		t.Fatal("SetMapFactsOutForBlock sticky", HasErrorSess(testAmbientSession))
 	}
 	// live UnionFacts must remain pre-OOS (post_creation keeps live during FP)
-	if FindRelatedUnion(fm.UnionFacts, lu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, lu) == nil {
 		t.Fatal("live UnionFacts must not be mutated by SetMapFactsOutForBlock")
 	}
 	gotU := fm.GetMapUnionFactsOut(body.StmID)
-	if FindRelatedUnion(gotU, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, gotU, lu) != nil {
 		t.Fatal("map_union_out must drop body-local union subject", gotU)
 	}
-	if FindRelatedUnion(gotU, gu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, gotU, gu) == nil {
 		t.Fatal("map_union_out must keep global union", gotU)
 	}
 	ClearErrorSess(testAmbientSession)

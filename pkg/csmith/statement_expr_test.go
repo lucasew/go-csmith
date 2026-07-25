@@ -138,7 +138,7 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	}
 	f0 := parent.FieldVars[0]
 	// pre-call: last written field 0 → f0 readable
-	preU := MakeFactUnion(parent, 0)
+	preU := MakeFactUnionSess(testAmbientSession, parent, 0)
 	if preU == nil {
 		t.Fatal("MakeFactUnion f0")
 	}
@@ -149,12 +149,12 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	factsCopy := append([]*FactPointTo(nil), fm.GlobalFacts...)
 	unionCopy := append([]*FactUnion(nil), fm.UnionFacts...)
 	// simulate failed call that wrote a different field
-	mut := MakeFactUnion(parent, 1)
+	mut := MakeFactUnionSess(testAmbientSession, parent, 1)
 	if mut == nil {
 		t.Fatal("MakeFactUnion f1")
 	}
 	fm.UnionFacts = []*FactUnion{mut}
-	if !IsNonreadableField(f0, fm.UnionFacts) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) {
 		t.Fatal("after mutate to f1 write, f0 must be nonreadable")
 	}
 	// full restore (production path after fix)
@@ -168,13 +168,13 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	if fm.UnionFacts[0].LastWrittenFID != 0 {
 		t.Fatalf("want last_written fid 0 after restore, got %d", fm.UnionFacts[0].LastWrittenFID)
 	}
-	if IsNonreadableField(f0, fm.UnionFacts) {
+	if IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) {
 		t.Fatal("after full restore, f0 must be readable again")
 	}
 	// PT-only restore must NOT be relied on for production: document the hole
 	fm.UnionFacts = []*FactUnion{mut}
 	fm.RestoreFacts(factsCopy) // legacy PT-only
-	if !IsNonreadableField(f0, fm.UnionFacts) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) {
 		t.Fatal("PT-only RestoreFacts must leave mutated union last-write (hole)")
 	}
 	ClearErrorSess(testAmbientSession)

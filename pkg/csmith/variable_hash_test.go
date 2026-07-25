@@ -168,7 +168,7 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	}
 	av.AsArray = av
 	// BOTTOM last-write → no field readable (FactUnion.cpp / seed 94-style)
-	facts := []*FactUnion{MakeFactUnion(&av.Variable, FactUnionBottom)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, &av.Variable, FactUnionBottom)}
 	out := hashArrayVariableSess(testAmbientSession, &av.Variable, nil, facts)
 	if out != "" {
 		t.Fatalf("empty field_names must skip hash entirely, got:\n%s", out)
@@ -182,7 +182,7 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 		t.Fatal("nil facts must hash all leaves", all)
 	}
 	// partial: only f0 readable → loops + f0 only
-	f0 := []*FactUnion{MakeFactUnion(&av.Variable, 0)}
+	f0 := []*FactUnion{MakeFactUnionSess(testAmbientSession, &av.Variable, 0)}
 	part := hashArrayVariableSess(testAmbientSession, &av.Variable, nil, f0)
 	if !strings.Contains(part, "g_336[i].f0") || strings.Contains(part, "g_336[i].f1") {
 		t.Fatal("want only f0", part)

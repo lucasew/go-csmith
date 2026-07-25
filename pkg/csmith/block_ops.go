@@ -862,7 +862,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			return nil
 		}
 		preFacts = CloneFactSliceSess(sessFromCG(cg), fm.GlobalFacts)
-		preUnion = CloneUnionFactSlice(fm.UnionFacts)
+		preUnion = CloneUnionFactSliceSess(sessFromCG(cg), fm.UnionFacts)
 		if hasErrCG(cg) || !UnionFactsComplete(preUnion) {
 			if !hasErrCG(cg) {
 				noteErrCG(cg, ErrGeneric)

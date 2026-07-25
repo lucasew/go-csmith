@@ -569,7 +569,7 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	// Type-nil non-special already sticky; complete non-union empty transfer hygiene.
 	ClearErrorSess(testAmbientSession)
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
-	out, n := AbstractFactUnionForAssign(nil, nil, iv, 0, nil, nil)
+	out, n := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, iv, 0, nil, nil)
 	if !UnionFactsComplete(out) && out != nil {
 		// IncompleteUnionFactSlice when incomplete maps — nil maps are complete empty
 	}
@@ -581,7 +581,7 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky
 	hole := &Variable{Name: "g_x", Type: nil}
-	uf, _ := AbstractFactUnionForAssign(nil, nil, hole, 0, nil, nil)
+	uf, _ := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, hole, 0, nil, nil)
 	if UnionFactsComplete(uf) {
 		// IncompleteUnionFactSlice is not complete
 		t.Fatal("Type-nil must fail closed incomplete", uf)
@@ -629,7 +629,7 @@ func TestRhsToLhsTransferUnionGetCollectiveResidualSticky(t *testing.T) {
 	lvars := []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false)}
 	// force union transfer path via RhsToLhsTransferUnion with TermVariable shell
 	rhs := &Expression{Term: TermVariable, Var: shell, ExprType: GetIntTypeSess(testAmbientSession)}
-	out := RhsToLhsTransferUnion(nil, nil, lvars, rhs)
+	out := RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, lvars, rhs)
 	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}
@@ -676,7 +676,7 @@ func TestAbstractFactUnionForAssignGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-abstract union past array shell.
 	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
-	out, _ := AbstractFactUnionForAssign(nil, nil, shell, 0, nil, nil)
+	out, _ := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, shell, 0, nil, nil)
 	if UnionFactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete
 	}

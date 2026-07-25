@@ -223,8 +223,8 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 		t.Fatal("need union fields")
 	}
 	f0 := parent.FieldVars[0]
-	entryU := MakeFactUnion(parent, 0) // then-entry: last write f0
-	exitU := MakeFactUnion(parent, 1)  // then-exit: last write f1
+	entryU := MakeFactUnionSess(testAmbientSession, parent, 0) // then-entry: last write f0
+	exitU := MakeFactUnionSess(testAmbientSession, parent, 1)  // then-exit: last write f1
 	if entryU == nil || exitU == nil {
 		t.Fatal("MakeFactUnion")
 	}
@@ -246,13 +246,13 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	if len(fm.UnionFacts) != 1 || fm.UnionFacts[0] == nil || fm.UnionFacts[0].LastWrittenFID != 0 {
 		t.Fatalf("want entry last_written 0, got %#v", fm.UnionFacts)
 	}
-	if IsNonreadableField(f0, fm.UnionFacts) {
+	if IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) {
 		t.Fatal("after map_facts_in assign, f0 must be readable")
 	}
 	// Document PT-only hole: SetGlobalFacts alone leaves exit union write
 	fm.UnionFacts = []*FactUnion{exitU}
 	fm.SetGlobalFacts([]*FactPointTo{}, "test_pt_only")
-	if !IsNonreadableField(f0, fm.UnionFacts) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) {
 		t.Fatal("PT-only SetGlobalFacts must leave exit union last-write (hole)")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -332,8 +332,8 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 		t.Fatal("need field")
 	}
 	f0 := parent.FieldVars[0]
-	entryU := MakeFactUnion(parent, 0)
-	exitU := MakeFactUnion(parent, 1)
+	entryU := MakeFactUnionSess(testAmbientSession, parent, 0)
+	exitU := MakeFactUnionSess(testAmbientSession, parent, 1)
 	if entryU == nil || exitU == nil {
 		t.Fatal("MakeFactUnion")
 	}
@@ -365,7 +365,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	if !UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("UnionFacts incomplete")
 	}
-	if FindRelatedUnion(fm.UnionFacts, parent) == nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, parent) == nil {
 		t.Fatal("union subject missing after if visit")
 	}
 	// Sanity: exit-only would make f0 nonreadable; merged then+else should not be stuck

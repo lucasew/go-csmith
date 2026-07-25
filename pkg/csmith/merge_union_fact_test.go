@@ -17,20 +17,20 @@ func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	// old already implies new → keep old (must not join-to-BOTTOM)
-	facts := []*FactUnion{MakeFactUnion(uv, 3)}
-	got := MergeUnionFactInto(facts, MakeFactUnion(uv, 3))
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 3)}
+	got := MergeUnionFactIntoSess(testAmbientSession, facts, MakeFactUnionSess(testAmbientSession, uv, 3))
 	if !UnionFactsComplete(got) || HasErrorSess(testAmbientSession) {
 		t.Fatal("into incomplete", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
-	fu := FindRelatedUnion(got, uv)
-	if fu == nil || fu.LastWrittenFID != 3 || fu.IsBottom() {
+	fu := FindRelatedUnionSess(testAmbientSession, got, uv)
+	if fu == nil || fu.LastWrittenFID != 3 || fu.IsBottomSess(testAmbientSession) {
 		t.Fatalf("want keep fid 3, got %#v", fu)
 	}
 	// 0 join 3 → BOTTOM
 	ClearErrorSess(testAmbientSession)
-	got2 := MergeUnionFactInto([]*FactUnion{MakeFactUnion(uv, 0)}, MakeFactUnion(uv, 3))
-	fu2 := FindRelatedUnion(got2, uv)
-	if fu2 == nil || !fu2.IsBottom() {
+	got2 := MergeUnionFactIntoSess(testAmbientSession, []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}, MakeFactUnionSess(testAmbientSession, uv, 3))
+	fu2 := FindRelatedUnionSess(testAmbientSession, got2, uv)
+	if fu2 == nil || !fu2.IsBottomSess(testAmbientSession) {
 		t.Fatalf("want BOTTOM after 0 join 3, got %#v", fu2)
 	}
 }
@@ -51,21 +51,21 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	// seed field-vars so IsUnion paths are live
 	uv.CreateFieldVarsSess(testAmbientSession)
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	// merge fid 4 into fid 0 → neither implies → BOTTOM (not replace with 4)
-	merged := MergeUnionFact(facts, MakeFactUnion(uv, 4))
+	merged := MergeUnionFact(facts, MakeFactUnionSess(testAmbientSession, uv, 4))
 	if !UnionFactsComplete(merged) || HasErrorSess(testAmbientSession) {
 		t.Fatal("merge incomplete", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(merged, uv)
-	if got == nil || !got.IsBottom() {
+	got := FindRelatedUnionSess(testAmbientSession, merged, uv)
+	if got == nil || !got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("want BOTTOM after 0 join 4, got %#v", got)
 	}
 	// old already implies new → keep old
 	ClearErrorSess(testAmbientSession)
-	facts2 := []*FactUnion{MakeFactUnion(uv, 3)}
-	merged2 := MergeUnionFact(facts2, MakeFactUnion(uv, 3))
-	got2 := FindRelatedUnion(merged2, uv)
+	facts2 := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 3)}
+	merged2 := MergeUnionFact(facts2, MakeFactUnionSess(testAmbientSession, uv, 3))
+	got2 := FindRelatedUnionSess(testAmbientSession, merged2, uv)
 	if got2 == nil || got2.LastWrittenFID != 3 {
 		t.Fatalf("want keep 3, got %#v", got2)
 	}
@@ -88,13 +88,13 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 	}
 	f3 := uv.FieldVars[1]
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	// definitive assign to union field f3 → renew last_written to field id of f3
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	if !fm.UpdateFactForAssign(f3, 0, rhs) {
 		t.Fatal("update", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(fm.UnionFacts, uv)
+	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
 	if got == nil || got.LastWrittenFID != f3.GetFieldIDSess(testAmbientSession) {
 		t.Fatalf("want renew to f3 fid, got %#v fieldID=%d", got, f3.GetFieldIDSess(testAmbientSession))
 	}
@@ -116,10 +116,10 @@ func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
 	u1.CreateFieldVarsSess(testAmbientSession)
 	// pointer that may point to either union's f4 field parent via indir write is complex;
 	// exercise MergeUnionFact join path used by may-assign: 0 join 4 → BOTTOM
-	facts := []*FactUnion{MakeFactUnion(u0, 0)}
-	merged := MergeUnionFact(facts, MakeFactUnion(u0, 4))
-	got := FindRelatedUnion(merged, u0)
-	if got == nil || !got.IsBottom() {
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, u0, 0)}
+	merged := MergeUnionFact(facts, MakeFactUnionSess(testAmbientSession, u0, 4))
+	got := FindRelatedUnionSess(testAmbientSession, merged, u0)
+	if got == nil || !got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("may-merge must BOTTOM not replace-to-4: %#v", got)
 	}
 	_ = u1
@@ -149,34 +149,34 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	f.Stack = []*Block{body}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// init fact last=0 (constant init of union)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	// IV assign g_721.f1 = 0
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("assign f1", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(fm.UnionFacts, uv)
+	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
 	if got == nil || got.LastWrittenFID != 1 {
 		t.Fatalf("after f1 write want last=1 got %#v", got)
 	}
 	// empty then/else blocks with entry last=1
 	thenB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
 	elseB := &Block{StmID: AllocStmID(), Func: f, Parent: body}
-	fm.SetMapFactsInPair(thenB.StmID, CloneFactSlice(fm.GlobalFacts), CloneUnionFactSliceDeep(fm.UnionFacts))
+	fm.SetMapFactsInPair(thenB.StmID, CloneFactSlice(fm.GlobalFacts), CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts))
 	fm.SetMapFactsOutForBlock(thenB, CloneFactSlice(fm.GlobalFacts))
 	// else starts from then map_in (StatementIf.cpp:97)
 	fm.AssignGlobalFactsFromMapIn(thenB.StmID)
 	fm.SetMapFactsOutForBlock(elseB, CloneFactSlice(fm.GlobalFacts))
 	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmID(), Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	prePT := CloneFactSlice(fm.GlobalFacts)
-	preU := CloneUnionFactSliceDeep(fm.UnionFacts)
+	preU := CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts)
 	CombineBranchFacts(ifSt, &prePT, &preU, fm)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("combine", GetErrorSess(testAmbientSession))
 	}
-	got = FindRelatedUnion(fm.UnionFacts, uv)
-	if got == nil || got.IsBottom() {
+	got = FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
+	if got == nil || got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("empty if/else after f1 IV must not bottom g_721, got %#v", got)
 	}
 	if got.LastWrittenFID != 1 {

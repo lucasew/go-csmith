@@ -178,17 +178,17 @@ func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	// body-out style entry: last field 0; return wrote field 1
-	bodyU := []*FactUnion{MakeFactUnion(uv, 0)}
-	retU := []*FactUnion{MakeFactUnion(uv, 1)}
+	bodyU := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
+	retU := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 1)}
 	fm.SetMapFactsOutPair(7, []*FactPointTo{}, retU)
 	body := &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 7}}}
 	facts := []*FactPointTo{}
-	unions := CloneUnionFactSliceDeep(bodyU)
+	unions := CloneUnionFactSliceDeepSess(testAmbientSession, bodyU)
 	if !AddBackReturnFacts(body, fm, &facts, &unions) {
 		t.Fatal("add_back must succeed")
 	}
-	got := FindRelatedUnion(unions, uv)
-	if got == nil || !got.IsBottom() {
+	got := FindRelatedUnionSess(testAmbientSession, unions, uv)
+	if got == nil || !got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("0 join 1 must BOTTOM, got %v", got)
 	}
 	if HasErrorSess(testAmbientSession) {

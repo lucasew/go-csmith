@@ -39,12 +39,12 @@ func TestUnionWriteFactsForHashUsesLiveFirstFunc(t *testing.T) {
 		}
 	}
 	if g605 != nil {
-		if !IsFieldReadable(g605, 0, uf) || IsFieldReadable(g605, 4, uf) {
+		if !IsFieldReadableSess(testAmbientSession, g605, 0, uf) || IsFieldReadableSess(testAmbientSession, g605, 4, uf) {
 			t.Fatalf("g_605 want only f0 readable")
 		}
 	}
 	if g467 != nil {
-		if !IsFieldReadable(g467, 0, uf) {
+		if !IsFieldReadableSess(testAmbientSession, g467, 0, uf) {
 			t.Fatalf("g_467 want f0 readable")
 		}
 	}
@@ -87,11 +87,11 @@ func TestUnionWriteFactsForHashSeed34(t *testing.T) {
 		t.Fatal("missing g_26/g_255")
 	}
 	for i := range g26.FieldVars {
-		if IsFieldReadable(g26, i, uf) {
+		if IsFieldReadableSess(testAmbientSession, g26, i, uf) {
 			t.Fatalf("g_26 f%d must not be readable (live BOTTOM)", i)
 		}
 	}
-	if !IsFieldReadable(g255, 4, uf) {
+	if !IsFieldReadableSess(testAmbientSession, g255, 4, uf) {
 		t.Fatal("g_255.f4 must be readable")
 	}
 	h := g.hashGlobals()

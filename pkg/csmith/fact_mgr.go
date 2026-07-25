@@ -1128,7 +1128,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 			}
 		}
 	}
-	cl := fact.Clone()
+	cl := fact.CloneSess(sessFromFM(fm))
 	if hasErrFM(fm) {
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 		return
@@ -2587,7 +2587,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		}
 	}
 	if wantUn {
-		relU := FindRelatedUnion(fm.UnionFacts, v)
+		relU := FindRelatedUnionSess(sessFromFM(fm), fm.UnionFacts, v)
 		// residual ERROR sticky — no invent soft-skip makeup past FindRelatedUnion residual
 		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -2981,7 +2981,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
 					continue
 				}
-				cp := uf.Clone()
+				cp := uf.CloneSess(sessFromFM(fm))
 				if cp == nil || hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
@@ -3040,7 +3040,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					fm.MapUnionFactsOut[id] = IncompleteUnionFactSlice()
 					continue
 				}
-				cp := uf.Clone()
+				cp := uf.CloneSess(sessFromFM(fm))
 				if cp == nil || hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()

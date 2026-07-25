@@ -24,7 +24,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 		t.Fatal(all)
 	}
 	// only field 0 readable
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	out := HashGlobalVariablesWithUnionFacts(vs, facts)
 	if !strings.Contains(out, "g_u.f0") {
 		t.Fatal(out)
@@ -126,7 +126,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	if len(g.Funcs.Funcs) > 0 {
 		fm := g.FactMgrs.ForFunc(g.Funcs.Funcs[0])
 		if fm != nil {
-			fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+			fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 		}
 	}
 	out := g.hashGlobals()

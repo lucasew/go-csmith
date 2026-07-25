@@ -106,7 +106,7 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 		t.Fatal(all)
 	}
 	// last write f0 only
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	out := uv.HashOutputWithUnionFactsSess(testAmbientSession, facts)
 	if !strings.Contains(out, "g_u.f0") {
 		t.Fatal("want f0", out)

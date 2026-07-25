@@ -911,7 +911,7 @@ func TestIsFieldReadableIsUnionResidualSticky(t *testing.T) {
 	// Non-union complete: not readable false without sticky.
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
-	if IsFieldReadable(v, 0, nil) {
+	if IsFieldReadableSess(testAmbientSession, v, 0, nil) {
 		t.Fatal("non-union IsFieldReadable must be false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -919,7 +919,7 @@ func TestIsFieldReadableIsUnionResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil sticky
-	if IsFieldReadable(&Variable{Name: "g_u", Type: nil}, 0, nil) {
+	if IsFieldReadableSess(testAmbientSession, &Variable{Name: "g_u", Type: nil}, 0, nil) {
 		t.Fatal("Type-nil IsFieldReadable must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

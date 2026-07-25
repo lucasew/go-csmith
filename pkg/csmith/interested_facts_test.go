@@ -19,7 +19,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	fm.AddNewVarFact(uv)
-	if FindRelatedUnion(fm.UnionFacts, uv) != nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv) != nil {
 		t.Fatal("union should be skipped")
 	}
 
@@ -33,7 +33,7 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	// FactUnion.cpp:82 assert(rhs); Constant init → fid 0 (no invent TOP on nil init)
 	uv.Init = MakeIntSess(testAmbientSession, 0)
 	fm2.AddNewVarFact(uv)
-	if FindRelatedUnion(fm2.UnionFacts, uv) == nil {
+	if FindRelatedUnionSess(testAmbientSession, fm2.UnionFacts, uv) == nil {
 		t.Fatal("want union fact")
 	}
 

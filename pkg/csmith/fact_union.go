@@ -23,10 +23,6 @@ type FactUnion struct {
 
 // MakeFactUnion mirrors FactUnion::make_fact(v, fid).
 // FactUnion.cpp:162–167 — assert(v==null || union type); default fid 0 when omitted.
-func MakeFactUnion(v *Variable, fid int) *FactUnion {
-	return MakeFactUnionSess(testAmbientSession, v, fid)
-}
-
 func MakeFactUnionSess(s *Session, v *Variable, fid int) *FactUnion {
 	// FactUnion.cpp:163 — assert(v == nullptr || v->type->eType == eUnion) sticky
 	// no soft invent FactUnion on scalar/struct vars
@@ -54,10 +50,6 @@ func MakeFactUnionSess(s *Session, v *Variable, fid int) *FactUnion {
 // MakeFactUnionTop mirrors make_fact(v) with TOP.
 // Incomplete MakeFactUnion sticky nil (no invent TOP shell past hole).}
 
-func MakeFactUnionTop(v *Variable) *FactUnion {
-	return MakeFactUnionTopSess(testAmbientSession, v)
-}
-
 func MakeFactUnionTopSess(s *Session, v *Variable) *FactUnion {
 	f := MakeFactUnionSess(s, v, FactUnionTop)
 	if f == nil {
@@ -74,10 +66,6 @@ func MakeFactUnionTopSess(s *Session, v *Variable) *FactUnion {
 // FactUnion.cpp:169–176 — vars[i] always live; make_fact asserts union type.
 // Incomplete IR fails closed sticky IncompleteUnionFactSlice (not bare nil —
 // UnionFactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).
-func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
-	return MakeFactUnionsSess(testAmbientSession, vars, fid)
-}
-
 func MakeFactUnionsSess(s *Session, vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
@@ -98,10 +86,6 @@ func MakeFactUnionsSess(s *Session, vars []*Variable, fid int) []*FactUnion {
 
 // FindRelatedUnion finds FactUnion for union variable v.
 // FactUnion* always live; nil hole fails closed (nil — no invent skip to later match).
-func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
-	return FindRelatedUnionSess(testAmbientSession, facts, v)
-}
-
 func FindRelatedUnionSess(s *Session, facts []*FactUnion, v *Variable) *FactUnion {
 	// subject always live; sticky no invent miss / soft-skip nil key
 	if v == nil {
@@ -122,10 +106,6 @@ func FindRelatedUnionSess(s *Session, facts []*FactUnion, v *Variable) *FactUnio
 }
 
 // GetVar mirrors FactUnion::get_var.
-func (f *FactUnion) GetVar() *Variable {
-	return f.GetVarSess(testAmbientSession)
-}
-
 func (f *FactUnion) GetVarSess(s *Session) *Variable {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -135,10 +115,6 @@ func (f *FactUnion) GetVarSess(s *Session) *Variable {
 }
 
 // SetVar mirrors FactUnion::set_var.
-func (f *FactUnion) SetVar(v *Variable) {
-	f.SetVarSess(testAmbientSession, v)
-}
-
 func (f *FactUnion) SetVarSess(s *Session, v *Variable) {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -152,10 +128,6 @@ func (f *FactUnion) SetVarSess(s *Session, v *Variable) {
 }
 
 // GetLastWrittenFID mirrors FactUnion::get_last_written_fid.
-func (f *FactUnion) GetLastWrittenFID() int {
-	return f.GetLastWrittenFIDSess(testAmbientSession)
-}
-
 func (f *FactUnion) GetLastWrittenFIDSess(s *Session) int {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -165,10 +137,6 @@ func (f *FactUnion) GetLastWrittenFIDSess(s *Session) int {
 }
 
 // IsRelated mirrors Fact::is_related for Union — same subject var.
-func (f *FactUnion) IsRelated(other *FactUnion) bool {
-	return f.IsRelatedSess(testAmbientSession, other)
-}
-
 func (f *FactUnion) IsRelatedSess(s *Session, other *FactUnion) bool {
 	if f == nil || other == nil {
 		sessNoteError(s, ErrGeneric)
@@ -179,10 +147,6 @@ func (f *FactUnion) IsRelatedSess(s *Session, other *FactUnion) bool {
 
 // IsTop mirrors FactUnion::is_top.
 // Incomplete FactUnion sticky false (no invent TOP / soft re-pick past hole).}
-
-func (f *FactUnion) IsTop() bool {
-	return f.IsTopSess(testAmbientSession)
-}
 
 func (f *FactUnion) IsTopSess(s *Session) bool {
 	// FactUnion always live; sticky incomplete no invent TOP soft-skip
@@ -195,10 +159,6 @@ func (f *FactUnion) IsTopSess(s *Session) bool {
 
 // IsBottom mirrors FactUnion::is_bottom.
 // Incomplete FactUnion sticky false (no invent BOTTOM / soft re-pick past hole).
-func (f *FactUnion) IsBottom() bool {
-	return f.IsBottomSess(testAmbientSession)
-}
-
 func (f *FactUnion) IsBottomSess(s *Session) bool {
 	// FactUnion always live; sticky incomplete no invent BOTTOM soft-skip
 	if f == nil {
@@ -210,10 +170,6 @@ func (f *FactUnion) IsBottomSess(s *Session) bool {
 
 // SetTop mirrors FactUnion::set_top.
 // Incomplete FactUnion sticky no-op (no invent soft-set TOP past missing shell).
-func (f *FactUnion) SetTop() {
-	f.SetTopSess(testAmbientSession)
-}
-
 func (f *FactUnion) SetTopSess(s *Session) {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -224,10 +180,6 @@ func (f *FactUnion) SetTopSess(s *Session) {
 
 // SetBottom mirrors FactUnion::set_bottom.
 // Incomplete FactUnion sticky no-op (no invent soft-set BOTTOM past missing shell).
-func (f *FactUnion) SetBottom() {
-	f.SetBottomSess(testAmbientSession)
-}
-
 func (f *FactUnion) SetBottomSess(s *Session) {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -238,10 +190,6 @@ func (f *FactUnion) SetBottomSess(s *Session) {
 
 // Clone mirrors FactUnion::clone.
 // Incomplete FactUnion sticky nil (no invent empty clone shell past hole).
-func (f *FactUnion) Clone() *FactUnion {
-	return f.CloneSess(testAmbientSession)
-}
-
 func (f *FactUnion) CloneSess(s *Session) *FactUnion {
 	// FactUnion always live; sticky incomplete no invent nil clone soft-skip
 	if f == nil {
@@ -254,10 +202,6 @@ func (f *FactUnion) CloneSess(s *Session) *FactUnion {
 // Equal mirrors FactUnion::equal.
 // FactUnion.cpp:195–201.
 // Incomplete FactUnion sticky false (no invent not-equal / soft re-pick past holes).
-func (f *FactUnion) Equal(other *FactUnion) bool {
-	return f.EqualSess(testAmbientSession, other)
-}
-
 func (f *FactUnion) EqualSess(s *Session, other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent not-equal
 	if f == nil || other == nil {
@@ -273,10 +217,6 @@ func (f *FactUnion) EqualSess(s *Session, other *FactUnion) bool {
 // Imply mirrors FactUnion::imply.
 // FactUnion.cpp:249–259 — bottom implies all; equal fid implies; else false.
 // Incomplete FactUnion sticky false (no invent not-imply / soft re-pick past holes).
-func (f *FactUnion) Imply(other *FactUnion) bool {
-	return f.ImplySess(testAmbientSession, other)
-}
-
 func (f *FactUnion) ImplySess(s *Session, other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent not-imply
 	if f == nil || other == nil {
@@ -314,10 +254,6 @@ func (f *FactUnion) ImplySess(s *Session, other *FactUnion) bool {
 // Join mirrors FactUnion::join — merge lattice; return true if changed.
 // FactUnion.cpp:207–221.
 // Incomplete FactUnion sticky false (no invent join no-op / soft re-pick past holes).
-func (f *FactUnion) Join(other *FactUnion) bool {
-	return f.JoinSess(testAmbientSession, other)
-}
-
 func (f *FactUnion) JoinSess(s *Session, other *FactUnion) bool {
 	// both FactUnion* always live; sticky incomplete no invent join no-op success
 	if f == nil || other == nil {
@@ -359,21 +295,17 @@ func (f *FactUnion) JoinSess(s *Session, other *FactUnion) bool {
 // FactUnion + Var always live; sticky nil (no invent soft-skip past hole).
 // Top/bottom are complete no-type (not incomplete IR).}
 
-func (f *FactUnion) GetLastWrittenType() *Type {
-	return f.GetLastWrittenTypeSess(testAmbientSession)
-}
-
 func (f *FactUnion) GetLastWrittenTypeSess(s *Session) *Type {
 	if f == nil || f.Var == nil {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	isTop := f.IsTop()
+	isTop := f.IsTopSess(s)
 	// residual ERROR sticky — no invent soft-nil type past IsTop residual
 	if sessHasError(s) {
 		return nil
 	}
-	isBot := f.IsBottom()
+	isBot := f.IsBottomSess(s)
 	// residual ERROR sticky — no invent soft-nil type past IsBottom residual
 	if sessHasError(s) {
 		return nil
@@ -415,10 +347,6 @@ func (f *FactUnion) GetLastWrittenTypeSess(s *Session) *Type {
 
 // Output mirrors FactUnion::Output.
 // FactUnion.cpp:272–275.}
-
-func (f *FactUnion) Output() string {
-	return f.OutputSess(testAmbientSession)
-}
 
 func (f *FactUnion) OutputSess(s *Session) string {
 	if f == nil || f.Var == nil {
@@ -462,10 +390,6 @@ func IncompleteUnionFactSlice() []*FactUnion {
 // CloneUnionFactSlice shallow-copies a complete FactUnion* vector (C++ Fact* vector copy).
 // FunctionInvocationUser.cpp:206 — global_facts = caller_fm->global_facts includes eUnionWrite.
 // Incomplete maps fail closed sticky IncompleteUnionFactSlice (no invent cleaned partial).
-func CloneUnionFactSlice(facts []*FactUnion) []*FactUnion {
-	return CloneUnionFactSliceSess(testAmbientSession, facts)
-}
-
 func CloneUnionFactSliceSess(s *Session, facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
@@ -483,10 +407,6 @@ func CloneUnionFactSliceSess(s *Session, facts []*FactUnion) []*FactUnion {
 // Use for pre-visit snapshots where visit may Join/SetBottom in place on live facts;
 // shallow CloneUnionFactSlice would alias and observe post-visit last_written_fid.
 // Incomplete maps fail closed sticky IncompleteUnionFactSlice.
-func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
-	return CloneUnionFactSliceDeepSess(testAmbientSession, facts)
-}
-
 func CloneUnionFactSliceDeepSess(s *Session, facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
@@ -497,7 +417,7 @@ func CloneUnionFactSliceDeepSess(s *Session, facts []*FactUnion) []*FactUnion {
 	}
 	out := make([]*FactUnion, len(facts))
 	for i, f := range facts {
-		cp := f.Clone()
+		cp := f.CloneSess(s)
 		if cp == nil || sessHasError(s) {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
@@ -511,10 +431,6 @@ func CloneUnionFactSliceDeepSess(s *Session, facts []*FactUnion) []*FactUnion {
 
 // RenewUnionFact mirrors renew_fact for FactUnion (Fact.cpp:178–201).
 // Related subject replaced; else append. Incomplete maps fail closed sticky wipe.}
-
-func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
-	return RenewUnionFactSess(testAmbientSession, facts, nf)
-}
 
 func RenewUnionFactSess(s *Session, facts *[]*FactUnion, nf *FactUnion) bool {
 	if facts == nil {
@@ -533,7 +449,7 @@ func RenewUnionFactSess(s *Session, facts *[]*FactUnion, nf *FactUnion) bool {
 	}
 	for i, f := range *facts {
 		if f.Var == nf.Var {
-			if f.Equal(nf) {
+			if f.EqualSess(s, nf) {
 				if sessHasError(s) {
 					*facts = IncompleteUnionFactSlice()
 					return false
@@ -554,10 +470,6 @@ func RenewUnionFactSess(s *Session, facts *[]*FactUnion, nf *FactUnion) bool {
 
 // RenewUnionFacts mirrors renew_facts for FactUnion (Fact.cpp:222–229).
 // FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts) includes eUnionWrite.}
-
-func RenewUnionFacts(facts *[]*FactUnion, newFacts []*FactUnion) bool {
-	return RenewUnionFactsSess(testAmbientSession, facts, newFacts)
-}
 
 func RenewUnionFactsSess(s *Session, facts *[]*FactUnion, newFacts []*FactUnion) bool {
 	if facts == nil {
@@ -589,10 +501,6 @@ func RenewUnionFactsSess(s *Session, facts *[]*FactUnion, newFacts []*FactUnion)
 // FactMgr::remove_function_local_facts drops stack/other-RV; ret_facts for renew
 // are body map_facts_out after that filter — global union last-writes remain.}
 
-func GlobalUnionFactsOnly(facts []*FactUnion) []*FactUnion {
-	return GlobalUnionFactsOnlySess(testAmbientSession, facts)
-}
-
 func GlobalUnionFactsOnlySess(s *Session, facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
@@ -617,10 +525,6 @@ func GlobalUnionFactsOnlySess(s *Session, facts []*FactUnion) []*FactUnion {
 // IsFieldReadable mirrors FactUnion::is_field_readable.
 // FactUnion.cpp:262–270.
 // Incomplete facts fail closed sticky false (no invent readable past UnionFacts hole).
-func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
-	return IsFieldReadableSess(testAmbientSession, v, fid, facts)
-}
-
 func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) bool {
 	// subject always live union; incomplete subject sticky not-readable
 	if v == nil || v.Type == nil {
@@ -677,10 +581,6 @@ func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) b
 // Variable always live; sticky nonreadable (no invent readable soft-skip past hole).
 // Incomplete FactUnion maps fail closed nonreadable (no invent readable while
 // FindRelatedUnion returns nil past a hole before a matching parent fact).}
-
-func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
-	return IsNonreadableFieldSess(testAmbientSession, v, facts)
-}
 
 func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 	if v == nil {
@@ -761,10 +661,6 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 // (nil join — callers of transfer must not invent empty complete from that alone;
 // RhsToLhsTransferUnion pre-checks completeness before join).}
 
-func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
-	return JoinVarFactsUnionSess(testAmbientSession, facts, vars)
-}
-
 func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *FactUnion {
 	// incomplete union map / vars fails closed sticky (no invent soft nil join success path)
 	if !UnionFactsComplete(facts) || !VariablesComplete(vars) {
@@ -773,7 +669,7 @@ func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *Fa
 	}
 	var fu *FactUnion
 	for _, v := range vars {
-		exist := FindRelatedUnion(facts, v)
+		exist := FindRelatedUnionSess(s, facts, v)
 		// residual ERROR sticky — no invent soft-continue join past FindRelated hole
 		if sessHasError(s) {
 			return nil
@@ -782,7 +678,7 @@ func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *Fa
 			continue
 		}
 		if fu == nil {
-			fu = exist.Clone()
+			fu = exist.CloneSess(s)
 			// residual ERROR sticky — no invent soft-continue past Clone hole
 			if sessHasError(s) || fu == nil {
 				if !sessHasError(s) {
@@ -794,7 +690,7 @@ func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *Fa
 		}
 		// hack: both must share var identity for join — set to exist's var
 		fu.Var = exist.Var
-		fu.Join(exist)
+		fu.JoinSess(s, exist)
 		// residual ERROR sticky — no invent soft-continue partial join past Join hole
 		if sessHasError(s) {
 			return nil
@@ -808,10 +704,6 @@ func JoinVarFactsUnionSess(s *Session, facts []*FactUnion, vars []*Variable) *Fa
 // copy=new.clone(); copy.join(old)). Soft invent always-joined old.clone().join(new)
 // without imply short-circuit (see call_analysis comment at if-combine).}
 
-func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
-	return MergeUnionFactIntoSess(testAmbientSession, facts, nf)
-}
-
 func MergeUnionFactIntoSess(s *Session, facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	return MergeUnionFactSess(s, facts, nf)
 }
@@ -822,15 +714,6 @@ func MergeUnionFactIntoSess(s *Session, facts []*FactUnion, nf *FactUnion) []*Fa
 // Hard IR asserts (nil rhs, non-union lvars, nil Var/Invoke, address-of,
 // missing rv_fact) fail closed sticky IncompleteUnionFactSlice. Incomplete
 // union/pt maps and MergePointees stay non-sticky for soft re-pick factories.
-func RhsToLhsTransferUnion(
-	unionFacts []*FactUnion,
-	ptFacts []*FactPointTo,
-	lvars []*Variable,
-	rhs *Expression,
-) []*FactUnion {
-	return RhsToLhsTransferUnionSess(testAmbientSession, unionFacts, ptFacts, lvars, rhs)
-}
-
 func RhsToLhsTransferUnionSess(s *Session,
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
@@ -984,17 +867,6 @@ func RhsToLhsTransferUnionSess(s *Session,
 //
 // Returns (factsOut, lvarCount). Hard IR (nil lhs, nil pointee, MakeFact fail)
 // sticky; incomplete maps/MergePointees stay non-sticky hole markers.}
-
-func AbstractFactUnionForAssign(
-	unionFacts []*FactUnion,
-	ptFacts []*FactPointTo,
-	lhs *Variable,
-	lhsIndir int,
-	lhsWant *Type,
-	rhs *Expression,
-) (out []*FactUnion, lvarCnt int) {
-	return AbstractFactUnionForAssignSess(testAmbientSession, unionFacts, ptFacts, lhs, lhsIndir, lhsWant, rhs)
-}
 
 func AbstractFactUnionForAssignSess(s *Session,
 	unionFacts []*FactUnion,

@@ -483,8 +483,8 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 		t.Fatal("need fields")
 	}
 	f0, f1 := parent.FieldVars[0], parent.FieldVars[1]
-	thenU := MakeFactUnion(parent, 0) // then wrote f0
-	elseU := MakeFactUnion(parent, 1) // else wrote f1
+	thenU := MakeFactUnionSess(testAmbientSession, parent, 0) // then wrote f0
+	elseU := MakeFactUnionSess(testAmbientSession, parent, 1) // else wrote f1
 	if thenU == nil || elseU == nil {
 		t.Fatal("MakeFactUnion")
 	}
@@ -500,20 +500,20 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
 	}
 	pre := []*FactPointTo{}
-	preU := []*FactUnion{MakeFactUnion(parent, FactUnionTop)}
+	preU := []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, FactUnionTop)}
 	CombineBranchFacts(st, &pre, &preU, fm)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	// join f0 + f1 → BOTTOM; both fields nonreadable
-	got := FindRelatedUnion(fm.UnionFacts, parent)
+	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, parent)
 	if got == nil {
 		t.Fatal("missing union fact after merge")
 	}
-	if !got.IsBottom() {
+	if !got.IsBottomSess(testAmbientSession) {
 		t.Fatalf("want BOTTOM after f0|f1 branch merge, fid=%d", got.LastWrittenFID)
 	}
-	if !IsNonreadableField(f0, fm.UnionFacts) || !IsNonreadableField(f1, fm.UnionFacts) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) || !IsNonreadableFieldSess(testAmbientSession, f1, fm.UnionFacts) {
 		t.Fatal("BOTTOM merge: both fields nonreadable")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -533,8 +533,8 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 	if elseLocal == nil || g == nil {
 		t.Fatal("vars")
 	}
-	thenU := MakeFactUnion(g, 0)
-	foreign := MakeFactUnion(elseLocal, 0)
+	thenU := MakeFactUnionSess(testAmbientSession, g, 0)
+	foreign := MakeFactUnionSess(testAmbientSession, elseLocal, 0)
 	if thenU == nil || foreign == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("MakeFactUnion", GetErrorSess(testAmbientSession))
 	}
@@ -542,10 +542,10 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	if FindRelatedUnion(stripped, elseLocal) != nil {
+	if FindRelatedUnionSess(testAmbientSession, stripped, elseLocal) != nil {
 		t.Fatal("must drop else-local from then-out")
 	}
-	if FindRelatedUnion(stripped, g) == nil {
+	if FindRelatedUnionSess(testAmbientSession, stripped, g) == nil {
 		t.Fatal("must keep global subject")
 	}
 	ClearErrorSess(testAmbientSession)

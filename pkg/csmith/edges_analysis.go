@@ -135,7 +135,7 @@ func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactU
 		if isReturnVar(f.Var) {
 			continue
 		}
-		jumpF := FindRelatedUnion(jumpFacts, f.Var)
+		jumpF := FindRelatedUnionSess(s, jumpFacts, f.Var)
 		if sessHasError(s) {
 			*facts = IncompleteUnionFactSlice()
 			return false
@@ -935,7 +935,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 						noteErrCG(cg, ErrGeneric)
 						return nil, nil, -1, false
 					}
-					if FindRelatedUnion(workUnions, uf.Var) != nil {
+					if FindRelatedUnionSess(sessFromCG(cg), workUnions, uf.Var) != nil {
 						if hasErrCG(cg) {
 							return nil, nil, -1, false
 						}
@@ -944,7 +944,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					if hasErrCG(cg) {
 						return nil, nil, -1, false
 					}
-					cp := uf.Clone()
+					cp := uf.CloneSess(sessFromCG(cg))
 					if cp == nil || hasErrCG(cg) {
 						if !hasErrCG(cg) {
 							noteErrCG(cg, ErrGeneric)

@@ -1011,9 +1011,9 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	}
 	f0 := uv.FieldVars[0]
 	// Live lattice: last write f1 → f0 nonreadable
-	liveUF := []*FactUnion{MakeFactUnion(uv, 1)}
+	liveUF := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 1)}
 	// Historical map_facts_out: last write f0 → f0 readable
-	outUF := []*FactUnion{MakeFactUnion(uv, 0)}
+	outUF := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 
 	// ChooseVisibleReadVar with live → NR skip → nil pool
 	ClearErrorSess(testAmbientSession)

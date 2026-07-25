@@ -146,11 +146,11 @@ func TestSameFactVec(t *testing.T) {
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_sfv", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	u0 := MakeFactUnion(parent, 0)
-	u1 := MakeFactUnion(parent, 1)
+	u0 := MakeFactUnionSess(testAmbientSession, parent, 0)
+	u1 := MakeFactUnionSess(testAmbientSession, parent, 1)
 	pvar := CreateVariableScalarsSess(testAmbientSession, "g_p_sfv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	pt := []*FactPointTo{MakeFactPointTo(pvar, NullPtr)}
-	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnion(parent, 0)}) {
+	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}) {
 		t.Fatal("same full vec")
 	}
 	if SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{u1}) {
@@ -169,8 +169,8 @@ func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_scu", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	entryU := MakeFactUnion(parent, 0)
-	liveU := MakeFactUnion(parent, 1)
+	entryU := MakeFactUnionSess(testAmbientSession, parent, 0)
+	liveU := MakeFactUnionSess(testAmbientSession, parent, 1)
 	if entryU == nil || liveU == nil {
 		t.Fatal("facts")
 	}
@@ -190,7 +190,7 @@ func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// matching live + map_in → still ShortcutOK
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}
 	facts = append([]*FactPointTo(nil), pt...)
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
 		t.Fatalf("want ShortcutOK when full FactVec matches, err=%v", HasErrorSess(testAmbientSession))
@@ -208,8 +208,8 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_sc", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	entryU := MakeFactUnion(parent, 0)
-	outU := MakeFactUnion(parent, 1)
+	entryU := MakeFactUnionSess(testAmbientSession, parent, 0)
+	outU := MakeFactUnionSess(testAmbientSession, parent, 1)
 	if entryU == nil || outU == nil {
 		t.Fatal("facts")
 	}
@@ -218,7 +218,7 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 	fm.SetMapFactsInPair(9, pt, []*FactUnion{entryU})
 	fm.SetMapFactsOutPair(9, pt, []*FactUnion{outU})
 	fm.SetMapStmEffect(9, EmptyEffect())
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)} // entry lattice live
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)} // entry lattice live
 	st := &Stmt{Kind: StmtAssign, StmID: 9}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -246,11 +246,11 @@ func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_vin2", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	pre := MakeFactUnion(parent, 0)
+	pre := MakeFactUnionSess(testAmbientSession, parent, 0)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.UnionFacts = []*FactUnion{pre}
 	// deep snapshot then in-place mutate live (Join path)
-	snap := CloneUnionFactSliceDeep(fm.UnionFacts)
+	snap := CloneUnionFactSliceDeepSess(testAmbientSession, fm.UnionFacts)
 	fm.UnionFacts[0].LastWrittenFID = 1
 	if snap[0].LastWrittenFID != 0 {
 		t.Fatal("deep clone must isolate lattice from live mutate")
@@ -779,8 +779,8 @@ func TestContainsUnfixedGotoUnionImply(t *testing.T) {
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	fm.MapVisited = map[int]bool{20: true}
 	// dest in: last-write field 0; jump src out: last-write field 1 — not imply
-	destU := MakeFactUnion(u, 0)
-	srcU := MakeFactUnion(u, 1)
+	destU := MakeFactUnionSess(testAmbientSession, u, 0)
+	srcU := MakeFactUnionSess(testAmbientSession, u, 1)
 	if destU == nil || srcU == nil {
 		t.Fatal("need FactUnion helpers")
 	}
@@ -791,12 +791,12 @@ func TestContainsUnfixedGotoUnionImply(t *testing.T) {
 		t.Fatal("eUnionWrite dest-in not imply jump-src out must be unfixed")
 	}
 	// matching union last-write → fixed
-	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnion(u, 0)})
+	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnionSess(testAmbientSession, u, 0)})
 	if ContainsUnfixedGoto(root, fm) {
 		t.Fatal("equal eUnionWrite must be fixed when PT empty-equal")
 	}
 	// nonempty union srcOut + empty full dest in → unfixed (full FactVec empty)
-	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnion(u, 0)})
+	fm.SetMapFactsOutPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnionSess(testAmbientSession, u, 0)})
 	fm.SetMapFactsInPair(10, []*FactPointTo{}, []*FactUnion{})
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("nonempty union srcOut + empty destIn must be unfixed")

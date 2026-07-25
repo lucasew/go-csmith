@@ -53,7 +53,7 @@ func MakeRandomIf(
 		// StatementIf.cpp:69 — shallow Fact* vector (same as restoreFactsPT).
 		func1PreFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
 		// CloneUnionFactSlice is already a shallow FactUnion* copy (FactVec partition).
-		func1PreUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
+		func1PreUnion = CloneUnionFactSliceSess(sessFromCG(cg), cg.FM.UnionFacts)
 		if hasErrCG(cg) || !UnionFactsComplete(func1PreUnion) {
 			if !hasErrCG(cg) {
 				noteErrCG(cg, ErrGeneric)

@@ -128,7 +128,7 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	rv := CreateVariableQferSess(testAmbientSession, "rv", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	f := &Function{Name: "func_u", ReturnType: ut, RV: rv}
 	fi := &Invocation{User: f}
-	uf := MakeFactUnion(rv, 0)
+	uf := MakeFactUnionSess(testAmbientSession, rv, 0)
 	fi.SaveReturnUnionFacts([]*FactUnion{uf})
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("SaveReturnUnionFacts sticky", GetErrorSess(testAmbientSession))
@@ -140,7 +140,7 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	// transfer to param-like LHS uses registry, not ambient
 	param := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: ut}
-	out := RhsToLhsTransferUnion(nil, nil, []*Variable{param}, rhs)
+	out := RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{param}, rhs)
 	if !UnionFactsComplete(out) || len(out) != 1 || out[0].Var != param || out[0].LastWrittenFID != 0 {
 		t.Fatalf("FuncCall union transfer must use return registry: %+v", out)
 	}
@@ -444,11 +444,11 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	uParent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
-	stale := MakeFactUnion(uParent, 1) // last-written f1
+	stale := MakeFactUnionSess(testAmbientSession, uParent, 1) // last-written f1
 	calFM.UnionFacts = []*FactUnion{stale}
 
 	// Caller lattice has last-written f0 for same union
-	callerU := MakeFactUnion(uParent, 0)
+	callerU := MakeFactUnionSess(testAmbientSession, uParent, 0)
 	callerFM := NewFactMgrSess(testAmbientSession, &Function{Name: "caller"})
 	callerFM.UnionFacts = []*FactUnion{callerU}
 	callerFM.GlobalFacts = []*FactPointTo{}
@@ -511,7 +511,7 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	calFM.SetMapFactsOut(300, []*FactPointTo{})
 	// Caller lattice: global union only.
 	callerFM := NewFactMgrSess(testAmbientSession, &Function{Name: "caller"})
-	callerFM.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0)}
+	callerFM.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0)}
 	callerFM.GlobalFacts = []*FactPointTo{}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(callerFM)
@@ -524,20 +524,20 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	// Revisit installs caller unions first; inject param after by pre-setting and relying on
 	// Filter keeping params when PT work has param from handover.
 	// Pre-seed: put param on caller temporarily so install+filter retain it, then OOS drops.
-	callerFM.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(p, 0)}
+	callerFM.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, p, 0)}
 	if !RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
 		t.Fatalf("revisit expected ok err=%v", HasErrorSess(testAmbientSession))
 	}
 	// After success, callee live UnionFacts must not still list the param subject
-	if FindRelatedUnion(calFM.UnionFacts, p) != nil {
+	if FindRelatedUnionSess(testAmbientSession, calFM.UnionFacts, p) != nil {
 		t.Fatal("revisit must OOS param union subject from callee lattice", calFM.UnionFacts)
 	}
-	if FindRelatedUnion(calFM.UnionFacts, gu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, calFM.UnionFacts, gu) == nil {
 		t.Fatal("callee must still hold global union after param OOS")
 	}
 	// Caller renews globals-only from callee; param subject on caller is not removed by renew
 	// (renew joins/replaces related only). Clear residual caller param for contract of renew path:
-	if uf := FindRelatedUnion(callerFM.UnionFacts, gu); uf == nil {
+	if uf := FindRelatedUnionSess(testAmbientSession, callerFM.UnionFacts, gu); uf == nil {
 		t.Fatal("caller must retain global union after revisit renew")
 	}
 	ClearErrorSess(testAmbientSession)

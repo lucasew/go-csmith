@@ -23,7 +23,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_ord", ut, false, false)
 	parent.Init = MakeIntSess(testAmbientSession, 0) // union init abstract → last=0 (f0)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	liveU := MakeFactUnion(parent, 3)
+	liveU := MakeFactUnionSess(testAmbientSession, parent, 3)
 	if liveU == nil {
 		t.Fatal("live")
 	}
@@ -35,7 +35,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 	if !makeupNewUnionFacts(&unionCopy, fm.UnionFacts) {
 		t.Fatalf("union makeup sticky=%v", GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(unionCopy, parent)
+	got := FindRelatedUnionSess(testAmbientSession, unionCopy, parent)
 	if got == nil {
 		t.Fatal("makeup must add init union fact")
 	}
@@ -43,13 +43,13 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 		t.Fatalf("makeup must use abstract_fact_for_var_init last=0, got %d", got.LastWrittenFID)
 	}
 	for _, f := range unionCopy {
-		fm.UnionFacts = MergeUnionFactInto(fm.UnionFacts, f)
+		fm.UnionFacts = MergeUnionFactIntoSess(testAmbientSession, fm.UnionFacts, f)
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	merged := FindRelatedUnion(fm.UnionFacts, parent)
-	if merged == nil || !merged.IsBottom() {
+	merged := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, parent)
+	if merged == nil || !merged.IsBottomSess(testAmbientSession) {
 		t.Fatalf("live last=3 ⊕ makeup last=0 must BOTTOM, got %#v", merged)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -58,7 +58,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 // TestOrderedBinaryNilSnapshotStillMakeupMerge —
 // FunctionInvocation.cpp:275–279 — ordered &&/|| always makeup+merge, even when
 // the post-LHS snapshot is empty. NewFactMgr leaves GlobalFacts/UnionFacts nil;
-// CloneFactSlice(nil)/CloneUnionFactSlice(nil) return nil. Soft invent guarded
+// CloneFactSlice(nil)/CloneUnionFactSliceSess(testAmbientSession, nil) return nil. Soft invent guarded
 // the make_random path with `factsCopy != nil`, which skipped the merge entirely
 // for the first-program ordered binary (UP seed-199 seq=1: nCopy=0, live last=3
 // → JOIN 0⊕3 BOTTOM; Go kept last=3 and later ChooseOKVar pool differed).
@@ -74,7 +74,7 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_nil", ut, false, false)
 	parent.Init = MakeIntSess(testAmbientSession, 0)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	liveU := MakeFactUnion(parent, 3)
+	liveU := MakeFactUnionSess(testAmbientSession, parent, 3)
 	if liveU == nil {
 		t.Fatal("live")
 	}
@@ -94,19 +94,19 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	if !FactsComplete(factsCopy) || !UnionFactsComplete(unionCopy) {
 		t.Fatal("makeup must leave complete snapshots")
 	}
-	got := FindRelatedUnion(unionCopy, parent)
+	got := FindRelatedUnionSess(testAmbientSession, unionCopy, parent)
 	if got == nil || got.LastWrittenFID != 0 {
 		t.Fatalf("nil snapshot makeup must add init last=0, got %#v", got)
 	}
 	_ = MergeFacts(&fm.GlobalFacts, factsCopy)
 	for _, f := range unionCopy {
-		fm.UnionFacts = MergeUnionFactInto(fm.UnionFacts, f)
+		fm.UnionFacts = MergeUnionFactIntoSess(testAmbientSession, fm.UnionFacts, f)
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
-	merged := FindRelatedUnion(fm.UnionFacts, parent)
-	if merged == nil || !merged.IsBottom() {
+	merged := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, parent)
+	if merged == nil || !merged.IsBottomSess(testAmbientSession) {
 		t.Fatalf("nil post-LHS ⊕ live last=3 must BOTTOM, got %#v", merged)
 	}
 	ClearErrorSess(testAmbientSession)

@@ -27,7 +27,7 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	// l_90 points to g_88
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(l90, g88)}
 	// g_88 currently BOTTOM (as after conflicting path merges)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(g88, FactUnionBottom), MakeFactUnion(src, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, g88, FactUnionBottom), MakeFactUnionSess(testAmbientSession, src, 0)}
 
 	// (*l_90) = src  — Lhs desired type is union, indir=1
 	lhs := &Lhs{Var: l90, Type: ut}
@@ -39,7 +39,7 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	if !fm.UpdateFactForAssignWant(l90, indir, lhs.GetType(), rhs) {
 		t.Fatalf("UpdateFactForAssignWant: %v", GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(fm.UnionFacts, g88)
+	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, g88)
 	if got == nil {
 		t.Fatal("missing g_88 after star-assign")
 	}
@@ -47,9 +47,9 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 		t.Fatalf("(*union*)= must renew last=0 (not keep BOTTOM), got %d", got.LastWrittenFID)
 	}
 	// Negative: Variable.Type-only path (old soft invent) must NOT transfer
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(g88, FactUnionBottom), MakeFactUnion(src, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, g88, FactUnionBottom), MakeFactUnionSess(testAmbientSession, src, 0)}
 	_ = fm.UpdateFactForAssign(l90, 1, rhs)
-	got2 := FindRelatedUnion(fm.UnionFacts, g88)
+	got2 := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, g88)
 	if got2 == nil {
 		t.Fatal("missing g_88")
 	}

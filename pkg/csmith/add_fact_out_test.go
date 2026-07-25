@@ -252,7 +252,7 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 	fm.MapFactsOut = map[int][]*FactPointTo{39: {}}
 	fm.MapUnionFactsOut = map[int][]*FactUnion{39: {}}
 	// add_fact_out union for nested local must drop (not visible at loop head body)
-	uf := MakeFactUnion(l237, 0)
+	uf := MakeFactUnionSess(testAmbientSession, l237, 0)
 	fm.AddFactOutUnion(cont, contParent, uf)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("AddFactOutUnion sticky", GetErrorSess(testAmbientSession))
@@ -261,13 +261,13 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 	if !UnionFactsComplete(outU) {
 		t.Fatal("map_union_out incomplete", outU)
 	}
-	if FindRelatedUnion(outU, l237) != nil {
+	if FindRelatedUnionSess(testAmbientSession, outU, l237) != nil {
 		t.Fatalf("continue map_out must drop nested loop-local union l_237, got %v", outU)
 	}
 	// global union still accepted
 	gU := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, true, false)
-	fm.AddFactOutUnion(cont, contParent, MakeFactUnion(gU, 0))
-	if FindRelatedUnion(fm.GetMapUnionFactsOut(39), gU) == nil {
+	fm.AddFactOutUnion(cont, contParent, MakeFactUnionSess(testAmbientSession, gU, 0))
+	if FindRelatedUnionSess(testAmbientSession, fm.GetMapUnionFactsOut(39), gU) == nil {
 		t.Fatal("continue map_out must keep global union subject")
 	}
 }
@@ -301,7 +301,7 @@ func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("AddNewVarFactAndUpdate sticky", GetErrorSess(testAmbientSession))
 	}
-	if FindRelatedUnion(fm.GetMapUnionFactsOut(39), l237) != nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.GetMapUnionFactsOut(39), l237) != nil {
 		t.Fatalf("AddNewVarFactAndUpdate must not re-append l_237 onto continue map_out, got %v",
 			fm.GetMapUnionFactsOut(39))
 	}

@@ -330,7 +330,7 @@ func TestFactUnionOutputGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was invent " last written field: N" past empty name.
 	ClearErrorSess(testAmbientSession)
 	f := &FactUnion{Var: &Variable{Type: GetIntTypeSess(testAmbientSession)}, LastWrittenFID: 0}
-	if s := f.Output(); s != "" {
+	if s := f.OutputSess(testAmbientSession); s != "" {
 		t.Fatal("empty name residual must fail closed FactUnion.Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -108,7 +108,7 @@ func TestIsNonreadableField(t *testing.T) {
 	}
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
 	// FactUnion.cpp:188–189 — fu == nullptr → nonreadable (empty complete map)
-	if !IsNonreadableField(f1, nil) {
+	if !IsNonreadableFieldSess(testAmbientSession, f1, nil) {
 		t.Fatal("empty complete facts: no related FactUnion → nonreadable")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -117,7 +117,7 @@ func TestIsNonreadableField(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky nonreadable (no invent readable soft-skip)
 	ClearErrorSess(testAmbientSession)
-	if !IsNonreadableField(nil, nil) {
+	if !IsNonreadableFieldSess(testAmbientSession, nil, nil) {
 		t.Fatal("nil Variable IsNonreadableField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -125,11 +125,11 @@ func TestIsNonreadableField(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// last write f0 → f1 nonreadable
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
-	if IsNonreadableField(f0, facts) {
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
+	if IsNonreadableFieldSess(testAmbientSession, f0, facts) {
 		t.Fatal("f0 should be readable")
 	}
-	if !IsNonreadableField(f1, facts) {
+	if !IsNonreadableFieldSess(testAmbientSession, f1, facts) {
 		t.Fatal("f1 blocked")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -140,15 +140,15 @@ func TestIsNonreadableField(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete UnionFacts hole: sticky fail closed nonreadable / not-readable
 	ClearErrorSess(testAmbientSession)
-	hole := []*FactUnion{MakeFactUnion(uv, 0), nil}
-	if IsFieldReadable(uv, 0, hole) {
+	hole := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0), nil}
+	if IsFieldReadableSess(testAmbientSession, uv, 0, hole) {
 		t.Fatal("incomplete UnionFacts must not invent field readable")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete UnionFacts IsFieldReadable must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !IsNonreadableField(f0, hole) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, hole) {
 		t.Fatal("incomplete UnionFacts must fail closed nonreadable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -173,7 +173,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	fm.UpdateFactForAssign(uv.FieldVars[0], 0, rhs)
-	fu := FindRelatedUnion(fm.UnionFacts, uv)
+	fu := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
 	if fu == nil || fu.LastWrittenFID != 0 {
 		t.Fatalf("%+v", fu)
 	}

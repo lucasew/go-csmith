@@ -19,35 +19,35 @@ func TestFactUnionJoinAndImply(t *testing.T) {
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	uv := &Variable{Name: "g_u", Type: ut}
-	a := MakeFactUnion(uv, 0)
-	b := MakeFactUnion(uv, 1)
+	a := MakeFactUnionSess(testAmbientSession, uv, 0)
+	b := MakeFactUnionSess(testAmbientSession, uv, 1)
 	if a == nil || b == nil {
 		t.Fatal("make fact")
 	}
-	if a.Imply(b) {
+	if a.ImplySess(testAmbientSession, b) {
 		t.Fatal("0 does not imply 1")
 	}
-	if !a.Imply(a) {
+	if !a.ImplySess(testAmbientSession, a) {
 		t.Fatal("equal")
 	}
-	bot := MakeFactUnion(uv, FactUnionBottom)
-	if !bot.Imply(a) {
+	bot := MakeFactUnionSess(testAmbientSession, uv, FactUnionBottom)
+	if !bot.ImplySess(testAmbientSession, a) {
 		t.Fatal("bottom implies all")
 	}
-	if a.Imply(bot) {
+	if a.ImplySess(testAmbientSession, bot) {
 		t.Fatal("concrete does not imply bottom")
 	}
 	// join different → bottom
-	cp := a.Clone()
-	if !cp.Join(b) {
+	cp := a.CloneSess(testAmbientSession)
+	if !cp.JoinSess(testAmbientSession, b) {
 		t.Fatal("join should change")
 	}
-	if !cp.IsBottom() {
+	if !cp.IsBottomSess(testAmbientSession) {
 		t.Fatal(cp.LastWrittenFID)
 	}
 	// join with equal → no change
-	c2 := MakeFactUnion(uv, 0)
-	if c2.Join(MakeFactUnion(uv, 0)) {
+	c2 := MakeFactUnionSess(testAmbientSession, uv, 0)
+	if c2.JoinSess(testAmbientSession, MakeFactUnionSess(testAmbientSession, uv, 0)) {
 		t.Fatal("no change")
 	}
 }
@@ -58,11 +58,11 @@ func TestIsFieldReadable(t *testing.T) {
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	uv := &Variable{Name: "g_u", Type: ut}
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
-	if !IsFieldReadable(uv, 0, facts) {
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
+	if !IsFieldReadableSess(testAmbientSession, uv, 0, facts) {
 		t.Fatal("f0")
 	}
-	if IsFieldReadable(uv, 1, facts) {
+	if IsFieldReadableSess(testAmbientSession, uv, 1, facts) {
 		t.Fatal("f1")
 	}
 }
@@ -71,19 +71,19 @@ func TestFactUnionOutput(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	uv := &Variable{Name: "g_u", Type: ut}
-	f := MakeFactUnion(uv, 2)
+	f := MakeFactUnionSess(testAmbientSession, uv, 2)
 	if f == nil {
 		t.Fatal("make")
 	}
-	s := f.Output()
+	s := f.OutputSess(testAmbientSession)
 	if !strings.Contains(s, "g_u") || !strings.Contains(s, "2") {
 		t.Fatal(s)
 	}
 	// sticky no invent " last written field: N" without identifier
 	ClearErrorSess(testAmbientSession)
-	anon := MakeFactUnion(&Variable{Type: ut}, 0)
+	anon := MakeFactUnionSess(testAmbientSession, &Variable{Type: ut}, 0)
 	if anon != nil {
-		if out := anon.Output(); out != "" {
+		if out := anon.OutputSess(testAmbientSession); out != "" {
 			t.Fatal("empty union var name must fail closed", out)
 		}
 		if !HasErrorSess(testAmbientSession) {
@@ -97,7 +97,7 @@ func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
 	// FactUnion.cpp:163 assert union type sticky — no invent FactUnion on int
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), true, false)
-	if MakeFactUnion(v, 0) != nil {
+	if MakeFactUnionSess(testAmbientSession, v, 0) != nil {
 		t.Fatal("non-union must not invent FactUnion")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -105,21 +105,21 @@ func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
 	}
 	// MakeFactUnions fails closed sticky incomplete on non-union / nil hole
 	ClearErrorSess(testAmbientSession)
-	if UnionFactsComplete(MakeFactUnions([]*Variable{v}, 0)) {
+	if UnionFactsComplete(MakeFactUnionsSess(testAmbientSession, []*Variable{v}, 0)) {
 		t.Fatal("non-union MakeFactUnions must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-union MakeFactUnions must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if UnionFactsComplete(MakeFactUnions([]*Variable{nil}, 0)) {
+	if UnionFactsComplete(MakeFactUnionsSess(testAmbientSession, []*Variable{nil}, 0)) {
 		t.Fatal("nil hole MakeFactUnions must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil hole MakeFactUnions must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if len(MakeFactUnions([]*Variable{}, 0)) != 0 {
+	if len(MakeFactUnionsSess(testAmbientSession, []*Variable{}, 0)) != 0 {
 		t.Fatal("empty vars must yield empty facts")
 	}
 }
@@ -127,10 +127,10 @@ func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
 func TestJoinVarFactsUnion(t *testing.T) {
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	u1 := &Variable{Name: "g_u1", Type: ut}
-	facts := []*FactUnion{MakeFactUnion(u1, 0), MakeFactUnion(u1, 1)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, u1, 0), MakeFactUnionSess(testAmbientSession, u1, 1)}
 	// same var twice with different fids — FindRelated finds first only
 	// join list with one var
-	j := JoinVarFactsUnion(facts, []*Variable{u1})
+	j := JoinVarFactsUnionSess(testAmbientSession, facts, []*Variable{u1})
 	if j == nil || j.LastWrittenFID != 0 {
 		t.Fatal(j)
 	}
@@ -144,8 +144,8 @@ func TestJoinVarFactsUnionResidualSticky(t *testing.T) {
 	u1 := &Variable{Name: "g_u1", Type: ut}
 	u2 := &Variable{Name: "g_u2", Type: ut}
 	// facts hole then complete fact — soft invent was skip hole invent join u2
-	facts := []*FactUnion{nil, MakeFactUnion(u2, 0)}
-	if JoinVarFactsUnion(facts, []*Variable{u1, u2}) != nil {
+	facts := []*FactUnion{nil, MakeFactUnionSess(testAmbientSession, u2, 0)}
+	if JoinVarFactsUnionSess(testAmbientSession, facts, []*Variable{u1, u2}) != nil {
 		t.Fatal("FindRelated residual must fail closed JoinVarFactsUnion")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -163,12 +163,12 @@ func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 	uv := &Variable{Name: "g_u", Type: ut, FieldVars: []*Variable{
 		{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession)},
 	}}
-	f := MakeFactUnion(uv, 0)
-	if f.GetLastWrittenType() != GetIntTypeSess(testAmbientSession) {
+	f := MakeFactUnionSess(testAmbientSession, uv, 0)
+	if f.GetLastWrittenTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("field0 type")
 	}
 	f.LastWrittenFID = 99
-	if f.GetLastWrittenType() != nil {
+	if f.GetLastWrittenTypeSess(testAmbientSession) != nil {
 		t.Fatal("OOB fid")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -176,14 +176,14 @@ func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// FactUnion always live; sticky nil (no invent soft-skip past hole)
-	if (*FactUnion)(nil).GetLastWrittenType() != nil {
+	if (*FactUnion)(nil).GetLastWrittenTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil GetLastWrittenType must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil GetLastWrittenType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&FactUnion{}).GetLastWrittenType() != nil {
+	if (&FactUnion{}).GetLastWrittenTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil Var GetLastWrittenType must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -199,7 +199,7 @@ func TestRhsToLhsTransferUnionConstant(t *testing.T) {
 	}}
 	lhs := &Variable{Name: "g_u", Type: ut}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
-	out := RhsToLhsTransferUnion(nil, nil, []*Variable{lhs}, rhs)
+	out := RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{lhs}, rhs)
 	if len(out) != 1 || out[0].LastWrittenFID != 0 || out[0].Var != lhs {
 		t.Fatalf("%+v", out)
 	}
@@ -211,15 +211,15 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	}}
 	src := &Variable{Name: "g_src", Type: ut}
 	dst := &Variable{Name: "g_dst", Type: ut}
-	ufacts := []*FactUnion{MakeFactUnion(src, 1)}
+	ufacts := []*FactUnion{MakeFactUnionSess(testAmbientSession, src, 1)}
 	rhs := &Expression{Term: TermVariable, Var: src, ExprType: ut}
-	out := RhsToLhsTransferUnion(ufacts, nil, []*Variable{dst}, rhs)
+	out := RhsToLhsTransferUnionSess(testAmbientSession, ufacts, nil, []*Variable{dst}, rhs)
 	if len(out) != 1 || out[0].LastWrittenFID != 1 || out[0].Var != dst {
 		t.Fatalf("%+v", out)
 	}
 	// incomplete union map — non-sticky hole (soft re-pick factories)
 	ClearErrorSess(testAmbientSession)
-	if UnionFactsComplete(RhsToLhsTransferUnion([]*FactUnion{MakeFactUnion(src, 0), nil}, nil, []*Variable{dst}, rhs)) {
+	if UnionFactsComplete(RhsToLhsTransferUnionSess(testAmbientSession, []*FactUnion{MakeFactUnionSess(testAmbientSession, src, 0), nil}, nil, []*Variable{dst}, rhs)) {
 		t.Fatal("incomplete unionFacts must fail closed incomplete")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -228,7 +228,7 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	// non-union lvar hard IR sticky
 	ClearErrorSess(testAmbientSession)
 	i := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), true, false)
-	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{i}, rhs)) {
+	if UnionFactsComplete(RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-union lvar must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -236,7 +236,7 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	}
 	// nil rhs with targets — incomplete non-sticky (AddParamFacts missing union args)
 	ClearErrorSess(testAmbientSession)
-	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, nil)) {
+	if UnionFactsComplete(RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{dst}, nil)) {
 		t.Fatal("nil rhs must fail closed incomplete")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -244,7 +244,7 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty lvars is complete empty
-	if RhsToLhsTransferUnion(nil, nil, nil, rhs) != nil {
+	if RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, nil, rhs) != nil {
 		t.Fatal("empty lvars must be complete empty")
 	}
 }
@@ -261,7 +261,7 @@ func TestRhsToLhsTransferUnionCommaNilRHSFailClosed(t *testing.T) {
 		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		// CommaRHS nil
 	}
-	out := RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, rhs)
+	out := RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{dst}, rhs)
 	if UnionFactsComplete(out) {
 		t.Fatal("nil CommaRHS must fail closed incomplete", out)
 	}
@@ -286,7 +286,7 @@ func TestRhsToLhsTransferUnionAssignNilExprFailClosed(t *testing.T) {
 		// Expr nil
 	}
 	rhs := &Expression{Term: TermAssignment, Assign: assign, ExprType: ut}
-	out := RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, rhs)
+	out := RhsToLhsTransferUnionSess(testAmbientSession, nil, nil, []*Variable{dst}, rhs)
 	if UnionFactsComplete(out) {
 		t.Fatal("nil Assign.Expr must fail closed incomplete", out)
 	}
@@ -305,7 +305,7 @@ func TestAbstractFactUnionForAssignField(t *testing.T) {
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0, {Name: "g_u.f1", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
-	out, n := AbstractFactUnionForAssign(nil, nil, f0, 0, nil, rhs)
+	out, n := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, f0, 0, nil, rhs)
 	if n != 1 || len(out) != 1 || out[0].Var != parent || out[0].LastWrittenFID != 0 {
 		t.Fatalf("n=%d out=%+v", n, out)
 	}
@@ -317,7 +317,7 @@ func TestAbstractFactUnionForAssignUnionTypedLHS(t *testing.T) {
 	}}
 	lhs := &Variable{Name: "g_u", Type: ut}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
-	out, n := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
+	out, n := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, lhs, 0, nil, rhs)
 	if n != 1 || len(out) != 1 || out[0].LastWrittenFID != 0 {
 		t.Fatalf("n=%d out=%+v", n, out)
 	}
@@ -340,8 +340,8 @@ func TestAbstractFactUnionPaddingBottom(t *testing.T) {
 	nested := &Variable{Name: "g_u.f0.sub", Type: st, FieldVarOf: ufield}
 	parent.FieldVars = []*Variable{ufield}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
-	out, _ := AbstractFactUnionForAssign(nil, nil, nested, 0, nil, rhs)
-	if len(out) != 1 || out[0].Var != parent || !out[0].IsBottom() {
+	out, _ := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, nested, 0, nil, rhs)
+	if len(out) != 1 || out[0].Var != parent || !out[0].IsBottomSess(testAmbientSession) {
 		t.Fatalf("%+v", out)
 	}
 }
@@ -351,7 +351,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	lhs := &Variable{Name: "g_x", Type: nil}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
-	out, _ := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
+	out, _ := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, lhs, 0, nil, rhs)
 	if UnionFactsComplete(out) {
 		t.Fatal("Type-nil LHS must IncompleteUnionFactSlice, not invent non-union complete")
 	}
@@ -360,7 +360,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// special null Type-nil is complete non-union path (by design)
-	out2, n := AbstractFactUnionForAssign(nil, nil, NullPtr, 0, nil, rhs)
+	out2, n := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, NullPtr, 0, nil, rhs)
 	if !UnionFactsComplete(out2) || n != 1 {
 		t.Fatalf("special Type-nil must complete non-union path n=%d out=%+v", n, out2)
 	}
@@ -373,7 +373,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	parentHole := &Variable{Name: "g_u", Type: nil}
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parentHole}
 	parentHole.FieldVars = []*Variable{f0}
-	out3, _ := AbstractFactUnionForAssign(nil, nil, f0, 0, nil, rhs)
+	out3, _ := AbstractFactUnionForAssignSess(testAmbientSession, nil, nil, f0, 0, nil, rhs)
 	if UnionFactsComplete(out3) {
 		t.Fatal("IsUnionField residual AbstractFactUnion must fail closed incomplete")
 	}
@@ -385,7 +385,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 
 func TestFindRelatedUnionNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if FindRelatedUnion(nil, nil) != nil {
+	if FindRelatedUnionSess(testAmbientSession, nil, nil) != nil {
 		t.Fatal("nil subject FindRelatedUnion must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -393,7 +393,7 @@ func TestFindRelatedUnionNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false)
-	if FindRelatedUnion([]*FactUnion{nil}, v) != nil {
+	if FindRelatedUnionSess(testAmbientSession, []*FactUnion{nil}, v) != nil {
 		t.Fatal("nil fact hole FindRelatedUnion must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -404,21 +404,21 @@ func TestFindRelatedUnionNilSticky(t *testing.T) {
 
 func TestFactUnionEqualImplyJoinIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).Equal(&FactUnion{}) {
+	if (*FactUnion)(nil).EqualSess(testAmbientSession, &FactUnion{}) {
 		t.Fatal("nil Equal must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Equal must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).Imply(&FactUnion{}) {
+	if (*FactUnion)(nil).ImplySess(testAmbientSession, &FactUnion{}) {
 		t.Fatal("nil Imply must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Imply must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).Join(&FactUnion{}) {
+	if (*FactUnion)(nil).JoinSess(testAmbientSession, &FactUnion{}) {
 		t.Fatal("nil Join must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -429,21 +429,21 @@ func TestFactUnionEqualImplyJoinIncompleteSticky(t *testing.T) {
 
 func TestFactUnionIsTopBottomCloneIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).IsTop() {
+	if (*FactUnion)(nil).IsTopSess(testAmbientSession) {
 		t.Fatal("nil IsTop must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsTop must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).IsBottom() {
+	if (*FactUnion)(nil).IsBottomSess(testAmbientSession) {
 		t.Fatal("nil IsBottom must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsBottom must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).Clone() != nil {
+	if (*FactUnion)(nil).CloneSess(testAmbientSession) != nil {
 		t.Fatal("nil Clone must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -451,7 +451,7 @@ func TestFactUnionIsTopBottomCloneIncompleteSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f := &FactUnion{LastWrittenFID: FactUnionTop}
-	if !f.IsTop() || f.IsBottom() {
+	if !f.IsTopSess(testAmbientSession) || f.IsBottomSess(testAmbientSession) {
 		t.Fatal("TOP lattice")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -464,7 +464,7 @@ func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 	// IsUnion residual soft invent was invent soft-nil FactUnion past non-union Type.
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
-	if MakeFactUnion(v, 0) != nil {
+	if MakeFactUnionSess(testAmbientSession, v, 0) != nil {
 		t.Fatal("non-union MakeFactUnion must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -472,7 +472,7 @@ func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil sticky
-	if MakeFactUnion(&Variable{Name: "g_y", Type: nil}, 0) != nil {
+	if MakeFactUnionSess(testAmbientSession, &Variable{Name: "g_y", Type: nil}, 0) != nil {
 		t.Fatal("Type-nil MakeFactUnion must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -484,7 +484,7 @@ func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 func TestImplyIsBottomResidualSticky(t *testing.T) {
 	// IsBottom residual soft invent was invent soft-imply past nil FactUnion.
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).Imply(MakeFactUnionTop(CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false))) {
+	if (*FactUnion)(nil).ImplySess(testAmbientSession, MakeFactUnionTopSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntTypeSess(testAmbientSession), false, false))) {
 		t.Fatal("nil Imply must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

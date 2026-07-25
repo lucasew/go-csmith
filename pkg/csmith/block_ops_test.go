@@ -749,22 +749,22 @@ func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 	loc.CreateFieldVarsSess(testAmbientSession)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_u_sync", ut, false, false)
 	g.CreateFieldVarsSess(testAmbientSession)
-	uLoc := MakeFactUnion(loc, 0)
-	uG := MakeFactUnion(g, 0)
+	uLoc := MakeFactUnionSess(testAmbientSession, loc, 0)
+	uG := MakeFactUnionSess(testAmbientSession, g, 0)
 	if uLoc == nil || uG == nil {
 		t.Fatal("union facts")
 	}
 	// currentUnions after merge of goto map_out that still listed a body local.
-	currentUnions := []*FactUnion{uG.Clone(), uLoc.Clone()}
+	currentUnions := []*FactUnion{uG.CloneSess(testAmbientSession), uLoc.CloneSess(testAmbientSession)}
 	locals := []*Variable{loc}
 	entryUnions := DropUnionSubjectsByVars(currentUnions, locals)
 	if !UnionFactsComplete(entryUnions) {
 		t.Fatal("drop incomplete")
 	}
-	if FindRelatedUnion(entryUnions, loc) != nil {
+	if FindRelatedUnionSess(testAmbientSession, entryUnions, loc) != nil {
 		t.Fatal("drop must remove body local")
 	}
-	if FindRelatedUnion(entryUnions, g) == nil {
+	if FindRelatedUnionSess(testAmbientSession, entryUnions, g) == nil {
 		t.Fatal("drop must keep non-local")
 	}
 	// Without sync: same_facts(currentUnions, entryUnions) is false forever.
@@ -1810,8 +1810,8 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_fpbe", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
-	entryU := MakeFactUnion(parent, 0)
-	outU := MakeFactUnion(parent, 1)
+	entryU := MakeFactUnionSess(testAmbientSession, parent, 0)
+	outU := MakeFactUnionSess(testAmbientSession, parent, 1)
 	if entryU == nil || outU == nil {
 		t.Fatal("union facts")
 	}
@@ -1838,7 +1838,7 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	// merge of map_out (fid 1) into currentUnions. map_facts_in[block] is entry of last pass.
 	// After merge fid1 into currentUnions then set_fact_in(currentUnions):
 	inU := fm.GetMapUnionFactsIn(60)
-	got := FindRelatedUnion(inU, parent)
+	got := FindRelatedUnionSess(testAmbientSession, inU, parent)
 	if got == nil {
 		t.Fatal("map_in must have union subject after FP")
 	}
@@ -1962,9 +1962,9 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	body := &Block{StmID: 1, Func: f, Looping: false, Parent: nil, Stmts: nil, LocalVars: []*Variable{loc, lu}}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{mid}
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0)}
-	fm.SetMapFactsInPair(1, entry, []*FactUnion{MakeFactUnion(gu, 0)})
-	fm.SetMapFactsOutPair(1, []*FactPointTo{mid}, []*FactUnion{MakeFactUnion(gu, 0)})
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0)}
+	fm.SetMapFactsInPair(1, entry, []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0)})
+	fm.SetMapFactsOutPair(1, []*FactPointTo{mid}, []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0)})
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
@@ -1982,10 +1982,10 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	if !UnionFactsComplete(postU) {
 		t.Fatal("post_facts unions incomplete")
 	}
-	if FindRelatedUnion(postU, lu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, postU, lu) == nil {
 		t.Fatal("post_facts unions (pre-OOS) must include body-local union subject", postU)
 	}
-	if FindRelatedUnion(postU, gu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, postU, gu) == nil {
 		t.Fatal("post_facts unions must keep global union", postU)
 	}
 	// map_facts_out is post-OOS — local removed
@@ -1994,7 +1994,7 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 		t.Fatal("map_facts_out must OOS local var")
 	}
 	moutU := fm.GetMapUnionFactsOut(1)
-	if FindRelatedUnion(moutU, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, moutU, lu) != nil {
 		t.Fatal("map_union_out must OOS body-local union", moutU)
 	}
 	// Returned unions are independent of live after ShortcutAnalysis may install
@@ -2016,12 +2016,12 @@ func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
 	}
 	f0 := lu.FieldVars[0]
 	// no fact → nonreadable
-	if !IsNonreadableField(f0, []*FactUnion{}) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, []*FactUnion{}) {
 		t.Fatal("empty facts: union field must be nonreadable")
 	}
 	// related last-write f0 → readable
-	facts := []*FactUnion{MakeFactUnion(lu, 0)}
-	if IsNonreadableField(f0, facts) {
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, lu, 0)}
+	if IsNonreadableFieldSess(testAmbientSession, f0, facts) {
 		t.Fatal("matching FactUnion must make field readable")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -2165,7 +2165,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	// Simulate pre-snapshot without g_newu, then live gains union fact (created mid-for).
 	preU := []*FactUnion{}
 	g := &Variable{Name: "g_newu", Type: ut, Init: MakeIntSess(testAmbientSession, 0)}
-	liveU := []*FactUnion{MakeFactUnion(g, 0)}
+	liveU := []*FactUnion{MakeFactUnionSess(testAmbientSession, g, 0)}
 	if liveU[0] == nil {
 		t.Fatal("MakeFactUnion")
 	}
@@ -2179,7 +2179,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	preU2 := []*FactUnion{}
 	if UnionFactsComplete(preU2) && len(preU2) == 0 {
 		// without makeupNewUnionFacts this would be what SetMapFactsInPair stored
-		if FindRelatedUnion(preU2, g) != nil {
+		if FindRelatedUnionSess(testAmbientSession, preU2, g) != nil {
 			t.Fatal("empty pre should not find g")
 		}
 	}
@@ -2222,7 +2222,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 		MakeFactPointTo(param, NullPtr),
 		MakeFactPointTo(gp, param),
 	}
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	if fm.MapStmEffect == nil {
 		fm.MapStmEffect = make(map[int]Effect)
 	}
@@ -2237,15 +2237,15 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 		t.Fatalf("no-FP post_creation sticky: %v", GetErrorSess(testAmbientSession))
 	}
 	// live Union: local subject dropped; global kept
-	if FindRelatedUnion(fm.UnionFacts, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, lu) != nil {
 		t.Fatal("no-FP live UnionFacts must OOS body-local union subject", fm.UnionFacts)
 	}
-	if FindRelatedUnion(fm.UnionFacts, gu) == nil {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, gu) == nil {
 		t.Fatal("no-FP live UnionFacts must keep global union", fm.UnionFacts)
 	}
 	// map_union_out also OOS (SetMapFactsOutForBlock)
 	outU := fm.GetMapUnionFactsOut(inner.StmID)
-	if FindRelatedUnion(outU, lu) != nil {
+	if FindRelatedUnionSess(testAmbientSession, outU, lu) != nil {
 		t.Fatal("map_union_out must drop local", outU)
 	}
 	// Function-body no-FP: live must NOT apply remove_function_local (param subject stays).
@@ -2268,7 +2268,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 		MakeFactPointTo(param, NullPtr),
 		MakeFactPointTo(gp, param),
 	}
-	fm2.UnionFacts = []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(bodyLoc, 0)}
+	fm2.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, bodyLoc, 0)}
 	fm2.MapStmEffect = map[int]Effect{
 		body.StmID:    EmptyEffect(),
 		bodyAsg.StmID: EmptyEffect(),
@@ -2292,7 +2292,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 			t.Fatal("function-body map_facts_out must remove param subject", outPT)
 		}
 	}
-	if FindRelatedUnion(fm2.UnionFacts, bodyLoc) != nil {
+	if FindRelatedUnionSess(testAmbientSession, fm2.UnionFacts, bodyLoc) != nil {
 		t.Fatal("no-FP live must OOS body local union", fm2.UnionFacts)
 	}
 	ClearErrorSess(testAmbientSession)

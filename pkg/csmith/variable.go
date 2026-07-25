@@ -2488,7 +2488,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		var b strings.Builder
 		for i, f := range v.FieldVars {
 			// Variable.cpp:1195–1200 — FactUnion::is_field_readable (program end facts)
-			if !IsFieldReadable(v, i, unionFacts) {
+			if !IsFieldReadableSess(s, v, i, unionFacts) {
 				// residual ERROR sticky — no invent soft-skip then partial dump past hole
 				if sessHasError(s) {
 					return ""
@@ -2591,7 +2591,7 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 					sessNoteError(s, ErrGeneric)
 					return ""
 				}
-				if v.Type.IsUnionSess(s) && !IsFieldReadable(v, fi, unionFacts) {
+				if v.Type.IsUnionSess(s) && !IsFieldReadableSess(s, v, fi, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial dump past hole
 					if sessHasError(s) {
 						return ""

@@ -40,7 +40,7 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 		t.Fatal("create union")
 	}
 	uv.FieldVars = []*Variable{nil}
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	if s := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, facts); s != "" {
 		t.Fatal("nil union FieldVars hole must fail closed", s)
 	}
@@ -83,7 +83,7 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 	if s := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, nil); s != "" {
 		t.Fatal("empty facts should dump no union fields", s)
 	}
-	facts := []*FactUnion{MakeFactUnion(uv, 0)}
+	facts := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	out := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, facts)
 	if !strings.Contains(out, "g_u.f0") {
 		t.Fatal(out)

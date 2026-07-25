@@ -223,14 +223,14 @@ func SubsetUnionFactsSess(s *Session, a, b []*FactUnion) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		f2 := FindRelatedUnion(b, f1.Var)
+		f2 := FindRelatedUnionSess(s, b, f1.Var)
 		if sessHasError(s) {
 			return false
 		}
 		if f2 == nil {
 			return false
 		}
-		ok := f2.Imply(f1)
+		ok := f2.ImplySess(s, f1)
 		if sessHasError(s) {
 			return false
 		}

@@ -579,11 +579,11 @@ func TestAnalyzeWithEdgesInMergesJumpUnions(t *testing.T) {
 	// dest stmt already visited so back-edge merge runs
 	dest := &Stmt{Kind: StmtAssign, StmID: 20}
 	// live entry: field 0 last-write
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	// jump out: field 1 last-write
-	fm.SetMapFactsOutPair(10, []*FactPointTo{}, []*FactUnion{MakeFactUnion(parent, 1)})
-	fm.SetMapFactsInPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnion(parent, 0)})
+	fm.SetMapFactsOutPair(10, []*FactPointTo{}, []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 1)})
+	fm.SetMapFactsInPair(20, []*FactPointTo{}, []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)})
 	fm.SetMapStmEffect(20, EmptyEffect())
 	fm.SetMapAccumEffect(10, EmptyEffect())
 	fm.MapVisited = map[int]bool{10: true, 20: true}
@@ -599,7 +599,7 @@ func TestAnalyzeWithEdgesInMergesJumpUnions(t *testing.T) {
 	if !UnionFactsComplete(fm.UnionFacts) {
 		t.Fatalf("union merge incomplete err=%v", GetErrorSess(testAmbientSession))
 	}
-	fu := FindRelatedUnion(fm.UnionFacts, parent)
+	fu := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, parent)
 	if fu == nil {
 		t.Fatal("missing union fact after jump merge")
 	}

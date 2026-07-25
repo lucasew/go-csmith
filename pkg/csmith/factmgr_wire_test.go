@@ -60,7 +60,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	parent.FieldVars = []*Variable{f0, f1}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// incomplete existing union map (nil hole)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0), nil}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0), nil}
 	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	if fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("nil UnionFacts hole must fail closed false, not invent success")
@@ -72,7 +72,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete map + MergeUnionFact incomplete subject sticky wipe
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
-	fm2.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	fm2.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}
 	merged := MergeUnionFact(fm2.UnionFacts, nil)
 	if UnionFactsComplete(merged) {
 		t.Fatal("nil fact MergeUnionFact must fail closed incomplete")
@@ -236,7 +236,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.AddNewVarFact(uv)
-	if FindRelatedUnion(fm.UnionFacts, uv) == nil || FindRelatedUnion(fm.UnionFacts, uv).LastWrittenFID != 0 {
+	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv) == nil || FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv).LastWrittenFID != 0 {
 		t.Fatal(fm.UnionFacts)
 	}
 	// incomplete hard IR: nil var sticky (no invent empty init success / soft re-pick)
@@ -435,7 +435,7 @@ func TestUpdateFactForAssignUnionField(t *testing.T) {
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("update")
 	}
-	fu := FindRelatedUnion(fm.UnionFacts, parent)
+	fu := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, parent)
 	if fu == nil || fu.LastWrittenFID != 1 {
 		t.Fatalf("%+v", fu)
 	}
@@ -874,13 +874,13 @@ func TestStoreUnionFactMapEntryDeepIsolatesLive(t *testing.T) {
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	uv.CreateFieldVarsSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	live := MakeFactUnion(uv, 0)
+	live := MakeFactUnionSess(testAmbientSession, uv, 0)
 	fm.UnionFacts = []*FactUnion{live}
 	fm.SetMapFactsInPair(10, []*FactPointTo{}, fm.UnionFacts)
 	// mutate live lattice after store
 	live.LastWrittenFID = 1
 	got := fm.GetMapUnionFactsIn(10)
-	stored := FindRelatedUnion(got, uv)
+	stored := FindRelatedUnionSess(testAmbientSession, got, uv)
 	if stored == nil {
 		t.Fatal("missing stored union fact")
 	}

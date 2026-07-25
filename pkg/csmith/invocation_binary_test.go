@@ -142,7 +142,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	p := CreateVariableQferSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// post-left lattice: last written f0
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	// p points to f1
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, f1)}
 	eff := EmptyEffect()
@@ -164,16 +164,16 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	if !VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
 		t.Fatalf("visit sticky=%v", GetErrorSess(testAmbientSession))
 	}
-	fu := FindRelatedUnion(fm.UnionFacts, uv)
+	fu := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, uv)
 	if fu == nil {
 		t.Fatal("union fact missing after ordered visit")
 	}
 	// post-left last=f0 join post-right last=f1 → BOTTOM (neither implies)
-	if !fu.IsBottom() {
+	if !fu.IsBottomSess(testAmbientSession) {
 		t.Fatalf("want BOTTOM after && merge of f0|f1, got last=%d", fu.LastWrittenFID)
 	}
 	// both fields nonreadable under BOTTOM
-	if !IsNonreadableField(f0, fm.UnionFacts) || !IsNonreadableField(f1, fm.UnionFacts) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, fm.UnionFacts) || !IsNonreadableFieldSess(testAmbientSession, f1, fm.UnionFacts) {
 		t.Fatal("BOTTOM must make both union fields nonreadable")
 	}
 	if HasErrorSess(testAmbientSession) {

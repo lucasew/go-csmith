@@ -32,7 +32,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	// pre-init last_write f0 (abstract init of union)
 	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	fm.UnionFacts = []*FactUnion{MakeFactUnion(g88, 0)}
+	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, g88, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	outer := &Block{StmID: AllocStmID(), Func: f, Looping: false}
 	f.Body = outer
@@ -54,7 +54,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	if !VisitFactsStatementAssign(initSt, &cg, opts) {
 		t.Fatal("init visit", GetErrorSess(testAmbientSession))
 	}
-	got := FindRelatedUnion(fm.UnionFacts, g88)
+	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, g88)
 	if got == nil || got.LastWrittenFID != 1 {
 		t.Fatalf("after f1 IV init want last=1, got %#v", got)
 	}
@@ -64,7 +64,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 		t.Fatal("body", GetErrorSess(testAmbientSession))
 	}
 	inU := fm.GetMapUnionFactsIn(body.StmID)
-	gotIn := FindRelatedUnion(inU, g88)
+	gotIn := FindRelatedUnionSess(testAmbientSession, inU, g88)
 	if gotIn == nil {
 		t.Fatal("map_in missing g_88")
 	}

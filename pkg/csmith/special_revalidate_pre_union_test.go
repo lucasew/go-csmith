@@ -10,7 +10,7 @@ import "testing"
 // aborting validate and leaving gen-time map_stm_effect IV extras.
 //
 // Contract: pre eUnionWrite lattice must be the special-revalidate base for
-// CheckReadVar/IsNonreadableField (same as C++ FactVec pre_facts).
+// CheckReadVar/IsNonreadableFieldSess(testAmbientSession, same as C++ FactVec pre_facts).
 func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
@@ -28,17 +28,17 @@ func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
 
 	// Pre-statement lattice: last write field 0 → f0 readable.
-	preUnion := []*FactUnion{MakeFactUnion(uv, 0)}
+	preUnion := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 0)}
 	// Post-gen lattice: nested body last-wrote field 1 → f0 nonreadable.
-	postGenUnion := []*FactUnion{MakeFactUnion(uv, 1)}
+	postGenUnion := []*FactUnion{MakeFactUnionSess(testAmbientSession, uv, 1)}
 
-	if IsNonreadableField(f0, preUnion) {
+	if IsNonreadableFieldSess(testAmbientSession, f0, preUnion) {
 		t.Fatal("pre-union last=f0: f0 must be readable (special revalidate base)")
 	}
-	if !IsNonreadableField(f0, postGenUnion) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, postGenUnion) {
 		t.Fatal("post-gen last=f1: f0 must be nonreadable (must not be revalidate base)")
 	}
-	if IsNonreadableField(f1, postGenUnion) {
+	if IsNonreadableFieldSess(testAmbientSession, f1, postGenUnion) {
 		t.Fatal("post-gen last=f1: f1 readable")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -46,7 +46,7 @@ func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
 	}
 
 	// Deep clone of pre must not alias post-gen mutations (visit Join/SetBottom).
-	work := CloneUnionFactSliceDeep(preUnion)
+	work := CloneUnionFactSliceDeepSess(testAmbientSession, preUnion)
 	if !UnionFactsComplete(work) || HasErrorSess(testAmbientSession) {
 		t.Fatalf("deep clone pre incomplete err=%v", GetErrorSess(testAmbientSession))
 	}
@@ -58,10 +58,10 @@ func TestSpecialRevalidatePreUnionReadableField(t *testing.T) {
 	if preUnion[0].LastWrittenFID != 0 {
 		t.Fatalf("shallow alias: preUnion last=%d want 0", preUnion[0].LastWrittenFID)
 	}
-	if IsNonreadableField(f0, preUnion) {
+	if IsNonreadableFieldSess(testAmbientSession, f0, preUnion) {
 		t.Fatal("preUnion must remain last=f0 after deep-clone work mutation")
 	}
-	if !IsNonreadableField(f0, work) {
+	if !IsNonreadableFieldSess(testAmbientSession, f0, work) {
 		t.Fatal("mutated work last=f1 must block f0")
 	}
 }
