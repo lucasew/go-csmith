@@ -5,23 +5,28 @@ package csmith
 // MakeRandomIterCtrl mirrors StatementArrayOp::make_random_iter_ctrl.
 // StatementArrayOp.cpp:64–70 — pure_rnd flip for init 0 or upto(size); incr 1 or upto(size)+1.
 func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
+	return MakeRandomIterCtrlSess(nil, r, size)
+}
+
+// MakeRandomIterCtrlSess is MakeRandomIterCtrl with explicit session residual sticky.
+func MakeRandomIterCtrlSess(s *Session, r *Rng, size int) (init, incr int) {
 	// StatementArrayOp.cpp:64–70 — pure_rnd_upto(size); sticky no invent incr=1 without RNG
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0, 0
 	}
 	if size < 1 {
 		return 0, 0
 	}
-	if r.RndFlipcoin(50) {
+	if r.RndFlipcoinSess(s, 50) {
 		init = 0
 	} else {
-		init = int(r.RndUpto(uint32(size)))
+		init = int(r.RndUptoSess(s, uint32(size)))
 	}
-	if r.RndFlipcoin(50) {
+	if r.RndFlipcoinSess(s, 50) {
 		incr = 1
 	} else {
-		incr = int(r.RndUpto(uint32(size))) + 1
+		incr = int(r.RndUptoSess(s, uint32(size))) + 1
 	}
 	return init, incr
 }
@@ -31,14 +36,19 @@ func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
 // Incomplete *set (nil hole) sticky no-op — no invent append/dup when
 // IsVariableInSet is false only because membership cannot be decided past a hole.
 func AddVariableToSet(set *[]*Variable, v *Variable) {
+	AddVariableToSetSess(nil, set, v)
+}
+
+// AddVariableToSetSess is AddVariableToSet with explicit session residual sticky.
+func AddVariableToSetSess(s *Session, set *[]*Variable, v *Variable) {
 	// set + Variable always live; sticky incomplete no invent soft no-op past hole
 	if set == nil || v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// incomplete *set sticky no-op (no invent append/dup past membership hole)
 	if !VariablesComplete(*set) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !IsVariableInSet(*set, v) {
@@ -50,14 +60,19 @@ func AddVariableToSet(set *[]*Variable, v *Variable) {
 // Variable* always live in sets; incomplete list fails closed IncompleteVariables
 // (not bare nil invent empty-complete combined set via VariablesComplete(nil)).
 func CombineVariableSets(a, b []*Variable) []*Variable {
+	return CombineVariableSetsSess(nil, a, b)
+}
+
+// CombineVariableSetsSess is CombineVariableSets with explicit session residual sticky.
+func CombineVariableSetsSess(s *Session, a, b []*Variable) []*Variable {
 	if !VariablesComplete(a) || !VariablesComplete(b) {
 		// incomplete lists fail closed sticky (no invent soft re-pick combined pool past holes)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := append([]*Variable(nil), a...)
 	for _, v := range b {
-		AddVariableToSet(&out, v)
+		AddVariableToSetSess(s, &out, v)
 	}
 	return out
 }
@@ -155,22 +170,22 @@ func MakeRandomArrayLoop(
 		}
 		avs = append(avs, av)
 		// access: 0 = must read, 1 = must write, 2 = both
-		access := int(r.RndUpto(3))
+		access := int(r.RndUptoSess(cgSess(cg), 3))
 		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		if access == 0 || access == 2 {
-			AddVariableToSet(&mustReads, &av.Variable)
+			AddVariableToSetSess(cgSess(cg), &mustReads, &av.Variable)
 		}
 		if access == 1 || access == 2 {
-			AddVariableToSet(&mustWrites, &av.Variable)
+			AddVariableToSetSess(cgSess(cg), &mustWrites, &av.Variable)
 		}
 	}
 	// StatementFor.cpp:331–345 — combine with existing directive
 	var allMustReads, allMustWrites, noReads, noWrites []*Variable
 	if cg.RW != nil {
-		allMustReads = CombineVariableSets(cg.RW.MustReadVars, mustReads)
-		allMustWrites = CombineVariableSets(cg.RW.MustWriteVars, mustWrites)
+		allMustReads = CombineVariableSetsSess(cgSess(cg), cg.RW.MustReadVars, mustReads)
+		allMustWrites = CombineVariableSetsSess(cgSess(cg), cg.RW.MustWriteVars, mustWrites)
 		// incomplete combine / existing No* lists fail closed sticky (no invent partial RW)
 		if !VariablesComplete(allMustReads) || !VariablesComplete(allMustWrites) ||
 			!VariablesComplete(cg.RW.NoReadVars) || !VariablesComplete(cg.RW.NoWriteVars) {
