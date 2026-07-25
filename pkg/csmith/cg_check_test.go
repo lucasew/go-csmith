@@ -584,7 +584,7 @@ func TestExtendCallChainNilHoleFailClosed(t *testing.T) {
 	// incomplete call_chain fails closed empty (no invent keep-hole chain)
 	from := EmptyCGContext()
 	from.CallChain = []*Block{&Block{StmID: 1}, nil}
-	var c CGContext
+	c := EmptyCGContext()
 	c.ExtendCallChain(from)
 	if c.CallChain != nil {
 		t.Fatal("nil CallChain hole must clear chain, not invent keep-hole")

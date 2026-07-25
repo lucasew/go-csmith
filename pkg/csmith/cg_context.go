@@ -65,21 +65,27 @@ func EmptyCGContext() CGContext {
 	return CGContext{effectContext: EmptyEffect(), Sess: testAmbientSession}
 }
 
+// ptrEmptyCG returns a heap EmptyCGContext for APIs that take *CGContext.
+func ptrEmptyCG() *CGContext {
+	c := EmptyCGContext()
+	return &c
+}
+
 // WithSession attaches the pure-run bag (copied by later With* value receivers).
 func (c CGContext) WithSession(s *Session) CGContext {
 	c.Sess = s
 	return c
 }
 
-// cgSess returns c.Sess. Nil c → unit-test ambient. Non-nil c with unset Sess
-// lazy-installs ambient on the context (Generate uses WithSession / sets Sess).
+// cgSess returns c.Sess. Nil c → unit-test ambient.
+// Non-nil c must have Sess set (EmptyCGContext / WithSession / Generate).
 // Pass &cg for by-value CGContext params.
 func cgSess(c *CGContext) *Session {
 	if c == nil {
 		return testAmbientSession
 	}
 	if c.Sess == nil {
-		c.Sess = testAmbientSession
+		panic("cgSess: Sess unset (use EmptyCGContext / WithSession / set Sess)")
 	}
 	return c.Sess
 }

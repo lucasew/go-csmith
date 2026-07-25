@@ -197,14 +197,14 @@ func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{loop}
-	if stmtOK(MakeRandomBreak(nil, opts, vs, NewExprTables(opts), &CGContext{})) {
+	if stmtOK(MakeRandomBreak(nil, opts, vs, NewExprTables(opts), ptrEmptyCG())) {
 		t.Fatal("nil RNG break must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("nil RNG MakeRandomBreak must SetError sticky")
 	}
 	ClearError()
-	if stmtOK(MakeRandomContinue(nil, opts, vs, NewExprTables(opts), &CGContext{}, loop)) {
+	if stmtOK(MakeRandomContinue(nil, opts, vs, NewExprTables(opts), ptrEmptyCG(), loop)) {
 		t.Fatal("nil RNG continue must fail closed")
 	}
 	if !HasError() {

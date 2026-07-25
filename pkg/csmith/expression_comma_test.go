@@ -149,7 +149,7 @@ func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell
 	ClearError()
 	opts := Defaults()
-	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &CGContext{}, GetIntType(), nil) != nil {
+	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), ptrEmptyCG(), GetIntType(), nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasError() {

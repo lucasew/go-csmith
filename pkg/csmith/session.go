@@ -10,8 +10,8 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession + Process*/SetError bridges for legacy unit tests
-//   - NewVariableSelector / NewFactMgr / cgSess install ambient when needed
-//   - vsSess/envSess/fmSess panic if owner.Sess unset (constructors set it)
+//   - NewVariableSelector / NewFactMgr / EmptyCGContext install ambient
+//   - vsSess/envSess/fmSess/cgSess panic if owner.Sess unset (constructors set it)
 //   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes

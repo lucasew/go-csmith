@@ -157,7 +157,7 @@ func TestNeedNestedLoop(t *testing.T) {
 	arr := &av.Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	rw := &RWDirective{MustReadVars: []*Variable{arr}}
-	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}} // depth 0
+	cg := CGContext{Sess: testAmbientSession, RW: rw, IVBounds: map[*Variable]int{}} // depth 0
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("dim 2 > iv 0")
 	}
@@ -183,7 +183,7 @@ func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	arr := &av.Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	rw := &RWDirective{MustReadVars: []*Variable{nil, arr}}
-	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}}
+	cg := CGContext{Sess: testAmbientSession, RW: rw, IVBounds: map[*Variable]int{}}
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("nil MustRead hole must fail closed true need-nested, not invent none")
 	}
@@ -192,7 +192,7 @@ func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	}
 	ClearError()
 	rw2 := &RWDirective{MustWriteVars: []*Variable{nil, arr}}
-	cg2 := CGContext{RW: rw2, IVBounds: map[*Variable]int{}}
+	cg2 := CGContext{Sess: testAmbientSession, RW: rw2, IVBounds: map[*Variable]int{}}
 	if !b.NeedNestedLoop(cg2, NewRng(1)) {
 		t.Fatal("nil MustWrite hole must fail closed true need-nested, not invent none")
 	}
@@ -209,7 +209,7 @@ func TestNeedNestedLoopMustJumpResidualSticky(t *testing.T) {
 	ClearError()
 	defer ClearError()
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtBreak}}} // nil Expr
-	cg := CGContext{}                                            // RW nil would soft invent false after residual
+	cg := EmptyCGContext()                                            // RW nil would soft invent false after residual
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("MustJump residual must fail closed true need-nested, not invent none")
 	}
@@ -1094,7 +1094,7 @@ func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
 	// via AsArray on Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	rw := &RWDirective{MustWriteVars: []*Variable{&av.Variable}}
-	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}}
+	cg := CGContext{Sess: testAmbientSession, RW: rw, IVBounds: map[*Variable]int{}}
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("dim 2 > iv 0 via GetDimension")
 	}
