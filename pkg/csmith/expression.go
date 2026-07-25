@@ -1697,14 +1697,19 @@ func (e *Expression) Output() string {
 
 // OutputOpts is Output with explicit session Options (const emit / access_once / lang_cpp).
 func (e *Expression) OutputOpts(opts Options) string {
+	return e.OutputOptsSess(nil, opts)
+}
+
+// OutputOptsSess is OutputOpts with sticky errors on bag s.
+func (e *Expression) OutputOptsSess(s *Session, opts Options) string {
 	// Expression* always live at Output; sticky no invent empty token without it
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	body := e.outputBodyOpts(opts)
+	body := e.outputBodyOptsSess(s, opts)
 	// residual ERROR sticky — no invent soft-empty body past outputBody residual hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if e.CastType != nil {
@@ -1712,12 +1717,12 @@ func (e *Expression) OutputOpts(opts Options) string {
 		// sticky no invent "() body" / "(type) " empty body
 		cn := e.CastType.CName()
 		// residual ERROR sticky — no invent cast emit past CName residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if cn == "" || body == "" {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
@@ -1734,9 +1739,14 @@ func (e *Expression) IndentedOutput(indent int) string {
 
 // IndentedOutputOpts is IndentedOutput with explicit session Options.
 func (e *Expression) IndentedOutputOpts(indent int, opts Options) string {
-	out := e.OutputOpts(opts)
+	return e.IndentedOutputOptsSess(nil, indent, opts)
+}
+
+// IndentedOutputOptsSess is IndentedOutputOpts with sticky errors on bag s.
+func (e *Expression) IndentedOutputOptsSess(s *Session, indent int, opts Options) string {
+	out := e.OutputOptsSess(s, opts)
 	// residual ERROR sticky — no invent soft-indent emit past Output residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	return OutputTab(indent) + out
@@ -1747,6 +1757,10 @@ func (e *Expression) outputBody() string {
 }
 
 func (e *Expression) outputBodyOpts(opts Options) string {
+	return e.outputBodyOptsSess(nil, opts)
+}
+
+func (e *Expression) outputBodyOptsSess(s *Session, opts Options) string {
 	if e == nil {
 		return ""
 	}
@@ -1756,13 +1770,13 @@ func (e *Expression) outputBodyOpts(opts Options) string {
 		// Must use Con.OutputOpts so negatives become "(-6L)" for array init_strings
 		// (ArrayVariable.cpp:490–492 init_values[i]->to_string()), not bare Value.
 		if e.Con == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return e.Con.OutputOpts(opts)
 	case TermVariable:
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// ExpressionVariable::Output — *…var or &var from indirect level.
@@ -1772,12 +1786,12 @@ func (e *Expression) outputBodyOpts(opts Options) string {
 		if e.Invoke != nil {
 			out := e.Invoke.OutputOpts(opts)
 			// residual ERROR sticky — no invent soft-empty call past Invoke Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			return out
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	case TermAssignment:
 		if e.Assign != nil {
@@ -1785,43 +1799,43 @@ func (e *Expression) outputBodyOpts(opts Options) string {
 			wrap := e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal
 			as := OutputAssignAsExprOpts(e.Assign, wrap, opts)
 			// residual ERROR sticky — no invent soft-empty assign expr past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if as != "" {
 				return "(" + as + ")"
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	case TermCommaExpr:
 		// ExpressionComma.cpp:137–144 — "(" + lhs + " , " + rhs + ")"
 		// C++ always has live lhs/rhs Output; sticky no invent "( , )" / "(x , )" / "( , y)"
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		lhs := e.CommaLHS.OutputOpts(opts)
+		lhs := e.CommaLHS.OutputOptsSess(s, opts)
 		// residual ERROR sticky — no invent soft-continue RHS past LHS Output residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
-		rhs := e.CommaRHS.OutputOpts(opts)
+		rhs := e.CommaRHS.OutputOptsSess(s, opts)
 		// residual ERROR sticky — no invent soft-empty comma past RHS Output residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if lhs == "" || rhs == "" {
 			// incomplete side IR — sticky fail closed whole comma
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		return "(" + lhs + " , " + rhs + ")"
 	}
 	// Expression.cpp:195–200 default: no emit invent; incomplete IR sticky empty
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return ""
 }
 

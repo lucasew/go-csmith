@@ -1698,8 +1698,13 @@ func (b *Block) outputStmtsOnly(indent int) string {
 // (seed 86: UP one lbl_1132 vs GO three inside nested fors). Nested shells
 // still emit for-headers/body; only pre_output is suppressed.
 func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) string {
+	return b.outputStmtsOnlySess(nil, indent, skipPre, opts)
+}
+
+// outputStmtsOnlySess is outputStmtsOnlyOpts with sticky errors on bag s.
+func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts Options) string {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	inner := strings.Repeat("    ", indent)
@@ -1712,7 +1717,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 		if !skipPre {
 			pre, isGotoTarget = PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
 			// residual ERROR sticky — no invent soft-continue stmt emit past PreOutput hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 		}
@@ -1737,16 +1742,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// StatementReturn.cpp:125–134 — always ExpressionVariable var (no invent bare return;)
 			// incomplete sticky fails whole block (no invent soft-skip stmt and still emit later)
 			if st.Expr == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			exprOut := st.Expr.OutputOpts(opts)
+			exprOut := st.Expr.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if exprOut == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// StatementReturn.cpp:127–129 — DEPTH-- when CGOptions::depth_protect()
@@ -1764,16 +1769,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 				ty := st.LhsVar.Type.CName()
 				// residual ERROR sticky — no invent soft-continue past CName residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
-				rhs := st.Expr.OutputOpts(opts)
+				rhs := st.Expr.OutputOptsSess(s, opts)
 				// residual ERROR sticky — no invent soft-continue past Output residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				if ty == "" || rhs == "" {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return ""
 				}
 				content.WriteString(ty + " tmp = " + rhs + ";\n")
@@ -1785,41 +1790,41 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// no soft invent Defaults() / force IdentifyWrappers=false
 			asExpr := OutputAssignAsExprOpts(&st, wrap, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past OutputAssign residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if asExpr != "" {
 				content.WriteString(asExpr + ";\n")
 			} else if st.ArrayAccess != "" && st.Expr != nil {
 				// array_init simple: a[i] = expr
-				rhs := st.Expr.OutputOpts(opts)
+				rhs := st.Expr.OutputOptsSess(s, opts)
 				// residual ERROR sticky — no invent soft-continue stmt past Output residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return ""
 				}
 				if rhs == "" {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return ""
 				}
 				content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
 			} else {
 				// incomplete assign IR sticky — fail whole block (no invent soft-skip)
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 		case StmtBreak:
 			// StatementBreak.cpp:117–118 — test.Output always live; sticky no invent if () break
 			if st.Expr == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.OutputOpts(opts)
+			test := st.Expr.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if test == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1829,16 +1834,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 		case StmtContinue:
 			// StatementContinue.cpp — test.Output always live; sticky no invent if () continue
 			if st.Expr == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.OutputOpts(opts)
+			test := st.Expr.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if test == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1849,22 +1854,22 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// StatementFor.cpp:422–424 — output_header(indent); body.Output(indent)
 			// same indent as for (not indent+1). sticky no invent for(;;) / missing body
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			hdr := forHeaderOutput(st.Loop)
 			// residual ERROR sticky — no invent soft-continue body past header residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			// body pad matches statement indent; outer sb prefixes first line with inner
-			bodyOut := st.Then.OutputOpts(indent, opts)
+			bodyOut := st.Then.OutputOptsSess(s, indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if hdr == "" || bodyOut == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
@@ -1873,26 +1878,26 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// StatementIf.cpp:139–159 — if_true/if_false.Output(indent) same as condition
 			// sticky no invent if () / missing branches / empty test or branch Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.OutputOpts(opts)
+			test := st.Expr.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue arms past test residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			thenOut := st.Then.OutputOpts(indent, opts)
+			thenOut := st.Then.OutputOptsSess(s, indent, opts)
 			// residual ERROR sticky — no invent soft-continue else past Then residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
-			elseOut := st.Else.OutputOpts(indent, opts)
+			elseOut := st.Else.OutputOptsSess(s, indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Else residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if test == "" || thenOut == "" || elseOut == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1904,16 +1909,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 		case StmtGoto:
 			// StatementGoto.cpp:252–253 — test.Output always live; sticky no invent if () goto
 			if st.Label == "" || st.Expr == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			test := st.Expr.OutputOpts(opts)
+			test := st.Expr.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if test == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString("if (")
@@ -1924,16 +1929,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// StatementArrayOp.cpp:225–267 — header; body Block OR bare-brace init_value
 			// sticky no invent header without body/init
 			if st.Loop == nil || st.Loop.IV == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, opts)
 			// residual ERROR sticky — no invent soft-continue body past header residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if hdr == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString(hdr + "\n")
@@ -1947,23 +1952,23 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				assignPad := strings.Repeat("    ", indent+1)
 				if st.Expr.Term == TermConstant && st.LhsVar != nil && st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 					ty := st.LhsVar.Type.CName()
-					rhs := st.Expr.OutputOpts(opts)
-					if sessHasError(nil) {
+					rhs := st.Expr.OutputOptsSess(s, opts)
+					if sessHasError(s) {
 						return ""
 					}
 					if ty == "" || rhs == "" {
-						sessNoteError(nil, ErrGeneric)
+						sessNoteError(s, ErrGeneric)
 						return ""
 					}
 					content.WriteString(assignPad + ty + " tmp = " + rhs + ";\n")
 					content.WriteString(assignPad + st.ArrayAccess + " = tmp;\n")
 				} else {
-					rhs := st.Expr.OutputOpts(opts)
-					if sessHasError(nil) {
+					rhs := st.Expr.OutputOptsSess(s, opts)
+					if sessHasError(s) {
 						return ""
 					}
 					if rhs == "" {
-						sessNoteError(nil, ErrGeneric)
+						sessNoteError(s, ErrGeneric)
 						return ""
 					}
 					content.WriteString(assignPad + st.ArrayAccess + " = " + rhs + ";\n")
@@ -1973,7 +1978,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			}
 			// StatementArrayOp.cpp:229–230 — body->Output(indent) when body non-null
 			if st.Then == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// Nested multi-dim may wrap child StmtArrayOp in a synthetic Block.
@@ -1989,25 +1994,25 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 				nest := &Block{Stmts: []Stmt{child}, EmitFM: b.EmitFM, EmitStepHash: b.EmitStepHash,
 					EmitLabelAttrs: b.EmitLabelAttrs, LabelAttrRng: b.LabelAttrRng,
 					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise}
-				childOut := nest.outputStmtsOnlyOpts(indent+1, true, opts)
-				if sessHasError(nil) {
+				childOut := nest.outputStmtsOnlySess(s, indent+1, true, opts)
+				if sessHasError(s) {
 					return ""
 				}
 				if childOut == "" {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return ""
 				}
 				content.WriteString(childOut)
 				content.WriteString(pad + "}\n")
 				break
 			}
-			bodyOut := st.Then.OutputOpts(indent, opts)
+			bodyOut := st.Then.OutputOptsSess(s, indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past body residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if bodyOut == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString(bodyOut)
@@ -2015,16 +2020,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// StatementExpr::Output — expr.Output(); ";"
 			// incomplete sticky fails whole block (no invent soft-skip empty invoke)
 			if st.Expr == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			out := st.Expr.OutputOpts(opts)
+			out := st.Expr.OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past Output residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if out == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString(out + ";\n")
@@ -2032,16 +2037,16 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// Block is Statement; OutputStatementList calls Block::Output at same indent
 			// sticky no invent empty nested shell
 			if st.Then == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			bodyOut := st.Then.OutputOpts(indent, opts)
+			bodyOut := st.Then.OutputOptsSess(s, indent, opts)
 			// residual ERROR sticky — no invent soft-continue stmt past nested residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if bodyOut == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			content.WriteString(bodyOut)
@@ -2049,7 +2054,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 			// unknown/zero Kind in live body is incomplete IR sticky — fail whole block
 			// (no invent soft-skip hole and still emit later stmts)
 			// StmtLabel handled earlier via continue
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if content.Len() > 0 {
@@ -2060,7 +2065,7 @@ func (b *Block) outputStmtsOnlyOpts(indent int, skipPre bool, opts Options) stri
 		if b.EmitParanoid && b.EmitFM != nil {
 			post := PostOutput(&st, b, b.EmitFM, true, b.EmitConcise, inner)
 			// residual ERROR sticky — no invent soft-continue stmt emit past PostOutput hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			sb.WriteString(post)
@@ -2076,9 +2081,14 @@ func (b *Block) Output(indent int) string {
 
 // OutputOpts is Block.Output with explicit session Options (no ambient ProcessOptions).
 func (b *Block) OutputOpts(indent int, opts Options) string {
+	return b.OutputOptsSess(nil, indent, opts)
+}
+
+// OutputOptsSess is OutputOpts with sticky errors on bag s.
+func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 	// Block.cpp:248+ — always live this; sticky no invent empty "{}" shell for nil
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	pad := strings.Repeat("    ", indent)
@@ -2108,23 +2118,23 @@ func (b *Block) OutputOpts(indent int, opts Options) string {
 		for _, name := range names {
 			// macro_tmp_vars name + type always live; sticky no invent "int  = 0;" / skip holes
 			if name == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			// eSimpleType always valid in macro_tmp_vars; OOB/invalid sticky fail closed
 			// (GetSimpleType nil — no invent "int" for broken tmp type)
 			ty := GetSimpleType(b.TmpVars[name])
 			if ty == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			cn := ty.CName()
 			// residual ERROR sticky — no invent soft-continue tmp decl past CName residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			if cn == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			sb.WriteString(inner)
@@ -2134,7 +2144,7 @@ func (b *Block) OutputOpts(indent int, opts Options) string {
 	// OutputVariableList(local_vars) — Variable.cpp:855–864
 	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
 	if !VariablesComplete(b.LocalVars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Block.cpp:268 — OutputVariableList(local_vars): defs then OutputArrayInitializers
@@ -2143,16 +2153,16 @@ func (b *Block) OutputOpts(indent int, opts Options) string {
 	if len(b.LocalVars) > 0 {
 		listOut := OutputVariableListOpts(b.LocalVars, inner, false, opts)
 		// residual ERROR sticky — no invent soft-continue stmts past OutputVariableList residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		sb.WriteString(listOut)
 	}
 	// Block.cpp:235–241 OutputStatementList
 	// Only fail closed on residuals raised during stmt emit (not pre-existing sticky).
-	hadErr := sessHasError(nil)
-	stmtsOut := b.outputStmtsOnlyOpts(indent+1, false, opts)
-	if stmtsOut == "" && sessHasError(nil) && !hadErr {
+	hadErr := sessHasError(s)
+	stmtsOut := b.outputStmtsOnlySess(s, indent+1, false, opts)
+	if stmtsOut == "" && sessHasError(s) && !hadErr {
 		// residual during stmt list — no invent braces-only success past hole
 		return ""
 	}

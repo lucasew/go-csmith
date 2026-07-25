@@ -1333,7 +1333,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 		return ""
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
-	bodyOut := f.Body.OutputOpts(0, opts)
+	bodyOut := f.Body.OutputOptsSess(sess, 0, opts)
 	// residual ERROR sticky — no invent soft-continue past Body.Output residual
 	if sessHasError(sess) {
 		return ""
