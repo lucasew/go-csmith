@@ -34,13 +34,13 @@ func TestMakeExpressionComma(t *testing.T) {
 	}
 	// Expression always live for cast_if_needed; sticky (no invent soft-skip past hole)
 	ClearError()
-	castIfNeeded(nil, nil)
+	castIfNeeded(testAmbientSession, nil)
 	if !HasError() {
 		t.Fatal("nil castIfNeeded must SetError sticky")
 	}
 	ClearError()
 	// non-constant complete no-op
-	castIfNeeded(nil, &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false)})
+	castIfNeeded(testAmbientSession, &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false)})
 	if HasError() {
 		t.Fatal("non-constant castIfNeeded must complete no-op")
 	}
@@ -170,7 +170,7 @@ func TestCastIfNeededGetTypeResidualSticky(t *testing.T) {
 	ClearError()
 	// Type-nil Con → GetType residual; no invent cast
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
-	castIfNeeded(nil, hole)
+	castIfNeeded(testAmbientSession, hole)
 	if hole.CastType != nil {
 		t.Fatal("GetType residual must not invent CastType", hole.CastType)
 	}
@@ -181,7 +181,7 @@ func TestCastIfNeededGetTypeResidualSticky(t *testing.T) {
 	// empty Value → EqualsInt residual after live pointer type; no invent cast
 	pt := PointerTo(GetIntType())
 	eqHole := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: ""}}
-	castIfNeeded(nil, eqHole)
+	castIfNeeded(testAmbientSession, eqHole)
 	if eqHole.CastType != nil {
 		t.Fatal("EqualsInt residual must not invent CastType", eqHole.CastType)
 	}

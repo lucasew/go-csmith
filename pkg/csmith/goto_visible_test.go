@@ -186,13 +186,13 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 func TestCastIfNeeded(t *testing.T) {
 	pt := PointerTo(GetIntType())
 	e := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
-	castIfNeeded(nil, e)
+	castIfNeeded(testAmbientSession, e)
 	if e.CastType != pt {
 		t.Fatal("cast")
 	}
 	// non-zero no cast
 	e2 := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "1"}}
-	castIfNeeded(nil, e2)
+	castIfNeeded(testAmbientSession, e2)
 	if e2.CastType != nil {
 		t.Fatal("no cast")
 	}

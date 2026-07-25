@@ -177,43 +177,43 @@ const (
 func (c CGContext) FindVariableScope(v *Variable) int {
 	// Variable always live; sticky incomplete ScopeInactive (no invent soft re-pick)
 	if v == nil {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return ScopeInactive
 	}
-	if v.IsGlobalSess(c.Sess) {
+	if v.IsGlobalSess(cgSess(&c)) {
 		// residual ERROR sticky — no invent global-scope past IsGlobal residual hole
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return ScopeInactive
 		}
 		return ScopeGlobalVar
 	}
 	// residual ERROR sticky — no invent soft-continue scope past IsGlobal residual false
-	if sessHasError(c.Sess) {
+	if sessHasError(cgSess(&c)) {
 		return ScopeInactive
 	}
 	// non-global scope needs live curr_func (CGContext.cpp always has it for locals/params);
 	// sticky ScopeInactive (no invent "not found" soft re-pick past missing frame shell)
 	f := c.CurrentFunc
 	if f == nil {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return ScopeInactive
 	}
 	// params → 0
 	// Variable* always live on Param; nil hole sticky fail closed as inactive
 	for _, p := range f.Param {
 		if p == nil {
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return ScopeInactive
 		}
 		if p.Match(v) {
 			// residual ERROR sticky — no invent param-scope true past Match hole
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return ScopeInactive
 			}
 			return 0
 		}
 		// residual ERROR sticky — no invent soft-continue then later scope past Match residual
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return ScopeInactive
 		}
 	}
@@ -224,7 +224,7 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
 				// incomplete LocalVars sticky ScopeInactive
-				sessNoteError(c.Sess, ErrGeneric)
+				sessNoteError(cgSess(&c), ErrGeneric)
 				return ScopeInactive
 			}
 			if loc == v {
@@ -239,13 +239,13 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		b = c.CallChain[i]
 		if b == nil {
 			// incomplete call_chain sticky ScopeInactive
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return ScopeInactive
 		}
 		for b != nil {
 			for _, loc := range b.LocalVars {
 				if loc == nil {
-					sessNoteError(c.Sess, ErrGeneric)
+					sessNoteError(cgSess(&c), ErrGeneric)
 					return ScopeInactive
 				}
 				if loc == v {
@@ -387,7 +387,7 @@ func (c CGContext) OutputCallChain() string {
 		// CGContext.cpp:484 — call_chain[i] always live Block*; incomplete sticky
 		// (no invent "?" / blank " in " / skip holes that soft-rewrite the chain)
 		if blk == nil || blk.Func == nil || blk.Func.Name == "" {
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return ""
 		}
 		if i > 0 {
@@ -611,18 +611,18 @@ func (c CGContext) IsNonReadable(v *Variable) bool {
 	for _, nr := range c.RW.NoReadVars {
 		if nr == nil {
 			// incomplete NoReadVars sticky nonreadable (restrictive)
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return true
 		}
 		if nr.Match(v) {
 			// residual ERROR sticky — no invent nonreadable true past Match hole
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue readable past Match residual false path
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
 	}
@@ -642,18 +642,18 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 		for _, nw := range c.RW.NoWriteVars {
 			if nw == nil {
 				// incomplete NoWriteVars sticky nonwritable (restrictive)
-				sessNoteError(c.Sess, ErrGeneric)
+				sessNoteError(cgSess(&c), ErrGeneric)
 				return true
 			}
-			if nw.LooseMatchSess(c.Sess, v) || v.LooseMatchSess(c.Sess, nw) {
+			if nw.LooseMatchSess(cgSess(&c), v) || v.LooseMatchSess(cgSess(&c), nw) {
 				// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
-				if sessHasError(c.Sess) {
+				if sessHasError(cgSess(&c)) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue writable past LooseMatch residual
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 		}
@@ -662,18 +662,18 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 	for iv := range c.IVBounds {
 		if iv == nil {
 			// incomplete IVBounds sticky nonwritable
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return true
 		}
-		if v.LooseMatchSess(c.Sess, iv) {
+		if v.LooseMatchSess(cgSess(&c), iv) {
 			// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue writable past LooseMatch residual
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
 	}
@@ -1461,12 +1461,12 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 // Incomplete ambient sticky false (no invent allow-vol under IncompleteEffect).
 func (c CGContext) AllowVolatile() bool {
 	if !EffectComplete(c.EffectContext()) {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return false
 	}
-	ok := c.EffectContext().IsSideEffectFreeSess(c.Sess)
+	ok := c.EffectContext().IsSideEffectFreeSess(cgSess(&c))
 	// residual ERROR sticky — no invent allow-vol true past IsSideEffectFree residual hole
-	if sessHasError(c.Sess) {
+	if sessHasError(cgSess(&c)) {
 		return false
 	}
 	return ok
@@ -1483,27 +1483,27 @@ func (c CGContext) AllowConst(access Access) bool {
 // Nil type sticky; incomplete ambient sticky (no invent accept under IncompleteEffect).
 func (c CGContext) AcceptType(t *Type) bool {
 	if t == nil {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectContext()) {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return false
 	}
-	if c.EffectContext().IsSideEffectFreeSess(c.Sess) {
+	if c.EffectContext().IsSideEffectFreeSess(cgSess(&c)) {
 		// residual ERROR sticky — no invent accept past IsSideEffectFree hole
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue vol check past IsSideEffectFree residual
-	if sessHasError(c.Sess) {
+	if sessHasError(cgSess(&c)) {
 		return false
 	}
-	vol := t.IsVolatileStructUnionSess(c.Sess)
+	vol := t.IsVolatileStructUnionSess(cgSess(&c))
 	// residual ERROR sticky — no invent accept true past IsVolatileStructUnion residual
-	if sessHasError(c.Sess) {
+	if sessHasError(cgSess(&c)) {
 		return false
 	}
 	return !vol
@@ -1516,12 +1516,12 @@ func (c CGContext) AcceptType(t *Type) bool {
 // Incomplete eff or effect_context sticky as conflict.
 func (c CGContext) InConflict(eff Effect) bool {
 	if !EffectComplete(eff) || !EffectComplete(c.EffectContext()) {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return true
 	}
-	for _, v := range eff.ReadVarsSess(c.Sess) {
+	for _, v := range eff.ReadVarsSess(cgSess(&c)) {
 		if v == nil {
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return true
 		}
 		if c.IsNonReadable(v) {
@@ -1529,67 +1529,67 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsNonReadable residual
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
-		if c.EffectContext().IsWrittenPartiallySess(c.Sess, v) {
+		if c.EffectContext().IsWrittenPartiallySess(cgSess(&c), v) {
 			// residual ERROR sticky — no invent conflict true past IsWrittenPartially residual hole
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsWrittenPartially residual false
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
-		if v.IsVolatileSess(c.Sess) && !c.EffectContext().IsSideEffectFreeSess(c.Sess) {
+		if v.IsVolatileSess(cgSess(&c)) && !c.EffectContext().IsSideEffectFreeSess(cgSess(&c)) {
 			// residual ERROR sticky — no invent conflict past IsVolatile/SE residual
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsVolatile residual false
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
 	}
-	for _, v := range eff.WrittenVarsSess(c.Sess) {
+	for _, v := range eff.WrittenVarsSess(cgSess(&c)) {
 		if v == nil {
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return true
 		}
-		if c.IsNonWritable(v) || v.IsConstSess(c.Sess) {
+		if c.IsNonWritable(v) || v.IsConstSess(cgSess(&c)) {
 			// residual ERROR sticky — no invent conflict true past IsNonWritable/IsConst hole
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past IsNonWritable residual false
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
 		ctx := c.EffectContext()
-		if ctx.IsWrittenPartiallySess(c.Sess, v) || ctx.IsReadPartiallySess(c.Sess, v) {
+		if ctx.IsWrittenPartiallySess(cgSess(&c), v) || ctx.IsReadPartiallySess(cgSess(&c), v) {
 			// residual ERROR sticky — no invent conflict true past partial residual hole
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue conflict scan past partial residual false
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
-		if v.IsVolatileSess(c.Sess) && !ctx.IsSideEffectFreeSess(c.Sess) {
-			if sessHasError(c.Sess) {
+		if v.IsVolatileSess(cgSess(&c)) && !ctx.IsSideEffectFreeSess(cgSess(&c)) {
+			if sessHasError(cgSess(&c)) {
 				return true
 			}
 			return true
 		}
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return true
 		}
 	}
@@ -1604,7 +1604,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 func (c CGContext) IsFrameVar(v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-frame soft-skip
 	if v == nil {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return false
 	}
 	// CGContext.cpp:493–494 — get_current_block(); assert(b)
@@ -1617,20 +1617,20 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	if !b.StackScanComplete() {
 		// incomplete stack sticky (no invent not-frame / soft re-pick past hole)
 		// residual ERROR sticky — no invent soft not-frame past StackScan residual
-		if !sessHasError(c.Sess) {
-			sessNoteError(c.Sess, ErrGeneric)
+		if !sessHasError(cgSess(&c)) {
+			sessNoteError(cgSess(&c), ErrGeneric)
 		}
 		return false
 	}
-	if v.IsVisibleLocalSess(c.Sess, b) {
+	if v.IsVisibleLocalSess(cgSess(&c), b) {
 		// residual ERROR sticky — no invent frame-true past IsVisibleLocal hole
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent not-frame soft-skip past IsVisibleLocal hole
-	if sessHasError(c.Sess) {
+	if sessHasError(cgSess(&c)) {
 		return false
 	}
 	for _, cb := range c.CallChain {
@@ -1638,18 +1638,18 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		// (no invent skip hole and still match a later frame)
 		if cb == nil || !cb.StackScanComplete() {
 			// residual ERROR sticky — no invent soft not-frame past StackScan residual
-			if !sessHasError(c.Sess) {
-				sessNoteError(c.Sess, ErrGeneric)
+			if !sessHasError(cgSess(&c)) {
+				sessNoteError(cgSess(&c), ErrGeneric)
 			}
 			return false
 		}
-		if v.IsVisibleLocalSess(c.Sess, cb) {
-			if sessHasError(c.Sess) {
+		if v.IsVisibleLocalSess(cgSess(&c), cb) {
+			if sessHasError(cgSess(&c)) {
 				return false
 			}
 			return true
 		}
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return false
 		}
 	}
@@ -1666,14 +1666,14 @@ func (c CGContext) frameStacksComplete() bool {
 	}
 	if !b.StackScanComplete() {
 		// residual ERROR sticky — no invent soft-complete frames past StackScan residual
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return false
 		}
 		return false
 	}
 	for _, cb := range c.CallChain {
 		if cb == nil || !cb.StackScanComplete() {
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return false
 			}
 			return false
@@ -1689,11 +1689,11 @@ func (c CGContext) frameStacksComplete() bool {
 // Complete empty returns non-nil empty slice.
 func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 	if !FactsComplete(facts) {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return IncompleteVariables()
 	}
 	if !c.frameStacksComplete() {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
@@ -1702,7 +1702,7 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 		for _, p := range f.PointTo {
 			// pointee Variable* always live in point-to sets (specials are non-nil)
 			if p == nil {
-				sessNoteError(c.Sess, ErrGeneric)
+				sessNoteError(cgSess(&c), ErrGeneric)
 				return IncompleteVariables()
 			}
 			if IsSpecialPtr(p) || seen[p] {
@@ -1710,12 +1710,12 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 			}
 			if c.IsFrameVar(p) {
 				// residual ERROR sticky — no invent soft-continue frame scan past hole
-				if sessHasError(c.Sess) {
+				if sessHasError(cgSess(&c)) {
 					return IncompleteVariables()
 				}
 				seen[p] = true
 				out = append(out, p)
-			} else if sessHasError(c.Sess) {
+			} else if sessHasError(cgSess(&c)) {
 				// residual ERROR sticky — no invent soft-skip not-frame past hard IR hole
 				return IncompleteVariables()
 			}
@@ -1733,9 +1733,9 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		if v == nil {
 			return false
 		}
-		isG := v.IsGlobalSess(c.Sess)
+		isG := v.IsGlobalSess(cgSess(&c))
 		// residual ERROR sticky — no invent soft-frame past IsGlobal residual
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return false
 		}
 		if isG {
@@ -1743,44 +1743,44 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		}
 		ok := IsVariableInSet(frameVars, v)
 		// residual ERROR sticky — no invent soft-frame past IsVariableInSet residual
-		if sessHasError(c.Sess) {
+		if sessHasError(cgSess(&c)) {
 			return false
 		}
 		return ok
 	}
 	// incomplete frame list must not invent membership past holes
 	if frameVars != nil && !VariablesComplete(frameVars) {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return IncompleteVariables(), IncompleteVariables()
 	}
 	if c.RW != nil {
 		for _, v := range c.RW.NoReadVars {
 			if v == nil {
-				sessNoteError(c.Sess, ErrGeneric)
+				sessNoteError(cgSess(&c), ErrGeneric)
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
 				// residual ERROR sticky — no invent soft-continue later no-reads past residual
-				if sessHasError(c.Sess) {
+				if sessHasError(cgSess(&c)) {
 					return IncompleteVariables(), IncompleteVariables()
 				}
 				noReads = append(noReads, v)
-			} else if sessHasError(c.Sess) {
+			} else if sessHasError(cgSess(&c)) {
 				// residual ERROR sticky — no invent soft-skip no-read past residual false
 				return IncompleteVariables(), IncompleteVariables()
 			}
 		}
 		for _, v := range c.RW.NoWriteVars {
 			if v == nil {
-				sessNoteError(c.Sess, ErrGeneric)
+				sessNoteError(cgSess(&c), ErrGeneric)
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
-				if sessHasError(c.Sess) {
+				if sessHasError(cgSess(&c)) {
 					return IncompleteVariables(), IncompleteVariables()
 				}
 				noWrites = append(noWrites, v)
-			} else if sessHasError(c.Sess) {
+			} else if sessHasError(cgSess(&c)) {
 				return IncompleteVariables(), IncompleteVariables()
 			}
 		}
@@ -1788,15 +1788,15 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 	// convert global / frame IVs into non-writables
 	for iv := range c.IVBounds {
 		if iv == nil {
-			sessNoteError(c.Sess, ErrGeneric)
+			sessNoteError(cgSess(&c), ErrGeneric)
 			return IncompleteVariables(), IncompleteVariables()
 		}
 		if inFrame(iv) {
-			if sessHasError(c.Sess) {
+			if sessHasError(cgSess(&c)) {
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			noWrites = append(noWrites, iv)
-		} else if sessHasError(c.Sess) {
+		} else if sessHasError(cgSess(&c)) {
 			return IncompleteVariables(), IncompleteVariables()
 		}
 	}
@@ -1811,11 +1811,11 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	frame := c.FindReachableFrameVars(facts)
 	// residual ERROR sticky / incomplete frame — no invent unrestricted nil RW;
 	// inherit full external NoRead/NoWrite (restrictive) and keep sticky ERROR
-	if sessHasError(c.Sess) || !VariablesComplete(frame) {
+	if sessHasError(cgSess(&c)) || !VariablesComplete(frame) {
 		// incomplete facts — fail closed sticky full external lists (no invent empty RW
 		// or soft re-pick unrestricted nil past holes)
-		if !sessHasError(c.Sess) {
-			sessNoteError(c.Sess, ErrGeneric)
+		if !sessHasError(cgSess(&c)) {
+			sessNoteError(cgSess(&c), ErrGeneric)
 		}
 		if c.RW == nil {
 			return &RWDirective{}
@@ -1841,7 +1841,7 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	nr, nw := c.GetExternalNoReadsWrites(frame)
 	// incomplete RW/IV lists — fail closed sticky empty RW directive (no invent unrestricted)
 	if !VariablesComplete(nr) || !VariablesComplete(nw) {
-		sessNoteError(c.Sess, ErrGeneric)
+		sessNoteError(cgSess(&c), ErrGeneric)
 		return &RWDirective{}
 	}
 	if len(nr) == 0 && len(nw) == 0 {

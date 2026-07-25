@@ -65,40 +65,32 @@ func ClearProcessProgramGenerator() { ClearProcessProgramGeneratorSess(testAmbie
 // ClearProcessProgramGeneratorSess clears ProgramGen on an explicit session bag.
 func ClearProcessProgramGeneratorSess(s *Session) { sessOrAmbient(s).ProgramGen = nil }
 
-// noteErr records ERROR on g.Sess (and ambient bridge).
+// gSess returns g.Sess when set; else the quarantined unit-test ambient bag.
+func gSess(g *ProgramGenerator) *Session {
+	if g != nil && g.Sess != nil {
+		return g.Sess
+	}
+	return testAmbientSession
+}
+
+// noteErr records ERROR on g.Sess (or unit-test ambient when unset).
 func (g *ProgramGenerator) noteErr(code int) {
-	var s *Session
-	if g != nil {
-		s = g.Sess
-	}
-	sessNoteError(s, code)
+	sessNoteError(gSess(g), code)
 }
 
-// hasErr reports ERROR on g.Sess when set, else ambient (bridge).
+// hasErr reports ERROR on g.Sess when set, else unit-test ambient.
 func (g *ProgramGenerator) hasErr() bool {
-	var s *Session
-	if g != nil {
-		s = g.Sess
-	}
-	return sessHasError(s)
+	return sessHasError(gSess(g))
 }
 
-// clearErr clears ERROR on g.Sess when set, and ambient (bridge).
+// clearErr clears ERROR on g.Sess when set, else unit-test ambient.
 func (g *ProgramGenerator) clearErr() {
-	var s *Session
-	if g != nil {
-		s = g.Sess
-	}
-	sessClearError(s)
+	sessClearError(gSess(g))
 }
 
-// errCode returns sticky code preferring g.Sess, else ambient (bridge).
+// errCode returns sticky code preferring g.Sess, else unit-test ambient.
 func (g *ProgramGenerator) errCode() int {
-	var s *Session
-	if g != nil {
-		s = g.Sess
-	}
-	return sessErrorCode(s)
+	return sessErrorCode(gSess(g))
 }
 
 // GetOutputMgrKind mirrors AbsProgramGenerator::getOutputMgr kind (Go: no ostream).

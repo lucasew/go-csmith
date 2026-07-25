@@ -11,15 +11,25 @@ import (
 // quarantined testAmbientSession, and residual sessOrAmbient(nil) panics.
 // Opt-in multi-seed battery: PURE_GEN_STRICT=1.
 func TestPureGenStrictResidual(t *testing.T) {
-	// Residual *Sess(nil) must not dual-fill ambient.
-	func() {
-		defer func() {
-			if recover() == nil {
-				t.Fatal("sessOrAmbient(nil) must panic")
+	// Residual nil bag helpers must not dual-fill ambient.
+	for _, name := range []string{"sessOrAmbient", "sessNoteError", "sessHasError"} {
+		name := name
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Fatalf("%s(nil) must panic", name)
+				}
+			}()
+			switch name {
+			case "sessOrAmbient":
+				_ = sessOrAmbient(nil)
+			case "sessNoteError":
+				sessNoteError(nil, ErrGeneric)
+			case "sessHasError":
+				_ = sessHasError(nil)
 			}
 		}()
-		_ = sessOrAmbient(nil)
-	}()
+	}
 	seeds := []uint64{2}
 	if os.Getenv("PURE_GEN_STRICT") != "" {
 		seeds = []uint64{1, 2, 3, 7, 65, 123, 353}

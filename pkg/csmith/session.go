@@ -12,8 +12,8 @@
 //   - testAmbientSession + Process*/SetError bridges for legacy unit tests
 //   - non-Sess wrappers pass testAmbientSession into *Sess helpers explicitly
 //   - vsSess/cgSess/fmSess/envSess fall back to testAmbientSession when unset
-//   - sessOrAmbient(nil) panics (no silent ambient dual-fill mid-Generate)
-//   - sessNoteError(nil) still writes ambient GenError for unit-test sticky
+//   - sessOrAmbient(nil) / sessNoteError(nil) / sessHasError(nil) panics
+//     (no silent ambient dual-fill mid-Generate)
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
 // (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not

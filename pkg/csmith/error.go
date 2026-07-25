@@ -37,39 +37,36 @@ func HasError() bool { return HasErrorSess(testAmbientSession) }
 // HasErrorSess reports sticky error on an explicit session bag.
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
-// sessNoteError writes GenError on s when non-nil; nil s writes the quarantined
-// unit-test ambient bag for residual hang-prevention on Filter loops (unit tests
-// without an explicit bag). Prefer explicit s so pure Generate never touches ambient.
+// sessNoteError writes GenError on an explicit bag. Nil s panics — residual
+// sticky must not dual-fill testAmbientSession (unit tests use SetError/ClearError
+// or pass testAmbientSession / vsSess/cgSess/envSess/fmSess).
 func sessNoteError(s *Session, code int) {
-	if s != nil {
-		s.GenError = code
-		return
+	if s == nil {
+		panic("residual sessNoteError(nil)")
 	}
-	testAmbientSession.GenError = code
+	s.GenError = code
 }
 
-// sessHasError reports sticky error on s when non-nil, else unit-test ambient.
-// Prefer explicit s for pure-session ERROR_GUARD; ambient nil path is unit-test only.
+// sessHasError reports sticky error on an explicit bag. Nil s panics.
 func sessHasError(s *Session) bool {
-	if s != nil {
-		return s.GenError != ErrSuccess
+	if s == nil {
+		panic("residual sessHasError(nil)")
 	}
-	return testAmbientSession.GenError != ErrSuccess
+	return s.GenError != ErrSuccess
 }
 
-// sessClearError clears sticky error on s when non-nil; nil s clears ambient.
+// sessClearError clears sticky error on an explicit bag. Nil s panics.
 func sessClearError(s *Session) {
-	if s != nil {
-		s.GenError = ErrSuccess
-		return
+	if s == nil {
+		panic("residual sessClearError(nil)")
 	}
-	testAmbientSession.GenError = ErrSuccess
+	s.GenError = ErrSuccess
 }
 
-// sessErrorCode returns sticky code on s when non-nil; nil s reads ambient.
+// sessErrorCode returns sticky code on an explicit bag. Nil s panics.
 func sessErrorCode(s *Session) int {
-	if s != nil {
-		return s.GenError
+	if s == nil {
+		panic("residual sessErrorCode(nil)")
 	}
-	return testAmbientSession.GenError
+	return s.GenError
 }
