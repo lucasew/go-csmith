@@ -210,7 +210,7 @@ func (fi *Invocation) outputUnarySess(s *Session, a0 string) string {
 		if fi.Safe.Size == SafeFloat {
 			return fmt.Sprintf("(-%s)", a0)
 		}
-		fname := fi.Safe.UnaryMinusFuncName()
+		fname := fi.Safe.UnaryMinusFuncNameSess(s)
 		// SafeOpFlags.cpp:325 assert / empty name → cast path (no invent wrapper name)
 		if fname == "" {
 			return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
@@ -283,7 +283,7 @@ func (fi *Invocation) outputBinarySess(s *Session, a0, a1 string) string {
 	}
 	// FunctionInvocationBinary.cpp:363–399 — arith/shift + avoid_signed_overflow
 	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
-		if fname := fi.Safe.BinaryFuncName(fi.Binary); fname != "" {
+		if fname := fi.Safe.BinaryFuncNameSess(s, fi.Binary); fname != "" {
 			id := SafeOpFlagsToIDSess(s, fname)
 			if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
 				var b strings.Builder

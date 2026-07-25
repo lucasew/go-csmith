@@ -1137,7 +1137,7 @@ func selectDerefPointerInv(
 		if sessHasError(cg.Sess) {
 			return nil
 		}
-		pq = qfer.RandomAddQualifiers(r, opts, probs, !seFree)
+		pq = qfer.RandomAddQualifiersSess(cg.Sess, r, opts, probs, !seFree)
 	}
 	// VariableSelector.cpp:1281 ERROR_GUARD after random_add/random_qualifiers
 	if sessHasError(cg.Sess) {

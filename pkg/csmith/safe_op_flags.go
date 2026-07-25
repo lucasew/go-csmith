@@ -406,7 +406,7 @@ func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, b
 		return 0, false
 	}
 	if probs == nil {
-		probs = sessProbs(nil)
+		probs = sessProbs(s)
 	}
 	if probs == nil {
 		// Probabilities singleton always live in C++; sticky fail closed

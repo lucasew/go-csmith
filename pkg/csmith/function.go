@@ -863,7 +863,7 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
-	f.MakeReturnConst(opts, probs, r)
+	f.MakeReturnConstSess(vsSess(vs), opts, probs, r)
 	if sessHasError(vsSess(vs)) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false

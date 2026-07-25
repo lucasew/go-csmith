@@ -845,7 +845,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			fname := st.SafeFlags.BinaryFuncName(bop.BinaryOpC())
+			fname := st.SafeFlags.BinaryFuncNameSess(s, bop.BinaryOpC())
 			if fname == "" {
 				// SafeOpFlags.cpp assert empty name sticky; no invent bare +=
 				if !sessHasError(s) {

@@ -648,9 +648,9 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	if noVolatile {
 		vols = make([]bool, len(q.IsVolatiles))
 	} else if !q.AcceptStricter {
-		vols = q.RandomLooserVolatiles(r, opts, probs)
+		vols = q.RandomLooserVolatilesSess(cg.Sess, r, opts, probs)
 	} else {
-		vols = q.RandomStricterVolatiles(r, opts, probs)
+		vols = q.RandomStricterVolatilesSess(cg.Sess, r, opts, probs)
 	}
 	// CVQualifiers.cpp:209 — ERROR_GUARD after random_*_volatiles
 	if sessHasError(cg.Sess) {
@@ -674,9 +674,9 @@ func (q CVQualifiers) RandomQualifiersFrom(
 
 	var consts []bool
 	if !q.AcceptStricter {
-		consts = q.RandomLooserConsts(r, opts, probs)
+		consts = q.RandomLooserConstsSess(cg.Sess, r, opts, probs)
 	} else {
-		consts = q.RandomStricterConsts(r, opts, probs)
+		consts = q.RandomStricterConstsSess(cg.Sess, r, opts, probs)
 	}
 	MakeScalarConsts(opts, consts)
 	// CVQualifiers.cpp:219 — ERROR_GUARD after random_*_consts
@@ -716,7 +716,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	if noVolatile {
 		vols = make([]bool, len(q.IsVolatiles))
 	} else {
-		vols = q.RandomLooserVolatiles(r, opts, probs)
+		vols = q.RandomLooserVolatilesSess(cg.Sess, r, opts, probs)
 		// residual ERROR sticky — no invent soft-continue looser past RandomLooserVolatiles residual
 		if sessHasError(cg.Sess) {
 			return CVQualifiers{}
@@ -733,7 +733,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 		}
 	}
 	MakeScalarVolatiles(opts, vols)
-	consts := q.RandomLooserConsts(r, opts, probs)
+	consts := q.RandomLooserConstsSess(cg.Sess, r, opts, probs)
 	// residual ERROR sticky — no invent soft-continue looser past RandomLooserConsts residual
 	if sessHasError(cg.Sess) {
 		return CVQualifiers{}
@@ -1344,7 +1344,7 @@ func RandomQualifiersForType(
 	}
 
 	// CVQualifiers.cpp:332–343 — variable itself.
-	seFree := effectCtx.IsSideEffectFreeSess(nil)
+	seFree := effectCtx.IsSideEffectFreeSess(cg.Sess)
 	// residual ERROR sticky — no invent soft-qual past IsSideEffectFree residual
 	if sessHasError(cg.Sess) {
 		return CVQualifiers{}
