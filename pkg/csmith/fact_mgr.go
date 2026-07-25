@@ -867,7 +867,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			}
 			return
 		}
-		if !f.IsVarVisible(fact.Var, stParent) {
+		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
 			// residual ERROR sticky — no invent soft-skip not-visible past hard IR hole
 			if sessHasError(fmSess(fm)) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
@@ -885,7 +885,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
-		if !f.IsVarVisible(fact.Var, stParent) {
+		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			}
@@ -929,7 +929,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
-		if f != nil && !f.IsVarVisible(fact.Var, b) {
+		if f != nil && !f.IsVarVisibleSess(fmSess(fm), fact.Var, b) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			}
@@ -963,7 +963,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
-			if !f.IsVarVisible(fact.Var, destParent) {
+			if !f.IsVarVisibleSess(fmSess(fm), fact.Var, destParent) {
 				if sessHasError(fmSess(fm)) {
 					fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				}
@@ -1031,7 +1031,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 			}
 			return
 		}
-		if !f.IsVarVisible(fact.Var, stParent) {
+		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
@@ -1046,7 +1046,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
-		if !f.IsVarVisible(fact.Var, stParent) {
+		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
@@ -1089,7 +1089,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
-		if f != nil && !f.IsVarVisible(fact.Var, b) {
+		if f != nil && !f.IsVarVisibleSess(fmSess(fm), fact.Var, b) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
@@ -1120,7 +1120,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
 			}
-			if !f.IsVarVisible(fact.Var, destParent) {
+			if !f.IsVarVisibleSess(fmSess(fm), fact.Var, destParent) {
 				if sessHasError(fmSess(fm)) {
 					fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				}
@@ -1188,7 +1188,7 @@ func UpdateFactsForDestSess(s *Session, factsIn []*FactPointTo, factsOut *[]*Fac
 		if isReturnVar(fact.Var) {
 			continue
 		}
-		if f.IsVarOOS(fact.Var, destParent) {
+		if f.IsVarOOSSess(s, fact.Var, destParent) {
 			// residual ERROR sticky — no invent soft-continue OOS scan past hard IR hole
 			if sessHasError(s) {
 				*factsOut = IncompleteFactSlice()
@@ -1208,7 +1208,7 @@ func UpdateFactsForDestSess(s *Session, factsIn []*FactPointTo, factsOut *[]*Fac
 				sessNoteError(s, ErrGeneric)
 				return
 			}
-			if !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
+			if !IsSpecialPtr(p) && f.IsVarOOSSess(s, p, destParent) {
 				if sessHasError(s) {
 					*factsOut = IncompleteFactSlice()
 					return
@@ -1281,7 +1281,7 @@ func UpdateUnionFactsForDestSess(s *Session, factsIn []*FactUnion, factsOut *[]*
 		if isReturnVar(fact.Var) {
 			continue
 		}
-		if f.IsVarOOS(fact.Var, destParent) {
+		if f.IsVarOOSSess(s, fact.Var, destParent) {
 			if sessHasError(s) {
 				*factsOut = IncompleteUnionFactSlice()
 				return
@@ -2069,7 +2069,7 @@ func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Functio
 		// FactMgr.cpp:191–195 — is_var_on_stack OR other-function RV
 		// stParent may be nil (function body set_fact_out); IsVarOnStack still
 		// matches params (Function.cpp:187–190).
-		if f != nil && f.IsVarOnStack(fact.Var, stParent) {
+		if f != nil && f.IsVarOnStackSess(s, fact.Var, stParent) {
 			// residual ERROR sticky — no invent soft-skip stack fact past hard IR hole
 			if sessHasError(s) {
 				return IncompleteFactSlice()
@@ -2139,7 +2139,7 @@ func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Func
 			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		if f != nil && f.IsVarOnStack(fact.Var, stParent) {
+		if f != nil && f.IsVarOnStackSess(s, fact.Var, stParent) {
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
@@ -2814,7 +2814,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					// FactMgr.cpp:283 — is_var_visible(var, stm); for Block, is_var_on_stack
 					// walks stm->parent (Block.cpp/Function.cpp:192).
 					if fm.Func != nil {
-						vis := fm.Func.IsVarVisible(f.Var, b.Parent)
+						vis := fm.Func.IsVarVisibleSess(fmSess(fm), f.Var, b.Parent)
 						if sessHasError(fmSess(fm)) {
 							fm.GlobalFacts = IncompleteFactSlice()
 							return
@@ -3017,7 +3017,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					continue
 				}
 				if fm.Func != nil && !uf.Var.IsGlobal() {
-					vis := fm.Func.IsVarVisible(uf.Var, b.Parent)
+					vis := fm.Func.IsVarVisibleSess(fmSess(fm), uf.Var, b.Parent)
 					if sessHasError(fmSess(fm)) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						fm.UnionFacts = IncompleteUnionFactSlice()

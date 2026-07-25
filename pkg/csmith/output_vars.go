@@ -105,7 +105,7 @@ func OutputGlobalVariablesSess(s *Session, vars []*Variable, opts Options) strin
 		return ""
 	}
 	var b strings.Builder
-	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
+	hdr := OutputCommentLineSess(s, "--- GLOBAL VARIABLES ---", false, false)
 	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
 	if sessHasError(s) {
 		return ""
@@ -137,7 +137,7 @@ func OutputGlobalVariablesDeclsSess(s *Session, vars []*Variable, prefix string,
 		return ""
 	}
 	var b strings.Builder
-	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
+	hdr := OutputCommentLineSess(s, "--- GLOBAL VARIABLES ---", false, false)
 	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
 	if sessHasError(s) {
 		return ""

@@ -97,33 +97,38 @@ func (f *Function) IsVarOnStackSess(s *Session, v *Variable, stParent *Block) bo
 
 // IsVarVisible mirrors Function::is_var_visible.
 // Function.cpp:204–205 — global or on stack at statement.
-// Incomplete Variable sticky false; incomplete stack via IsVarOnStack sticky.}
+// Incomplete Variable sticky false; incomplete stack via IsVarOnStack sticky.
 
 func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
+	return f.IsVarVisibleSess(nil, v, stParent)
+}
+
+// IsVarVisibleSess is IsVarVisible with explicit session residual sticky.
+func (f *Function) IsVarVisibleSess(s *Session, v *Variable, stParent *Block) bool {
 	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if v.IsGlobal() {
 		// residual ERROR sticky — no invent visible-true past IsGlobal hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent not-global soft-skip past IsGlobal hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	// nil Function for non-global sticky not-visible (IsVarOnStack also stickies)
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := f.IsVarOnStack(v, stParent)
+	ok := f.IsVarOnStackSess(s, v, stParent)
 	// residual ERROR sticky — no invent visible/not-visible soft-skip past stack hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -154,7 +159,7 @@ func (f *Function) IsVarOOSSess(s *Session, v *Variable, stParent *Block) bool {
 		}
 		return true
 	}
-	if f.IsVarVisible(v, stParent) {
+	if f.IsVarVisibleSess(s, v, stParent) {
 		// residual ERROR sticky — no invent not-OOS past IsVarVisible hole
 		if sessHasError(s) {
 			return true
@@ -494,15 +499,20 @@ func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPoint
 
 // OutputCommentLine mirrors OutputMgr::output_comment_line.
 // OutputMgr.cpp:314–320 — "/* comment */\n" unless quiet/concise.
-// empty comment is incomplete IR — no invent "/*  */" shell (still emits "\n" when quiet/concise).}
+// empty comment is incomplete IR — no invent "/*  */" shell (still emits "\n" when quiet/concise).
 
 func OutputCommentLine(comment string, quiet, concise bool) string {
+	return OutputCommentLineSess(nil, comment, quiet, concise)
+}
+
+// OutputCommentLineSess is OutputCommentLine with explicit session residual sticky.
+func OutputCommentLineSess(s *Session, comment string, quiet, concise bool) string {
 	if quiet || concise {
 		return "\n"
 	}
 	// empty comment sticky (no invent "/*  */" / soft re-pick blank shell)
 	if comment == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return "/* " + comment + " */\n"

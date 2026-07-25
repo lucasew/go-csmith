@@ -1358,7 +1358,7 @@ func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool
 	}
 	s := ""
 	// Function.cpp:567 — output_comment_line separator
-	s += OutputCommentLine("------------------------------------------", false, f.EmitConcise)
+	s += OutputCommentLineSess(sess, "------------------------------------------", false, f.EmitConcise)
 	// Function.cpp:568–570 — feffect.Output when !concise
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()

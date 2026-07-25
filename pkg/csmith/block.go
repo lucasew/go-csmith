@@ -2160,7 +2160,7 @@ func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 		sb.WriteString("\n")
 	} else {
 		// OutputMgr::output_comment_line — skip when quiet/concise (EmitConcise)
-		sb.WriteString(OutputCommentLine("block id: "+Int2Str(b.StmID), false, false))
+		sb.WriteString(OutputCommentLineSess(s, "block id: "+Int2Str(b.StmID), false, false))
 	}
 	// Block.cpp:255–257 — CGOptions::depth_protect(), not Block::depth_protect flag.
 	// Function sets body->set_depth_protect(true) always; emit still gates on CGOptions.

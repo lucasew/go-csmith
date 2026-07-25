@@ -868,7 +868,7 @@ func (g *ProgramGenerator) OutputMain() string {
 	var b strings.Builder
 	b.WriteString("\n\n")
 	// OutputMgr.cpp:99 — output_comment_line("----------------------------------------")
-	b.WriteString(OutputCommentLine("----------------------------------------", g.Opts.Quiet, g.Opts.Concise))
+	b.WriteString(OutputCommentLineSess(g.Sess, "----------------------------------------", g.Opts.Quiet, g.Opts.Concise))
 	if g.Opts.AcceptArgc {
 		b.WriteString("int main (int argc, char* argv[])\n{\n")
 	} else {

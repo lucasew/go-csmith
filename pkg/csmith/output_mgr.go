@@ -279,10 +279,15 @@ func CompactOutputLn(compact bool) string {
 // CompactOutputCommentLine mirrors DFSOutputMgr::output_comment_line.
 // DFSOutputMgr.cpp:99–103 — compact skips comments entirely.
 func CompactOutputCommentLine(comment string, compact, quiet, concise bool) string {
+	return CompactOutputCommentLineSess(nil, comment, compact, quiet, concise)
+}
+
+// CompactOutputCommentLineSess is CompactOutputCommentLine with explicit session residual sticky.
+func CompactOutputCommentLineSess(s *Session, comment string, compact, quiet, concise bool) string {
 	if compact {
 		return ""
 	}
-	return OutputCommentLine(comment, quiet, concise)
+	return OutputCommentLineSess(s, comment, quiet, concise)
 }
 
 // CompactOutputTab mirrors DFSOutputMgr::output_tab.

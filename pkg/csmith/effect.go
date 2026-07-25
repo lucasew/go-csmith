@@ -1634,7 +1634,7 @@ func (e Effect) CommentOutputSess(s *Session) string {
 	}
 	ss.WriteString("\n")
 	// OutputMgr.cpp:318 — "/* " + comment + " */" + newline
-	return OutputCommentLine(ss.String(), false, false)
+	return OutputCommentLineSess(s, ss.String(), false, false)
 }
 
 // MergeEffects combines two post-branch effects (union of reads/writes; SE-free only if both are).

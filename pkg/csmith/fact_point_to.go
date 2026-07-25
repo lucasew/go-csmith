@@ -1779,7 +1779,7 @@ func (f *FactPointTo) MarkFuncEndSess(s *Session, fn *Function, stParent *Block)
 		if IsSpecialPtr(v) {
 			continue
 		}
-		onStack := fn.IsVarOnStack(v, stParent)
+		onStack := fn.IsVarOnStackSess(s, v, stParent)
 		// residual ERROR sticky — no invent soft-skip stack scan past hard IR hole
 		// (IsVarOnStack may sticky residual false then leave later stack pointees live)
 		if sessHasError(s) {
