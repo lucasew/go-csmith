@@ -40,21 +40,21 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 func TestOutputDefVolatileComment(t *testing.T) {
 	// Variable.cpp:662–667 — is_volatile() only (locals included; text still "GLOBAL")
 	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
-	v.Init = MakeInt(0)
+	v.Init = MakeIntSess(testAmbientSession, 0)
 	s := v.OutputDefFullSess(testAmbientSession, true, false, false, nil)
 	if !strings.Contains(s, "VOLATILE GLOBAL g_v") {
 		t.Fatal(s)
 	}
 	// local volatile still gets the comment (seed 95 l_1341)
 	l := CreateVariableScalarsSess(testAmbientSession, "l_v", GetIntTypeSess(testAmbientSession), false, true)
-	l.Init = MakeInt(1)
+	l.Init = MakeIntSess(testAmbientSession, 1)
 	s2 := l.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if !strings.Contains(s2, "VOLATILE GLOBAL l_v") {
 		t.Fatal(s2)
 	}
 	// non-volatile local: no comment
 	n := CreateVariableScalarsSess(testAmbientSession, "l_n", GetIntTypeSess(testAmbientSession), false, false)
-	n.Init = MakeInt(2)
+	n.Init = MakeIntSess(testAmbientSession, 2)
 	s3 := n.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if strings.Contains(s3, "VOLATILE GLOBAL") {
 		t.Fatal(s3)
@@ -155,7 +155,7 @@ func TestOutputGlobalsVolatileComment(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	// Force a known scalar volatile global through OutputGlobals path.
 	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
-	v.Init = MakeInt(0)
+	v.Init = MakeIntSess(testAmbientSession, 0)
 	g.VS.GlobalList = []*Variable{v}
 	out := g.OutputGlobals()
 	if !strings.Contains(out, "VOLATILE GLOBAL g_v") {
@@ -171,7 +171,7 @@ func TestOutputGlobalsVolatileArrayNoComment(t *testing.T) {
 		Variable: Variable{
 			Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
 			Qfer: NewCVQualifiers([]bool{false}, []bool{true}),
-			Init: MakeInt(0),
+			Init: MakeIntSess(testAmbientSession, 0),
 		},
 		Sizes: []int{2},
 	}
@@ -192,7 +192,7 @@ func TestOutputGlobalsIncompleteSticky(t *testing.T) {
 	opts := Defaults()
 	g := NewProgramGenerator(NewSession(opts))
 	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, false)
-	v.Init = MakeInt(0)
+	v.Init = MakeIntSess(testAmbientSession, 0)
 	g.VS.GlobalList = []*Variable{v, nil}
 	g.clearErr()
 	if g.OutputGlobals() != "" {

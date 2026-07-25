@@ -21,7 +21,7 @@ func TestIsValidVolatile(t *testing.T) {
 	// const null pointer invalid
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	p.Qfer.SetConstSess(testAmbientSession, true, 0)
-	p.Init = MakeInt(0)
+	p.Init = MakeIntSess(testAmbientSession, 0)
 	if !p.IsConstSess(testAmbientSession) {
 		t.Fatal("expected const")
 	}
@@ -31,7 +31,7 @@ func TestIsValidVolatile(t *testing.T) {
 	// const non-null ok
 	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	p2.Qfer.SetConstSess(testAmbientSession, true, 0)
-	p2.Init = MakeInt(1)
+	p2.Init = MakeIntSess(testAmbientSession, 1)
 	if !p2.IsValidVolatileSess(testAmbientSession) {
 		t.Fatal("const non-null")
 	}

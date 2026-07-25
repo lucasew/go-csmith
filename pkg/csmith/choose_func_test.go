@@ -44,13 +44,13 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 func TestArrayNoLoopInitializer(t *testing.T) {
 	opts := Defaults()
 	// global → true
-	g := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if g == nil || !g.NoLoopInitializerSess(testAmbientSession) {
 		t.Fatal("global must no-loop")
 	}
 	// local with no multi inits: force empty InitValues
 	blk := &Block{}
-	loc := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, blk, "l_1", GetIntTypeSess(testAmbientSession), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
+	loc := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, blk, "l_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiers([]bool{false}, []bool{false}))
 	if loc == nil {
 		t.Fatal("nil local")
 	}

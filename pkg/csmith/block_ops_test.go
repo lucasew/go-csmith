@@ -164,7 +164,7 @@ func TestNeedNestedLoop(t *testing.T) {
 	// must_jump last blocks nested loop
 	b.Stmts = []Stmt{{
 		Kind: StmtBreak,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}
 	if b.NeedNestedLoop(cg, NewRngSess(testAmbientSession, 1)) {
 		t.Fatal("must jump")
@@ -226,7 +226,7 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 		Stmts: []Stmt{{
 			Kind:  StmtReturn,
 			StmID: 51,
-			Expr:  &Expression{Term: TermConstant, Con: MakeInt(0)},
+			Expr:  &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		}},
 	}
 	// no back edges → true
@@ -711,7 +711,7 @@ func TestFindFixedPointShortcut(t *testing.T) {
 		StmID: 50,
 		Stmts: []Stmt{{
 			Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}, AssignOp: AssignSimple,
 		}},
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
@@ -792,7 +792,7 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 	st := Stmt{Kind: StmtAssign, StmID: 51,
 		LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false),
 		Lhs:    &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)},
-		Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr:   &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	inner.Stmts = []Stmt{st}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -873,7 +873,7 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 		Stmts: []Stmt{{Kind: StmtAssign, StmID: 81,
 			LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false),
 			Lhs:    &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)},
-			Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+			Expr:   &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 		}},
 	}
 	// fix LhsVar pointer identity
@@ -1065,7 +1065,7 @@ func TestGetDimension(t *testing.T) {
 		t.Fatal("scalar")
 	}
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -1089,7 +1089,7 @@ func TestGetDimension(t *testing.T) {
 
 func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_m", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_m", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	av.Sizes = []int{2, 3}
 	// via AsArray on Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -1671,7 +1671,7 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{live}
@@ -1868,7 +1868,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar: ptr, Lhs: &Lhs{Var: ptr, Type: GetIntTypeSess(testAmbientSession)}, // deref store
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
@@ -1908,7 +1908,7 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
@@ -1950,9 +1950,9 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	lu.Init = MakeInt(0)
+	lu.Init = MakeIntSess(testAmbientSession, 0)
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	gu.Init = MakeInt(0)
+	gu.Init = MakeIntSess(testAmbientSession, 0)
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
 	if mid == nil {
@@ -2043,7 +2043,7 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	parent := &Block{StmID: AllocStmID(), Func: f}
 	body := &Block{
@@ -2164,7 +2164,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	}}
 	// Simulate pre-snapshot without g_newu, then live gains union fact (created mid-for).
 	preU := []*FactUnion{}
-	g := &Variable{Name: "g_newu", Type: ut, Init: MakeInt(0)}
+	g := &Variable{Name: "g_newu", Type: ut, Init: MakeIntSess(testAmbientSession, 0)}
 	liveU := []*FactUnion{MakeFactUnion(g, 0)}
 	if liveU[0] == nil {
 		t.Fatal("MakeFactUnion")
@@ -2210,7 +2210,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	inner := &Block{
 		StmID: AllocStmID(), Func: fn, Parent: parent, Looping: false, NeedRevisit: false,
@@ -2255,7 +2255,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	bodyAsg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}, AssignOp: AssignSimple,
 	}
 	body := &Block{
 		StmID: AllocStmID(), Func: fn, Parent: nil, Looping: false, NeedRevisit: false,
@@ -2312,7 +2312,7 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	// even though Looping (Block.cpp:729).
 	ret := Stmt{
 		Kind: StmtReturn, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}
 	// Fall-through last would be from_tail; with return last, from_tail is false
 	// unless continue/break topology. Use looping + return last and assert no edge.

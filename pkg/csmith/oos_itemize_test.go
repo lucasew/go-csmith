@@ -57,7 +57,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 
 func TestChooseOKVarItemizesArray(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil || av.AsArray == nil {
 		t.Fatal("av")
 	}

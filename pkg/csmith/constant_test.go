@@ -8,7 +8,7 @@ import (
 func TestMakeRandomPointerIsZero(t *testing.T) {
 	// Constant.cpp: pointer → "0", no RNG
 	r := NewRngSess(testAmbientSession, 2)
-	c := MakeRandom(PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt)), Defaults(), nil, r)
+	c := MakeRandomSess(testAmbientSession, PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt)), Defaults(), nil, r)
 	if c.Value != "0" {
 		t.Fatalf("pointer const: %q", c.Value)
 	}
@@ -20,7 +20,7 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 func TestMakeRandomVoidFailClosed(t *testing.T) {
 	// Constant.cpp:312 — assert(st != eVoid) sticky; no invent "/* void */" / soft success
 	ClearErrorSess(testAmbientSession)
-	c := MakeRandom(GetSimpleTypeSess(testAmbientSession, EVoid), Defaults(), nil, NewRngSess(testAmbientSession, 1))
+	c := MakeRandomSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EVoid), Defaults(), nil, NewRngSess(testAmbientSession, 1))
 	if c != nil {
 		t.Fatalf("void constant must fail closed, got %+v", c)
 	}
@@ -29,7 +29,7 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type* always live; sticky no invent Constant{Type:nil, Value:"0"} shell
-	if MakeRandom(nil, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if MakeRandomSess(testAmbientSession, nil, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil type MakeRandom must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -37,7 +37,7 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// simple non-void needs RNG sticky (no invent NewRng)
-	if MakeRandom(GetIntTypeSess(testAmbientSession), Defaults(), nil, nil) != nil {
+	if MakeRandomSess(testAmbientSession, GetIntTypeSess(testAmbientSession), Defaults(), nil, nil) != nil {
 		t.Fatal("nil RNG simple MakeRandom must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -45,7 +45,7 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Constant.cpp:411 unsupported kind sticky
-	if MakeRandom(&Type{}, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if MakeRandomSess(testAmbientSession, &Type{}, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("non-simple/non-ptr MakeRandom must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -69,7 +69,7 @@ func TestMakeRandomIntHexPathSeed2(t *testing.T) {
 		hex := r.RandomHexDigits(8)
 		want := "0x" + hex + "L"
 		r2 := NewRngSess(testAmbientSession, seed)
-		c := MakeRandom(GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r2)
+		c := MakeRandomSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r2)
 		if c.Value != want {
 			t.Fatalf("seed %d: got %q want %q", seed, c.Value, want)
 		}
@@ -92,9 +92,9 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 		} else {
 			num = int(r.RndUpto(20)) - 10
 		}
-		want := formatSmallConstant(EInt, num, opts)
+		want := formatSmallConstantSess(testAmbientSession, EInt, num, opts)
 		r2 := NewRngSess(testAmbientSession, seed)
-		c := MakeRandom(GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r2)
+		c := MakeRandomSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r2)
 		if c.Value != want {
 			t.Fatalf("seed %d: got %q want %q", seed, c.Value, want)
 		}
@@ -107,12 +107,12 @@ func TestMakeRandomUpto(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	r := NewRngSess(testAmbientSession, 2)
 	// first RndUpto(10) = 3 for seed2
-	c := MakeRandomUpto(10, r)
+	c := MakeRandomUptoSess(testAmbientSession, 10, r)
 	if c.Value != "3" || c.Type != GetSimpleTypeSess(testAmbientSession, EUInt) {
 		t.Fatalf("%+v", c)
 	}
 	// Constant.cpp always has RNG; sticky no invent NewRngSess(testAmbientSession, 0)
-	if MakeRandomUpto(10, nil) != nil {
+	if MakeRandomUptoSess(testAmbientSession, 10, nil) != nil {
 		t.Fatal("nil RNG MakeRandomUpto must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -122,7 +122,7 @@ func TestMakeRandomUpto(t *testing.T) {
 }
 
 func TestMakeInt(t *testing.T) {
-	c := MakeInt(42)
+	c := MakeIntSess(testAmbientSession, 42)
 	if c.Value != "42" || c.Type != GetSimpleTypeSess(testAmbientSession, EInt) {
 		t.Fatalf("%+v", c)
 	}
@@ -132,7 +132,7 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 	// Constant.cpp:192–196 — pure_rnd_flipcoin(50) chooses + or − exp; no invent always +
 	sawPlus, sawMinus := false, false
 	for seed := uint64(1); seed < 40; seed++ {
-		s := generateRandomFloatHexConstant(NewRngSess(testAmbientSession, seed))
+		s := generateRandomFloatHexConstantSess(testAmbientSession, NewRngSess(testAmbientSession, seed))
 		if s == "" {
 			t.Fatal("nil rng invent empty")
 		}
@@ -146,7 +146,7 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 	if !sawPlus || !sawMinus {
 		t.Fatalf("need both exp signs, plus=%v minus=%v", sawPlus, sawMinus)
 	}
-	if generateRandomFloatHexConstant(nil) != "" {
+	if generateRandomFloatHexConstantSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil rng must fail closed")
 	}
 }
@@ -154,14 +154,14 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 func TestHexToBinary(t *testing.T) {
 	// Constant.cpp:85–97
 	ClearErrorSess(testAmbientSession)
-	if HexToBinary("0") != "0000" || HexToBinary("f") != "1111" || HexToBinary("A") != "1010" {
-		t.Fatalf("nibbles: 0=%q f=%q A=%q", HexToBinary("0"), HexToBinary("f"), HexToBinary("A"))
+	if HexToBinarySess(testAmbientSession, "0") != "0000" || HexToBinarySess(testAmbientSession, "f") != "1111" || HexToBinarySess(testAmbientSession, "A") != "1010" {
+		t.Fatalf("nibbles: 0=%q f=%q A=%q", HexToBinarySess(testAmbientSession, "0"), HexToBinarySess(testAmbientSession, "f"), HexToBinarySess(testAmbientSession, "A"))
 	}
-	if HexToBinary("0f") != "00001111" {
-		t.Fatalf("0f=%q", HexToBinary("0f"))
+	if HexToBinarySess(testAmbientSession, "0f") != "00001111" {
+		t.Fatalf("0f=%q", HexToBinarySess(testAmbientSession, "0f"))
 	}
 	ClearErrorSess(testAmbientSession)
-	if HexToBinary("g") != "" {
+	if HexToBinarySess(testAmbientSession, "g") != "" {
 		t.Fatal("invalid hex must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -169,7 +169,7 @@ func TestHexToBinary(t *testing.T) {
 	}
 	// empty string has no broken digit — complete empty is ok non-sticky
 	ClearErrorSess(testAmbientSession)
-	if HexToBinary("") != "" {
+	if HexToBinarySess(testAmbientSession, "") != "" {
 		t.Fatal("empty hex must be empty")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -185,7 +185,7 @@ func TestBinaryConstantPath(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, probs)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	s := generateRandomIntConstant(opts, NewRngSess(testAmbientSession, 1))
+	s := generateRandomIntConstant(testAmbientSession, opts, NewRngSess(testAmbientSession, 1))
 	if !strings.HasPrefix(s, "0b") {
 		t.Fatalf("want binary int, got %q", s)
 	}
@@ -196,14 +196,14 @@ func TestBinaryConstantPath(t *testing.T) {
 		}
 	}
 	// long long binary includes LL
-	sll := generateRandomLongLongConstant(opts, NewRngSess(testAmbientSession, 1))
+	sll := generateRandomLongLongConstant(testAmbientSession, opts, NewRngSess(testAmbientSession, 1))
 	if !strings.HasPrefix(sll, "0b") || !strings.HasSuffix(sll, "LL") {
 		t.Fatalf("ll binary %q", sll)
 	}
 	// BinaryConstant off → never invent 0b
 	opts.BinaryConstant = false
 	for seed := uint64(1); seed < 20; seed++ {
-		s = generateRandomIntConstant(opts, NewRngSess(testAmbientSession, seed))
+		s = generateRandomIntConstant(testAmbientSession, opts, NewRngSess(testAmbientSession, seed))
 		if strings.HasPrefix(s, "0b") {
 			t.Fatalf("binary off invent %q", s)
 		}
@@ -211,7 +211,7 @@ func TestBinaryConstantPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// BinaryConstant on + nil RNG sticky (no invent soft skip without draw)
 	opts.BinaryConstant = true
-	if _, ok := maybeBinaryConstant(opts, nil, 2, ""); ok {
+	if _, ok := maybeBinaryConstantSess(testAmbientSession, opts, nil, 2, ""); ok {
 		t.Fatal("nil RNG maybeBinaryConstant must not claim binary branch")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -220,7 +220,7 @@ func TestBinaryConstantPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// BinaryConstant off complete no-op
 	opts.BinaryConstant = false
-	if _, ok := maybeBinaryConstant(opts, nil, 2, ""); ok {
+	if _, ok := maybeBinaryConstantSess(testAmbientSession, opts, nil, 2, ""); ok {
 		t.Fatal("BinaryConstant off must complete no-op")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -236,7 +236,7 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 	opts.MarkMutableConst = true
 	// force deterministic simple path via MakeRandom int
 	r := NewRngSess(testAmbientSession, 2)
-	c := MakeRandom(GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r)
+	c := MakeRandomSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, r)
 	if c == nil || c.Value == "" {
 		t.Fatal("nil const")
 	}
@@ -244,13 +244,13 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 		t.Fatalf("want paren wrap, got %q", c.Value)
 	}
 	// pointer is not simple wrap path in C++ (type ePointer, not eSimple)
-	c2 := MakeRandom(PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), opts, nil, NewRngSess(testAmbientSession, 1))
+	c2 := MakeRandomSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), opts, nil, NewRngSess(testAmbientSession, 1))
 	if c2 == nil || c2.Value != "0" {
 		t.Fatalf("pointer must stay 0, got %+v", c2)
 	}
 	// off → no invent wrap
 	opts.MarkMutableConst = false
-	c3 := MakeRandom(GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, NewRngSess(testAmbientSession, 2))
+	c3 := MakeRandomSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt), opts, nil, NewRngSess(testAmbientSession, 2))
 	if c3 == nil || strings.HasPrefix(c3.Value, "(") {
 		t.Fatalf("off must not wrap, got %q", c3.Value)
 	}
@@ -265,19 +265,19 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	// Constant.cpp:207–223 — RandomHexDigits(1) + flipcoin ±1; no invent from num%
 	// positive num
-	s := generateSmallRandomFloatHexConstant(2, NewRngSess(testAmbientSession, 1))
+	s := generateSmallRandomFloatHexConstantSess(testAmbientSession, 2, NewRngSess(testAmbientSession, 1))
 	if !strings.HasPrefix(s, "0x2.") || !strings.Contains(s, "p") {
 		t.Fatalf("got %q", s)
 	}
 	// negative num → -0x…
-	s = generateSmallRandomFloatHexConstant(-3, NewRngSess(testAmbientSession, 2))
+	s = generateSmallRandomFloatHexConstantSess(testAmbientSession, -3, NewRngSess(testAmbientSession, 2))
 	if !strings.HasPrefix(s, "-0x3.") {
 		t.Fatalf("neg got %q", s)
 	}
 	// both p+1 and p-1 across seeds
 	sawP, sawM := false, false
 	for seed := uint64(1); seed < 30; seed++ {
-		s = generateSmallRandomFloatHexConstant(1, NewRngSess(testAmbientSession, seed))
+		s = generateSmallRandomFloatHexConstantSess(testAmbientSession, 1, NewRngSess(testAmbientSession, seed))
 		if strings.HasSuffix(s, "p+1") {
 			sawP = true
 		}
@@ -289,7 +289,7 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 		t.Fatalf("need both p±1, +1=%v -1=%v", sawP, sawM)
 	}
 	ClearErrorSess(testAmbientSession)
-	if generateSmallRandomFloatHexConstant(0, nil) != "" {
+	if generateSmallRandomFloatHexConstantSess(testAmbientSession, 0, nil) != "" {
 		t.Fatal("nil rng fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -298,7 +298,7 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// formatSmallConstant must not invent float without RNG; sticky broken dispatch
 	ClearErrorSess(testAmbientSession)
-	if formatSmallConstant(EFloat, 1, Defaults()) != "" {
+	if formatSmallConstantSess(testAmbientSession, EFloat, 1, Defaults()) != "" {
 		t.Fatal("formatSmallConstant float invent")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -329,7 +329,7 @@ func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent Constant void shell past eVoid.
 	ClearErrorSess(testAmbientSession)
 	vt := GetSimpleTypeSess(testAmbientSession, EVoid)
-	if MakeRandom(vt, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if MakeRandomSess(testAmbientSession, vt, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("void MakeRandom must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -337,7 +337,7 @@ func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Type sticky
-	if MakeRandom(nil, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if MakeRandomSess(testAmbientSession, nil, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil Type MakeRandom must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -351,14 +351,14 @@ func TestMakeRandomNonzero(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	c := MakeRandomNonzero(GetIntTypeSess(testAmbientSession), opts, probs, r)
+	c := MakeRandomNonzeroSess(testAmbientSession, GetIntTypeSess(testAmbientSession), opts, probs, r)
 	if c == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("nonzero", HasErrorSess(testAmbientSession))
 	}
-	if c.Equals(0) {
+	if c.EqualsSess(testAmbientSession, 0) {
 		t.Fatal("must nonzero", c.Value)
 	}
-	if MakeRandomNonzero(nil, opts, probs, r) != nil || !HasErrorSess(testAmbientSession) {
+	if MakeRandomNonzeroSess(testAmbientSession, nil, opts, probs, r) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -366,36 +366,36 @@ func TestMakeRandomNonzero(t *testing.T) {
 
 func TestConstantCloneOutputCompatible(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	c := MakeInt(-3)
-	cl := c.Clone()
+	c := MakeIntSess(testAmbientSession, -3)
+	cl := c.CloneSess(testAmbientSession)
 	if cl == nil || cl.Value != "-3" || cl == c {
 		t.Fatal(cl)
 	}
-	if c.Output() != "(-3)" {
-		t.Fatal(c.Output())
+	if c.OutputSess(testAmbientSession) != "(-3)" {
+		t.Fatal(c.OutputSess(testAmbientSession))
 	}
 	z := &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}
-	if z.Output() != "(void*)0" {
-		t.Fatal(z.Output())
+	if z.OutputSess(testAmbientSession) != "(void*)0" {
+		t.Fatal(z.OutputSess(testAmbientSession))
 	}
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	if !c.CompatibleWithVar(v, true) || c.CompatibleWithVar(v, false) {
+	if !c.CompatibleWithVarSess(testAmbientSession, v, true) || c.CompatibleWithVarSess(testAmbientSession, v, false) {
 		t.Fatal("expand_struct gate")
 	}
-	if c.CompatibleWithExpr(&Expression{Term: TermConstant, Con: c}) {
+	if c.CompatibleWithExprSess(testAmbientSession, &Expression{Term: TermConstant, Con: c}) {
 		t.Fatal("expr always false")
 	}
-	if c.GetComplexity() != 1 || c.GetType() != GetIntTypeSess(testAmbientSession) {
+	if c.GetComplexitySess(testAmbientSession) != 1 || c.GetTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("accessors")
 	}
-	if c.GetReferencedPtrs() != nil {
+	if c.GetReferencedPtrsSess(testAmbientSession) != nil {
 		t.Fatal("no ptrs")
 	}
 	// MakeInt with mark_mutable_const
 	o := Defaults()
 	o.MarkMutableConst = true
-	if MakeIntOpts(5, o).Value != "(5)" {
-		t.Fatal(MakeIntOpts(5, o).Value)
+	if MakeIntOptsSess(testAmbientSession, 5, o).Value != "(5)" {
+		t.Fatal(MakeIntOptsSess(testAmbientSession, 5, o).Value)
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -412,7 +412,7 @@ func TestBlockDepthProtectAndFind(t *testing.T) {
 	if !b.SetDepthProtect(true) || !b.GetDepthProtect() {
 		t.Fatal("set")
 	}
-	b.PushStmt(Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}})
+	b.PushStmt(Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}})
 	if len(b.Stmts) != 1 {
 		t.Fatal("push")
 	}

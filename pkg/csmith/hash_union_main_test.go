@@ -118,7 +118,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	// Constant init field 0 — AbstractFactUnion transfer for constant → MakeFactUnions
-	uv.Init = MakeInt(0)
+	uv.Init = MakeIntSess(testAmbientSession, 0)
 	g.VS.GlobalList = append(g.VS.GlobalList, uv)
 	g.GenerateFunctions()
 	ClearErrorSess(testAmbientSession) // generation may fail-closed other paths; hash path only needs VS+FM

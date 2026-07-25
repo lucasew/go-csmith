@@ -23,9 +23,9 @@ func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := Stmt{
 		Kind: StmtIfElse,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
-		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
-		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
+		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
 	}
 	if VisitFactsStatementIf(&st, &cg, opts) {
 		t.Fatal("incomplete GlobalFacts must fail closed if visit")
@@ -56,7 +56,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	// Simpler: just empty branches and ensure visit succeeds
 	st := Stmt{
 		Kind: StmtIfElse,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{Stmts: []Stmt{thenAssign}},
 		Else: &Block{Stmts: []Stmt{}},
 	}
@@ -116,7 +116,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	}
 	st := Stmt{
 		Kind: StmtIfElse, StmID: 1,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{StmID: 3, Stmts: []Stmt{ret}},
 		Else: &Block{StmID: 4, Stmts: []Stmt{}},
 	}
@@ -136,7 +136,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	// nil arms sticky hard IR
 	st2 := Stmt{
 		Kind: StmtIfElse, StmID: 1,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: nil, Else: &Block{StmID: 4},
 	}
 	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
@@ -157,7 +157,7 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectStm = IncompleteEffect()
 	// Jump / Label / Expr
-	if VisitFactsStatementJump(&Stmt{Kind: StmtBreak, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}, &cg, Defaults()) {
+	if VisitFactsStatementJump(&Stmt{Kind: StmtBreak, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed jump visit")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -173,7 +173,7 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cg.EffectStm = IncompleteEffect()
-	if VisitFactsStatementExpr(&Stmt{Kind: StmtInvoke, StmID: 3, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}, &cg, Defaults()) {
+	if VisitFactsStatementExpr(&Stmt{Kind: StmtInvoke, StmID: 3, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed expr visit")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -200,7 +200,7 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	cg.EffectStm = IncompleteEffect()
 	if VisitFactsStatementAssign(&Stmt{
 		Kind: StmtAssign, StmID: 5, LhsVar: v, Lhs: &Lhs{Var: v, Type: v.Type},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed assign visit")
@@ -239,7 +239,7 @@ func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
 func testForInit(iv *Variable, n int) *Stmt {
 	return &Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(), LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(n), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, n), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 }
@@ -254,7 +254,7 @@ func TestVisitFactsStatementForIV(t *testing.T) {
 	// body + for need live StmID when FM is present; this test has no FM
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple,
 	}}}
 	st := Stmt{
 		Kind: StmtFor,
@@ -299,7 +299,7 @@ func TestOutputAssignAsExprSafeAdd(t *testing.T) {
 	flags := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
 	st := Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(2)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 		AssignOp: AssignAdd, SafeFlags: flags,
 	}
 	out := OutputAssignAsExpr(&st, false)
@@ -318,7 +318,7 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	st := makePossibleCompoundAssign(cg, opts, probs, NewRngSess(testAmbientSession, 2), GetIntTypeSess(testAmbientSession), lhs, AssignAdd, rhs, nil)
 	if st.SafeFlags == nil {
 		t.Fatal("flags")
@@ -356,7 +356,7 @@ func TestMakePossibleCompoundAssignGetTypeResidualSticky(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// Lhs Type-nil + Var Type-nil → GetType residual
 	lhs := &Lhs{Var: &Variable{Name: "g_hole"}}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	st := makePossibleCompoundAssign(cg, opts, probs, NewRngSess(testAmbientSession, 3), GetIntTypeSess(testAmbientSession), lhs, AssignAdd, rhs, nil)
 	if st.Kind != 0 || st.SafeFlags != nil || st.Rhs != nil {
 		t.Fatal("GetType residual must fail closed compound, not invent shell", st)
@@ -377,7 +377,7 @@ func TestMakePossibleCompoundAssignNoSafeMathStillCanonizes(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	st := makePossibleCompoundAssign(cg, opts, probs, NewRngSess(testAmbientSession, 3), GetIntTypeSess(testAmbientSession), lhs, AssignBitAnd, rhs, nil)
 	if st.SafeFlags == nil {
 		t.Fatal("dummy flags for safe_assign bit op")
@@ -391,7 +391,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple},
 	}}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
@@ -501,7 +501,7 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	body := &Block{StmID: 20, Func: f, Looping: true, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 21, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false),
 			Lhs:  &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)},
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple},
 	}}
 	// pre-seed MapFactsIn so after VisitFactsBlock we force known entry
 	// Use empty body that succeeds fixed point; then override MapFactsIn
@@ -553,7 +553,7 @@ func TestVisitFactsStatementForMustReturnRestoresPostInit(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	// body that must return
 	body := &Block{StmID: 30, Func: f, Looping: true, Stmts: []Stmt{
-		{Kind: StmtReturn, StmID: 31, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}},
+		{Kind: StmtReturn, StmID: 31, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}},
 	}}
 	st := &Stmt{
 		Kind: StmtFor, StmID: 11,
@@ -673,7 +673,7 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	asg := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	if VisitFactsStatementAssign(asg, &cg, Defaults()) {
 		t.Fatal("assign IncompleteStmID must fail closed")
@@ -752,7 +752,7 @@ func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
 	if VisitFactsStatementArrayOp(&Stmt{
 		Kind: StmtArrayOp,
 		Loop: &LoopControl{}, // IV nil
-		Then: &Block{Stmts: []Stmt{{Kind: StmtAssign, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g", GetIntTypeSess(testAmbientSession), false, false), Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		Then: &Block{Stmts: []Stmt{{Kind: StmtAssign, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g", GetIntTypeSess(testAmbientSession), false, false), Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
 	}, &cg, Defaults()) {
 		t.Fatal("nil IV must fail closed")
 	}
@@ -802,11 +802,11 @@ func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 5,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{StmID: 6, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 7,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
 		Else: &Block{StmID: 8, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 9,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}}},
 	}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -830,9 +830,9 @@ func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 10,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{StmID: 11, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 12,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
 		Else: &Block{StmID: 13, Func: f, Stmts: []Stmt{}},
 	}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -858,7 +858,7 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	elseB := &Block{StmID: 3, Func: f}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 1,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: thenB, Else: elseB,
 	}
 	// incomplete then map effect → AddEffect fails closed
@@ -892,7 +892,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	bad := Stmt{Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: x,
 		Lhs:  &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple}
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple}
 	b := &Block{StmID: 50, Func: f, Stmts: []Stmt{bad}}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = f

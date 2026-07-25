@@ -41,8 +41,8 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 		IsStd:  true,
 		Binary: "+",
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1)},
-			{Term: TermConstant, Con: MakeInt(2)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 		},
 	}
 	st := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}

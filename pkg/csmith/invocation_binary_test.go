@@ -14,8 +14,8 @@ func TestBinaryOpFromString(t *testing.T) {
 
 func TestInvocationIs0Or1(t *testing.T) {
 	fi := &Invocation{IsStd: true, Binary: ">", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(0)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
 	if !fi.Is0Or1() {
 		t.Fatal("cmp")
@@ -27,8 +27,8 @@ func TestInvocationIs0Or1(t *testing.T) {
 }
 
 func TestInvocationEqualsIntFold(t *testing.T) {
-	zero := &Expression{Term: TermConstant, Con: MakeInt(0)}
-	one := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	zero := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
+	one := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	// 0 * x
 	fi := &Invocation{IsStd: true, Binary: "*", Args: []*Expression{zero, one}}
 	if !fi.EqualsInt(0) {
@@ -94,8 +94,8 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	cg.EffectAccum = &eff
 	// && with constants — both visit ok, merge keeps a
 	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(0)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
 	if !VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
 		t.Fatal("visit")
@@ -105,8 +105,8 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	}
 	// through VisitFactsInvocation
 	fi2 := &Invocation{IsStd: true, Binary: "||", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(0)},
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}
 	if !VisitFactsInvocation(fi2, &cg, Defaults()) {
 		t.Fatal("dispatch")
@@ -153,12 +153,12 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 		Kind:     StmtAssign,
 		LhsVar:   p,
 		Lhs:      &Lhs{Var: p, Type: f1.Type}, // indir = ptr - pointee = 1
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		AssignOp: AssignSimple,
 		StmID:    AllocStmID(),
 	}
 	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermAssignment, Assign: rhsAssign},
 	}}
 	if !VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
@@ -184,7 +184,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 	// FunctionInvocationUnary.cpp:117 — assert invalid operator sticky; no invent eInt
 	ClearErrorSess(testAmbientSession)
-	arg := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
+	arg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "??", Args: []*Expression{arg}}
 	if fi.GetType() != nil {
 		t.Fatal("invalid unary op must fail closed")
@@ -471,7 +471,7 @@ func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil param_value hole sticky
-	left := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	left := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	if VisitFactsBinaryOrdered(&Invocation{
 		IsStd: true, Binary: "&&",
 		Args: []*Expression{nil, left},
@@ -504,8 +504,8 @@ func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(0)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
 	if VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
 		t.Fatal("incomplete GlobalFacts before left snapshot must fail closed")
@@ -538,8 +538,8 @@ func TestInvocationGetTypeUnary(t *testing.T) {
 func TestInvocationGetTypeBinary(t *testing.T) {
 	// cmp → int
 	fi := &Invocation{IsStd: true, Binary: ">", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(0)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
 	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("cmp")
@@ -548,8 +548,8 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 	fi = &Invocation{
 		IsStd: true, Binary: "+",
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1)},
-			{Term: TermConstant, Con: MakeInt(2)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 		},
 		Safe: &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat},
 	}
@@ -569,7 +569,7 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 	// shift follows left
 	fi = &Invocation{IsStd: true, Binary: "<<", Args: []*Expression{
 		{Term: TermConstant, Con: cu},
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}
 	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EUInt) {
 		t.Fatal("ushift")
@@ -669,7 +669,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 		t.Fatal("add without args must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fi.Args = []*Expression{{Term: TermConstant, Con: MakeInt(1)}}
+	fi.Args = []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	if fi.GetType() != nil {
 		t.Fatal("add with one arg")
 	}
@@ -709,7 +709,7 @@ func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
 	// GetType residual soft invent was invent eInt/eUInt past incomplete arg type shell.
 	ClearErrorSess(testAmbientSession)
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
-	good := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	good := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{hole, good}}
 	if fi.GetType() != nil {
 		t.Fatal("GetType residual must fail closed nil type, not invent eInt")
@@ -745,7 +745,7 @@ func TestInvocationOutputArgResidualSticky(t *testing.T) {
 	fi := &Invocation{
 		User: f,
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 			{Term: TermConstant, Con: &Constant{Value: "2"}}, // Type-nil residual
 		},
 	}
@@ -764,7 +764,7 @@ func TestInvocationBinaryOutputResidualSticky(t *testing.T) {
 	fi := &Invocation{
 		IsStd: true, Binary: "+",
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 			{Term: TermConstant, Con: &Constant{Value: "2"}}, // Type-nil residual
 		},
 	}
@@ -827,8 +827,8 @@ func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
 	fi := &Invocation{
 		IsStd: true, Binary: "+",
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
-			{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)},
 		},
 	}
 	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EInt) {
@@ -902,7 +902,7 @@ func TestBinarySubcontextClearsCurrRHS(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// plant outer CurrRHS as if mid ExpressionAssign Lhs
-	outerRHS := &Expression{Term: TermConstant, Con: MakeInt(42)}
+	outerRHS := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 42)}
 	cg.CurrRHS = outerRHS
 	// MakeRandomBinary must not leave residual error from wrong CurrRHS overlap
 	// (generation may still fail closed for other reasons — key is CurrRHS not leaked into subcontexts)

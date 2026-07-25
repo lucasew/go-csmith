@@ -44,7 +44,7 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{Func: f, StmID: AllocStmID()}
 	st := &Stmt{Kind: StmtReturn, StmID: AllocStmID(), Expr: &Expression{
-		Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession),
+		Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession),
 	}}
 	// Return with const may not need RV; still exercise CurrBlk assignment path
 	// via ValidateAndUpdateFacts which sets CurrBlk before StmVisitFacts.
@@ -74,7 +74,7 @@ func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	eff := EmptyEffect()
 	parent := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	parent.EffectAccum = &eff

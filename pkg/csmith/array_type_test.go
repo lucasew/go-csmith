@@ -573,7 +573,7 @@ func TestAddNewVarFactAndUpdateFillsUnionMapFromPTKeys(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// Init required for complete union abstract (FactUnion assign transfer)
-	g := &Variable{Name: "g_ufill", Type: ut, Init: MakeInt(0)}
+	g := &Variable{Name: "g_ufill", Type: ut, Init: MakeIntSess(testAmbientSession, 0)}
 	fm.AddNewVarFactAndUpdate(nil, g) // global create
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))

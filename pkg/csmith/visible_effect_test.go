@@ -153,7 +153,7 @@ func TestOutputVariableList(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was scalar OutputDef path
 	// fair: sticky empty whole list
-	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
+	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeIntSess(testAmbientSession, 0)}
 	if s := OutputVariableList([]*Variable{arrShell}, "  ", true); s != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole list", s)
 	}

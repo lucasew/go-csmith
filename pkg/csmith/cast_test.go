@@ -44,7 +44,7 @@ func TestNeedsCastPointerBases(t *testing.T) {
 func TestExpressionCastOutput(t *testing.T) {
 	e := &Expression{
 		Term:     TermConstant,
-		Con:      MakeInt(0),
+		Con:      MakeIntSess(testAmbientSession, 0),
 		CastType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
 	}
 	out := e.Output()

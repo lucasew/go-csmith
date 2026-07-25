@@ -1026,7 +1026,7 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 
 func MakeUnionConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
 	// Constant.cpp:289–291 — assert union with fields; always has RNG sticky
-	// no soft invent MakeInt(0) / "{}" without live RNG
+	// no soft invent MakeIntSess(sessFromEnv(env), 0) / "{}" without live RNG
 	if r == nil || ut == nil || !ut.isUnion || len(ut.Fields) == 0 {
 		sessNoteError(s, ErrGeneric)
 		return nil

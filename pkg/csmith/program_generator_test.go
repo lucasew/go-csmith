@@ -146,7 +146,7 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	opts := Defaults()
 	g := NewProgramGenerator(NewSession(opts))
 	built := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
-		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
 		RV:   CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), false, false),
 	}
 	// hasUser scan: hole first must fail closed (not invent hasUser from built after hole)
@@ -183,13 +183,13 @@ func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 	bad := &Function{
 		Name: "func_bad", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}}},
 		RV: &Variable{Name: "func_bad_rv"}, // Type nil
 	}
 	good := &Function{
 		Name: "func_ok", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 3, Stmts: []Stmt{{Kind: StmtReturn, StmID: 4,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}}},
 		RV: CreateVariableScalarsSess(testAmbientSession, "func_ok_rv", GetIntTypeSess(testAmbientSession), false, false),
 	}
 	g := NewProgramGenerator(NewSession(Defaults()))

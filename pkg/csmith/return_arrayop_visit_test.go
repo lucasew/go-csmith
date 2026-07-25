@@ -14,7 +14,7 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	st := Stmt{
 		Kind: StmtReturn,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}
 	// Body flag may be set by set_depth_protect(true); emit still requires CGOptions.
 	b := &Block{Func: f, Stmts: []Stmt{st}, EmitDepthProtect: true}
@@ -61,7 +61,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = []int{3}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}

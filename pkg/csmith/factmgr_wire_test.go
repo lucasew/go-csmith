@@ -61,7 +61,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// incomplete existing union map (nil hole)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0), nil}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	if fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("nil UnionFacts hole must fail closed false, not invent success")
 	}
@@ -226,7 +226,7 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	uv := &Variable{Name: "g_u", Type: ut, Init: MakeInt(0)}
+	uv := &Variable{Name: "g_u", Type: ut, Init: MakeIntSess(testAmbientSession, 0)}
 	pt, un := AbstractFactForVarInit(uv)
 	if len(pt) != 0 {
 		t.Fatal("no pt for union")
@@ -431,7 +431,7 @@ func TestUpdateFactForAssignUnionField(t *testing.T) {
 	f1 := &Variable{Name: "g_u.f1", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0, f1}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("update")
 	}
@@ -491,7 +491,7 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtReturn, StmID: 8,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntTypeSess(testAmbientSession)}}
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3), ExprType: GetIntTypeSess(testAmbientSession)}}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

@@ -25,7 +25,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 		vs := NewVariableSelector(testAmbientSession, opts)
 		vs.Probs = probs
 		blk := &Block{StmID: 1}
-		init := MakeRandom(elem, opts, probs, r)
+		init := MakeRandomSess(testAmbientSession, elem, opts, probs, r)
 		if init == nil {
 			continue
 		}

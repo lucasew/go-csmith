@@ -11,7 +11,7 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	probs := NewProbabilities(opts)
 	r := NewRngSess(testAmbientSession, 42)
 	elem := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
-	init := MakeRandom(elem, opts, probs, r)
+	init := MakeRandomSess(testAmbientSession, elem, opts, probs, r)
 	if init == nil || init.Value != "0" || init.Type == nil || !init.Type.IsPointerLikeSess(testAmbientSession) {
 		t.Fatalf("pointer MakeRandom: %+v", init)
 	}
@@ -79,7 +79,7 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	b := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}

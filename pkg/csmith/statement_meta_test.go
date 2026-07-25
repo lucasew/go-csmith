@@ -98,9 +98,9 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	initBody := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, ArrayAccess: "a[i]",
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}}
-	arr := &Stmt{Kind: StmtArrayOp, Then: initBody, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	arr := &Stmt{Kind: StmtArrayOp, Then: initBody, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	if blks := GetBlocksStmtSess(testAmbientSession, arr); len(blks) != 0 {
 		t.Fatal("array-init ArrayOp get_blocks must be empty (C++ body=null)", blks)
 	}
@@ -311,7 +311,7 @@ func TestIsPtrUsed(t *testing.T) {
 		t.Fatal("ptr")
 	}
 	st2 := &Stmt{Kind: StmtAssign, LhsVar: CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	if IsPtrUsedSess(testAmbientSession, st2) {
 		t.Fatal("no ptr")
 	}

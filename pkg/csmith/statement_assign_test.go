@@ -80,7 +80,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 
 func TestAssignOutputIncr(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
-	st := Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignPostIncr, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	st := Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignPostIncr, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	out := (&Block{Stmts: []Stmt{st}}).Output(0)
 	if !strings.Contains(out, "g_1++") {
 		t.Fatal(out)
@@ -209,7 +209,7 @@ func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 		GetIntTypeSess(testAmbientSession),
 		lhs,
 		AssignBitAnd,
-		&Expression{Term: TermConstant, Con: MakeInt(1)},
+		&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		nil,
 	)
 	if stmtOK(st) {

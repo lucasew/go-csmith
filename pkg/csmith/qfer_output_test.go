@@ -197,7 +197,7 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	}
 	g.clearErr()
 	// IsArray without AsArray soft invent was scalar OutputDef for array shell
-	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
+	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeIntSess(testAmbientSession, 0)}
 	g.VS.GlobalList = []*Variable{shell}
 	if out3 := g.OutputGlobals(); out3 != "" {
 		t.Fatal("IsArray without AsArray must fail closed globals", out3)
@@ -329,7 +329,7 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 	if ok == nil {
 		t.Fatal("CreateVariableScalars after ClearError")
 	}
-	ok.Init = MakeInt(1)
+	ok.Init = MakeIntSess(testAmbientSession, 1)
 	b2 := &Block{LocalVars: []*Variable{ok}}
 	if out2 := b2.Output(0); !strings.Contains(out2, "l_ok") {
 		t.Fatal(out2)
@@ -529,7 +529,7 @@ func TestOutputHeaderAliasNoInvent(t *testing.T) {
 func TestExpressionCastNoInventEmpty(t *testing.T) {
 	// cast_type + body both required sticky
 	ClearErrorSess(testAmbientSession)
-	e := &Expression{Term: TermConstant, Con: MakeInt(1), CastType: &Type{isStruct: true}}
+	e := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), CastType: &Type{isStruct: true}}
 	if out := e.Output(); out != "" {
 		t.Fatal("cast with incomplete type must fail closed", out)
 	}
@@ -559,7 +559,7 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 func TestExpressionCommaNoInventEmptySide(t *testing.T) {
 	// ExpressionComma.cpp:109–115 — both sides Output live; sticky no invent "( , x)"
 	ClearErrorSess(testAmbientSession)
-	good := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	good := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	bad := &Expression{Term: TermConstant} // nil Con → empty Output sticky
 	e := &Expression{Term: TermCommaExpr, CommaLHS: bad, CommaRHS: good}
 	if out := e.Output(); out != "" {
@@ -577,7 +577,7 @@ func TestExpressionCommaNoInventEmptySide(t *testing.T) {
 		t.Fatal("empty rhs comma must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	e.CommaLHS, e.CommaRHS = good, &Expression{Term: TermConstant, Con: MakeInt(2)}
+	e.CommaLHS, e.CommaRHS = good, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
 	if out := e.Output(); out != "(1 , 2)" {
 		t.Fatal(out)
 	}
@@ -655,7 +655,7 @@ func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
 
 func TestVariableOutputDef(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	v.Init = MakeInt(3)
+	v.Init = MakeIntSess(testAmbientSession, 3)
 	s := v.OutputDefFullSess(testAmbientSession, true, false, false, nil)
 	if !strings.Contains(s, "static") || !strings.Contains(s, "const") || !strings.Contains(s, "g_1") || !strings.Contains(s, "3") {
 		t.Fatal(s)
@@ -674,7 +674,7 @@ func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was scalar "int g_a = 0;"
-	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
+	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeIntSess(testAmbientSession, 0)}
 	if shell.OutputDefFullSess(testAmbientSession, true, false, false, nil) != "" {
 		t.Fatal("IsArray without AsArray OutputDef must fail closed")
 	}
@@ -687,7 +687,7 @@ func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
 func TestVariableOutputDefMissingDeclFailClosed(t *testing.T) {
 	// Variable.cpp:640–660 — sticky no invent " = 3;" without live decl/type
 	ClearErrorSess(testAmbientSession)
-	v := &Variable{Name: "g_u", Init: MakeInt(3)}
+	v := &Variable{Name: "g_u", Init: MakeIntSess(testAmbientSession, 3)}
 	if v.OutputDefFullSess(testAmbientSession, true, false, false, nil) != "" {
 		t.Fatal("missing type must fail closed", v.OutputDefFullSess(testAmbientSession, true, false, false, nil))
 	}

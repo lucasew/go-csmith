@@ -153,7 +153,7 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live sticky
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	st := &Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	st := &Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	// no CurrentFunc
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 	if VisitFactsStatementReturn(st, &cg, opts) {

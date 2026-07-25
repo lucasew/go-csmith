@@ -135,14 +135,14 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.CompatibleCheck = true
 	// enabled + incomplete IR rejects sticky (no invent non-error)
-	if !CompatibleCheckExprVar(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+	if !CompatibleCheckExprVar(opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("nil var must reject when compatible-check on")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var CompatibleCheck must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !CompatibleCheckExprs(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+	if !CompatibleCheckExprs(opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("nil expr must reject when compatible-check on")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -450,12 +450,12 @@ func TestEnableCompatibleCheckProcess(t *testing.T) {
 	defer ResetCompatibleCheck()
 	opts := Defaults()
 	opts.CompatibleCheck = false
-	if CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+	if CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("disabled must be false")
 	}
 	EnableCompatibleCheck()
 	// process static on even when opts.CompatibleCheck false
-	if !CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+	if !CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("EnableCompatibleCheck must activate checker")
 	}
 }

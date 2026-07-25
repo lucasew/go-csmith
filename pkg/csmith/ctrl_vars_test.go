@@ -129,7 +129,7 @@ func TestOutputForComment(t *testing.T) {
 func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -203,7 +203,7 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	avBroken.AsArray = avBroken
 	// GetMaxArrayDimension uses AsArray.Sizes — Type nil still dims from sizes
 	// NoLoopInitializer(av) Type nil stickies residual true → soft-skip invent next
-	avGood := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	avGood := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if avGood == nil {
 		t.Fatal("good array")
 	}
@@ -231,7 +231,7 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 			Type:       GetIntTypeSess(testAmbientSession),
 			IsArray:    true,
 			ArraySizes: []int{2, 3},
-			Init:       MakeInt(0),
+			Init:       MakeIntSess(testAmbientSession, 0),
 		},
 		Sizes:      []int{2, 3},
 		InitValues: []string{"0", "1"},

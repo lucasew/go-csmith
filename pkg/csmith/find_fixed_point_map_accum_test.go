@@ -27,13 +27,13 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 		Kind: StmtAssign, StmID: AllocStmID(),
 		AssignOp: AssignSimple,
 		Lhs:      &Lhs{Var: early},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	s1 := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		AssignOp: AssignSimple,
 		Lhs:      &Lhs{Var: late},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	// Manually plant map_stm and pre-seed map_accum as if a polluted second
 	// pass already ran: early's map_accum incorrectly lists late.

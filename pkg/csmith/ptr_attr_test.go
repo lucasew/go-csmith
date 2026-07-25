@@ -44,7 +44,7 @@ func TestPtrModifiedInRhs(t *testing.T) {
 
 func TestOutputDefWithAttrs(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
-	v.Init = MakeInt(0)
+	v.Init = MakeIntSess(testAmbientSession, 0)
 	// force attrs with 100% boolean
 	ClearAttrGeneratorsSess(testAmbientSession)
 	currentSession().VarAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
@@ -77,7 +77,7 @@ func TestArrayOutputInitNoPostIncr(t *testing.T) {
 		Block:    &Block{}, // local
 	}
 	// force not NoLoopInitializer — local non-const
-	av.Init = MakeInt(0)
+	av.Init = MakeIntSess(testAmbientSession, 0)
 	out := av.OutputInitOptsSess(testAmbientSession, "    ", []string{"i"}, false)
 	if !strings.Contains(out, "i = i + 1") {
 		t.Fatal(out)

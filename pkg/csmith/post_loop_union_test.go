@@ -14,10 +14,10 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	}}
 	oldU := CreateVariableQferSess(testAmbientSession, "g_old", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	oldU.CreateFieldVarsSess(testAmbientSession)
-	oldU.Init = MakeInt(0)
+	oldU.Init = MakeIntSess(testAmbientSession, 0)
 	newU := CreateVariableQferSess(testAmbientSession, "g_new", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	newU.CreateFieldVarsSess(testAmbientSession)
-	newU.Init = MakeInt(0)
+	newU.Init = MakeIntSess(testAmbientSession, 0)
 	// preUnion (make_iteration snap) differs from map_in — must not clobber map_in
 	preU := []*FactUnion{MakeFactUnion(oldU, 0)}
 	// map_in after fair FP: old last_write 4 + body-created new global

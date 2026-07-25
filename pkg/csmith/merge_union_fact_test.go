@@ -90,7 +90,7 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	// definitive assign to union field f3 → renew last_written to field id of f3
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	if !fm.UpdateFactForAssign(f3, 0, rhs) {
 		t.Fatal("update", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
@@ -152,7 +152,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	// IV assign g_721.f1 = 0
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("assign f1", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
@@ -168,7 +168,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	// else starts from then map_in (StatementIf.cpp:97)
 	fm.AssignGlobalFactsFromMapIn(thenB.StmID)
 	fm.SetMapFactsOutForBlock(elseB, CloneFactSlice(fm.GlobalFacts))
-	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmID(), Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	ifSt := &Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB, StmID: AllocStmID(), Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	prePT := CloneFactSlice(fm.GlobalFacts)
 	preU := CloneUnionFactSliceDeep(fm.UnionFacts)
 	CombineBranchFacts(ifSt, &prePT, &preU, fm)

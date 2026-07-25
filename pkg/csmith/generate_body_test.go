@@ -121,7 +121,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, nil, nil, "g_16", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, nil, nil, "g_16", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("array")
 	}

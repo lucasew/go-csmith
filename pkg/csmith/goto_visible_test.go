@@ -209,11 +209,11 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	b1 := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntTypeSess(testAmbientSession)},
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}}
 	b2 := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 2, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntTypeSess(testAmbientSession)},
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}},
 	}}
 	f.Blocks = []*Block{b1, b2}
 	f.Stack = []*Block{b2}

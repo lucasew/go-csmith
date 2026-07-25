@@ -106,7 +106,7 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 
 func TestArrayBuildInitRecursive(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -287,7 +287,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		Then: thenBlk, Else: elseBlk,
 	}
 	fn.RV = CreateVariableScalarsSess(testAmbientSession, "g_rv", GetIntTypeSess(testAmbientSession), false, false)
@@ -352,7 +352,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	fm.MapVisited = map[int]bool{thenBlk.StmID: true, elseBlk.StmID: true}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		Then: thenBlk, Else: elseBlk,
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)

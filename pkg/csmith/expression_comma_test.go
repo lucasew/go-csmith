@@ -54,7 +54,7 @@ func TestMakeExpressionComma(t *testing.T) {
 		t.Fatal("incomplete comma Output must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	oneSide := &Expression{Term: TermCommaExpr, CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	oneSide := &Expression{Term: TermCommaExpr, CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	if oneSide.Output() != "" {
 		t.Fatalf("one-side comma must fail closed empty, got %q", oneSide.Output())
 	}
@@ -197,7 +197,7 @@ func TestCommaOutputLHSResidualSticky(t *testing.T) {
 	e := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
-		CommaRHS: &Expression{Term: TermConstant, Con: MakeInt(2)},
+		CommaRHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}
 	if s := e.Output(); s != "" {
 		t.Fatal("LHS Output residual must fail closed comma Output", s)

@@ -4,8 +4,8 @@ import "testing"
 
 func TestPermuteParamOrdersTwo(t *testing.T) {
 	fi := &Invocation{Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(2)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}}
 	ords := fi.PermuteParamOrders()
 	if len(ords) != 2 {
@@ -275,8 +275,8 @@ func TestVisitUnorderedParamsMerges(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	fi := &Invocation{Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(2)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}}
 	facts := []*FactPointTo{}
 	if !fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
@@ -288,7 +288,7 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 	// FunctionInvocation.cpp:434–453 + util permute(empty) → empty;
 	// visit_unordered assert(orders.size()>0) — no soft invent identity order
 	fi := &Invocation{Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}
 	if got := fi.PermuteParamOrders(); len(got) != 0 {
 		t.Fatalf("want empty orders for n!=2 without call args, got %v", got)
@@ -299,8 +299,8 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 	}
 	// n==2 still both orders
 	fi2 := &Invocation{Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermConstant, Con: MakeInt(2)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}}
 	if len(fi2.PermuteParamOrders()) != 2 {
 		t.Fatal("2-arg shortcut")
@@ -308,7 +308,7 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 	// n!=2 with nil arg hole — no invent skip hole as non-call permute slot
 	fiHole := &Invocation{Args: []*Expression{
 		userCall("a"),
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		nil,
 	}}
 	if got := fiHole.PermuteParamOrders(); got != nil {
@@ -325,8 +325,8 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
-	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	a := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
+	b := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
 	// n==2 forces two permute orders
 	fi := &Invocation{
 		User: &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true},
@@ -346,7 +346,7 @@ func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
-	fi := &Invocation{Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}}}
+	fi := &Invocation{Args: []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}}
 	facts := []*FactPointTo{}
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
 		t.Fatal("empty orders must fail closed")
@@ -361,7 +361,7 @@ func TestFactChangedOnAssign(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
-	fm.UpdateFactForAssign(p, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})
+	fm.UpdateFactForAssign(p, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)})
 	if !f.FactChanged {
 		// may not change if no pointer abstract result — force with null assign
 		// AbstractFactForAssign for pointer const 0 should yield null fact
@@ -379,7 +379,7 @@ func TestFactChangedOnAssign(t *testing.T) {
 		// call with existing null merge
 		fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 		// re-assign to null
-		if fm.UpdateFactForAssign(p, 0, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+		if fm.UpdateFactForAssign(p, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 			if !f.FactChanged {
 				t.Fatal("fact_changed after update")
 			}
@@ -393,7 +393,7 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 	assign := Stmt{
 		Kind: StmtAssign, StmID: 101,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	callee := &Function{
@@ -517,7 +517,7 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(callerFM)
 	cg.EffectAccum = &eff
 	fi := &Invocation{User: callee, Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)},
 	}}
 	facts := []*FactPointTo{}
 	// Seed callee param union as if body abstract had it after handover (params kept by filter)

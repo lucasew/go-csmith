@@ -280,7 +280,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	}
 	// RetConst only — sticky no invent if/else without body
 	ClearErrorSess(testAmbientSession)
-	f.RetConst = MakeInt(42)
+	f.RetConst = MakeIntSess(testAmbientSession, 42)
 	out = f.Output()
 	if out != "" {
 		t.Fatal("RetConst without Body must fail closed empty", out)
@@ -300,7 +300,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 		t.Fatal("Body without RetConst must not invent depth if", out)
 	}
 	// complete depth_protect IR
-	f.RetConst = MakeInt(42)
+	f.RetConst = MakeIntSess(testAmbientSession, 42)
 	out = f.Output()
 	if !strings.Contains(out, "if (DEPTH < MAX_DEPTH)") || !strings.Contains(out, "return 42") {
 		t.Fatal("complete depth_protect IR", out)

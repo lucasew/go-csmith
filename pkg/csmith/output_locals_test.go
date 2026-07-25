@@ -9,7 +9,7 @@ func TestLocalOutputDef(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{}
 	lv := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), true, false)
-	lv.Init = MakeInt(2)
+	lv.Init = MakeIntSess(testAmbientSession, 2)
 	b.LocalVars = []*Variable{lv}
 	out := b.Output(0)
 	if !strings.Contains(out, "const") || !strings.Contains(out, "l_1") || !strings.Contains(out, "2") {
@@ -21,7 +21,7 @@ func TestBlockOutputDefResidualSticky(t *testing.T) {
 	// OutputDef residual soft invent was soft-continue later locals invent partial block.
 	ClearErrorSess(testAmbientSession)
 	good := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntTypeSess(testAmbientSession), false, false)
-	good.Init = MakeInt(1)
+	good.Init = MakeIntSess(testAmbientSession, 1)
 	// incomplete InitExpr residual OutputDef
 	bad := CreateVariableScalarsSess(testAmbientSession, "l_bad", GetIntTypeSess(testAmbientSession), false, false)
 	bad.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil
@@ -40,7 +40,7 @@ func TestBlockOutputInvokeResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	good := Stmt{
 		Kind: StmtInvoke, StmID: 1,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
 	bad := Stmt{
 		Kind: StmtInvoke, StmID: 2,

@@ -5,7 +5,7 @@ import "testing"
 func TestFindMustUseArrays(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -171,7 +171,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	f.Stack = []*Block{blk}
 	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntTypeSess(testAmbientSession), false, false)
 	// ItemizeArray Type-nil IV residual: soft invent was try-next then pick good.
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -203,7 +203,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

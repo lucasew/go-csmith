@@ -66,9 +66,9 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Test residual soft invent was soft-continue incr invent partial for header.
 	// Fair: sticky empty whole header.
-	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple}
+	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple}
 	badTest := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual Output
-	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd}
+	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignAdd}
 	lcRes := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: badTest, IncrStmt: goodIncr}
 	if forHeaderOutput(lcRes) != "" {
 		t.Fatal("test Output residual must fail closed forHeaderOutput, not invent partial")
@@ -83,7 +83,7 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	}
 	// header present but no Then body
 	ClearErrorSess(testAmbientSession)
-	goodTest := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	goodTest := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	lc2 := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: goodTest, IncrStmt: goodIncr}
 	if forHeaderOutput(lc2) == "" {
 		t.Fatal("complete IR must emit header")
@@ -153,7 +153,7 @@ func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
 	// StatementIf always has test + both branches
 	out = (&Block{Stmts: []Stmt{{
 		Kind: StmtIfElse,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{},
 	}}}).Output(0)
 	if strings.Contains(out, "if (") {
@@ -390,7 +390,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	vs.AllVars = []*Variable{g}
 	loop := &Block{Func: f, Looping: true}
 	inner := &Block{Func: f, Parent: loop, Stmts: []Stmt{
-		{Kind: StmtAssign, StmID: 1, LhsVar: g, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+		{Kind: StmtAssign, StmID: 1, LhsVar: g, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}}
 	f.Stack = []*Block{loop, inner}
 	fm := NewFactMgrSess(testAmbientSession, f)

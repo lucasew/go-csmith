@@ -135,7 +135,7 @@ func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
-		Args:        []*Expression{{Term: TermConstant, Con: MakeInt(1)}},
+		Args:        []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 		Safe:        &SafeOpFlags{Size: SafeOpSize(99), Op1Signed: true},
 		OutSafeMath: false,
 	}
@@ -202,7 +202,7 @@ func TestBinaryFuncNameFloat(t *testing.T) {
 
 func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {
 	// FunctionInvocationUnary.cpp:220–223 — float size → standard minus
-	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	arg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
 		Args:        []*Expression{arg},
@@ -221,7 +221,7 @@ func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {
 func TestUnaryMinusOutputSafeAndIdentify(t *testing.T) {
 	ClearSafeOpWrapperNamesSess(testAmbientSession)
 	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
-	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	arg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
 		Args:                []*Expression{arg},
@@ -245,7 +245,7 @@ func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
 	// pre-register so id is known; filter only id 1 — deny if id != 1
 	fname := "safe_unary_minus_func_int32_t_s"
 	id := SafeOpFlagsToID(fname)
-	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	arg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
 		Args:                []*Expression{arg},
@@ -269,7 +269,7 @@ func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
 func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nested: ~ applied to a safe unary-minus invocation
-	innerArg := &Expression{Term: TermConstant, Con: MakeInt(-10)}
+	innerArg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, -10)}
 	minus := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
 		Args:        []*Expression{innerArg},
@@ -317,8 +317,8 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 func TestBinaryOutputIdentifyWrappers(t *testing.T) {
 	ClearSafeOpWrapperNamesSess(testAmbientSession)
 	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
-	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	a1 := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	a0 := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
+	a1 := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
 	fi := &Invocation{
 		IsStd: true, Binary: "+",
 		Args:                []*Expression{a0, a1},
@@ -336,8 +336,8 @@ func TestBinaryOutputIdentifyWrappers(t *testing.T) {
 }
 
 func TestUnaryEqualsIntFold(t *testing.T) {
-	zero := &Expression{Term: TermConstant, Con: MakeInt(0)}
-	five := &Expression{Term: TermConstant, Con: MakeInt(5)}
+	zero := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
+	five := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 5)}
 	not0 := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{five}}
 	if !not0.EqualsInt(0) {
 		t.Fatal("!nonzero equals 0")

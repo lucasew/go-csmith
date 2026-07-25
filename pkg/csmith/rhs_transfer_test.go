@@ -4,45 +4,45 @@ import "testing"
 
 func TestConstantEquals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if !MakeInt(0).Equals(0) {
+	if !MakeIntSess(testAmbientSession, 0).EqualsSess(testAmbientSession, 0) {
 		t.Fatal("0")
 	}
-	if MakeInt(3).Equals(0) {
+	if MakeIntSess(testAmbientSession, 3).EqualsSess(testAmbientSession, 0) {
 		t.Fatal("3")
 	}
 	// Constant.cpp:357–361 + str2int — small-path "0L"/"0UL" must equals(0)
 	// (seed-2 e15477: div/mod re-pick needs rhs->equals(0))
 	zeroL := &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "0L"}
-	if !zeroL.Equals(0) {
+	if !zeroL.EqualsSess(testAmbientSession, 0) {
 		t.Fatal("0L must Equals(0) via Str2Int stream extract")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("0L Equals must not sticky")
 	}
 	zeroUL := &Constant{Type: GetSimpleTypeSess(testAmbientSession, EUInt), Value: "0UL"}
-	if !zeroUL.Equals(0) {
+	if !zeroUL.EqualsSess(testAmbientSession, 0) {
 		t.Fatal("0UL must Equals(0)")
 	}
 	negL := &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "-1L"}
-	if !negL.Equals(-1) || negL.Equals(0) {
+	if !negL.EqualsSess(testAmbientSession, -1) || negL.EqualsSess(testAmbientSession, 0) {
 		t.Fatal("-1L fold")
 	}
 	// incomplete Constant sticky false (no invent not-equal / not-less)
-	if (*Constant)(nil).Equals(0) {
+	if (*Constant)(nil).EqualsSess(testAmbientSession, 0) {
 		t.Fatal("nil Constant Equals must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Constant Equals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Constant)(nil).NotEquals(0) {
+	if (*Constant)(nil).NotEqualsSess(testAmbientSession, 0) {
 		t.Fatal("nil Constant NotEquals must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Constant NotEquals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Constant)(nil).LessThan(1) {
+	if (*Constant)(nil).LessThanSess(testAmbientSession, 1) {
 		t.Fatal("nil Constant LessThan must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -51,21 +51,21 @@ func TestConstantEquals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// empty Value incomplete shell sticky (no invent not-equal / not-less soft-skip)
 	empty := &Constant{Type: GetIntTypeSess(testAmbientSession), Value: ""}
-	if empty.Equals(0) {
+	if empty.EqualsSess(testAmbientSession, 0) {
 		t.Fatal("empty Value Equals must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Value Equals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if empty.NotEquals(0) {
+	if empty.NotEqualsSess(testAmbientSession, 0) {
 		t.Fatal("empty Value NotEquals must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty Value NotEquals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if empty.LessThan(1) {
+	if empty.LessThanSess(testAmbientSession, 1) {
 		t.Fatal("empty Value LessThan must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -74,21 +74,21 @@ func TestConstantEquals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil incomplete shell sticky (no invent fold success past hole)
 	noTy := &Constant{Value: "0"}
-	if noTy.Equals(0) {
+	if noTy.EqualsSess(testAmbientSession, 0) {
 		t.Fatal("nil Type Equals must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type Equals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if noTy.NotEquals(1) {
+	if noTy.NotEqualsSess(testAmbientSession, 1) {
 		t.Fatal("nil Type NotEquals must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type NotEquals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if noTy.LessThan(1) {
+	if noTy.LessThanSess(testAmbientSession, 1) {
 		t.Fatal("nil Type LessThan must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -126,7 +126,7 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalFacts after assign path fails closed sticky
 	fm.GlobalFacts = IncompleteFactSlice()
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, rhs) {
 		t.Fatal("incomplete GlobalFacts must fail closed UpdateFactForReturnStmt")
 	}
@@ -206,7 +206,7 @@ func TestUpdateFactForAssign(t *testing.T) {
 
 func TestAbstractFactNonPointerLHS(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	// non-pointer scalar: complete empty (no pointer facts), not incomplete marker
 	if out, _ := AbstractFactForAssign(nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
 		t.Fatal("non-ptr must be complete empty", out)
@@ -218,7 +218,7 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rhs := &Expression{
 		Term:     TermCommaExpr,
-		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		CommaRHS: &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))},
 		ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
 	}
@@ -234,7 +234,7 @@ func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rhs := &Expression{
 		Term:     TermCommaExpr,
-		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		// CommaRHS nil
 	}
 	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
@@ -427,7 +427,7 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 		t.Skip("missing field kinds")
 	}
 	// assign non-pointer field x = 0 → union path updates p0 and p1
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
 	facts, _ := AbstractFactForAssign(nil, xField, 0, rhs)
 	got0 := FindRelatedPointTo(facts, p0)
 	got1 := FindRelatedPointTo(facts, p1)
@@ -529,7 +529,7 @@ func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 
 func TestAbstractFactForAssignNilLhsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	outAF, _ := AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})
+	outAF, _ := AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)})
 	if FactsComplete(outAF) {
 		t.Fatal("nil lhs AbstractFactForAssign must fail closed incomplete")
 	}
@@ -553,7 +553,7 @@ func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 		MakeFactPointTo(p, q),
 		MakeFactPointTo(q, shell),
 	}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
 	out, _ := AbstractFactForAssign(factsIn, p, 1, rhs)
 	if FactsComplete(out) {
 		t.Fatal("Type-nil more pointee must fail closed incomplete, not partial transfer", out)
@@ -661,7 +661,7 @@ func TestAbstractFactForAssignGetCollectiveResidualSticky(t *testing.T) {
 	// GetCollective residual soft invent was invent soft-abstract past array shell LHS.
 	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_a", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2}}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}
 	out, _ := AbstractFactForAssign(nil, shell, 0, rhs)
 	if FactsComplete(out) && out != nil && len(out) > 0 {
 		// may incomplete

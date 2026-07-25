@@ -248,7 +248,7 @@ func TestGetDereferencedPtrsIncompleteFailClosed(t *testing.T) {
 		{Term: TermCommaExpr},
 		{Term: TermFunction},
 		{Term: TermFunction, Invoke: &Invocation{
-			Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil},
+			Args: []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, nil},
 		}},
 		{Term: TermAssignment},
 		nil,

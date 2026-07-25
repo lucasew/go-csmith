@@ -186,7 +186,7 @@ func TestLabelAttrEmit(t *testing.T) {
 			Kind: StmtAssign, SourceLabel: "lbl_1",
 			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false),
 			AssignOp: AssignSimple,
-			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
+			Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		}},
 	}
 	out := b.Output(0)
@@ -226,14 +226,14 @@ func TestMustBreakOrReturn(t *testing.T) {
 	// Block.cpp:342–357 — last must_return (break alone is not enough)
 	b := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}}
 	if b.MustBreakOrReturn() {
 		t.Fatal("break is not must_return")
 	}
 	b.Stmts = []Stmt{{
 		Kind: StmtReturn,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
 	if !b.MustBreakOrReturn() {
 		t.Fatal("return must_break_or_return")
@@ -243,7 +243,7 @@ func TestMustBreakOrReturn(t *testing.T) {
 func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Block.cpp:313–331 — break_stms nonempty → not must_return
-	ret := Stmt{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	ret := Stmt{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	b := &Block{StmID: 1, Stmts: []Stmt{ret}, BreakStmIDs: []int{9}}
 	if b.MustReturn() {
 		t.Fatal("break_stms blocks must_return")
@@ -283,7 +283,7 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// MustJump also requires empty break_stms
 	b2 := &Block{Stmts: []Stmt{{
-		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}, BreakStmIDs: []int{1}}
 	if b2.MustJump() {
 		t.Fatal("break_stms nonempty")
@@ -326,7 +326,7 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 	b := &Block{StmID: 42, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1,
 		LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false),
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		AssignOp: AssignSimple,
 	}}}
 	out := b.Output(0)

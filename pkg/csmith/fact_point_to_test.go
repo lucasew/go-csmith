@@ -699,7 +699,7 @@ func TestFactFreeHelpers(t *testing.T) {
 	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), RV: rv}
 	// null constant RHS is a complete abstract path
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	ClearErrorSess(testAmbientSession)
 	ret := AbstractFactForReturn(nil, rhs, fn)
 	if HasErrorSess(testAmbientSession) {

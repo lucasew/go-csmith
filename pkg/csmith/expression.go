@@ -688,7 +688,7 @@ func (e *Expression) LessThanSess(s *Session, num int) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := e.Con.LessThan(num)
+	ok := e.Con.LessThanSess(s, num)
 	// residual ERROR sticky — no invent less-true past Con.LessThan residual hole
 	if sessHasError(s) {
 		return false

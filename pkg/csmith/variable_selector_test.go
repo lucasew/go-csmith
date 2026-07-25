@@ -5,7 +5,7 @@ import "testing"
 func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	// VariableSelector.cpp:332–337 — collective array must itemize(); no return bare
 	ClearErrorSess(testAmbientSession)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), Defaults(), NewProbabilities(Defaults()), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), Defaults(), NewProbabilities(Defaults()), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}
@@ -221,7 +221,7 @@ func TestCreateArrayVariableEmptyNameFailClosed(t *testing.T) {
 	// name always live from gensym; no invent empty-name array shell
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
 }
@@ -236,7 +236,7 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, &cg, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, &cg, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed CreateArrayVariable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -248,7 +248,7 @@ func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
 	eff := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectAccum = &eff
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, &cg2, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, &cg2, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed CreateArrayVariable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -424,7 +424,7 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 	vs := NewVariableSelectorProbs(opts, probs)
 	vs.Sess = testAmbientSession
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st}, StructTypes: []*Type{st}}
-	vs.Probs = nil // MakeRandom(struct) fails closed
+	vs.Probs = nil // MakeRandomSess(testAmbientSession, struct) fails closed
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

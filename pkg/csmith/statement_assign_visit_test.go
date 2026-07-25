@@ -26,7 +26,7 @@ func TestVisitFactsStatementAssignSimple(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	st := Stmt{Kind: StmtAssign, LhsVar: v, Lhs: lhs, Expr: rhs, AssignOp: AssignSimple}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
@@ -44,7 +44,7 @@ func TestVisitFactsStatementAssignNoWriteToIV(t *testing.T) {
 	lhs := &Lhs{Var: iv, Type: GetIntTypeSess(testAmbientSession)}
 	st := Stmt{
 		Kind: StmtAssign, LhsVar: iv, Lhs: lhs,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 10)
@@ -148,7 +148,7 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 		t.Fatal("empty Value VisitFactsExpression must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !VisitFactsExpression(&Expression{Term: TermConstant, Con: MakeInt(0)}, &cg, Defaults()) {
+	if !VisitFactsExpression(&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, &cg, Defaults()) {
 		t.Fatal("live constant must visit")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -157,7 +157,7 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 	comma := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: hole,
-		CommaRHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		CommaRHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
 	if VisitFactsExpression(comma, &cg, Defaults()) {
 		t.Fatal("LHS visit residual must fail closed comma visit")
@@ -215,7 +215,7 @@ func TestVisitFactsStatementAssignWriteVarSet(t *testing.T) {
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignAdd,
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
@@ -234,7 +234,7 @@ func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 10,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
@@ -261,7 +261,7 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 11,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	// plant incomplete EffectStm so RHS path leaves residual before WriteVarSet fold
@@ -448,7 +448,7 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := Stmt{
 		Kind: StmtAssign, Lhs: lhs, LhsVar: ptr,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	if !VisitFactsStatementAssign(&st, &cg, opts) {
 		t.Fatalf("visit must succeed with fresh rhs EffectStm; err=%v", GetErrorSess(testAmbientSession))

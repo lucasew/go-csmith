@@ -102,8 +102,8 @@ func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	fi := &Invocation{
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1)},
-			{Term: TermConstant, Con: MakeInt(0)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		},
 		Binary: "&&",
 	}
@@ -121,7 +121,7 @@ func TestVisitFactsBinaryOrderedVisitResidualSticky(t *testing.T) {
 	cg.EffectAccum = &eff
 	// incomplete Constant shell residuals VisitFactsExpression
 	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession)}} // empty Value
-	good := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	good := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	fi := &Invocation{Args: []*Expression{hole, good}, Binary: "&&"}
 	if VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
 		t.Fatal("visit residual must fail closed ordered binary, not invent success")
@@ -229,8 +229,8 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1)},
-			{Term: TermConstant, Con: MakeInt(2)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 		},
 	}
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
@@ -250,7 +250,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 3, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
@@ -282,7 +282,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	// StmID 0 — no invent post_creation success without maps
 	st0 := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	PostCreationAnalysis(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil, EmptyEffect(), &cg, Defaults())

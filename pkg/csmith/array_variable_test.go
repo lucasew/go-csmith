@@ -10,7 +10,7 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil || av.DimensionSess(testAmbientSession) < 1 {
 		t.Fatal(av)
 	}
@@ -32,21 +32,21 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("void element must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("nil element must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil element must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -55,7 +55,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("sticky error after dim draw must fail closed")
 	}
 }
@@ -67,7 +67,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
 	opts.MaxArrayLength = 0
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -87,7 +87,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	if st == nil || !st.IsStructSess(testAmbientSession) {
 		t.Skip("no struct")
 	}
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, probs, nil, nil, nil, "g_s", st, MakeRandom(st, opts, probs, NewRngSess(testAmbientSession, 4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, probs, nil, nil, nil, "g_s", st, MakeRandomSess(testAmbientSession, st, opts, probs, NewRngSess(testAmbientSession, 4)), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -130,7 +130,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	sawFail := false
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearErrorSess(testAmbientSession)
-		av := CreateArrayVariable(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), nil, nil, nil, "g_a", pt, MakeInt(0), q)
+		av := CreateArrayVariable(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), nil, nil, nil, "g_a", pt, MakeIntSess(testAmbientSession, 0), q)
 		if av == nil {
 			sawFail = true
 			continue
@@ -152,7 +152,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		// make_init_value may ERROR_GUARD; not invent Constant "0"
 		// Clear residual sticky so later tests are not poisoned
@@ -223,7 +223,7 @@ func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 	}
 	parent.AsArray = parent
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
-	off := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
+	off := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)}
 	ivExpr := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ivExpr, off}}
 	item := &ArrayVariable{
@@ -372,7 +372,7 @@ func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 		t.Fatal("nil IndexExprs hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	item.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0)}}
+	item.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	if s := item.OutputAccessSess(testAmbientSession); s != "g_a[0]" {
 		t.Fatal(s)
 	}
@@ -475,12 +475,12 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		t.Fatal("nil av AddIndex must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*ArrayVariable)(nil).AddIndexExprSess(testAmbientSession, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)})
+	(*ArrayVariable)(nil).AddIndexExprSess(testAmbientSession, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av AddIndexExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	av.SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntTypeSess(testAmbientSession)})
+	av.SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3), ExprType: GetIntTypeSess(testAmbientSession)})
 	if len(av.Indices) != 1 || av.Indices[0] != "3" {
 		t.Fatal(av.Indices)
 	}
@@ -508,7 +508,7 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		t.Fatal("nil av SetIndex must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*ArrayVariable)(nil).SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)})
+	(*ArrayVariable)(nil).SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av SetIndexExpr must SetError sticky")
 	}
@@ -538,7 +538,7 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	// Array IsGlobal is Block==nil; attach a block so loop-initializer path is live.
 	ClearErrorSess(testAmbientSession)
 	loc := &ArrayVariable{
-		Variable: Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}, Init: MakeInt(0)},
+		Variable: Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}, Init: MakeIntSess(testAmbientSession, 0)},
 		Sizes:    []int{2, 3},
 		Block:    &Block{},
 	}
@@ -655,7 +655,7 @@ func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
 		Sizes:      []int{2, 3},
 		Collective: parent,
 		IndexExprs: []*Expression{
-			{Term: TermConstant, Con: MakeInt(0)},
+			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 			{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual Output
 		},
 	}
@@ -869,7 +869,7 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 	if CountExprKeyVarSess(testAmbientSession, ev) != 1 || FindExprKeyVarSess(testAmbientSession, ev) != iv {
 		t.Fatal("var")
 	}
-	c := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
+	c := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)}
 	if CountExprKeyVarSess(testAmbientSession, c) != 0 || FindExprKeyVarSess(testAmbientSession, c) != nil {
 		t.Fatal("const")
 	}
@@ -962,7 +962,7 @@ func TestIsVariantKeyVars(t *testing.T) {
 	parent.AsArray = parent
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}
-	off := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
+	off := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	// a[i] and a[i+1] share key i
 	a1 := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
@@ -1228,7 +1228,7 @@ func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
-	v.Init = MakeInt(0)
+	v.Init = MakeIntSess(testAmbientSession, 0)
 	s := v.OutputDefFullSess(testAmbientSession, true, false, false, nil)
 	if !strings.Contains(s, ";/* VOLATILE GLOBAL g_v */") {
 		t.Fatal(s)
@@ -1256,7 +1256,7 @@ func TestOutputInitNegativeConstParen(t *testing.T) {
 	if av.NoLoopInitializerSess(testAmbientSession) {
 		t.Fatal("test array must use loop initializer")
 	}
-	if got := av.Init.Output(); got != "(-3L)" {
+	if got := av.Init.OutputSess(testAmbientSession); got != "(-3L)" {
 		t.Fatalf("Init.Output got %q", got)
 	}
 	out := av.OutputInitOptsSess(testAmbientSession, "", []string{"i"}, true)

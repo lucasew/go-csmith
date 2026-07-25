@@ -19,7 +19,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Prefer multi-dim so nested shells exist
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("CreateArrayVariable")
 	}
@@ -94,7 +94,7 @@ func TestMultiDimArrayOpLabelOnce(t *testing.T) {
 		Sizes:    []int{2, 3, 1},
 	}
 	av.AsArray = av
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	// Innermost → mid → outer (same StmID)
 	sid := 42
 	inner := Stmt{

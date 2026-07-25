@@ -444,7 +444,7 @@ func TestReadIndicesConstantOK(t *testing.T) {
 		Sizes:      []int{4},
 		Collective: parent,
 		Indices:    []string{"1"},
-		IndexExprs: []*Expression{{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}},
+		IndexExprs: []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	item.AsArray = item
 	cg := EmptyCGContext().WithSession(testAmbientSession)
@@ -493,7 +493,7 @@ func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
 		Sizes:      []int{2},
 		Collective: parent,
 		Indices:    []string{"0"},
-		IndexExprs: []*Expression{{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}},
+		IndexExprs: []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	item.AsArray = item
 	field := &Variable{Name: "g_a[0].f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: &item.Variable}

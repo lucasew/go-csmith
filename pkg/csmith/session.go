@@ -12,7 +12,7 @@
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
 //   - cgSess/vsSess/fmSess/gSess/envSess panic on nil (no dual-fill)
 //   - nil-owner residual sticky: noteErr*/hasErr*/sessFrom* → ambient explicitly
-//   - residual: other package duals; Type duals deleted (*Sess only);
+//   - residual: other package duals; Type/Constant duals deleted (*Sess only);
 //     VectorFilter via f.Sess; rSess panics on nil/unset
 //   - NewVariableSelector requires *Session (no ambient install)
 //   - CVQualifiers + statement_meta + Effect + Variable duals deleted (*Sess only)

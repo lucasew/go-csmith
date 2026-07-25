@@ -415,7 +415,7 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete empty: non-pointer term → empty unions, no overlap
-	c := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	c := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	empty := FindUnionPointees(nil, c)
 	if empty == nil || len(empty) != 0 {
 		t.Fatal("complete non-ptr must be non-nil empty", empty)

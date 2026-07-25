@@ -101,14 +101,14 @@ func TestStmtOKIncompleteForIfAssignFailClosed(t *testing.T) {
 		t.Fatal("for IV-only must fail stmtOK")
 	}
 	if stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{
-		IV: iv, InitStmt: &Stmt{Kind: StmtAssign}, TestExpr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		IV: iv, InitStmt: &Stmt{Kind: StmtAssign}, TestExpr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}, Then: &Block{}}) {
 		t.Fatal("for missing IncrStmt must fail stmtOK")
 	}
 	// complete for shape
-	init := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
-	incr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
-	test := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	init := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
+	incr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
+	test := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	if !stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{
 		IV: iv, InitStmt: init, TestExpr: test, IncrStmt: incr,
 	}, Then: &Block{}}) {

@@ -55,7 +55,7 @@ func TestStr2Int(t *testing.T) {
 	}
 	// FunctionInvocationBinary.cpp:171–173 — equals(-1) must not fire on BIGUL
 	c := &Constant{Type: GetSimpleTypeSess(testAmbientSession, EULongLong), Value: big}
-	if c.Equals(-1) {
+	if c.EqualsSess(testAmbientSession, -1) {
 		t.Fatal("BIGUL must not Equals(-1) after overflow clamp")
 	}
 }
@@ -127,7 +127,7 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 	outer := &Block{}
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_1"
-	loc.Init = MakeInt(3)
+	loc.Init = MakeIntSess(testAmbientSession, 3)
 	inner := &Block{Parent: outer, LocalVars: []*Variable{loc}}
 	skipped := CollectInitSkippedVars(outer, inner)
 	if skipped == nil || len(skipped) != 1 || skipped[0] != loc {
@@ -157,14 +157,14 @@ func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
 	// Statement.cpp:911–913 — output_skipped_var_inits after label is commented out
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_2"
-	loc.Init = MakeInt(9)
+	loc.Init = MakeIntSess(testAmbientSession, 9)
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtGoto, Label: "lbl_x", InitSkippedVars: []*Variable{loc},
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+			Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 		{Kind: StmtAssign, SourceLabel: "lbl_x",
 			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false),
 			AssignOp: AssignSimple,
-			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)}},
+			Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}},
 	}}
 	out := b.Output(0)
 	if !strings.Contains(out, "lbl_x:") {
@@ -183,14 +183,14 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// force address-like output path: variable expr of pointed type often emits name
 	// set InitExpr to constant pointer-ish "0" via constant for stable assert
-	loc.InitExpr = &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
+	loc.InitExpr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{loc}}
 	out := OutputSkippedVarInits(st, "")
 	if !strings.Contains(out, "l_p = 0;") {
 		t.Fatal(out)
 	}
 	// InitExpr wins over Init
-	loc.Init = MakeInt(99)
+	loc.Init = MakeIntSess(testAmbientSession, 99)
 	out2 := OutputSkippedVarInits(st, "")
 	if strings.Contains(out2, "99") {
 		t.Fatal("InitExpr should win", out2)
@@ -205,7 +205,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	v.Name = "l_miss"
 	good := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntTypeSess(testAmbientSession), false, false)
 	good.Name = "l_ok"
-	good.Init = MakeInt(4)
+	good.Init = MakeIntSess(testAmbientSession, 4)
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{v, good}}
 	out := OutputSkippedVarInits(st, "")
 	if out != "" {
@@ -227,7 +227,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	// sticky no invent " = 5;" without identifier / partial good siblings
 	anon := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntTypeSess(testAmbientSession), false, false)
 	anon.Name = ""
-	anon.Init = MakeInt(5)
+	anon.Init = MakeIntSess(testAmbientSession, 5)
 	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{anon, good}}
 	out2 := OutputSkippedVarInits(st2, "")
 	if out2 != "" {
@@ -261,11 +261,11 @@ func TestVariableInitOutput(t *testing.T) {
 	if variableInitOutput(v2) == "" {
 		t.Fatal("scalars path always has init")
 	}
-	v.Init = MakeInt(5)
+	v.Init = MakeIntSess(testAmbientSession, 5)
 	if variableInitOutput(v) != "5" {
 		t.Fatal(variableInitOutput(v))
 	}
-	v.InitExpr = &Expression{Term: TermConstant, Con: MakeInt(7)}
+	v.InitExpr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 7)}
 	if variableInitOutput(v) != "7" {
 		t.Fatal(variableInitOutput(v))
 	}

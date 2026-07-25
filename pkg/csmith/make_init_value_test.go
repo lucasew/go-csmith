@@ -31,7 +31,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	// pre-create int global to take address of
 	qInt := NewCVQualifiers([]bool{false}, []bool{false})
 	iv := CreateVariableQferSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), qInt)
-	iv.Init = MakeInt(0)
+	iv.Init = MakeIntSess(testAmbientSession, 0)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, iv)
 
@@ -84,7 +84,7 @@ func TestApplyInitExprOutputDef(t *testing.T) {
 	}
 	// Variable always live; sticky (no invent soft-skip init bind past hole)
 	// Nil init complete no-op
-	applyInitExpr(nil, &Expression{Term: TermConstant, Con: MakeInt(1)})
+	applyInitExpr(nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil var applyInitExpr must SetError sticky")
 	}

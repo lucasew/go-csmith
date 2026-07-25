@@ -232,7 +232,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// ptrs always live; sticky (no invent soft-skip collect past hole)
-	CollectReferencedPtrsExpression(&Expression{Term: TermConstant, Con: MakeInt(0)}, nil)
+	CollectReferencedPtrsExpression(&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptrs CollectReferencedPtrsExpression must SetError sticky")
 	}
@@ -292,7 +292,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	var ptrs5 []*Variable
 	CollectReferencedPtrsStmt(&Stmt{
 		Kind: StmtAssign, StmID: 10,
-		Expr:   &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr:   &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		LhsVar: &Variable{Name: "g_hole", Type: nil},
 	}, &ptrs5)
 	if VariablesComplete(ptrs5) {
@@ -305,7 +305,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	// StatementArrayOp.h:65–68 / 69–71 — get_exprs if(init_value); get_blocks if(body).
 	// array_init Expression ctor: body=0, init_value=e. Go Then is Output-only.
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	ptrArr := CreateVariableScalarsSess(testAmbientSession, "a", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, LhsVar: ptrArr,
@@ -452,7 +452,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete constant assign does not read union field
-	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), AssignOp: AssignSimple}
+	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), AssignOp: AssignSimple}
 	if ReadUnionFieldStmt(st) {
 		t.Fatal("scalar assign must not read union field")
 	}
@@ -464,7 +464,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	// Fair: sticky true.
 	parentHole := &Variable{Name: "g_u"} // Type nil
 	fieldHole := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parentHole}
-	stHole := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, LhsVar: fieldHole, AssignOp: AssignSimple}
+	stHole := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, LhsVar: fieldHole, AssignOp: AssignSimple}
 	if !ReadUnionFieldStmt(stHole) {
 		t.Fatal("IsInsideUnionField residual ReadUnionFieldStmt must fail closed true")
 	}

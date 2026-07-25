@@ -49,7 +49,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	if got == nil {
 		t.Skip("deref path rare")
 	}
-	out := got.Output(false)
+	out := got.OutputSess(testAmbientSession, false)
 	if !strings.Contains(out, "*") {
 		t.Fatal(out)
 	}
@@ -661,7 +661,7 @@ func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 	cg.EffectStm = IncompleteEffect()
 	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true}, Sizes: []int{2}}
 	av.AsArray = av
-	av.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}}
+	av.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: GetIntTypeSess(testAmbientSession)}}
 	av.Variable.AsArray = av
 	l := &Lhs{Var: &av.Variable, Type: GetIntTypeSess(testAmbientSession)}
 	if l.VisitIndices(&cg, opts) {

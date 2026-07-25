@@ -363,7 +363,7 @@ func TestMakeBinaryForCompare(t *testing.T) {
 	opts := Defaults()
 	opts.SafeMath = true
 	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), true, false), ExprType: GetIntTypeSess(testAmbientSession)}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(10), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 10), ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := MakeBinary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinCmpLt, lhs, rhs)
 	if fi == nil || fi.Binary != "<" {
 		t.Fatalf("%+v", fi)
@@ -388,8 +388,8 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient must not invent binary shell / soft re-pick past holes
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
+	lhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)}
 	if fi := MakeBinary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeBinary")
 	}
@@ -415,7 +415,7 @@ func TestMakeBinaryGetTypeResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)}
 	if fi := MakeBinary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, hole, rhs); fi != nil {
 		t.Fatal("GetType residual must fail closed MakeBinary, not invent shell", fi)
 	}
@@ -429,8 +429,8 @@ func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 	// FunctionInvocation.cpp:565+ — always has RNG + operands sticky; no invent Binary shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
+	lhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)}
 	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("nil RNG")
 	}
@@ -812,7 +812,7 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
-	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, GotoDestStmID: 20}
+	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, GotoDestStmID: 20}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -867,7 +867,7 @@ func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	// InitExpr Output residual soft invent was soft-continue invent partial re-inits.
 	ClearErrorSess(testAmbientSession)
 	ok := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntTypeSess(testAmbientSession), false, false)
-	ok.Init = MakeInt(0)
+	ok.Init = MakeIntSess(testAmbientSession, 0)
 	ok.InitExpr = nil
 	hole := CreateVariableScalarsSess(testAmbientSession, "l_bad", GetIntTypeSess(testAmbientSession), false, false)
 	hole.Init = nil

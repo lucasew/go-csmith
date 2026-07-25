@@ -268,7 +268,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 5, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
@@ -284,7 +284,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 		t.Fatal(sc)
 	}
 	// ctrl stmt (break/continue/goto) never shortcuts — Statement.h:164–167
-	st2 := &Stmt{Kind: StmtBreak, StmID: 6, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	st2 := &Stmt{Kind: StmtBreak, StmID: 6, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	fm.SetMapFactsIn(6, facts)
 	fm.SetMapFactsOut(6, facts)
 	fm.SetMapStmEffect(6, EmptyEffect())
@@ -377,7 +377,7 @@ func TestValidateAndUpdateFacts(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -404,7 +404,7 @@ func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
 	loop := &Stmt{
 		Kind: StmtFor, StmID: 10,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		Then: &Block{Stmts: []Stmt{gotoSt}},
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
@@ -532,7 +532,7 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// inject foreign RV into working facts
@@ -560,7 +560,7 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 	pre := []*FactPointTo{MakeFactPointTo(v, GarbagePtr)}
 	st2 := &Stmt{
 		Kind: StmtAssign, StmID: 43, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}, AssignOp: AssignSimple,
 	}
 	work := CloneFactSlice(pre)
 	if !ValidateAndUpdateFacts(st2, &work, &cg, Defaults(), nil) {
@@ -577,7 +577,7 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 77, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -834,7 +834,7 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 88, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -859,7 +859,7 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -884,7 +884,7 @@ func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
@@ -909,7 +909,7 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 8, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -972,7 +972,7 @@ func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
@@ -1001,7 +1001,7 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -1025,7 +1025,7 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	// StmID 0 fails closed sticky (no invent soft-skip map_accum/visited)
 	st0 := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

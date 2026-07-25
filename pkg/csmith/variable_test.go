@@ -34,7 +34,7 @@ func TestCreateVariableRejectsVoid(t *testing.T) {
 		t.Fatal("nil type CreateVariableScalars must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateVariableWithInitSess(testAmbientSession, "g_n", nil, MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_n", nil, MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("CreateVariableWithInit nil type")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -48,7 +48,7 @@ func TestCreateVariableRejectsVoid(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name CreateVariableScalars must stay non-sticky soft factory")
 	}
-	if CreateVariableWithInitSess(testAmbientSession, "", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("empty name must fail closed CreateVariableWithInit")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -66,7 +66,7 @@ func TestCreateVariableErrorGuardAfterInit(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if CreateVariableWithInitSess(testAmbientSession, "g_e2", GetIntTypeSess(testAmbientSession), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_e2", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("sticky error must fail CreateVariableWithInit after field expand")
 	}
 }

@@ -58,7 +58,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	avInt.AsArray = avInt
-	rhsInt := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
+	rhsInt := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	stInt := Stmt{
 		Kind:        StmtArrayOp,
 		Loop:        &LoopControl{IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
@@ -90,7 +90,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -153,7 +153,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = nil
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -173,7 +173,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	// no float types in simple select — just ensure no panic with empty filter path
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	av.Sizes = []int{4}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}

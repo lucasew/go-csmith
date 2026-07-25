@@ -41,12 +41,12 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	elseDeref := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		LhsVar: g77, Lhs: &Lhs{Var: g77, Type: i32},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: i32},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
 		AssignOp: AssignSimple,
 	}
 	ifSt := Stmt{
 		Kind: StmtIfElse, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: i32},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
 		Then: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{thenNull}},
 		Else: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{elseDeref}},
 	}
@@ -124,12 +124,12 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	elseDeref := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		LhsVar: g77, Lhs: &Lhs{Var: g77, Type: i32},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: i32},
+		Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
 		AssignOp: AssignSimple,
 	}
 	ifSt := Stmt{
 		Kind: StmtIfElse, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: i32},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: i32},
 		Then: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{thenNull}},
 		Else: &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{elseDeref}},
 	}

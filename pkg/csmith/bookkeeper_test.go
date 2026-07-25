@@ -331,7 +331,7 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	// incomplete Funcs list sticky
 	currentSession().BK.exprDepthCnts = []int{99}
 	good := &Function{Name: "g", Body: &Block{Stmts: []Stmt{
-		{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+		{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}}}
 	StatExprDepthsSess(testAmbientSession, []*Function{nil, good})
 	if currentSession().BK.exprDepthCnts != nil {
@@ -354,7 +354,7 @@ func TestStatExprDepthsForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs pushes test; soft invent skip would leave counts empty
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	test := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	test := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}},
 	}}}
@@ -443,8 +443,8 @@ func TestRecordPointerComparisonsIsPointerLikeResidualSticky(t *testing.T) {
 	// Type-nil GetType residual already sticky; complete non-pointer soft-skip hygiene.
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	a := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
+	b := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
 	before := currentSession().BK.cmpPtrToNull + currentSession().BK.cmpPtrToPtr + currentSession().BK.cmpPtrToAddr
 	RecordPointerComparisonsSess(testAmbientSession, a, b)
 	// non-pointer soft skip no count

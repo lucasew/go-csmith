@@ -4,13 +4,13 @@ import "testing"
 
 func TestExpressionNotEquals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if !(&Expression{Term: TermConstant, Con: MakeInt(1)}).NotEquals(0) {
+	if !(&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}).NotEqualsSess(testAmbientSession, 0) {
 		t.Fatal("1 != 0")
 	}
-	if (&Expression{Term: TermConstant, Con: MakeInt(0)}).NotEquals(0) {
+	if (&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}).NotEqualsSess(testAmbientSession, 0) {
 		t.Fatal("0 equals 0")
 	}
-	if (&Expression{Term: TermVariable}).NotEquals(0) {
+	if (&Expression{Term: TermVariable}).NotEqualsSess(testAmbientSession, 0) {
 		t.Fatal("var not_equals false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -38,7 +38,7 @@ func TestExpressionUseVar(t *testing.T) {
 	}
 	comma := &Expression{
 		Term:     TermCommaExpr,
-		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(0)},
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		CommaRHS: e,
 	}
 	if !comma.UseVar(v) {
@@ -70,11 +70,11 @@ func TestExpressionUseVar(t *testing.T) {
 
 func TestMustJumpUsesNotEquals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
 	if !st.MustJump() {
 		t.Fatal("true const")
 	}
-	st.Expr = &Expression{Term: TermConstant, Con: MakeInt(0)}
+	st.Expr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	if st.MustJump() {
 		t.Fatal("false const")
 	}
@@ -149,7 +149,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	gu.Init = MakeInt(0)
+	gu.Init = MakeIntSess(testAmbientSession, 0)
 	u := MakeFactUnion(gu, 0)
 	// dest has union lattice; prev/cur outs empty union (size match via PT only)
 	fm.MapUnionFactsIn = map[int][]*FactUnion{10: {u}}
@@ -162,7 +162,7 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtGoto, StmID: 5, GotoDestStmID: 10,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
 	if !VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("visit", HasErrorSess(testAmbientSession))
@@ -201,7 +201,7 @@ func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtGoto, StmID: 1, GotoDestStmID: 0,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
 	if !VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("visit", HasErrorSess(testAmbientSession))
@@ -212,7 +212,7 @@ func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 }
 
 func TestExpressionToString(t *testing.T) {
-	e := &Expression{Term: TermConstant, Con: MakeInt(42)}
+	e := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 42)}
 	if e.ToString() != "42" && e.ToString() != e.Output() {
 		t.Fatal(e.ToString())
 	}

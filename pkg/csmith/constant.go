@@ -18,9 +18,6 @@ type Constant struct {
 // Constant.cpp:423–426 → GenerateRandomConstant; ERROR_GUARD(nullptr).
 // probs is the session Probabilities (C++ singleton); nil allowed for simple/pointer
 // only — aggregate constants need live probs (no invent NewProbabilities(opts)).
-func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
-	return MakeRandomSess(testAmbientSession, typ, opts, probs, r)
-}
 
 func MakeRandomSess(s *Session, typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
 	// Type* always live at make_random (Expression choose_random / callers);
@@ -68,10 +65,6 @@ func MakeRandomSess(s *Session, typ *Type, opts Options, probs *Probabilities, r
 // MakeRandomUpto mirrors Constant::make_random_upto — rnd_upto(limit) as eUInt decimal.
 // Constant.cpp:429–433 — always has RNG; sticky no soft invent NewRng(0).}
 
-func MakeRandomUpto(limit uint32, r *Rng) *Constant {
-	return MakeRandomUptoSess(testAmbientSession, limit, r)
-}
-
 func MakeRandomUptoSess(s *Session, limit uint32, r *Rng) *Constant {
 	if r == nil {
 		sessNoteError(s, ErrGeneric)
@@ -87,9 +80,6 @@ func MakeRandomUptoSess(s *Session, limit uint32, r *Rng) *Constant {
 
 // MakeInt mirrors Constant::make_int.
 // Constant.cpp:449–481 — optional mark_mutable_const wraps "(v)".
-func MakeInt(v int) *Constant {
-	return MakeIntSess(testAmbientSession, v)
-}
 
 // MakeIntSess is MakeInt with Options from an explicit session bag.
 func MakeIntSess(s *Session, v int) *Constant {
@@ -97,9 +87,6 @@ func MakeIntSess(s *Session, v int) *Constant {
 }
 
 // MakeIntOpts is make_int with explicit Options (library tests).
-func MakeIntOpts(v int, opts Options) *Constant {
-	return MakeIntOptsSess(testAmbientSession, v, opts)
-}
 
 // MakeIntOptsSess is MakeIntOpts with sticky errors on bag s.
 func MakeIntOptsSess(s *Session, v int, opts Options) *Constant {
@@ -114,9 +101,6 @@ func MakeIntOptsSess(s *Session, v int, opts Options) *Constant {
 // MakeRandomNonzero mirrors Constant::make_random_nonzero.
 // Constant.cpp:436–446 — regenerate until str2int(value) != 0.
 // Incomplete type/rng sticky nil; bounded retries fail closed (no invent hang).
-func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
-	return MakeRandomNonzeroSess(testAmbientSession, typ, opts, probs, r)
-}
 
 func MakeRandomNonzeroSess(s *Session, typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
 	if typ == nil || r == nil {
@@ -130,7 +114,7 @@ func MakeRandomNonzeroSess(s *Session, typ *Type, opts Options, probs *Probabili
 			return nil
 		}
 		// Constant.cpp:439 — StringUtils::str2int(v) == 0 → retry
-		if c.NotEqualsZero() {
+		if c.NotEqualsZeroSess(s) {
 			return c
 		}
 		// residual ERROR sticky — no invent soft-retry past NotEqualsZero residual
@@ -146,10 +130,6 @@ func MakeRandomNonzeroSess(s *Session, typ *Type, opts Options, probs *Probabili
 // Constant.cpp:82.
 // Incomplete Constant sticky nil (no invent zero Constant shell).}
 
-func (c *Constant) Clone() *Constant {
-	return c.CloneSess(testAmbientSession)
-}
-
 func (c *Constant) CloneSess(s *Session) *Constant {
 	if c == nil || c.Type == nil {
 		sessNoteError(s, ErrGeneric)
@@ -160,9 +140,6 @@ func (c *Constant) CloneSess(s *Session) *Constant {
 
 // GetType mirrors Constant::get_type.
 // Constant.cpp:527 — return *type.
-func (c *Constant) GetType() *Type {
-	return c.GetTypeSess(testAmbientSession)
-}
 
 func (c *Constant) GetTypeSess(s *Session) *Type {
 	if c == nil || c.Type == nil {
@@ -173,9 +150,6 @@ func (c *Constant) GetTypeSess(s *Session) *Type {
 }
 
 // GetValue mirrors Constant value string accessor.
-func (c *Constant) GetValue() string {
-	return c.GetValueSess(testAmbientSession)
-}
 
 func (c *Constant) GetValueSess(s *Session) string {
 	if c == nil {
@@ -187,9 +161,6 @@ func (c *Constant) GetValueSess(s *Session) string {
 
 // GetComplexity mirrors Constant::get_complexity — always 1.
 // Constant.h:88.
-func (c *Constant) GetComplexity() int {
-	return c.GetComplexitySess(testAmbientSession)
-}
 
 func (c *Constant) GetComplexitySess(s *Session) int {
 	if c == nil {
@@ -201,9 +172,6 @@ func (c *Constant) GetComplexitySess(s *Session) int {
 
 // GetReferencedPtrs mirrors Expression::get_referenced_ptrs on Constant — none.
 // Constant has no pointers.
-func (c *Constant) GetReferencedPtrs() []*Variable {
-	return c.GetReferencedPtrsSess(testAmbientSession)
-}
 
 func (c *Constant) GetReferencedPtrsSess(s *Session) []*Variable {
 	if c == nil {
@@ -215,9 +183,6 @@ func (c *Constant) GetReferencedPtrsSess(s *Session) []*Variable {
 
 // CompatibleWithVar mirrors Constant::compatible(Variable*).
 // Constant.cpp:488–493 — expand_struct → true; else false (not field soft-match).
-func (c *Constant) CompatibleWithVar(v *Variable, expandStruct bool) bool {
-	return c.CompatibleWithVarSess(testAmbientSession, v, expandStruct)
-}
 
 func (c *Constant) CompatibleWithVarSess(s *Session, v *Variable, expandStruct bool) bool {
 	if c == nil {
@@ -237,9 +202,6 @@ func (c *Constant) CompatibleWithVarSess(s *Session, v *Variable, expandStruct b
 
 // CompatibleWithExpr mirrors Constant::compatible(Expression*).
 // Constant.cpp:496–498 — always false (assert exp non-null).
-func (c *Constant) CompatibleWithExpr(exp *Expression) bool {
-	return c.CompatibleWithExprSess(testAmbientSession, exp)
-}
 
 func (c *Constant) CompatibleWithExprSess(s *Session, exp *Expression) bool {
 	if c == nil {
@@ -256,9 +218,6 @@ func (c *Constant) CompatibleWithExprSess(s *Session, exp *Expression) bool {
 // Output mirrors Constant::Output.
 // Constant.cpp:532–553 — paren negatives; pointer-0 → (void*)0 / nullptr; else cast+value.
 // Incomplete Constant sticky "" (no invent bare "0" for Type-nil shell).
-func (c *Constant) Output() string {
-	return c.OutputSess(testAmbientSession)
-}
 
 // OutputSess is Output with Options/sticky from an explicit session bag.
 func (c *Constant) OutputSess(s *Session) string {
@@ -266,9 +225,6 @@ func (c *Constant) OutputSess(s *Session) string {
 }
 
 // OutputOpts is Output with explicit session Options (lang_cpp nullptr).
-func (c *Constant) OutputOpts(opts Options) string {
-	return c.OutputOptsSess(testAmbientSession, opts)
-}
 
 // OutputOptsSess is OutputOpts with sticky errors on bag s.
 func (c *Constant) OutputOptsSess(s *Session, opts Options) string {
@@ -291,7 +247,7 @@ func (c *Constant) OutputOptsSess(s *Session, opts Options) string {
 		if sessHasError(s) {
 			return ""
 		}
-		if c.Equals(0) {
+		if c.EqualsSess(s, 0) {
 			if opts.LangCPP {
 				return "nullptr"
 			}
@@ -310,9 +266,6 @@ func (c *Constant) OutputOptsSess(s *Session, opts Options) string {
 // Small-path constants use "0L"/"0UL" suffixes (Constant.cpp:357–361). C++ str2int
 // stream-extracts and stops at the suffix; Atoi would miss equals(0) and skip the
 // div/mod binary re-pick (seed-2 e15477 U18 vs U120).
-func (c *Constant) Equals(num int) bool {
-	return c.EqualsSess(testAmbientSession, num)
-}
 
 func (c *Constant) EqualsSess(s *Session, num int) bool {
 	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
@@ -326,16 +279,13 @@ func (c *Constant) EqualsSess(s *Session, num int) bool {
 
 // NotEqualsZero mirrors Constant/Expression not_equals(0).
 // Incomplete Constant sticky (Equals sets sticky false for nil).
-func (c *Constant) NotEqualsZero() bool {
-	return !c.Equals(0)
+func (c *Constant) NotEqualsZeroSess(s *Session) bool {
+	return !c.EqualsSess(s, 0)
 }
 
 // NotEquals mirrors Constant::not_equals(int).
 // Constant.cpp:505–507.
 // Incomplete Constant sticky false (no invent equals fold / soft re-pick).
-func (c *Constant) NotEquals(num int) bool {
-	return c.NotEqualsSess(testAmbientSession, num)
-}
 
 func (c *Constant) NotEqualsSess(s *Session, num int) bool {
 	// nil / Type-nil / empty Value → Equals stickies false; !false invents "not equals"
@@ -355,9 +305,6 @@ func (c *Constant) NotEqualsSess(s *Session, num int) bool {
 // LessThan mirrors Constant::less_than(int).
 // Constant.cpp:501–503 — str2int(value) < num.
 // Incomplete Constant sticky false (no invent compare fold / soft re-pick).
-func (c *Constant) LessThan(num int) bool {
-	return c.LessThanSess(testAmbientSession, num)
-}
 
 func (c *Constant) LessThanSess(s *Session, num int) bool {
 	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
@@ -373,9 +320,6 @@ func (c *Constant) LessThanSess(s *Session, num int) bool {
 // Constant.cpp:513–522 — split union/struct brace init by "{}," pick field fid.
 // Constant always live with non-empty Value; sticky empty (no invent empty field
 // soft-skip past empty-value shell). Negative fid is complete empty (not incomplete).
-func (c *Constant) GetField(fid int) string {
-	return c.GetFieldSess(testAmbientSession, fid)
-}
 
 func (c *Constant) GetFieldSess(s *Session, fid int) string {
 	// Type* + Value always live for aggregate field split; sticky empty
@@ -423,9 +367,6 @@ func splitConstFields(s string) []string {
 
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).
 // Constant.cpp:296–...
-func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rng) string {
-	return generateRandomConstantSess(testAmbientSession, typ, opts, probs, r)
-}
 
 func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Probabilities, r *Rng) string {
 	// Constant.cpp:302–314 — type dispatch before pure_rnd (no invent require RNG first)
@@ -536,27 +477,27 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 		}
 		// Constant.cpp:346–348 — eFloat → GenerateSmallRandomFloatHexConstant(num)
 		if st == EFloat {
-			v = generateSmallRandomFloatHexConstant(num, r)
+			v = generateSmallRandomFloatHexConstantSess(s, num, r)
 		} else {
-			v = formatSmallConstant(st, num, opts)
+			v = formatSmallConstantSess(s, st, num, opts)
 		}
 	} else {
 		// hex / wide path by simple type
 		switch st {
 		case EChar, EUChar:
-			v = generateRandomCharConstant(opts, r)
+			v = generateRandomCharConstant(s, opts, r)
 		case EInt, EUInt:
-			v = generateRandomIntConstant(opts, r)
+			v = generateRandomIntConstant(s, opts, r)
 		case EShort, EUShort:
-			v = generateRandomShortConstant(opts, r)
+			v = generateRandomShortConstant(s, opts, r)
 		case ELong, EULong:
-			v = generateRandomLongConstant(opts, r)
+			v = generateRandomLongConstant(s, opts, r)
 		case ELongLong, EULongLong:
-			v = generateRandomLongLongConstant(opts, r)
+			v = generateRandomLongLongConstant(s, opts, r)
 		case EInt128, EUInt128:
-			v = generateRandomInt128Constant(opts, r)
+			v = generateRandomInt128Constant(s, opts, r)
 		case EFloat:
-			v = generateRandomFloatHexConstant(r)
+			v = generateRandomFloatHexConstantSess(s, r)
 		default:
 			// Constant.cpp:407 — assert(0 && "Unsupported type!") sticky; no soft invent int
 			sessNoteError(s, ErrGeneric)
@@ -573,10 +514,6 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 
 // generateSmallRandomFloatHexConstant mirrors GenerateSmallRandomFloatHexConstant.
 // Constant.cpp:207–223 — ±0x{num}.{RandomHexDigits(1)}p±1 via pure_rnd_flipcoin(50).}
-
-func generateSmallRandomFloatHexConstant(num int, r *Rng) string {
-	return generateSmallRandomFloatHexConstantSess(testAmbientSession, num, r)
-}
 
 func generateSmallRandomFloatHexConstantSess(s *Session, num int, r *Rng) string {
 	if r == nil {
@@ -597,10 +534,6 @@ func generateSmallRandomFloatHexConstantSess(s *Session, num int, r *Rng) string
 	}
 	// Constant.cpp:215 — num << "." << RandomHexDigits(1)
 	return sign + "0x" + strconv.Itoa(abs) + "." + r.RandomHexDigits(1) + "p" + pm
-}
-
-func formatSmallConstant(st ESimpleType, num int, opts Options) string {
-	return formatSmallConstantSess(testAmbientSession, st, num, opts)
 }
 
 func formatSmallConstantSess(s *Session, st ESimpleType, num int, opts Options) string {
@@ -647,9 +580,6 @@ func formatSmallConstantSess(s *Session, st ESimpleType, num int, opts Options) 
 
 // HexToBinary mirrors Constant.cpp HexToBinary.
 // Constant.cpp:85–97 — each hex digit → 4-bit nibble string.
-func HexToBinary(val string) string {
-	return HexToBinarySess(testAmbientSession, val)
-}
 
 func HexToBinarySess(s *Session, val string) string {
 	const toBin = "0000000100100011010001010110011110001001101010111100110111101111"
@@ -676,9 +606,6 @@ func HexToBinarySess(s *Session, val string) string {
 }
 
 // binaryConstProb mirrors BinaryConstProb() (Probabilities singleton; default 3).
-func binaryConstProb() uint32 {
-	return binaryConstProbSess(testAmbientSession)
-}
 
 // binaryConstProbSess is binaryConstProb on an explicit session bag.
 func binaryConstProbSess(s *Session) uint32 {
@@ -691,13 +618,10 @@ func binaryConstProbSess(s *Session) uint32 {
 }
 
 // maybeBinaryConstant is binary_constant && rnd_flipcoin(BinaryConstProb).
-// On hit returns "0b"+HexToBinary(...)+suffix; ok=true means binary branch taken
+// On hit returns "0b"+HexToBinarySess(s, ...)+suffix; ok=true means binary branch taken
 // (including empty fail-closed). No invent hex fallback when binary was selected.
 // When BinaryConstant is on, RNG always live; sticky (no invent soft skip without draw).
 // BinaryConstant off is complete no-op.
-func maybeBinaryConstant(opts Options, r *Rng, nHex int, suffix string) (string, bool) {
-	return maybeBinaryConstantSess(testAmbientSession, opts, r, nHex, suffix)
-}
 
 func maybeBinaryConstantSess(s *Session, opts Options, r *Rng, nHex int, suffix string) (string, bool) {
 	if !opts.BinaryConstant {
@@ -707,7 +631,7 @@ func maybeBinaryConstantSess(s *Session, opts Options, r *Rng, nHex int, suffix 
 		sessNoteError(s, ErrGeneric)
 		return "", false
 	}
-	if !r.RndFlipcoin(binaryConstProb()) {
+	if !r.RndFlipcoin(binaryConstProbSess(s)) {
 		return "", false
 	}
 	hex := r.RandomHexDigits(nHex)
@@ -719,8 +643,8 @@ func maybeBinaryConstantSess(s *Session, opts Options, r *Rng, nHex int, suffix 
 }
 
 // generateRandomCharConstant — Constant.cpp:100–108
-func generateRandomCharConstant(opts Options, r *Rng) string {
-	if s, ok := maybeBinaryConstant(opts, r, 2, ""); ok {
+func generateRandomCharConstant(s *Session, opts Options, r *Rng) string {
+	if s, ok := maybeBinaryConstantSess(s, opts, r, 2, ""); ok {
 		return s
 	}
 	hex := r.RandomHexDigits(2)
@@ -730,9 +654,9 @@ func generateRandomCharConstant(opts Options, r *Rng) string {
 	return "0x" + hex + "L"
 }
 
-func generateRandomIntConstant(opts Options, r *Rng) string {
+func generateRandomIntConstant(s *Session, opts Options, r *Rng) string {
 	// Constant.cpp:112–122
-	if s, ok := maybeBinaryConstant(opts, r, 8, ""); ok {
+	if s, ok := maybeBinaryConstantSess(s, opts, r, 8, ""); ok {
 		return s
 	}
 	hex := r.RandomHexDigits(8)
@@ -742,9 +666,9 @@ func generateRandomIntConstant(opts Options, r *Rng) string {
 	return "0x" + hex + "L"
 }
 
-func generateRandomShortConstant(opts Options, r *Rng) string {
+func generateRandomShortConstant(s *Session, opts Options, r *Rng) string {
 	// Constant.cpp:136–146
-	if s, ok := maybeBinaryConstant(opts, r, 4, ""); ok {
+	if s, ok := maybeBinaryConstantSess(s, opts, r, 4, ""); ok {
 		return s
 	}
 	hex := r.RandomHexDigits(4)
@@ -754,9 +678,9 @@ func generateRandomShortConstant(opts Options, r *Rng) string {
 	return "0x" + hex + "L"
 }
 
-func generateRandomLongConstant(opts Options, r *Rng) string {
+func generateRandomLongConstant(s *Session, opts Options, r *Rng) string {
 	// Constant.cpp:150–160 — !longlong → no L; else L
-	if s, ok := maybeBinaryConstant(opts, r, 8, ""); ok {
+	if s, ok := maybeBinaryConstantSess(s, opts, r, 8, ""); ok {
 		return s
 	}
 	hex := r.RandomHexDigits(8)
@@ -766,18 +690,18 @@ func generateRandomLongConstant(opts Options, r *Rng) string {
 	return "0x" + hex + "L"
 }
 
-func generateRandomLongLongConstant(opts Options, r *Rng) string {
+func generateRandomLongLongConstant(s *Session, opts Options, r *Rng) string {
 	// Constant.cpp:164–171 — binary path includes "LL"
-	if s, ok := maybeBinaryConstant(opts, r, 16, "LL"); ok {
+	if s, ok := maybeBinaryConstantSess(s, opts, r, 16, "LL"); ok {
 		return s
 	}
 	hex := r.RandomHexDigits(16)
 	return "0x" + hex + "LL"
 }
 
-func generateRandomInt128Constant(opts Options, r *Rng) string {
+func generateRandomInt128Constant(s *Session, opts Options, r *Rng) string {
 	// Constant.cpp:126–133
-	if s, ok := maybeBinaryConstant(opts, r, 16, ""); ok {
+	if s, ok := maybeBinaryConstantSess(s, opts, r, 16, ""); ok {
 		return s
 	}
 	hex := r.RandomHexDigits(16)
@@ -786,9 +710,6 @@ func generateRandomInt128Constant(opts Options, r *Rng) string {
 
 // generateRandomFloatHexConstant mirrors GenerateRandomFloatHexConstant.
 // Constant.cpp:187–199 — pure_rnd_upto(100); hex; pure_rnd_flipcoin(50) for +/− exp.
-func generateRandomFloatHexConstant(r *Rng) string {
-	return generateRandomFloatHexConstantSess(testAmbientSession, r)
-}
 
 func generateRandomFloatHexConstantSess(s *Session, r *Rng) string {
 	if r == nil {

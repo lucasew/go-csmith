@@ -224,7 +224,7 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	st := Stmt{
 		Kind: StmtAssign, StmID: 51, AssignOp: AssignSimple,
 		LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{st}}
 	_ = callee.ensurePairedFactMgr()
@@ -304,7 +304,7 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	// Block::stm_id always live when FM bound
 	b := &Block{StmID: 5, Stmts: []Stmt{st}}

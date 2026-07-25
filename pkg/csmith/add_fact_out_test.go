@@ -283,7 +283,7 @@ func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// Init required for complete union abstract (array_type_test.go:576)
-	l237 := &Variable{Name: "l_237", Type: ut, Init: MakeInt(0)}
+	l237 := &Variable{Name: "l_237", Type: ut, Init: MakeIntSess(testAmbientSession, 0)}
 	nested := &Block{Func: f, Parent: body, Looping: false, StmID: 27, LocalVars: []*Variable{l237}}
 	contParent := &Block{Func: f, Parent: nested, Looping: false, StmID: 31}
 	contParent.Stmts = []Stmt{{Kind: StmtContinue, StmID: 39}}

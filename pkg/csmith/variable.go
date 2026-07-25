@@ -873,7 +873,7 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 	}
 	if !isUn {
 		// session RNG + probs; nil probs → fail closed for aggregates
-		init = MakeRandom(typ, sessOpts(s), sessProbs(s), createVarRngSess(s))
+		init = MakeRandomSess(s, typ, sessOpts(s), sessProbs(s), createVarRngSess(s))
 		// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random fails / nullptr
 		if sessHasError(s) || init == nil {
 			return nil
@@ -1050,7 +1050,7 @@ func (v *Variable) IsValidVolatileSess(s *Session) bool {
 	// const pointer: invalid when init is null (equals 0)
 	// C++ assert(init) — missing init sticky invalid (no invent valid true)
 	if v.InitExpr != nil {
-		ok := v.InitExpr.NotEquals(0)
+		ok := v.InitExpr.NotEqualsSess(s, 0)
 		// residual ERROR sticky — no invent valid-true past NotEquals residual hole
 		if sessHasError(s) {
 			return false
@@ -1061,7 +1061,7 @@ func (v *Variable) IsValidVolatileSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := v.Init.NotEqualsZero()
+	ok := v.Init.NotEqualsZeroSess(s)
 	// residual ERROR sticky — no invent valid-true past NotEqualsZero residual hole
 	if sessHasError(s) {
 		return false

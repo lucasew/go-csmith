@@ -9,7 +9,7 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("create")
 	}
@@ -53,8 +53,8 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// VariableSelector.cpp:1386 — find_all_visible_vars only (GlobalList / local_vars)
-	a := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
-	b := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_2", GetIntTypeSess(testAmbientSession), MakeInt(1), q)
+	a := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
+	b := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_2", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 1), q)
 	if a == nil || b == nil {
 		t.Fatal("create")
 	}
@@ -128,7 +128,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	// force multi-dim array
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if av == nil {
 		t.Fatal("nil array")
 	}
@@ -234,7 +234,7 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Create without vs/blk registration (orphan array)
-	orphan := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	orphan := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q)
 	if orphan == nil {
 		t.Fatal("orphan create")
 	}

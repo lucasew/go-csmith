@@ -56,7 +56,7 @@ func TestFuncCountIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// out always live; sticky (no invent soft-skip collect past hole)
-	CollectCalledInvocationsExpr(&Expression{Term: TermConstant, Con: MakeInt(1)}, nil)
+	CollectCalledInvocationsExpr(&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil out CollectCalledInvocationsExpr must SetError sticky")
 	}
@@ -108,7 +108,7 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar:      CreateVariableScalarsSess(testAmbientSession, "a", GetIntTypeSess(testAmbientSession), false, false),
-		Expr:        &Expression{Term: TermConstant, Con: MakeInt(0)},
+		Expr:        &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		ArrayAccess: "a[i]",
 	}}}
 	var callsArr []*Invocation
@@ -197,7 +197,7 @@ func TestHasUncertainCall(t *testing.T) {
 	// one call arg only
 	fi2 := &Invocation{
 		User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession)},
-		Args: []*Expression{a, &Expression{Term: TermConstant, Con: MakeInt(1)}},
+		Args: []*Expression{a, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}
 	if fi2.HasUncertainCall() {
 		t.Fatal("not uncertain")
@@ -208,7 +208,7 @@ func TestHasUncertainCall(t *testing.T) {
 	nestedHole := &Expression{Term: TermFunction, Invoke: nil}
 	fiHole := &Invocation{
 		User: &Function{Name: "func_h", ReturnType: GetIntTypeSess(testAmbientSession)},
-		Args: []*Expression{nestedHole, &Expression{Term: TermConstant, Con: MakeInt(1)}},
+		Args: []*Expression{nestedHole, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}
 	if !fiHole.HasUncertainCallRecursive() {
 		t.Fatal("nested Invoke-nil residual must fail closed uncertain")
@@ -218,7 +218,7 @@ func TestHasUncertainCall(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// comma LHS residual soft invent was soft-continue RHS invent certain.
-	comma := &Expression{Term: TermCommaExpr, CommaLHS: nestedHole, CommaRHS: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	comma := &Expression{Term: TermCommaExpr, CommaLHS: nestedHole, CommaRHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	if !HasUncertainCallRecursiveExpr(comma) {
 		t.Fatal("comma nested residual must fail closed uncertain")
 	}
@@ -233,7 +233,7 @@ func TestHasUncertainCall(t *testing.T) {
 
 func TestHasSimpleParams(t *testing.T) {
 	fi := &Invocation{Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)},
 	}}
 	if !fi.HasSimpleParams() {
@@ -245,7 +245,7 @@ func TestHasSimpleParams(t *testing.T) {
 	}
 	// nil arg hole — sticky not-simple
 	ClearErrorSess(testAmbientSession)
-	fi.Args = []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil}
+	fi.Args = []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, nil}
 	if fi.HasSimpleParams() {
 		t.Fatal("nil arg must fail closed not-simple")
 	}
@@ -285,7 +285,7 @@ func TestGetDirectInvocation(t *testing.T) {
 	if GetDirectInvocation(st2) != inv {
 		t.Fatal("invoke")
 	}
-	st3 := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	st3 := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
 	if GetDirectInvocation(st3) != nil {
 		t.Fatal("const")
 	}
@@ -567,7 +567,7 @@ func TestPostCreationAssignFacts(t *testing.T) {
 		AssignOp: AssignSimple,
 	}
 	// pointer assign from variable of type int won't abstract well; use Null
-	st.Expr = &Expression{Term: TermConstant, Con: MakeInt(0)}
+	st.Expr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	pre := CloneFactSlice(fm.GlobalFacts)
 	PostCreationAnalysis(st, pre, nil, EmptyEffect(), &cg, Defaults())
 	if !fm.MapVisited[3] {

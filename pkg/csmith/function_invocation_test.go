@@ -369,7 +369,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	// FunctionInvocationUser::Output — param_value[i] always live; sticky no invent f(a, , c)
 	ClearErrorSess(testAmbientSession)
 	callee := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt}
-	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	a0 := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	// empty callee name — sticky no invent "()"
 	if out := (&Invocation{User: &Function{Name: "", ReturnType: GetIntTypeSess(testAmbientSession)}, Args: nil}).Output(); out != "" {
 		t.Fatal("empty User.Name must fail closed, got", out)
@@ -398,7 +398,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 		t.Fatal("empty arg Output must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeInt(2)}}
+	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}}
 	out := fi.Output()
 	if out != "func_2(1, 2)" {
 		t.Fatal(out)
@@ -406,7 +406,7 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	// binary incomplete operand Output sticky
 	ClearErrorSess(testAmbientSession)
 	bin := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{
-		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant},
 	}}
 	if out := bin.Output(); out != "" {

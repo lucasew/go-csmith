@@ -198,7 +198,7 @@ func TestRhsToLhsTransferUnionConstant(t *testing.T) {
 		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	lhs := &Variable{Name: "g_u", Type: ut}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	out := RhsToLhsTransferUnion(nil, nil, []*Variable{lhs}, rhs)
 	if len(out) != 1 || out[0].LastWrittenFID != 0 || out[0].Var != lhs {
 		t.Fatalf("%+v", out)
@@ -258,7 +258,7 @@ func TestRhsToLhsTransferUnionCommaNilRHSFailClosed(t *testing.T) {
 	dst := &Variable{Name: "g_dst", Type: ut}
 	rhs := &Expression{
 		Term:     TermCommaExpr,
-		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		// CommaRHS nil
 	}
 	out := RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, rhs)
@@ -304,7 +304,7 @@ func TestAbstractFactUnionForAssignField(t *testing.T) {
 	parent := &Variable{Name: "g_u", Type: ut}
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{f0, {Name: "g_u.f1", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	out, n := AbstractFactUnionForAssign(nil, nil, f0, 0, nil, rhs)
 	if n != 1 || len(out) != 1 || out[0].Var != parent || out[0].LastWrittenFID != 0 {
 		t.Fatalf("n=%d out=%+v", n, out)
@@ -316,7 +316,7 @@ func TestAbstractFactUnionForAssignUnionTypedLHS(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	lhs := &Variable{Name: "g_u", Type: ut}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	out, n := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
 	if n != 1 || len(out) != 1 || out[0].LastWrittenFID != 0 {
 		t.Fatalf("n=%d out=%+v", n, out)
@@ -339,7 +339,7 @@ func TestAbstractFactUnionPaddingBottom(t *testing.T) {
 	// Direct union field uses IsUnionField path (fid), so use a child of ufield with padded type.
 	nested := &Variable{Name: "g_u.f0.sub", Type: st, FieldVarOf: ufield}
 	parent.FieldVars = []*Variable{ufield}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	out, _ := AbstractFactUnionForAssign(nil, nil, nested, 0, nil, rhs)
 	if len(out) != 1 || out[0].Var != parent || !out[0].IsBottom() {
 		t.Fatalf("%+v", out)
@@ -350,7 +350,7 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 	// FactUnion.cpp:129 — lhs->get_type() always live; Type-nil sticky incomplete
 	ClearErrorSess(testAmbientSession)
 	lhs := &Variable{Name: "g_x", Type: nil}
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	rhs := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	out, _ := AbstractFactUnionForAssign(nil, nil, lhs, 0, nil, rhs)
 	if UnionFactsComplete(out) {
 		t.Fatal("Type-nil LHS must IncompleteUnionFactSlice, not invent non-union complete")

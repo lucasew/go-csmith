@@ -783,9 +783,9 @@ func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
 }
 
 func TestEqualsIntZeroPointer(t *testing.T) {
-	e := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
+	e := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	if !e.EqualsInt(0) {
-		t.Fatalf("EqualsInt(0) false for MakeInt(0) pointer expr; Con=%v", e.Con)
+		t.Fatalf("EqualsInt(0) false for MakeIntSess(testAmbientSession, 0) pointer expr; Con=%v", e.Con)
 	}
 }
 

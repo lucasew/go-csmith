@@ -252,7 +252,7 @@ func TestPostOutputInBlock(t *testing.T) {
 		Stmts: []Stmt{{
 			Kind: StmtAssign, StmID: 7,
 			LhsVar: p, Lhs: &Lhs{Var: p, Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))},
-			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
+			Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 			AssignOp: AssignSimple,
 		}},
 	}
@@ -366,7 +366,7 @@ func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
 		Stmts: []Stmt{
 			{Kind: StmtAssign, StmID: 3, SourceLabel: "lbl_x",
 				LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false),
-				Expr:     &Expression{Term: TermConstant, Con: MakeInt(1)},
+				Expr:     &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 				AssignOp: AssignSimple},
 		},
 	}

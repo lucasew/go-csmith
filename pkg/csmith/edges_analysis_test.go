@@ -216,7 +216,7 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -245,7 +245,7 @@ func TestAnalyzeWithEdgesInNilCFGFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.CFGEdges = []*CFGEdge{nil}
@@ -266,7 +266,7 @@ func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// prior goto edge from 10 → 20 with facts
@@ -294,7 +294,7 @@ func TestAnalyzeWithEdgesInIncompleteOutFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
@@ -349,7 +349,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 	// Block::stm_id always live when FM bound
 	b := &Block{StmID: 10, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}, AssignOp: AssignSimple,
 	}}}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -367,7 +367,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	bad := &Block{StmID: IncompleteStmID, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}}}
 	if _, _, _, ok := FindFixedPointBlock(bad, nil, &cg, Defaults(), false); ok {
 		t.Fatal("block IncompleteStmID must fail closed")
@@ -391,7 +391,7 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	body.Stmts = []Stmt{{
 		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignSimple,
 	}}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
