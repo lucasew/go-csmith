@@ -119,8 +119,12 @@ func ReturnFloatTypeUnarySess(s *Session, opts Options, rv, op1 *Type, uop Unary
 // SafeOpFlags* always live at clone; sticky nil (no invent soft-skip past hole).}
 
 func (f *SafeOpFlags) Clone() *SafeOpFlags {
+	return f.CloneSess(nil)
+}
+
+func (f *SafeOpFlags) CloneSess(s *Session) *SafeOpFlags {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	cp := *f
@@ -202,8 +206,12 @@ func MakeDummyFlags() *SafeOpFlags {
 
 // Op1Sign mirrors SafeOpFlags::get_op1_sign.
 func (f *SafeOpFlags) Op1Sign() bool {
+	return f.Op1SignSess(nil)
+}
+
+func (f *SafeOpFlags) Op1SignSess(s *Session) bool {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.Op1Signed
@@ -211,8 +219,12 @@ func (f *SafeOpFlags) Op1Sign() bool {
 
 // Op2Sign mirrors SafeOpFlags::get_op2_sign.
 func (f *SafeOpFlags) Op2Sign() bool {
+	return f.Op2SignSess(nil)
+}
+
+func (f *SafeOpFlags) Op2SignSess(s *Session) bool {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.Op2Signed
@@ -220,8 +232,12 @@ func (f *SafeOpFlags) Op2Sign() bool {
 
 // OpSize mirrors SafeOpFlags::get_op_size.
 func (f *SafeOpFlags) OpSize() SafeOpSize {
+	return f.OpSizeSess(nil)
+}
+
+func (f *SafeOpFlags) OpSizeSess(s *Session) SafeOpSize {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return SafeInt8
 	}
 	return f.Size
@@ -412,8 +428,12 @@ func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, b
 // SafeOpFlags.cpp:245–247 — "func_" or "macro_".}
 
 func (f *SafeOpFlags) OutputFuncOrMacro() string {
+	return f.OutputFuncOrMacroSess(nil)
+}
+
+func (f *SafeOpFlags) OutputFuncOrMacroSess(s *Session) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if f.IsFunc {
@@ -425,8 +445,12 @@ func (f *SafeOpFlags) OutputFuncOrMacro() string {
 // OutputSign mirrors SafeOpFlags::OutputSign.
 // SafeOpFlags.cpp:249–251 — "_s" or "_u".
 func (f *SafeOpFlags) OutputSign(signed bool) string {
+	return f.OutputSignSess(nil, signed)
+}
+
+func (f *SafeOpFlags) OutputSignSess(s *Session, signed bool) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if signed {
@@ -438,35 +462,51 @@ func (f *SafeOpFlags) OutputSign(signed bool) string {
 // OutputOp1 mirrors SafeOpFlags::OutputOp1 → OutputSign(op1_).
 // SafeOpFlags.cpp:253.
 func (f *SafeOpFlags) OutputOp1() string {
+	return f.OutputOp1Sess(nil)
+}
+
+func (f *SafeOpFlags) OutputOp1Sess(s *Session) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return f.OutputSign(f.Op1Signed)
+	return f.OutputSignSess(s, f.Op1Signed)
 }
 
 // OutputOp2 mirrors SafeOpFlags::OutputOp2 → OutputSign(op2_).
 // SafeOpFlags.cpp:255.
 func (f *SafeOpFlags) OutputOp2() string {
+	return f.OutputOp2Sess(nil)
+}
+
+func (f *SafeOpFlags) OutputOp2Sess(s *Session) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	return f.OutputSign(f.Op2Signed)
+	return f.OutputSignSess(s, f.Op2Signed)
 }
 
 // OutputSize mirrors SafeOpFlags::OutputSize.
 // SafeOpFlags.cpp:219–242 — optional leading "u" from !op1_, then type token.
 func (f *SafeOpFlags) OutputSize() string {
-	return f.SizeToken()
+	return f.OutputSizeSess(nil)
+}
+
+func (f *SafeOpFlags) OutputSizeSess(s *Session) string {
+	return f.SizeTokenSess(s)
 }
 
 // SizeToken mirrors OutputSize (optional leading 'u' for unsigned op1).
 // SafeOpFlags.cpp:219–242 — assert invalid size; method is const on live flags.
 func (f *SafeOpFlags) SizeToken() string {
+	return f.SizeTokenSess(nil)
+}
+
+func (f *SafeOpFlags) SizeTokenSess(s *Session) string {
 	if f == nil {
 		// sticky no soft invent int32_t for nil flags
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:236–238 — float has no u prefix path
@@ -488,7 +528,7 @@ func (f *SafeOpFlags) SizeToken() string {
 		b.WriteString("int64_t")
 	default:
 		// SafeOpFlags.cpp:239 — assert(!"invalid size!"); sticky no soft invent int32_t
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return b.String()
@@ -497,37 +537,41 @@ func (f *SafeOpFlags) SizeToken() string {
 // FlagsToType mirrors SafeOpFlags::flags_to_type.
 // SafeOpFlags.cpp:65–98.
 func FlagsToType(signed bool, size SafeOpSize) *Type {
+	return FlagsToTypeSess(nil, signed, size)
+}
+
+func FlagsToTypeSess(s *Session, signed bool, size SafeOpSize) *Type {
 	// SafeOpFlags.cpp:65–98 — default: assert(0); return eInt is dead after assert
 	if signed {
 		switch size {
 		case SafeInt8:
-			return GetSimpleType(EChar)
+			return GetSimpleTypeSess(s, EChar)
 		case SafeInt16:
-			return GetSimpleType(EShort)
+			return GetSimpleTypeSess(s, EShort)
 		case SafeInt32:
-			return GetSimpleType(EInt)
+			return GetSimpleTypeSess(s, EInt)
 		case SafeInt64:
-			return GetSimpleType(ELongLong)
+			return GetSimpleTypeSess(s, ELongLong)
 		case SafeFloat:
-			return GetSimpleType(EFloat)
+			return GetSimpleTypeSess(s, EFloat)
 		default:
 			// assert(0) path sticky — no soft invent GetIntType for unknown size
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 	}
 	switch size {
 	case SafeInt8:
-		return GetSimpleType(EUChar)
+		return GetSimpleTypeSess(s, EUChar)
 	case SafeInt16:
-		return GetSimpleType(EUShort)
+		return GetSimpleTypeSess(s, EUShort)
 	case SafeInt32:
-		return GetSimpleType(EUInt)
+		return GetSimpleTypeSess(s, EUInt)
 	case SafeInt64:
-		return GetSimpleType(EULongLong)
+		return GetSimpleTypeSess(s, EULongLong)
 	default:
 		// assert(0) path sticky — no soft invent EUInt for unknown size
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 }
@@ -535,30 +579,42 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 // LHSType mirrors SafeOpFlags::get_lhs_type.
 // SafeOpFlags.cpp:98–102 — flags_to_type(op1_, op_size_); nil flags → nil (no invent).
 func (f *SafeOpFlags) LHSType() *Type {
+	return f.LHSTypeSess(nil)
+}
+
+func (f *SafeOpFlags) LHSTypeSess(s *Session) *Type {
 	// SafeOpFlags methods are const on live flags; sticky no invent type for nil
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	return FlagsToType(f.Op1Signed, f.Size)
+	return FlagsToTypeSess(s, f.Op1Signed, f.Size)
 }
 
 // RHSType mirrors SafeOpFlags::get_rhs_type.
 // SafeOpFlags.cpp:104–108 — flags_to_type(op2_, op_size_); nil flags → nil.
 func (f *SafeOpFlags) RHSType() *Type {
+	return f.RHSTypeSess(nil)
+}
+
+func (f *SafeOpFlags) RHSTypeSess(s *Session) *Type {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	return FlagsToType(f.Op2Signed, f.Size)
+	return FlagsToTypeSess(s, f.Op2Signed, f.Size)
 }
 
 // BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for safe arithmetic/shifts.
 // SafeOpFlags.cpp:285–320 — float uses safe_*_func_float_f_f.
 func (f *SafeOpFlags) BinaryFuncName(op string) string {
+	return f.BinaryFuncNameSess(nil, op)
+}
+
+func (f *SafeOpFlags) BinaryFuncNameSess(s *Session, op string) string {
 	// live flags required; sticky no invent safe_* name for nil
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:286–287 — float size short-circuit
@@ -586,28 +642,28 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 		shift = true
 	default:
 		// invalid binary op sticky (no invent empty wrapper name)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:314–319 — OutputFuncOrMacro + OutputSize + OutputOp1 + Op1/Op2
-	sz := f.OutputSize()
+	sz := f.OutputSizeSess(s)
 	if sz == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
 	// safe_add_func_int32_t_s_s  /  safe_lshift_func_int32_t_s_u
 	var b strings.Builder
 	b.WriteString(prefix)
-	b.WriteString(f.OutputFuncOrMacro())
+	b.WriteString(f.OutputFuncOrMacroSess(s))
 	b.WriteString(sz)
-	b.WriteString(f.OutputOp1())
+	b.WriteString(f.OutputOp1Sess(s))
 	// shifts use Op2 sign; other ops repeat Op1 (SafeOpFlags.cpp:318)
 	if shift {
-		b.WriteString(f.OutputOp2())
+		b.WriteString(f.OutputOp2Sess(s))
 	} else {
-		b.WriteString(f.OutputOp1())
+		b.WriteString(f.OutputOp1Sess(s))
 	}
 	return b.String()
 }
@@ -635,9 +691,13 @@ func safeFloatFuncString(op string) string {
 // UnaryMinusFuncName mirrors to_string(eMinus).
 // SafeOpFlags.cpp:323–341 — no float unary safe function.
 func (f *SafeOpFlags) UnaryMinusFuncName() string {
+	return f.UnaryMinusFuncNameSess(nil)
+}
+
+func (f *SafeOpFlags) UnaryMinusFuncNameSess(s *Session) string {
 	// live flags required; sticky no invent int32 name for nil
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:325 — assert(op_size_ != sFloat); non-sticky empty
@@ -646,15 +706,15 @@ func (f *SafeOpFlags) UnaryMinusFuncName() string {
 		return ""
 	}
 	// SafeOpFlags.cpp:334–338 — OutputFuncOrMacro + OutputSize + OutputOp1
-	sz := f.OutputSize()
+	sz := f.OutputSizeSess(s)
 	if sz == "" {
 		// invalid size assert path sticky
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
-	return "safe_unary_minus_" + f.OutputFuncOrMacro() + sz + f.OutputOp1()
+	return "safe_unary_minus_" + f.OutputFuncOrMacroSess(s) + sz + f.OutputOp1Sess(s)
 }
 
 // SafeOpsBinary reports whether op uses safe wrappers under avoid_signed_overflow.
