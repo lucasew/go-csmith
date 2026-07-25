@@ -26,8 +26,12 @@ type FactPointTo struct {
 // FactPointTo.cpp:354–359 — Variable* always live at construction sites.
 // nil subject sticky (no invent FactPointTo{nil, garbage} shell / soft re-pick).
 func NewFactPointTo(v *Variable) *FactPointTo {
+	return NewFactPointToSess(nil, v)
+}
+
+func NewFactPointToSess(s *Session, v *Variable) *FactPointTo {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{GarbagePtr}}
@@ -36,8 +40,12 @@ func NewFactPointTo(v *Variable) *FactPointTo {
 // MakeFactPointTo mirrors FactPointTo::make_fact(v, point_to).
 // nil subject/pointee sticky (no invent fact without live Variable* / soft re-pick).
 func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
+	return MakeFactPointToSess(nil, v, pointTo)
+}
+
+func MakeFactPointToSess(s *Session, v *Variable, pointTo *Variable) *FactPointTo {
 	if v == nil || pointTo == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{pointTo}}
@@ -48,8 +56,12 @@ func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
 // no invent empty IsTop PointTo from nil); nil pointee hole sticky.
 // Valid empty sets use non-nil empty slice []*Variable{}.
 func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
+	return MakeFactPointToSetSess(nil, v, set)
+}
+
+func MakeFactPointToSetSess(s *Session, v *Variable, set []*Variable) *FactPointTo {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// nil set = incomplete merge_pointees path — non-sticky hole for soft re-pick
@@ -58,7 +70,7 @@ func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
 	}
 	for _, p := range set {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 	}
@@ -69,14 +81,18 @@ func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
 // IsNull mirrors FactPointTo::is_null — any null_ptr in the set.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-null past holes.
 func (f *FactPointTo) IsNull() bool {
+	return f.IsNullSess(nil)
+}
+
+func (f *FactPointTo) IsNullSess(s *Session) bool {
 	// Fact always live; sticky incomplete fails closed true (no invent not-null)
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if p == NullPtr {
@@ -89,14 +105,18 @@ func (f *FactPointTo) IsNull() bool {
 // IsDead mirrors FactPointTo::is_dead — garbage_ptr in the set.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-dead past holes.
 func (f *FactPointTo) IsDead() bool {
+	return f.IsDeadSess(nil)
+}
+
+func (f *FactPointTo) IsDeadSess(s *Session) bool {
 	// Fact always live; sticky incomplete fails closed true (no invent not-dead)
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if p == GarbagePtr {
@@ -109,9 +129,13 @@ func (f *FactPointTo) IsDead() bool {
 // IsTBDOnly mirrors FactPointTo::is_tbd_only.
 // Incomplete Fact/PointTo sticky false (no invent TBD-only / soft re-pick past holes).
 func (f *FactPointTo) IsTBDOnly() bool {
+	return f.IsTBDOnlySess(nil)
+}
+
+func (f *FactPointTo) IsTBDOnlySess(s *Session) bool {
 	// Fact always live; sticky incomplete no invent TBD-only soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(f.PointTo) != 1 {
@@ -119,7 +143,7 @@ func (f *FactPointTo) IsTBDOnly() bool {
 	}
 	if f.PointTo[0] == nil {
 		// incomplete PointTo hole sticky not-TBD-only
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.PointTo[0] == TBDPtr
@@ -133,8 +157,12 @@ func IsSpecialPtr(p *Variable) bool {
 // PointToStr mirrors FactPointTo::point_to_str.
 // FactPointTo.cpp:530–540 — specials as 0/tbd/garbage; else "&name".
 func PointToStr(v *Variable) string {
+	return PointToStrSess(nil, v)
+}
+
+func PointToStrSess(s *Session, v *Variable) string {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	switch v {
@@ -152,8 +180,12 @@ func PointToStr(v *Variable) string {
 // Size mirrors FactPointTo::size — number of pointees.
 // FactPointTo.cpp:155.
 func (f *FactPointTo) Size() int {
+	return f.SizeSess(nil)
+}
+
+func (f *FactPointTo) SizeSess(s *Session) int {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	return len(f.PointTo)
@@ -162,8 +194,12 @@ func (f *FactPointTo) Size() int {
 // GetPointToVars mirrors FactPointTo::get_point_to_vars.
 // FactPointTo.h:69 — returns pointee slice (may be nil when empty).
 func (f *FactPointTo) GetPointToVars() []*Variable {
+	return f.GetPointToVarsSess(nil)
+}
+
+func (f *FactPointTo) GetPointToVarsSess(s *Session) []*Variable {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return f.PointTo
@@ -197,15 +233,19 @@ func (f *FactPointTo) IsRelatedSess(s *Session, other *FactPointTo) bool {
 // Fact* always live; nil hole fails closed (nil — no invent skip to later match).}
 
 func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
+	return FindRelatedPointToSess(nil, facts, p)
+}
+
+func FindRelatedPointToSess(s *Session, facts []*FactPointTo, p *Variable) *FactPointTo {
 	// subject always live; sticky no invent miss / soft-skip nil key
 	if p == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	for _, f := range facts {
 		// Fact* always live; sticky no invent skip hole to later match
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if f.Var == p {
@@ -1078,9 +1118,13 @@ func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable
 // Incomplete PointTo nil hole fails closed sticky as unequal (no invent equal / soft re-pick).}
 
 func (f *FactPointTo) Equal(other *FactPointTo) bool {
+	return f.EqualSess(nil, other)
+}
+
+func (f *FactPointTo) EqualSess(s *Session, other *FactPointTo) bool {
 	// both Fact* always live; sticky incomplete no invent not-equal soft-skip
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -1089,13 +1133,13 @@ func (f *FactPointTo) Equal(other *FactPointTo) bool {
 	// Variable* always live in PointTo; scan holes before len (len may differ with holes)
 	for _, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 	}
 	for _, p := range other.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 	}
@@ -1118,9 +1162,13 @@ func (f *FactPointTo) Equal(other *FactPointTo) bool {
 // FactPointTo.cpp:602–609.
 // Incomplete PointTo (nil hole) fails closed sticky as not-imply (no invent cover / soft re-pick).
 func (f *FactPointTo) Imply(other *FactPointTo) bool {
+	return f.ImplySess(nil, other)
+}
+
+func (f *FactPointTo) ImplySess(s *Session, other *FactPointTo) bool {
 	// both Fact* always live; sticky incomplete no invent not-imply soft-skip
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -1129,14 +1177,14 @@ func (f *FactPointTo) Imply(other *FactPointTo) bool {
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		set[p] = true
 	}
 	for _, p := range other.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if !set[p] {
@@ -1151,9 +1199,13 @@ func (f *FactPointTo) Imply(other *FactPointTo) bool {
 // Incomplete PointTo (nil hole) fails closed sticky false without partial absorb
 // (no invent soft-skip hole and still join later pointees / soft re-pick).
 func (f *FactPointTo) Join(other *FactPointTo) bool {
+	return f.JoinSess(nil, other)
+}
+
+func (f *FactPointTo) JoinSess(s *Session, other *FactPointTo) bool {
 	// both Fact* always live; sticky incomplete no invent join no-op soft-skip
 	if f == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if f.Var != other.Var {
@@ -1162,7 +1214,7 @@ func (f *FactPointTo) Join(other *FactPointTo) bool {
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		set[p] = true
@@ -1170,7 +1222,7 @@ func (f *FactPointTo) Join(other *FactPointTo) bool {
 	// pre-scan other for holes before mutating self sticky
 	for _, p := range other.PointTo {
 		if p == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 	}
@@ -1201,7 +1253,7 @@ func (f *FactPointTo) JoinVisitsSess(s *Session, other *FactPointTo) bool {
 		}
 		return false
 	}
-	if other.IsTBDOnly() {
+	if other.IsTBDOnlySess(s) {
 		// residual ERROR sticky — no invent ignore-TBD soft-skip past IsTBDOnly hole
 		if sessHasError(s) {
 			return false
@@ -1212,7 +1264,7 @@ func (f *FactPointTo) JoinVisitsSess(s *Session, other *FactPointTo) bool {
 	if sessHasError(s) {
 		return false
 	}
-	if f.IsTBDOnly() {
+	if f.IsTBDOnlySess(s) {
 		// residual ERROR sticky — no invent clear-TBD past IsTBDOnly hole
 		if sessHasError(s) {
 			return false
@@ -1222,7 +1274,7 @@ func (f *FactPointTo) JoinVisitsSess(s *Session, other *FactPointTo) bool {
 		// residual ERROR sticky — no invent soft-continue join past self IsTBDOnly residual false
 		return false
 	}
-	ok := f.Join(other)
+	ok := f.JoinSess(s, other)
 	// residual ERROR sticky — no invent join-change soft-skip past Join hole
 	if sessHasError(s) {
 		return false
@@ -1315,8 +1367,12 @@ func JoinVisitsIntoSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPoint
 // / soft re-pick past holes. Empty top (nil PointTo) clones as empty non-nil set.}
 
 func (f *FactPointTo) Clone() *FactPointTo {
+	return f.CloneSess(nil)
+}
+
+func (f *FactPointTo) CloneSess(s *Session) *FactPointTo {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	set := f.PointTo
@@ -1324,7 +1380,7 @@ func (f *FactPointTo) Clone() *FactPointTo {
 		set = []*Variable{}
 	}
 	// MakeFactPointToSet sticky on nil pointee holes / nil Var
-	return MakeFactPointToSet(f.Var, set)
+	return MakeFactPointToSetSess(s, f.Var, set)
 }
 
 // FactsComplete reports whether every Fact* is live with complete PointTo sets.
@@ -1484,23 +1540,27 @@ func MergeFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) 
 // FactsComplete(nil)==true invents empty-complete clone / soft re-pick past hole).}
 
 func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
+	return CloneFactSliceSess(nil, facts)
+}
+
+func CloneFactSliceSess(s *Session, facts []*FactPointTo) []*FactPointTo {
 	if facts == nil {
 		return nil
 	}
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
 		// Fact* always live after FactsComplete; Clone nil = incomplete PointTo sticky
-		cl := f.Clone()
+		cl := f.CloneSess(s)
 		// residual ERROR sticky — no invent soft-clone past Clone residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		if cl == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, cl)
@@ -1779,8 +1839,12 @@ func MarkFuncEndOnFactsSess(s *Session, facts *[]*FactPointTo, fn *Function, stP
 // Empty idx is complete not-used.}
 
 func indexExprUsesVar(idx string, indexVar *Variable) bool {
+	return indexExprUsesVarSess(nil, idx, indexVar)
+}
+
+func indexExprUsesVarSess(s *Session, idx string, indexVar *Variable) bool {
 	if indexVar == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if idx == "" {
@@ -1818,8 +1882,12 @@ func isIdentChar(c byte) bool {
 // Returns this fact if unchanged, or a new fact with rewritten pointees.
 // Fact + indexVar always live; sticky nil (no invent identity soft-skip past hole).
 func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
+	return f.UpdateWithModifiedIndexSess(nil, indexVar)
+}
+
+func (f *FactPointTo) UpdateWithModifiedIndexSess(s *Session, indexVar *Variable) *FactPointTo {
 	if f == nil || indexVar == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	pointees := append([]*Variable(nil), f.PointTo...)
@@ -1827,7 +1895,7 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 	for j, v := range f.PointTo {
 		// Variable* always live in PointTo; nil hole sticky fail closed (no invent skip)
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		// walk to root field_var_of (FactPointTo.cpp:718–720)
@@ -1838,7 +1906,7 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent soft-skip shell as non-itemized then complete identity success)
 		if root.IsArray && root.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		// itemized array: isArray && get_collective() != v (FactPointTo.cpp:722)
@@ -1852,16 +1920,16 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 		if len(av.IndexExprs) > 0 {
 			for k, exp := range av.IndexExprs {
 				if exp == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return nil
 				}
-				if exp.UseVar(indexVar) {
+				if exp.UseVarSess(s, indexVar) {
 					modified = append(modified, k)
 				}
 			}
 		} else {
 			for k, exp := range av.Indices {
-				if indexExprUsesVar(exp, indexVar) {
+				if indexExprUsesVarSess(s, exp, indexVar) {
 					modified = append(modified, k)
 				}
 			}
@@ -1892,7 +1960,7 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 	if !changed {
 		return f
 	}
-	return MakeFactPointToSet(f.Var, pointees)
+	return MakeFactPointToSetSess(s, f.Var, pointees)
 }
 
 // UpdateFactsWithModifiedIndex mirrors FactPointTo::update_facts_with_modified_index.
@@ -1900,21 +1968,25 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 // Fact* always live; nil hole or failed rewrite fails closed sticky (facts incomplete).
 // facts + indexVar always live; sticky (no invent soft-skip update past hole).
 func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
+	UpdateFactsWithModifiedIndexSess(nil, facts, indexVar)
+}
+
+func UpdateFactsWithModifiedIndexSess(s *Session, facts *[]*FactPointTo, indexVar *Variable) {
 	if facts == nil || indexVar == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !FactsComplete(*facts) {
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for i, fp := range *facts {
-		newFP := fp.UpdateWithModifiedIndex(indexVar)
+		newFP := fp.UpdateWithModifiedIndexSess(s, indexVar)
 		// UpdateWithModifiedIndex nil = incomplete pointees
 		if newFP == nil {
 			*facts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		if newFP != fp {
@@ -2343,13 +2415,17 @@ func CombineFacts(facts *[]*FactPointTo, facts2 []*FactPointTo) {
 // PrintFacts mirrors print_facts — concatenate OutputAssertion lines.
 // Fact.cpp:263–268.
 func PrintFacts(facts []*FactPointTo, stParent *Block) string {
+	return PrintFactsSess(nil, facts, stParent)
+}
+
+func PrintFactsSess(s *Session, facts []*FactPointTo, stParent *Block) string {
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	for _, f := range facts {
-		b.WriteString(f.OutputAssertion(stParent, ""))
+		b.WriteString(f.OutputAssertionSess(s, stParent, ""))
 	}
 	return b.String()
 }
@@ -2357,18 +2433,22 @@ func PrintFacts(facts []*FactPointTo, stParent *Block) string {
 // PrintVarFact mirrors print_var_fact — assertions for one variable name.
 // Fact.cpp:270–277.
 func PrintVarFact(facts []*FactPointTo, vname string, stParent *Block) string {
+	return PrintVarFactSess(nil, facts, vname, stParent)
+}
+
+func PrintVarFactSess(s *Session, facts []*FactPointTo, vname string, stParent *Block) string {
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	for _, f := range facts {
 		if f.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		if f.Var.Name == vname {
-			b.WriteString(f.OutputAssertion(stParent, ""))
+			b.WriteString(f.OutputAssertionSess(s, stParent, ""))
 		}
 	}
 	return b.String()
