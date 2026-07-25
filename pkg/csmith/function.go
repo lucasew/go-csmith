@@ -711,7 +711,7 @@ func (f *Function) generateBodyCore(
 				f.IsBuilt = false
 				return
 			}
-			if p.IsPointer() {
+			if p.IsPointerSess(vsSess(vs)) {
 				// residual ERROR sticky — no invent soft-skip param seed past IsPointer hole
 				if sessHasError(vsSess(vs)) {
 					f.BuildState = BuildUnbuilt

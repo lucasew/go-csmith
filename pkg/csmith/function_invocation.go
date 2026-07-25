@@ -1068,7 +1068,7 @@ func BuildInvocationAndFunction(
 		fi.Failed = true
 		return fi
 	}
-	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffect(cg.EffectContext())
+	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffectSess(cgSess(cg), cg.EffectContext())
 	if !EffectComplete(callee.AccumEffContext) {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		fi.Failed = true
@@ -1080,7 +1080,7 @@ func BuildInvocationAndFunction(
 		fi.Failed = true
 		return fi
 	}
-	callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+	callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(cgSess(cg), effectAccum, cg.CallChain)
 	if !EffectComplete(callee.FEffect) {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		fi.Failed = true

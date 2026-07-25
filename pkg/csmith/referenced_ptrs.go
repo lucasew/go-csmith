@@ -53,7 +53,7 @@ func collectReferencedPtrsExpressionSess(s *Session, e *Expression, ptrs *[]*Var
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if e.Var.IsPointer() {
+		if e.Var.IsPointerSess(s) {
 			// residual ERROR sticky — no invent complete no-ptrs past IsPointer hole
 			if sessHasError(s) {
 				*ptrs = IncompleteVariables()
@@ -211,7 +211,7 @@ func collectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) bool
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if st.LhsVar.IsPointer() {
+		if st.LhsVar.IsPointerSess(s) {
 			if sessHasError(s) {
 				*ptrs = IncompleteVariables()
 				return false
@@ -235,7 +235,7 @@ func collectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) bool
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if st.Lhs.Var.IsPointer() {
+		if st.Lhs.Var.IsPointerSess(s) {
 			if sessHasError(s) {
 				*ptrs = IncompleteVariables()
 				return false
@@ -345,7 +345,7 @@ func ReadUnionFieldExprSess(s *Session, e *Expression) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		ok := e.Var.IsInsideUnionField()
+		ok := e.Var.IsInsideUnionFieldSess(s)
 		// residual ERROR sticky — no invent no-union-read soft-skip past IsInsideUnionField hole
 		if sessHasError(s) {
 			return true
@@ -382,7 +382,7 @@ func ReadUnionFieldExprSess(s *Session, e *Expression) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		return ReadUnionFieldStmt(e.Assign)
+		return ReadUnionFieldStmtSess(s, e.Assign)
 	case TermFunction:
 		if e.Invoke == nil {
 			sessNoteError(s, ErrGeneric)
@@ -449,7 +449,7 @@ func ReadUnionFieldStmtSess(s *Session, st *Stmt) bool {
 		}
 	}
 	if st.LhsVar != nil {
-		if st.LhsVar.IsInsideUnionField() {
+		if st.LhsVar.IsInsideUnionFieldSess(s) {
 			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
 			if sessHasError(s) {
 				return true
@@ -467,7 +467,7 @@ func ReadUnionFieldStmtSess(s *Session, st *Stmt) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if st.Lhs.Var.IsInsideUnionField() {
+		if st.Lhs.Var.IsInsideUnionFieldSess(s) {
 			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
 			if sessHasError(s) {
 				return true

@@ -287,7 +287,7 @@ func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 			return false
 		}
 		// Fact.cpp:177 — new_fact->is_related(*facts[i]) only (not Variable::match)
-		if !f.IsRelated(nf) {
+		if !f.IsRelatedSess(s, nf) {
 			// residual ERROR sticky — no invent soft-skip not-related then renew later
 			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
@@ -299,7 +299,7 @@ func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 			*facts = IncompleteFactSlice()
 			return false
 		}
-		if f.Equal(nf) {
+		if f.EqualSess(s, nf) {
 			// residual ERROR sticky — no invent no-change soft-success past Equal hole
 			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
@@ -341,7 +341,7 @@ func RenewFactsSess(s *Session, facts *[]*FactPointTo, newFacts []*FactPointTo) 
 	}
 	changed := false
 	for _, nf := range newFacts {
-		if RenewFactSess(nil, facts, nf) {
+		if RenewFactSess(s, facts, nf) {
 			// residual ERROR sticky — no invent soft-continue partial renew past hole
 			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
