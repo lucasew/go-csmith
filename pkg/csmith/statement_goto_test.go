@@ -143,27 +143,27 @@ func TestGenerateCanEmitGoto(t *testing.T) {
 }
 
 func TestLabelForGotoDestReuses(t *testing.T) {
-	GotoLabelsDoFinalization()
-	defer GotoLabelsDoFinalization()
+	GotoLabelsDoFinalizationSess(testAmbientSession, )
+	defer GotoLabelsDoFinalizationSess(testAmbientSession, )
 	n := 0
 	next := func() string {
 		n++
 		return "lbl_" + Int2Str(n)
 	}
-	a := LabelForGotoDest(42, next)
-	b := LabelForGotoDest(42, next)
+	a := LabelForGotoDestSess(testAmbientSession, 42, next)
+	b := LabelForGotoDestSess(testAmbientSession, 42, next)
 	if a != b || a != "lbl_1" {
 		t.Fatalf("%q %q n=%d", a, b, n)
 	}
-	c := LabelForGotoDest(99, next)
+	c := LabelForGotoDestSess(testAmbientSession, 99, next)
 	if c == a || c != "lbl_2" {
 		t.Fatalf("%q %q", a, c)
 	}
 	// nil nextLabel → process gensym; no invent fixed "lbl_1"
-	GotoLabelsDoFinalization()
+	GotoLabelsDoFinalizationSess(testAmbientSession, )
 	ResetDefaultGensym()
-	g1 := LabelForGotoDest(7, nil)
-	g2 := LabelForGotoDest(8, nil)
+	g1 := LabelForGotoDestSess(testAmbientSession, 7, nil)
+	g2 := LabelForGotoDestSess(testAmbientSession, 8, nil)
 	if g1 == "" || g2 == "" || g1 == g2 {
 		t.Fatalf("gensym labels want distinct non-empty, got %q %q", g1, g2)
 	}
@@ -172,7 +172,7 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 	}
 	// empty nextLabel — sticky fail closed, no invent empty label token
 	ClearErrorSess(testAmbientSession)
-	if LabelForGotoDest(9, func() string { return "" }) != "" {
+	if LabelForGotoDestSess(testAmbientSession, 9, func() string { return "" }) != "" {
 		t.Fatal("empty gensym must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -265,7 +265,7 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 	inner.Parent = outer
 	// dest pointer must be into slice; destParent is inner
 	d := &inner.Stmts[0]
-	MarkNeedRevisitLCAParent(inner, d, inner)
+	MarkNeedRevisitLCAParentSess(testAmbientSession, inner, d, inner)
 	if !inner.NeedRevisit {
 		t.Fatal("inner is destParent → mark inner")
 	}
@@ -273,7 +273,7 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 	curr := &Block{Parent: outer, Stmts: []Stmt{{Kind: StmtAssign, StmID: 8}}}
 	outer.NeedRevisit = false
 	inner.NeedRevisit = false
-	MarkNeedRevisitLCAParent(curr, d, inner)
+	MarkNeedRevisitLCAParentSess(testAmbientSession, curr, d, inner)
 	if !outer.NeedRevisit {
 		t.Fatal("outer is LCA on dest parent chain")
 	}
@@ -282,7 +282,7 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 	}
 	// StatementGoto.cpp:147 assert(b) — no soft invent NeedRevisit when dest not in ancestry
 	orphan := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 9}}}
-	MarkNeedRevisitLCAParent(orphan, d, inner)
+	MarkNeedRevisitLCAParentSess(testAmbientSession, orphan, d, inner)
 	if orphan.NeedRevisit {
 		t.Fatal("orphan must not invent NeedRevisit when dest not found")
 	}
@@ -300,7 +300,7 @@ func TestMarkNeedRevisitLCABodyWhileIfNotAppended(t *testing.T) {
 	elseB := &Block{StmID: 3, Parent: body}
 	// body.Stmts empty — if not appended yet (MakeRandomIf mid-build)
 	d := &thenB.Stmts[0]
-	MarkNeedRevisitLCAParent(elseB, d, thenB)
+	MarkNeedRevisitLCAParentSess(testAmbientSession, elseB, d, thenB)
 	if !body.NeedRevisit {
 		t.Fatal("body must be LCA via dest parent chain while if not in body.Stmts")
 	}
@@ -315,14 +315,14 @@ func TestBlockContainsViaParent(t *testing.T) {
 	body := &Block{StmID: 1}
 	mid := &Block{StmID: 2, Parent: body}
 	leaf := &Block{StmID: 3, Parent: mid}
-	if !BlockContainsViaParent(body, leaf) || !BlockContainsViaParent(mid, leaf) || !BlockContainsViaParent(leaf, leaf) {
+	if !BlockContainsViaParentSess(testAmbientSession, body, leaf) || !BlockContainsViaParentSess(testAmbientSession, mid, leaf) || !BlockContainsViaParentSess(testAmbientSession, leaf, leaf) {
 		t.Fatal("ancestors and self must contain via parent chain")
 	}
 	sib := &Block{StmID: 4, Parent: body}
-	if BlockContainsViaParent(sib, leaf) {
+	if BlockContainsViaParentSess(testAmbientSession, sib, leaf) {
 		t.Fatal("sibling must not contain")
 	}
-	if BlockContainsViaParent(nil, leaf) {
+	if BlockContainsViaParentSess(testAmbientSession, nil, leaf) {
 		t.Fatal("nil block sticky false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -371,7 +371,7 @@ func TestMakeBinaryForCompare(t *testing.T) {
 	if fi.Safe == nil {
 		t.Fatal("flags always set")
 	}
-	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
+	if fi.GetTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("cmp type")
 	}
 	// Output is standard cmp (not safe_ops arith)
@@ -462,15 +462,15 @@ func TestGotoLabelsClearedOnFinalization(t *testing.T) {
 		SetProcessRngSess(testAmbientSession, prevR)
 		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
-	GotoLabelsDoFinalization()
-	_ = LabelForGotoDest(1, func() string { return "lbl_x" })
+	GotoLabelsDoFinalizationSess(testAmbientSession, )
+	_ = LabelForGotoDestSess(testAmbientSession, 1, func() string { return "lbl_x" })
 	DoFinalizationSess(testAmbientSession)
 	// after finalization map empty → new gensym path
-	lab := LabelForGotoDest(1, func() string { return "lbl_y" })
+	lab := LabelForGotoDestSess(testAmbientSession, 1, func() string { return "lbl_y" })
 	if lab != "lbl_y" {
 		t.Fatal(lab)
 	}
-	GotoLabelsDoFinalization()
+	GotoLabelsDoFinalizationSess(testAmbientSession, )
 }
 
 func TestMakeRandomGotoForwardInsert(t *testing.T) {
@@ -713,7 +713,7 @@ func TestFindGoodJumpBlockNilRNGSticky(t *testing.T) {
 	// StatementGoto always has process RNG; sticky no invent jump block without it
 	ClearErrorSess(testAmbientSession)
 	good := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
-	if FindGoodJumpBlock(nil, []*Block{good}, good, false) != nil {
+	if FindGoodJumpBlockSess(testAmbientSession, nil, []*Block{good}, good, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -726,14 +726,14 @@ func TestFindGoodJumpBlockNilHoleFailClosed(t *testing.T) {
 	// Block* always live; nil hole fails closed sticky (no invent soft-skip / re-pick)
 	good := &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
 	ClearErrorSess(testAmbientSession)
-	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 1), []*Block{good, nil}, good, false) != nil {
+	if FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 1), []*Block{good, nil}, good, false) != nil {
 		t.Fatal("nil Block hole must fail closed FindGoodJumpBlock")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Block hole must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), []*Block{nil, good}, good, true) != nil {
+	if FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 2), []*Block{nil, good}, good, true) != nil {
 		t.Fatal("nil hole first must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -873,7 +873,7 @@ func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	hole.Init = nil
 	hole.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{ok, hole}}
-	if s := OutputSkippedVarInits(st, "    "); s != "" {
+	if s := OutputSkippedVarInitsSess(testAmbientSession, st, "    "); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed OutputSkippedVarInits", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -882,7 +882,7 @@ func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete single re-init
 	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{ok}}
-	if s := OutputSkippedVarInits(st2, "    "); !strings.Contains(s, "l_ok = 0") {
+	if s := OutputSkippedVarInitsSess(testAmbientSession, st2, "    "); !strings.Contains(s, "l_ok = 0") {
 		t.Fatal("complete OutputSkippedVarInits", s)
 	}
 	if HasErrorSess(testAmbientSession) {

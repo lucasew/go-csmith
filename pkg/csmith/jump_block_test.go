@@ -11,16 +11,16 @@ func TestHasInitSkippedVars(t *testing.T) {
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	inner.LocalVars = []*Variable{loc}
 	// jump from outer into inner skips l_1
-	if !HasInitSkippedVars(outer, inner) {
+	if !HasInitSkippedVarsSess(testAmbientSession, outer, inner) {
 		t.Fatal("skip")
 	}
 	// same block no skip
-	if HasInitSkippedVars(inner, inner) {
+	if HasInitSkippedVarsSess(testAmbientSession, inner, inner) {
 		t.Fatal("same")
 	}
 	// src nil sticky has-skipped (no invent none soft-skip past hole)
 	ClearErrorSess(testAmbientSession)
-	if !HasInitSkippedVars(nil, inner) {
+	if !HasInitSkippedVarsSess(testAmbientSession, nil, inner) {
 		t.Fatal("nil src HasInitSkippedVars must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -28,7 +28,7 @@ func TestHasInitSkippedVars(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// destParent nil complete false
-	if HasInitSkippedVars(outer, nil) {
+	if HasInitSkippedVarsSess(testAmbientSession, outer, nil) {
 		t.Fatal("nil dest complete false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -42,18 +42,18 @@ func TestFindGoodJumpBlock(t *testing.T) {
 	b1 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	b2 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
 	f.Blocks = []*Block{b1, b2}
-	got := FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), f.Blocks, b1, true)
+	got := FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 2), f.Blocks, b1, true)
 	if got == nil {
 		t.Fatal("nil")
 	}
 	// empty blocks rejected
 	empty := &Block{Func: f}
-	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), []*Block{empty}, b1, true) != nil {
+	if FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 2), []*Block{empty}, b1, true) != nil {
 		t.Fatal("empty")
 	}
 	// array loop dest rejected
 	arr := &Block{Func: f, InArrayLoop: true, Stmts: []Stmt{{Kind: StmtAssign}}}
-	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 2), []*Block{arr}, b1, true) != nil {
+	if FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 2), []*Block{arr}, b1, true) != nil {
 		t.Fatal("array dest")
 	}
 }
@@ -67,8 +67,8 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	// hole in LocalVars stickies CollectInitSkippedVars residual when climbed as dest parent
 	hole := &Block{Func: f, Parent: src, LocalVars: []*Variable{nil}, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
 	good := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
-	// asDest: HasInitSkippedVars(src, hole) stickies residual; soft invent picks good
-	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 1), []*Block{hole, good}, src, true) != nil {
+	// asDest: HasInitSkippedVarsSess(testAmbientSession, src, hole) stickies residual; soft invent picks good
+	if FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 1), []*Block{hole, good}, src, true) != nil {
 		t.Fatal("HasInitSkippedVars residual must fail closed FindGoodJumpBlock")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -76,14 +76,14 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// curr last MustReturn residual soft invent was soft-continue allow dest invent pick.
-	// Fair: sticky fail closed whole FindGoodJumpBlock (asDest).
+	// Fair: sticky fail closed whole FindGoodJumpBlockSess(testAmbientSession, asDest).
 	// last if incomplete residual MustReturn false; without sticky re-pick continues to good.
 	curr := &Block{
 		Func:  f,
 		Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}},
 	}
 	good2 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
-	if FindGoodJumpBlock(NewRngSess(testAmbientSession, 1), []*Block{good2}, curr, true) != nil {
+	if FindGoodJumpBlockSess(testAmbientSession, NewRngSess(testAmbientSession, 1), []*Block{good2}, curr, true) != nil {
 		t.Fatal("MustReturn residual must fail closed FindGoodJumpBlock asDest")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -102,7 +102,7 @@ func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 	mid := &Block{}                                   // no Parent chain to src → !reachedSrc
 	loc := &Variable{Name: "l_x", Type: GetIntTypeSess(testAmbientSession)} // non-global local
 	mid.LocalVars = []*Variable{loc}
-	got := CollectInitSkippedVars(src, mid)
+	got := CollectInitSkippedVarsSess(testAmbientSession, src, mid)
 	if VariablesComplete(got) {
 		t.Fatal("IsVisibleLocal residual must fail closed incomplete skip list")
 	}

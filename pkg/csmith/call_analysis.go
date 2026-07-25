@@ -28,10 +28,6 @@ func IncompleteInvocationsSlice() []*Invocation {
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil —
 // len(nil)==0 invents empty-complete call list / soft re-pick past holes).
 // out always live; sticky (no invent soft-skip collect past hole).
-func CollectCalledInvocationsExpr(e *Expression, out *[]*Invocation) {
-	CollectCalledInvocationsExprSess(testAmbientSession, e, out)
-}
-
 func CollectCalledInvocationsExprSess(s *Session, e *Expression, out *[]*Invocation) {
 	if out == nil {
 		sessNoteError(s, ErrGeneric)
@@ -91,10 +87,6 @@ func collectCalledInvocationsExpr(s *Session, e *Expression, out *[]*Invocation)
 // Statement.cpp:748–762 — get_exprs + get_blocks.
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil invent empty).
 // out always live; sticky (no invent soft-skip collect past hole).
-func CollectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) {
-	CollectCalledInvocationsStmtSess(testAmbientSession, st, out)
-}
-
 func CollectCalledInvocationsStmtSess(s *Session, st *Stmt, out *[]*Invocation) {
 	if out == nil {
 		sessNoteError(s, ErrGeneric)
@@ -161,10 +153,6 @@ func collectCalledInvocationsStmt(s *Session, st *Stmt, out *[]*Invocation) bool
 // CollectCalledInvocationsBlock walks all statements in a block.
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil invent empty).
 // out always live; sticky (no invent soft-skip collect past hole).
-func CollectCalledInvocationsBlock(b *Block, out *[]*Invocation) {
-	CollectCalledInvocationsBlockSess(testAmbientSession, b, out)
-}
-
 func CollectCalledInvocationsBlockSess(s *Session, b *Block, out *[]*Invocation) {
 	if out == nil {
 		sessNoteError(s, ErrGeneric)
@@ -191,10 +179,6 @@ func collectCalledInvocationsBlock(s *Session, b *Block, out *[]*Invocation) boo
 // FuncCount mirrors Expression::func_count.
 // Expression.cpp:114–118.
 // Incomplete IR fails closed as -1 (no invent empty call count past holes).
-func FuncCount(e *Expression) int {
-	return FuncCountSess(testAmbientSession, e)
-}
-
 func FuncCountSess(s *Session, e *Expression) int {
 	var calls []*Invocation
 	CollectCalledInvocationsExprSess(s, e, &calls)
@@ -208,10 +192,6 @@ func FuncCountSess(s *Session, e *Expression) int {
 // FunctionInvocation.cpp:383–394 — ≥2 params each containing a call.
 // Nil invoke / nil arg / incomplete FuncCount sticky true
 // (no invent certain order / no-call soft-skip past hole).
-func (fi *Invocation) HasUncertainCall() bool {
-	return fi.HasUncertainCallSess(testAmbientSession)
-}
-
 func (fi *Invocation) HasUncertainCallSess(s *Session) bool {
 	if fi == nil {
 		sessNoteError(s, ErrGeneric)
@@ -241,10 +221,6 @@ func (fi *Invocation) HasUncertainCallSess(s *Session) bool {
 // HasUncertainCallRecursive mirrors FunctionInvocation::has_uncertain_call_recursive.
 // FunctionInvocation.cpp:396–406.
 // Nil invoke / nil arg sticky true (no invent skip hole as non-call).
-func (fi *Invocation) HasUncertainCallRecursive() bool {
-	return fi.HasUncertainCallRecursiveSess(testAmbientSession)
-}
-
 func (fi *Invocation) HasUncertainCallRecursiveSess(s *Session) bool {
 	if fi == nil {
 		sessNoteError(s, ErrGeneric)
@@ -284,10 +260,6 @@ func (fi *Invocation) HasUncertainCallRecursiveSess(s *Session) bool {
 // HasSimpleParams mirrors FunctionInvocation::has_simple_params.
 // FunctionInvocation.cpp:408–416 — no TermFunction args.
 // Nil invoke / nil arg sticky false (no invent simple past hole).
-func (fi *Invocation) HasSimpleParams() bool {
-	return fi.HasSimpleParamsSess(testAmbientSession)
-}
-
 func (fi *Invocation) HasSimpleParamsSess(s *Session) bool {
 	// C++ always has live FunctionInvocation*; nil shell sticky not-simple
 	// (no invent simple-params success without args IR)
@@ -311,10 +283,6 @@ func (fi *Invocation) HasSimpleParamsSess(s *Session) bool {
 // HasUncertainCallRecursiveExpr mirrors Expression::has_uncertain_call_recursive.
 // ExpressionFuncall / Comma / Assign overrides; default false.
 // Incomplete IR sticky true (no invent "no uncertain call" soft-skip past hole).
-func HasUncertainCallRecursiveExpr(e *Expression) bool {
-	return HasUncertainCallRecursiveExprSess(testAmbientSession, e)
-}
-
 func HasUncertainCallRecursiveExprSess(s *Session, e *Expression) bool {
 	if e == nil {
 		sessNoteError(s, ErrGeneric)
@@ -385,10 +353,6 @@ func HasUncertainCallRecursiveExprSess(s *Session, e *Expression) bool {
 // C++ StatementIf never overrides — special path never runs for if (combine
 // result kept). StatementIf.cpp:79 is condition re-analyze at make_random only.}
 
-func HasUncertainCallRecursiveStmt(st *Stmt) bool {
-	return HasUncertainCallRecursiveStmtSess(testAmbientSession, st)
-}
-
 func HasUncertainCallRecursiveStmtSess(s *Session, st *Stmt) bool {
 	if st == nil {
 		sessNoteError(s, ErrGeneric)
@@ -417,10 +381,6 @@ func HasUncertainCallRecursiveStmtSess(s *Session, st *Stmt) bool {
 // Statement.cpp:714–734 — assign RHS, invoke, or if-test when TermFunction.
 // Expression* always live for these kinds; incomplete Expr/Invoke fails closed
 // as Failed shell (no invent nil "no call" for broken IR).}
-
-func GetDirectInvocation(st *Stmt) *Invocation {
-	return GetDirectInvocationSess(testAmbientSession, st)
-}
 
 func GetDirectInvocationSess(s *Session, st *Stmt) *Invocation {
 	// Statement always live for call extract; sticky no invent "no call" without it

@@ -256,7 +256,7 @@ func TestMarkMutableConstWrapsSimple(t *testing.T) {
 	}
 	// bitfield InRange also wraps
 	opts.MarkMutableConst = true
-	s := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 8, opts, NewRngSess(testAmbientSession, 3))
+	s := GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 8, opts, NewRngSess(testAmbientSession, 3))
 	if s == "" || !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") {
 		t.Fatalf("InRange wrap got %q", s)
 	}

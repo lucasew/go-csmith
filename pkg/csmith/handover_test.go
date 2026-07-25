@@ -206,7 +206,7 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
-	fm.UpdateFactsForOOSVars([]*Variable{lu})
+	fm.UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{lu})
 	if FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, lu) != nil {
 		t.Fatal("FM OOS must drop UnionFacts for OOS var", fm.UnionFacts)
 	}
@@ -238,7 +238,7 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	fm.UnionFacts = []*FactUnion{MakeFactUnionSess(testAmbientSession, gu, 0), MakeFactUnionSess(testAmbientSession, lu, 0)}
 	// Nested block: OOS locals only (parent != nil skips remove_function_local)
 	outPT := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
-	UpdateFactsForOOSVars(body.LocalVars, &outPT)
+	UpdateFactsForOOSVarsSess(testAmbientSession, body.LocalVars, &outPT)
 	fm.SetMapFactsOutForBlock(body, outPT)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("SetMapFactsOutForBlock sticky", HasErrorSess(testAmbientSession))

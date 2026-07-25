@@ -33,11 +33,11 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	f.Stack = []*Block{body}
 
 	// Field not on stack at body (parent of for142) — only for146 has l_298
-	if f.IsVarOnStack(f0, body) {
+	if f.IsVarOnStackSess(testAmbientSession, f0, body) {
 		t.Fatal("f0 must not be on stack at function body")
 	}
 	// C++ find_variable_in_set(local_vars, f0) matches parent aggregate → OOS
-	if !f.IsVarOOS(f0, body) {
+	if !f.IsVarOOSSess(testAmbientSession, f0, body) {
 		t.Fatal("field of later-sibling local must IsVarOOS at earlier dest parent")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -46,7 +46,7 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 
 	// Live stack aggregate field still not OOS
 	body.LocalVars = []*Variable{l298}
-	if f.IsVarOOS(f0, body) {
+	if f.IsVarOOSSess(testAmbientSession, f0, body) {
 		t.Fatal("field of live stack aggregate must not be OOS")
 	}
 	ClearErrorSess(testAmbientSession)

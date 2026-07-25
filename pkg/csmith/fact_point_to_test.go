@@ -685,7 +685,7 @@ func TestFactFreeHelpers(t *testing.T) {
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, a)}
 	cp := CopyFactsSess(testAmbientSession, facts)
-	if !SameFacts(cp, facts) {
+	if !SameFactsSess(testAmbientSession, cp, facts) {
 		t.Fatal("CopyFacts/SameFacts")
 	}
 	// CombineFacts join_visits

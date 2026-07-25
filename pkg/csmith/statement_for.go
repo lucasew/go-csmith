@@ -32,10 +32,6 @@ type LoopControl struct {
 // MakeRandomLoopControl mirrors make_random_loop_control.
 // StatementFor.cpp:61–113.
 // Sticky ERROR_RETURN leaves partial values; callers must check HasError.
-func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
-	return MakeRandomLoopControlSess(testAmbientSession, r, opts, ivSigned)
-}
-
 func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
 	// pure_rnd_* == rnd_* in random mode (ERROR_RETURN still honors sticky Error)
 	// C++ always has RNG; sticky no invent fixed init/limit/incr when r nil
@@ -123,10 +119,6 @@ func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) 
 // MakeRandomArrayControl mirrors make_random_array_control.
 // StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb;
 // returns adjusted IV bound (out-param `bound` in C++).}
-
-func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
-	return MakeRandomArrayControlSess(testAmbientSession, r, bound, isSigned, oobProb)
-}
 
 // MakeRandomArrayControlSess is MakeRandomArrayControl with OOB bookkeeping on bag s.
 func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
@@ -449,7 +441,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if testFi == nil || hasErrCG(cg) {
 		return nil
 	}
-	testTy := testFi.GetType()
+	testTy := testFi.GetTypeSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent for-test ExprType past GetType residual hole
 	if hasErrCG(cg) {
 		return nil
@@ -750,10 +742,6 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 // forHeaderOutput emits "for (init; test; incr)" using full IR when present.
 // StatementFor::Output / StatementAssign OutputAsExpr paths.
 // Not used for StatementArrayOp (that uses arrayOpHeaderOutput with numeric inits).
-func forHeaderOutput(lc *LoopControl) string {
-	return forHeaderOutputSess(testAmbientSession, lc)
-}
-
 func forHeaderOutputSess(s *Session, lc *LoopControl) string {
 	// StatementFor always has init/test/incr IR; incomplete sticky empty (no soft invent for(;;))
 	if lc == nil || lc.IV == nil {
@@ -788,10 +776,6 @@ func forHeaderOutputSess(s *Session, lc *LoopControl) string {
 // arrayOpHeaderOutput mirrors StatementArrayOp::output_header one dimension.
 // StatementArrayOp.cpp:194–220 — for (cv = init; cv < size; cv += incr)
 // (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).}
-
-func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
-	return arrayOpHeaderOutputSess(testAmbientSession, lc, opts)
-}
 
 func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 	// StatementArrayOp always has live LoopControl + IV sticky
@@ -841,10 +825,6 @@ func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 	return b.String()
 }
 
-func forInitOutput(lc *LoopControl) string {
-	return forInitOutputSess(testAmbientSession, lc)
-}
-
 // forInitOutputSess is forInitOutput with explicit session residual sticky.
 func forInitOutputSess(s *Session, lc *LoopControl) string {
 	// StatementFor.cpp:408–410 — init->OutputAsExpr; always live StatementAssign
@@ -865,10 +845,6 @@ func forInitOutputSess(s *Session, lc *LoopControl) string {
 	return out
 }
 
-func forTestOutput(lc *LoopControl) string {
-	return forTestOutputSess(testAmbientSession, lc)
-}
-
 // forTestOutputSess is forTestOutput with explicit session residual sticky.
 func forTestOutputSess(s *Session, lc *LoopControl) string {
 	// StatementFor.cpp:412 — test.Output; sticky no invent "iv < LimitN" for missing test
@@ -887,10 +863,6 @@ func forTestOutputSess(s *Session, lc *LoopControl) string {
 // forIncrOutput emits for-loop increment via IncrStmt OutputAsExpr.
 // StatementFor.cpp:414 — incr->OutputAsExpr; always live StatementAssign.
 // sticky no invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
-func forIncrOutput(lc *LoopControl) string {
-	return forIncrOutputSess(testAmbientSession, lc)
-}
-
 // forIncrOutputSess is forIncrOutput with explicit session residual sticky.
 func forIncrOutputSess(s *Session, lc *LoopControl) string {
 	if lc == nil || lc.IncrStmt == nil {

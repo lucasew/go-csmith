@@ -3779,10 +3779,10 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
 // FactMgr.cpp:141–172 — drop facts for oos vars (all Fact categories incl. eUnionWrite);
 // mark pointees garbage.
-// Delegates to package UpdateFactsForOOSVars (fail closed on fact/var holes).
+// Delegates to package UpdateFactsForOOSVarsSess(sessFromFM(fm), fail closed on fact/var holes).
 // FactMgr always live; sticky (no invent soft-skip OOS update past hole).
 // Empty vars is complete no-op.
-func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
+func (fm *FactMgr) UpdateFactsForOOSVarsSess(s *Session, vars []*Variable) {
 	if fm == nil {
 		noteErrFM(fm, ErrGeneric)
 		return

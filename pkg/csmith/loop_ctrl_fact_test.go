@@ -106,7 +106,7 @@ func TestIsVisibleLocal(t *testing.T) {
 		t.Fatal("nil LocalVars hole IsVisibleLocal must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f.IsVarOnStack(l, inner) {
+	if f.IsVarOnStackSess(testAmbientSession, l, inner) {
 		t.Fatal("IsVarOnStack nil local hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

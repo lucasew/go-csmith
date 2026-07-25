@@ -19,7 +19,7 @@ func TestMakeRandomUnionType(t *testing.T) {
 	if ut.StructName != "U0" || ut.SID != 0 {
 		t.Fatalf("first aggregate union want U0, got %q sid=%d", ut.StructName, ut.SID)
 	}
-	decl := ut.OutputUnionDecl()
+	decl := ut.OutputUnionDeclSess(testAmbientSession, nil, nil)
 	if !strings.Contains(decl, "union U0") {
 		t.Fatal(decl)
 	}
@@ -52,7 +52,7 @@ func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	c := MakeUnionConstant(NewRngSess(testAmbientSession, 2), opts, probs, ut)
+	c := MakeUnionConstantSess(testAmbientSession, NewRngSess(testAmbientSession, 2), opts, probs, ut)
 	if c == nil {
 		t.Fatal("union constant")
 	}

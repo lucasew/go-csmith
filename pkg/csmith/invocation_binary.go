@@ -56,10 +56,6 @@ func GetBinopStringSess(s *Session, op BinaryOp) string {
 // FunctionInvocationBinary.cpp:184–187 — assert(op_flags); size is sFloat.
 // Missing Safe is complete non-float (not sticky) — Safe is optional on std binary
 // shells; invent would be treating nil as float, not non-float.
-func (fi *Invocation) IsReturnTypeFloat() bool {
-	return fi.IsReturnTypeFloatSess(testAmbientSession)
-}
-
 // IsReturnTypeFloatSess is IsReturnTypeFloat with explicit session residual sticky.
 func (fi *Invocation) IsReturnTypeFloatSess(s *Session) bool {
 	// nil inv sticky incomplete; missing Safe alone → complete false (not float)
@@ -76,10 +72,6 @@ func (fi *Invocation) IsReturnTypeFloatSess(s *Session) bool {
 // GetType mirrors FunctionInvocation{Unary,Binary,User}::get_type.
 // FunctionInvocationUnary.cpp:114–131; FunctionInvocationBinary.cpp:192–241;
 // FunctionInvocationUser.cpp:380 — return type.
-func (fi *Invocation) GetType() *Type {
-	return fi.GetTypeSess(testAmbientSession)
-}
-
 func (fi *Invocation) GetTypeSess(s *Session) *Type {
 	// C++ FunctionInvocation always non-null; sticky nil → no invent int type shell
 	if fi == nil {
@@ -109,10 +101,6 @@ func (fi *Invocation) GetTypeSess(s *Session) *Type {
 // getTypeUnary mirrors FunctionInvocationUnary::get_type.
 // FunctionInvocationUnary.cpp:114–131.}
 
-func (fi *Invocation) getTypeUnary() *Type {
-	return fi.getTypeUnarySess(testAmbientSession)
-}
-
 func (fi *Invocation) getTypeUnarySess(s *Session) *Type {
 	// FunctionInvocationUnary.cpp:116–129 — switch on known ops only
 	switch fi.Unary {
@@ -139,10 +127,6 @@ func (fi *Invocation) getTypeUnarySess(s *Session) *Type {
 
 // getTypeBinary mirrors FunctionInvocationBinary::get_type.
 // FunctionInvocationBinary.cpp:192–241.}
-
-func (fi *Invocation) getTypeBinary() *Type {
-	return fi.getTypeBinarySess(testAmbientSession)
-}
 
 func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 	// FunctionInvocationBinary.cpp:193–194
@@ -219,10 +203,6 @@ func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 // Binary: always false; User: always true.
 // Incomplete Invocation sticky false (no invent unsafe soft-skip / soft re-pick).}
 
-func (fi *Invocation) SafeInvocation() bool {
-	return fi.SafeInvocationSess(testAmbientSession)
-}
-
 func (fi *Invocation) SafeInvocationSess(s *Session) bool {
 	// Invocation always live; sticky incomplete no invent not-safe soft-skip
 	if fi == nil {
@@ -242,10 +222,6 @@ func (fi *Invocation) SafeInvocationSess(s *Session) bool {
 // CompatibleVar mirrors FunctionInvocationUnary::compatible.
 // FunctionInvocationUnary.cpp:137–141 — operand[0].compatible(v); binary/user false.
 // Incomplete unary operand sticky false (no invent soft-skip / soft re-pick past hole).}
-
-func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
-	return fi.CompatibleVarSess(testAmbientSession, v, expandStruct)
-}
 
 func (fi *Invocation) CompatibleVarSess(s *Session, v *Variable, expandStruct bool) bool {
 	// Invocation always live; non-unary-std complete false (C++ binary/user)
@@ -279,10 +255,6 @@ func (fi *Invocation) CompatibleVarSess(s *Session, v *Variable, expandStruct bo
 // FunctionInvocationUnary.h:67 — eNot only.
 // Incomplete Invocation sticky false (no invent not-0or1 / soft re-pick past hole).}
 
-func (fi *Invocation) Is0Or1() bool {
-	return fi.Is0Or1Sess(testAmbientSession)
-}
-
 func (fi *Invocation) Is0Or1Sess(s *Session) bool {
 	// Invocation always live for fold; sticky incomplete no invent not-0or1
 	if fi == nil {
@@ -311,10 +283,6 @@ func (fi *Invocation) Is0Or1Sess(s *Session) bool {
 // EqualsInt mirrors FunctionInvocationBinary::equals / FunctionInvocationUnary::equals.
 // FunctionInvocationBinary.cpp:154–177; FunctionInvocationUnary.cpp:144–156.
 // Incomplete param IR sticky false (no invent not-equal fold / soft re-pick past holes).}
-
-func (fi *Invocation) EqualsInt(num int) bool {
-	return fi.EqualsIntSess(testAmbientSession, num)
-}
 
 func (fi *Invocation) EqualsIntSess(s *Session, num int) bool {
 	// Invocation always live for fold; sticky incomplete no invent not-equal

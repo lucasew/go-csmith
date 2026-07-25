@@ -18,7 +18,7 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 		MakeFactPointToSess(testAmbientSession, bodyLoc, outer),
 	}
 	locals := []*Variable{bodyLoc}
-	out := DropFactSubjectsByVars(in, locals)
+	out := DropFactSubjectsByVarsSess(testAmbientSession, in, locals)
 	if !FactsComplete(out) || HasErrorSess(testAmbientSession) {
 		t.Fatalf("drop must complete: out complete=%v err=%v", FactsComplete(out), HasErrorSess(testAmbientSession))
 	}
@@ -29,7 +29,7 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 		t.Fatal("unrelated subjects must remain")
 	}
 	// empty vars no-op
-	same := DropFactSubjectsByVars(in, nil)
+	same := DropFactSubjectsByVarsSess(testAmbientSession, in, nil)
 	if len(same) != len(in) {
 		t.Fatal("nil vars must no-op")
 	}
@@ -68,8 +68,8 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 	// after Assign + Drop, merge jump must not invent garbage on l_body.
 	fm.AssignGlobalFactsFromMapIn(body.StmID)
 	if len(body.LocalVars) > 0 {
-		fm.GlobalFacts = DropFactSubjectsByVars(fm.GlobalFacts, body.LocalVars)
-		fm.UnionFacts = DropUnionSubjectsByVars(fm.UnionFacts, body.LocalVars)
+		fm.GlobalFacts = DropFactSubjectsByVarsSess(testAmbientSession, fm.GlobalFacts, body.LocalVars)
+		fm.UnionFacts = DropUnionSubjectsByVarsSess(testAmbientSession, fm.UnionFacts, body.LocalVars)
 	}
 	out := fm.GetMapFactsOut(20)
 	if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {

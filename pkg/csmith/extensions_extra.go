@@ -20,10 +20,6 @@ func KleeOutputHeader() string {
 }
 
 // KleeOutputSymbolics mirrors KleeExtension::output_symbolics.
-func KleeOutputSymbolics(values []*ExtensionValue) string {
-	return KleeOutputSymbolicsSess(testAmbientSession, values)
-}
-
 // KleeOutputSymbolicsSess is KleeOutputSymbolics with explicit session residual sticky.
 func KleeOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 	if !extensionValuesComplete(values) {
@@ -45,10 +41,6 @@ func KleeOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 }
 
 // KleeOutputInit mirrors KleeExtension::OutputInit.
-func KleeOutputInit(values []*ExtensionValue) string {
-	return KleeOutputInitSess(testAmbientSession, values)
-}
-
 // KleeOutputInitSess is KleeOutputInit with explicit session residual sticky.
 func KleeOutputInitSess(s *Session, values []*ExtensionValue) string {
 	var b strings.Builder
@@ -73,10 +65,6 @@ const CrestInputBaseName = "CREST_"
 
 // CrestTypeToString mirrors CrestExtension::type_to_string.
 // CrestExtension.cpp:52–78 — simple types only; sticky "" on non-simple.
-func CrestTypeToString(t *Type) string {
-	return CrestTypeToStringSess(testAmbientSession, t)
-}
-
 // CrestTypeToStringSess is CrestTypeToString with explicit session residual sticky.
 func CrestTypeToStringSess(s *Session, t *Type) string {
 	if t == nil || !t.IsSimpleSess(s) {
@@ -107,10 +95,6 @@ func CrestTypeToStringSess(s *Session, t *Type) string {
 }
 
 // CrestOutputSymbolics mirrors CrestExtension::output_symbolics.
-func CrestOutputSymbolics(values []*ExtensionValue) string {
-	return CrestOutputSymbolicsSess(testAmbientSession, values)
-}
-
 // CrestOutputSymbolicsSess is CrestOutputSymbolics with explicit session residual sticky.
 func CrestOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 	if !extensionValuesComplete(values) {
@@ -134,10 +118,6 @@ func CrestOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 }
 
 // CrestOutputInit mirrors CrestExtension::OutputInit.
-func CrestOutputInit(values []*ExtensionValue) string {
-	return CrestOutputInitSess(testAmbientSession, values)
-}
-
 // CrestOutputInitSess is CrestOutputInit with explicit session residual sticky.
 func CrestOutputInitSess(s *Session, values []*ExtensionValue) string {
 	var b strings.Builder
@@ -170,10 +150,6 @@ const (
 
 // CoverageGenerateValues mirrors CoverageTestExtension::GenerateValues.
 // CoverageTestExtension.cpp:52–61 — make_random per value × inputs_size.
-func CoverageGenerateValues(values []*ExtensionValue, inputsSize int, r *Rng, opts Options, probs *Probabilities) []*Constant {
-	return CoverageGenerateValuesSess(testAmbientSession, values, inputsSize, r, opts, probs)
-}
-
 // CoverageGenerateValuesSess is CoverageGenerateValues with sticky on run bag.
 func CoverageGenerateValuesSess(s *Session, values []*ExtensionValue, inputsSize int, r *Rng, opts Options, probs *Probabilities) []*Constant {
 	if inputsSize <= 0 || r == nil || probs == nil {
@@ -199,10 +175,6 @@ func CoverageGenerateValuesSess(s *Session, values []*ExtensionValue, inputsSize
 
 // CoverageOutputArrayInit mirrors output_array_init for one value's row.
 // count is the value index; tests layout is [v0_t0, v0_t1, ..., v1_t0, ...].
-func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
-	return CoverageOutputArrayInitSess(testAmbientSession, tests, count, inputsSize)
-}
-
 func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSize int) string {
 	if inputsSize <= 0 || count < 0 {
 		sessNoteError(s, ErrGeneric)
@@ -248,17 +220,13 @@ func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSiz
 
 // CoverageOutputDecls mirrors CoverageTestExtension::output_decls.}
 
-func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize int) string {
-	return CoverageOutputDeclsSess(testAmbientSession, values, tests, inputsSize)
-}
-
 func CoverageOutputDeclsSess(s *Session, values []*ExtensionValue, tests []*Constant, inputsSize int) string {
 	if !extensionValuesComplete(values) {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
+	b.WriteString(AbsExtensionDefaultOutputDefinitionsSess(s, values, false))
 	if sessHasError(s) {
 		return ""
 	}
@@ -290,10 +258,6 @@ func CoverageOutputDeclsSess(s *Session, values []*ExtensionValue, tests []*Cons
 }
 
 // CoverageOutputFirstFunInvocation mirrors OutputFirstFunInvocation.}
-
-func CoverageOutputFirstFunInvocation(values []*ExtensionValue, invokeOut string, inputsSize int) string {
-	return CoverageOutputFirstFunInvocationSess(testAmbientSession, values, invokeOut, inputsSize)
-}
 
 // CoverageOutputFirstFunInvocationSess is CoverageOutputFirstFunInvocation with explicit session residual sticky.
 func CoverageOutputFirstFunInvocationSess(s *Session, values []*ExtensionValue, invokeOut string, inputsSize int) string {
@@ -332,10 +296,6 @@ func CoverageOutputFirstFunInvocationSess(s *Session, values []*ExtensionValue, 
 }
 
 // CoverageOutputInit mirrors CoverageTestExtension::OutputInit.
-func CoverageOutputInit(values []*ExtensionValue, tests []*Constant, inputsSize int) string {
-	return CoverageOutputInitSess(testAmbientSession, values, tests, inputsSize)
-}
-
 // CoverageOutputInitSess is CoverageOutputInit with explicit session residual sticky.
 func CoverageOutputInitSess(s *Session, values []*ExtensionValue, tests []*Constant, inputsSize int) string {
 	var b strings.Builder
@@ -353,10 +313,6 @@ func CoverageOutputTail() string {
 
 // CreateExtensionFull installs Klee/Crest/Coverage when options request them.
 // Replaces sticky-only CreateExtension for those flags.
-func CreateExtensionFull(opts Options, r *Rng, probs *Probabilities) {
-	CreateExtensionFullSess(testAmbientSession, opts, r, probs)
-}
-
 // CreateExtensionFullSess installs Klee/Crest/Coverage on an explicit session bag.
 func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilities) {
 	s = sessOrAmbient(s)

@@ -32,19 +32,19 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	body.LocalVars = []*Variable{arr}
 	field := arr.FieldVars[1] // f3
 	// Parent is on stack at body
-	if !f.IsVarOnStack(arr, body) {
+	if !f.IsVarOnStackSess(testAmbientSession, arr, body) {
 		t.Fatal("array must be on stack")
 	}
 	// Field of stack aggregate: Match(parent) in local_vars → on-stack
-	if !f.IsVarOnStack(field, body) {
+	if !f.IsVarOnStackSess(testAmbientSession, field, body) {
 		t.Fatal("field of stack aggregate must be IsVarOnStack via Match")
 	}
 	// Visible when on-stack
-	if !f.IsVarVisible(field, body) {
+	if !f.IsVarVisibleSess(testAmbientSession, field, body) {
 		t.Fatal("on-stack field must be visible")
 	}
 	// Not OOS while parent remains on stack
-	if f.IsVarOOS(field, body) {
+	if f.IsVarOOSSess(testAmbientSession, field, body) {
 		t.Fatal("field of live stack aggregate must not be IsVarOOS")
 	}
 	if HasErrorSess(testAmbientSession) {

@@ -623,11 +623,11 @@ func TestIfStructAssignOps(t *testing.T) {
 
 func TestMoreTypesProbabilityNilProbs(t *testing.T) {
 	// below threshold still true; above threshold nil probs → 0% not invent 50
-	if !MoreTypesProbability(NewRngSess(testAmbientSession, 1), nil, 5) {
+	if !MoreTypesProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil, 5) {
 		t.Fatal("count<10 always true")
 	}
 	for seed := uint64(1); seed < 40; seed++ {
-		if MoreTypesProbability(NewRngSess(testAmbientSession, seed), nil, 20) {
+		if MoreTypesProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, seed), nil, 20) {
 			t.Fatal("nil probs past threshold must not invent 50% true")
 		}
 	}

@@ -20,7 +20,7 @@ func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
 	_ = rManual.RndUptoSess(testAmbientSession, uint32(wantB))
 	_ = rManual.RndFlipcoinSess(testAmbientSession, 50)
 	rGen := NewRngSess(testAmbientSession, 1)
-	s := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 15, opts, rGen)
+	s := GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 15, opts, rGen)
 	if s == "" || HasErrorSess(testAmbientSession) {
 		t.Fatal("range const", s, GetErrorSess(testAmbientSession))
 	}
@@ -45,7 +45,7 @@ func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 50; i++ {
-		s := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 3, opts, r)
+		s := GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 3, opts, r)
 		if s == "" {
 			t.Fatal("empty")
 		}
@@ -66,7 +66,7 @@ func TestGenerateRandomConstantInRangeSignPolarity(t *testing.T) {
 		want = "-" + want
 	}
 	r2 := NewRngSess(testAmbientSession, 2)
-	got := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 8, opts, r2)
+	got := GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 8, opts, r2)
 	if got != want {
 		t.Fatalf("sign polarity: got %q want %q (num=%d flipTrue=%v)", got, want, num, pos)
 	}
@@ -81,28 +81,28 @@ func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
 	// Constant.cpp assert path sticky — no invent empty/default past broken range IR
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 8, opts, nil) != "" {
+	if GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 8, opts, nil) != "" {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG GenerateRandomConstantInRange must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GenerateRandomConstantInRange(nil, 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
+	if GenerateRandomConstantInRangeSess(testAmbientSession, nil, 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type GenerateRandomConstantInRange must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 0, opts, NewRngSess(testAmbientSession, 1)) != "" {
+	if GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 0, opts, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("bound 0 must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("bound 0 GenerateRandomConstantInRange must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GenerateRandomConstantInRange(GetSimpleTypeSess(testAmbientSession, EChar), 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
+	if GenerateRandomConstantInRangeSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar), 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("non int/uint simple must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -123,7 +123,7 @@ func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	c := MakeStructConstant(NewRngSess(testAmbientSession, 4), opts, probs, st)
+	c := MakeStructConstantSess(testAmbientSession, NewRngSess(testAmbientSession, 4), opts, probs, st)
 	// should have two values, not three (pad skipped)
 	// Constant.cpp:266–275 — "{a,b}" with bare "," separators
 	inner := strings.TrimPrefix(strings.TrimSuffix(c.Value, "}"), "{")

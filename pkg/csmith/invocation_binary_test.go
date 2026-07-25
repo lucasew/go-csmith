@@ -17,11 +17,11 @@ func TestInvocationIs0Or1(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
-	if !fi.Is0Or1() {
+	if !fi.Is0Or1Sess(testAmbientSession) {
 		t.Fatal("cmp")
 	}
 	fi.Binary = "+"
-	if fi.Is0Or1() {
+	if fi.Is0Or1Sess(testAmbientSession) {
 		t.Fatal("add")
 	}
 }
@@ -31,23 +31,23 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 	one := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	// 0 * x
 	fi := &Invocation{IsStd: true, Binary: "*", Args: []*Expression{zero, one}}
-	if !fi.EqualsInt(0) {
+	if !fi.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("0*")
 	}
 	// x * 0
 	fi = &Invocation{IsStd: true, Binary: "*", Args: []*Expression{one, zero}}
-	if !fi.EqualsInt(0) {
+	if !fi.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("*0")
 	}
 	// same expr subtract
 	v := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)}
 	fi = &Invocation{IsStd: true, Binary: "-", Args: []*Expression{v, v}}
-	if !fi.EqualsInt(0) {
+	if !fi.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("a-a")
 	}
 	// x % 1
 	fi = &Invocation{IsStd: true, Binary: "%", Args: []*Expression{one, one}}
-	if !fi.EqualsInt(0) {
+	if !fi.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("%1")
 	}
 	// Expression.EqualsInt through funcall
@@ -62,7 +62,7 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 	// EqualsInt residual soft invent was soft-continue invent fold true later.
 	// Fair: sticky false. incomplete arg residual.
 	fiHole := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{nil}}
-	if fiHole.EqualsInt(0) {
+	if fiHole.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("EqualsInt residual must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,7 +73,7 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 	// Fair: sticky false.
 	holeArg := &Expression{Term: TermConstant, Con: &Constant{Type: nil, Value: "0"}}
 	fiHole2 := &Invocation{IsStd: true, Binary: "*", Args: []*Expression{holeArg, one}}
-	if fiHole2.EqualsInt(0) {
+	if fiHole2.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("binary EqualsInt residual must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -186,7 +186,7 @@ func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	arg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "??", Args: []*Expression{arg}}
-	if fi.GetType() != nil {
+	if fi.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("invalid unary op must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -195,14 +195,14 @@ func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 	// valid not
 	ClearErrorSess(testAmbientSession)
 	fi.Unary = "!"
-	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
+	if fi.GetTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("!")
 	}
 	// empty args for minus sticky
 	ClearErrorSess(testAmbientSession)
 	fi.Unary = "-"
 	fi.Args = nil
-	if fi.GetType() != nil {
+	if fi.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("empty args")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -526,11 +526,11 @@ func TestInvocationGetTypeUnary(t *testing.T) {
 	// FunctionInvocationUnary.cpp:120–128
 	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleTypeSess(testAmbientSession, ELongLong), Value: "7"}}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{arg}}
-	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, ELongLong) {
-		t.Fatalf("minus type %v", fi.GetType())
+	if fi.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, ELongLong) {
+		t.Fatalf("minus type %v", fi.GetTypeSess(testAmbientSession))
 	}
 	fi.Unary = "!"
-	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
+	if fi.GetTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("not → int")
 	}
 }
@@ -541,7 +541,7 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 	}}
-	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
+	if fi.GetTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("cmp")
 	}
 	// float size flags → float
@@ -553,7 +553,7 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 		},
 		Safe: &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat},
 	}
-	if !fi.IsReturnTypeFloat() || fi.GetType() != GetSimpleTypeSess(testAmbientSession, EFloat) {
+	if !fi.IsReturnTypeFloatSess(testAmbientSession) || fi.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EFloat) {
 		t.Fatal("float ret")
 	}
 	// both unsigned → uint
@@ -563,15 +563,15 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 		{Term: TermConstant, Con: cu},
 		{Term: TermConstant, Con: cu},
 	}}
-	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EUInt) {
-		t.Fatalf("unsigned add %v", fi.GetType())
+	if fi.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EUInt) {
+		t.Fatalf("unsigned add %v", fi.GetTypeSess(testAmbientSession))
 	}
 	// shift follows left
 	fi = &Invocation{IsStd: true, Binary: "<<", Args: []*Expression{
 		{Term: TermConstant, Con: cu},
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}}
-	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EUInt) {
+	if fi.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EUInt) {
 		t.Fatal("ushift")
 	}
 }
@@ -579,23 +579,23 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 func TestInvocationSafeInvocation(t *testing.T) {
 	// Unary: minus unsafe; others safe; binary always unsafe; user always safe
 	ClearErrorSess(testAmbientSession)
-	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-"}).SafeInvocation() {
+	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-"}).SafeInvocationSess(testAmbientSession) {
 		t.Fatal("minus")
 	}
-	if !(&Invocation{IsStd: true, IsUnary: true, Unary: "!"}).SafeInvocation() {
+	if !(&Invocation{IsStd: true, IsUnary: true, Unary: "!"}).SafeInvocationSess(testAmbientSession) {
 		t.Fatal("not")
 	}
-	if (&Invocation{IsStd: true, Binary: "+"}).SafeInvocation() {
+	if (&Invocation{IsStd: true, Binary: "+"}).SafeInvocationSess(testAmbientSession) {
 		t.Fatal("binary")
 	}
-	if !(&Invocation{User: &Function{Name: "f"}}).SafeInvocation() {
+	if !(&Invocation{User: &Function{Name: "f"}}).SafeInvocationSess(testAmbientSession) {
 		t.Fatal("user")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete SafeInvocation must not sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Invocation)(nil).SafeInvocation() {
+	if (*Invocation)(nil).SafeInvocationSess(testAmbientSession) {
 		t.Fatal("nil SafeInvocation must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -609,15 +609,15 @@ func TestInvocationCompatibleVarUnary(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
-	if !fi.CompatibleVar(v, false) {
+	if !fi.CompatibleVarSess(testAmbientSession, v, false) {
 		t.Fatal("self")
 	}
-	if fi.CompatibleVar(CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false), false) {
+	if fi.CompatibleVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false), false) {
 		t.Fatal("other")
 	}
 	// binary never compatible (complete false, not sticky)
 	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ev}}
-	if fi2.CompatibleVar(v, false) {
+	if fi2.CompatibleVarSess(testAmbientSession, v, false) {
 		t.Fatal("binary")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -625,7 +625,7 @@ func TestInvocationCompatibleVarUnary(t *testing.T) {
 	}
 	// incomplete unary operand sticky
 	ClearErrorSess(testAmbientSession)
-	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: nil}).CompatibleVar(v, false) {
+	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: nil}).CompatibleVarSess(testAmbientSession, v, false) {
 		t.Fatal("missing unary arg must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -633,7 +633,7 @@ func TestInvocationCompatibleVarUnary(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete EqualsInt args sticky
-	if (&Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: nil}).EqualsInt(0) {
+	if (&Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: nil}).EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("missing unary arg EqualsInt must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -662,7 +662,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	// sticky no soft invent signed=true → eInt when operands missing
 	ClearErrorSess(testAmbientSession)
 	fi := &Invocation{IsStd: true, Binary: "+"}
-	if fi.GetType() != nil {
+	if fi.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("add without args must not invent eInt")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -670,7 +670,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	fi.Args = []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
-	if fi.GetType() != nil {
+	if fi.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("add with one arg")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -679,7 +679,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	// shift needs left only sticky
 	ClearErrorSess(testAmbientSession)
 	fi = &Invocation{IsStd: true, Binary: "<<"}
-	if fi.GetType() != nil {
+	if fi.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("shift without left must not invent eInt")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -688,7 +688,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	// cmp still returns int without consulting operands (C++ switch arm)
 	ClearErrorSess(testAmbientSession)
 	fi = &Invocation{IsStd: true, Binary: "=="}
-	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
+	if fi.GetTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("cmp")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -696,7 +696,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 
 func TestInvocationGetTypeNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Invocation)(nil).GetType() != nil {
+	if (*Invocation)(nil).GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil Invocation GetType must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -711,7 +711,7 @@ func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
 	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
 	good := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{hole, good}}
-	if fi.GetType() != nil {
+	if fi.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("GetType residual must fail closed nil type, not invent eInt")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -720,7 +720,7 @@ func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// unary operand residual
 	fiU := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{hole}}
-	if fiU.GetType() != nil {
+	if fiU.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("GetType residual unary must fail closed nil type")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -729,7 +729,7 @@ func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// shift left residual
 	fiS := &Invocation{IsStd: true, Binary: "<<", Args: []*Expression{hole, good}}
-	if fiS.GetType() != nil {
+	if fiS.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("GetType residual shift must fail closed nil type")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -831,7 +831,7 @@ func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
 			{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2), ExprType: GetIntTypeSess(testAmbientSession)},
 		},
 	}
-	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EInt) {
+	if fi.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EInt) {
 		t.Fatal("complete signed binary GetType must eInt")
 	}
 	if HasErrorSess(testAmbientSession) {

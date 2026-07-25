@@ -90,7 +90,7 @@ func TestKleeCrestCoverageEmit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	r := NewRngSess(testAmbientSession, 2)
 	probs := NewProbabilities(Defaults())
-	vals := AbsExtensionInitialize(2, r, probs)
+	vals := AbsExtensionInitializeSess(testAmbientSession, 2, r, probs)
 	if vals == nil {
 		t.Fatal("init")
 	}
@@ -98,28 +98,28 @@ func TestKleeCrestCoverageEmit(t *testing.T) {
 	if !strings.Contains(KleeOutputHeader(), "klee") {
 		t.Fatal("hdr")
 	}
-	init := KleeOutputInit(vals)
+	init := KleeOutputInitSess(testAmbientSession, vals)
 	if !strings.Contains(init, "klee_make_symbolic") || !strings.Contains(init, "x0") {
 		t.Fatal(init)
 	}
 	// Crest
-	if CrestTypeToString(GetIntTypeSess(testAmbientSession)) != "int" {
-		t.Fatal(CrestTypeToString(GetIntTypeSess(testAmbientSession)))
+	if CrestTypeToStringSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) != "int" {
+		t.Fatal(CrestTypeToStringSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))
 	}
-	cinit := CrestOutputInit(vals)
+	cinit := CrestOutputInitSess(testAmbientSession, vals)
 	if !strings.Contains(cinit, "CREST_") {
 		t.Fatal(cinit)
 	}
 	// Coverage
-	tests := CoverageGenerateValues(vals, 2, r, Defaults(), probs)
+	tests := CoverageGenerateValuesSess(testAmbientSession, vals, 2, r, Defaults(), probs)
 	if len(tests) != 4 {
 		t.Fatal(len(tests))
 	}
-	d := CoverageOutputDecls(vals, tests, 2)
+	d := CoverageOutputDeclsSess(testAmbientSession, vals, tests, 2)
 	if !strings.Contains(d, "a0[2]") || !strings.Contains(d, "test_index") {
 		t.Fatal(d)
 	}
-	inv := CoverageOutputFirstFunInvocation(vals, "func_1()", 2)
+	inv := CoverageOutputFirstFunInvocationSess(testAmbientSession, vals, "func_1()", 2)
 	if !strings.Contains(inv, "for(test_index") || !strings.Contains(inv, "func_1();") {
 		t.Fatal(inv)
 	}

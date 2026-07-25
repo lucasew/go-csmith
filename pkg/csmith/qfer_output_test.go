@@ -646,7 +646,7 @@ func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	_, _, _, _, _ = MakeRandomLoopControl(NewRngSess(testAmbientSession, 1), opts, true)
+	_, _, _, _, _ = MakeRandomLoopControlSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, true)
 	// sticky remains; MakeIteration would abort
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("ERROR_RETURN must keep sticky error")

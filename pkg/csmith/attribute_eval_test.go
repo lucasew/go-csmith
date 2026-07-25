@@ -299,7 +299,7 @@ func TestTypeAttrOnStructDecl(t *testing.T) {
 	attrs := &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 	}}
-	out := st.OutputStructDeclOpts(NewRngSess(testAmbientSession, 1), attrs)
+	out := st.OutputStructDeclSess(testAmbientSession, NewRngSess(testAmbientSession, 1), attrs)
 	if !strings.Contains(out, "struct S0") || !strings.Contains(out, "unused") {
 		t.Fatal(out)
 	}

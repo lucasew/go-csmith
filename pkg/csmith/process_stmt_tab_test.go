@@ -210,7 +210,7 @@ func TestMakeRandomExprStmtNilCGSticky(t *testing.T) {
 
 func TestHasUncertainCallRecursiveExprNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if !HasUncertainCallRecursiveExpr(nil) {
+	if !HasUncertainCallRecursiveExprSess(testAmbientSession, nil) {
 		t.Fatal("nil HasUncertainCallRecursiveExpr must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -219,7 +219,7 @@ func TestHasUncertainCallRecursiveExprNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete constant no uncertain
 	e := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
-	if HasUncertainCallRecursiveExpr(e) {
+	if HasUncertainCallRecursiveExprSess(testAmbientSession, e) {
 		t.Fatal("constant must not invent uncertain call")
 	}
 	if HasErrorSess(testAmbientSession) {

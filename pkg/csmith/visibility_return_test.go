@@ -12,14 +12,14 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	f.Param = []*Variable{p}
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
-	if !f.IsVarOnStack(p, blk) || !f.IsVarOnStack(loc, blk) {
+	if !f.IsVarOnStackSess(testAmbientSession, p, blk) || !f.IsVarOnStackSess(testAmbientSession, loc, blk) {
 		t.Fatal("stack")
 	}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
-	if f.IsVarOnStack(g, blk) {
+	if f.IsVarOnStackSess(testAmbientSession, g, blk) {
 		t.Fatal("global")
 	}
-	if !f.IsVarVisible(g, blk) {
+	if !f.IsVarVisibleSess(testAmbientSession, g, blk) {
 		t.Fatal("global visible")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -39,10 +39,10 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	}
 	fld := agg.FieldVars[0]
 	blk2 := &Block{Func: f, LocalVars: []*Variable{agg}}
-	if !f.IsVarOnStack(agg, blk2) {
+	if !f.IsVarOnStackSess(testAmbientSession, agg, blk2) {
 		t.Fatal("aggregate local must be on stack")
 	}
-	if !f.IsVarOnStack(fld, blk2) {
+	if !f.IsVarOnStackSess(testAmbientSession, fld, blk2) {
 		t.Fatal("field of stack aggregate must IsVarOnStack (C++ find_variable_in_set+match)")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -52,7 +52,7 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	// Type-nil param soft invent was soft-continue then invent on-stack later good.
 	// Fair: sticky fail closed not-on-stack (StackScanComplete / Param hole).
 	f.Param = []*Variable{&Variable{Name: "p_hole"}, p}
-	if f.IsVarOnStack(p, blk) {
+	if f.IsVarOnStackSess(testAmbientSession, p, blk) {
 		t.Fatal("Param hole must fail closed not-on-stack, not invent later param match")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,7 +73,7 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	if f.StackScanComplete(blk) {
 		t.Fatal("LocalVars hole must be incomplete stack scan")
 	}
-	if f.IsVarOnStack(loc, blk) {
+	if f.IsVarOnStackSess(testAmbientSession, loc, blk) {
 		t.Fatal("IsVarOnStack must not invent membership past hole")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -116,15 +116,15 @@ func TestFunctionIsVarOOS(t *testing.T) {
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	inner := &Block{Func: f, LocalVars: []*Variable{loc}}
 	// at function body root with empty parent chain, loc not on stack
-	if !f.IsVarOOS(loc, nil) {
+	if !f.IsVarOOSSess(testAmbientSession, loc, nil) {
 		// need loc in Blocks
 		f.Blocks = []*Block{inner}
-		if !f.IsVarOOS(loc, nil) {
+		if !f.IsVarOOSSess(testAmbientSession, loc, nil) {
 			t.Fatal("oos")
 		}
 	}
 	// visible when parent is inner
-	if f.IsVarOOS(loc, inner) {
+	if f.IsVarOOSSess(testAmbientSession, loc, inner) {
 		t.Fatal("visible not oos")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -261,7 +261,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	}
 	// second fact subject is l_p local-named — Match with l_1? no
 	lp := facts[1].Var
-	UpdateFactsForOOSVars([]*Variable{loc, lp}, &facts)
+	UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{loc, lp}, &facts)
 	// fact for lp subject removed; p fact remains but pointee loc marked dead
 	if len(facts) != 1 || facts[0].Var != p {
 		t.Fatal(facts)
@@ -272,7 +272,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	// nil fact hole fails closed sticky — no invent clean filter past hole
 	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
-	UpdateFactsForOOSVars([]*Variable{loc}, &hole)
+	UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{loc}, &hole)
 	if FactsComplete(hole) {
 		t.Fatal("nil fact hole must fail closed", hole)
 	}
@@ -282,7 +282,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil OOS var hole fails closed sticky
 	ok := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	UpdateFactsForOOSVars([]*Variable{nil}, &ok)
+	UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{nil}, &ok)
 	if FactsComplete(ok) {
 		t.Fatal("nil OOS var hole must fail closed", ok)
 	}
@@ -292,13 +292,13 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip OOS cleanup past hole)
 	// empty vars is complete no-op
-	UpdateFactsForOOSVars(nil, nil)
+	UpdateFactsForOOSVarsSess(testAmbientSession, nil, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts UpdateFactsForOOSVars must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	var empty []*FactPointTo
-	UpdateFactsForOOSVars(nil, &empty)
+	UpdateFactsForOOSVarsSess(testAmbientSession, nil, &empty)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty vars UpdateFactsForOOSVars must not sticky")
 	}
@@ -309,7 +309,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	facts2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p2, NullPtr)}
 	holeOOS := &Variable{Name: "l_hole", Type: nil, FieldVars: nil}
 	// FieldVarsComplete for Type-nil with empty FieldVars is true (no nil holes)
-	UpdateFactsForOOSVars([]*Variable{holeOOS}, &facts2)
+	UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{holeOOS}, &facts2)
 	if FactsComplete(facts2) {
 		t.Fatal("Match residual UpdateFactsForOOSVars must fail closed incomplete", facts2)
 	}
@@ -321,16 +321,16 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 
 func TestOutputCommentLine(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	s := OutputCommentLine("hello", false, false)
+	s := OutputCommentLineSess(testAmbientSession, "hello", false, false)
 	if s != "/* hello */\n" {
 		t.Fatal(s)
 	}
-	if OutputCommentLine("x", true, false) != "\n" {
+	if OutputCommentLineSess(testAmbientSession, "x", true, false) != "\n" {
 		t.Fatal("quiet")
 	}
 	// empty comment sticky — no invent "/*  */"
 	ClearErrorSess(testAmbientSession)
-	if OutputCommentLine("", false, false) != "" {
+	if OutputCommentLineSess(testAmbientSession, "", false, false) != "" {
 		t.Fatal("empty comment must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

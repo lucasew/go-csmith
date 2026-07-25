@@ -10,7 +10,7 @@ func TestMakeOneBitfieldWidth(t *testing.T) {
 	opts.IntSize = 4
 	probs := NewProbabilities(opts)
 	r := NewRngSess(testAmbientSession, 2)
-	f := MakeOneBitfield(r, opts, probs, 0, true)
+	f := MakeOneBitfieldSess(testAmbientSession, r, opts, probs, 0, true)
 	if f.BitWidth < 0 || f.BitWidth > 32 {
 		t.Fatal(f.BitWidth)
 	}
@@ -82,7 +82,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	decl := st.OutputStructDecl()
+	decl := st.OutputStructDeclSess(testAmbientSession, nil, nil)
 	if !strings.Contains(decl, "f0 : 3") {
 		t.Fatal(decl)
 	}
@@ -97,7 +97,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 			{Name: "f0", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: 3},
 		},
 	}
-	if s := bad.OutputStructDecl(); s != "" {
+	if s := bad.OutputStructDeclSess(testAmbientSession, nil, nil); s != "" {
 		t.Fatal("non-simple bitfield must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -106,7 +106,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// empty sid sticky
 	anon := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
-	if s := anon.OutputStructDecl(); s != "" {
+	if s := anon.OutputStructDeclSess(testAmbientSession, nil, nil); s != "" {
 		t.Fatal("empty StructName must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -136,7 +136,7 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 			{Name: "f5", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
 		},
 	}
-	decl := st.OutputStructDecl()
+	decl := st.OutputStructDeclSess(testAmbientSession, nil, nil)
 	if decl == "" || HasErrorSess(testAmbientSession) {
 		t.Fatalf("decl empty/err: %q err=%v", decl, HasErrorSess(testAmbientSession))
 	}
@@ -161,7 +161,7 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 			{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	udecl := ut.OutputUnionDecl()
+	udecl := ut.OutputUnionDeclSess(testAmbientSession, nil, nil)
 	if !strings.Contains(udecl, " f0;") || !strings.Contains(udecl, " f1;") {
 		t.Fatalf("union want f0 then f1 after pad, got %q", udecl)
 	}
@@ -197,7 +197,7 @@ func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	opts := Defaults()
 	opts.IntSize = 0
 	probs := NewProbabilities(opts)
-	f := MakeOneBitfield(NewRngSess(testAmbientSession, 2), opts, probs, 0, true)
+	f := MakeOneBitfieldSess(testAmbientSession, NewRngSess(testAmbientSession, 2), opts, probs, 0, true)
 	if f.Type != nil || f.BitWidth >= 0 {
 		t.Fatalf("IntSize 0 must fail closed, got %+v", f)
 	}
@@ -207,7 +207,7 @@ func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	// normal IntSize still works after ClearError
 	ClearErrorSess(testAmbientSession)
 	opts.IntSize = 4
-	f2 := MakeOneBitfield(NewRngSess(testAmbientSession, 2), opts, probs, 0, true)
+	f2 := MakeOneBitfieldSess(testAmbientSession, NewRngSess(testAmbientSession, 2), opts, probs, 0, true)
 	if f2.Type == nil || f2.BitWidth < 1 || f2.BitWidth > 32 {
 		t.Fatalf("want live bitfield, got %+v", f2)
 	}
@@ -228,14 +228,14 @@ func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
 
 func TestOutputStructUnionDeclNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).OutputStructDecl() != "" {
+	if (*Type)(nil).OutputStructDeclSess(testAmbientSession, nil, nil) != "" {
 		t.Fatal("nil Type OutputStructDecl must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type OutputStructDecl must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).OutputUnionDecl() != "" {
+	if (*Type)(nil).OutputUnionDeclSess(testAmbientSession, nil, nil) != "" {
 		t.Fatal("nil Type OutputUnionDecl must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -254,7 +254,7 @@ func TestOutputStructDeclFieldTypeResidualSticky(t *testing.T) {
 			{Name: "f1", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // CName residual
 		},
 	}
-	if s := st.OutputStructDecl(); s != "" {
+	if s := st.OutputStructDeclSess(testAmbientSession, nil, nil); s != "" {
 		t.Fatal("field CName residual must fail closed OutputStructDecl", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -272,7 +272,7 @@ func TestOutputUnionDeclFieldTypeResidualSticky(t *testing.T) {
 			{Name: "f0", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	if s := ut.OutputUnionDecl(); s != "" {
+	if s := ut.OutputUnionDeclSess(testAmbientSession, nil, nil); s != "" {
 		t.Fatal("field CName residual must fail closed OutputUnionDecl", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -288,7 +288,7 @@ func TestOutputStructDeclBitfieldIsSimpleResidualSticky(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: 3},
 	}}
-	if s := st.OutputStructDecl(); s != "" {
+	if s := st.OutputStructDeclSess(testAmbientSession, nil, nil); s != "" {
 		t.Fatal("non-simple bitfield must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

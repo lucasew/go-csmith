@@ -31,7 +31,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 		MakeFactPointToSess(testAmbientSession, lp, loc),
 		MakeFactPointToSess(testAmbientSession, p, loc),
 	}
-	fm.UpdateFactsForOOSVars([]*Variable{lp, loc})
+	fm.UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{lp, loc})
 	// lp fact gone
 	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, lp) != nil {
 		t.Fatal("lp fact should drop")
@@ -45,7 +45,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
-	fm2.UpdateFactsForOOSVars([]*Variable{loc})
+	fm2.UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{loc})
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil fact hole must fail closed", fm2.GlobalFacts)
 	}
@@ -144,7 +144,7 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 	}
 	// OOS path
 	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{fld, NullPtr})}
-	UpdateFactsForOOSVars([]*Variable{agg}, &facts)
+	UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{agg}, &facts)
 	fp := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if fp == nil || !fp.IsDeadSess(testAmbientSession) {
 		t.Fatalf("OOS aggregate must garbage field pointee, got %+v", fp)

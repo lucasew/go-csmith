@@ -490,10 +490,6 @@ func (o Options) VolTestsMachValue() string { return o.VolTestsMach }
 // Last known body (csmith-2.1.0 CGOptions.cpp): accept "x86"|"x86_64", store mach, return true.
 // enable_vol_tests flag was removed from the pin; only vol_tests_mach_ remains (Variable dump).
 // Incomplete/unknown mach fails closed false (no invent silent store of invalid host string).
-func (o *Options) SetVolTests(mach string) bool {
-	return o.SetVolTestsSess(testAmbientSession, mach)
-}
-
 // SetVolTestsSess is SetVolTests with explicit session residual sticky.
 func (o *Options) SetVolTestsSess(s *Session, mach string) bool {
 	if o == nil {
@@ -509,10 +505,6 @@ func (o *Options) SetVolTestsSess(s *Session, mach string) bool {
 
 // ApplyMonitoredFuncs installs Options.MonitorFuncs into OutputMgr process list.
 // Call from generation setup (CGOptions::monitored_funcs).
-func (o Options) ApplyMonitoredFuncs() {
-	o.ApplyMonitoredFuncsSess(testAmbientSession)
-}
-
 // ApplyMonitoredFuncsSess installs MonitorFuncs on an explicit session bag.
 func (o Options) ApplyMonitoredFuncsSess(s *Session) {
 	SetMonitoredFuncsSess(s, o.MonitorFuncs)

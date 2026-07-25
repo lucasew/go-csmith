@@ -117,7 +117,7 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	if lc.IncrStmt == nil || lc.IncrStmt.Kind != StmtAssign {
 		t.Fatal("incr stmt")
 	}
-	hdr := forHeaderOutput(lc)
+	hdr := forHeaderOutputSess(testAmbientSession, lc)
 	if !strings.HasPrefix(hdr, "for (") || !strings.Contains(hdr, ";") {
 		t.Fatal(hdr)
 	}

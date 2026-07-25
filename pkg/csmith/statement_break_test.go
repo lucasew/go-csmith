@@ -57,7 +57,7 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	// Loop with IV only — missing InitStmt/TestExpr/IncrStmt
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1}
-	if forHeaderOutput(lc) != "" {
+	if forHeaderOutputSess(testAmbientSession, lc) != "" {
 		t.Fatal("forHeader must fail closed without init/test/incr IR")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -70,7 +70,7 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	badTest := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual Output
 	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, AssignOp: AssignAdd}
 	lcRes := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: badTest, IncrStmt: goodIncr}
-	if forHeaderOutput(lcRes) != "" {
+	if forHeaderOutputSess(testAmbientSession, lcRes) != "" {
 		t.Fatal("test Output residual must fail closed forHeaderOutput, not invent partial")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -85,7 +85,7 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	goodTest := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	lc2 := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: goodTest, IncrStmt: goodIncr}
-	if forHeaderOutput(lc2) == "" {
+	if forHeaderOutputSess(testAmbientSession, lc2) == "" {
 		t.Fatal("complete IR must emit header")
 	}
 	out = (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc2}}}).Output(0)
@@ -267,19 +267,19 @@ func TestArrayOpHeaderNumeric(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1}
 	opts := Defaults()
-	out := arrayOpHeaderOutput(lc, opts)
+	out := arrayOpHeaderOutputSess(testAmbientSession, lc, opts)
 	if out != "for (i = 0; i < 10; i += 1)" {
 		t.Fatal(out)
 	}
 	opts.CComp = true
-	out = arrayOpHeaderOutput(lc, opts)
+	out = arrayOpHeaderOutputSess(testAmbientSession, lc, opts)
 	if out != "for (i = 0; i < 10; i = i + 1)" {
 		t.Fatal(out)
 	}
 	// empty IV OutputC — sticky no invent for ( = 0; …)
 	ClearErrorSess(testAmbientSession)
 	anon := &Variable{Type: GetIntTypeSess(testAmbientSession)}
-	if s := arrayOpHeaderOutput(&LoopControl{IV: anon, InitN: 0, LimitN: 3, IncrN: 1}, Defaults()); s != "" {
+	if s := arrayOpHeaderOutputSess(testAmbientSession, &LoopControl{IV: anon, InitN: 0, LimitN: 3, IncrN: 1}, Defaults()); s != "" {
 		t.Fatal("empty IV name must fail closed arrayop header", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

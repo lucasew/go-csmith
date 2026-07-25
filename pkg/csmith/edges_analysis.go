@@ -812,7 +812,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 		}
 		// Drop this block's LocalVars from current_inputs before same_facts / set_fact_in.
-		// map_facts_in is stored after DropFactSubjectsByVars (below); back-edge merge
+		// map_facts_in is stored after DropFactSubjectsByVarsSess(sessFromCG(cg), below); back-edge merge
 		// can reintroduce body locals from goto/break outs. Comparing pre-drop current
 		// to post-drop map_in never converges (seed 1469030 blk 548: nFact 76 vs nIn 72
 		// ×50 iterations → map_accum pollution → goto cond l_858 vs g_1065.f0).

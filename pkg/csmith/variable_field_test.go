@@ -97,7 +97,7 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	facts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, child)}
-	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
+	UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{parent}, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("OOS incomplete FieldVars must clear facts, not invent live pointee", facts)
 	}

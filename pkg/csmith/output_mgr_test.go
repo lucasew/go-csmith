@@ -45,7 +45,7 @@ func TestMonitoredFuncs(t *testing.T) {
 	// Options.ApplyMonitoredFuncs
 	o := Defaults()
 	o.MonitorFuncs = "main"
-	o.ApplyMonitoredFuncs()
+	o.ApplyMonitoredFuncsSess(testAmbientSession)
 	SetCurrFuncSess(testAmbientSession, "main")
 	if !IsMonitoredFuncSess(testAmbientSession, ) {
 		t.Fatal("main")
@@ -76,21 +76,21 @@ func TestSetVolTests(t *testing.T) {
 	// Historical CGOptions::set_vol_tests (csmith-2.1.0); pin header-only.
 	ClearErrorSess(testAmbientSession)
 	o := Defaults()
-	if o.SetVolTests("arm") {
+	if o.SetVolTestsSess(testAmbientSession, "arm") {
 		t.Fatal("invalid mach must fail closed")
 	}
 	if o.VolTestsMach != "" {
 		t.Fatal("must not invent store")
 	}
-	if !o.SetVolTests("x86") || o.VolTestsMach != "x86" {
+	if !o.SetVolTestsSess(testAmbientSession, "x86") || o.VolTestsMach != "x86" {
 		t.Fatal(o.VolTestsMach)
 	}
-	if !o.SetVolTests("x86_64") || o.VolTestsMach != "x86_64" {
+	if !o.SetVolTestsSess(testAmbientSession, "x86_64") || o.VolTestsMach != "x86_64" {
 		t.Fatal(o.VolTestsMach)
 	}
 	// nil Options sticky
 	var nilO *Options
-	if nilO.SetVolTests("x86") || !HasErrorSess(testAmbientSession) {
+	if nilO.SetVolTestsSess(testAmbientSession, "x86") || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SetVolTests sticky")
 	}
 	ClearErrorSess(testAmbientSession)

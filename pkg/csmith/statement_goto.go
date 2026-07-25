@@ -10,10 +10,6 @@ import "strings"
 // LabelForGotoDest returns existing or new gensym label for a jump destination.
 // StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present; else gensym("lbl_").
 // no invent fixed "lbl_1" when nextLabel is nil
-func LabelForGotoDest(destStmID int, nextLabel func() string) string {
-	return LabelForGotoDestSess(testAmbientSession, destStmID, nextLabel)
-}
-
 // LabelForGotoDestSess is LabelForGotoDest on an explicit session bag.
 func LabelForGotoDestSess(s *Session, destStmID int, nextLabel func() string) string {
 	s = sessOrAmbient(s)
@@ -45,10 +41,6 @@ func LabelForGotoDestSess(s *Session, destStmID int, nextLabel func() string) st
 
 // GotoLabelsDoFinalization mirrors StatementGoto::doFinalization.
 // StatementGoto.cpp:404 — stm_labels.clear().
-func GotoLabelsDoFinalization() {
-	GotoLabelsDoFinalizationSess(testAmbientSession)
-}
-
 // GotoLabelsDoFinalizationSess clears stm_labels on an explicit session bag.
 func GotoLabelsDoFinalizationSess(s *Session) {
 	sessOrAmbient(s).StmLabels = map[int]string{}
@@ -90,10 +82,6 @@ func goodGotoTarget(st Stmt) bool {
 // (Statement.cpp:789–795 Block case).
 // Kind-gated get_blocks only; nil arm sticky false (no invent membership
 // by soft-skipping a missing if-arm / stray Then on assign).
-func (b *Block) ContainsStmt(st *Stmt) bool {
-	return b.ContainsStmtSess(testAmbientSession, st)
-}
-
 // ContainsStmtSess is ContainsStmt with explicit session residual sticky.
 func (b *Block) ContainsStmtSess(s *Session, st *Stmt) bool {
 	// Block + Statement always live; sticky incomplete no invent not-contain soft-skip
@@ -133,10 +121,6 @@ func (b *Block) ContainsStmtSess(s *Session, st *Stmt) bool {
 // the if holding dest was not yet appended to body.Stmts during MakeRandomIf
 // (seed-154: body NeedRevisit stayed false → no body FP → effect_accum kept
 // make_iteration IV reads in feffect vs UP body FP cleaning them).
-func BlockContainsViaParent(b, destParent *Block) bool {
-	return BlockContainsViaParentSess(testAmbientSession, b, destParent)
-}
-
 // BlockContainsViaParentSess is BlockContainsViaParent with explicit session residual sticky.
 func BlockContainsViaParentSess(s *Session, b, destParent *Block) bool {
 	if b == nil {
@@ -155,10 +139,6 @@ func BlockContainsViaParentSess(s *Session, b, destParent *Block) bool {
 // MarkNeedRevisitLCA sets NeedRevisit on the least incomplete ancestor of curr
 // that contains dest (StatementGoto.cpp:141–147).
 // destParent is dest->parent (ok_blk for the chosen other_stm).
-func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
-	MarkNeedRevisitLCASess(testAmbientSession, curr, dest)
-}
-
 // MarkNeedRevisitLCASess is MarkNeedRevisitLCA with explicit session residual sticky.
 func MarkNeedRevisitLCASess(s *Session, curr *Block, dest *Stmt) {
 	MarkNeedRevisitLCAParentSess(s, curr, dest, nil)
@@ -166,10 +146,6 @@ func MarkNeedRevisitLCASess(s *Session, curr *Block, dest *Stmt) {
 
 // MarkNeedRevisitLCAParent is the StatementGoto.cpp:141–147 LCA walk with an
 // explicit dest parent for Block contains_stmt (parent-chain) semantics.
-func MarkNeedRevisitLCAParent(curr *Block, dest *Stmt, destParent *Block) {
-	MarkNeedRevisitLCAParentSess(testAmbientSession, curr, dest, destParent)
-}
-
 // MarkNeedRevisitLCAParentSess is MarkNeedRevisitLCAParent with explicit session residual sticky.
 func MarkNeedRevisitLCAParentSess(s *Session, curr *Block, dest *Stmt, destParent *Block) {
 	// StatementGoto.cpp:143–147 — while (!contains) b=parent; assert(b); need_revisit
@@ -179,7 +155,7 @@ func MarkNeedRevisitLCAParentSess(s *Session, curr *Block, dest *Stmt, destParen
 		return
 	}
 	// Prefer destParent (C++ other_stm->parent). When nil, fall back to tree walk
-	// ContainsStmt (tests / incomplete IR).
+	// ContainsStmtSess(s, tests / incomplete IR).
 	for b := curr; b != nil; b = b.Parent {
 		var has bool
 		if destParent != nil {
@@ -202,10 +178,6 @@ func MarkNeedRevisitLCAParentSess(s *Session, curr *Block, dest *Stmt, destParen
 // destParent nil is complete false (no dest chain). src nil sticky has-skipped
 // (no invent none / soft re-pick past hole).
 // Incomplete LocalVars fails closed sticky as has-skipped (no invent none / soft re-pick).
-func HasInitSkippedVars(src *Block, destParent *Block) bool {
-	return HasInitSkippedVarsSess(testAmbientSession, src, destParent)
-}
-
 func HasInitSkippedVarsSess(s *Session, src *Block, destParent *Block) bool {
 	if destParent == nil {
 		return false
@@ -232,10 +204,6 @@ func HasInitSkippedVarsSess(s *Session, src *Block, destParent *Block) bool {
 // Complete scan with no skipped vars → empty non-nil slice.
 // destParent nil → complete empty (no dest chain).
 // Incomplete LocalVars fails closed sticky IncompleteVariables (no soft re-pick past hole).}
-
-func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
-	return CollectInitSkippedVarsSess(testAmbientSession, src, destParent)
-}
 
 func CollectInitSkippedVarsSess(s *Session, src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
@@ -280,10 +248,6 @@ func CollectInitSkippedVarsSess(s *Session, src *Block, destParent *Block) []*Va
 // OutputSkippedVarInits mirrors StatementGoto::output_skipped_var_inits.
 // StatementGoto.cpp:264–275 — re-init skipped locals at destination label via init->Output.
 // Incomplete InitSkippedVars fails closed sticky empty (no invent soft-skip hole partial re-inits).}
-
-func OutputSkippedVarInits(st *Stmt, indent string) string {
-	return OutputSkippedVarInitsSess(testAmbientSession, st, indent)
-}
 
 func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
 	// Statement always live at goto dest re-init; sticky no invent re-inits without it
@@ -335,10 +299,6 @@ func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
 // Prefer InitExpr (full Expression*); else Constant value.
 // StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".}
 
-func variableInitOutput(v *Variable) string {
-	return variableInitOutputSess(testAmbientSession, v)
-}
-
 func variableInitOutputSess(s *Session, v *Variable) string {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -369,10 +329,6 @@ func variableInitOutputSess(s *Session, v *Variable) string {
 // copyBlocksNoHole copies blocks; nil hole sticky fails closed (ok=false).
 // Block* always live on Function.Blocks; no invent soft-skip holes as absent.
 
-func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
-	return copyBlocksNoHoleSess(testAmbientSession, blocks)
-}
-
 // copyBlocksNoHoleSess is copyBlocksNoHole with explicit session residual sticky.
 func copyBlocksNoHoleSess(s *Session, blocks []*Block) (out []*Block, ok bool) {
 	out = make([]*Block, 0, len(blocks))
@@ -392,10 +348,6 @@ func copyBlocksNoHoleSess(s *Session, blocks []*Block) (out []*Block, ok bool) {
 // asDest true: block is jump destination; false: block is jump source (contains goto).
 // Mutates blocks slice by removing bad candidates (caller should pass a copy).
 // Incomplete Blocks list fails closed sticky (no invent soft-skip hole / re-pick past hole).
-func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
-	return FindGoodJumpBlockSess(testAmbientSession, r, blocks, curr, asDest)
-}
-
 func FindGoodJumpBlockSess(s *Session, r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
 	// StatementGoto always has process RNG; sticky no invent jump block without it
 	if r == nil {
@@ -728,7 +680,7 @@ func MakeRandomGoto(
 		// C++ map[] always; incomplete maps fail closed (no invent partial goto)
 		var srcFacts []*FactPointTo
 		var srcUnions []*FactUnion
-		if IsCtrlStmt(other) {
+		if IsCtrlStmtSess(sessFromCG(cg), other) {
 			srcFacts = fm.GetMapFactsIn(other.StmID)
 			srcUnions = fm.GetMapUnionFactsIn(other.StmID)
 		} else {
@@ -985,8 +937,8 @@ func MakeRandomGoto(
 			// goto map_out kept g_124={g_106} while live other map_out had l_2181 range
 			// → contains_unfixed_goto false → pure-shortcut need_revisit LCA →
 			// Func.Blocks n=37 vs UP n=3 at FindGoodJumpBlock).
-			if ContainsStmt(dest, other) {
-				if IsCtrlStmt(other) {
+			if ContainsStmtSess(sessFromCG(cg), dest, other) {
+				if IsCtrlStmtSess(sessFromCG(cg), other) {
 					gotoIn = CloneFactSliceSess(sessFromCG(cg), fm.GetMapFactsIn(other.StmID))
 					gotoInU = CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.GetMapUnionFactsIn(other.StmID))
 				} else {
@@ -1041,7 +993,7 @@ func MakeRandomGoto(
 		dest.StmID = AllocStmIDSess(sessFromCG(cg))
 	}
 	destID := dest.StmID
-	destIsCtrl := IsCtrlStmt(dest) || dest.Kind == StmtReturn
+	destIsCtrl := IsCtrlStmtSess(sessFromCG(cg), dest) || dest.Kind == StmtReturn
 	// residual ERROR sticky — no invent soft-insert past IsCtrlStmt residual
 	if hasErrCG(cg) {
 		return makeGotoFailed()

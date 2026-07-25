@@ -87,7 +87,7 @@ func (e *Expression) CompatibleWithVarSess(s *Session, v *Variable, expandStruct
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Invoke.CompatibleVar(v, expandStruct)
+		ok := e.Invoke.CompatibleVarSess(s, v, expandStruct)
 		// residual ERROR sticky — no invent compatible true past CompatibleVar residual hole
 		if sessHasError(s) {
 			return false

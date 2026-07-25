@@ -339,15 +339,15 @@ func TestUnaryEqualsIntFold(t *testing.T) {
 	zero := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}
 	five := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 5)}
 	not0 := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{five}}
-	if !not0.EqualsInt(0) {
+	if !not0.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("!nonzero equals 0")
 	}
 	not1 := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{zero}}
-	if !not1.EqualsInt(1) {
+	if !not1.EqualsIntSess(testAmbientSession, 1) {
 		t.Fatal("!0 equals 1")
 	}
 	neg := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{five}}
-	if !neg.EqualsInt(-5) {
+	if !neg.EqualsIntSess(testAmbientSession, -5) {
 		t.Fatal("-5 equals -5")
 	}
 }

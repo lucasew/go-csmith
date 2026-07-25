@@ -65,14 +65,14 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)
 	f.Param = []*Variable{p, nil}
 	body := &Block{Func: f, LocalVars: nil}
-	if f.IsVarVisible(p, body) {
+	if f.IsVarVisibleSess(testAmbientSession, p, body) {
 		t.Fatal("incomplete Param must not invent visible")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete Param IsVarVisible must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !f.IsVarOOS(p, body) {
+	if !f.IsVarOOSSess(testAmbientSession, p, body) {
 		t.Fatal("incomplete stack must fail closed OOS, not invent not-OOS")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -86,7 +86,7 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	okBlk := &Block{Func: f2, LocalVars: []*Variable{loc}}
 	f2.Blocks = []*Block{nil, okBlk}
 	// nil dest: not visible; scan Blocks hits nil hole before okBlk match
-	if !f2.IsVarOOS(loc, nil) {
+	if !f2.IsVarOOSSess(testAmbientSession, loc, nil) {
 		t.Fatal("Blocks hole must fail closed OOS sticky")
 	}
 	if !HasErrorSess(testAmbientSession) {

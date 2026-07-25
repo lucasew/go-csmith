@@ -24,11 +24,11 @@ func TestFuncCountAndCollectCalls(t *testing.T) {
 			Args: []*Expression{c1, c2},
 		},
 	}
-	if FuncCount(outer) != 3 { // c1, c2, then outer
-		t.Fatalf("func count %d", FuncCount(outer))
+	if FuncCountSess(testAmbientSession, outer) != 3 { // c1, c2, then outer
+		t.Fatalf("func count %d", FuncCountSess(testAmbientSession, outer))
 	}
 	var calls []*Invocation
-	CollectCalledInvocationsExpr(outer, &calls)
+	CollectCalledInvocationsExprSess(testAmbientSession, outer, &calls)
 	if len(calls) != 3 {
 		t.Fatal(len(calls))
 	}
@@ -36,10 +36,10 @@ func TestFuncCountAndCollectCalls(t *testing.T) {
 
 func TestFuncCountIncompleteFailClosed(t *testing.T) {
 	// nil Invoke / nil arg hole — no invent empty call count
-	if FuncCount(&Expression{Term: TermFunction}) >= 0 {
+	if FuncCountSess(testAmbientSession, &Expression{Term: TermFunction}) >= 0 {
 		t.Fatal("nil Invoke must FuncCount -1")
 	}
-	if FuncCount(&Expression{Term: TermFunction, Invoke: &Invocation{
+	if FuncCountSess(testAmbientSession, &Expression{Term: TermFunction, Invoke: &Invocation{
 		User: &Function{Name: "h"}, Args: []*Expression{userCall("a"), nil},
 	}}) >= 0 {
 		t.Fatal("nil arg hole must FuncCount -1")
@@ -47,7 +47,7 @@ func TestFuncCountIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	var calls []*Invocation
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
-	CollectCalledInvocationsExpr(&Expression{Term: TermFunction}, &calls)
+	CollectCalledInvocationsExprSess(testAmbientSession, &Expression{Term: TermFunction}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("incomplete collect must fail closed incomplete, not invent empty complete", calls)
 	}
@@ -56,17 +56,17 @@ func TestFuncCountIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// out always live; sticky (no invent soft-skip collect past hole)
-	CollectCalledInvocationsExpr(&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, nil)
+	CollectCalledInvocationsExprSess(testAmbientSession, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil out CollectCalledInvocationsExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	CollectCalledInvocationsStmt(&Stmt{Kind: StmtBreak, StmID: 1}, nil)
+	CollectCalledInvocationsStmtSess(testAmbientSession, &Stmt{Kind: StmtBreak, StmID: 1}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil out CollectCalledInvocationsStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	CollectCalledInvocationsBlock(&Block{}, nil)
+	CollectCalledInvocationsBlockSess(testAmbientSession, &Block{}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil out CollectCalledInvocationsBlock must SetError sticky")
 	}
@@ -79,13 +79,13 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	call := userCall("func_in_test")
 	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: call}, Then: &Block{}}
 	var calls []*Invocation
-	CollectCalledInvocationsStmt(st, &calls)
+	CollectCalledInvocationsStmtSess(testAmbientSession, st, &calls)
 	if len(calls) != 1 || calls[0].User == nil || calls[0].User.Name != "func_in_test" {
 		t.Fatalf("for-test calls: %+v", calls)
 	}
 	// incomplete for without TestExpr → incomplete marker sticky
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
-	CollectCalledInvocationsStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}, &calls)
+	CollectCalledInvocationsStmtSess(testAmbientSession, &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("for without TestExpr must fail closed incomplete, not invent empty", calls)
 	}
@@ -95,7 +95,7 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Statement.h:185 — StatementFor does not override has_uncertain_call_recursive
 	// (base false). Soft invent walked for-test/body as uncertain (unfair special path).
-	if HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
+	if HasUncertainCallRecursiveStmtSess(testAmbientSession, &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
 		t.Fatal("StatementFor must be certain (base false), not invent body walk")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -112,7 +112,7 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 		ArrayAccess: "a[i]",
 	}}}
 	var callsArr []*Invocation
-	CollectCalledInvocationsStmt(&Stmt{
+	CollectCalledInvocationsStmtSess(testAmbientSession, &Stmt{
 		Kind: StmtArrayOp, StmID: 1,
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1},
 		Then: body,
@@ -124,7 +124,7 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 		t.Fatal("array-init ArrayOp must not SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if HasUncertainCallRecursiveStmt(&Stmt{
+	if HasUncertainCallRecursiveStmtSess(testAmbientSession, &Stmt{
 		Kind: StmtArrayOp, StmID: 1,
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1},
 		Then: body,
@@ -143,7 +143,7 @@ func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	var calls []*Invocation
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
-	CollectCalledInvocationsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &calls)
+	CollectCalledInvocationsStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: 1}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("assign without Expr must fail closed incomplete, not invent empty success", calls)
 	}
@@ -152,7 +152,7 @@ func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
-	CollectCalledInvocationsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &calls)
+	CollectCalledInvocationsStmtSess(testAmbientSession, &Stmt{Kind: StmtInvoke, StmID: 2}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("invoke without Expr must fail closed incomplete")
 	}
@@ -160,21 +160,21 @@ func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
 		t.Fatal("invoke without Expr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtAssign, StmID: 3}) {
+	if !HasUncertainCallRecursiveStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: 3}) {
 		t.Fatal("nil Expr assign must fail closed uncertain")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Expr assign must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !HasUncertainCallRecursiveExpr(nil) {
+	if !HasUncertainCallRecursiveExprSess(testAmbientSession, nil) {
 		t.Fatal("nil expr must fail closed uncertain")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil expr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*Invocation)(nil).HasUncertainCall() {
+	if !(*Invocation)(nil).HasUncertainCallSess(testAmbientSession) {
 		t.Fatal("nil invoke must fail closed HasUncertainCall")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -191,7 +191,7 @@ func TestHasUncertainCall(t *testing.T) {
 		User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession)},
 		Args: []*Expression{a, b},
 	}
-	if !fi.HasUncertainCall() {
+	if !fi.HasUncertainCallSess(testAmbientSession) {
 		t.Fatal("uncertain")
 	}
 	// one call arg only
@@ -199,7 +199,7 @@ func TestHasUncertainCall(t *testing.T) {
 		User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession)},
 		Args: []*Expression{a, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}
-	if fi2.HasUncertainCall() {
+	if fi2.HasUncertainCallSess(testAmbientSession) {
 		t.Fatal("not uncertain")
 	}
 	// nested HasUncertainCallRecursive residual: soft invent was soft-continue later args certain.
@@ -210,7 +210,7 @@ func TestHasUncertainCall(t *testing.T) {
 		User: &Function{Name: "func_h", ReturnType: GetIntTypeSess(testAmbientSession)},
 		Args: []*Expression{nestedHole, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}},
 	}
-	if !fiHole.HasUncertainCallRecursive() {
+	if !fiHole.HasUncertainCallRecursiveSess(testAmbientSession) {
 		t.Fatal("nested Invoke-nil residual must fail closed uncertain")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -219,14 +219,14 @@ func TestHasUncertainCall(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// comma LHS residual soft invent was soft-continue RHS invent certain.
 	comma := &Expression{Term: TermCommaExpr, CommaLHS: nestedHole, CommaRHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
-	if !HasUncertainCallRecursiveExpr(comma) {
+	if !HasUncertainCallRecursiveExprSess(testAmbientSession, comma) {
 		t.Fatal("comma nested residual must fail closed uncertain")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("comma nested residual HasUncertainCallRecursiveExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !fi.HasUncertainCallRecursive() {
+	if !fi.HasUncertainCallRecursiveSess(testAmbientSession) {
 		t.Fatal("recursive")
 	}
 }
@@ -236,17 +236,17 @@ func TestHasSimpleParams(t *testing.T) {
 		{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 		{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)},
 	}}
-	if !fi.HasSimpleParams() {
+	if !fi.HasSimpleParamsSess(testAmbientSession) {
 		t.Fatal("simple")
 	}
 	fi.Args[0] = userCall("f")
-	if fi.HasSimpleParams() {
+	if fi.HasSimpleParamsSess(testAmbientSession) {
 		t.Fatal("has call")
 	}
 	// nil arg hole — sticky not-simple
 	ClearErrorSess(testAmbientSession)
 	fi.Args = []*Expression{{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, nil}
-	if fi.HasSimpleParams() {
+	if fi.HasSimpleParamsSess(testAmbientSession) {
 		t.Fatal("nil arg must fail closed not-simple")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -254,7 +254,7 @@ func TestHasSimpleParams(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil invoke shell — sticky not-simple
-	if (*Invocation)(nil).HasSimpleParams() {
+	if (*Invocation)(nil).HasSimpleParamsSess(testAmbientSession) {
 		t.Fatal("nil invoke must fail closed not-simple")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -266,7 +266,7 @@ func TestHasSimpleParams(t *testing.T) {
 		userCall("a"),
 		{Term: TermFunction}, // nil Invoke
 	}}
-	if !fiHole.HasUncertainCall() {
+	if !fiHole.HasUncertainCallSess(testAmbientSession) {
 		t.Fatal("incomplete arg must fail closed uncertain")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -278,20 +278,20 @@ func TestHasSimpleParams(t *testing.T) {
 func TestGetDirectInvocation(t *testing.T) {
 	inv := &Invocation{User: &Function{Name: "f"}}
 	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermFunction, Invoke: inv}}
-	if GetDirectInvocation(st) != inv {
+	if GetDirectInvocationSess(testAmbientSession, st) != inv {
 		t.Fatal("assign")
 	}
 	st2 := &Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: inv}}
-	if GetDirectInvocation(st2) != inv {
+	if GetDirectInvocationSess(testAmbientSession, st2) != inv {
 		t.Fatal("invoke")
 	}
 	st3 := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}}
-	if GetDirectInvocation(st3) != nil {
+	if GetDirectInvocationSess(testAmbientSession, st3) != nil {
 		t.Fatal("const")
 	}
 	// incomplete Expr/Invoke fails closed Failed sticky (no invent nil as no-call soft-skip)
 	ClearErrorSess(testAmbientSession)
-	got := GetDirectInvocation(&Stmt{Kind: StmtInvoke})
+	got := GetDirectInvocationSess(testAmbientSession, &Stmt{Kind: StmtInvoke})
 	if got == nil || !got.Failed {
 		t.Fatal("nil Expr invoke must fail closed Failed shell", got)
 	}
@@ -299,7 +299,7 @@ func TestGetDirectInvocation(t *testing.T) {
 		t.Fatal("nil Expr invoke must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	got = GetDirectInvocation(&Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}})
+	got = GetDirectInvocationSess(testAmbientSession, &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}})
 	if got == nil || !got.Failed {
 		t.Fatal("nil Invoke on TermFunction must fail closed Failed")
 	}
@@ -307,7 +307,7 @@ func TestGetDirectInvocation(t *testing.T) {
 		t.Fatal("nil Invoke must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	got = GetDirectInvocation(&Stmt{Kind: StmtAssign, Expr: nil})
+	got = GetDirectInvocationSess(testAmbientSession, &Stmt{Kind: StmtAssign, Expr: nil})
 	if got == nil || !got.Failed {
 		t.Fatal("nil Expr assign must fail closed Failed")
 	}
@@ -538,7 +538,7 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 	if thenU == nil || foreign == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("MakeFactUnion", GetErrorSess(testAmbientSession))
 	}
-	stripped := DropUnionSubjectsByVars([]*FactUnion{thenU, foreign}, []*Variable{elseLocal})
+	stripped := DropUnionSubjectsByVarsSess(testAmbientSession, []*FactUnion{thenU, foreign}, []*Variable{elseLocal})
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
@@ -604,7 +604,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: rhs, AssignOp: AssignSimple,
 	}
-	if !HasUncertainCallRecursiveStmt(st) {
+	if !HasUncertainCallRecursiveStmtSess(testAmbientSession, st) {
 		t.Fatal("expect uncertain")
 	}
 	PostCreationAnalysis(st, nil, nil, EmptyEffect(), &cg, Defaults())
@@ -650,7 +650,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: rhs, AssignOp: AssignSimple,
 	}
-	if !HasUncertainCallRecursiveStmt(st) {
+	if !HasUncertainCallRecursiveStmtSess(testAmbientSession, st) {
 		t.Fatal("expect uncertain for special path")
 	}
 	// Pre-install gen map as PostCreation would after saving EffectStm, then run
@@ -706,7 +706,7 @@ func TestFindContainedLabelsFM(t *testing.T) {
 
 func TestGetDirectInvocationNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if GetDirectInvocation(nil) != nil {
+	if GetDirectInvocationSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil Stmt GetDirectInvocation must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -731,7 +731,7 @@ func TestHasUncertainCallRecursiveIfElseBaseFalse(t *testing.T) {
 		},
 	}
 	st := &Stmt{Kind: StmtIfElse, StmID: 1, Expr: cond, Then: &Block{}, Else: &Block{}}
-	if HasUncertainCallRecursiveStmt(st) {
+	if HasUncertainCallRecursiveStmtSess(testAmbientSession, st) {
 		t.Fatal("StatementIf must return false (base), not invent condition walk")
 	}
 	if HasErrorSess(testAmbientSession) {

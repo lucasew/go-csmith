@@ -35,7 +35,7 @@ func TestMakeRandomStructType(t *testing.T) {
 	}
 	// mark used for emit contract tests
 	st.Used = true
-	decl := st.OutputStructDecl()
+	decl := st.OutputStructDeclSess(testAmbientSession, nil, nil)
 	if !strings.Contains(decl, "struct S0") || !strings.Contains(decl, "f0") {
 		t.Fatal(decl)
 	}
@@ -131,7 +131,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	decl := st.OutputStructDecl()
+	decl := st.OutputStructDeclSess(testAmbientSession, nil, nil)
 	if !strings.Contains(decl, "#pragma pack(push)\n#pragma pack(1)\n") {
 		t.Fatalf("expected split pack(push)/pack(1), got %q", decl)
 	}
@@ -146,7 +146,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	opts := Defaults()
 	opts.CComp = true
 	SetProcessOptionsSess(testAmbientSession, opts)
-	decl2 := st.OutputStructDecl()
+	decl2 := st.OutputStructDeclSess(testAmbientSession, nil, nil)
 	if strings.Contains(decl2, "#pragma pack(push)") {
 		t.Fatalf("ccomp must not emit pack(push): %q", decl2)
 	}
@@ -229,7 +229,7 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	// C++ always has RNG + Probabilities sticky; no invent fields/aggregates without them
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if MoreTypesProbability(nil, NewProbabilities(opts), 20) {
+	if MoreTypesProbabilitySess(testAmbientSession, nil, NewProbabilities(opts), 20) {
 		t.Fatal("nil RNG past threshold must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -301,13 +301,13 @@ func TestMakeStructConstant(t *testing.T) {
 	if st == nil {
 		t.Fatal("struct")
 	}
-	c := MakeStructConstant(NewRngSess(testAmbientSession, 4), opts, probs, st)
+	c := MakeStructConstantSess(testAmbientSession, NewRngSess(testAmbientSession, 4), opts, probs, st)
 	if c == nil || !strings.HasPrefix(c.Value, "{") {
 		t.Fatal(c)
 	}
 	// Constant.cpp always has RNG sticky; no invent "{}" aggregate shell
 	ClearErrorSess(testAmbientSession)
-	if MakeStructConstant(nil, opts, probs, st) != nil {
+	if MakeStructConstantSess(testAmbientSession, nil, opts, probs, st) != nil {
 		t.Fatal("nil RNG struct constant")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -317,7 +317,7 @@ func TestMakeStructConstant(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if MakeUnionConstant(nil, opts, probs, ut) != nil {
+	if MakeUnionConstantSess(testAmbientSession, nil, opts, probs, ut) != nil {
 		t.Fatal("nil RNG union constant")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -328,7 +328,7 @@ func TestMakeStructConstant(t *testing.T) {
 	stHole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if MakeStructConstant(NewRngSess(testAmbientSession, 5), opts, probs, stHole) != nil {
+	if MakeStructConstantSess(testAmbientSession, NewRngSess(testAmbientSession, 5), opts, probs, stHole) != nil {
 		t.Fatal("Type-nil field MakeStructConstant must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -338,7 +338,7 @@ func TestMakeStructConstant(t *testing.T) {
 	utHole := &Type{isUnion: true, StructName: "Uhole", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if MakeUnionConstant(NewRngSess(testAmbientSession, 5), opts, probs, utHole) != nil {
+	if MakeUnionConstantSess(testAmbientSession, NewRngSess(testAmbientSession, 5), opts, probs, utHole) != nil {
 		t.Fatal("Type-nil field MakeUnionConstant must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -352,12 +352,12 @@ func TestCheckImplicitNontrivialAssignOps(t *testing.T) {
 	opts := Defaults()
 	opts.LangCPP = false
 	fields := []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession)}}
-	if CheckImplicitNontrivialAssignOps(opts, fields) {
+	if CheckImplicitNontrivialAssignOpsSess(testAmbientSession, opts, fields) {
 		t.Fatal("C mode")
 	}
 	// C++ with simple field → no
 	opts.LangCPP = true
-	if CheckImplicitNontrivialAssignOps(opts, fields) {
+	if CheckImplicitNontrivialAssignOpsSess(testAmbientSession, opts, fields) {
 		t.Fatal("simple field")
 	}
 	// field with flag → yes
@@ -365,12 +365,12 @@ func TestCheckImplicitNontrivialAssignOps(t *testing.T) {
 		Name: "f0",
 		Type: &Type{isStruct: true, StructName: "S", HasImplicitNontrivialAssignOps: true},
 	}}
-	if !CheckImplicitNontrivialAssignOps(opts, fields) {
+	if !CheckImplicitNontrivialAssignOpsSess(testAmbientSession, opts, fields) {
 		t.Fatal("flagged field")
 	}
 	// nil field Type sticky true (no invent no-nontrivial soft-skip past hole)
 	ClearErrorSess(testAmbientSession)
-	if !CheckImplicitNontrivialAssignOps(opts, []StructField{{Name: "f0", Type: nil}}) {
+	if !CheckImplicitNontrivialAssignOpsSess(testAmbientSession, opts, []StructField{{Name: "f0", Type: nil}}) {
 		t.Fatal("nil field Type must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {

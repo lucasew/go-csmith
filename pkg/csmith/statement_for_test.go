@@ -6,10 +6,11 @@ import (
 )
 
 func TestMakeRandomLoopControlRanges(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 50; i++ {
-		init, limit, incr, _, incrOp := MakeRandomLoopControl(r, opts, true)
+		init, limit, incr, _, incrOp := MakeRandomLoopControlSess(testAmbientSession, r, opts, true)
 		if incr == 0 {
 			t.Fatal("incr never 0 after fixup")
 		}
@@ -19,7 +20,7 @@ func TestMakeRandomLoopControlRanges(t *testing.T) {
 	}
 	// nil RNG sticky — no invent fixed init/limit/incr shell
 	ClearErrorSess(testAmbientSession)
-	init, limit, incr, testOp, incrOp := MakeRandomLoopControl(nil, opts, true)
+	init, limit, incr, testOp, incrOp := MakeRandomLoopControlSess(testAmbientSession, nil, opts, true)
 	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v", init, limit, incr, testOp, incrOp)
 	}

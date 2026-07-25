@@ -8,7 +8,7 @@ import (
 func TestMakeRandomArrayControlLe(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	// force Le by unsigned
-	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControl(r, 10, false, 0)
+	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControlSess(testAmbientSession, r, 10, false, 0)
 	if testOp != BinCmpLe {
 		t.Fatalf("unsigned want Le got %v", testOp)
 	}
@@ -37,7 +37,7 @@ func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
 		// skip oob flip (prob 0 still draws)
 		_ = r0.RndFlipcoinSess(testAmbientSession, 0)
 		wantLe := r0.RndFlipcoinSess(testAmbientSession, 50)
-		_, _, _, testOp, _, _ := MakeRandomArrayControl(NewRngSess(testAmbientSession, seed), 10, true, 0)
+		_, _, _, testOp, _, _ := MakeRandomArrayControlSess(testAmbientSession, NewRngSess(testAmbientSession, seed), 10, true, 0)
 		if wantLe && testOp != BinCmpLe {
 			t.Fatalf("seed %d flip true must be Le got %v", seed, testOp)
 		}
@@ -62,18 +62,18 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// 100% OOB
-	_, _, _, _, _, _ = MakeRandomArrayControl(NewRngSess(testAmbientSession, 1), 8, false, 100)
+	_, _, _, _, _, _ = MakeRandomArrayControlSess(testAmbientSession, NewRngSess(testAmbientSession, 1), 8, false, 100)
 	if OOBCount() != 1 {
 		t.Fatalf("oob %d", OOBCount())
 	}
 	// 0% OOB
-	_, _, _, _, _, _ = MakeRandomArrayControl(NewRngSess(testAmbientSession, 2), 8, false, 0)
+	_, _, _, _, _, _ = MakeRandomArrayControlSess(testAmbientSession, NewRngSess(testAmbientSession, 2), 8, false, 0)
 	if OOBCount() != 1 {
 		t.Fatalf("still 1 after no-oob %d", OOBCount())
 	}
 	// nil RNG sticky — no invent fixed array-loop control
 	ClearErrorSess(testAmbientSession)
-	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControl(nil, 8, false, 0)
+	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControlSess(testAmbientSession, nil, 8, false, 0)
 	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 || outBound != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v %d", init, limit, incr, testOp, incrOp, outBound)
 	}

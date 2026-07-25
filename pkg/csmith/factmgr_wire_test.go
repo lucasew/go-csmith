@@ -657,13 +657,13 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil FM AddNewVarFactAndUpdate must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*FactMgr)(nil).UpdateFactsForOOSVars([]*Variable{CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntTypeSess(testAmbientSession), false, false)})
+	(*FactMgr)(nil).UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntTypeSess(testAmbientSession), false, false)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FM UpdateFactsForOOSVars must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty OOS list complete no-op
-	fm.UpdateFactsForOOSVars(nil)
+	fm.UpdateFactsForOOSVarsSess(testAmbientSession, nil)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty UpdateFactsForOOSVars must not sticky")
 	}

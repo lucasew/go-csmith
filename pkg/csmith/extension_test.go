@@ -7,24 +7,24 @@ import (
 
 func TestExtensionValueAndInitialize(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if NewExtensionValue(nil, "x") != nil || !HasErrorSess(testAmbientSession) {
+	if NewExtensionValueSess(testAmbientSession, nil, "x") != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil type sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if NewExtensionValue(GetIntTypeSess(testAmbientSession), "") != nil || !HasErrorSess(testAmbientSession) {
+	if NewExtensionValueSess(testAmbientSession, GetIntTypeSess(testAmbientSession), "") != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	r := NewRngSess(testAmbientSession, 2)
 	probs := NewProbabilities(Defaults())
-	vals := AbsExtensionInitialize(3, r, probs)
+	vals := AbsExtensionInitializeSess(testAmbientSession, 3, r, probs)
 	if vals == nil || len(vals) != 3 || HasErrorSess(testAmbientSession) {
 		t.Fatal(len(vals), HasErrorSess(testAmbientSession))
 	}
 	if vals[0].Name != "x0" || vals[2].Name != "x2" {
 		t.Fatal(vals[0].Name, vals[2].Name)
 	}
-	defs := AbsExtensionDefaultOutputDefinitions(vals, true)
+	defs := AbsExtensionDefaultOutputDefinitionsSess(testAmbientSession, vals, true)
 	if !strings.Contains(defs, "x0 = 0") || !strings.Contains(defs, "x1 = 0") {
 		t.Fatal(defs)
 	}
@@ -33,8 +33,8 @@ func TestExtensionValueAndInitialize(t *testing.T) {
 func TestAbsExtensionMakeInvocation(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1"}
-	ev := NewExtensionValue(GetIntTypeSess(testAmbientSession), "x0")
-	inv := AbsExtensionMakeFuncInvocation(f, []*ExtensionValue{ev})
+	ev := NewExtensionValueSess(testAmbientSession, GetIntTypeSess(testAmbientSession), "x0")
+	inv := AbsExtensionMakeFuncInvocationSess(testAmbientSession, f, []*ExtensionValue{ev})
 	if inv == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal(HasErrorSess(testAmbientSession))
 	}
@@ -42,7 +42,7 @@ func TestAbsExtensionMakeInvocation(t *testing.T) {
 	if !strings.Contains(out, "func_1") || !strings.Contains(out, "x0") {
 		t.Fatal(out)
 	}
-	first := AbsExtensionOutputFirstFunInvocation(out)
+	first := AbsExtensionOutputFirstFunInvocationSess(testAmbientSession, out)
 	if !strings.HasPrefix(first, "    ") || !strings.HasSuffix(first, ";\n") {
 		t.Fatal(first)
 	}
@@ -50,8 +50,8 @@ func TestAbsExtensionMakeInvocation(t *testing.T) {
 
 func TestExtensionMgrNullPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	DestroyExtension()
-	CreateExtension(Defaults())
+	DestroyExtensionSess(testAmbientSession, )
+	CreateExtensionSess(testAmbientSession, Defaults())
 	if ExtensionActiveSess(testAmbientSession) || HasErrorSess(testAmbientSession) {
 		t.Fatal("null extension")
 	}
@@ -61,7 +61,7 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	if ExtensionMgrOutputTailSess(testAmbientSession) != "    return 0;\n" {
 		t.Fatal(ExtensionMgrOutputTailSess(testAmbientSession))
 	}
-	init := ExtensionMgrOutputInit(true)
+	init := ExtensionMgrOutputInitSess(testAmbientSession, true)
 	if !strings.Contains(init, "argc") || !strings.Contains(init, "{") {
 		t.Fatal(init)
 	}
@@ -73,14 +73,14 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, o)
 	SetProcessRngSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(o))
-	CreateExtension(o)
+	CreateExtensionSess(testAmbientSession, o)
 	if HasErrorSess(testAmbientSession) || !ExtensionActiveSess(testAmbientSession) || ExtensionKindSess(testAmbientSession) != "klee" {
 		t.Fatal("klee create", HasErrorSess(testAmbientSession), ExtensionKindSess(testAmbientSession))
 	}
 	if !strings.Contains(ExtensionMgrOutputHeaderSess(testAmbientSession), "klee/klee.h") {
 		t.Fatal(ExtensionMgrOutputHeaderSess(testAmbientSession))
 	}
-	DestroyExtension()
+	DestroyExtensionSess(testAmbientSession, )
 	ReinstallTestProcessSingletons()
 }
 

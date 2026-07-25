@@ -68,7 +68,7 @@ func TestModHugeConstNotEqualsZero(t *testing.T) {
 	left := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "1L"}, ExprType: GetIntTypeSess(testAmbientSession)}
 	right := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleTypeSess(testAmbientSession, EULongLong), Value: "18446744073709551607UL"}, ExprType: GetSimpleTypeSess(testAmbientSession, EULongLong)}
 	fi := &Invocation{IsStd: true, Binary: "%", Args: []*Expression{left, right}}
-	if fi.EqualsInt(0) {
+	if fi.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("1 % BIGUL must not EqualsInt(0) (would re-pick div/mod)")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -129,25 +129,25 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 	loc.Name = "l_1"
 	loc.Init = MakeIntSess(testAmbientSession, 3)
 	inner := &Block{Parent: outer, LocalVars: []*Variable{loc}}
-	skipped := CollectInitSkippedVars(outer, inner)
+	skipped := CollectInitSkippedVarsSess(testAmbientSession, outer, inner)
 	if skipped == nil || len(skipped) != 1 || skipped[0] != loc {
 		t.Fatal(skipped)
 	}
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: skipped}
-	out := OutputSkippedVarInits(st, "    ")
+	out := OutputSkippedVarInitsSess(testAmbientSession, st, "    ")
 	if !strings.Contains(out, "l_1 = 3;") {
 		t.Fatal(out)
 	}
 	// nil LocalVars hole fails closed sticky incomplete (not bare nil invent empty complete)
 	ClearErrorSess(testAmbientSession)
 	hole := &Block{Parent: outer, LocalVars: []*Variable{nil}}
-	if VariablesComplete(CollectInitSkippedVars(outer, hole)) {
+	if VariablesComplete(CollectInitSkippedVarsSess(testAmbientSession, outer, hole)) {
 		t.Fatal("nil local hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil local hole CollectInitSkippedVars must SetError sticky")
 	}
-	if !HasInitSkippedVars(outer, hole) {
+	if !HasInitSkippedVarsSess(testAmbientSession, outer, hole) {
 		t.Fatal("incomplete must fail closed as has-skipped")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -185,13 +185,13 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 	// set InitExpr to constant pointer-ish "0" via constant for stable assert
 	loc.InitExpr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0), ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{loc}}
-	out := OutputSkippedVarInits(st, "")
+	out := OutputSkippedVarInitsSess(testAmbientSession, st, "")
 	if !strings.Contains(out, "l_p = 0;") {
 		t.Fatal(out)
 	}
 	// InitExpr wins over Init
 	loc.Init = MakeIntSess(testAmbientSession, 99)
-	out2 := OutputSkippedVarInits(st, "")
+	out2 := OutputSkippedVarInitsSess(testAmbientSession, st, "")
 	if strings.Contains(out2, "99") {
 		t.Fatal("InitExpr should win", out2)
 	}
@@ -207,7 +207,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	good.Name = "l_ok"
 	good.Init = MakeIntSess(testAmbientSession, 4)
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{v, good}}
-	out := OutputSkippedVarInits(st, "")
+	out := OutputSkippedVarInitsSess(testAmbientSession, st, "")
 	if out != "" {
 		t.Fatal("incomplete re-init list must fail closed whole emit", out)
 	}
@@ -217,7 +217,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	// nil hole fails closed sticky
 	ClearErrorSess(testAmbientSession)
 	stHole := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{good, nil}}
-	if out := OutputSkippedVarInits(stHole, ""); out != "" {
+	if out := OutputSkippedVarInitsSess(testAmbientSession, stHole, ""); out != "" {
 		t.Fatal("nil InitSkippedVars hole must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -229,7 +229,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	anon.Name = ""
 	anon.Init = MakeIntSess(testAmbientSession, 5)
 	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{anon, good}}
-	out2 := OutputSkippedVarInits(st2, "")
+	out2 := OutputSkippedVarInitsSess(testAmbientSession, st2, "")
 	if out2 != "" {
 		t.Fatal("empty name must fail closed whole emit", out2)
 	}
@@ -239,7 +239,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	// complete list still emits
 	ClearErrorSess(testAmbientSession)
 	st3 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{good}}
-	if out3 := OutputSkippedVarInits(st3, ""); !strings.Contains(out3, "l_ok = 4;") {
+	if out3 := OutputSkippedVarInitsSess(testAmbientSession, st3, ""); !strings.Contains(out3, "l_ok = 4;") {
 		t.Fatal(out3)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -249,8 +249,8 @@ func TestVariableInitOutput(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); sticky no soft invent "0" when missing
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableWithInitSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiers([]bool{false}, []bool{false}))
-	if variableInitOutput(v) != "" {
-		t.Fatal("nil init must not invent 0", variableInitOutput(v))
+	if variableInitOutputSess(testAmbientSession, v) != "" {
+		t.Fatal("nil init must not invent 0", variableInitOutputSess(testAmbientSession, v))
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil init variableInitOutput must SetError sticky")
@@ -258,16 +258,16 @@ func TestVariableInitOutput(t *testing.T) {
 	// Variable.cpp:395 — CreateVariableScalars always Constant::make_random
 	ClearErrorSess(testAmbientSession)
 	v2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
-	if variableInitOutput(v2) == "" {
+	if variableInitOutputSess(testAmbientSession, v2) == "" {
 		t.Fatal("scalars path always has init")
 	}
 	v.Init = MakeIntSess(testAmbientSession, 5)
-	if variableInitOutput(v) != "5" {
-		t.Fatal(variableInitOutput(v))
+	if variableInitOutputSess(testAmbientSession, v) != "5" {
+		t.Fatal(variableInitOutputSess(testAmbientSession, v))
 	}
 	v.InitExpr = &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 7)}
-	if variableInitOutput(v) != "7" {
-		t.Fatal(variableInitOutput(v))
+	if variableInitOutputSess(testAmbientSession, v) != "7" {
+		t.Fatal(variableInitOutputSess(testAmbientSession, v))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -307,7 +307,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 		if st.Kind == StmtGoto {
 			// if Collect was incomplete, must have failed closed
 			// hole on outer LocalVars when dest is outer and src is inner:
-			// CollectInitSkippedVars(inner, outer) — dest outer, climb outer, LocalVars hole → nil
+			// CollectInitSkippedVarsSess(testAmbientSession, inner, outer) — dest outer, climb outer, LocalVars hole → nil
 			// path depends on back vs forward
 			if !VariablesComplete(st.InitSkippedVars) {
 				// incomplete skip list must not be attached to a live goto
@@ -316,7 +316,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 		}
 	}
 	// Direct: Collect incomplete when hole
-	if VariablesComplete(CollectInitSkippedVars(inner, outer)) {
+	if VariablesComplete(CollectInitSkippedVarsSess(testAmbientSession, inner, outer)) {
 		t.Fatal("outer LocalVars hole must yield incomplete Collect")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -324,7 +324,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 
 func TestOutputSkippedVarInitsNilStmtSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if OutputSkippedVarInits(nil, "  ") != "" {
+	if OutputSkippedVarInitsSess(testAmbientSession, nil, "  ") != "" {
 		t.Fatal("nil Stmt OutputSkippedVarInits must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

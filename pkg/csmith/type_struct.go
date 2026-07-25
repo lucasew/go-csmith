@@ -11,10 +11,6 @@ import (
 
 // MoreTypesProbability mirrors Type.cpp MoreTypesProbability.
 // Always true while AllTypes-like count < 10; else 50% MoreStructUnionProb.
-func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
-	return MoreTypesProbabilitySess(testAmbientSession, r, probs, typeCount)
-}
-
 // MoreTypesProbabilitySess is MoreTypesProbability with explicit session residual sticky.
 func MoreTypesProbabilitySess(s *Session, r *Rng, probs *Probabilities, typeCount int) bool {
 	if typeCount < 10 {
@@ -71,10 +67,6 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 
 // MakeOneBitfield mirrors Type::make_one_bitfield.
 // Type.cpp:638–668 — signed flip, int/uint type, field qfer, length rnd_upto(int_size*8).
-func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
-	return MakeOneBitfieldSess(testAmbientSession, r, opts, probs, fieldIdx, prevZero)
-}
-
 func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
 	// Type.cpp:641 — CGOptions::int_size()*8; no soft invent 32 when size is 0
 	// empty StructField uses BitWidth -1 (not a bitfield) so callers can detect fail
@@ -252,10 +244,6 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 // Type.cpp:259–269 — true if any field has_implicit_nontrivial_assign_ops (C++ only).
 // Type* always live on Fields; nil hole sticky true (no invent no-nontrivial /
 // soft re-pick past incomplete field Type that would skip C++ assign-op bans).
-func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
-	return CheckImplicitNontrivialAssignOpsSess(testAmbientSession, opts, fields)
-}
-
 // CheckImplicitNontrivialAssignOpsSess is CheckImplicitNontrivialAssignOps with
 // explicit session residual sticky.
 func CheckImplicitNontrivialAssignOpsSess(s *Session, opts Options, fields []StructField) bool {
@@ -322,10 +310,6 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 }
 
 // OutputStructDecl emits a C struct definition.
-func (t *Type) OutputStructDecl() string {
-	return t.OutputStructDeclSess(testAmbientSession, nil, nil)
-}
-
 // OutputStructDeclSess is OutputStructDecl with Options/sticky from an explicit bag.
 func (t *Type) OutputStructDeclSess(s *Session, r *Rng, attrs *AttributeGenerator) string {
 	return t.OutputStructDeclWithSess(s, r, attrs, sessOpts(s))
@@ -333,15 +317,7 @@ func (t *Type) OutputStructDeclSess(s *Session, r *Rng, attrs *AttributeGenerato
 
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
-func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	return t.OutputStructDeclSess(testAmbientSession, r, attrs)
-}
-
 // OutputStructDeclWith is OutputStructDeclOpts with explicit session Options (ccomp pack).
-func (t *Type) OutputStructDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
-	return t.OutputStructDeclWithSess(testAmbientSession, r, attrs, opts)
-}
-
 func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
 	// Type* always live at struct emit; sticky no invent decl without it
 	if t == nil {
@@ -493,10 +469,6 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 
 // GenerateRandomConstantInRange mirrors GenerateRandomConstantInRange for bitfields.
 // Constant.cpp:225–250 — small random value within ~2^(bound/2).
-func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) string {
-	return GenerateRandomConstantInRangeSess(testAmbientSession, typ, bound, opts, r)
-}
-
 func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Options, r *Rng) string {
 	// Constant.cpp:222–246 — GenerateRandomConstantInRange
 	// Constant.cpp:223 — assert(type->eType == eSimple)
@@ -568,10 +540,6 @@ func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Op
 // MakeStructConstant mirrors GenerateRandomStructConstant.
 // Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.}
 
-func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
-	return MakeStructConstantSess(testAmbientSession, r, opts, probs, st)
-}
-
 func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
 	// Constant.cpp:255 — assert(eStruct); always has RNG for field constants sticky
 	// no invent "{}" shell without live RNG / fields path
@@ -595,7 +563,7 @@ func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabiliti
 		}
 		var val string
 		if f.BitWidth > 0 {
-			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
+			// bitfield: GenerateRandomConstantInRangeSess(s, eInt/eUInt only)
 			val = GenerateRandomConstantInRangeSess(s, f.Type, f.BitWidth, opts, r)
 			// residual ERROR sticky — no invent soft-field past range residual
 			if sessHasError(s) {
@@ -879,10 +847,6 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 }
 
 // OutputUnionDecl emits a C union definition.
-func (t *Type) OutputUnionDecl() string {
-	return t.OutputUnionDeclSess(testAmbientSession, nil, nil)
-}
-
 // OutputUnionDeclSess is OutputUnionDecl with Options/sticky from an explicit bag.
 func (t *Type) OutputUnionDeclSess(s *Session, r *Rng, attrs *AttributeGenerator) string {
 	return t.OutputUnionDeclWithSess(s, r, attrs, sessOpts(s))
@@ -890,15 +854,7 @@ func (t *Type) OutputUnionDeclSess(s *Session, r *Rng, attrs *AttributeGenerator
 
 // OutputUnionDeclOpts optionally emits type attributes.
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
-func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	return t.OutputUnionDeclSess(testAmbientSession, r, attrs)
-}
-
 // OutputUnionDeclWith is OutputUnionDeclOpts with explicit session Options.
-func (t *Type) OutputUnionDeclWith(r *Rng, attrs *AttributeGenerator, opts Options) string {
-	return t.OutputUnionDeclWithSess(testAmbientSession, r, attrs, opts)
-}
-
 func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
 	// Type* always live at union emit; sticky no invent decl without it
 	if t == nil {
@@ -1020,10 +976,6 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 
 // MakeUnionConstant mirrors GenerateRandomUnionConstant — initialize first field only.
 // Constant.cpp:288–294.
-func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
-	return MakeUnionConstantSess(testAmbientSession, r, opts, probs, ut)
-}
-
 func MakeUnionConstantSess(s *Session, r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
 	// Constant.cpp:289–291 — assert union with fields; always has RNG sticky
 	// no soft invent MakeIntSess(sessFromEnv(env), 0) / "{}" without live RNG

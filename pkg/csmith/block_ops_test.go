@@ -581,7 +581,7 @@ func TestAddNewVarFactTo(t *testing.T) {
 		t.Fatal("pointer init")
 	}
 	var facts []*FactPointTo
-	AddNewVarFactTo(p, &facts)
+	AddNewVarFactToSess(testAmbientSession, p, &facts)
 	got := FindRelatedPointToSess(testAmbientSession, facts, p)
 	if got == nil {
 		t.Fatal(facts)
@@ -593,7 +593,7 @@ func TestAddNewVarFactTo(t *testing.T) {
 		t.Fatalf("want null from init, got %+v", got.PointTo)
 	}
 	// idempotent
-	AddNewVarFactTo(p, &facts)
+	AddNewVarFactToSess(testAmbientSession, p, &facts)
 	if len(facts) != 1 {
 		t.Fatal(len(facts))
 	}
@@ -602,7 +602,7 @@ func TestAddNewVarFactTo(t *testing.T) {
 	ClearMetaFactsSess(testAmbientSession)
 	currentSession().MetaFactPointToEnabled = false
 	var empty []*FactPointTo
-	AddNewVarFactTo(p, &empty)
+	AddNewVarFactToSess(testAmbientSession, p, &empty)
 	if len(empty) != 0 {
 		t.Fatal("meta off must not invent", empty)
 	}
@@ -685,7 +685,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 }
 
 func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {
-	// soft invent: AddNewVarFactTo(nil) no-op skip LocalVars hole
+	// soft invent: AddNewVarFactToSess(testAmbientSession, nil) no-op skip LocalVars hole
 	// fair: nil LocalVars fails closed fixed-point
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
@@ -757,7 +757,7 @@ func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 	// currentUnions after merge of goto map_out that still listed a body local.
 	currentUnions := []*FactUnion{uG.CloneSess(testAmbientSession), uLoc.CloneSess(testAmbientSession)}
 	locals := []*Variable{loc}
-	entryUnions := DropUnionSubjectsByVars(currentUnions, locals)
+	entryUnions := DropUnionSubjectsByVarsSess(testAmbientSession, currentUnions, locals)
 	if !UnionFactsComplete(entryUnions) {
 		t.Fatal("drop incomplete")
 	}
@@ -768,12 +768,12 @@ func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 		t.Fatal("drop must keep non-local")
 	}
 	// Without sync: same_facts(currentUnions, entryUnions) is false forever.
-	if SameUnionFacts(currentUnions, entryUnions) {
+	if SameUnionFactsSess(testAmbientSession, currentUnions, entryUnions) {
 		t.Fatal("pre-sync currentUnions must still hold local (merge residue)")
 	}
 	// FindFixedPointBlock assigns currentUnions = entryUnions after drop.
 	currentUnions = entryUnions
-	if !SameUnionFacts(currentUnions, entryUnions) {
+	if !SameUnionFactsSess(testAmbientSession, currentUnions, entryUnions) {
 		t.Fatal("synced currentUnions must same_facts with map_in half")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -991,8 +991,8 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 }
 
 func TestFindJumpLabel(t *testing.T) {
-	GotoLabelsDoFinalization()
-	defer GotoLabelsDoFinalization()
+	GotoLabelsDoFinalizationSess(testAmbientSession, )
+	defer GotoLabelsDoFinalizationSess(testAmbientSession, )
 	f := &Function{Name: "f"}
 	body := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 7},
@@ -1005,7 +1005,7 @@ func TestFindJumpLabel(t *testing.T) {
 		t.Fatal(got)
 	}
 	// registry fallback when no matching edge
-	_ = LabelForGotoDest(99, func() string { return "lbl_reg" })
+	_ = LabelForGotoDestSess(testAmbientSession, 99, func() string { return "lbl_reg" })
 	if got := FindJumpLabel(fm, 99); got != "lbl_reg" {
 		t.Fatal(got)
 	}
@@ -1254,7 +1254,7 @@ func TestRemoveStmtScrubsParentChainOrphanBlocks(t *testing.T) {
 
 func TestRemoveStmtDestEdgeUsesParentChainContains(t *testing.T) {
 	// Block.cpp:632–646 — if (s->contains_stmt(edge->dest)) full contains_stmt.
-	// Soft invent was blockUnderStmt (Stmts walk) for DestBlock, missing orphan
+	// Soft invent was blockUnderStmtSess(testAmbientSession, Stmts walk) for DestBlock, missing orphan
 	// nested blocks with only Parent set → edge kept, goto cascade skipped.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}

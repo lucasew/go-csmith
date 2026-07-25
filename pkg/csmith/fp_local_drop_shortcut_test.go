@@ -3,7 +3,7 @@ package csmith
 import "testing"
 
 // TestFindFixedPointDropsBodyLocalsBeforeShortcut — Block.cpp:520–557.
-// map_facts_in is stored after DropFactSubjectsByVars(body.LocalVars).
+// map_facts_in is stored after DropFactSubjectsByVarsSess(testAmbientSession, body.LocalVars).
 // Back-edge merge can reintroduce those locals from goto/break map_out.
 // same_facts(current_with_locals, map_in_without) never converges → multi-pass
 // rewrites map_accum_effect with end-of-body effect_accum → StatementGoto

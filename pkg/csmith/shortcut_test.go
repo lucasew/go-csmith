@@ -9,17 +9,17 @@ func TestSameFacts(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	a := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	b := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	if !SameFacts(a, b) {
+	if !SameFactsSess(testAmbientSession, a, b) {
 		t.Fatal("same")
 	}
 	b2 := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
-	if SameFacts(a, b2) {
+	if SameFactsSess(testAmbientSession, a, b2) {
 		t.Fatal("diff")
 	}
 	// nil hole sticky — no invent same-as-skip
 	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{nil}
-	if SameFacts(hole, hole) {
+	if SameFactsSess(testAmbientSession, hole, hole) {
 		t.Fatal("nil hole must not be same")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -28,14 +28,14 @@ func TestSameFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete PointTo sticky
 	ptHole := []*FactPointTo{{Var: p, PointTo: []*Variable{nil}}}
-	if SameFacts(ptHole, ptHole) {
+	if SameFactsSess(testAmbientSession, ptHole, ptHole) {
 		t.Fatal("nil pointee must not invent SameFacts")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("SameFacts nil pointee must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindFact(ptHole, MakeFactPointToSess(testAmbientSession, p, NullPtr)) >= 0 {
+	if FindFactSess(testAmbientSession, ptHole, MakeFactPointToSess(testAmbientSession, p, NullPtr)) >= 0 {
 		t.Fatal("FindFact incomplete map must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -46,7 +46,7 @@ func TestSameFacts(t *testing.T) {
 	// Fair: sticky -1. Want with PointTo hole stickies Equal residual false.
 	wantHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	complete := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), MakeFactPointToSess(testAmbientSession, p, GarbagePtr)}
-	if FindFact(complete, wantHole) >= 0 {
+	if FindFactSess(testAmbientSession, complete, wantHole) >= 0 {
 		t.Fatal("Equal residual FindFact must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -56,12 +56,12 @@ func TestSameFacts(t *testing.T) {
 	// SameFacts residual via FindFact Equal residual soft invent was same-true.
 	// Fair: sticky not-same.
 	// Use complete map vs want that causes Equal residual on first scan element...
-	// SameFacts(a,b) for each a in FindFact(b): if want in a has PointTo hole, FactsComplete fails first.
+	// SameFactsSess(testAmbientSession, a,b) for each a in FindFactSess(testAmbientSession, b): if want in a has PointTo hole, FactsComplete fails first.
 	// Equal residual: complete facts with different PointTo holes on map side already FactsComplete false.
 	// Equal residual via want complete but map fact with PointTo that Equal can residual - FactsComplete rejects map holes.
 	// Residual path for FindFact Equal residual is want incomplete PointTo - already covered above for FindFact.
 	// SameFacts with residual from FindFact when want is complete: soft invent covered by FindFact residual.
-	// Add SameFacts residual when FindFact residual from incomplete want isn't reachable via SameFacts (FactsComplete on a).
+	// Add SameFacts residual when FindFact residual from incomplete want isn't reachable via SameFactsSess(testAmbientSession, FactsComplete on a).
 	// Covered by FindFact residual test.
 }
 
@@ -73,10 +73,10 @@ func TestSubsetFacts(t *testing.T) {
 	narrow := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	// subset_facts(narrow, wide): each narrow must be implied by related in wide
 	// wide.Imply(narrow) means wide covers narrow's points
-	if !SubsetFacts(narrow, wide) {
+	if !SubsetFactsSess(testAmbientSession, narrow, wide) {
 		// narrow is subset if wide implies narrow
 		// Imply: f.Imply(other) means f covers other
-		// SubsetFacts(a,b): for each f1 in a, related f2 in b implies f1
+		// SubsetFactsSess(testAmbientSession, a,b): for each f1 in a, related f2 in b implies f1
 		// so f2.Imply(f1) — wide implies narrow ✓
 		if !wide[0].ImplySess(testAmbientSession, narrow[0]) {
 			t.Fatal("imply")
@@ -85,18 +85,18 @@ func TestSubsetFacts(t *testing.T) {
 		t.Log("size mismatch expected fail")
 	}
 	// same size: both one fact
-	if !SubsetFacts(narrow, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})}) {
+	if !SubsetFactsSess(testAmbientSession, narrow, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})}) {
 		// related wide implies null-only? wide implies null-only yes
-		// wait SubsetFacts(narrow, wide2) with same len
+		// wait SubsetFactsSess(testAmbientSession, narrow, wide2) with same len
 		w := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{NullPtr, GarbagePtr})}
-		if !SubsetFacts(narrow, w) {
+		if !SubsetFactsSess(testAmbientSession, narrow, w) {
 			t.Fatal("subset")
 		}
 	}
 	// nil fact hole sticky — no invent skip as subset
 	ClearErrorSess(testAmbientSession)
 	hole := []*FactPointTo{nil}
-	if SubsetFacts(hole, hole) {
+	if SubsetFactsSess(testAmbientSession, hole, hole) {
 		t.Fatal("nil hole must not be subset")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -107,7 +107,7 @@ func TestSubsetFacts(t *testing.T) {
 	// Fair: sticky fail closed not-subset with ERROR.
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{NullPtr, nil}}
 	ok := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
-	if SubsetFacts(ok, []*FactPointTo{broken}) {
+	if SubsetFactsSess(testAmbientSession, ok, []*FactPointTo{broken}) {
 		t.Fatal("Imply residual must fail closed not-subset")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -118,17 +118,17 @@ func TestSubsetFacts(t *testing.T) {
 
 func TestIsCtrlStmt(t *testing.T) {
 	// Statement.h:164–167 — continue/break/goto only; not return (may pure-shortcut)
-	if !IsCtrlStmt(&Stmt{Kind: StmtBreak}) || !IsCtrlStmt(&Stmt{Kind: StmtContinue}) ||
-		!IsCtrlStmt(&Stmt{Kind: StmtGoto}) {
+	if !IsCtrlStmtSess(testAmbientSession, &Stmt{Kind: StmtBreak}) || !IsCtrlStmtSess(testAmbientSession, &Stmt{Kind: StmtContinue}) ||
+		!IsCtrlStmtSess(testAmbientSession, &Stmt{Kind: StmtGoto}) {
 		t.Fatal("break/continue/goto must be ctrl")
 	}
-	if IsCtrlStmt(&Stmt{Kind: StmtAssign}) || IsCtrlStmt(&Stmt{Kind: StmtReturn}) ||
-		IsCtrlStmt(&Stmt{Kind: StmtFor}) {
+	if IsCtrlStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign}) || IsCtrlStmtSess(testAmbientSession, &Stmt{Kind: StmtReturn}) ||
+		IsCtrlStmtSess(testAmbientSession, &Stmt{Kind: StmtFor}) {
 		t.Fatal("assign/return/for must not be is_ctrl_stmt")
 	}
 	// Statement always live; sticky no invent not-ctrl soft-skip
 	ClearErrorSess(testAmbientSession)
-	if IsCtrlStmt(nil) {
+	if IsCtrlStmtSess(testAmbientSession, nil) {
 		t.Fatal("nil IsCtrlStmt must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -150,10 +150,10 @@ func TestSameFactVec(t *testing.T) {
 	u1 := MakeFactUnionSess(testAmbientSession, parent, 1)
 	pvar := CreateVariableScalarsSess(testAmbientSession, "g_p_sfv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	pt := []*FactPointTo{MakeFactPointToSess(testAmbientSession, pvar, NullPtr)}
-	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}) {
+	if !SameFactVecSess(testAmbientSession, pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnionSess(testAmbientSession, parent, 0)}) {
 		t.Fatal("same full vec")
 	}
-	if SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{u1}) {
+	if SameFactVecSess(testAmbientSession, pt, []*FactUnion{u0}, pt, []*FactUnion{u1}) {
 		t.Fatal("union mismatch")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -479,40 +479,40 @@ func TestContainsStmt(t *testing.T) {
 	inner := Stmt{Kind: StmtAssign, StmID: 2}
 	// StatementIf always has both arms
 	outer := Stmt{Kind: StmtIfElse, StmID: 1, Then: &Block{Stmts: []Stmt{inner}}, Else: &Block{}}
-	if !ContainsStmt(&outer, &inner) {
+	if !ContainsStmtSess(testAmbientSession, &outer, &inner) {
 		t.Fatal("contains")
 	}
 	// Statement always live; sticky no invent not-contained soft-skip
 	ClearErrorSess(testAmbientSession)
-	if ContainsStmt(nil, &inner) {
+	if ContainsStmtSess(testAmbientSession, nil, &inner) {
 		t.Fatal("nil root ContainsStmt must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil root ContainsStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ContainsStmt(&outer, nil) {
+	if ContainsStmtSess(testAmbientSession, &outer, nil) {
 		t.Fatal("nil target ContainsStmt must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil target ContainsStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindStmtInTree(nil, 1) != nil {
+	if FindStmtInTreeSess(testAmbientSession, nil, 1) != nil {
 		t.Fatal("nil FindStmtInTree must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FindStmtInTree must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if FindStmtInTree(&outer, IncompleteStmID) != nil {
+	if FindStmtInTreeSess(testAmbientSession, &outer, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtInTree must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmID 0 FindStmtInTree must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if BlockContainsStmt(nil, &inner) {
+	if BlockContainsStmtSess(testAmbientSession, nil, &inner) {
 		t.Fatal("nil BlockContainsStmt must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -927,7 +927,7 @@ func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 		t.Fatal("incomplete MapFactsOut must fail closed ShortcutNone")
 	}
 	// inputs must not be replaced with invent-cleaned clone
-	if !SameFacts(facts, in) {
+	if !SameFactsSess(testAmbientSession, facts, in) {
 		t.Fatal("facts must stay pre-shortcut inputs on fail closed")
 	}
 }
