@@ -567,7 +567,7 @@ func MakeRandomBlock(
 	f.Stack = append(f.Stack, b)
 	f.Blocks = append(f.Blocks, b)
 	// DepthSpec::depth_guard_by_type(dtBlock) — random mode always GOOD
-	if DepthGuardByType(opts, "dtBlock") == BadDepth {
+	if DepthGuardByTypeSess(cgSess(cg), opts, "dtBlock") == BadDepth {
 		abortBlockMake(f, b)
 		return nil
 	}
@@ -1388,7 +1388,7 @@ func makeRandomStmtForced(
 	if forceKind == MaxStatementType {
 		guardT = int(MaxStatementType)
 	}
-	if DepthGuardByTypeFlag(opts, DtStatement, guardT) == BadDepth {
+	if DepthGuardByTypeFlagSess(cgSess(cg), opts, DtStatement, guardT) == BadDepth {
 		return Stmt{}
 	}
 	// Statement static ProbabilityTable always live; sticky no invent NewStatementThresholdTable

@@ -38,7 +38,8 @@ func HasError() bool { return HasErrorSess(nil) }
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
 // sessNoteError writes GenError on s when non-nil and dual-syncs ambient GenError
-// while call sites still use SetError/HasError (pure-session bridge).
+// while call sites still use SetError/HasError and sessHasError(nil) residual
+// checks (pure-session bridge until emit paths stop reading ambient).
 // Nil s targets only the Process* ambient bag.
 func sessNoteError(s *Session, code int) {
 	if s != nil {
@@ -49,6 +50,8 @@ func sessNoteError(s *Session, code int) {
 }
 
 // sessHasError reports sticky error on s when non-nil, else ambient.
+// When s is non-nil, also ORs ambient so residual Output/HasError paths that
+// still read Process* see sticky written via dual-sync.
 func sessHasError(s *Session) bool {
 	if s != nil && s.GenError != ErrSuccess {
 		return true

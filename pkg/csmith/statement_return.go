@@ -105,7 +105,7 @@ func MakeRandomReturn(
 		return Stmt{}
 	}
 	// StatementReturn.cpp:55 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementReturn, nullptr)
-	if DepthGuardByType(opts, DtStatementReturn) == BadDepth {
+	if DepthGuardByTypeSess(cgSess(cg), opts, DtStatementReturn) == BadDepth {
 		return Stmt{}
 	}
 	// StatementReturn.cpp:56–59 — assert(curr_func); assert(fm)

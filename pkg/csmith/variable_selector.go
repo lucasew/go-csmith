@@ -1101,7 +1101,7 @@ func (vs *VariableSelector) MakeInitValue(
 
 	if chosen == nil {
 		// VariableSelector.cpp:866–904 — create suitable addressable
-		if DepthGuardByType(vs.Opts, DtInitPointerValue) == BadDepth {
+		if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtInitPointerValue) == BadDepth {
 			return nil
 		}
 		noVolatile := false
@@ -2479,7 +2479,7 @@ func (vs *VariableSelector) SelectGlobalMT(
 	}
 	// VariableSelector.cpp:685 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectGlobal, nullptr)
 	// only on the GenerateNewGlobal path after choose_var miss
-	if DepthGuardByType(vs.Opts, DtSelectGlobal) == BadDepth {
+	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtSelectGlobal) == BadDepth {
 		return nil
 	}
 	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
@@ -3479,7 +3479,7 @@ func (vs *VariableSelector) SelectWithInvalid(
 	}
 	// VariableSelector.cpp:1190–1191 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtSelectVariable, scope, nullptr)
 	// scope not chosen yet → MAX_VAR_SCOPE flag (mirrors call with default MAX)
-	if DepthGuardByTypeFlag(vs.Opts, DtSelectVariable, int(MaxVarScope)) == BadDepth {
+	if DepthGuardByTypeFlagSess(vsSess(vs), vs.Opts, DtSelectVariable, int(MaxVarScope)) == BadDepth {
 		return nil
 	}
 	vs.VarCreated = false
@@ -3592,7 +3592,7 @@ func (vs *VariableSelector) SelectParentLocalInv(
 		return nil
 	}
 	// VariableSelector.cpp:989 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectParentLocal, nullptr)
-	if DepthGuardByType(vs.Opts, DtSelectParentLocal) == BadDepth {
+	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtSelectParentLocal) == BadDepth {
 		return nil
 	}
 	// VariableSelector.cpp:991–996 — assert(!stack.empty()); no soft invent global/param
@@ -3773,7 +3773,7 @@ func (vs *VariableSelector) GenerateNewVariable(
 		return nil
 	}
 	// VariableSelector.cpp:1093 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewVariable, nullptr)
-	if DepthGuardByType(vs.Opts, DtGenerateNewVariable) == BadDepth {
+	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtGenerateNewVariable) == BadDepth {
 		return nil
 	}
 	scope := VariableCreationProbability(r, vs.Opts)
@@ -3785,7 +3785,7 @@ func (vs *VariableSelector) GenerateNewVariable(
 	switch scope {
 	case ScopeGlobal:
 		// VariableSelector.cpp:1100 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewGlobal, nullptr)
-		if DepthGuardByType(vs.Opts, DtGenerateNewGlobal) == BadDepth {
+		if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtGenerateNewGlobal) == BadDepth {
 			return nil
 		}
 		// VariableSelector.cpp:1104–1107 — !is_random && GlobalList.empty → ERROR

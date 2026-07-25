@@ -1096,7 +1096,7 @@ func MakeRandomBinaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:173 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomBinary, nullptr)
-	if DepthGuardByType(opts, DtFunctionInvocationRandomBinary) == BadDepth {
+	if DepthGuardByTypeSess(cgSess(cg), opts, DtFunctionInvocationRandomBinary) == BadDepth {
 		return nil
 	}
 	// FunctionInvocation.cpp:171+ — type may be nullptr (StatementExpr); no GetIntType invent
@@ -1600,7 +1600,7 @@ func MakeBinary(
 		return nil
 	}
 	// FunctionInvocation.cpp:565 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationBinary, nullptr)
-	if DepthGuardByType(opts, DtFunctionInvocationBinary) == BadDepth {
+	if DepthGuardByTypeSess(cg.Sess, opts, DtFunctionInvocationBinary) == BadDepth {
 		return nil
 	}
 	// invalid / MAX op — sticky no invent empty Binary token shell
@@ -1664,7 +1664,7 @@ func MakeRandomUnaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:143 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomUnary, nullptr)
-	if DepthGuardByType(opts, DtFunctionInvocationRandomUnary) == BadDepth {
+	if DepthGuardByTypeSess(cgSess(cg), opts, DtFunctionInvocationRandomUnary) == BadDepth {
 		return nil
 	}
 	// FunctionInvocation.cpp:144 — assert(type) sticky

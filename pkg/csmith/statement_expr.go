@@ -26,7 +26,7 @@ func MakeRandomExprStmt(
 		return Stmt{}
 	}
 	// StatementExpr.cpp:53 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementExpr, nullptr)
-	if DepthGuardByType(opts, DtStatementExpr) == BadDepth {
+	if DepthGuardByTypeSess(cgSess(cg), opts, DtStatementExpr) == BadDepth {
 		return Stmt{}
 	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback

@@ -893,8 +893,13 @@ func NewExprTables(opts Options) *ExprTables {
 // InitProbabilityTables mirrors Expression::InitProbabilityTables static setup.
 // Expression.cpp:93–96 — installs process session expr/param tables from opts.
 func InitProbabilityTables(opts Options) *ExprTables {
+	return InitProbabilityTablesSess(nil, opts)
+}
+
+// InitProbabilityTablesSess installs ExprTables on an explicit session bag.
+func InitProbabilityTablesSess(s *Session, opts Options) *ExprTables {
 	t := NewExprTables(opts)
-	SetProcessExprTables(t)
+	SetProcessExprTablesSess(s, t)
 	return t
 }
 
@@ -1065,7 +1070,7 @@ func MakeRandomParam(
 	}
 	// Expression.cpp:242–243 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpressionRandomParam, tt, …)
 	// term type not chosen yet when MAX; guard uses flag 0 until Pick (C++ uses tt arg)
-	if DepthGuardByTypeFlag(opts, DtExpressionRandomParam, int(MaxTermTypes)) == BadDepth {
+	if DepthGuardByTypeFlagSess(cgSess(cg), opts, DtExpressionRandomParam, int(MaxTermTypes)) == BadDepth {
 		return nil
 	}
 	// Expression.cpp:258 — use cg_context.expr_depth (exprDepth param kept for API)
@@ -1183,7 +1188,7 @@ func MakeRandomExpression(
 		return nil
 	}
 	// Expression.cpp:144–145 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpression, tt, nullptr)
-	if DepthGuardByTypeFlag(opts, DtExpression, int(tt)) == BadDepth {
+	if DepthGuardByTypeFlagSess(cgSess(cg), opts, DtExpression, int(tt)) == BadDepth {
 		return nil
 	}
 	// Expression::InitProbabilityTables — session tables when caller omits them
@@ -1381,7 +1386,7 @@ func makeExpressionVariableFlags(
 		return nil
 	}
 	// ExpressionVariable.cpp:61 — DEPTH_GUARD_BY_TYPE_RETURN(dtExpressionVariable, nullptr)
-	if DepthGuardByType(vs.Opts, DtExpressionVariable) == BadDepth {
+	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtExpressionVariable) == BadDepth {
 		return nil
 	}
 	// ExpressionVariable.cpp:67–69 — snapshot effects for visit_facts failure restore

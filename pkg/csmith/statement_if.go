@@ -31,7 +31,7 @@ func MakeRandomIf(
 		return nil
 	}
 	// StatementIf.cpp:58 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementIf, nullptr)
-	if DepthGuardByType(opts, DtStatementIf) == BadDepth {
+	if DepthGuardByTypeSess(cgSess(cg), opts, DtStatementIf) == BadDepth {
 		return nil
 	}
 	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition

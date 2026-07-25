@@ -545,7 +545,7 @@ func MakeRandomLhs(
 	var dummy []*Variable
 	for tries := 0; tries < 10000; tries++ {
 		// Lhs.cpp:71 — DEPTH_GUARD_BY_TYPE_RETURN(dtLhs, nullptr) inside the do-loop
-		if DepthGuardByType(opts, DtLhs) == BadDepth {
+		if DepthGuardByTypeSess(cgSess(cg), opts, DtLhs) == BadDepth {
 			return nil
 		}
 		if sessHasError(nil) {

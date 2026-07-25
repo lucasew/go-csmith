@@ -180,11 +180,21 @@ func DepthGuardByDepthSess(s *Session, opts Options, depthNeeded int) int {
 // DepthGuardByType mirrors DepthSpec::depth_guard_by_type.
 // DepthSpec.cpp:337+ — always GOOD when !dfs_exhaustive; else backtracking(minimal).
 func DepthGuardByType(opts Options, dType string) int {
-	return DepthGuardByTypeFlag(opts, dType, 0)
+	return DepthGuardByTypeSess(nil, opts, dType)
+}
+
+// DepthGuardByTypeSess is DepthGuardByType with an explicit session RNG bag.
+func DepthGuardByTypeSess(s *Session, opts Options, dType string) int {
+	return DepthGuardByTypeFlagSess(s, opts, dType, 0)
 }
 
 // DepthGuardByTypeFlag is depth_guard_by_type with extra_flag for MAX_* cases.
 func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
+	return DepthGuardByTypeFlagSess(nil, opts, dType, flag)
+}
+
+// DepthGuardByTypeFlagSess is DepthGuardByTypeFlag on bag s (DFS RNG / sticky).
+func DepthGuardByTypeFlagSess(s *Session, opts Options, dType string, flag int) int {
 	if !opts.DFSExhaustive {
 		return GoodDepth
 	}
@@ -192,10 +202,10 @@ func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
 	d := MinimalDepth(dType, flag)
 	if d < 0 {
 		// MinimalDepth already SetError on unknown; ensure sticky if that path skipped
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return BadDepth
 	}
-	return DepthGuardByDepth(opts, d)
+	return DepthGuardByDepthSess(s, opts, d)
 }

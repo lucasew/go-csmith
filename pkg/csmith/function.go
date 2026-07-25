@@ -226,7 +226,7 @@ func MakeRandomSignature(
 		}
 	}
 	// Function.cpp:407 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunction, nullptr)
-	if DepthGuardByType(opts, DtFunction) == BadDepth {
+	if DepthGuardByTypeSess(s, opts, DtFunction) == BadDepth {
 		return nil
 	}
 	// Function.cpp:408 ERROR_GUARD after DEPTH_GUARD
