@@ -36,12 +36,13 @@ func ProcessOptions() Options { return ProcessOptionsSess(testAmbientSession) }
 // ProcessOptionsSess returns Options on an explicit session bag.
 func ProcessOptionsSess(s *Session) Options { return sessOrAmbient(s).Opts }
 
-// sessOpts returns s.Opts when s is non-nil, else ambient ProcessOptions.
+// sessOpts returns s.Opts. Nil s panics — pass run bag or testAmbientSession
+// (no silent ProcessOptions dual-read).
 func sessOpts(s *Session) Options {
-	if s != nil {
-		return s.Opts
+	if s == nil {
+		panic("sessOpts(nil)")
 	}
-	return ProcessOptions()
+	return s.Opts
 }
 
 // SetProcessProbabilities installs the session Probabilities singleton.
@@ -59,12 +60,12 @@ func ProcessProbabilities() *Probabilities { return ProcessProbabilitiesSess(tes
 // ProcessProbabilitiesSess returns Probabilities on an explicit session bag.
 func ProcessProbabilitiesSess(s *Session) *Probabilities { return sessOrAmbient(s).Probs }
 
-// sessProbs returns s.Probs when s is non-nil, else ambient ProcessProbabilities.
+// sessProbs returns s.Probs. Nil s panics — pass run bag or testAmbientSession.
 func sessProbs(s *Session) *Probabilities {
-	if s != nil {
-		return s.Probs
+	if s == nil {
+		panic("sessProbs(nil)")
 	}
-	return ProcessProbabilities()
+	return s.Probs
 }
 
 // SetProcessRng installs the session DefaultRndNumGenerator (shared with generator).
@@ -80,12 +81,12 @@ func ProcessRng() *Rng { return ProcessRngSess(testAmbientSession) }
 // ProcessRngSess returns Rng on an explicit session bag.
 func ProcessRngSess(s *Session) *Rng { return sessOrAmbient(s).Rng }
 
-// sessRng returns s.Rng when s is non-nil, else ambient ProcessRng.
+// sessRng returns s.Rng. Nil s panics — pass run bag or testAmbientSession.
 func sessRng(s *Session) *Rng {
-	if s != nil {
-		return s.Rng
+	if s == nil {
+		panic("sessRng(nil)")
 	}
-	return ProcessRng()
+	return s.Rng
 }
 
 // SetProcessStmtTab installs the session statement probability table.
@@ -103,12 +104,12 @@ func ProcessStmtTab() *ThresholdTable { return ProcessStmtTabSess(testAmbientSes
 // ProcessStmtTabSess returns StmtTab on an explicit session bag.
 func ProcessStmtTabSess(s *Session) *ThresholdTable { return sessOrAmbient(s).StmtTab }
 
-// sessStmtTab returns s.StmtTab when s is non-nil, else ambient ProcessStmtTab.
+// sessStmtTab returns s.StmtTab. Nil s panics — pass run bag or testAmbientSession.
 func sessStmtTab(s *Session) *ThresholdTable {
-	if s != nil {
-		return s.StmtTab
+	if s == nil {
+		panic("sessStmtTab(nil)")
 	}
-	return ProcessStmtTab()
+	return s.StmtTab
 }
 
 // SetProcessScopeTab installs the session VariableSelector::scopeTable_.
@@ -125,12 +126,12 @@ func ProcessScopeTab() *ThresholdTable { return ProcessScopeTabSess(testAmbientS
 // ProcessScopeTabSess returns ScopeTab on an explicit session bag.
 func ProcessScopeTabSess(s *Session) *ThresholdTable { return sessOrAmbient(s).ScopeTab }
 
-// sessScopeTab returns s.ScopeTab when s is non-nil, else ambient ProcessScopeTab.
+// sessScopeTab returns s.ScopeTab. Nil s panics — pass run bag or testAmbientSession.
 func sessScopeTab(s *Session) *ThresholdTable {
-	if s != nil {
-		return s.ScopeTab
+	if s == nil {
+		panic("sessScopeTab(nil)")
 	}
-	return ProcessScopeTab()
+	return s.ScopeTab
 }
 
 // InitScopeTable mirrors VariableSelector::InitScopeTable.
@@ -158,12 +159,12 @@ func ProcessAssignOpsTableSess(s *Session) *DistributionTable {
 	return sessOrAmbient(s).AssignOpsTab
 }
 
-// sessAssignOpsTab returns s.AssignOpsTab when s is non-nil, else ambient ProcessAssignOpsTable.
+// sessAssignOpsTab returns s.AssignOpsTab. Nil s panics — pass run bag or testAmbientSession.
 func sessAssignOpsTab(s *Session) *DistributionTable {
-	if s != nil {
-		return s.AssignOpsTab
+	if s == nil {
+		panic("sessAssignOpsTab(nil)")
 	}
-	return ProcessAssignOpsTable()
+	return s.AssignOpsTab
 }
 
 // SetProcessExprTables installs Expression::exprTable_/paramTable_ session pair.
@@ -178,12 +179,12 @@ func ProcessExprTables() *ExprTables { return ProcessExprTablesSess(testAmbientS
 // ProcessExprTablesSess returns ExprTables on an explicit session bag.
 func ProcessExprTablesSess(s *Session) *ExprTables { return sessOrAmbient(s).ExprTables }
 
-// sessExprTables returns s.ExprTables when s is non-nil, else ambient ProcessExprTables.
+// sessExprTables returns s.ExprTables. Nil s panics — pass run bag or testAmbientSession.
 func sessExprTables(s *Session) *ExprTables {
-	if s != nil {
-		return s.ExprTables
+	if s == nil {
+		panic("sessExprTables(nil)")
 	}
-	return ProcessExprTables()
+	return s.ExprTables
 }
 
 // InitSessionProbabilityTables mirrors Probabilities::initialize_group_probs

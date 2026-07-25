@@ -1748,7 +1748,7 @@ func stmtOK(st Stmt) bool {
 // outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
 // indent is statement base indent (spaces/4); uses Emit* flags on b.
 func (b *Block) outputStmtsOnly(indent int) string {
-	return b.outputStmtsOnlySess(testAmbientSession, indent, false, sessOpts(nil))
+	return b.outputStmtsOnlySess(testAmbientSession, indent, false, sessOpts(testAmbientSession))
 }
 
 // outputStmtsOnlyOpts is outputStmtsOnly with optional PreOutput skip.

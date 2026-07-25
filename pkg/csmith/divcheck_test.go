@@ -12,7 +12,7 @@ import (
 // Opt-in multi-seed battery: PURE_GEN_STRICT=1.
 func TestPureGenStrictResidual(t *testing.T) {
 	// Residual nil bag helpers must not dual-fill ambient.
-	for _, name := range []string{"sessOrAmbient", "sessNoteError", "sessHasError"} {
+	for _, name := range []string{"sessOrAmbient", "sessNoteError", "sessHasError", "sessOpts", "sessProbs", "sessRng"} {
 		name := name
 		func() {
 			defer func() {
@@ -27,6 +27,12 @@ func TestPureGenStrictResidual(t *testing.T) {
 				sessNoteError(nil, ErrGeneric)
 			case "sessHasError":
 				_ = sessHasError(nil)
+			case "sessOpts":
+				_ = sessOpts(nil)
+			case "sessProbs":
+				_ = sessProbs(nil)
+			case "sessRng":
+				_ = sessRng(nil)
 			}
 		}()
 	}

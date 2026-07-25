@@ -10,10 +10,9 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession + Process*/SetError bridges for legacy unit tests
-//   - constructors + *Sess helpers install/return ambient when Sess unset
-//     (install is on the owner object when non-nil; Generate overwrites)
-//   - sessOrAmbient(nil) / sessNoteError(nil) / sessHasError(nil) panics
-//     (must pass a bag — helpers always yield non-nil)
+//   - constructors + vsSess/envSess/fmSess install/return ambient when unset
+//   - sessOrAmbient(nil) / sessNoteError(nil) / sessOpts(nil) / sessProbs(nil)
+//     / sessRng(nil) panics (must pass an explicit bag)
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
 // (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not

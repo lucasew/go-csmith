@@ -40,7 +40,8 @@ func vsSess(vs *VariableSelector) *Session {
 // (C++ Probabilities singleton). No invent second NewProbabilities(opts) when
 // process unset — Probs may be nil (fail closed on draws that need tables).
 func NewVariableSelector(opts Options) *VariableSelector {
-	return NewVariableSelectorProbs(opts, sessProbs(nil))
+	// Unit-test convenience: Probs from ambient Process* bag (ReinstallTestProcessSingletons).
+	return NewVariableSelectorProbs(opts, ProcessProbabilities())
 }
 
 // NewVariableSelectorProbs constructs a selector sharing session Probabilities

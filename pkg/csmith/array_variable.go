@@ -907,7 +907,7 @@ func (av *ArrayVariable) buildInitRecursiveSess(s *Session, dimen int, initStrin
 // buildInitializerStr mirrors ArrayVariable::build_initializer_str.
 // ArrayVariable.cpp:450–474 — force_non_uniform → recursive seed path; else nested dims.
 func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
-	return av.buildInitializerStrSess(testAmbientSession, initStrings, sessOpts(nil))
+	return av.buildInitializerStrSess(testAmbientSession, initStrings, sessOpts(testAmbientSession))
 }
 
 // buildInitializerStrOpts is buildInitializerStr with explicit session Options (ambient seed).
@@ -959,7 +959,7 @@ func (av *ArrayVariable) buildInitializerStrSess(s *Session, initStrings []strin
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
 // ArrayVariable.cpp:491–520 — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
-	return av.OutputDefSess(testAmbientSession, sessOpts(nil))
+	return av.OutputDefSess(testAmbientSession, sessOpts(testAmbientSession))
 }
 
 // OutputDefOpts is OutputDef with explicit session Options (ambient ArrayInitSeed bag).
