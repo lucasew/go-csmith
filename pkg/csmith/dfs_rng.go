@@ -44,7 +44,7 @@ func NewDFSRngSess(s *Session, seed uint64, opts Options) *Rng {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	r := NewRng(seed)
+	r := NewRngSess(s, seed)
 	r.kind = RngKindDFS
 	eng := &dfsEngine{
 		decisionDepth: -1,

@@ -10,13 +10,16 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - non-Sess helpers still hardcode ambient (r.RndUpto, bookkeeper Record*, …)
+//   - non-Sess helpers still hardcode ambient (bookkeeper Record*, effect
+//     method duals, statement_meta, …)
+//   - Rng.Sess routes non-Sess RndUpto/RndFlipcoin residual sticky to the run
+//     bag when set (session factories / NewProgramGenerator); else ambient
 //   - NewVariableSelector (unit-test only) installs ambient; Generate uses
 //     NewVariableSelectorProbs without ambient install + vs.Sess = run bag
 //   - EmptyCGContext/WithFunc/WithEffectContext leave Sess nil — callers
 //     WithSession(run bag) or WithSession(testAmbientSession)
 //   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag (no ambient install)
-//   - vsSess/envSess/fmSess/cgSess/gSess panic if owner.Sess unset
+//   - vsSess/envSess/fmSess/cgSess/gSess/rSess panic or ambient on nil owner
 //   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes

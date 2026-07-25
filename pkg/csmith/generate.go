@@ -25,7 +25,9 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 // Generate runs one generation using s as the only mutable bag for the run.
 // Bag-local: mid-gen paths pass s / g.Sess / cg.Sess; no package meta lock toggle.
 // Package simpleTypes[] are identity-only; Used marks live on s.simpleUsed.
-// Remaining process impurity: testAmbientSession (unit-test bag + non-Sess helpers).
+// Remaining process impurity: testAmbientSession + residual non-Sess helpers
+// (bookkeeper duals, effect duals, …). Generate-path Rng residual sticky is
+// bag-local via Rng.Sess.
 func (s *Session) Generate(ctx context.Context) (string, error) {
 	if s == nil {
 		return "", fmt.Errorf("nil session")

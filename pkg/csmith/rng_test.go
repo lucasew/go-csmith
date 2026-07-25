@@ -400,19 +400,19 @@ func TestProcessRndNilSticky(t *testing.T) {
 func TestRandomNumberCreateInstance(t *testing.T) {
 	// RandomNumber.cpp:63–74 CreateInstance default generator
 	prevR := ProcessRngSess(testAmbientSession)
-	RandomNumberDoFinalization()
+	RandomNumberDoFinalizationSess(testAmbientSession)
 	defer func() {
-		RandomNumberDoFinalization()
+		RandomNumberDoFinalizationSess(testAmbientSession)
 		SetProcessRngSess(testAmbientSession, prevR)
 	}()
 
 	ClearErrorSess(testAmbientSession)
-	CreateRandomNumberInstance(RngKindDefault, 2)
-	rn := GetRandomNumber()
+	CreateRandomNumberInstanceSess(testAmbientSession, RngKindDefault, 2)
+	rn := GetRandomNumberSess(testAmbientSession)
 	if rn == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateInstance default must succeed")
 	}
-	if GetRndNumGenerator() == nil {
+	if GetRndNumGeneratorSess(testAmbientSession) == nil {
 		t.Fatal("GetRndNumGenerator")
 	}
 	r2 := NewRng(2)
@@ -422,7 +422,7 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 		t.Fatalf("rnd_upto via RandomNumber: got %d want %d", got, want)
 	}
 	// Switch default→default identity
-	old := SwitchRndNumGenerator(RngKindDefault)
+	old := SwitchRndNumGeneratorSess(testAmbientSession, RngKindDefault)
 	if old != RngKindDefault {
 		t.Fatalf("switch same kind old=%v", old)
 	}
@@ -431,12 +431,12 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 	o := Defaults()
 	o.MaxExhaustiveDepth = 4
 	SetProcessOptionsSess(testAmbientSession, o)
-	old = SwitchRndNumGenerator(RngKindDFS)
+	old = SwitchRndNumGeneratorSess(testAmbientSession, RngKindDFS)
 	if old != RngKindDefault {
 		t.Fatalf("switch to DFS old=%v", old)
 	}
-	if HasErrorSess(testAmbientSession) || GetRndNumGenerator() == nil || GetRndNumGenerator().Kind() != RngKindDFS {
-		t.Fatal("DFS switch", HasErrorSess(testAmbientSession), GetRndNumGenerator())
+	if HasErrorSess(testAmbientSession) || GetRndNumGeneratorSess(testAmbientSession) == nil || GetRndNumGeneratorSess(testAmbientSession).Kind() != RngKindDFS {
+		t.Fatal("DFS switch", HasErrorSess(testAmbientSession), GetRndNumGeneratorSess(testAmbientSession))
 	}
 	// restore default for later tests via finalization path
 	ClearErrorSess(testAmbientSession)
@@ -445,10 +445,10 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 func TestRandomNumberDoFinalization(t *testing.T) {
 	prevR := ProcessRngSess(testAmbientSession)
 	defer SetProcessRngSess(testAmbientSession, prevR)
-	CreateRandomNumberInstance(RngKindDefault, 1)
-	RandomNumberDoFinalization()
+	CreateRandomNumberInstanceSess(testAmbientSession, RngKindDefault, 1)
+	RandomNumberDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	if GetRandomNumber() != nil || !HasErrorSess(testAmbientSession) {
+	if GetRandomNumberSess(testAmbientSession) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("after doFinalization GetInstance sticky nil")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -457,7 +457,7 @@ func TestRandomNumberDoFinalization(t *testing.T) {
 func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	// AbsRndNumGenerator::make_rndnum_generator default
 	ClearErrorSess(testAmbientSession)
-	r := MakeRndNumGenerator(RngKindDefault, 7)
+	r := MakeRndNumGeneratorSess(testAmbientSession, RngKindDefault, 7)
 	if r == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("default generator")
 	}
@@ -468,7 +468,7 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	prevO := ProcessOptionsSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults()) // MaxExhaustiveDepth -1
-	if MakeRndNumGenerator(RngKindDFS, 1) != nil || !HasErrorSess(testAmbientSession) {
+	if MakeRndNumGeneratorSess(testAmbientSession, RngKindDFS, 1) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("DFS max_depth<=0 sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -477,12 +477,12 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, o)
 	// clear prior singleton if any
 	clearDFSImpl()
-	dr := MakeRndNumGenerator(RngKindDFS, 1)
+	dr := MakeRndNumGeneratorSess(testAmbientSession, RngKindDFS, 1)
 	if dr == nil || HasErrorSess(testAmbientSession) || dr.Kind() != RngKindDFS {
 		t.Fatal("DFS generator", HasErrorSess(testAmbientSession))
 	}
 	// singleton
-	if MakeRndNumGenerator(RngKindDFS, 9) != dr {
+	if MakeRndNumGeneratorSess(testAmbientSession, RngKindDFS, 9) != dr {
 		t.Fatal("DFS singleton")
 	}
 	clearDFSImpl()

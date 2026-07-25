@@ -6,7 +6,7 @@ func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 	// DFSRndNumGenerator::random_choice first-visit path picks lowest valid v.
 	ClearErrorSess(testAmbientSession)
 	defer func() {
-		RandomNumberDoFinalization()
+		RandomNumberDoFinalizationSess(testAmbientSession)
 		ReinstallTestProcessSingletons()
 		ClearErrorSess(testAmbientSession)
 	}()
@@ -180,7 +180,7 @@ func TestDFSGetPrefixedName(t *testing.T) {
 func TestDFSDepthGuardIntegration(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer func() {
-		RandomNumberDoFinalization()
+		RandomNumberDoFinalizationSess(testAmbientSession)
 		ReinstallTestProcessSingletons()
 		ClearErrorSess(testAmbientSession)
 	}()
@@ -190,12 +190,12 @@ func TestDFSDepthGuardIntegration(t *testing.T) {
 	o.MaxExhaustiveDepth = 8
 	SetProcessOptionsSess(testAmbientSession, o)
 	clearDFSImpl()
-	CreateRandomNumberInstance(RngKindDFS, 2)
+	CreateRandomNumberInstanceSess(testAmbientSession, RngKindDFS, 2)
 	if DepthGuardByDepth(o, 1) != GoodDepth || HasErrorSess(testAmbientSession) {
 		t.Fatal("fresh GOOD")
 	}
 	// burn a few choices so pos advances
-	r := GetRndNumGenerator()
+	r := GetRndNumGeneratorSess(testAmbientSession)
 	_ = r.RndUpto(2)
 	_ = r.RndUpto(2)
 	// pos=1, remain=7; need 20 → BAD + BACKTRACKING

@@ -50,6 +50,10 @@ type Filter interface {
 // Default: DefaultRndNumGenerator + Abs genrand.
 // DFS: DFSRndNumGenerator (dfs engine) + Abs genrand for hex/digits.
 type Rng struct {
+	// Sess is the residual sticky bag for non-Sess Rng methods (RndUpto, …).
+	// Set by session factories / NewProgramGenerator; nil → unit-test ambient.
+	Sess *Session
+
 	state     uint64
 	randDepth uint64
 
@@ -67,8 +71,19 @@ type Rng struct {
 	dfs *dfsEngine
 }
 
+// rSess returns r.Sess when set; else unit-test ambient.
+// Non-Sess Rng methods (RndUpto/RndFlipcoin/…) route residual sticky here so
+// Generate-path draws hit the run bag, not testAmbientSession.
+func rSess(r *Rng) *Session {
+	if r != nil && r.Sess != nil {
+		return r.Sess
+	}
+	return testAmbientSession
+}
+
 // NewRng seeds like AbsRndNumGenerator::seedrand → srand48(seed).
-// srand48: X0 = (seed << 16) + 0x330E (48-bit).
+// srand48: X0 = (seed << 16) + 0x330E (48-bit). Sess is left nil — session
+// factories / NewProgramGenerator set r.Sess for bag-local residual sticky.
 func NewRng(seed uint64) *Rng {
 	r := &Rng{
 		state: ((seed << 16) + 0x330E) & lcgMask,
@@ -92,11 +107,18 @@ func NewRng(seed uint64) *Rng {
 	return r
 }
 
+// NewRngSess is NewRng bound to an explicit residual sticky bag.
+func NewRngSess(s *Session, seed uint64) *Rng {
+	r := NewRng(seed)
+	r.Sess = s
+	return r
+}
+
 // Genrand returns the next 31-bit value.
 // AbsRndNumGenerator::genrand → lrand48: (X >> 17) after LCG step.
 // Nil Rng sticky 0 (no invent fixed zero stream / soft re-pick without RNG).
 func (r *Rng) Genrand() uint32 {
-	return r.GenrandSess(testAmbientSession)
+	return r.GenrandSess(rSess(r))
 }
 
 // GenrandSess is Genrand with explicit session residual sticky.
@@ -113,7 +135,7 @@ func (r *Rng) GenrandSess(s *Session) uint32 {
 // RandDepth is DefaultRndNumGenerator::rand_depth_ (count of rnd_upto/rnd_flipcoin/hex digit steps).
 // Nil Rng sticky 0 (no invent depth 0 soft-success past missing stream).
 func (r *Rng) RandDepth() uint64 {
-	return r.RandDepthSess(testAmbientSession)
+	return r.RandDepthSess(rSess(r))
 }
 
 // RandDepthSess is RandDepth with explicit session residual sticky.
@@ -129,7 +151,7 @@ func (r *Rng) RandDepthSess(s *Session) uint64 {
 // RndUpto returns v in [0, n). n must be > 0.
 // DefaultRndNumGenerator::rnd_upto (no Filter* → no reject loop).
 func (r *Rng) RndUpto(n uint32) uint32 {
-	return r.RndUptoFilterSess(testAmbientSession, n, nil)
+	return r.RndUptoFilterSess(rSess(r), n, nil)
 }
 
 // RndUptoSess is RndUpto with explicit session residual sticky.
@@ -143,7 +165,7 @@ func (r *Rng) RndUptoSess(s *Session, n uint32) uint32 {
 // non-sticky return 0 without inventing domain (soft re-pick: empty half/list lengths
 // must not sticky-poison factories).
 func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
-	return r.RndUptoFilterSess(testAmbientSession, n, f)
+	return r.RndUptoFilterSess(rSess(r), n, f)
 }
 
 // RndUptoFilterSess is RndUptoFilter with explicit session residual sticky.
@@ -213,7 +235,7 @@ func (r *Rng) RndUptoFilterSess(s *Session, n uint32, f Filter) uint32 {
 // RndFlipcoin returns true with probability p% (p clamped to 100).
 // DefaultRndNumGenerator::rnd_flipcoin.
 func (r *Rng) RndFlipcoin(p uint32) bool {
-	return r.RndFlipcoinFilterSess(testAmbientSession, p, nil)
+	return r.RndFlipcoinFilterSess(rSess(r), p, nil)
 }
 
 // RndFlipcoinSess is RndFlipcoin with explicit session residual sticky.
@@ -225,7 +247,7 @@ func (r *Rng) RndFlipcoinSess(s *Session, p uint32) bool {
 // If filter rejects 0 → true without genrand; rejects 1 → false without genrand.
 // Nil Rng sticky false (no invent fixed tails / soft re-pick without RNG).
 func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
-	return r.RndFlipcoinFilterSess(testAmbientSession, p, f)
+	return r.RndFlipcoinFilterSess(rSess(r), p, f)
 }
 
 // RndFlipcoinFilterSess is RndFlipcoinFilter with explicit session residual sticky.
@@ -274,7 +296,7 @@ func (r *Rng) RndFlipcoinFilterSess(s *Session, p uint32, f Filter) bool {
 // Each digit: genrand()%16; increments rand_depth_ per digit.
 // AbsRndNumGenerator.cpp:50 — hex1 = "0123456789ABCDEF" (uppercase; no invent abcdef).
 func (r *Rng) RandomHexDigits(num int) string {
-	return r.RandomHexDigitsSess(testAmbientSession, num)
+	return r.RandomHexDigitsSess(rSess(r), num)
 }
 
 // RandomHexDigitsSess is RandomHexDigits with explicit session residual sticky.
@@ -302,7 +324,7 @@ func (r *Rng) RandomHexDigitsSess(s *Session, num int) string {
 // RandomDigits is DefaultRndNumGenerator::RandomDigits when CGOptions::is_random().
 // DFS uses AbsRndNumGenerator::RandomDigits (no rand_depth_ bump).
 func (r *Rng) RandomDigits(num int) string {
-	return r.RandomDigitsSess(testAmbientSession, num)
+	return r.RandomDigitsSess(rSess(r), num)
 }
 
 // RandomDigitsSess is RandomDigits with explicit session residual sticky.
@@ -328,7 +350,7 @@ func (r *Rng) RandomDigitsSess(s *Session, num int) string {
 
 // Kind is AbsRndNumGenerator::kind — Default or DFS.
 func (r *Rng) Kind() RngKind {
-	return r.KindSess(testAmbientSession)
+	return r.KindSess(rSess(r))
 }
 
 // KindSess is Kind with explicit session residual sticky.
@@ -348,7 +370,7 @@ func GetPrefixedNameDefault(name string) string { return name }
 // Random-mode default does not append where labels unless callers use where;
 // Go Rng keeps an empty string unless extended.
 func (r *Rng) TraceDepth() string {
-	return r.TraceDepthSess(testAmbientSession)
+	return r.TraceDepthSess(rSess(r))
 }
 
 // TraceDepthSess is TraceDepth with explicit session residual sticky.
@@ -364,7 +386,7 @@ func (r *Rng) TraceDepthSess(s *Session) string {
 // Default: sequence bookkeeping no-op → "".
 // DFS: LinearSequence map joined by sep (empty sticky "").
 func (r *Rng) GetSequence() string {
-	return r.GetSequenceSess(testAmbientSession)
+	return r.GetSequenceSess(rSess(r))
 }
 
 // GetSequenceSess is GetSequence with explicit session residual sticky.
@@ -381,7 +403,7 @@ func (r *Rng) GetSequenceSess(s *Session) string {
 
 // SetRandDepth is DefaultRndNumGenerator::set_rand_depth.
 func (r *Rng) SetRandDepth(depth uint64) {
-	r.SetRandDepthSess(testAmbientSession, depth)
+	r.SetRandDepthSess(rSess(r), depth)
 }
 
 // SetRandDepthSess is SetRandDepth with explicit session residual sticky.

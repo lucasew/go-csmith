@@ -11,12 +11,6 @@ type RandomNumber struct {
 	currKind   RngKind
 }
 
-// MakeRndNumGenerator mirrors AbsRndNumGenerator::make_rndnum_generator.
-// AbsRndNumGenerator.cpp:66–84 — seedrand then Default or DFS factory.
-func MakeRndNumGenerator(kind RngKind, seed uint64) *Rng {
-	return MakeRndNumGeneratorSess(testAmbientSession, kind, seed)
-}
-
 // MakeRndNumGeneratorSess is MakeRndNumGenerator using session Options (DFS).
 func MakeRndNumGeneratorSess(s *Session, kind RngKind, seed uint64) *Rng {
 	return makeRndNumGeneratorWithOptsSess(s, kind, seed, sessOpts(s))
@@ -31,19 +25,13 @@ func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
 func makeRndNumGeneratorWithOptsSess(s *Session, kind RngKind, seed uint64, opts Options) *Rng {
 	switch kind {
 	case RngKindDefault:
-		return NewRng(seed)
+		return NewRngSess(s, seed)
 	case RngKindDFS:
 		return makeDFSRndNumGeneratorOptsSess(s, seed, opts)
 	default:
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-}
-
-// CreateRandomNumberInstance mirrors RandomNumber::CreateInstance.
-// RandomNumber.cpp:63–78. Session-specific (no process mutex).
-func CreateRandomNumberInstance(kind RngKind, seed uint64) {
-	CreateRandomNumberInstanceSess(testAmbientSession, kind, seed)
 }
 
 // CreateRandomNumberInstanceSess is CreateInstance on an explicit session bag.
@@ -58,6 +46,7 @@ func CreateRandomNumberInstanceSess(s *Session, kind RngKind, seed uint64) {
 		if g == nil {
 			return
 		}
+		g.Sess = s
 		s.RandomNumber.generators[kind] = g
 		s.RandomNumber.curr = g
 		s.RandomNumber.currKind = kind
@@ -73,15 +62,10 @@ func CreateRandomNumberInstanceSess(s *Session, kind RngKind, seed uint64) {
 		}
 		rn.generators[kind] = g
 	}
+	g.Sess = s
 	rn.curr = g
 	rn.currKind = kind
 	s.Rng = g
-}
-
-// GetRandomNumber mirrors RandomNumber::GetInstance.
-// RandomNumber.cpp:80–83 — C++ asserts; nil is library fail-closed.
-func GetRandomNumber() *RandomNumber {
-	return GetRandomNumberSess(testAmbientSession)
 }
 
 // GetRandomNumberSess returns RandomNumber on an explicit session bag.
@@ -94,12 +78,6 @@ func GetRandomNumberSess(s *Session) *RandomNumber {
 	return rn
 }
 
-// GetRndNumGenerator mirrors RandomNumber::GetRndNumGenerator.
-// RandomNumber.cpp:85–88.
-func GetRndNumGenerator() *Rng {
-	return GetRndNumGeneratorSess(testAmbientSession)
-}
-
 // GetRndNumGeneratorSess returns the current AbsRng on an explicit session bag.
 func GetRndNumGeneratorSess(s *Session) *Rng {
 	rn := sessOrAmbient(s).RandomNumber
@@ -108,12 +86,6 @@ func GetRndNumGeneratorSess(s *Session) *Rng {
 		return nil
 	}
 	return rn.curr
-}
-
-// SwitchRndNumGenerator mirrors RandomNumber::SwitchRndNumGenerator.
-// RandomNumber.cpp:95–110 — create missing generator from seed; return previous kind.
-func SwitchRndNumGenerator(kind RngKind) RngKind {
-	return SwitchRndNumGeneratorSess(testAmbientSession, kind)
 }
 
 // SwitchRndNumGeneratorSess switches generators on an explicit session bag.
@@ -133,17 +105,11 @@ func SwitchRndNumGeneratorSess(s *Session, kind RngKind) RngKind {
 		}
 		rn.generators[kind] = g
 	}
+	g.Sess = s
 	rn.curr = g
 	rn.currKind = kind
 	s.Rng = g
 	return old
-}
-
-// RandomNumberDoFinalization mirrors RandomNumber::doFinalization.
-// RandomNumber.cpp:142–152 — drop generators and instance.
-// Also clears DFSRndNumGenerator::impl_ + SequenceFactory sequences.
-func RandomNumberDoFinalization() {
-	RandomNumberDoFinalizationSess(testAmbientSession)
 }
 
 // RandomNumberDoFinalizationSess clears RandomNumber/DFS on an explicit session bag.

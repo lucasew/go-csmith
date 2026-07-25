@@ -150,10 +150,12 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	if r == nil {
 		// Create failed; Default always works; DFS needs MaxExhaustiveDepth>0
 		if kind == RngKindDefault {
-			r = NewRng(seed)
+			r = NewRngSess(s, seed)
 			s.Rng = r
 		}
 		// DFS fail closed with sticky error + nil rng handled below
+	} else if r.Sess == nil {
+		r.Sess = s
 	}
 	// C++ Probabilities is a process singleton — one session table for generator + VS
 	probs := NewProbabilities(opts)

@@ -44,11 +44,11 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 	// DefaultOutputMgr.cpp:144–151 pure_rnd_upto per global
 	ClearErrorSess(testAmbientSession)
 	defer func() {
-		RandomNumberDoFinalization()
+		RandomNumberDoFinalizationSess(testAmbientSession)
 		ReinstallTestProcessSingletons()
 		ClearErrorSess(testAmbientSession)
 	}()
-	CreateRandomNumberInstance(RngKindDefault, 2)
+	CreateRandomNumberInstanceSess(testAmbientSession, RngKindDefault, 2)
 	o := Defaults()
 	SetProcessOptionsSess(testAmbientSession, o)
 	v1 := CreateVariableScalars("g_1", GetIntType(), true, false)
