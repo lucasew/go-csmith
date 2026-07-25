@@ -33,8 +33,13 @@ var builtinFunctionStrings = []string{
 // TypeFromString mirrors Type::get_type_from_string.
 // Type.cpp:370–402 — assert(0 && "Unsupported type string!") on default.
 func TypeFromString(s string) *Type {
-	s = strings.TrimSpace(s)
-	switch s {
+	return TypeFromStringSess(nil, s)
+}
+
+// TypeFromStringSess is TypeFromString with explicit session residual sticky.
+func TypeFromStringSess(s *Session, name string) *Type {
+	name = strings.TrimSpace(name)
+	switch name {
 	case "Void":
 		return GetSimpleType(EVoid)
 	case "Char":
@@ -65,7 +70,7 @@ func TypeFromString(s string) *Type {
 		return GetSimpleType(EUInt128)
 	default:
 		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 }
@@ -145,15 +150,21 @@ func MakeDummyBlockSess(s *Session, f *Function) *Block {
 // Fail wipes Param to IncompleteVariables sticky (not bare nil invent empty-complete
 // void-param list after partial append / soft re-pick past VariablesComplete(nil)).
 func GenerateParameterListFromString(f *Function, params string) bool {
+	return GenerateParameterListFromStringSess(nil, f, params)
+}
+
+// GenerateParameterListFromStringSess is GenerateParameterListFromString with
+// explicit session residual sticky.
+func GenerateParameterListFromStringSess(s *Session, f *Function, params string) bool {
 	// Function always live; sticky no invent param list without it
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	vs := SplitString(params, ',')
 	fail := func() {
 		f.Param = IncompleteVariables()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 	}
 	// Function.cpp:350 — assert(params_cnt > 0) sticky (no invent empty-complete Param)
 	if len(vs) == 0 {
@@ -171,7 +182,7 @@ func GenerateParameterListFromString(f *Function, params string) bool {
 			fail()
 			return false
 		}
-		ty := TypeFromString(ts)
+		ty := TypeFromStringSess(s, ts)
 		if ty == nil {
 			// unsupported type string — assert path
 			fail()
@@ -219,7 +230,7 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	ty := TypeFromString(parts[0])
+	ty := TypeFromStringSess(s, parts[0])
 	if ty == nil {
 		sessNoteError(s, ErrGeneric)
 		return nil
@@ -252,7 +263,7 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 	// params from ( ... )
 	paramStr := GetSubstring(parts[2], '(', ')')
 	// Function.cpp:345+ — assert-path on bad param list; sticky no soft invent empty params
-	if !GenerateParameterListFromString(f, paramStr) {
+	if !GenerateParameterListFromStringSess(s, f, paramStr) {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
 		}
