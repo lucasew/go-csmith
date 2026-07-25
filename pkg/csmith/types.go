@@ -138,15 +138,37 @@ func GetSimpleTypeSess(s *Session, st ESimpleType) *Type {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	t := simpleTypes[st]
-	// Type.cpp get_simple_type — first materialization pushes to AllTypes.
-	// Package simples are pre-built; register once per run when a ProgramGen bag
-	// is live so CreateExtension (before GenerateSimpleTypes) matches C++ size.
-	if s != nil && s.ProgramGen != nil && !s.simpleAllTypesReg[st] {
-		s.simpleAllTypesReg[st] = true
-		s.ProgramGen.Types.AllTypes = append(s.ProgramGen.Types.AllTypes, t)
+	// Type.cpp:347–367 get_simple_type — run-local simple_types[] binding.
+	// 1) if already bound for this run, return it
+	// 2) else search AllTypes for matching eSimple and adopt (GenerateSimpleTypes
+	//    leaves simple_types[] empty until first get_simple_type)
+	// 3) else create (package canonical) and push to AllTypes (CreateExtension path)
+	if s != nil {
+		if t := s.simpleBound[st]; t != nil {
+			return t
+		}
+		if s.ProgramGen != nil {
+			for _, t := range s.ProgramGen.Types.AllTypes {
+				if t == nil || t.ptrTo != nil || t.isStruct || t.isUnion {
+					continue
+				}
+				if t.simple == st {
+					s.simpleBound[st] = t
+					s.simpleAllTypesReg[st] = true
+					return t
+				}
+			}
+		}
+		t := simpleTypes[st]
+		s.simpleBound[st] = t
+		if s.ProgramGen != nil && !s.simpleAllTypesReg[st] {
+			s.simpleAllTypesReg[st] = true
+			s.ProgramGen.Types.AllTypes = append(s.ProgramGen.Types.AllTypes, t)
+		}
+		return t
 	}
-	return t
+	// nil session (unit tests without bag): package canonical only
+	return simpleTypes[st]
 }
 
 // IsSimple reports eType == eSimple.
@@ -815,6 +837,7 @@ func TypeDoFinalizationSess(s *Session) {
 	s = sessOrAmbient(s)
 	s.PointerCache = map[*Type]*Type{}
 	s.simpleUsed = [MaxSimpleTypes]bool{}
+	s.simpleBound = [MaxSimpleTypes]*Type{}
 	s.simpleAllTypesReg = [MaxSimpleTypes]bool{}
 }
 

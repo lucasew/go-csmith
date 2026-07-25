@@ -56,8 +56,11 @@ type Session struct {
 	// cache must not carry run-local used marks — C++ process-static Used would
 	// race multi-Generate; library bags keep marks session-local).
 	simpleUsed [MaxSimpleTypes]bool
-	// simpleAllTypesReg tracks Type.cpp get_simple_type first-time AllTypes.push_back
-	// (CreateExtension may materialize simples before GenerateSimpleTypes).
+	// simpleBound mirrors Type::simple_types[] for this run: get_simple_type adopts
+	// the first matching AllTypes entry after GenerateSimpleTypes (Type.cpp:352–360).
+	// CreateExtension may bind earlier and push into AllTypes first.
+	simpleBound [MaxSimpleTypes]*Type
+	// simpleAllTypesReg tracks first-time AllTypes.push_back for a bound simple.
 	simpleAllTypesReg [MaxSimpleTypes]bool
 
 	// Bookkeeper static counters (subset; full fields inlined via package funcs)

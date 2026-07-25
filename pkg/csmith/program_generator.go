@@ -955,8 +955,9 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 
 	b.WriteString("    int print_hash_value = 0;\n")
-	if g.Opts.AcceptArgc && !ExtensionActiveSess(g.Sess) {
-		// Klee/Crest OutputInit always uses main(void); argc branch only on null extension
+	// OutputMgr.cpp:124–128 — accept_argc argc check even when extension OutputInit
+	// used main(void) (upstream emits the dead argc reference under klee/crest too).
+	if g.Opts.AcceptArgc {
 		b.WriteString("    if (argc == 2 && strcmp(argv[1], \"1\") == 0) print_hash_value = 1;\n")
 	}
 	b.WriteString("    platform_main_begin();\n")

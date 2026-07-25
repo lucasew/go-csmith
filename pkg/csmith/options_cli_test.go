@@ -132,6 +132,20 @@ func TestOptionsFromFuzzBlobV2RoundTripDefaults(t *testing.T) {
 	if got.Jumps != o.Jumps || got.SafeMath != o.SafeMath || got.MaxFuncs != o.MaxFuncs {
 		t.Fatalf("round-trip mismatch: jumps=%v safe=%v maxFuncs=%d", got.Jumps, got.SafeMath, got.MaxFuncs)
 	}
+	// Ints outside the compact fuzz span (or equal to Defaults) must survive:
+	// previously MaxExhaustiveDepth=-1 and CoverageTestSize=500 were clamped into
+	// the span, so FuzzBlobFromOptions(Defaults()) emitted non-default CLI flags.
+	if got.MaxExhaustiveDepth != o.MaxExhaustiveDepth {
+		t.Fatalf("MaxExhaustiveDepth: got %d want %d", got.MaxExhaustiveDepth, o.MaxExhaustiveDepth)
+	}
+	if got.CoverageTestSize != o.CoverageTestSize {
+		t.Fatalf("CoverageTestSize: got %d want %d", got.CoverageTestSize, o.CoverageTestSize)
+	}
+	// Drop-in Defaults blob should only need -s on the golden CLI.
+	args := got.CLIArgs()
+	if len(args) != 2 || args[0] != "-s" || args[1] != "99" {
+		t.Fatalf("Defaults round-trip CLIArgs=%v want [-s 99]", args)
+	}
 }
 
 func TestFuzzPlanesNonZero(t *testing.T) {
@@ -190,5 +204,30 @@ func TestOptionsFromFuzzBlobDoesNotSetMaxParams(t *testing.T) {
 	}
 	if got.Jumps {
 		t.Fatal("want jumps false")
+	}
+}
+
+func TestCLIArgsTakeUnionFieldAddr(t *testing.T) {
+	o := Defaults()
+	o.TakeUnionFieldAddr = false
+	args := o.CLIArgs()
+	found := false
+	for _, a := range args {
+		if a == "--take-no-union-field-addr" {
+			found = true
+		}
+		if a == "--no-take-union-field-addr" {
+			t.Fatalf("wrong negative form in %v", args)
+		}
+	}
+	if !found {
+		t.Fatalf("missing --take-no-union-field-addr in %v", args)
+	}
+	o.TakeUnionFieldAddr = true
+	// default true → no flag
+	for _, a := range o.CLIArgs() {
+		if a == "--take-union-field-addr" || a == "--take-no-union-field-addr" {
+			t.Fatalf("default should omit flag, got %v", o.CLIArgs())
+		}
 	}
 }

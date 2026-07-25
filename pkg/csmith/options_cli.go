@@ -58,6 +58,7 @@ const (
 	cliBoolOff              // only when false: --name (e.g. --no-hash-value-printf)
 	cliBoolNomain           // --nomain / --main
 	cliBoolRetDead          // --no-return-dead-pointer / --return-dead-pointer
+	cliBoolTakeUnion        // --take-union-field-addr / --take-no-union-field-addr
 	cliInt                  // --flag N
 	cliStr                  // --flag val
 	cliSeed                 // -s N always
@@ -143,7 +144,9 @@ func buildOptionsRegistry() []optionsField {
 		bp("Unions", "unions", FieldCLI, func(o Options) bool { return o.Unions }, func(o *Options, v bool) { o.Unions = v }),
 		bp("ReturnUnions", "return-unions", FieldCLI, func(o Options) bool { return o.ReturnUnions }, func(o *Options, v bool) { o.ReturnUnions = v }),
 		bp("ArgUnions", "arg-unions", FieldCLI, func(o Options) bool { return o.ArgUnions }, func(o *Options, v bool) { o.ArgUnions = v }),
-		bp("TakeUnionFieldAddr", "take-union-field-addr", FieldCLI, func(o Options) bool { return o.TakeUnionFieldAddr }, func(o *Options, v bool) { o.TakeUnionFieldAddr = v }),
+		// Upstream: --take-union-field-addr | --take-no-union-field-addr (not --no-take-…).
+		optionsField{Name: "TakeUnionFieldAddr", Kind: FieldCLI, CLI: "take-union-field-addr", CLIStyle: cliBoolTakeUnion,
+			getBool: func(o Options) bool { return o.TakeUnionFieldAddr }, setBool: func(o *Options, v bool) { o.TakeUnionFieldAddr = v }},
 		bp("VolStructUnionFields", "vol-struct-union-fields", FieldCLI, func(o Options) bool { return o.VolStructUnionFields }, func(o *Options, v bool) { o.VolStructUnionFields = v }),
 		bp("ConstStructUnionFields", "const-struct-union-fields", FieldCLI, func(o Options) bool { return o.ConstStructUnionFields }, func(o *Options, v bool) { o.ConstStructUnionFields = v }),
 		bp("Volatiles", "volatiles", FieldCLI, func(o Options) bool { return o.Volatiles }, func(o *Options, v bool) { o.Volatiles = v }),
@@ -353,6 +356,15 @@ func (o Options) CLIArgs() []string {
 					args = append(args, "--return-dead-pointer")
 				}
 			}
+		case cliBoolTakeUnion:
+			// RandomProgramGenerator.cpp — --take-union-field-addr | --take-no-union-field-addr
+			if o.TakeUnionFieldAddr != d.TakeUnionFieldAddr {
+				if o.TakeUnionFieldAddr {
+					args = append(args, "--take-union-field-addr")
+				} else {
+					args = append(args, "--take-no-union-field-addr")
+				}
+			}
 		case cliInt:
 			if f.getInt(o) != f.getInt(d) {
 				args = append(args, "--"+f.CLI, strconv.Itoa(f.getInt(o)))
@@ -430,6 +442,11 @@ func (o Options) ForDropInParity() Options {
 const (
 	fuzzBlobMagic   = byte(0xFF)
 	fuzzBlobVersion = byte(2)
+	// fuzzIntKeepDefault: int-plane byte meaning "leave Defaults()".
+	// Needed when Defaults() sit outside the compact fuzz span (e.g.
+	// MaxExhaustiveDepth=-1, CoverageTestSize=500) so FuzzBlobFromOptions
+	// → OptionsFromFuzzBlob is a true round-trip for drop-in roots.
+	fuzzIntKeepDefault = byte(0xFF)
 )
 
 // Drop-in fuzz blob v2 (bodyparity / flag-surface loops):
@@ -480,6 +497,10 @@ func OptionsFromFuzzBlob(b []byte) Options {
 	if len(b) >= off+len(ints) {
 		for i, f := range ints {
 			if f.setInt == nil || f.intSpan <= 0 {
+				continue
+			}
+			// 0xFF = keep Defaults() for this int (see FuzzBlobFromOptions).
+			if b[off+i] == fuzzIntKeepDefault {
 				continue
 			}
 			f.setInt(&o, f.intLo+int(b[off+i])%f.intSpan)
@@ -534,16 +555,27 @@ func FuzzBlobFromOptions(o Options) []byte {
 		}
 	}
 	off += nb
+	d := Defaults()
 	for i, f := range ints {
 		if f.getInt == nil || f.intSpan <= 0 {
+			continue
+		}
+		// Preserve Defaults exactly when the field matches (even if the
+		// default is outside [intLo, intLo+intSpan), e.g. MaxExhaustiveDepth).
+		if f.getInt(o) == f.getInt(d) {
+			b[off+i] = fuzzIntKeepDefault
 			continue
 		}
 		x := f.getInt(o) - f.intLo
 		if x < 0 {
 			x = 0
 		}
-		if x > 255 {
-			x = 255
+		if f.intSpan > 0 && x >= f.intSpan {
+			x = f.intSpan - 1
+		}
+		// Reserve 0xFF as keep-default sentinel.
+		if x > 254 {
+			x = 254
 		}
 		b[off+i] = byte(x)
 	}
@@ -616,6 +648,10 @@ func SanitizeForBodyParityFuzz(o Options) Options {
 	o.SplitFilesDir = ""
 	if o.PlatformInfoPath == "" {
 		o.PlatformInfoPath = defaultPlatformInfoPath
+	}
+	// Upstream: --cpp11 only valid with --lang-cpp.
+	if o.CPP11 {
+		o.LangCPP = true
 	}
 	// Upstream: only one of --klee / --crest / --coverage-test.
 	nExt := 0
