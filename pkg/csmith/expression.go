@@ -934,6 +934,10 @@ func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
 // PickTermType builds default filters for Expression::make_random when tt==MAX.
 // Expression.cpp:160–179 (subset: no_func, no_const, depth).
 func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
+	return PickTermTypeSess(nil, r, tables, opts, typ, noFunc, noConst, exprDepth)
+}
+
+func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
 	// Expression::InitProbabilityTables always live; ambient tables if arg nil
 	if tables == nil {
 		tables = sessExprTables(nil)
@@ -941,7 +945,7 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 	// tables always live after InitProbabilityTables; sticky MaxTermTypes
 	// (no invent soft term pick without session tables)
 	if tables == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxTermTypes
 	}
 	f := NewVectorFilter(&tables.Expr)
@@ -955,12 +959,12 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 	if typ != nil {
 		isSt := typ.IsStruct()
 		// residual ERROR sticky — no invent soft-filter term past IsStruct residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return MaxTermTypes
 		}
 		isUn := typ.IsUnion()
 		// residual ERROR sticky — no invent soft-filter term past IsUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return MaxTermTypes
 		}
 		if isSt || isUn {
@@ -973,12 +977,12 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 			}
 			isCSU := typ.IsConstStructUnion()
 			// residual ERROR sticky — no invent soft-filter term past IsConstStructUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return MaxTermTypes
 			}
 			isVSU := typ.IsVolatileStructUnion()
 			// residual ERROR sticky — no invent soft-filter term past IsVolatileStructUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return MaxTermTypes
 			}
 			if isCSU || isVSU {
@@ -994,8 +998,13 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 }
 
 // PickParamTermType mirrors Expression::make_random_param term selection.
-// Expression.cpp:244–260 — paramTable + always filter Constant.
+// Expression.cpp:244–260 — paramTable + always filter Constant.}
+
 func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
+	return PickParamTermTypeSess(nil, r, tables, opts, typ, exprDepth)
+}
+
+func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
 	// Expression::InitProbabilityTables always live; ambient tables if arg nil
 	if tables == nil {
 		tables = sessExprTables(nil)
@@ -1003,7 +1012,7 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 	// tables always live after InitProbabilityTables; sticky MaxTermTypes
 	// (no invent soft param term pick without session tables)
 	if tables == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxTermTypes
 	}
 	f := NewVectorFilter(&tables.Param)
@@ -1018,7 +1027,7 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 		}
 		isCSU := typ.IsConstStructUnion()
 		// residual ERROR sticky — no invent soft-filter param term past IsConstStructUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return MaxTermTypes
 		}
 		if isCSU {
@@ -1033,7 +1042,8 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 
 // MakeRandomParam mirrors Expression::make_random_param.
 // Expression.cpp:238–296 — param probability table; constants filtered out.
-// cg is *CGContext so visit_facts effects persist (C++ CGContext&).
+// cg is *CGContext so visit_facts effects persist (C++ CGContext&).}
+
 func MakeRandomParam(
 	r *Rng,
 	opts Options,
@@ -1078,7 +1088,7 @@ func MakeRandomParam(
 	if cg != nil {
 		depth = cg.ExprDepth
 	}
-	tt := PickParamTermType(r, tables, opts, typ, depth)
+	tt := PickParamTermTypeSess(cgSess(cg), r, tables, opts, typ, depth)
 	// Expression.cpp:264 — ERROR_GUARD(nullptr) after ExpressionTypeProbability
 	if sessHasError(cgSess(cg)) {
 		return nil
@@ -1281,7 +1291,7 @@ func MakeRandomExpression(
 	_ = exprDepth
 	depth := cg.ExprDepth
 	if tt == MaxTermTypes {
-		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, depth)
+		tt = PickTermTypeSess(cgSess(cg), r, tables, opts, typ, noFunc, noConst, depth)
 	}
 	// Expression.cpp:182 — ERROR_GUARD(nullptr) after term pick
 	if sessHasError(cgSess(cg)) {

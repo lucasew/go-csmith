@@ -391,9 +391,13 @@ func HasUncertainCallRecursiveStmtSess(s *Session, st *Stmt) bool {
 // as Failed shell (no invent nil "no call" for broken IR).}
 
 func GetDirectInvocation(st *Stmt) *Invocation {
+	return GetDirectInvocationSess(nil, st)
+}
+
+func GetDirectInvocationSess(s *Session, st *Stmt) *Invocation {
 	// Statement always live for call extract; sticky no invent "no call" without it
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	switch st.Kind {
@@ -401,25 +405,25 @@ func GetDirectInvocation(st *Stmt) *Invocation {
 		// StatementAssign/If always have live get_expr/get_test
 		if st.Expr == nil {
 			// incomplete Expr sticky Failed shell (no invent nil "no call" soft-skip)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		if st.Expr.Term != TermFunction {
 			return nil
 		}
 		if st.Expr.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		return st.Expr.Invoke
 	case StmtInvoke:
 		// StatementExpr always has live get_invoke
 		if st.Expr == nil || st.Expr.Term != TermFunction {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		if st.Expr.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		return st.Expr.Invoke
@@ -428,7 +432,8 @@ func GetDirectInvocation(st *Stmt) *Invocation {
 }
 
 // FindContainedLabels mirrors Statement::find_contained_labels without FactMgr.
-// Uses SourceLabel (set at generation when dest is labeled).
+// Uses SourceLabel (set at generation when dest is labeled).}
+
 func FindContainedLabels(st *Stmt) []string {
 	return FindContainedLabelsFM(st, nil)
 }

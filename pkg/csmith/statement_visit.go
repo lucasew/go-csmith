@@ -293,7 +293,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		inputsCopyU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		inputsCopyU = CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(inputsCopyU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -330,7 +330,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		postCondU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		postCondU = CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(postCondU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -367,7 +367,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		thenUnions = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		thenUnions = CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(thenUnions) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -384,7 +384,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		clU := CloneUnionFactSliceDeep(postCondU)
+		clU := CloneUnionFactSliceDeepSess(cgSess(cg), postCondU)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -417,7 +417,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		elseUnions = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		elseUnions = CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(elseUnions) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -523,7 +523,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 				return false
 			}
-			cl := CloneUnionFactSliceDeep(u)
+			cl := CloneUnionFactSliceDeepSess(cgSess(cg), u)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(cl) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -645,7 +645,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		if sessHasError(cgSess(cg)) {
 			return false
 		}
-		factsCopyU = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		factsCopyU = CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(factsCopyU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -718,7 +718,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			if sessHasError(cgSess(cg)) {
 				return false
 			}
-			clU := CloneUnionFactSliceDeep(factsCopyU)
+			clU := CloneUnionFactSliceDeepSess(cgSess(cg), factsCopyU)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)

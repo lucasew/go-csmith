@@ -433,10 +433,14 @@ func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts
 // FactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).}
 
 func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
+	return MakeFactsPointToSess(nil, lvars, pointTo)
+}
+
+func MakeFactsPointToSess(s *Session, lvars []*Variable, pointTo *Variable) []*FactPointTo {
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// type null: specials (null/garbage/tbd) skipped; other broken IR fails closed sticky
@@ -444,12 +448,12 @@ func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 			if IsSpecialPtr(v) {
 				continue
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		f := MakeFactPointTo(v, pointTo)
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, f)
@@ -459,28 +463,33 @@ func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 
 // MakeFactsPointToSet mirrors FactPointTo::make_facts(vars, set).
 // same live-vars rules as MakeFactsPointTo; nil set fails closed sticky IncompleteFactSlice
-// (no invent empty complete — FactsComplete(nil)==true / soft re-pick past hole).
+// (no invent empty complete — FactsComplete(nil)==true / soft re-pick past hole).}
+
 func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
+	return MakeFactsPointToSetSess(nil, lvars, set)
+}
+
+func MakeFactsPointToSetSess(s *Session, lvars []*Variable, set []*Variable) []*FactPointTo {
 	if set == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if v.Type == nil {
 			if IsSpecialPtr(v) {
 				continue
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		f := MakeFactPointToSet(v, set)
 		if f == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, f)
@@ -494,7 +503,8 @@ func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
 // Hard IR asserts (non-pointer lvars, nil Var/Invoke/Assign, multi-level &,
 // len mismatch, missing rv_fact) fail closed sticky IncompleteFactSlice so soft
 // re-pick cannot invent empty transfer success. Incomplete MergePointees /
-// FindPointerFields / fact-map holes stay non-sticky hole markers.
+// FindPointerFields / fact-map holes stay non-sticky hole markers.}
+
 func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
 	return RhsToLhsTransferSess(nil, facts, lvars, rhs)
 }
@@ -527,7 +537,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 	// FactPointTo.cpp:168–169 — rhs==nullptr → garbage (param missing / abstract nullptr)
 	// fair C++ path for AddParamFacts missing args — not invent; mirrors nullptr value
 	if rhs == nil {
-		return MakeFactsPointTo(lvars, GarbagePtr)
+		return MakeFactsPointToSess(s, lvars, GarbagePtr)
 	}
 	// Compound terms first — TermFunction without Invoke has nil GetType and must
 	// not invent complete GarbagePtr via the scalar non-pointer branch (soft invent).
@@ -569,9 +579,9 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 				return IncompleteFactSlice()
 			}
 			if eq0 && sz >= 8 {
-				return MakeFactsPointTo(lvars, NullPtr)
+				return MakeFactsPointToSess(s, lvars, NullPtr)
 			}
-			return MakeFactsPointTo(lvars, GarbagePtr)
+			return MakeFactsPointToSess(s, lvars, GarbagePtr)
 		}
 	}
 	rt := rhs.GetType()
@@ -596,9 +606,9 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 				return IncompleteFactSlice()
 			}
 			if eq0 {
-				return MakeFactsPointTo(lvars, NullPtr)
+				return MakeFactsPointToSess(s, lvars, NullPtr)
 			}
-			return MakeFactsPointTo(lvars, GarbagePtr)
+			return MakeFactsPointToSess(s, lvars, GarbagePtr)
 		}
 		// residual ERROR sticky — no invent soft-continue past IsPointerLike residual false
 		if sessHasError(s) {
@@ -630,7 +640,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 						if sessHasError(s) {
 							return IncompleteFactSlice()
 						}
-						return MakeFactsPointTo(lvars, NullPtr)
+						return MakeFactsPointToSess(s, lvars, NullPtr)
 					}
 					// residual ERROR sticky — no invent soft-continue past GetField residual false
 					if sessHasError(s) {
@@ -642,14 +652,14 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 						return IncompleteFactSlice()
 					}
 					if eq0 {
-						return MakeFactsPointTo(lvars, NullPtr)
+						return MakeFactsPointToSess(s, lvars, NullPtr)
 					}
 				} else if sessHasError(s) {
 					// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 					return IncompleteFactSlice()
 				}
 			}
-			return MakeFactsPointTo(lvars, GarbagePtr)
+			return MakeFactsPointToSess(s, lvars, GarbagePtr)
 		}
 		// residual ERROR sticky — no invent soft-continue past IsUnion residual false
 		if sessHasError(s) {
@@ -687,7 +697,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
-			return MakeFactsPointTo(lvars, coll)
+			return MakeFactsPointToSess(s, lvars, coll)
 		}
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
@@ -756,7 +766,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 		if !VariablesComplete(set) {
 			return IncompleteFactSlice()
 		}
-		return MakeFactsPointToSet(lvars, set)
+		return MakeFactsPointToSetSess(s, lvars, set)
 	case TermFunction:
 		// FactPointTo.cpp:230–231 — assert(fi); hard IR sticky when Invoke nil
 		if rhs.Invoke == nil {
@@ -836,7 +846,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 		if set == nil {
 			set = []*Variable{}
 		}
-		return MakeFactsPointToSet(lvars, set)
+		return MakeFactsPointToSetSess(s, lvars, set)
 	case TermAssignment:
 		// FactPointTo.cpp:256–258 — peel embedded assign RHS
 		// incomplete Assign/Expr sticky — no invent GarbagePtr via nil-rhs peel soft path

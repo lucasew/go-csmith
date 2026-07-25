@@ -271,7 +271,7 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 		}
 		return
 	}
-	outU := CloneUnionFactSliceDeep(fm.UnionFacts)
+	outU := CloneUnionFactSliceDeepSess(fmSess(fm), fm.UnionFacts)
 	if !UnionFactsComplete(outU) {
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 		if !sessHasError(fmSess(fm)) {
@@ -428,7 +428,7 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_in_assign")
 	// Deep install: live lattice must not alias map_facts_in FactUnion objects
 	// (renew/join replace or mutate; maps must retain historical arm/entry lattice).
-	cl := CloneUnionFactSliceDeep(un)
+	cl := CloneUnionFactSliceDeepSess(fmSess(fm), un)
 	if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
@@ -468,7 +468,7 @@ func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 		return
 	}
 	fm.SetGlobalFacts(CloneFactSlice(pt), "auto_map_out_assign")
-	cl := CloneUnionFactSliceDeep(un)
+	cl := CloneUnionFactSliceDeepSess(fmSess(fm), un)
 	if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
@@ -646,7 +646,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		return
 	}
-	outU := CloneUnionFactSliceDeep(fm.UnionFacts)
+	outU := CloneUnionFactSliceDeepSess(fmSess(fm), fm.UnionFacts)
 	if sessHasError(fmSess(fm)) || !UnionFactsComplete(outU) {
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
@@ -1952,7 +1952,7 @@ func RemoveLoopLocalUnionFactsSess(s *Session, facts []*FactUnion, blk *Block) [
 		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
-	out := CloneUnionFactSliceDeep(facts)
+	out := CloneUnionFactSliceDeepSess(s, facts)
 	if !UnionFactsComplete(out) {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
@@ -3129,15 +3129,19 @@ func blockParentChainContains(b, target *Block) bool {
 // Variable always live; sticky IncompleteVariables (no invent soft-skip lhs past hole).
 // Incomplete fact map / merge result stays non-sticky IncompleteVariables (soft re-pick).
 func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
+	return lhsAssignPointeesSess(nil, facts, lhs, lhsIndir)
+}
+
+func lhsAssignPointeesSess(s *Session, facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
 	if lhs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	// Type* always live for abstract LHS; Type-nil non-special sticky
 	// (no invent complete [lhs] soft-success / empty lvars past incomplete type shell)
 	// Special null/garbage/tbd have Type nil by design — complete path below.
 	if lhs.Type == nil && !IsSpecialPtr(lhs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	// incomplete map non-sticky hole (fact-map soft re-pick factories)
@@ -3146,17 +3150,17 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 	}
 	coll := lhs.GetCollective()
 	// residual ERROR sticky — no invent soft-lvars past GetCollective residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteVariables()
 	}
 	if coll == nil {
 		// incomplete field path collective sticky (hard IR hole)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	lvars := MergePointeesOfPointer(coll, lhsIndir, facts)
 	// residual ERROR sticky — no invent soft-lvars past MergePointees residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return IncompleteVariables()
 	}
 	if !VariablesComplete(lvars) {
@@ -3177,7 +3181,8 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 // Returns (changed, ok). ok=false means incomplete map/merge — no invent apply success.
 // Incomplete *facts is wiped to IncompleteFactSlice. Incomplete newFacts alone fails
 // closed without wiping prior complete *facts (factory re-pick must not poison FM).
-// empty complete newFacts is ok with changed=false.
+// empty complete newFacts is ok with changed=false.}
+
 func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo, lvarCnt int) (changed bool, ok bool) {
 	return applyPointToAssignFactsSess(nil, facts, lhs, lhsIndir, newFacts, lvarCnt)
 }
@@ -4238,25 +4243,29 @@ func (fm *FactMgr) SanityCheckMap() {
 // FactMgr.cpp:732–735 — global_facts of first function's FactMgr.
 // fms must hold session FMList; first is GetFirstFunction(list).
 func GetProgramEndFacts(list *FunctionList, fms *FactMgrMap) []*FactPointTo {
+	return GetProgramEndFactsSess(nil, list, fms)
+}
+
+func GetProgramEndFactsSess(s *Session, list *FunctionList, fms *FactMgrMap) []*FactPointTo {
 	first := GetFirstFunction(list)
 	if first == nil {
 		// complete miss when list empty; sticky if hole in list
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		return nil
 	}
 	if fms == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	fm := fms.ForFunc(first)
 	if fm == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if !FactsComplete(fm.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	return fm.GlobalFacts

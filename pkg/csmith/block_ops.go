@@ -1161,7 +1161,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	*facts = CloneFactSlice(out)
-	clU := CloneUnionFactSliceDeep(outU)
+	clU := CloneUnionFactSliceDeepSess(cgSess(cg), outU)
 	if !UnionFactsComplete(clU) {
 		return ShortcutNone
 	}

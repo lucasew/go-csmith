@@ -685,15 +685,19 @@ func gensymFromVS(vs *VariableSelector) *GenSym {
 // StatementAssign.cpp:515–537 — lhs op rhs or pre/post incr forms.
 // Incomplete Statement sticky empty (no invent empty assign shell past hole).
 func OutputAssignSimple(st *Stmt, wrapVol bool) string {
+	return OutputAssignSimpleSess(nil, st, wrapVol)
+}
+
+func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 	// Statement always live at assign emit; sticky incomplete no invent empty token
 	if st == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	lhs := assignLhsText(st, wrapVol)
 	if lhs == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -703,13 +707,13 @@ func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 		return st.AssignOp.AssignOpC(lhs, "")
 	}
 	if st.Expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	rhs := st.Expr.Output()
 	if rhs == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -717,7 +721,8 @@ func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 }
 
 // assignLhsText resolves LHS text for assign emit.
-// Statement always live at assign emit; sticky empty (no invent bare RHS past hole).
+// Statement always live at assign emit; sticky empty (no invent bare RHS past hole).}
+
 func assignLhsText(st *Stmt, wrapVol bool) string {
 	if st == nil {
 		sessNoteError(nil, ErrGeneric)

@@ -29,40 +29,44 @@ type SafeOpFlags struct {
 // ReturnFloatTypeBinary mirrors SafeOpFlags::return_float_type for binary.
 // SafeOpFlags.cpp:113–124.
 func ReturnFloatTypeBinary(opts Options, rv, op1, op2 *Type, bop BinaryOp) bool {
+	return ReturnFloatTypeBinarySess(nil, opts, rv, op1, op2, bop)
+}
+
+func ReturnFloatTypeBinarySess(s *Session, opts Options, rv, op1, op2 *Type, bop BinaryOp) bool {
 	if !opts.EnableFloat {
 		return false
 	}
 	if rv != nil && rv.IsFloat() {
 		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past rv IsFloat residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if op1 != nil && op1.IsFloat() {
 		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past op1 IsFloat residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if op2 != nil && op2.IsFloat() {
 		// residual ERROR sticky — no invent float-true past op2 IsFloat residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past op2 IsFloat residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if !BinaryOpWorksForFloat(bop) {
@@ -72,31 +76,36 @@ func ReturnFloatTypeBinary(opts Options, rv, op1, op2 *Type, bop BinaryOp) bool 
 }
 
 // ReturnFloatTypeUnary mirrors SafeOpFlags::return_float_type for unary.
-// SafeOpFlags.cpp:126–136.
+// SafeOpFlags.cpp:126–136.}
+
 func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
+	return ReturnFloatTypeUnarySess(nil, opts, rv, op1, uop)
+}
+
+func ReturnFloatTypeUnarySess(s *Session, opts Options, rv, op1 *Type, uop UnaryOp) bool {
 	if !opts.EnableFloat {
 		return false
 	}
 	if rv != nil && rv.IsFloat() {
 		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past rv IsFloat residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if op1 != nil && op1.IsFloat() {
 		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return true
 	}
 	// residual ERROR sticky — no invent soft-continue past op1 IsFloat residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	if !UnaryOpWorksForFloat(uop) {
@@ -107,7 +116,8 @@ func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
 
 // Clone mirrors SafeOpFlags::clone.
 // SafeOpFlags.cpp:217.
-// SafeOpFlags* always live at clone; sticky nil (no invent soft-skip past hole).
+// SafeOpFlags* always live at clone; sticky nil (no invent soft-skip past hole).}
+
 func (f *SafeOpFlags) Clone() *SafeOpFlags {
 	if f == nil {
 		sessNoteError(nil, ErrGeneric)

@@ -1527,36 +1527,40 @@ func HasAggregateField(fields []StructField) bool {
 // Type.cpp:1066–1073.
 // Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick).
 func HasLongLongField(fields []StructField) bool {
+	return HasLongLongFieldSess(nil, fields)
+}
+
+func HasLongLongFieldSess(s *Session, fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
 			// incomplete field Type sticky has-longlong (restrictive)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if f.Type.IsSimple() {
 			// residual ERROR sticky — no invent soft has-longlong past IsSimple residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			if f.Type.simple == ELongLong || f.Type.simple == EULongLong {
 				return true
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			return true
 		}
 		if f.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft has-longlong past IsAggregate residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
-			if HasLongLongField(f.Type.Fields) {
+			if HasLongLongFieldSess(s, f.Type.Fields) {
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue past recursive residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			return true
 		}
 	}
@@ -1566,7 +1570,8 @@ func HasLongLongField(fields []StructField) bool {
 // IsUnnamedPadding mirrors Type::is_unamed_padding.
 // Type.cpp:1280+ — zero-width bitfield without a name used as padding.
 // Our StructField always has names; treat BitWidth==0 as unnamed padding candidate.
-// Type* always live; sticky false (no invent not-padding soft success past hole).
+// Type* always live; sticky false (no invent not-padding soft success past hole).}
+
 func (t *Type) IsUnnamedPadding(index int) bool {
 	if t == nil {
 		sessNoteError(nil, ErrGeneric)

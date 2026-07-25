@@ -24,23 +24,27 @@ type FactUnion struct {
 // MakeFactUnion mirrors FactUnion::make_fact(v, fid).
 // FactUnion.cpp:162–167 — assert(v==null || union type); default fid 0 when omitted.
 func MakeFactUnion(v *Variable, fid int) *FactUnion {
+	return MakeFactUnionSess(nil, v, fid)
+}
+
+func MakeFactUnionSess(s *Session, v *Variable, fid int) *FactUnion {
 	// FactUnion.cpp:163 — assert(v == nullptr || v->type->eType == eUnion) sticky
 	// no soft invent FactUnion on scalar/struct vars
 	if v != nil {
 		if v.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if !v.Type.IsUnion() {
 			// residual ERROR sticky — no invent soft-nil FactUnion past IsUnion residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return nil
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		// residual ERROR sticky — no invent soft-FactUnion past IsUnion residual true
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 	}
@@ -48,7 +52,8 @@ func MakeFactUnion(v *Variable, fid int) *FactUnion {
 }
 
 // MakeFactUnionTop mirrors make_fact(v) with TOP.
-// Incomplete MakeFactUnion sticky nil (no invent TOP shell past hole).
+// Incomplete MakeFactUnion sticky nil (no invent TOP shell past hole).}
+
 func MakeFactUnionTop(v *Variable) *FactUnion {
 	f := MakeFactUnion(v, FactUnionTop)
 	if f == nil {
@@ -404,19 +409,23 @@ func CloneUnionFactSlice(facts []*FactUnion) []*FactUnion {
 // shallow CloneUnionFactSlice would alias and observe post-visit last_written_fid.
 // Incomplete maps fail closed sticky IncompleteUnionFactSlice.
 func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
+	return CloneUnionFactSliceDeepSess(nil, facts)
+}
+
+func CloneUnionFactSliceDeepSess(s *Session, facts []*FactUnion) []*FactUnion {
 	if facts == nil {
 		return nil
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, len(facts))
 	for i, f := range facts {
 		cp := f.Clone()
-		if cp == nil || sessHasError(nil) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if cp == nil || sessHasError(s) {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return IncompleteUnionFactSlice()
 		}
@@ -426,7 +435,8 @@ func CloneUnionFactSliceDeep(facts []*FactUnion) []*FactUnion {
 }
 
 // RenewUnionFact mirrors renew_fact for FactUnion (Fact.cpp:178–201).
-// Related subject replaced; else append. Incomplete maps fail closed sticky wipe.
+// Related subject replaced; else append. Incomplete maps fail closed sticky wipe.}
+
 func RenewUnionFact(facts *[]*FactUnion, nf *FactUnion) bool {
 	return RenewUnionFactSess(nil, facts, nf)
 }
@@ -557,7 +567,7 @@ func IsFieldReadableSess(s *Session, v *Variable, fid int, facts []*FactUnion) b
 	if fid >= len(v.Type.Fields) && fid >= len(v.FieldVars) {
 		return false
 	}
-	tmp := MakeFactUnion(v, fid)
+	tmp := MakeFactUnionSess(s, v, fid)
 	if tmp == nil {
 		// MakeFactUnion may already sticky non-union; ensure sticky
 		if !sessHasError(s) {
@@ -637,7 +647,7 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 	parent := uf.FieldVarOf
 	fid := uf.GetFieldID()
 	// incomplete parent FieldVars → GetFieldID -1 → MakeFactUnion fails → nonreadable
-	tmp := MakeFactUnion(parent, fid)
+	tmp := MakeFactUnionSess(s, parent, fid)
 	if tmp == nil {
 		// parent not union type — sticky fail closed nonreadable
 		if !sessHasError(s) {
@@ -985,7 +995,7 @@ func AbstractFactUnionForAssignSess(s *Session,
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
-			fu = MakeFactUnion(v.FieldVarOf, fid)
+			fu = MakeFactUnionSess(s, v.FieldVarOf, fid)
 			// residual ERROR sticky — no invent soft-continue past MakeFactUnion residual
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice(), lvarCnt
@@ -1022,7 +1032,7 @@ func AbstractFactUnionForAssignSess(s *Session,
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
 				if cu != nil {
-					fu = MakeFactUnion(cu, FactUnionBottom)
+					fu = MakeFactUnionSess(s, cu, FactUnionBottom)
 					// residual ERROR sticky — no invent soft-continue past MakeFactUnion residual
 					if sessHasError(s) {
 						return IncompleteUnionFactSlice(), lvarCnt

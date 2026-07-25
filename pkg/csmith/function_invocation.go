@@ -958,7 +958,7 @@ func BuildInvocationAndFunction(
 		return fi
 	}
 	retFacts = CloneFactSlice(out)
-	retUnions = CloneUnionFactSliceDeep(outU)
+	retUnions = CloneUnionFactSliceDeepSess(cgSess(cg), outU)
 	if sessHasError(cgSess(cg)) || !FactsComplete(retFacts) || !UnionFactsComplete(retUnions) {
 		if !sessHasError(cgSess(cg)) {
 			sessNoteError(cgSess(cg), ErrGeneric)

@@ -1350,7 +1350,7 @@ func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
 		return nil
 	}
 	// RandomOutputDefs into n buckets
-	defs := RandomOutputDefsOpts(globals, g.Funcs.Funcs, n, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
+	defs := RandomOutputDefsOptsSess(g.Sess, globals, g.Funcs.Funcs, n, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 	if defs == nil || g.hasErr() {
 		return nil
 	}

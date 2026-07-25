@@ -62,25 +62,29 @@ func SameUnionFacts(a, b []*FactUnion) bool {
 
 // FindUnionFact mirrors find_fact for FactUnion (equal by subject + last_written_fid).
 func FindUnionFact(facts []*FactUnion, want *FactUnion) int {
+	return FindUnionFactSess(nil, facts, want)
+}
+
+func FindUnionFactSess(s *Session, facts []*FactUnion, want *FactUnion) int {
 	if want == nil {
 		return -1
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	if !UnionFactsComplete([]*FactUnion{want}) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	for i, f := range facts {
 		if f.Equal(want) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return -1
 			}
 			return i
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return -1
 		}
 	}
@@ -88,7 +92,8 @@ func FindUnionFact(facts []*FactUnion, want *FactUnion) int {
 }
 
 // SameFactVec mirrors same_facts on a full FactVec (ePointTo + eUnionWrite partitions).
-// Fact.cpp:237–246 — total size must match; each fact finds an equal in the other env.
+// Fact.cpp:237–246 — total size must match; each fact finds an equal in the other env.}
+
 func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
 	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
 		sessNoteError(nil, ErrGeneric)
@@ -113,28 +118,32 @@ func SameFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*
 // Fact.cpp find_fact by equal().
 // Incomplete map fails closed sticky -1 (no invent soft-skip hole and match later).
 func FindFact(facts []*FactPointTo, want *FactPointTo) int {
+	return FindFactSess(nil, facts, want)
+}
+
+func FindFactSess(s *Session, facts []*FactPointTo, want *FactPointTo) int {
 	if want == nil {
 		return -1
 	}
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	// want must be a complete fact for Equal to be meaningful sticky
 	if !FactsComplete([]*FactPointTo{want}) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	for i, f := range facts {
 		if f.Equal(want) {
 			// residual ERROR sticky — no invent match-index true past Equal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return -1
 			}
 			return i
 		}
 		// residual ERROR sticky — no invent soft-continue later match past Equal residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return -1
 		}
 	}
@@ -143,10 +152,15 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 
 // SubsetFacts mirrors subset_facts — each f1 is implied by related f2.
 // Fact.cpp:249–260.
-// Incomplete maps/PointTo fail closed sticky (no invent subset / soft re-pick past holes).
+// Incomplete maps/PointTo fail closed sticky (no invent subset / soft re-pick past holes).}
+
 func SubsetFacts(a, b []*FactPointTo) bool {
+	return SubsetFactsSess(nil, a, b)
+}
+
+func SubsetFactsSess(s *Session, a, b []*FactPointTo) bool {
 	if !FactsComplete(a) || !FactsComplete(b) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -156,7 +170,7 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 	for _, f1 := range a {
 		f2 := FindRelatedPointTo(b, f1.Var)
 		// residual ERROR sticky — no invent soft-continue not-subset past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		if f2 == nil {
@@ -164,7 +178,7 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 		}
 		ok := f2.Imply(f1)
 		// residual ERROR sticky — no invent soft-continue not-subset past Imply hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		if !ok {
@@ -175,10 +189,15 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 }
 
 // SubsetUnionFacts mirrors subset_facts for the eUnionWrite partition.
-// Fact.cpp:249–260 — same size; each f1 has related f2 that implies f1.
+// Fact.cpp:249–260 — same size; each f1 has related f2 that implies f1.}
+
 func SubsetUnionFacts(a, b []*FactUnion) bool {
+	return SubsetUnionFactsSess(nil, a, b)
+}
+
+func SubsetUnionFactsSess(s *Session, a, b []*FactUnion) bool {
 	if !UnionFactsComplete(a) || !UnionFactsComplete(b) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -186,18 +205,18 @@ func SubsetUnionFacts(a, b []*FactUnion) bool {
 	}
 	for _, f1 := range a {
 		if f1 == nil || f1.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		f2 := FindRelatedUnion(b, f1.Var)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		if f2 == nil {
 			return false
 		}
 		ok := f2.Imply(f1)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		if !ok {
@@ -208,7 +227,8 @@ func SubsetUnionFacts(a, b []*FactUnion) bool {
 }
 
 // SubsetFactVec mirrors subset_facts on a full FactVec (ePointTo + eUnionWrite).
-// Fact.cpp:249–260 — total size match; each fact implied by related in other env.
+// Fact.cpp:249–260 — total size match; each fact implied by related in other env.}
+
 func SubsetFactVec(ptA []*FactPointTo, uA []*FactUnion, ptB []*FactPointTo, uB []*FactUnion) bool {
 	if !FactsComplete(ptA) || !FactsComplete(ptB) || !UnionFactsComplete(uA) || !UnionFactsComplete(uB) {
 		sessNoteError(nil, ErrGeneric)
@@ -652,7 +672,7 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 		return ShortcutNone
 	}
 	*facts = CloneFactSlice(out)
-	clU := CloneUnionFactSliceDeep(outU)
+	clU := CloneUnionFactSliceDeepSess(cgSess(cg), outU)
 	if !UnionFactsComplete(clU) {
 		return ShortcutNone
 	}
@@ -876,7 +896,7 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 			return false
 		}
 		// deep clone: visit may Join/SetBottom in place on live FactUnion objects
-		unionInCopy = CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+		unionInCopy = CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 		if !UnionFactsComplete(unionInCopy) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)

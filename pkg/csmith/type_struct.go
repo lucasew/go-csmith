@@ -199,7 +199,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	// Type.cpp:1100–1110 — packed_struct; ccomp skips when aggregate/longlong fields
 	packed := false
 	if opts.PackedStruct {
-		if opts.CComp && (HasAggregateField(fields) || HasLongLongField(fields)) {
+		if opts.CComp && (HasAggregateField(fields) || HasLongLongFieldSess(envSess(env), fields)) {
 			// leave packed false
 		} else {
 			packed = r.RndFlipcoin(50)

@@ -464,7 +464,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	specialHandled := false
 	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
 	if cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop() {
-		unc := HasUncertainCallRecursiveStmt(st)
+		unc := HasUncertainCallRecursiveStmtSess(cgSess(cg), st)
 		// residual ERROR sticky — no invent soft-validate past HasUncertain residual
 		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -519,7 +519,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			postGenFacts := append([]*FactPointTo(nil), fm.GlobalFacts...)
 			postGenUnion := append([]*FactUnion(nil), fm.UnionFacts...)
 			outputs := append([]*FactPointTo(nil), preFacts...)
-			preUnionWork := CloneUnionFactSliceDeep(workPreUnion)
+			preUnionWork := CloneUnionFactSliceDeepSess(cgSess(cg), workPreUnion)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnionWork) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
@@ -702,7 +702,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return inputs, nil, -1, false
 		}
-		currentUnions = CloneUnionFactSliceDeep(fm.UnionFacts)
+		currentUnions = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
 		if !UnionFactsComplete(currentUnions) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -840,7 +840,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
-			liveU := CloneUnionFactSliceDeep(currentUnions)
+			liveU := CloneUnionFactSliceDeepSess(cgSess(cg), currentUnions)
 			if !UnionFactsComplete(liveU) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -888,7 +888,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				sessNoteError(cgSess(cg), ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
-			entryUnions = CloneUnionFactSliceDeep(currentUnions)
+			entryUnions = CloneUnionFactSliceDeepSess(cgSess(cg), currentUnions)
 			if !UnionFactsComplete(entryUnions) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -901,7 +901,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Variable* always live on LocalVars; nil hole fails closed (no invent skip)
 		workUnions := entryUnions
 		if fm != nil {
-			workUnions = CloneUnionFactSliceDeep(currentUnions)
+			workUnions = CloneUnionFactSliceDeepSess(cgSess(cg), currentUnions)
 			if !UnionFactsComplete(workUnions) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -1032,7 +1032,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return outputs, nil, -1, false
 		}
-		lastPreOOSUnions = CloneUnionFactSliceDeep(fm.UnionFacts)
+		lastPreOOSUnions = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(lastPreOOSUnions) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)

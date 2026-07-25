@@ -49,8 +49,12 @@ const AbsExtensionBaseName = "x"
 // AbsExtension.cpp:52–62 — num simple types named x0..x{n-1}.
 // Incomplete num or RNG/probs sticky nil (no invent empty values as success).
 func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionValue {
+	return AbsExtensionInitializeSess(nil, num, r, probs)
+}
+
+func AbsExtensionInitializeSess(s *Session, num int, r *Rng, probs *Probabilities) []*ExtensionValue {
 	if num < 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if num == 0 {
@@ -58,22 +62,22 @@ func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionV
 	}
 	// Rng + Probabilities always live for choose_random_simple
 	if r == nil || probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	values := make([]*ExtensionValue, 0, num)
 	for i := 0; i < num; i++ {
 		st := ChooseRandomNonvoidSimple(r, probs)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		typ := GetSimpleType(st)
 		if typ == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		ev := NewExtensionValue(typ, fmt.Sprintf("%s%d", AbsExtensionBaseName, i))
-		if ev == nil || sessHasError(nil) {
+		if ev == nil || sessHasError(s) {
 			return nil
 		}
 		values = append(values, ev)
@@ -83,7 +87,8 @@ func AbsExtensionInitialize(num int, r *Rng, probs *Probabilities) []*ExtensionV
 
 // AbsExtensionDefaultOutputDefinitions mirrors default_output_definitions.
 // AbsExtension.cpp:93–105 — tab + type + name [ = 0]; per value.
-// Incomplete values sticky "" (no invent partial definitions section).
+// Incomplete values sticky "" (no invent partial definitions section).}
+
 func AbsExtensionDefaultOutputDefinitions(values []*ExtensionValue, initFlag bool) string {
 	if !extensionValuesComplete(values) {
 		sessNoteError(nil, ErrGeneric)

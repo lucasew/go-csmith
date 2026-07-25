@@ -219,21 +219,25 @@ func CoverageOutputArrayInit(tests []*Constant, count, inputsSize int) string {
 
 // CoverageOutputDecls mirrors CoverageTestExtension::output_decls.
 func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize int) string {
+	return CoverageOutputDeclsSess(nil, values, tests, inputsSize)
+}
+
+func CoverageOutputDeclsSess(s *Session, values []*ExtensionValue, tests []*Constant, inputsSize int) string {
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	for count, value := range values {
 		b.WriteString(AbsExtensionTab)
 		cn := value.Type.CName()
-		if sessHasError(nil) || cn == "" {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(s) || cn == "" {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
@@ -242,7 +246,7 @@ func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize
 		b.WriteString(fmt.Sprintf("%s%d", CoverageArrayBaseName, count))
 		b.WriteString(fmt.Sprintf("[%d] = {", inputsSize))
 		init := CoverageOutputArrayInit(tests, count, inputsSize)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		b.WriteString(init)
@@ -255,7 +259,8 @@ func CoverageOutputDecls(values []*ExtensionValue, tests []*Constant, inputsSize
 	return b.String()
 }
 
-// CoverageOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
+// CoverageOutputFirstFunInvocation mirrors OutputFirstFunInvocation.}
+
 func CoverageOutputFirstFunInvocation(values []*ExtensionValue, invokeOut string, inputsSize int) string {
 	if !extensionValuesComplete(values) || invokeOut == "" || inputsSize <= 0 {
 		sessNoteError(nil, ErrGeneric)
@@ -337,7 +342,7 @@ func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilit
 	}
 
 	// AbsExtension::Initialize(func1_max_params, values)
-	s.ExtValues = AbsExtensionInitialize(opts.Func1MaxParams, r, probs)
+	s.ExtValues = AbsExtensionInitializeSess(s, opts.Func1MaxParams, r, probs)
 	if s.ExtValues == nil || sessHasError(s) {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)

@@ -33,10 +33,14 @@ type LoopControl struct {
 // StatementFor.cpp:61–113.
 // Sticky ERROR_RETURN leaves partial values; callers must check HasError.
 func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
+	return MakeRandomLoopControlSess(nil, r, opts, ivSigned)
+}
+
+func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
 	// pure_rnd_* == rnd_* in random mode (ERROR_RETURN still honors sticky Error)
 	// C++ always has RNG; sticky no invent fixed init/limit/incr when r nil
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if r.RndFlipcoin(50) {
@@ -52,13 +56,13 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 	tOps := []BinaryOp{BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe}
 	testOp = tOps[r.RndUpto(uint32(len(tOps)))]
 	// StatementFor.cpp:79 — ERROR_RETURN after test_op pick
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 
 	if r.RndFlipcoin(50) {
 		// StatementFor.cpp:82 — ERROR_RETURN after flip into +=/-= branch
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		incr = int(r.RndUpto(10))
@@ -86,7 +90,7 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 		}
 	} else {
 		// StatementFor.cpp:102 — ERROR_RETURN after flip into ++/-- branch
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return
 		}
 		// ++/-- pre or post
@@ -118,7 +122,8 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 
 // MakeRandomArrayControl mirrors make_random_array_control.
 // StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb;
-// returns adjusted IV bound (out-param `bound` in C++).
+// returns adjusted IV bound (out-param `bound` in C++).}
+
 func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
 	return MakeRandomArrayControlSess(nil, r, bound, isSigned, oobProb)
 }
@@ -392,7 +397,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	} else {
 		// StatementFor.cpp:200 / 223–226 — leave bound = INVALID_BOUND
 		bound = InvalidIVBound
-		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
+		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControlSess(cgSess(cg), r, opts, signed)
 		// StatementFor.cpp:79/82/102 ERROR_RETURN inside make_random_loop_control
 		if sessHasError(cgSess(cg)) {
 			return nil
@@ -568,7 +573,7 @@ func MakeRandomFor(
 	}
 	// Deep: pre_facts eUnionWrite must not alias live FactUnion objects that
 	// body generation renews/joins (StatementFor.cpp:299–300 snapshot).
-	preUnion := CloneUnionFactSliceDeep(cg.FM.UnionFacts)
+	preUnion := CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
 	if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnion) {
 		if !sessHasError(cgSess(cg)) {
 			sessNoteError(cgSess(cg), ErrGeneric)
@@ -746,31 +751,35 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 // StatementFor::Output / StatementAssign OutputAsExpr paths.
 // Not used for StatementArrayOp (that uses arrayOpHeaderOutput with numeric inits).
 func forHeaderOutput(lc *LoopControl) string {
+	return forHeaderOutputSess(nil, lc)
+}
+
+func forHeaderOutputSess(s *Session, lc *LoopControl) string {
 	// StatementFor always has init/test/incr IR; incomplete sticky empty (no soft invent for(;;))
 	if lc == nil || lc.IV == nil {
 		if lc != nil && lc.IV == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
 	init := forInitOutput(lc)
 	// residual ERROR sticky — no invent soft-continue test/incr past init residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	test := forTestOutput(lc)
 	// residual ERROR sticky — no invent soft-continue incr past test residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	incr := forIncrOutput(lc)
 	// residual ERROR sticky — no invent soft-continue header past incr residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// StatementFor.cpp:408–414 — always live init/test/incr; sticky no invent empty segments
 	if init == "" || test == "" || incr == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
@@ -778,7 +787,8 @@ func forHeaderOutput(lc *LoopControl) string {
 
 // arrayOpHeaderOutput mirrors StatementArrayOp::output_header one dimension.
 // StatementArrayOp.cpp:194–220 — for (cv = init; cv < size; cv += incr)
-// (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).
+// (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).}
+
 func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
 	// StatementArrayOp always has live LoopControl + IV sticky
 	if lc == nil || lc.IV == nil {

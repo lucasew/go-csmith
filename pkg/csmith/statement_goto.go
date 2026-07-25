@@ -311,34 +311,39 @@ func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
 // StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".}
 
 func variableInitOutput(v *Variable) string {
+	return variableInitOutputSess(nil, v)
+}
+
+func variableInitOutputSess(s *Session, v *Variable) string {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:656 / OutputDef — InitExpr first
 	if v.InitExpr != nil {
 		out := v.InitExpr.Output()
 		// residual ERROR sticky — no invent soft-fallback Init past Output residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// incomplete InitExpr IR sticky — fail closed empty (no invent "0")
 		if out != "" {
 			return out
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if v.Init != nil && v.Init.Value != "" {
 		return v.Init.Value
 	}
 	// C++ assert(v->init); missing init is broken IR sticky
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return ""
 }
 
 // copyBlocksNoHole copies blocks; nil hole sticky fails closed (ok=false).
-// Block* always live on Function.Blocks; no invent soft-skip holes as absent.
+// Block* always live on Function.Blocks; no invent soft-skip holes as absent.}
+
 func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
 	out = make([]*Block, 0, len(blocks))
 	for _, b := range blocks {
@@ -705,7 +710,7 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		gotoIn = CloneFactSlice(srcFacts)
-		gotoInU = CloneUnionFactSliceDeep(srcUnions)
+		gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), srcUnions)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(gotoInU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -756,7 +761,7 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		stmInMerged = CloneFactSlice(destIn)
-		stmInMergedU = CloneUnionFactSliceDeep(destInU)
+		stmInMergedU = CloneUnionFactSliceDeepSess(cgSess(cg), destInU)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmInMergedU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -803,7 +808,7 @@ func MakeRandomGoto(
 		}
 		if changed || unionChanged {
 			stmOut = CloneFactSlice(stmInMerged)
-			stmOutU = CloneUnionFactSliceDeep(stmInMergedU)
+			stmOutU = CloneUnionFactSliceDeepSess(cgSess(cg), stmInMergedU)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmOutU) {
 				if !sessHasError(cgSess(cg)) {
 					sessNoteError(cgSess(cg), ErrGeneric)
@@ -835,7 +840,7 @@ func MakeRandomGoto(
 			// from the live GlobalFacts into the visit inputs (FactMgr.cpp:494–508).
 			// Keep post–merge_jump lattice (e.g. BOTTOM) — do not reload map_in.
 			liveSaved := CloneFactSlice(fm.GlobalFacts)
-			liveSavedU := CloneUnionFactSliceDeep(fm.UnionFacts)
+			liveSavedU := CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
 			if !FactsComplete(liveSaved) || !UnionFactsComplete(liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
@@ -871,7 +876,7 @@ func MakeRandomGoto(
 			if stmInMergedU == nil {
 				fm.UnionFacts = []*FactUnion{}
 			} else {
-				clU := CloneUnionFactSliceDeep(stmInMergedU)
+				clU := CloneUnionFactSliceDeepSess(cgSess(cg), stmInMergedU)
 				if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
 					fm.UnionFacts = liveSavedU
 					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
@@ -926,7 +931,7 @@ func MakeRandomGoto(
 			stmOut = work
 			// Capture post-visit eUnionWrite before restoring pre-visit live
 			// (set_fact_out pairs this lattice; C++ stm_out is the visit inputs FactVec).
-			stmOutU = CloneUnionFactSliceDeep(fm.UnionFacts)
+			stmOutU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
 			if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmOutU) {
 				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
 				fm.UnionFacts = liveSavedU
@@ -953,10 +958,10 @@ func MakeRandomGoto(
 			if ContainsStmt(dest, other) {
 				if IsCtrlStmt(other) {
 					gotoIn = CloneFactSlice(fm.GetMapFactsIn(other.StmID))
-					gotoInU = CloneUnionFactSliceDeep(fm.GetMapUnionFactsIn(other.StmID))
+					gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.GetMapUnionFactsIn(other.StmID))
 				} else {
 					gotoIn = CloneFactSlice(fm.GetMapFactsOut(other.StmID))
-					gotoInU = CloneUnionFactSliceDeep(fm.GetMapUnionFactsOut(other.StmID))
+					gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.GetMapUnionFactsOut(other.StmID))
 				}
 				if sessHasError(cgSess(cg)) || !FactsComplete(gotoIn) || !UnionFactsComplete(gotoInU) {
 					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)

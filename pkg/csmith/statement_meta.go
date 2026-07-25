@@ -261,9 +261,14 @@ func FindContainerStm(b *Block) *Stmt {
 // Nested-in-a uses get_blocks only (no invent dominate via stray Then on assign).
 // Incomplete get_blocks arms sticky false (no invent match Then then soft-skip nil Else).
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
+	return DominateSess(nil, a, aParent, s, sParent)
+}
+
+// DominateSess is Dominate with sticky on run bag (sess; stmt param remains s).
+func DominateSess(sess *Session, a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	// both Statement* always live; sticky incomplete no invent not-dominate soft-skip
 	if a == nil || s == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return false
 	}
 	// s is nested inside a (get_blocks of a includes s's parent block)
@@ -282,7 +287,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 			}
 		}
 		if incomplete {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(sess, ErrGeneric)
 			return false
 		}
 		if matched {
@@ -305,7 +310,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 				return ia <= is
 			}
 			// incomplete StmID and not both in parent — sticky fail closed
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(sess, ErrGeneric)
 			return false
 		}
 		return a.StmID <= s.StmID
@@ -315,22 +320,15 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	if sParent != nil {
 		container := FindContainerStm(sParent)
 		if container != nil {
-			return Dominate(a, aParent, container, sParent.Parent)
+			return DominateSess(sess, a, aParent, container, sParent.Parent)
 		}
-		if sessHasError(nil) {
+		if sessHasError(sess) {
 			return false
 		}
 	}
 	return false
 }
 
-// IsJumpTargetFromOtherBlocks mirrors Statement::is_jump_target_from_other_blocks.
-// Statement.cpp:653–663 — goto sources from a different parent block.
-// destParent is this statement's parent; srcParentOf maps src StmID → parent block.
-// When srcParentOf is nil, treat non-sibling StmIDs in destParent as other-block sources.
-// Incomplete CFG (FindJumpSources nil) fails closed as jump-target (no invent none).
-// Nil FactMgr fails closed as jump-target (no invent "not target" without CFG).
-// destStmID ≤0 fails closed sticky as jump-target (no invent "not target" on incomplete id).
 func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, srcParentOf map[int]*Block) bool {
 	if StmIDUnset(destStmID) {
 		sessNoteError(fmSess(fm), ErrGeneric)

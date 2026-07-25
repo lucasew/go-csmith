@@ -850,7 +850,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return
 		}
-		postUnion = CloneUnionFactSliceDeep(fm.UnionFacts)
+		postUnion = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(postUnion) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -983,7 +983,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					sessNoteError(cgSess(cg), ErrGeneric)
 					return
 				}
-				entryUnionsSnap := CloneUnionFactSliceDeep(inU0)
+				entryUnionsSnap := CloneUnionFactSliceDeepSess(cgSess(cg), inU0)
 				if sessHasError(cgSess(cg)) || !UnionFactsComplete(entryUnionsSnap) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
@@ -1011,7 +1011,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				for {
 					// Re-install entry eUnionWrite each attempt (reset_stm_fact_maps
 					// / prior FP may have left live at mid-body last-writes).
-					entryU := CloneUnionFactSliceDeep(entryUnionsSnap)
+					entryU := CloneUnionFactSliceDeepSess(cgSess(cg), entryUnionsSnap)
 					if sessHasError(cgSess(cg)) || !UnionFactsComplete(entryU) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						fm.UnionFacts = IncompleteUnionFactSlice()
@@ -1101,7 +1101,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					// from inputs. Breaking here left MapFactsIn/Out deleted → complete-empty
 					// postLoop/global_facts (seed-2 e2308: EV rejects ** with nfacts=0).
 					if len(b.Stmts) == 0 {
-						entryUEmpty := CloneUnionFactSliceDeep(entryUnionsSnap)
+						entryUEmpty := CloneUnionFactSliceDeepSess(cgSess(cg), entryUnionsSnap)
 						if sessHasError(cgSess(cg)) || !UnionFactsComplete(entryUEmpty) {
 							fm.GlobalFacts = IncompleteFactSlice()
 							fm.UnionFacts = IncompleteUnionFactSlice()
@@ -1297,7 +1297,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			// only when we will actually append so a soft-skip does not reinstall
 			// pre-OOS body-local unions after the no-FP OOS path.
 			if r != nil {
-				restU := CloneUnionFactSliceDeep(postUnion)
+				restU := CloneUnionFactSliceDeepSess(cgSess(cg), postUnion)
 				if sessHasError(cgSess(cg)) || !UnionFactsComplete(restU) {
 					if !sessHasError(cgSess(cg)) {
 						sessNoteError(cgSess(cg), ErrGeneric)
