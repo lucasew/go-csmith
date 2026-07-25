@@ -7,7 +7,7 @@ import (
 
 func TestGetActualNameAndPrefix(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if g.GetActualNameSess(testAmbientSession, false) != "g_1" {
 		t.Fatal(g.GetActualNameSess(testAmbientSession, false))
 	}
@@ -15,12 +15,12 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 	if GetPrefixedName("g_1", true) != "g_1" {
 		t.Fatal("prefix")
 	}
-	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	if l.GetActualNameSess(testAmbientSession, true) != "l_1" {
 		t.Fatal("local")
 	}
 	// empty Name sticky (no invent empty identifier soft-skip past incomplete name)
-	if s := (&Variable{Name: "", Type: GetIntType()}).GetActualNameSess(testAmbientSession, false); s != "" {
+	if s := (&Variable{Name: "", Type: GetIntTypeSess(testAmbientSession)}).GetActualNameSess(testAmbientSession, false); s != "" {
 		t.Fatal("empty Name GetActualName invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -39,21 +39,21 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 
 func TestOutputDefVolatileComment(t *testing.T) {
 	// Variable.cpp:662–667 — is_volatile() only (locals included; text still "GLOBAL")
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	v.Init = MakeInt(0)
 	s := v.OutputDefFullSess(testAmbientSession, true, false, false, nil)
 	if !strings.Contains(s, "VOLATILE GLOBAL g_v") {
 		t.Fatal(s)
 	}
 	// local volatile still gets the comment (seed 95 l_1341)
-	l := CreateVariableScalarsSess(testAmbientSession, "l_v", GetIntType(), false, true)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_v", GetIntTypeSess(testAmbientSession), false, true)
 	l.Init = MakeInt(1)
 	s2 := l.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if !strings.Contains(s2, "VOLATILE GLOBAL l_v") {
 		t.Fatal(s2)
 	}
 	// non-volatile local: no comment
-	n := CreateVariableScalarsSess(testAmbientSession, "l_n", GetIntType(), false, false)
+	n := CreateVariableScalarsSess(testAmbientSession, "l_n", GetIntTypeSess(testAmbientSession), false, false)
 	n.Init = MakeInt(2)
 	s3 := n.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if strings.Contains(s3, "VOLATILE GLOBAL") {
@@ -63,7 +63,7 @@ func TestOutputDefVolatileComment(t *testing.T) {
 
 func TestOutputAddrOf(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	v.UseVolRVal = true
 	// even with wrap, AddrOf uses bare name
 	if v.OutputAddrOfSess(testAmbientSession, false) != "&g_1" {
@@ -90,8 +90,8 @@ func TestOutputAddrOf(t *testing.T) {
 func TestOutputBoundNoInventFieldWithoutDot(t *testing.T) {
 	// Variable.cpp:724–727 assert(dot != npos); sticky no invent base-only field path
 	ClearErrorSess(testAmbientSession)
-	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), false, false)
-	f := &Variable{Name: "broken_field", Type: GetIntType(), FieldVarOf: parent}
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntTypeSess(testAmbientSession), false, false)
+	f := &Variable{Name: "broken_field", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	if s := f.OutputUpperBoundSess(testAmbientSession, false); s != "" {
 		t.Fatal("field without '.' must fail closed", s)
 	}
@@ -154,7 +154,7 @@ func TestOutputGlobalsVolatileComment(t *testing.T) {
 	opts := Defaults()
 	g := NewProgramGenerator(NewSession(opts))
 	// Force a known scalar volatile global through OutputGlobals path.
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	v.Init = MakeInt(0)
 	g.VS.GlobalList = []*Variable{v}
 	out := g.OutputGlobals()
@@ -169,7 +169,7 @@ func TestOutputGlobalsVolatileArrayNoComment(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	av := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
 			Qfer: NewCVQualifiers([]bool{false}, []bool{true}),
 			Init: MakeInt(0),
 		},
@@ -191,7 +191,7 @@ func TestOutputGlobalsIncompleteSticky(t *testing.T) {
 	// incomplete GlobalList / Arrays fail closed sticky (no invent empty section)
 	opts := Defaults()
 	g := NewProgramGenerator(NewSession(opts))
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, false)
 	v.Init = MakeInt(0)
 	g.VS.GlobalList = []*Variable{v, nil}
 	g.clearErr()
@@ -230,7 +230,7 @@ func TestOutputCNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was bare-name OutputC/LHS
-	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	if shell.OutputCSess(testAmbientSession, false) != "" {
 		t.Fatal("IsArray without AsArray OutputC must fail closed empty")
 	}
@@ -253,8 +253,8 @@ func TestGetActualNameIsGlobalFieldResidualSticky(t *testing.T) {
 	// Field of nil parent shell: FieldVarOf nil path is not field; force parent nil Variable residual via FieldVarOf cycle?
 	// Field with parent that is nil Variable pointer stuck:
 	// parent Type-nil still IsGlobal by name if g_
-	parent := &Variable{Name: "g_s", Type: GetIntType()}
-	child := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	parent := &Variable{Name: "g_s", Type: GetIntTypeSess(testAmbientSession)}
+	child := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	if child.GetActualNameSess(testAmbientSession, false) != "g_s.f0" {
 		// globals may use name as-is
 	}

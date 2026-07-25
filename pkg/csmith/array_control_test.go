@@ -88,7 +88,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -97,9 +97,9 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable}
 	vs.Arrays = []*ArrayVariable{av}
 	// add a loop ctrl candidate
-	iv := CreateVariableQferSess(testAmbientSession, "g_2", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
@@ -122,14 +122,14 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	av.Sizes = []int{5, 5}
 	av.ArraySizes = av.Sizes
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntTypeSess(testAmbientSession), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
@@ -153,8 +153,8 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 
 func TestCombineVariableSets(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	got := CombineVariableSets([]*Variable{a}, []*Variable{a, b})
 	if len(got) != 2 {
 		t.Fatalf("%d", len(got))
@@ -196,7 +196,7 @@ func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
 	// no Types env → CreateRandomArray fails closed
 	vs.Types = nil
 	vs.Arrays = nil
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// empty stack → CreateRandomArray cannot invent local array
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	ClearErrorSess(testAmbientSession)
@@ -216,7 +216,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// seed several arrays so select_array can pick
 	for i := 0; i < 3; i++ {
-		av := CreateArrayVariable(NewRngSess(testAmbientSession, uint64(10+i)), opts, NewProbabilities(opts), nil, nil, nil, "g_"+string(rune('a'+i)), GetIntType(), MakeInt(0), q)
+		av := CreateArrayVariable(NewRngSess(testAmbientSession, uint64(10+i)), opts, NewProbabilities(opts), nil, nil, nil, "g_"+string(rune('a'+i)), GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 		if av == nil {
 			continue
 		}
@@ -226,9 +226,9 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 		vs.GlobalList = append(vs.GlobalList, &av.Variable)
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, &av.Variable)
 	}
-	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntTypeSess(testAmbientSession), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
@@ -272,11 +272,11 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 2))
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 2))
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// pre-seed effect_stm as dirty
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)
@@ -323,7 +323,7 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

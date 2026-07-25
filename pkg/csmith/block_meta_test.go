@@ -57,7 +57,7 @@ func TestGetLastStmStopsAtReturn(t *testing.T) {
 
 func TestSetAccumulatedEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	fm.SetMapStmEffect(1, EmptyEffect().WriteVarSess(testAmbientSession, v))
 	fm.SetMapStmEffect(2, EmptyEffect().ReadVarSess(testAmbientSession, v))
 	b := &Block{
@@ -184,7 +184,7 @@ func TestLabelAttrEmit(t *testing.T) {
 		LabelAttrRng:   NewRngSess(testAmbientSession, 1),
 		Stmts: []Stmt{{
 			Kind: StmtAssign, SourceLabel: "lbl_1",
-			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false),
+			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false),
 			AssignOp: AssignSimple,
 			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
 		}},
@@ -199,7 +199,7 @@ func TestLabelAttrEmit(t *testing.T) {
 func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// make a small looping block
@@ -325,7 +325,7 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 42, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1,
-		LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false),
+		LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false),
 		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
 		AssignOp: AssignSimple,
 	}}}
@@ -345,10 +345,10 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 // same as header (not indent+1). Unfair indent+1: "for\n        {" vs "for\n    {".
 func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	body := &Block{StmID: 7, Stmts: []Stmt{{
 		Kind: StmtReturn,
-		Expr: &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()},
+		Expr: &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)},
 	}}}
 	// ArrayOp header only needs IV + InitN/LimitN/IncrN (numeric), same indent rule
 	parent := &Block{StmID: 1, Stmts: []Stmt{{

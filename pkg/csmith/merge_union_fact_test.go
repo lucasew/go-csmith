@@ -10,8 +10,8 @@ func TestMergeUnionFactIntoMatchesMergeFact(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f3", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -41,11 +41,11 @@ func TestMergeUnionFactJoinsLattice(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
-			{Name: "f2", Type: GetIntType(), BitWidth: -1},
-			{Name: "f3", Type: GetIntType(), BitWidth: -1},
-			{Name: "f4", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -77,8 +77,8 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f3", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -90,7 +90,7 @@ func TestUpdateFactForAssignUnionRenewDefinitive(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	// definitive assign to union field f3 → renew last_written to field id of f3
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
 	if !fm.UpdateFactForAssign(f3, 0, rhs) {
 		t.Fatal("update", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
@@ -106,8 +106,8 @@ func TestUpdateFactForAssignUnionMayMergeJoins(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f4", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	u0 := CreateVariableQferSess(testAmbientSession, "g_u0", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -133,8 +133,8 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetSimpleType(EChar), BitWidth: -1},
-			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1},
+			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_721", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -143,7 +143,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 		t.Fatal("need f0 f1")
 	}
 	f1 := uv.FieldVars[1]
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{StmID: AllocStmID(), Func: f}
 	f.Body = body
 	f.Stack = []*Block{body}
@@ -152,7 +152,7 @@ func TestCombineBranchAfterUnionFieldIVKeepsLastWritten(t *testing.T) {
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
 	// IV assign g_721.f1 = 0
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}
 	if !fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("assign f1", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}

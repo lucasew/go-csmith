@@ -1502,7 +1502,7 @@ func MakeRandomBinaryPtrComparison(
 	// nullptr, nullptr, sOpBinary, op) BEFORE choose_random_pointer_type.
 	// Output for ptr_cmp still uses standard ==/!= (not safe_* wrappers), but the
 	// RNG draws for signedness + size still run (seed-2 e129 was F50 from flags).
-	flags := MakeRandomBinaryKindSess(sessFromCG(cg), r, opts, probs, GetIntType(), nil, nil, SafeOpBinary, op)
+	flags := MakeRandomBinaryKindSess(sessFromCG(cg), r, opts, probs, GetIntTypeSess(sessFromCG(cg)), nil, nil, SafeOpBinary, op)
 	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison
 	if flags == nil || hasErrCG(cg) {
 		return nil
@@ -1797,7 +1797,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		noteErrCG(&cg, ErrGeneric)
 		return "", ""
 	}
-	if !ty1.IsSimple() {
+	if !ty1.IsSimpleSess(sessFromCG(&cg)) {
 		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
 		if hasErrCG(&cg) {
 			return "", ""
@@ -1809,7 +1809,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	if hasErrCG(&cg) {
 		return "", ""
 	}
-	st := ty1.Simple()
+	st := ty1.SimpleSess(sessFromCG(&cg))
 	tmp1 = blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), st)
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
 	if hasErrCG(&cg) {
@@ -1824,7 +1824,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 			noteErrCG(&cg, ErrGeneric)
 			return "", ""
 		}
-		if !ty.IsSimple() {
+		if !ty.IsSimpleSess(sessFromCG(&cg)) {
 			if hasErrCG(&cg) {
 				return "", ""
 			}
@@ -1834,7 +1834,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		if hasErrCG(&cg) {
 			return "", ""
 		}
-		st2 = ty.Simple()
+		st2 = ty.SimpleSess(sessFromCG(&cg))
 	}
 	tmp2 = blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), st2)
 	return tmp1, tmp2
@@ -1859,7 +1859,7 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 		noteErrCG(&cg, ErrGeneric)
 		return ""
 	}
-	if !ty.IsSimple() {
+	if !ty.IsSimpleSess(sessFromCG(&cg)) {
 		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
 		if hasErrCG(&cg) {
 			return ""
@@ -1871,7 +1871,7 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 	if hasErrCG(&cg) {
 		return ""
 	}
-	tmp := blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), ty.Simple())
+	tmp := blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), ty.SimpleSess(sessFromCG(&cg)))
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
 	if hasErrCG(&cg) {
 		return ""
@@ -1916,7 +1916,7 @@ func MakeRandomInvocation(
 	matchType := typ
 	// FunctionInvocation.cpp:71–73 path — non-simple/void force user path (type known)
 	if typ != nil {
-		pt := typ.PtrType()
+		pt := typ.PtrTypeSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-std path past PtrType residual
 		if hasErrCG(cg) {
 			return &Invocation{Failed: true}
@@ -1924,12 +1924,12 @@ func MakeRandomInvocation(
 		if pt != nil {
 			stdFunc = false
 		} else {
-			simple := typ.IsSimple()
+			simple := typ.IsSimpleSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-std path past IsSimple residual
 			if hasErrCG(cg) {
 				return &Invocation{Failed: true}
 			}
-			if simple && typ.Simple() == EVoid {
+			if simple && typ.SimpleSess(cgSess(cg)) == EVoid {
 				stdFunc = false
 			}
 		}

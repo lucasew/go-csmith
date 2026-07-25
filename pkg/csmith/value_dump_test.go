@@ -6,7 +6,7 @@ import (
 )
 
 func TestOutputValueDumpSimple(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	out := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil)
 	// int may be %d or %lld depending on platform SizeInBytes
 	if !strings.Contains(out, "checksum g_1 = %") || !strings.Contains(out, ", g_1);") {
@@ -18,11 +18,11 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	// Variable* always live in FieldVars sticky; soft invent skip would dump later fields
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
-	f0 := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: v}
+	f0 := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: v}
 	v.FieldVars = []*Variable{nil, f0}
 	if s := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil); s != "" {
 		t.Fatal("nil FieldVars hole must fail closed whole dump, not soft-skip", s)
@@ -33,7 +33,7 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// union hole
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "a", Type: GetIntType(), BitWidth: -1},
+		{Name: "a", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if uv == nil {
@@ -55,8 +55,8 @@ func TestOutputValueDumpStructFields(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1},
 		},
 	}
 	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -74,8 +74,8 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -107,7 +107,7 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 	// live AsArray required for virtual expand (no invent scalar dump past IsArray shell)
 	av := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
 			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 		},
 		Sizes: []int{2},
@@ -119,7 +119,7 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 	}
 	// IsArray without AsArray soft invent was scalar printf path
 	ClearErrorSess(testAmbientSession)
-	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	if shell.OutputValueDumpSess(testAmbientSession, "c ", 1, nil) != "" {
 		t.Fatal("IsArray without AsArray OutputValueDump must fail closed empty")
 	}
@@ -157,11 +157,11 @@ func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	f0 := &Variable{Name: "g_s.f0", Type: GetIntType()}
-	f1 := &Variable{Name: "g_s.f1", Type: GetIntType()}
+	f0 := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession)}
+	f1 := &Variable{Name: "g_s.f1", Type: GetIntTypeSess(testAmbientSession)}
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_s", Type: st, IsArray: true, ArraySizes: []int{1},
@@ -218,7 +218,7 @@ func TestBlindCheckGlobalMain(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	// seed simple global
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	g.VS.GlobalList = []*Variable{v}
 	g.GenerateFunctions()
 	main := g.OutputMain()
@@ -242,7 +242,7 @@ func TestOutputMainNoInventWithoutFirstInvoke(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	// incomplete first func (no RV/body) — BuildUserInvocation may still run with empty params
 	g.Funcs.Funcs = []*Function{{
-		Name: "func_1", ReturnType: GetIntType(),
+		Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession),
 		// no Body / not Built — invocation of unbuilt still possible for zero-param
 		IsBuilt: true, BuildState: BuildBuilt,
 	}}

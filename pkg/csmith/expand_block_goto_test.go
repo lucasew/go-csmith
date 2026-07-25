@@ -187,7 +187,7 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	f.Stack = []*Block{parent, thenArm}
 	beforeP, beforeT := len(parent.LocalVars), len(thenArm.LocalVars)
-	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 5))
+	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 5))
 	if v == nil {
 		t.Fatal("nil var", HasErrorSess(testAmbientSession))
 	}
@@ -229,7 +229,7 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVariableInSet false → var stays remaining
 	// fair: incomplete LocalVars → nil, IncompleteVariables sticky
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntTypeSess(testAmbientSession), false, false)
 	a.Name = "l_a"
 	inner := &Block{LocalVars: []*Variable{a, nil}}
 	blk, rem := LowerBlockForVars([]*Block{inner}, []*Variable{a})
@@ -244,9 +244,9 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 
 func TestLowerBlockForVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "l_b", GetIntType(), false, false)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "l_b", GetIntTypeSess(testAmbientSession), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	inner := &Block{LocalVars: []*Variable{a}}
 	outer := &Block{LocalVars: []*Variable{a, b}, Parent: nil}
 	// vars {a,b}: inner covers only a → remaining {b}; outer covers rest
@@ -278,7 +278,7 @@ func TestLowerBlockForVars(t *testing.T) {
 func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
 	dest := Stmt{Kind: StmtAssign, StmID: AllocStmID()}
@@ -295,7 +295,7 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 
 	beforeOuter := len(outer.LocalVars)
 	beforeInner := len(inner.LocalVars)
-	v := vs.GenerateNewParentLocal(inner, AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 3))
+	v := vs.GenerateNewParentLocal(inner, AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 3))
 	if v == nil {
 		t.Fatal("nil var")
 	}
@@ -319,7 +319,7 @@ func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 		Fields: []StructField{
 			{
 				Name:     "f0",
-				Type:     GetIntType(),
+				Type:     GetIntTypeSess(testAmbientSession),
 				BitWidth: -1,
 				Qfer:     NewCVQualifiers([]bool{false}, []bool{true}), // volatile
 			},
@@ -358,7 +358,7 @@ func TestReachMaxFunctionsNilFuncResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete under max
 	list2 := &FunctionList{Funcs: []*Function{
-		{Name: "func_1", ReturnType: GetIntType()},
+		{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)},
 	}}
 	if ReachMaxFunctions(list2, opts) {
 		t.Fatal("one user func under max must not invent max")

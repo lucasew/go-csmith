@@ -63,7 +63,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	opts := Defaults()
 	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// many draws with empty params: never ParentParam
 	for seed := uint64(1); seed < 80; seed++ {
@@ -76,7 +76,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 		}
 	}
 	// with a param, ParentParam is allowed
-	f.Param = []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)}
+	f.Param = []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)}
 	seenParam := false
 	for seed := uint64(1); seed < 100; seed++ {
 		if VariableSelectionProbabilityCG(NewRngSess(testAmbientSession, seed), opts, &cg, MaxVarScope) == ScopeParentParam {
@@ -95,7 +95,7 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 	opts := Defaults()
 	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
-	f := &Function{Name: "f", ReturnType: GetIntType(), Param: IncompleteVariables()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Param: IncompleteVariables()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if sc := VariableSelectionProbabilityCG(NewRngSess(testAmbientSession, 1), opts, &cg, MaxVarScope); sc != MaxVarScope {
 		t.Fatalf("incomplete Param must fail closed MAX, got %v", sc)
@@ -113,13 +113,13 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRngSess(testAmbientSession, 3)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	f.Body = blk
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.Select(AccessRead, cg, GetIntType(), &q, r, MatchFlexible)
+	v := vs.Select(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, r, MatchFlexible)
 	if v == nil {
 		t.Fatal("nil")
 	}
@@ -177,7 +177,7 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -201,7 +201,7 @@ func TestExpandStructUnionVarsIsAggregateResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent soft-continue expand past incomplete pool.
 	ClearErrorSess(testAmbientSession)
 	// incomplete vars pool sticky
-	out := ExpandStructUnionVars([]*Variable{nil}, GetIntType())
+	out := ExpandStructUnionVars([]*Variable{nil}, GetIntTypeSess(testAmbientSession))
 	if VariablesComplete(out) {
 		t.Fatal("nil hole ExpandStructUnionVars must fail closed incomplete")
 	}

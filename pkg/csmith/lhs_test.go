@@ -12,7 +12,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRngSess(testAmbientSession, 3)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	lhs := MakeRandomLhs(r, opts, probs, vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(r, opts, probs, vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil)
 	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil lhs")
 	}
@@ -31,7 +31,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	vs.Types = env
 	// seed an int* global — qfer depth must be indirect+1 (pointer: 2 levels)
-	p := env.FindPointerType(GetIntType(), true)
+	p := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	pv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRngSess(testAmbientSession, 1))
 	if pv == nil {
@@ -40,8 +40,8 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	// force high deref probability by trying many seeds
 	var got *Lhs
 	for seed := uint64(1); seed < 100; seed++ {
-		got = MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, nil)
-		if got != nil && got.Var != nil && got.Var.Type != nil && got.Var.Type.IndirectLevel() == 1 && got.IndirectLevel() == 1 {
+		got = MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntTypeSess(testAmbientSession), false, false, nil)
+		if got != nil && got.Var != nil && got.Var.Type != nil && got.Var.Type.IndirectLevelSess(testAmbientSession) == 1 && got.IndirectLevelSess(testAmbientSession) == 1 {
 			break
 		}
 		got = nil
@@ -62,7 +62,7 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
-	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
+	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntTypeSess(testAmbientSession), true, false)
 	broken.Type = nil
 	vs.GlobalList = []*Variable{broken}
 	vs.AllVars = []*Variable{broken}
@@ -71,7 +71,7 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	// (no invent soft fall-through create/accept past incomplete type IR)
 	for seed := uint64(1); seed < 20; seed++ {
 		ClearErrorSess(testAmbientSession)
-		lhs := MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
+		lhs := MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil)
 		if lhs != nil && lhs.Var == broken {
 			t.Fatal("Type-nil var must not be accepted as Lhs")
 		}
@@ -89,17 +89,17 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	// must_use Type-nil stickies SelectMustUseVar residual; must not invent soft select Lhs
-	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
+	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntTypeSess(testAmbientSession), true, false)
 	broken.Type = nil
-	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntType(), true, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntTypeSess(testAmbientSession), true, false)
 	vs.GlobalList = []*Variable{good}
 	vs.AllVars = []*Variable{good}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	rw := &RWDirective{MustWriteVars: []*Variable{broken, good}}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, probs, vs, &cg, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, probs, vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("must-use Type-nil residual must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -109,14 +109,14 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	// IsArray without AsArray shell in must-use: SelectMustUse stickies residual;
 	// soft invent was fall through soft select invent Lhs from good global.
 	shell := &Variable{
-		Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+		Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
 		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 	}
 	rw2 := &RWDirective{MustWriteVars: []*Variable{shell, good}}
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithRW(rw2)
 	eff2 := EmptyEffect()
 	cg2.EffectAccum = &eff2
-	if MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, probs, vs, &cg2, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, probs, vs, &cg2, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("IsArray without AsArray must-use residual must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -126,8 +126,8 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 }
 
 func TestLhsOutputVolLval(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
-	lhs := &Lhs{Var: v, Type: GetIntType()}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
+	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
 	out := lhs.Output(true)
 	if !strings.Contains(out, "VOL_LVAL(g_v") {
 		t.Fatal(out)
@@ -135,11 +135,11 @@ func TestLhsOutputVolLval(t *testing.T) {
 }
 
 func TestLhsIndirectLevel(t *testing.T) {
-	p := PointerTo(GetIntType())
+	p := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	v := CreateVariableQferSess(testAmbientSession, "g_p", p, NewCVQualifiers([]bool{false}, []bool{false}))
-	lhs := &Lhs{Var: v, Type: GetIntType()}
-	if lhs.IndirectLevel() != 1 {
-		t.Fatal(lhs.IndirectLevel())
+	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
+	if lhs.IndirectLevelSess(testAmbientSession) != 1 {
+		t.Fatal(lhs.IndirectLevelSess(testAmbientSession))
 	}
 	if lhs.Output(false) != "(*g_p)" {
 		t.Fatal(lhs.Output(false))
@@ -174,8 +174,8 @@ func TestLhsIndirectLevel(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// GetCollective residual soft invent was soft-merge invent complete GetLvars list.
 	// IsArray without AsArray stickies GetCollective.
-	arrShell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	lhsArr := &Lhs{Var: arrShell, Type: GetIntType()}
+	arrShell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
+	lhsArr := &Lhs{Var: arrShell, Type: GetIntTypeSess(testAmbientSession)}
 	if VariablesComplete(lhsArr.GetLvars(nil)) {
 		t.Fatal("GetCollective residual GetLvars must fail closed incomplete")
 	}
@@ -239,9 +239,9 @@ func TestPickUnaryOp(t *testing.T) {
 }
 
 func TestExpressionVariableDerefOutput(t *testing.T) {
-	p := PointerTo(GetIntType())
+	p := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	v := CreateVariableQferSess(testAmbientSession, "g_1", p, NewCVQualifiers([]bool{false}, []bool{false}))
-	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	out := e.Output()
 	if out != "(*g_1)" {
 		t.Fatalf("%q", out)
@@ -249,8 +249,8 @@ func TestExpressionVariableDerefOutput(t *testing.T) {
 }
 
 func TestExpressionVariableAddrOutput(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// ind = 0 - 1 = -1
 	out := e.Output()
 	if out != "&g_1" {
@@ -260,8 +260,8 @@ func TestExpressionVariableAddrOutput(t *testing.T) {
 
 func TestExpressionVariableMultiLevelAddrFailClosed(t *testing.T) {
 	// ExpressionVariable.cpp:211 — assert(indirect_level == -1); no invent single &
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(PointerTo(GetIntType()))}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))}
 	// ind = 0 - 2 = -2
 	if e.IndirectLevel() != -2 {
 		t.Fatalf("indir %d", e.IndirectLevel())
@@ -279,7 +279,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	vs.Types = env
-	p := env.FindPointerType(GetIntType(), true)
+	p := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	// pointer type needs two-level qfer for SanityCheck / MakeInitValue
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), p, &q, NewRngSess(testAmbientSession, 1))
@@ -288,7 +288,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	probs.single[PSelectDerefPointerProb] = 100
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		_ = MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, nil)
+		_ = MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntTypeSess(testAmbientSession), false, false, nil)
 	}
 	if CalcTotal(currentSession().BK.writeDereferenceCnts) == 0 && currentSession().BK.writeVolatileCnt+currentSession().BK.writeNonVolatileCnt == 0 {
 		t.Fatal("expected some write bookkeeping")
@@ -300,7 +300,7 @@ func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// only a signed int global
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
@@ -308,12 +308,12 @@ func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
 	// with only signed available and noSignedOverflow, must not return signed
 	foundSigned := false
 	for seed := uint64(1); seed < 15; seed++ {
-		lhs := MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), true, true, nil)
+		lhs := MakeRandomLhs(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntTypeSess(testAmbientSession), true, true, nil)
 		if lhs == nil {
 			continue
 		}
-		base := lhs.Var.Type.BaseType()
-		if base != nil && base.IsSigned() && !lhs.Var.IsBitfield {
+		base := lhs.Var.Type.BaseTypeSess(testAmbientSession)
+		if base != nil && base.IsSignedSess(testAmbientSession) && !lhs.Var.IsBitfield {
 			// new variables might be created unsigned; if same g_1 then fail
 			if lhs.Var == g {
 				foundSigned = true
@@ -330,14 +330,14 @@ func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
 	// Lhs.cpp:105 — !effect_stm.is_written(var)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	// with only g written in stm, make may create another var or fail
-	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil)
 	if lhs != nil && lhs.Var == g {
 		t.Fatal("must not select var already written in effect_stm")
 	}
@@ -347,13 +347,13 @@ func TestMakeRandomLhsUsesProvidedQferWildcard(t *testing.T) {
 	// Lhs.cpp:90–93 — wildcard skips Restrict
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	q.Wildcard = true
-	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntType(), false, false, &q)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext().WithSession(testAmbientSession); return &c }(), GetIntTypeSess(testAmbientSession), false, false, &q)
 	if lhs == nil {
 		t.Fatal("nil")
 	}
@@ -364,15 +364,15 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	// so StatementAssign can merge_param_context(lhs_cg).
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil)
 	if lhs == nil || lhs.Var == nil {
 		t.Skip("no lhs")
 	}
@@ -383,7 +383,7 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 		hasWrite = len(cg.EffectAccum.WrittenVarsSess(testAmbientSession)) > 0 || len(cg.EffectAccum.LhsWriteVarsSess(testAmbientSession)) > 0
 	}
 	if !hasWrite && len(cg.EffectStm.WrittenVarsSess(testAmbientSession)) == 0 {
-		t.Fatalf("expected write effect after lhs make (var %s indir=%d)", lhs.Var.Name, lhs.IndirectLevel())
+		t.Fatalf("expected write effect after lhs make (var %s indir=%d)", lhs.Var.Name, lhs.IndirectLevelSess(testAmbientSession))
 	}
 }
 
@@ -392,9 +392,9 @@ func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -415,15 +415,15 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -433,7 +433,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg2, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &cg2, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomLhs")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -446,7 +446,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
-	if MakeRandomLhs(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs2, &cg3, GetIntType(), false, false, nil) != nil {
+	if MakeRandomLhs(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs2, &cg3, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomLhs/selectWritable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -462,9 +462,9 @@ func TestSelectWritableNilTypSticky(t *testing.T) {
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -543,8 +543,8 @@ func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
 		t.Fatal("Lhs without Var LhsAsExpression must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
-	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntType()})
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
+	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)})
 	if e == nil || e.Var != v {
 		t.Fatal("complete LhsAsExpression must return TermVariable")
 	}
@@ -557,15 +557,15 @@ func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
 func TestLhsOutputAccessResidualSticky(t *testing.T) {
 	// OutputAccess residual soft invent was soft-empty invent bare/partial LHS.
 	ClearErrorSess(testAmbientSession)
-	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)}, Sizes: []int{2}}
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:      []int{2},
 		Collective: parent,
 		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Value: "0"}}}, // Type-nil residual
 	}
 	item.AsArray = item
-	lhs := &Lhs{Var: &item.Variable, Type: GetIntType()}
+	lhs := &Lhs{Var: &item.Variable, Type: GetIntTypeSess(testAmbientSession)}
 	if s := lhs.Output(false); s != "" {
 		t.Fatal("OutputAccess residual must fail closed Lhs.Output", s)
 	}
@@ -586,7 +586,7 @@ func TestLhsOutputAccessResidualSticky(t *testing.T) {
 func TestLhsOutputCNameResidualSticky(t *testing.T) {
 	// CName residual soft invent was soft-wrap invent VOL_LVAL(name, invented type).
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	lhs := &Lhs{Var: v, Type: &Type{isStruct: true}} // unnamed struct → CName residual
 	if s := lhs.Output(true); s != "" {
 		t.Fatal("CName residual must fail closed Lhs.Output VOL_LVAL wrap", s)
@@ -600,7 +600,7 @@ func TestLhsOutputCNameResidualSticky(t *testing.T) {
 func TestOutputLhsCAccessResidualSticky(t *testing.T) {
 	// covered by TestLhsOutputAccessResidualSticky OutputLhsC arm; keep Complete path hygiene.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntTypeSess(testAmbientSession), false, false)
 	if s := v.OutputLhsCOptsSess(testAmbientSession, false); s != "g_ok" {
 		t.Fatal("complete OutputLhsC", s)
 	}
@@ -614,7 +614,7 @@ func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was invent compound-read visit success past Type-nil Lhs.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// Type-nil Lhs + Type-nil Var → GetType residual
@@ -639,8 +639,8 @@ func TestLhsAsExpressionTypeNilResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete path
-	v := CreateVariableScalarsSess(testAmbientSession, "g_y", GetIntType(), false, false)
-	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntType()})
+	v := CreateVariableScalarsSess(testAmbientSession, "g_y", GetIntTypeSess(testAmbientSession), false, false)
+	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)})
 	if e == nil || e.Var != v {
 		t.Fatal("complete LhsAsExpression")
 	}
@@ -654,16 +654,16 @@ func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 	// AddEffect residual soft invent was invent index visit under incomplete ambient merge.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{}}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 	// incomplete EffectStm → AddEffect residual sticky before index visit
 	cg.EffectStm = IncompleteEffect()
-	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true}, Sizes: []int{2}}
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true}, Sizes: []int{2}}
 	av.AsArray = av
-	av.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}}
+	av.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)}}
 	av.Variable.AsArray = av
-	l := &Lhs{Var: &av.Variable, Type: GetIntType()}
+	l := &Lhs{Var: &av.Variable, Type: GetIntTypeSess(testAmbientSession)}
 	if l.VisitIndices(&cg, opts) {
 		t.Fatal("incomplete EffectStm AddEffect residual must fail closed VisitIndices")
 	}
@@ -676,7 +676,7 @@ func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
 func TestCompatibleVarResidualSticky(t *testing.T) {
 	// Compatible residual soft invent was invent soft-compat past nil other.
 	ClearErrorSess(testAmbientSession)
-	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)}
+	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)}
 	if lhs.CompatibleVar(nil, false) {
 		t.Fatal("nil other CompatibleVar must fail closed false")
 	}
@@ -689,7 +689,7 @@ func TestCompatibleVarResidualSticky(t *testing.T) {
 func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
 	// IndirectLevel residual soft invent was invent level-0 complete past Type-nil shell.
 	ClearErrorSess(testAmbientSession)
-	l := &Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: GetIntType()}
+	l := &Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: GetIntTypeSess(testAmbientSession)}
 	n, ok := l.IndirectLevelComplete()
 	if ok || n != 0 {
 		t.Fatal("Type-nil Lhs IndirectLevelComplete must fail closed 0,false", n, ok)
@@ -711,8 +711,8 @@ func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
 
 func TestLhsCloneDereferencedComplexity(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	lhs := &Lhs{Var: v, Type: GetIntType()} // deref once: pointer → int
+	v := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)} // deref once: pointer → int
 	cl := lhs.Clone()
 	if cl == nil || cl.Var != v || cl == lhs {
 		t.Fatal(cl)
@@ -725,8 +725,8 @@ func TestLhsCloneDereferencedComplexity(t *testing.T) {
 		t.Fatal(ptrs)
 	}
 	// bare non-deref
-	sc := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	bare := &Lhs{Var: sc, Type: GetIntType()}
+	sc := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	bare := &Lhs{Var: sc, Type: GetIntTypeSess(testAmbientSession)}
 	if len(bare.GetDereferencedPtrs()) != 0 {
 		t.Fatal("no deref")
 	}
@@ -740,22 +740,22 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	// that pollution so map_stm_effect missed outer-loop IV reads (seed-46 g_952.f8).
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntTypeSess(testAmbientSession), false, false)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
 	}
 	parent.AsArray = parent
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{8}},
 		Sizes:      []int{8},
 		Collective: parent,
 		Indices:    []string{"g_iv"},
-		IndexExprs: []*Expression{{Term: TermVariable, Var: iv, ExprType: GetIntType()}},
+		IndexExprs: []*Expression{{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	item.AsArray = item
-	ok := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntType(), false, false)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	ok := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntTypeSess(testAmbientSession), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 
 	// Precondition: is_eligible on itemized writes g_iv into effect_accum.
@@ -776,7 +776,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, iv)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil)
 	if lhs == nil || HasErrorSess(testAmbientSession) {
 		t.Fatalf("expected Lhs from l_ok-only pool err=%v", HasErrorSess(testAmbientSession))
 	}

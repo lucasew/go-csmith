@@ -6,13 +6,13 @@ import (
 )
 
 func TestFlagsToTypeSignedSizes(t *testing.T) {
-	if FlagsToType(true, SafeInt8).Simple() != EChar {
+	if FlagsToType(true, SafeInt8).SimpleSess(testAmbientSession) != EChar {
 		t.Fatal("int8")
 	}
-	if FlagsToType(false, SafeInt32).Simple() != EUInt {
+	if FlagsToType(false, SafeInt32).SimpleSess(testAmbientSession) != EUInt {
 		t.Fatal("uint32")
 	}
-	if FlagsToType(true, SafeInt64).Simple() != ELongLong {
+	if FlagsToType(true, SafeInt64).SimpleSess(testAmbientSession) != ELongLong {
 		t.Fatal("ll")
 	}
 }
@@ -28,7 +28,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		fi = func() *Invocation {
 			c := EmptyCGContext().WithSession(testAmbientSession)
-			return MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &c, GetIntType())
+			return MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &c, GetIntTypeSess(testAmbientSession))
 		}()
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
@@ -42,7 +42,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 		t.Fatal(out)
 	}
 	// LHS/RHS types are simple
-	if fi.Safe.LHSType() == nil || !fi.Safe.LHSType().IsSimple() {
+	if fi.Safe.LHSType() == nil || !fi.Safe.LHSType().IsSimpleSess(testAmbientSession) {
 		t.Fatal("lhs type")
 	}
 }
@@ -53,16 +53,16 @@ func TestMakeRandomPointerTypeMayBeIntStar(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, 3), opts, probs)
-	if p == nil || p.PtrType() == nil {
+	if p == nil || p.PtrTypeSess(testAmbientSession) == nil {
 		t.Fatal(p)
 	}
 	// integer bases consolidated to int*
-	if p.PtrType().IsSimple() && p.PtrType().Simple() != EInt && p.PtrType().Simple() != EFloat {
+	if p.PtrTypeSess(testAmbientSession).IsSimpleSess(testAmbientSession) && p.PtrTypeSess(testAmbientSession).SimpleSess(testAmbientSession) != EInt && p.PtrTypeSess(testAmbientSession).SimpleSess(testAmbientSession) != EFloat {
 		// after consolidate should be int for integer simples
-		if p.PtrType().Simple() != EInt {
+		if p.PtrTypeSess(testAmbientSession).SimpleSess(testAmbientSession) != EInt {
 			// struct* is fine
-			if !p.PtrType().IsStruct() && !p.PtrType().IsUnion() && p.PtrType().PtrType() == nil {
-				t.Log("base", p.PtrType().CName())
+			if !p.PtrTypeSess(testAmbientSession).IsStructSess(testAmbientSession) && !p.PtrTypeSess(testAmbientSession).IsUnionSess(testAmbientSession) && p.PtrTypeSess(testAmbientSession).PtrTypeSess(testAmbientSession) == nil {
+				t.Log("base", p.PtrTypeSess(testAmbientSession).CNameSess(testAmbientSession))
 			}
 		}
 	}
@@ -75,7 +75,7 @@ func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
 	opts.EnableFloat = true
 	// nil Type IsFloat residual false with SetError - but we skip nil checks
 	// Type-nil: IsFloat SetError + false
-	if ReturnFloatTypeBinary(opts, (*Type)(nil), GetIntType(), GetIntType(), BinAdd) {
+	if ReturnFloatTypeBinary(opts, (*Type)(nil), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
 		t.Fatal("nil rv must not invent float true")
 	}
 	// nil rv skipped by rv != nil check - no residual
@@ -84,7 +84,7 @@ func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 	}
 	// complete non-float
-	if ReturnFloatTypeBinary(opts, GetIntType(), GetIntType(), GetIntType(), BinAdd) {
+	if ReturnFloatTypeBinary(opts, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
 		t.Fatal("int binary must not invent float")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -92,8 +92,8 @@ func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// float rv
-	ft := GetSimpleType(EFloat)
-	if !ReturnFloatTypeBinary(opts, ft, GetIntType(), GetIntType(), BinAdd) {
+	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
+	if !ReturnFloatTypeBinary(opts, ft, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
 		t.Fatal("float rv must return float true")
 	}
 	if HasErrorSess(testAmbientSession) {

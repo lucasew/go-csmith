@@ -11,13 +11,13 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	vs := NewVariableSelectorProbs(opts, probs)
 	vs.Sess = testAmbientSession
 	for i := 0; i < 8; i++ {
-		g := CreateVariableScalarsSess(testAmbientSession, "g_"+string(rune('a'+i)), GetIntType(), false, false)
+		g := CreateVariableScalarsSess(testAmbientSession, "g_"+string(rune('a'+i)), GetIntTypeSess(testAmbientSession), false, false)
 		if g != nil {
 			vs.GlobalList = append(vs.GlobalList, g)
 			vs.AllVars = append(vs.AllVars, g)
 		}
 	}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	for _, g := range vs.GlobalList {
 		fm.AddNewVarFact(g)

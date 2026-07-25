@@ -38,8 +38,8 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	// StatementReturn.cpp:66 ERROR_GUARD — no soft const when select fails
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// nil vs → ExpressionVariable soft nil (non-sticky) → empty return re-pick
@@ -70,8 +70,8 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 		t.Fatal("nil RNG MakeRandomReturn must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	st := MakeRandomReturn(NewRngSess(testAmbientSession, 1), opts, NewVariableSelector(testAmbientSession, opts), &cg)
 	if st.Expr != nil {
@@ -97,8 +97,8 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient/facts must sticky ERROR (no invent return soft re-pick)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	inc := IncompleteEffect()
@@ -132,7 +132,7 @@ func TestCheckAndSetCastResidualNoInventReturnShell(t *testing.T) {
 	opts := Defaults()
 	opts.LangCPP = true
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
-	hole.CheckAndSetCastOpts(GetIntType(), opts)
+	hole.CheckAndSetCastOpts(GetIntTypeSess(testAmbientSession), opts)
 	if hole.CastType != nil {
 		t.Fatal("GetTypeUncast residual must not invent CastType")
 	}
@@ -164,7 +164,7 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// CurrentFunc without RV
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	if VisitFactsStatementReturn(st, &cg2, opts) {
@@ -175,7 +175,7 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete path
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntTypeSess(testAmbientSession), false, false)
 	if !VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("live return must visit")
 	}

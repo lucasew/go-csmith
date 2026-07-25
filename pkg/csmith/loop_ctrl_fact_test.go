@@ -3,57 +3,57 @@ package csmith
 import "testing"
 
 func TestHasIntFieldAndContainPointer(t *testing.T) {
-	if !GetIntType().HasIntField() {
+	if !GetIntTypeSess(testAmbientSession).HasIntFieldSess(testAmbientSession) {
 		t.Fatal("int")
 	}
-	if GetIntType().ContainPointerField() {
+	if GetIntTypeSess(testAmbientSession).ContainPointerFieldSess(testAmbientSession) {
 		t.Fatal("int no ptr")
 	}
-	pt := PointerTo(GetIntType())
-	if !pt.ContainPointerField() {
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	if !pt.ContainPointerFieldSess(testAmbientSession) {
 		t.Fatal("ptr")
 	}
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	if st == nil {
 		t.Fatal("struct")
 	}
-	_ = st.HasIntField() // may or may not
+	_ = st.HasIntFieldSess(testAmbientSession) // may or may not
 	// nil field Type holes sticky fail closed
 	ClearErrorSess(testAmbientSession)
 	hole := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
-	if hole.HasIntField() {
+	if hole.HasIntFieldSess(testAmbientSession) {
 		t.Fatal("nil field Type must not invent has-int")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type HasIntField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !hole.ContainPointerField() {
+	if !hole.ContainPointerFieldSess(testAmbientSession) {
 		t.Fatal("nil field Type must fail closed as has-pointer")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type ContainPointerField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !hole.IsConstStructUnion() {
+	if !hole.IsConstStructUnionSess(testAmbientSession) {
 		t.Fatal("nil field Type must fail closed as const")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type IsConstStructUnion must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !hole.IsVolatileStructUnion() {
+	if !hole.IsVolatileStructUnionSess(testAmbientSession) {
 		t.Fatal("nil field Type must fail closed as volatile")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type IsVolatileStructUnion must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !hole.HasBitfields() {
+	if !hole.HasBitfieldsSess(testAmbientSession) {
 		t.Fatal("nil field Type must fail closed as has-bitfields")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -67,7 +67,7 @@ func TestIsVisibleLocal(t *testing.T) {
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f}
 	inner := &Block{Parent: outer, Func: f}
-	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	if l == nil {
 		t.Fatal("loc")
 	}
@@ -75,11 +75,11 @@ func TestIsVisibleLocal(t *testing.T) {
 	if !l.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("outer local visible from inner")
 	}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if g.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("global not local-visible")
 	}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)
 	f.Param = []*Variable{p}
 	if !p.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("param")
@@ -123,10 +123,10 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk := &Block{LocalVars: []*Variable{loc}}
 	// collective array of int* whose fact points at a local
-	elemT := PointerTo(GetIntType())
+	elemT := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	collAV := &ArrayVariable{
 		Variable: Variable{Name: "l_arr", Type: elemT, IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -181,7 +181,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 		t.Fatal("nil Variable IsPointingToLocals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// incomplete PointTo sticky as pointing-to-locals
 	facts := []*FactPointTo{{Var: ptr, PointTo: []*Variable{nil}}}
 	if !IsPointingToLocals(ptr, &Block{}, 0, facts) {
@@ -192,7 +192,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete map hole sticky true
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
 	holeMap := []*FactPointTo{nil, MakeFactPointTo(ptr, loc)}
@@ -237,7 +237,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	// IsVisibleLocal residual: incomplete LocalVars on parent soft invent was not-local then invent false.
 	// Fair: sticky true (restrictive pointing-to-locals).
 	// Use indirection -1 path (direct IsVisibleLocal).
-	loc2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntType(), false, false)
+	loc2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
 	loc2.Name = "l_2"
 	badParent := &Block{LocalVars: []*Variable{loc2, nil}}
 	if !IsPointingToLocals(loc2, badParent, -1, nil) {
@@ -252,9 +252,9 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 func TestIsPointingToLocals(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk.LocalVars = []*Variable{loc}
-	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// fact points to local → true
 	facts := []*FactPointTo{MakeFactPointTo(ptr, loc)}
 	if !IsPointingToLocals(ptr, blk, 0, facts) {
@@ -271,9 +271,9 @@ func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// plain int global
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -287,7 +287,7 @@ func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	inc := IncompleteEffect()
@@ -322,9 +322,9 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	holeTy := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
 	hole := &Variable{Name: "g_hole", Type: holeTy}
-	good := &Variable{Name: "g_1", Type: GetIntType()}
+	good := &Variable{Name: "g_1", Type: GetIntTypeSess(testAmbientSession)}
 	vs.GlobalList = []*Variable{hole, good}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -339,13 +339,13 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 	// Soft invent was soft-continue filter then pick later good int.
 	// Fair: sticky fail closed whole SelectLoopCtrlVar.
 	unionOKThenHole := &Type{isUnion: true, Fields: []StructField{
-		{Name: "i", Type: GetIntType(), BitWidth: -1},
+		{Name: "i", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "x", Type: nil, BitWidth: -1},
 	}}
 	uvar := &Variable{Name: "g_u", Type: unionOKThenHole}
 	vs2 := NewVariableSelector(testAmbientSession, opts)
 	vs2.GlobalList = []*Variable{uvar, good}
-	f2 := &Function{Name: "f", ReturnType: GetIntType()}
+	f2 := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk2 := &Block{Func: f2}
 	f2.Stack = []*Block{blk2}
 	cg3 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession)
@@ -362,7 +362,7 @@ func TestAddNewVarFactPointer(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// Variable.cpp:395 — pointer init Constant::make_random → "0" → null fact
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFact(p)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || !fp.IsNull() {
@@ -379,25 +379,25 @@ func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
+	f := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk.LocalVars = []*Variable{loc}
 	// local pointer that points to local
-	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	blk.LocalVars = append(blk.LocalVars, lp)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(lp, loc))
 	// also a global pointer to global target (ok to return)
-	gt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
-	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	gt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	vs.GlobalList = []*Variable{gp, gt}
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(gp, gt))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// many tries — should never return the local-pointing ptr when filter works
 	for seed := uint64(1); seed < 30; seed++ {
-		ev := makeExpressionVariableFlags(NewRngSess(testAmbientSession, seed), vs, &cg, PointerTo(GetIntType()), nil, false, true)
+		ev := makeExpressionVariableFlags(NewRngSess(testAmbientSession, seed), vs, &cg, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), nil, false, true)
 		if ev != nil && ev.Var == lp {
 			t.Fatalf("returned local-pointing ptr seed=%d", seed)
 		}

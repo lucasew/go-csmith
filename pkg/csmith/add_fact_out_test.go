@@ -7,7 +7,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// fair: incomplete stack → sticky IncompleteFactSlice (not invent empty-complete skip)
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Body = body
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -21,7 +21,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// later appends must not invent cleaned facts onto incomplete map
-	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("append after incomplete must stay incomplete", fm.MapFactsOut[3])
@@ -49,7 +49,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// Type-nil subject IsGlobal residual is nil-only; use incomplete Blocks for goto dest.
 	// Goto dest parent resolve residual: incomplete Func Blocks hole sticky.
 	f3 := &Function{Name: "f3"}
-	gp3 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
+	gp3 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	body3 := &Block{Func: f3}
 	f3.Body = body3
 	f3.Blocks = []*Block{body3, nil}
@@ -67,19 +67,19 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 }
 
 func TestAddFactOutVisible(t *testing.T) {
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Blocks = []*Block{body}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
 	fm.AddFactOut(st, body, MakeFactPointTo(
-		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false),
+		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false),
 		NullPtr,
 	))
 	// use global pointer fact
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(p, NullPtr))
 	if len(fm.MapFactsOut[5]) != 2 {
 		// first call also used a fresh p - ok
@@ -92,7 +92,7 @@ func TestAddFactOutVisible(t *testing.T) {
 	fm.AddFactOut(ret, body, MakeFactPointTo(
 		// local as subject — need pointer local
 		func() *Variable {
-			lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+			lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 			lp.Name = "l_p"
 			return lp
 		}(),
@@ -111,10 +111,10 @@ func TestAddFactOutVisible(t *testing.T) {
 
 func TestAddFactOutGotoDestVisibility(t *testing.T) {
 	// FactMgr.cpp:296–300 — fact dropped when local not visible at dest parent
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	loc.Name = "l_p"
 	inner.LocalVars = []*Variable{loc}
 	f.Blocks = []*Block{outer, inner}
@@ -130,7 +130,7 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 		t.Fatal("local invisible at dest should drop", fm.MapFactsOut[9])
 	}
 	// global pointer still recorded
-	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.AddFactOut(st, inner, MakeFactPointTo(gp, NullPtr))
 	if len(fm.MapFactsOut[9]) != 1 {
 		t.Fatal("global at dest", fm.MapFactsOut[9])
@@ -157,19 +157,19 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 
 func TestArrayIsVariant(t *testing.T) {
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntType()},
+		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
 	a := &ArrayVariable{
-		Variable:   Variable{Name: "g_a[i]", IsArray: true, Type: GetIntType()},
+		Variable:   Variable{Name: "g_a[i]", IsArray: true, Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:      []int{4},
 		Collective: parent,
 		Indices:    []string{"i"},
 	}
 	a.AsArray = a
 	b := &ArrayVariable{
-		Variable:   Variable{Name: "g_a[i]", IsArray: true, Type: GetIntType()},
+		Variable:   Variable{Name: "g_a[i]", IsArray: true, Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:      []int{4},
 		Collective: parent,
 		Indices:    []string{"i"},
@@ -179,7 +179,7 @@ func TestArrayIsVariant(t *testing.T) {
 		t.Fatal("same keys")
 	}
 	c := &ArrayVariable{
-		Variable:   Variable{Name: "g_a[j]", IsArray: true, Type: GetIntType()},
+		Variable:   Variable{Name: "g_a[j]", IsArray: true, Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:      []int{4},
 		Collective: parent,
 		Indices:    []string{"j"},
@@ -213,7 +213,7 @@ func TestArrayIsVariant(t *testing.T) {
 	}
 	// mixed IndexExprs vs Indices-only must not invent dual-path match
 	ClearErrorSess(testAmbientSession)
-	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false), ExprType: GetIntType()}}
+	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false), ExprType: GetIntTypeSess(testAmbientSession)}}
 	b.IndexExprs = nil
 	b.Indices = []string{"i"}
 	if a.IsVariantSess(testAmbientSession, &b.Variable) {
@@ -231,12 +231,12 @@ func TestArrayIsVariant(t *testing.T) {
 func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// loop body (looping)
 	body := &Block{Func: f, Looping: true, StmID: 26}
 	// nested block declares union local
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	l237 := CreateVariableScalarsSess(testAmbientSession, "l_237", ut, false, false)
 	nested := &Block{Func: f, Parent: body, Looping: false, StmID: 27, LocalVars: []*Variable{l237}}
@@ -277,10 +277,10 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 func TestAddNewVarFactAndUpdateUnionContinueFilter(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{Func: f, Looping: true, StmID: 26}
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// Init required for complete union abstract (array_type_test.go:576)
 	l237 := &Variable{Name: "l_237", Type: ut, Init: MakeInt(0)}

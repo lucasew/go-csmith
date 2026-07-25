@@ -20,7 +20,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	loop := &Block{Func: f, Looping: true}
 	f.Stack = []*Block{loop}
 	// StatementBreak.cpp:76 — clear effect_stm on CGContext& before condition
-	pre := CreateVariableScalarsSess(testAmbientSession, "g_pre", GetIntType(), false, false)
+	pre := CreateVariableScalarsSess(testAmbientSession, "g_pre", GetIntTypeSess(testAmbientSession), false, false)
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, pre)
 	st := MakeRandomBreak(NewRngSess(testAmbientSession, 9), opts, vs, tables, &cg)
 	if st.Kind != StmtBreak {
@@ -38,7 +38,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 }
 
 func TestBreakOutputIsIfBreak(t *testing.T) {
-	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermVariable, Var: &Variable{Name: "g_1", Type: GetIntType()}}}
+	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermVariable, Var: &Variable{Name: "g_1", Type: GetIntTypeSess(testAmbientSession)}}}
 	b := &Block{Stmts: []Stmt{st}}
 	out := b.Output(0)
 	if !strings.Contains(out, "if (") || !strings.Contains(out, "break;") {
@@ -54,7 +54,7 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	// StatementFor always has init/test/incr + body; sticky no invent for(;;) or header-only
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	// Loop with IV only — missing InitStmt/TestExpr/IncrStmt
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1}
 	if forHeaderOutput(lc) != "" {
@@ -109,10 +109,10 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 2))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 2))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// force non-init path: flipcoin(5) false — seed until we get array loop (for) not array_init
 	var got *Stmt
@@ -170,7 +170,7 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// non-looping block only
 	blk := &Block{Func: f, Looping: false}
 	f.Stack = []*Block{blk}
@@ -194,7 +194,7 @@ func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{loop}
 	if stmtOK(MakeRandomBreak(nil, opts, vs, NewExprTables(opts), ptrEmptyCG())) {
@@ -218,7 +218,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{loop}
 	inc := IncompleteEffect()
@@ -264,7 +264,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 
 func TestArrayOpHeaderNumeric(t *testing.T) {
 	// StatementArrayOp::output_header uses numeric init/limit/incr (not InitStmt)
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1}
 	opts := Defaults()
 	out := arrayOpHeaderOutput(lc, opts)
@@ -278,7 +278,7 @@ func TestArrayOpHeaderNumeric(t *testing.T) {
 	}
 	// empty IV OutputC — sticky no invent for ( = 0; …)
 	ClearErrorSess(testAmbientSession)
-	anon := &Variable{Type: GetIntType()}
+	anon := &Variable{Type: GetIntTypeSess(testAmbientSession)}
 	if s := arrayOpHeaderOutput(&LoopControl{IV: anon, InitN: 0, LimitN: 3, IncrN: 1}, Defaults()); s != "" {
 		t.Fatal("empty IV name must fail closed arrayop header", s)
 	}
@@ -313,7 +313,7 @@ func TestMakeRandomContinueRequiresLoop(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// prior stmt so first-stmt gate passes; non-looping parent only
 	blk := &Block{Func: f, Looping: false, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
@@ -384,8 +384,8 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, nil)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	loop := &Block{Func: f, Looping: true}

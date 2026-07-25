@@ -6,12 +6,12 @@ import (
 )
 
 func TestMatchVarName(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	if v.MatchVarNameSess(testAmbientSession, "g_1") != v {
 		t.Fatal("self")
 	}
 	// struct field
-	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType()}}}
+	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession)}}}
 	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Skip("no fields")
@@ -28,7 +28,7 @@ func TestMatchVarName(t *testing.T) {
 func TestFindVarByName(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(testAmbientSession, Defaults())
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), true, false)
 	vs.AllVars = append(vs.AllVars, v)
 	if vs.FindVarByName("g_x") != v {
 		t.Fatal("find")
@@ -93,11 +93,11 @@ func TestIsSeenName(t *testing.T) {
 func TestItemizeArrayWithIV(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	// need dim 1 array with size > 0
@@ -129,13 +129,13 @@ func TestItemizeArrayTooFewIV(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntType()},
+		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:    []int{2, 3},
 	}
 	av.AsArray = av
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// only one IV for 2 dims
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
 		t.Fatal("expect nil")
@@ -174,7 +174,7 @@ func TestOutputCallChain(t *testing.T) {
 
 func TestVariableSelectorDoFinalization(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, Defaults())
-	vs.AllVars = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)}
+	vs.AllVars = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)}
 	vs.GlobalList = vs.AllVars
 	vs.DoFinalization()
 	if len(vs.AllVars) != 0 || len(vs.GlobalList) != 0 {
@@ -199,7 +199,7 @@ func TestMatchVarNameNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty query soft miss
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if v.MatchVarNameSess(testAmbientSession, "") != nil {
 		t.Fatal("empty name MatchVarName must soft miss")
 	}
@@ -209,7 +209,7 @@ func TestMatchVarNameNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was bare-name OutputC match on array path
 	// (Name identity is complete; query non-exact name hits array Output branch)
-	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	if shell.MatchVarNameSess(testAmbientSession, "g_b[0]") != nil {
 		t.Fatal("IsArray without AsArray array-output MatchVarName must fail closed")
 	}

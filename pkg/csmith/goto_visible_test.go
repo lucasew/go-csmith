@@ -5,16 +5,16 @@ import "testing"
 func TestIsVarOnStack(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)
 	f.Param = []*Variable{p}
 	outer := &Block{Func: f}
-	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	outer.LocalVars = []*Variable{l}
 	inner := &Block{Func: f, Parent: outer}
 	if !inner.IsVarOnStack(l) || !inner.IsVarOnStack(p) {
 		t.Fatal("stack")
 	}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if inner.IsVarOnStack(g) {
 		t.Fatal("global")
 	}
@@ -49,8 +49,8 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	// nil type sticky
 	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
@@ -60,7 +60,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// only a in read set and global
-	got := ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, b}, GetIntType(), nil)
+	got := ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, b}, GetIntTypeSess(testAmbientSession), nil)
 	if got != a && got != b {
 		// both global so either ok if both in list
 		if got == nil {
@@ -68,19 +68,19 @@ func TestChooseVisibleReadVar(t *testing.T) {
 		}
 	}
 	// local not on stack from empty block → only global
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntType(), false, false)
-	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntType(), nil)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntTypeSess(testAmbientSession), false, false)
+	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntTypeSess(testAmbientSession), nil)
 	if got != nil {
 		t.Fatal("local not on stack")
 	}
 	blk.LocalVars = []*Variable{loc}
-	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntType(), nil)
+	got = ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{loc}, GetIntTypeSess(testAmbientSession), nil)
 	if got != loc {
 		t.Fatal("local on stack")
 	}
 	// nil candidate hole fails closed sticky
 	ClearErrorSess(testAmbientSession)
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, nil}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil readVars hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -88,7 +88,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete union facts must not invent soft-filter pick
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, GetIntType(), IncompleteUnionFactSlice()) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a}, GetIntTypeSess(testAmbientSession), IncompleteUnionFactSlice()) != nil {
 		t.Fatal("incomplete union facts must fail closed nil pick")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -97,8 +97,8 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was IsVirtual residual false then pick shell
 	// fair: sticky nil fail closed
-	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, arrShell}, GetIntType(), nil) != nil {
+	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 2), blk, []*Variable{a, arrShell}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("IsArray without AsArray must fail closed ChooseVisibleReadVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -108,10 +108,10 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	// IsNonreadableField / IsInsideUnionField Type-nil ancestry residual: soft invent was
 	// continue then pick later good. Fair: sticky fail closed whole choose.
 	parent := &Variable{Name: "g_u"} // Type nil
-	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	field := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	// empty facts: IsInsideUnionField still stickies residual before early return not-banned
 	blk.LocalVars = []*Variable{field, a}
-	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 3), blk, []*Variable{field, a}, GetIntType(), nil) != nil {
+	if ChooseVisibleReadVar(NewRngSess(testAmbientSession, 3), blk, []*Variable{field, a}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("IsInsideUnionField residual must fail closed ChooseVisibleReadVar")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -124,18 +124,18 @@ func TestEffectReadVarsInsertionOrder(t *testing.T) {
 	// Effect.cpp:get_read_vars — C++ vector insertion order, not name-sorted.
 	// choose_visible_read_var ok_vars index depends on this order.
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	e := EmptyEffect().ReadVarSess(testAmbientSession, a).ReadVarSess(testAmbientSession, b)
 	rs := e.ReadVarsSess(testAmbientSession)
 	if len(rs) != 2 || rs[0] != a || rs[1] != b {
 		t.Fatalf("want insertion order [g_z,g_a], got %v", rs)
 	}
 	// struct parent covers field — field not re-pushed (Effect.cpp:117–119 + is_read)
-	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), true, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntTypeSess(testAmbientSession), true, false)
 	// mark as struct for IsRead field inheritance
-	parent.Type = &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
-	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	parent.Type = &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
+	field := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	e2 := EmptyEffect().ReadVarSess(testAmbientSession, parent).ReadVarSess(testAmbientSession, field)
 	rs2 := e2.ReadVarsSess(testAmbientSession)
 	if len(rs2) != 1 || rs2[0] != parent {
@@ -149,7 +149,7 @@ func TestEffectReadVarsInsertionOrder(t *testing.T) {
 func TestGotoCreatesCFGEdge(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	// prior statement as target
 	prior := Stmt{Kind: StmtAssign, StmID: AllocStmID()}
@@ -160,7 +160,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// seed a read so choose_visible may work
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 2))
+	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	// force back by trying many seeds
@@ -184,7 +184,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 }
 
 func TestCastIfNeeded(t *testing.T) {
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	e := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
 	castIfNeeded(testAmbientSession, e)
 	if e.CastType != pt {
@@ -203,16 +203,16 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	b1 := &Block{Func: f, Stmts: []Stmt{
-		{Kind: StmtAssign, StmID: 1, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntType()},
+		{Kind: StmtAssign, StmID: 1, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntTypeSess(testAmbientSession)},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
 	}}
 	b2 := &Block{Func: f, Stmts: []Stmt{
-		{Kind: StmtAssign, StmID: 2, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntType()},
+		{Kind: StmtAssign, StmID: 2, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntTypeSess(testAmbientSession)},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}},
 	}}
 	f.Blocks = []*Block{b1, b2}
@@ -223,7 +223,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	seed := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
+	seed := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntTypeSess(testAmbientSession), false, false)
 	// try seeds until successful goto (Expr set) to assert effect_stm clear order
 	cleared := false
 	for seedN := uint64(1); seedN < 40; seedN++ {

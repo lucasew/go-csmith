@@ -119,11 +119,11 @@ func TestSanityCheck(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// int: level 0 → need 1 qualifier slot
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if !q.SanityCheckSess(testAmbientSession, GetIntType()) {
+	if !q.SanityCheckSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("int")
 	}
 	// int*: level 1 → need 2 slots
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if q.SanityCheckSess(testAmbientSession, pt) {
 		t.Fatal("short qfer for ptr")
 	}
@@ -177,18 +177,18 @@ func TestGetAllQualifiers(t *testing.T) {
 }
 
 func TestLhsGetLvarsAndQualifiers(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	// bare pointer as LHS (want int* → indirect 0)
-	lhs0 := &Lhs{Var: p, Type: PointerTo(GetIntType())}
-	if lhs0.IndirectLevel() != 0 {
-		t.Fatal(lhs0.IndirectLevel())
+	lhs0 := &Lhs{Var: p, Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
+	if lhs0.IndirectLevelSess(testAmbientSession) != 0 {
+		t.Fatal(lhs0.IndirectLevelSess(testAmbientSession))
 	}
 	// deref *p (want int)
-	lhs1 := &Lhs{Var: p, Type: GetIntType()}
-	if lhs1.IndirectLevel() != 1 {
-		t.Fatal(lhs1.IndirectLevel())
+	lhs1 := &Lhs{Var: p, Type: GetIntTypeSess(testAmbientSession)}
+	if lhs1.IndirectLevelSess(testAmbientSession) != 1 {
+		t.Fatal(lhs1.IndirectLevelSess(testAmbientSession))
 	}
 	lvars := lhs1.GetLvars(facts)
 	if len(lvars) != 1 || lvars[0] != tgt {
@@ -210,8 +210,8 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 func TestLhsGetQualifiersConstSetsError(t *testing.T) {
 	// Lhs.cpp:200 — assert(!qfer.is_const()); sticky error, no invent strip / invent quals shell
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
-	lhs := &Lhs{Var: v, Type: GetIntType()}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntTypeSess(testAmbientSession), true, false)
+	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
 	q := lhs.GetQualifiers()
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatal("const LHS residual must fail closed empty quals, not invent shell", q)
@@ -224,23 +224,23 @@ func TestLhsGetQualifiersConstSetsError(t *testing.T) {
 
 func TestLhsVisitIndicesOK(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntType()},
+		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntTypeSess(testAmbientSession)},
 		Indices:  []string{"i"},
 	}
 	av.AsArray = av
-	lhs := &Lhs{Var: &av.Variable, Type: GetIntType()}
+	lhs := &Lhs{Var: &av.Variable, Type: GetIntTypeSess(testAmbientSession)}
 	if !lhs.VisitIndices(nil, Defaults()) {
 		t.Fatal("indices")
 	}
 }
 
 func TestLhsIsVolatileAfterDeref(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// volatile at storage (after one deref of pointer-to-vol?)
 	// IsVolatileAfterDeref(0) for bare uses Qfer
 	p.Qfer = NewCVQualifiers([]bool{false, true}, []bool{false, true})
 	// want int: indirect 1 → check volatile after deref 1
-	lhs := &Lhs{Var: p, Type: GetIntType()}
+	lhs := &Lhs{Var: p, Type: GetIntTypeSess(testAmbientSession)}
 	_ = lhs.IsVolatileSess(testAmbientSession) // exercise path
 }
 
@@ -275,7 +275,7 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	// OOB peel: pointer type peels once then nil at high deref.
 	// Qfer OOB (len 2, deref 3) fail-closed const/vol non-sticky first; Type peel
 	// sticky only when Qfer does not already short-circuit (empty qfer + nil type).
-	v.Type = PointerTo(GetIntType())
+	v.Type = PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if !v.IsConstAfterDerefSess(testAmbientSession, 3) {
 		t.Fatal("OOB peel must fail closed as const")
 	}
@@ -294,7 +294,7 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// GetFieldID incomplete parent FieldVars sticky -1
 	parent := &Variable{Name: "u", Type: &Type{isUnion: true}}
-	f0 := &Variable{Name: "u.f0", Type: GetIntType(), FieldVarOf: parent}
+	f0 := &Variable{Name: "u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{nil, f0}
 	if f0.GetFieldIDSess(testAmbientSession) != -1 {
 		t.Fatal("FieldVars hole must fail closed GetFieldID -1")

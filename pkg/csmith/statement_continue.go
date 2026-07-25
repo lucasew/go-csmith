@@ -42,7 +42,7 @@ func MakeRandomContinue(
 	// StatementContinue.cpp:72 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
 	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
-	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntTypeSess(sessFromCG(cg)), nil, true, true, TermVariable, cg.ExprDepth)
 	// residual ERROR sticky — no invent soft-return continue past condition make residual
 	if expr == nil || hasErrCG(cg) {
 		return Stmt{}

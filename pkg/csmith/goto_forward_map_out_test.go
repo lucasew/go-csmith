@@ -15,16 +15,16 @@ import "testing"
 func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	body := &Block{StmID: 1, Func: f, Parent: nil}
 	f.Body = body
 	f.Blocks = []*Block{body}
 
-	g124 := CreateVariableScalarsSess(testAmbientSession, "g_124", PointerTo(GetIntType()), true, false)
-	g106 := CreateVariableScalarsSess(testAmbientSession, "g_106", GetIntType(), true, false)
-	l2181 := CreateVariableScalarsSess(testAmbientSession, "l_2181", GetIntType(), false, false)
-	l2156 := CreateVariableScalarsSess(testAmbientSession, "l_2156", GetIntType(), false, false)
+	g124 := CreateVariableScalarsSess(testAmbientSession, "g_124", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	g106 := CreateVariableScalarsSess(testAmbientSession, "g_106", GetIntTypeSess(testAmbientSession), true, false)
+	l2181 := CreateVariableScalarsSess(testAmbientSession, "l_2181", GetIntTypeSess(testAmbientSession), false, false)
+	l2156 := CreateVariableScalarsSess(testAmbientSession, "l_2156", GetIntTypeSess(testAmbientSession), false, false)
 	wide := MakeFactPointToSet(g124, []*Variable{l2181, g106, l2156})
 	precise := MakeFactPointTo(g124, g106)
 

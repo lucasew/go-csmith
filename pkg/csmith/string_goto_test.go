@@ -54,7 +54,7 @@ func TestStr2Int(t *testing.T) {
 		}
 	}
 	// FunctionInvocationBinary.cpp:171–173 — equals(-1) must not fire on BIGUL
-	c := &Constant{Type: GetSimpleType(EULongLong), Value: big}
+	c := &Constant{Type: GetSimpleTypeSess(testAmbientSession, EULongLong), Value: big}
 	if c.Equals(-1) {
 		t.Fatal("BIGUL must not Equals(-1) after overflow clamp")
 	}
@@ -65,8 +65,8 @@ func TestStr2Int(t *testing.T) {
 // fold to 0 via Str2Int overflow→-1 (seed 105 safe_div vs safe_add).
 func TestModHugeConstNotEqualsZero(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	left := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: "1L"}, ExprType: GetIntType()}
-	right := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleType(EULongLong), Value: "18446744073709551607UL"}, ExprType: GetSimpleType(EULongLong)}
+	left := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "1L"}, ExprType: GetIntTypeSess(testAmbientSession)}
+	right := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleTypeSess(testAmbientSession, EULongLong), Value: "18446744073709551607UL"}, ExprType: GetSimpleTypeSess(testAmbientSession, EULongLong)}
 	fi := &Invocation{IsStd: true, Binary: "%", Args: []*Expression{left, right}}
 	if fi.EqualsInt(0) {
 		t.Fatal("1 % BIGUL must not EqualsInt(0) (would re-pick div/mod)")
@@ -125,7 +125,7 @@ func TestStr2Int64(t *testing.T) {
 
 func TestCollectAndOutputSkippedInits(t *testing.T) {
 	outer := &Block{}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_1"
 	loc.Init = MakeInt(3)
 	inner := &Block{Parent: outer, LocalVars: []*Variable{loc}}
@@ -155,14 +155,14 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 
 func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
 	// Statement.cpp:911–913 — output_skipped_var_inits after label is commented out
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_2"
 	loc.Init = MakeInt(9)
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtGoto, Label: "lbl_x", InitSkippedVars: []*Variable{loc},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
 		{Kind: StmtAssign, SourceLabel: "lbl_x",
-			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false),
+			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false),
 			AssignOp: AssignSimple,
 			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)}},
 	}}
@@ -177,13 +177,13 @@ func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
 
 func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 	// StatementGoto.cpp:271 — v->init->Output (InitExpr preferred)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	loc.Name = "l_p"
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
-	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
+	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// force address-like output path: variable expr of pointed type often emits name
 	// set InitExpr to constant pointer-ish "0" via constant for stable assert
-	loc.InitExpr = &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: PointerTo(GetIntType())}
+	loc.InitExpr = &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{loc}}
 	out := OutputSkippedVarInits(st, "")
 	if !strings.Contains(out, "l_p = 0;") {
@@ -201,9 +201,9 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); vars[i] always live
 	// incomplete entry fails whole emit sticky (no invent skip holes / partial list)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableWithInitSess(testAmbientSession, "l_miss", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableWithInitSess(testAmbientSession, "l_miss", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	v.Name = "l_miss"
-	good := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntTypeSess(testAmbientSession), false, false)
 	good.Name = "l_ok"
 	good.Init = MakeInt(4)
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{v, good}}
@@ -225,7 +225,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// sticky no invent " = 5;" without identifier / partial good siblings
-	anon := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntType(), false, false)
+	anon := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntTypeSess(testAmbientSession), false, false)
 	anon.Name = ""
 	anon.Init = MakeInt(5)
 	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{anon, good}}
@@ -248,7 +248,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 func TestVariableInitOutput(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); sticky no soft invent "0" when missing
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableWithInitSess(testAmbientSession, "l_1", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableWithInitSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	if variableInitOutput(v) != "" {
 		t.Fatal("nil init must not invent 0", variableInitOutput(v))
 	}
@@ -257,7 +257,7 @@ func TestVariableInitOutput(t *testing.T) {
 	}
 	// Variable.cpp:395 — CreateVariableScalars always Constant::make_random
 	ClearErrorSess(testAmbientSession)
-	v2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntType(), false, false)
+	v2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntTypeSess(testAmbientSession), false, false)
 	if variableInitOutput(v2) == "" {
 		t.Fatal("scalars path always has init")
 	}
@@ -276,7 +276,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 	// CollectInitSkippedVars nil (LocalVars hole) must not invent goto with empty skip list
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// outer with hole in LocalVars; nested dest so Collect climbs past hole
 	outer := &Block{Func: f, StmID: 1, LocalVars: []*Variable{nil}, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 10},
@@ -288,7 +288,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 	f.Stack = []*Block{outer, inner}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// need read vars for cond
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	fm.GlobalFacts = []*FactPointTo{}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)

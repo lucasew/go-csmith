@@ -10,11 +10,11 @@ import "testing"
 // for them (FactMgr.cpp:575–579; seed-7 for 640 / l_1402).
 func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	outer := CreateVariableScalarsSess(testAmbientSession, "g_outer", GetIntType(), false, false)
-	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerTo(GetIntType()), false, false)
-	bodyLoc.InitExpr = &Expression{Term: TermVariable, Var: outer, ExprType: PointerTo(GetIntType())}
+	outer := CreateVariableScalarsSess(testAmbientSession, "g_outer", GetIntTypeSess(testAmbientSession), false, false)
+	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	bodyLoc.InitExpr = &Expression{Term: TermVariable, Var: outer, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	in := []*FactPointTo{
-		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false), outer),
+		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), outer),
 		MakeFactPointTo(bodyLoc, outer),
 	}
 	locals := []*Variable{bodyLoc}
@@ -41,16 +41,16 @@ func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 // Body local in polluted map_in + break out without it must not invent garbage.
 func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// for body with local l_body
 	body := &Block{StmID: 10, Func: f, Looping: true, BreakStmIDs: []int{20}}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
-	lBody := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerTo(GetIntType()), false, false)
-	lBody.InitExpr = &Expression{Term: TermVariable, Var: g, ExprType: PointerTo(GetIntType())}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
+	lBody := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	lBody.InitExpr = &Expression{Term: TermVariable, Var: g, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	body.LocalVars = []*Variable{lBody}
 	// polluted map_facts_in[body] incorrectly includes body local (bug shape)
-	gPtr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	gPtr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.MapFactsIn[body.StmID] = []*FactPointTo{
 		MakeFactPointTo(gPtr, g),
 		MakeFactPointTo(lBody, g),

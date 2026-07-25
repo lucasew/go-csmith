@@ -9,8 +9,8 @@ func TestFunc1PreFactsSnapshotIsShallow(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_ptr", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_tgt", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_ptr", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_tgt", GetIntTypeSess(testAmbientSession), false, false)
 	if g == nil || tgt == nil {
 		t.Fatal("vars")
 	}

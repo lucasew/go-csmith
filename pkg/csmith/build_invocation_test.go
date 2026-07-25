@@ -26,7 +26,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	// zero-param callee must not invent success call without process RNG — sticky Failed
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	callee := &Function{Name: "func_x", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	callee := &Function{Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	list := &FunctionList{Funcs: []*Function{callee}}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	fi := BuildUserInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, callee)
@@ -37,7 +37,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
+	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
@@ -55,7 +55,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Param hole sticky Failed
-	callee2 := &Function{Name: "func_y", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+	callee2 := &Function{Name: "func_y", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
 		Param: []*Variable{nil}}
 	fi4 := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, callee2)
 	if fi4 == nil || !fi4.Failed {
@@ -66,7 +66,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// MakeRandomInvocation nil r/cg sticky Failed
-	fi5 := MakeRandomInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, GetIntType(), nil, false)
+	fi5 := MakeRandomInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil, false)
 	if fi5 == nil || !fi5.Failed {
 		t.Fatal("nil RNG MakeRandomInvocation must fail closed")
 	}
@@ -89,9 +89,9 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	list := &FunctionList{}
 	// seed globals for args / body
 	for i := 0; i < 3; i++ {
-		_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, uint64(10+i)))
+		_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, uint64(10+i)))
 	}
-	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
+	caller := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, caller)
@@ -100,12 +100,12 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	list.Funcs = []*Function{caller}
 
 	// force new function creation path
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType(), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs, tables, stmtTab, &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi == nil || fi.Failed {
 		// may fail if max funcs / depth — try more seeds
 		ok := false
 		for seed := uint64(1); seed < 40; seed++ {
-			fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType(), nil)
+			fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, stmtTab, &cg, list, GetIntTypeSess(testAmbientSession), nil)
 			if fi != nil && !fi.Failed && fi.User != nil {
 				ok = true
 				break
@@ -143,17 +143,17 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	cgSeed := EmptyCGContext().WithSession(testAmbientSession)
-	g := vs.GenerateNewGlobal(AccessRead, cgSeed, GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	g := vs.GenerateNewGlobal(AccessRead, cgSeed, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	if g == nil {
 		t.Fatal("need int global")
 	}
-	_ = vs.GenerateNewGlobal(AccessRead, cgSeed, PointerTo(GetIntType()), nil, NewRngSess(testAmbientSession, 2))
+	_ = vs.GenerateNewGlobal(AccessRead, cgSeed, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), nil, NewRngSess(testAmbientSession, 2))
 	callee := &Function{
 		Name:       "g_1",
-		ReturnType: GetIntType(),
+		ReturnType: GetIntTypeSess(testAmbientSession),
 		Param: []*Variable{
-			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false),
-			CreateVariableScalarsSess(testAmbientSession, "p_2", PointerTo(GetIntType()), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false),
 		},
 		BuildState: BuildBuilt,
 	}
@@ -191,8 +191,8 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	vs.AllVars = nil
 	callee := &Function{
 		Name:       "g_1",
-		ReturnType: GetIntType(),
-		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
+		ReturnType: GetIntTypeSess(testAmbientSession),
+		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)},
 		BuildState: BuildBuilt,
 		IsBuilt:    true,
 	}
@@ -220,7 +220,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	f := MakeRandomSignature(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, list)
+	f := MakeRandomSignature(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntTypeSess(testAmbientSession), nil, list)
 	if f == nil {
 		t.Fatal("signature", HasErrorSess(testAmbientSession))
 	}
@@ -238,7 +238,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectAccum = &inc
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntType(), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete ambient BuildInvocationAndFunction must Failed")
 	}
@@ -258,7 +258,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 		t.Fatal("nil Function PairedFactMgr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	f2 := &Function{Name: "no_fm", ReturnType: GetIntType()}
+	f2 := &Function{Name: "no_fm", ReturnType: GetIntTypeSess(testAmbientSession)}
 	if f2.PairedFactMgr() != nil {
 		t.Fatal("unpaired Function PairedFactMgr must be nil")
 	}
@@ -275,11 +275,11 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)}
+	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)}
 	// callee not first, NeedsRevisit, incomplete AccumEffContext
 	callee := &Function{
 		Name:            "g_helper",
-		ReturnType:      GetIntType(),
+		ReturnType:      GetIntTypeSess(testAmbientSession),
 		BuildState:      BuildBuilt,
 		IsBuilt:         true,
 		FactChanged:     true,
@@ -306,7 +306,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	// incomplete GlobalFacts on revisit must sticky fail
 	callee2 := &Function{
 		Name:            "g_helper2",
-		ReturnType:      GetIntType(),
+		ReturnType:      GetIntTypeSess(testAmbientSession),
 		BuildState:      BuildBuilt,
 		IsBuilt:         true,
 		FactChanged:     true,
@@ -344,14 +344,14 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	opts.MaxBlockSize = 1
 	// Frame local lives only on stack-top (inner). Outer parent is stale CurrBlk.
 	// IsVarOnStack walks Parent: inner sees l_inner; outer alone does not.
-	innerLoc := CreateVariableScalarsSess(testAmbientSession, "l_inner", GetIntType(), false, false)
+	innerLoc := CreateVariableScalarsSess(testAmbientSession, "l_inner", GetIntTypeSess(testAmbientSession), false, false)
 	if innerLoc == nil {
 		t.Fatal("create inner local")
 	}
 	innerLoc.Name = "l_inner"
 	outer := &Block{StmID: AllocStmID()}
 	inner := &Block{Parent: outer, LocalVars: []*Variable{innerLoc}, StmID: AllocStmID()}
-	caller := &Function{Name: "func_1", ReturnType: GetIntType(), Stack: []*Block{outer, inner}}
+	caller := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Stack: []*Block{outer, inner}}
 	outer.Func = caller
 	inner.Func = caller
 	list := &FunctionList{Funcs: []*Function{caller}}
@@ -390,7 +390,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	callee := &Function{
 		Name:            "func_rev",
-		ReturnType:      GetIntType(),
+		ReturnType:      GetIntTypeSess(testAmbientSession),
 		BuildState:      BuildBuilt,
 		IsBuilt:         true,
 		FactChanged:     true,
@@ -422,7 +422,7 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 	// Simple built callee: empty body always visits OK; FactChanged forces NeedsRevisit.
 	callee := &Function{
 		Name:            "func_49",
-		ReturnType:      GetIntType(),
+		ReturnType:      GetIntTypeSess(testAmbientSession),
 		BuildState:      BuildBuilt,
 		IsBuilt:         true,
 		FactChanged:     true,
@@ -431,12 +431,12 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 		Param:           nil,
 	}
 	callee.ensurePairedFactMgr()
-	caller := &Function{Name: "func_11", ReturnType: GetIntType()}
+	caller := &Function{Name: "func_11", ReturnType: GetIntTypeSess(testAmbientSession)}
 	list := &FunctionList{Funcs: []*Function{caller, callee}}
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(fm)
 	// Simulate ExpressionAssign: CurrRHS set while building invocation as RHS of assign.
-	rhsDummy := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), ExprType: GetIntType()}
+	rhsDummy := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), ExprType: GetIntTypeSess(testAmbientSession)}
 	cg.CurrRHS = rhsDummy
 	cg.EffectStm = EmptyEffect()
 	// Mark a write on EffectStm as if RHS gen ran
@@ -465,16 +465,16 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxFuncs = 5
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	list := &FunctionList{Types: vs.Types}
 	// plant incomplete ambient on caller before build
-	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
+	caller := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	list.Funcs = []*Function{caller}
 	cg := WithFunc(caller, IncompleteEffect()).WithSession(testAmbientSession).WithFuncList(list)
 	cg.Types = vs.Types
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg = cg.WithFactMgr(fm)
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi != nil && !fi.Failed {
 		// may return Failed or nil; must not invent clean success under incomplete ambient
 		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")
@@ -515,10 +515,10 @@ func TestGetFirstFunction(t *testing.T) {
 func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	callee := &Function{
 		Name:       "func_2",
-		ReturnType: GetIntType(),
+		ReturnType: GetIntTypeSess(testAmbientSession),
 		BuildState: BuildBuilt,
 		IsBuilt:    true,
 		FEffect:    EmptyEffect().ReadVarSess(testAmbientSession, g),
@@ -547,16 +547,16 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	// callee that needs revisit
 	callee := &Function{
 		Name:        "func_2",
-		ReturnType:  GetIntType(),
+		ReturnType:  GetIntTypeSess(testAmbientSession),
 		BuildState:  BuildBuilt,
 		IsBuilt:     true,
 		FactChanged: true,
 		Body:        &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
-		Param:       []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
+		Param:       []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)},
 	}
 	callee.Body.Func = callee
 	// FunctionInvocationUser.cpp:311 — revisit uses get_fact_mgr_for_func(callee)

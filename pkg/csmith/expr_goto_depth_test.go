@@ -21,8 +21,8 @@ func TestExpressionNotEquals(t *testing.T) {
 
 func TestExpressionUseVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	w := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	w := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
 	e := &Expression{Term: TermVariable, Var: v}
 	if !e.UseVar(v) || e.UseVar(w) {
 		t.Fatal("var")
@@ -137,16 +137,16 @@ func TestVisitFactsGotoSubsetClearsDest(t *testing.T) {
 	// (ePointTo + eUnionWrite). Soft invent was PT-only delete.
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
 	wide := MakeFactPointToSet(p, []*Variable{a, b})
 	narrow := MakeFactPointTo(p, a)
 	fm.SetMapFactsOut(5, []*FactPointTo{wide})
 	fm.SetMapFactsIn(10, []*FactPointTo{wide})
 	fm.SetMapFactsOut(10, []*FactPointTo{wide})
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	gu.Init = MakeInt(0)
@@ -185,9 +185,9 @@ func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 	// fair sid: dest stm_id 0 is valid (StatementGoto.cpp no destID>0 invent)
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p0", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a0", GetIntType(), true, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b0", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p0", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a0", GetIntTypeSess(testAmbientSession), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b0", GetIntTypeSess(testAmbientSession), true, false)
 	wide := MakeFactPointToSet(p, []*Variable{a, b})
 	narrow := MakeFactPointTo(p, a)
 	fm.SetMapFactsOut(1, []*FactPointTo{wide})

@@ -8,8 +8,8 @@ import (
 func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	env := TypeEnv{Sess: testAmbientSession}
-	p1 := env.FindPointerType(GetIntType(), true)
-	p2 := env.FindPointerType(GetIntType(), true)
+	p1 := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
+	p2 := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	if p1 != p2 {
 		t.Fatal("identity")
 	}
@@ -26,7 +26,7 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 		t.Fatal("incomplete DerivedTypes HasPointerType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if env.FindPointerType(GetIntType(), true) != nil {
+	if env.FindPointerType(GetIntTypeSess(testAmbientSession), true) != nil {
 		t.Fatal("incomplete DerivedTypes FindPointerType(add) must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -46,7 +46,7 @@ func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 		t.Fatal("empty pool must stay non-sticky soft")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomStructUnionType(nil, []*Type{GetIntType()}) != nil {
+	if ChooseRandomStructUnionType(nil, []*Type{GetIntTypeSess(testAmbientSession)}) != nil {
 		t.Fatal("nil rng")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -58,7 +58,7 @@ func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 func TestChooseRandomNilRNGSticky(t *testing.T) {
 	// Type.cpp always has process RNG; sticky no invent AllTypes[0] / derived pick
 	ClearErrorSess(testAmbientSession)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}, DerivedTypes: []*Type{PointerTo(GetIntType())}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}, DerivedTypes: []*Type{PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}}
 	if env.ChooseRandom(nil, Defaults(), NewProbabilities(Defaults()), false) != nil {
 		t.Fatal("nil RNG ChooseRandom must fail closed")
 	}
@@ -99,14 +99,14 @@ func TestMakeRandomPointerTypeIntStar(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	// first flip 20% for double ptr — seed2 first flipcoin(20)
 	p := env.MakeRandomPointerType(r, opts, probs)
-	if p == nil || p.PtrType() == nil {
+	if p == nil || p.PtrTypeSess(testAmbientSession) == nil {
 		t.Fatal(p)
 	}
 	// if base simple path, pointee is int
-	if p.IndirectLevel() == 1 && p.PtrType() != GetIntType() {
+	if p.IndirectLevelSess(testAmbientSession) == 1 && p.PtrTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
 		// double-ptr path might differ
-		if p.PtrType().PtrType() == nil && p.PtrType() != GetIntType() {
-			t.Fatalf("expected int* or deeper, got %s", p.CName())
+		if p.PtrTypeSess(testAmbientSession).PtrTypeSess(testAmbientSession) == nil && p.PtrTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
+			t.Fatalf("expected int* or deeper, got %s", p.CNameSess(testAmbientSession))
 		}
 	}
 	// Type.cpp:1141 — nil env/rng → ERROR_GUARD nullptr, no soft invent
@@ -120,12 +120,12 @@ func TestMakeRandomPointerTypeConsolidatesAllSimple(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleType(EFloat)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleTypeSess(testAmbientSession, EFloat)}}
 	// avoid 20% derived path (empty derived)
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
 		p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs)
-		if p != nil && p.IndirectLevel() == 1 && p.PtrType() == GetIntType() {
+		if p != nil && p.IndirectLevelSess(testAmbientSession) == 1 && p.PtrTypeSess(testAmbientSession) == GetIntTypeSess(testAmbientSession) {
 			found = true
 			break
 		}
@@ -143,9 +143,9 @@ func TestSelectLTypeDefaultInt(t *testing.T) {
 	env := TypeEnv{Sess: testAmbientSession}
 	r := NewRngSess(testAmbientSession, 2)
 	ty := SelectLType(r, opts, probs, &env, false, AssignBitAnd)
-	if ty != GetIntType() {
+	if ty != GetIntTypeSess(testAmbientSession) {
 		// float off, no struct → int
-		t.Fatalf("compound assign LType want int got %s", ty.CName())
+		t.Fatalf("compound assign LType want int got %s", ty.CNameSess(testAmbientSession))
 	}
 }
 
@@ -155,14 +155,14 @@ func TestSelectLTypeIncompleteStructPoolFailClosed(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// force struct-as-LType path eligible: simple assign + AllTypes with hole
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), nil}}
 	// plant high struct prob so we would enter branch if complete
 	probs.single[PStructAsLTypeProb] = 100
 	probs.single[PPointerAsLTypeProb] = 0
 	probs.single[PFloatAsLTypeProb] = 0
 	ty := SelectLType(NewRngSess(testAmbientSession, 1), opts, probs, env, false, AssignSimple)
 	if ty != nil {
-		t.Fatalf("incomplete AllTypes must fail closed SelectLType, got %v", ty.CName())
+		t.Fatalf("incomplete AllTypes must fail closed SelectLType, got %v", ty.CNameSess(testAmbientSession))
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete AllTypes must SetError sticky SelectLType")
@@ -192,7 +192,7 @@ func TestChooseRandomErrorGuard(t *testing.T) {
 	// Type.cpp:1208 — ERROR_GUARD after rnd_upto(AllTypes)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EShort)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort)}}
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
@@ -206,7 +206,7 @@ func TestChooseRandomNilTypeHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil, GetSimpleType(EShort)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), nil, GetSimpleTypeSess(testAmbientSession, EShort)}}
 	if env.ChooseRandom(NewRngSess(testAmbientSession, 1), opts, probs, false) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandom")
 	}
@@ -233,7 +233,7 @@ func TestChooseRandomNilTypeHole(t *testing.T) {
 func TestChooseRandomPointerTypeNilHole(t *testing.T) {
 	// Type* always live on derived_types; no invent pick past hole
 	ClearErrorSess(testAmbientSession)
-	intStar := PointerTo(GetIntType())
+	intStar := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	env := &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{intStar, nil}}
 	if env.ChooseRandomPointerType(NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil DerivedTypes hole must fail closed")
@@ -262,9 +262,9 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	intStar := PointerTo(GetIntType())
+	intStar := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	envBad := &TypeEnv{Sess: testAmbientSession,
-		AllTypes:     []*Type{GetIntType(), nil},
+		AllTypes:     []*Type{GetIntTypeSess(testAmbientSession), nil},
 		DerivedTypes: []*Type{intStar, nil},
 	}
 	for seed := uint64(1); seed < 30; seed++ {
@@ -279,7 +279,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete derived only: when 20% path hits, fail closed (nil); never soft-skip hole
 	envDerived := &TypeEnv{Sess: testAmbientSession,
-		AllTypes:     []*Type{GetIntType()},
+		AllTypes:     []*Type{GetIntTypeSess(testAmbientSession)},
 		DerivedTypes: []*Type{intStar, nil},
 	}
 	sawNilOnDerivedPath := false
@@ -316,7 +316,7 @@ func TestSelectLTypeCanBePointer(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		r := NewRngSess(testAmbientSession, seed)
 		ty := SelectLType(r, opts, probs, env, false, AssignSimple)
-		if ty != nil && ty.PtrType() != nil {
+		if ty != nil && ty.PtrTypeSess(testAmbientSession) != nil {
 			found = true
 			break
 		}
@@ -421,7 +421,7 @@ func TestRandomTypeFromTypeVoidIsSimpleResidualSticky(t *testing.T) {
 	probs := NewProbabilities(opts)
 	r := NewRngSess(testAmbientSession, 2)
 	// strict simple void
-	got := RandomTypeFromType(r, nil, opts, probs, GetSimpleType(EVoid), true, true)
+	got := RandomTypeFromType(r, nil, opts, probs, GetSimpleTypeSess(testAmbientSession, EVoid), true, true)
 	if got != nil {
 		t.Fatal("strict void RandomTypeFromType must fail closed nil", got)
 	}
@@ -440,10 +440,10 @@ func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	// empty DerivedTypes; AllTypes has simples for choose_random fallthrough
 	env.AllTypes = []*Type{
-		GetSimpleType(EChar), GetSimpleType(EInt), GetSimpleType(EShort),
-		GetSimpleType(ELong), GetSimpleType(ELongLong),
-		GetSimpleType(EUChar), GetSimpleType(EUInt), GetSimpleType(EUShort),
-		GetSimpleType(EULong), GetSimpleType(EULongLong),
+		GetSimpleTypeSess(testAmbientSession, EChar), GetSimpleTypeSess(testAmbientSession, EInt), GetSimpleTypeSess(testAmbientSession, EShort),
+		GetSimpleTypeSess(testAmbientSession, ELong), GetSimpleTypeSess(testAmbientSession, ELongLong),
+		GetSimpleTypeSess(testAmbientSession, EUChar), GetSimpleTypeSess(testAmbientSession, EUInt), GetSimpleTypeSess(testAmbientSession, EUShort),
+		GetSimpleTypeSess(testAmbientSession, EULong), GetSimpleTypeSess(testAmbientSession, EULongLong),
 	}
 	// Two RNGs: one for MakeRandomPointerType, one manual replay of fair stream
 	// Fair: flip(20) then choose_random path. After many seeds both succeed.
@@ -451,7 +451,7 @@ func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
 		p := env.MakeRandomPointerType(NewRngSess(testAmbientSession, seed), opts, probs)
-		if p != nil && p.PtrType() != nil {
+		if p != nil && p.PtrTypeSess(testAmbientSession) != nil {
 			ok++
 		}
 	}

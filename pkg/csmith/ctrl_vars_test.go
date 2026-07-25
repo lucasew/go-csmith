@@ -18,7 +18,7 @@ func TestNewCtrlVarsNoInventDimOne(t *testing.T) {
 	opts := Defaults()
 	opts.MaxArrayDim = 0
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
 	av.AsArray = av
@@ -63,7 +63,7 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 		t.Fatal("nil ctrl slot must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	emptyName := []*Variable{c1[0], {Name: "", Type: GetIntType()}}
+	emptyName := []*Variable{c1[0], {Name: "", Type: GetIntTypeSess(testAmbientSession)}}
 	if out := OutputArrayCtrlVarsSess(testAmbientSession, emptyName, 2, ""); out != "" {
 		t.Fatal("empty ctrl name must fail closed", out)
 	}
@@ -100,7 +100,7 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 
 func TestOutputLowerBoundArray(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
 	}
 	if av.OutputLowerBoundSess(testAmbientSession) != "g_a[0][0]" {
@@ -112,15 +112,15 @@ func TestOutputLowerBoundArray(t *testing.T) {
 }
 
 func TestOutputUpperBoundField(t *testing.T) {
-	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), false, false)
-	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntTypeSess(testAmbientSession), false, false)
+	field := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	if field.OutputUpperBoundSess(testAmbientSession, false) != "g_s.f0" {
 		t.Fatal(field.OutputUpperBoundSess(testAmbientSession, false))
 	}
 }
 
 func TestOutputForComment(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if v.OutputForCommentSess(testAmbientSession, false) != "g_1" {
 		t.Fatal(v.OutputForCommentSess(testAmbientSession, false))
 	}
@@ -129,7 +129,7 @@ func TestOutputForComment(t *testing.T) {
 func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -160,7 +160,7 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	blk := &Block{}
 	loc := &ArrayVariable{
-		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 		Block:    blk, // non-nil → not IsGlobal; needs loop init
 		// no Init / InitValues → OutputInit empty
@@ -175,7 +175,7 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable shell from
 	// ArraySizes then partial loop inits. Fair: sticky empty whole section.
-	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	if GetMaxArrayDimensionSess(testAmbientSession, []*Variable{shell}) >= 0 {
 		t.Fatal("IsArray without AsArray GetMaxArrayDimension must fail closed -1")
 	}
@@ -203,7 +203,7 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	avBroken.AsArray = avBroken
 	// GetMaxArrayDimension uses AsArray.Sizes — Type nil still dims from sizes
 	// NoLoopInitializer(av) Type nil stickies residual true → soft-skip invent next
-	avGood := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	avGood := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if avGood == nil {
 		t.Fatal("good array")
 	}
@@ -228,7 +228,7 @@ func TestOutputArrayInitializersBraceOnlyStillCtrlDecl(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name:       "l_137",
-			Type:       GetIntType(),
+			Type:       GetIntTypeSess(testAmbientSession),
 			IsArray:    true,
 			ArraySizes: []int{2, 3},
 			Init:       MakeInt(0),

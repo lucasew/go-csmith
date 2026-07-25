@@ -12,11 +12,11 @@ func TestAddParamFactsDoesNotSetFactChanged(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	fn := &Function{Name: "func_param", ReturnType: GetIntType()}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_0", PointerTo(GetIntType()), false, false)
+	fn := &Function{Name: "func_param", ReturnType: GetIntTypeSess(testAmbientSession)}
+	p := CreateVariableScalarsSess(testAmbientSession, "p_0", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fn.Param = []*Variable{p}
 	fm := NewFactMgrSess(testAmbientSession, fn)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	arg := &Expression{Term: TermVariable, Var: g}
 	// address-of style: pointer arg pointing at g via variable expression is fine;
 	// abstract for pointer param from non-ptr may yield garbage — still a lattice write

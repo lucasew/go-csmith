@@ -265,10 +265,10 @@ func (f *Function) NeedReturnStmtSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	simple := f.ReturnType.IsSimple()
+	simple := f.ReturnType.IsSimpleSess(s)
 	// residual ERROR sticky — no invent soft need-return past IsSimple residual
 	if sessHasError(s) {
 		return true
 	}
-	return !(simple && f.ReturnType.Simple() == EVoid)
+	return !(simple && f.ReturnType.SimpleSess(s) == EVoid)
 }

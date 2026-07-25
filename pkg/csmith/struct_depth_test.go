@@ -4,19 +4,19 @@ import "testing"
 
 func TestStructDepthNested(t *testing.T) {
 	inner := &Type{isStruct: true, StructName: "S1", Fields: []StructField{
-		{Type: GetIntType(), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	outer := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Type: inner, BitWidth: -1},
-		{Type: GetIntType(), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if inner.StructDepth() != 1 {
-		t.Fatalf("inner %d", inner.StructDepth())
+	if inner.StructDepthSess(testAmbientSession) != 1 {
+		t.Fatalf("inner %d", inner.StructDepthSess(testAmbientSession))
 	}
-	if outer.StructDepth() != 2 {
-		t.Fatalf("outer %d", outer.StructDepth())
+	if outer.StructDepthSess(testAmbientSession) != 2 {
+		t.Fatalf("outer %d", outer.StructDepthSess(testAmbientSession))
 	}
-	if GetIntType().StructDepth() != 0 {
+	if GetIntTypeSess(testAmbientSession).StructDepthSess(testAmbientSession) != 0 {
 		t.Fatal("int")
 	}
 	// nil field Type: fail closed deep (no invent depth 0 past hole)
@@ -24,8 +24,8 @@ func TestStructDepthNested(t *testing.T) {
 	hole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
 		{Type: nil, BitWidth: -1},
 	}}
-	if hole.StructDepth() != incompleteStructDepth {
-		t.Fatalf("incomplete depth %d want %d", hole.StructDepth(), incompleteStructDepth)
+	if hole.StructDepthSess(testAmbientSession) != incompleteStructDepth {
+		t.Fatalf("incomplete depth %d want %d", hole.StructDepthSess(testAmbientSession), incompleteStructDepth)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type StructDepth must SetError sticky")
@@ -35,10 +35,10 @@ func TestStructDepthNested(t *testing.T) {
 	// Fair: sticky incompleteStructDepth.
 	nestedHole := &Type{isStruct: true, StructName: "Snest", Fields: []StructField{
 		{Type: hole, BitWidth: -1},
-		{Type: GetIntType(), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if nestedHole.StructDepth() != incompleteStructDepth {
-		t.Fatalf("nested residual depth %d want %d", nestedHole.StructDepth(), incompleteStructDepth)
+	if nestedHole.StructDepthSess(testAmbientSession) != incompleteStructDepth {
+		t.Fatalf("nested residual depth %d want %d", nestedHole.StructDepthSess(testAmbientSession), incompleteStructDepth)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual StructDepth must SetError sticky")
@@ -47,7 +47,7 @@ func TestStructDepthNested(t *testing.T) {
 	// nested filter treats incomplete as too deep
 	opts := Defaults()
 	opts.MaxNestedStructLevel = 3
-	if hole.StructDepth() < opts.MaxNestedStructLevel {
+	if hole.StructDepthSess(testAmbientSession) < opts.MaxNestedStructLevel {
 		t.Fatal("incomplete must fail closed over max nested")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -70,7 +70,7 @@ func TestChooseRandomTypeFilterNoReturnUnionsGate(t *testing.T) {
 	found := false
 	for i := 0; i < 20; i++ {
 		ty := env.ChooseRandom(r, opts, probs, false)
-		if ty != nil && ty.IsUnion() {
+		if ty != nil && ty.IsUnionSess(testAmbientSession) {
 			found = true
 			break
 		}
@@ -86,10 +86,10 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	env := &TypeEnv{Sess: testAmbientSession}
 	okt := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
 	}}
 	volt := &Type{isStruct: true, StructName: "S1", Fields: []StructField{
-		{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
 	}}
 	env.StructTypes = []*Type{okt, volt}
 	cands := okStructUnionLTypes(env, true, true, false)
@@ -103,7 +103,7 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	if typesComplete(bad) {
 		t.Fatal("StructTypes hole must IncompleteTypes")
 	}
-	if chooseRandomStructFromType(env, GetIntType(), true, NewRngSess(testAmbientSession, 1)) != nil {
+	if chooseRandomStructFromType(env, GetIntTypeSess(testAmbientSession), true, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete ok pool must fail closed nil, not invent keep original")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -114,7 +114,7 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 
 func TestVolRValEmit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, true)
 	v.UseVolRVal = true
 	out := v.OutputCSess(testAmbientSession, false)
 	if out != "VOL_RVAL(g_1, int32_t)" {

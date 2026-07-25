@@ -11,7 +11,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
-	elem := GetSimpleType(EUInt)
+	elem := GetSimpleTypeSess(testAmbientSession, EUInt)
 	if elem == nil {
 		t.Fatal("no uint")
 	}
@@ -63,7 +63,7 @@ func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	ResetArrayInitSeedSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	elem := GetSimpleType(EUInt)
+	elem := GetSimpleTypeSess(testAmbientSession, EUInt)
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "l_t", Type: elem, IsArray: true,

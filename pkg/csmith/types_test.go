@@ -4,17 +4,17 @@ import "testing"
 
 func TestGetSimpleTypeCached(t *testing.T) {
 	// Type::simple_types identity for eExact
-	if GetSimpleType(EInt) != GetSimpleType(EInt) {
+	if GetSimpleTypeSess(testAmbientSession, EInt) != GetSimpleTypeSess(testAmbientSession, EInt) {
 		t.Fatal("cache identity")
 	}
-	if GetSimpleType(EInt) == GetSimpleType(EShort) {
+	if GetSimpleTypeSess(testAmbientSession, EInt) == GetSimpleTypeSess(testAmbientSession, EShort) {
 		t.Fatal("distinct types")
 	}
 }
 
 func TestPointerToCached(t *testing.T) {
-	p1 := PointerTo(GetSimpleType(EInt))
-	p2 := PointerTo(GetSimpleType(EInt))
+	p1 := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt))
+	p2 := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt))
 	if p1 != p2 {
 		t.Fatal("pointer cache")
 	}
@@ -26,15 +26,15 @@ func TestPointerToCached(t *testing.T) {
 func TestMatchConvertSimple(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// non-void integers interconvert
-	if !GetSimpleType(EInt).MatchSess(testAmbientSession, GetSimpleType(EShort), MatchConvert) {
+	if !GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort), MatchConvert) {
 		t.Fatal("int convert short")
 	}
-	if GetSimpleType(EInt).MatchSess(testAmbientSession, GetSimpleType(EVoid), MatchConvert) {
+	if GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EVoid), MatchConvert) {
 		t.Fatal("int not convert void")
 	}
 	// float → int forbidden when target is int and other is float
 	// is_convertable: if (t->is_float() && !is_float()) return false — t is *other*
-	if GetSimpleType(EInt).MatchSess(testAmbientSession, GetSimpleType(EFloat), MatchConvert) {
+	if GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EFloat), MatchConvert) {
 		t.Fatal("int not convertable from float")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -43,7 +43,7 @@ func TestMatchConvertSimple(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsConvertableOpts residual soft invent was soft-continue invent match true.
 	// Fair: sticky false.
-	if GetSimpleType(EInt).MatchSess(testAmbientSession, nil, MatchConvert) {
+	if GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, nil, MatchConvert) {
 		t.Fatal("nil other MatchConvert must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -54,14 +54,14 @@ func TestMatchConvertSimple(t *testing.T) {
 
 func TestMatchDereference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	pint := PointerTo(GetSimpleType(EInt))
-	if !GetSimpleType(EInt).MatchSess(testAmbientSession, pint, MatchDereference) {
+	pint := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt))
+	if !GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, pint, MatchDereference) {
 		t.Fatal("int is_dereferenced_from int*")
 	}
-	if !GetSimpleType(EInt).MatchSess(testAmbientSession, pint, MatchFlexible) {
+	if !GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, pint, MatchFlexible) {
 		t.Fatal("flexible")
 	}
-	if GetSimpleType(EShort).MatchSess(testAmbientSession, pint, MatchDereference) {
+	if GetSimpleTypeSess(testAmbientSession, EShort).MatchSess(testAmbientSession, pint, MatchDereference) {
 		t.Fatal("short not from int*")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -70,7 +70,7 @@ func TestMatchDereference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsDereferencedFrom residual soft invent was soft-continue invent match true.
 	// Fair: sticky false.
-	if GetSimpleType(EInt).MatchSess(testAmbientSession, nil, MatchDereference) {
+	if GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, nil, MatchDereference) {
 		t.Fatal("nil other MatchDereference must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -79,7 +79,7 @@ func TestMatchDereference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsDerivable residual soft invent was soft-continue invent flexible match true.
 	// Fair: sticky false.
-	if GetSimpleType(EInt).MatchSess(testAmbientSession, nil, MatchFlexible) {
+	if GetSimpleTypeSess(testAmbientSession, EInt).MatchSess(testAmbientSession, nil, MatchFlexible) {
 		t.Fatal("nil other MatchFlexible must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -89,7 +89,7 @@ func TestMatchDereference(t *testing.T) {
 }
 
 func TestIsSigned(t *testing.T) {
-	if !GetSimpleType(EInt).IsSigned() || GetSimpleType(EUInt).IsSigned() {
+	if !GetSimpleTypeSess(testAmbientSession, EInt).IsSignedSess(testAmbientSession) || GetSimpleTypeSess(testAmbientSession, EUInt).IsSignedSess(testAmbientSession) {
 		t.Fatal("signedness")
 	}
 }
@@ -97,14 +97,14 @@ func TestIsSigned(t *testing.T) {
 func TestStructDepthIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil}}}
-	if st.StructDepth() != incompleteStructDepth {
+	if st.StructDepthSess(testAmbientSession) != incompleteStructDepth {
 		t.Fatal("nil field Type must fail closed incompleteStructDepth")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil field Type StructDepth must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !HasLongLongField([]StructField{{Type: nil}}) {
+	if !HasLongLongFieldSess(testAmbientSession, []StructField{{Type: nil}}) {
 		t.Fatal("nil field Type HasLongLongField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -116,16 +116,16 @@ func TestStructDepthIncompleteSticky(t *testing.T) {
 	innerHole := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil}}}
 	outer := &Type{isStruct: true, Fields: []StructField{
 		{Name: "nest", Type: innerHole, BitWidth: -1},
-		{Name: "ok", Type: GetIntType(), BitWidth: -1},
+		{Name: "ok", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if !outer.IsConstStructUnion() {
+	if !outer.IsConstStructUnionSess(testAmbientSession) {
 		t.Fatal("nested residual IsConstStructUnion must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nested residual IsConstStructUnion must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !outer.IsVolatileStructUnion() {
+	if !outer.IsVolatileStructUnionSess(testAmbientSession) {
 		t.Fatal("nested residual IsVolatileStructUnion must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -138,7 +138,7 @@ func TestNeedsCastPtrTypeResidualSticky(t *testing.T) {
 	// PtrType residual soft invent was invent no-cast soft-skip past hole.
 	// nil Type already sticky; complete non-pointer is false no residual.
 	ClearErrorSess(testAmbientSession)
-	if NeedsCast := (*Type)(nil).NeedsCast(GetIntType()); NeedsCast {
+	if NeedsCast := (*Type)(nil).NeedsCastSess(testAmbientSession, GetIntTypeSess(testAmbientSession)); NeedsCast {
 		// nil sticky returns false with SetError
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -146,7 +146,7 @@ func TestNeedsCastPtrTypeResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete: int needs no cast to int
-	if GetIntType().NeedsCast(GetIntType()) {
+	if GetIntTypeSess(testAmbientSession).NeedsCastSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("int NeedsCast int must be false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -154,8 +154,8 @@ func TestNeedsCastPtrTypeResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// pointer to int vs int base mismatch needs cast when bases differ
-	pt := PointerTo(GetIntType())
-	if !pt.NeedsCast(PointerTo(GetSimpleType(EChar))) {
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	if !pt.NeedsCastSess(testAmbientSession, PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))) {
 		// may or may not need cast depending on base equivalence — just hygiene
 	}
 	ClearErrorSess(testAmbientSession)
@@ -164,7 +164,7 @@ func TestNeedsCastPtrTypeResidualSticky(t *testing.T) {
 func TestIsSignedIsSimpleResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent unsigned soft-skip past nil already sticky.
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).IsSigned() {
+	if !(*Type)(nil).IsSignedSess(testAmbientSession) {
 		t.Fatal("nil IsSigned must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -172,15 +172,15 @@ func TestIsSignedIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete pointer is not simple → unsigned false without sticky
-	pt := PointerTo(GetIntType())
-	if pt.IsSigned() {
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	if pt.IsSignedSess(testAmbientSession) {
 		t.Fatal("pointer IsSigned must be false")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete pointer IsSigned must not sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !GetIntType().IsSigned() {
+	if !GetIntTypeSess(testAmbientSession).IsSignedSess(testAmbientSession) {
 		t.Fatal("int IsSigned must be true")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -188,14 +188,14 @@ func TestIsSignedIsSimpleResidualSticky(t *testing.T) {
 
 func TestIsFloatIsSimpleResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsFloat() {
+	if (*Type)(nil).IsFloatSess(testAmbientSession) {
 		t.Fatal("nil IsFloat must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsFloat must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GetIntType().IsFloat() {
+	if GetIntTypeSess(testAmbientSession).IsFloatSess(testAmbientSession) {
 		t.Fatal("int IsFloat must be false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -210,7 +210,7 @@ func TestHasBitfieldsIsStructResidualSticky(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if !st.HasBitfields() {
+	if !st.HasBitfieldsSess(testAmbientSession) {
 		t.Fatal("nil field Type HasBitfields must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -221,7 +221,7 @@ func TestHasBitfieldsIsStructResidualSticky(t *testing.T) {
 
 func TestIsEquivalentIsSimpleResidualHygiene(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if GetIntType().IsEquivalent(GetIntType()) {
+	if GetIntTypeSess(testAmbientSession).IsEquivalentSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		// same size signed - true
 	} else {
 		t.Fatal("int IsEquivalent int")
@@ -231,7 +231,7 @@ func TestIsEquivalentIsSimpleResidualHygiene(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// pointer vs int not equivalent
-	if PointerTo(GetIntType()).IsEquivalent(GetIntType()) {
+	if PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)).IsEquivalentSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("pointer IsEquivalent int must be false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -243,7 +243,7 @@ func TestIsEquivalentIsSimpleResidualHygiene(t *testing.T) {
 func TestSignedOverflowPossibleIsSimpleResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent overflow-free soft-skip past Type-nil.
 	ClearErrorSess(testAmbientSession)
-	if !((*Type)(nil)).SignedOverflowPossible(4) {
+	if !((*Type)(nil)).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("nil Type SignedOverflowPossible must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -251,7 +251,7 @@ func TestSignedOverflowPossibleIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete unsigned int — no signed overflow
-	if GetSimpleType(EUInt).SignedOverflowPossible(4) {
+	if GetSimpleTypeSess(testAmbientSession, EUInt).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("uint SignedOverflowPossible must false")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -259,7 +259,7 @@ func TestSignedOverflowPossibleIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete signed int with size >= intSize
-	if !GetIntType().SignedOverflowPossible(4) {
+	if !GetIntTypeSess(testAmbientSession).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("int SignedOverflowPossible(4) must true")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -271,7 +271,7 @@ func TestSignedOverflowPossibleIsSimpleResidualSticky(t *testing.T) {
 func TestHasAggregateFieldIsAggregateResidualSticky(t *testing.T) {
 	// Type-nil field residual soft invent was invent no-aggregate soft-skip.
 	ClearErrorSess(testAmbientSession)
-	if !HasAggregateField([]StructField{{Name: "f0", Type: nil, BitWidth: -1}}) {
+	if !HasAggregateFieldSess(testAmbientSession, []StructField{{Name: "f0", Type: nil, BitWidth: -1}}) {
 		t.Fatal("Type-nil field HasAggregateField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -283,7 +283,7 @@ func TestHasAggregateFieldIsAggregateResidualSticky(t *testing.T) {
 func TestTypeNameStringIsStructResidualSticky(t *testing.T) {
 	// IsStruct residual soft invent was invent soft-empty name past Type-nil shell.
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).TypeNameString() != "" {
+	if (*Type)(nil).TypeNameStringSess(testAmbientSession) != "" {
 		t.Fatal("nil TypeNameString must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -291,7 +291,7 @@ func TestTypeNameStringIsStructResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete int
-	if GetIntType().TypeNameString() != "Int" {
+	if GetIntTypeSess(testAmbientSession).TypeNameStringSess(testAmbientSession) != "Int" {
 		t.Fatal("int TypeNameString must Int")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -300,7 +300,7 @@ func TestTypeNameStringIsStructResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// incomplete struct empty name sticky
 	st := &Type{isStruct: true, StructName: ""}
-	if st.TypeNameString() != "" {
+	if st.TypeNameStringSess(testAmbientSession) != "" {
 		t.Fatal("empty StructName TypeNameString must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -312,7 +312,7 @@ func TestTypeNameStringIsStructResidualSticky(t *testing.T) {
 func TestToUnsignedIsSimpleResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent soft-nil unsigned past Type-nil shell.
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).ToUnsigned() != nil {
+	if (*Type)(nil).ToUnsignedSess(testAmbientSession) != nil {
 		t.Fatal("nil ToUnsigned must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -320,8 +320,8 @@ func TestToUnsignedIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete signed int
-	u := GetIntType().ToUnsigned()
-	if u == nil || u.Simple() != EUInt {
+	u := GetIntTypeSess(testAmbientSession).ToUnsignedSess(testAmbientSession)
+	if u == nil || u.SimpleSess(testAmbientSession) != EUInt {
 		t.Fatal("int ToUnsigned must uint", u)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -329,7 +329,7 @@ func TestToUnsignedIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// pointer non-simple complete nil without sticky
-	if PointerTo(GetIntType()).ToUnsigned() != nil {
+	if PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)).ToUnsignedSess(testAmbientSession) != nil {
 		t.Fatal("pointer ToUnsigned must nil")
 	}
 	if HasErrorSess(testAmbientSession) {

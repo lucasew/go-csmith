@@ -53,12 +53,12 @@ func CreateArrayVariable(
 		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
-	simple := elem.IsSimple()
+	simple := elem.IsSimpleSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent soft-array past IsSimple residual
 	if hasErrCG(cg) {
 		return nil
 	}
-	if simple && elem.Simple() == EVoid {
+	if simple && elem.SimpleSess(sessFromCG(cg)) == EVoid {
 		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
@@ -163,7 +163,7 @@ func CreateArrayVariable(
 		// if (!pointer || strict_const_arrays) Constant::make_random
 		// else VariableSelector::make_init_value
 		var e *Expression
-		ptrLike := elem.IsPointerLike()
+		ptrLike := elem.IsPointerLikeSess(sessFromCG(cg))
 		if hasErrCG(cg) {
 			return nil
 		}
@@ -637,7 +637,7 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 		is := fmt.Sprintf("%d", idx)
 		item.Indices = append(item.Indices, is)
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeIntSess(bag, idx), ExprType: GetIntType(),
+			Term: TermConstant, Con: MakeIntSess(bag, idx), ExprType: GetIntTypeSess(bag),
 		})
 	}
 	// ArrayVariable.cpp:288–291 — type always live; type->is_aggregate()
@@ -646,7 +646,7 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 		sessNoteError(bag, ErrGeneric)
 		return nil
 	}
-	if item.Type.IsAggregate() {
+	if item.Type.IsAggregateSess(bag) {
 		item.CreateFieldVarsSess(bag)
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
 		if sessHasError(bag) {
@@ -680,7 +680,7 @@ func (av *ArrayVariable) SetIndexSess(s *Session, index int, expr string) {
 		return
 	}
 	con := &Expression{
-		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
+		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntTypeSess(s)}, ExprType: GetIntTypeSess(s),
 	}
 	if index == len(av.Indices) {
 		av.Indices = append(av.Indices, expr)
@@ -763,7 +763,7 @@ func (av *ArrayVariable) AddIndexSess(s *Session, expr string) {
 	}
 	av.Indices = append(av.Indices, expr)
 	av.IndexExprs = append(av.IndexExprs, &Expression{
-		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
+		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntTypeSess(s)}, ExprType: GetIntTypeSess(s),
 	})
 }
 
@@ -1217,7 +1217,7 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 		item.Indices = append(item.Indices, idxStr)
 		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeIntSess(s, idx), ExprType: GetIntType(),
+			Term: TermConstant, Con: MakeIntSess(s, idx), ExprType: GetIntTypeSess(s),
 		})
 	}
 	// ArrayVariable.cpp:261–264 — type always live; only expand aggregate itemized

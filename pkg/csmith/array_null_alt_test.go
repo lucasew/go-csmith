@@ -10,9 +10,9 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	r := NewRngSess(testAmbientSession, 42)
-	elem := PointerTo(GetIntType())
+	elem := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	init := MakeRandom(elem, opts, probs, r)
-	if init == nil || init.Value != "0" || init.Type == nil || !init.Type.IsPointerLike() {
+	if init == nil || init.Value != "0" || init.Type == nil || !init.Type.IsPointerLikeSess(testAmbientSession) {
 		t.Fatalf("pointer MakeRandom: %+v", init)
 	}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -38,9 +38,9 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "func_54", ReturnType: GetIntType()}
-	ptType := PointerTo(GetSimpleType(EShort))
-	g := CreateVariableScalarsSess(testAmbientSession, "g_127", GetSimpleType(EShort), false, false)
+	f := &Function{Name: "func_54", ReturnType: GetIntTypeSess(testAmbientSession)}
+	ptType := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort))
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", GetSimpleTypeSess(testAmbientSession, EShort), false, false)
 	arr := &ArrayVariable{
 		Variable: Variable{Name: "l_233", Type: ptType, IsArray: true},
 		Sizes:    []int{10},
@@ -70,16 +70,16 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	ptType := PointerTo(GetIntType())
-	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	ptType := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ptType, false, false)
 	entry := []*FactPointTo{MakeFactPointToSet(p, []*Variable{g, NullPtr})}
-	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
-		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	b := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}

@@ -6,7 +6,7 @@ import (
 
 func TestLhsWriteVarsFromWritten(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	e := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	e = e.SetLhsWriteVarsFromWrittenSess(testAmbientSession)
 	got := e.LhsWriteVarsSess(testAmbientSession)
@@ -40,8 +40,8 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 
 func TestWriteVarSet(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	e := EmptyEffect().WriteVarSetSess(testAmbientSession, []*Variable{a, b})
 	if !e.IsWrittenSess(testAmbientSession, a) || !e.IsWrittenSess(testAmbientSession, b) {
 		t.Fatal("writes")
@@ -49,7 +49,7 @@ func TestWriteVarSet(t *testing.T) {
 }
 
 func TestAddEffectOptsIncludeLHS(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	other := EmptyEffect().WriteVarSess(testAmbientSession, v).SetLhsWriteVarsFromWrittenSess(testAmbientSession)
 	base := EmptyEffect()
 	merged := base.AddEffectOptsSess(testAmbientSession, other, true)
@@ -111,8 +111,8 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 
 func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	lhs := &Lhs{Var: v, Type: GetIntType()}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -127,11 +127,11 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	// soft invent: Clone incomplete PointTo appends nil / keeps partial out
 	ClearErrorSess(testAmbientSession)
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{Func: fn}
 	fn.Body = body
 	fn.Blocks = []*Block{body}
-	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	facts := []*FactPointTo{{Var: gp, PointTo: []*Variable{nil}}}
 	if FactsComplete(RemoveFunctionLocalFacts(facts, fn)) {
 		t.Fatal("incomplete PointTo must fail closed incomplete, not invent filter")
@@ -145,8 +145,8 @@ func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 func TestRemoveFunctionLocalFacts(t *testing.T) {
 	// FactMgr.cpp:191 — is_var_on_stack(v, stm) via Body as function-exit parent
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerTo(GetIntType()), false, false)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Blocks = []*Block{body}
 	f.Body = body
@@ -166,7 +166,7 @@ func TestRemoveFunctionLocalFactsNilFuncNoResidualInvent(t *testing.T) {
 	// Fair: nil Func is complete no-op mark; filter stays complete non-sticky.
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr)}
 	out := RemoveFunctionLocalFactsAt(facts, nil, nil)
 	if !FactsComplete(out) || len(out) != 1 {
@@ -181,11 +181,11 @@ func TestRemoveFunctionLocalFactsNilFuncNoResidualInvent(t *testing.T) {
 func TestRemoveLoopLocalFacts(t *testing.T) {
 	outer := &Block{Looping: true}
 	inner := &Block{Parent: outer, LocalVars: []*Variable{
-		CreateVariableScalarsSess(testAmbientSession, "l_i", GetIntType(), false, false),
+		CreateVariableScalarsSess(testAmbientSession, "l_i", GetIntTypeSess(testAmbientSession), false, false),
 	}}
-	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	inner.LocalVars = append(inner.LocalVars, lp)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(lp, NullPtr), MakeFactPointTo(g, NullPtr)}
 	out := RemoveLoopLocalFacts(facts, inner)
 	if len(out) != 1 || out[0].Var != g {
@@ -196,9 +196,9 @@ func TestRemoveLoopLocalFacts(t *testing.T) {
 func TestRemoveLoopLocalFactsMarksDeadPointee(t *testing.T) {
 	// FactMgr.cpp:601–612 — update_facts_for_oos_vars marks pointees garbage
 	loop := &Block{Looping: true}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_t", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_t", GetIntTypeSess(testAmbientSession), false, false)
 	loop.LocalVars = []*Variable{loc}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(g, loc)}
 	out := RemoveLoopLocalFacts(facts, loop)
 	if len(out) != 1 || out[0].Var != g {
@@ -211,14 +211,14 @@ func TestRemoveLoopLocalFactsMarksDeadPointee(t *testing.T) {
 
 func TestRemoveLoopLocalFactsForStmtUsesParent(t *testing.T) {
 	loop := &Block{Looping: true, LocalVars: []*Variable{
-		CreateVariableScalarsSess(testAmbientSession, "l_iv", GetIntType(), false, false),
+		CreateVariableScalarsSess(testAmbientSession, "l_iv", GetIntTypeSess(testAmbientSession), false, false),
 	}}
 	body := &Block{Parent: loop, LocalVars: []*Variable{
-		CreateVariableScalarsSess(testAmbientSession, "l_tmp", GetIntType(), false, false),
+		CreateVariableScalarsSess(testAmbientSession, "l_tmp", GetIntTypeSess(testAmbientSession), false, false),
 	}}
-	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	body.LocalVars = append(body.LocalVars, lp)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	br := &Stmt{Kind: StmtBreak, StmID: 3}
 	facts := []*FactPointTo{MakeFactPointTo(lp, NullPtr), MakeFactPointTo(g, NullPtr)}
 	out := RemoveLoopLocalFactsForStmt(facts, br, body)
@@ -228,8 +228,8 @@ func TestRemoveLoopLocalFactsForStmtUsesParent(t *testing.T) {
 }
 
 func TestGetDereferencedPtrs(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	d := GetDereferencedPtrs(e)
 	if len(d) != 1 {
 		t.Fatal(d)

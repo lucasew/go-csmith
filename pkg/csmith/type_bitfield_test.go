@@ -18,8 +18,8 @@ func TestMakeOneBitfieldWidth(t *testing.T) {
 	if f.BitWidth == 0 {
 		t.Fatal("first field should not be zero-width")
 	}
-	if f.Type != GetIntType() && f.Type != GetSimpleType(EUInt) {
-		t.Fatal(f.Type.CName())
+	if f.Type != GetIntTypeSess(testAmbientSession) && f.Type != GetSimpleTypeSess(testAmbientSession, EUInt) {
+		t.Fatal(f.Type.CNameSess(testAmbientSession))
 	}
 }
 
@@ -30,7 +30,7 @@ func TestMakeRandomStructTypeCanHaveBitfields(t *testing.T) {
 	for seed := uint64(1); seed < 60; seed++ {
 		env := TypeEnv{Sess: testAmbientSession}
 		// Type.cpp AllTypes has simples before make_random_struct_type
-		env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
+		env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EUInt)}
 		st := MakeRandomStructType(NewRngSess(testAmbientSession, seed), opts, probs, &env, "S0")
 		if st == nil {
 			// ERROR_GUARD / empty field path fail closed — retry seed
@@ -78,8 +78,8 @@ func TestBitfieldDeclEmit(t *testing.T) {
 		isStruct:   true,
 		StructName: "Sbf",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: 3},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	decl := st.OutputStructDecl()
@@ -94,7 +94,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 		isStruct:   true,
 		StructName: "Sbad",
 		Fields: []StructField{
-			{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: 3},
+			{Name: "f0", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: 3},
 		},
 	}
 	if s := bad.OutputStructDecl(); s != "" {
@@ -105,7 +105,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty sid sticky
-	anon := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	anon := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	if s := anon.OutputStructDecl(); s != "" {
 		t.Fatal("empty StructName must fail closed", s)
 	}
@@ -127,13 +127,13 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0", Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetSimpleType(EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
-			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f2", Type: GetSimpleType(EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{true})},
+			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f2", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{true})},
 			// raw slot i=3 — Name "f3" would be invent if emit used Name after pad skip
-			{Name: "f3", Type: GetSimpleType(EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
-			{Name: "f4", Type: GetSimpleType(EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
-			{Name: "f5", Type: GetSimpleType(EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
+			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
+			{Name: "f4", Type: GetSimpleTypeSess(testAmbientSession, EUShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
+			{Name: "f5", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1, Qfer: NewCVQualifiers([]bool{true}, []bool{false})},
 		},
 	}
 	decl := st.OutputStructDecl()
@@ -156,9 +156,9 @@ func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f2", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
 	udecl := ut.OutputUnionDecl()
@@ -220,7 +220,7 @@ func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
 	opts.FixedStructFields = true
 	opts.Bitfields = false
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	if st := MakeRandomStructType(NewRngSess(testAmbientSession, 1), opts, probs, env, "S0"); st != nil {
 		t.Fatalf("fixed max 0 must not invent struct, got %d fields", len(st.Fields))
 	}
@@ -250,7 +250,7 @@ func TestOutputStructDeclFieldTypeResidualSticky(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 			{Name: "f1", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // CName residual
 		},
 	}
@@ -286,7 +286,7 @@ func TestOutputStructDeclBitfieldIsSimpleResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// pointer bitfield Type — IsSimple false without residual then SetError
 	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
-		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: 3},
+		{Name: "f0", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: 3},
 	}}
 	if s := st.OutputStructDecl(); s != "" {
 		t.Fatal("non-simple bitfield must fail closed", s)

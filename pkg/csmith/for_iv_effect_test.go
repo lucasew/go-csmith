@@ -16,15 +16,15 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
-		{Name: "f2", Type: GetIntType(), BitWidth: -1},
-		{Name: "f3", Type: GetIntType(), BitWidth: -1},
-		{Name: "f4", Type: GetIntType(), BitWidth: -1},
-		{Name: "f5", Type: GetIntType(), BitWidth: -1},
-		{Name: "f6", Type: GetIntType(), BitWidth: -1},
-		{Name: "f7", Type: GetIntType(), BitWidth: -1},
-		{Name: "f8", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f5", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f6", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f7", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f8", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", st, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -32,7 +32,7 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 		t.Fatal("need f8")
 	}
 	iv := parent.FieldVars[8]
-	fn := &Function{Name: "func_44", ReturnType: GetIntType()}
+	fn := &Function{Name: "func_44", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: fn}
 	fn.Body = blk
 	fn.Blocks = []*Block{blk}

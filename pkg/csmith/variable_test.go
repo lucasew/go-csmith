@@ -3,15 +3,15 @@ package csmith
 import "testing"
 
 func TestCreateVariableAndPredicates(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetSimpleType(EInt), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetSimpleTypeSess(testAmbientSession, EInt), true, false)
 	if v == nil || !v.IsGlobalSess(testAmbientSession) || v.IsLocalSess(testAmbientSession) || !v.IsConstSess(testAmbientSession) || v.IsVolatileSess(testAmbientSession) {
 		t.Fatalf("global const int: %+v const=%v vol=%v", v, v.IsConstSess(testAmbientSession), v.IsVolatileSess(testAmbientSession))
 	}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetSimpleType(EShort), false, true)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetSimpleTypeSess(testAmbientSession, EShort), false, true)
 	if !p.IsArgumentSess(testAmbientSession) || !p.IsVolatileSess(testAmbientSession) {
 		t.Fatal("param volatile")
 	}
-	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetSimpleType(EChar), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetSimpleTypeSess(testAmbientSession, EChar), false, false)
 	if !l.IsLocalSess(testAmbientSession) || l.IsGlobalSess(testAmbientSession) {
 		t.Fatal("local")
 	}
@@ -20,7 +20,7 @@ func TestCreateVariableAndPredicates(t *testing.T) {
 func TestCreateVariableRejectsVoid(t *testing.T) {
 	// Variable.cpp:388/412 — assert(type)/void sticky; empty name soft factory non-sticky
 	ClearErrorSess(testAmbientSession)
-	if CreateVariableScalarsSess(testAmbientSession, "g_1", GetSimpleType(EVoid), false, false) != nil {
+	if CreateVariableScalarsSess(testAmbientSession, "g_1", GetSimpleTypeSess(testAmbientSession, EVoid), false, false) != nil {
 		t.Fatal("void simple must be rejected")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -42,13 +42,13 @@ func TestCreateVariableRejectsVoid(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// name always live; empty name soft factory (non-sticky re-pick gate)
-	if CreateVariableScalarsSess(testAmbientSession, "", GetIntType(), false, false) != nil {
+	if CreateVariableScalarsSess(testAmbientSession, "", GetIntTypeSess(testAmbientSession), false, false) != nil {
 		t.Fatal("empty name must fail closed CreateVariableScalars")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name CreateVariableScalars must stay non-sticky soft factory")
 	}
-	if CreateVariableWithInitSess(testAmbientSession, "", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("empty name must fail closed CreateVariableWithInit")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -61,12 +61,12 @@ func TestCreateVariableErrorGuardAfterInit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if CreateVariableScalarsSess(testAmbientSession, "g_e", GetIntType(), false, false) != nil {
+	if CreateVariableScalarsSess(testAmbientSession, "g_e", GetIntTypeSess(testAmbientSession), false, false) != nil {
 		t.Fatal("sticky error must fail CreateVariableScalars")
 	}
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if CreateVariableWithInitSess(testAmbientSession, "g_e2", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_e2", GetIntTypeSess(testAmbientSession), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("sticky error must fail CreateVariableWithInit after field expand")
 	}
 }
@@ -80,13 +80,13 @@ func TestCreateVariableScalarsUsesProcessProbs(t *testing.T) {
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearErrorSess(testAmbientSession)
 	// simple still works with process table
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if v == nil || v.Init == nil || v.Init.Value == "" {
 		t.Fatal("simple init")
 	}
 	// aggregate needs live process probs (no invent NewProbabilities)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	s := CreateVariableScalarsSess(testAmbientSession, "g_s", st, false, false)
 	if s == nil || s.Init == nil {
@@ -104,7 +104,7 @@ func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "SFail", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	if CreateVariableScalarsSess(testAmbientSession, "g_s", st, false, false) != nil {
 		t.Fatal("nil process probs must not invent aggregate init")
@@ -114,7 +114,7 @@ func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// simple non-aggregate still works with process RNG (probs optional for simple)
-	if CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false) == nil {
+	if CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false) == nil {
 		t.Fatal("simple with process RNG")
 	}
 }
@@ -126,7 +126,7 @@ func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
 	defer SetProcessRngSess(testAmbientSession, prevR)
 	ClearErrorSess(testAmbientSession)
 	// simple needs pure_rnd — fail closed sticky without invent nextCreateVarRng
-	if CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false) != nil {
+	if CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false) != nil {
 		t.Fatal("simple must fail closed without ProcessRng")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -134,7 +134,7 @@ func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// pointer constant is "0" without RNG draws (Constant.cpp:308–310)
-	if CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false) == nil {
+	if CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false) == nil {
 		t.Fatal("pointer init must not require RNG")
 	}
 }
@@ -173,7 +173,7 @@ func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// burn some process draws so depth moves
 	before := r.RandDepth()
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if v == nil || v.Init == nil {
 		t.Fatal("want init")
 	}
@@ -184,7 +184,7 @@ func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
 
 func TestVariableCompatibleMatchIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	if (*Variable)(nil).CompatibleSess(testAmbientSession, v, false) {
 		t.Fatal("nil Variable Compatible must fail closed false")
 	}
@@ -253,9 +253,9 @@ func TestVariableCompatibleMatchIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// HasFieldVar residual soft invent was Match true/false past FieldVars hole.
 	// Fair: sticky not-match.
-	agg := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	agg := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	parent := &Variable{Name: "g_s", Type: agg, FieldVars: []*Variable{nil}}
-	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	field := &Variable{Name: "g_s.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	if parent.MatchSess(testAmbientSession, field) {
 		t.Fatal("HasFieldVar residual Match must fail closed false")
 	}
@@ -277,7 +277,7 @@ func TestCreateFieldVarsNilSticky(t *testing.T) {
 
 func TestHasFieldVarLooseMatchIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	if (*Variable)(nil).HasFieldVarSess(testAmbientSession, v) {
 		t.Fatal("nil HasFieldVar must fail closed false")
 	}
@@ -356,7 +356,7 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete predicates
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if !p.IsPointerSess(testAmbientSession) {
 		t.Fatal("pointer IsPointer must be true")
 	}
@@ -369,7 +369,7 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// field with Type-nil parent sticky (no invent not-union-field soft-skip)
 	parent := &Variable{Name: "g_u"} // Type nil
-	field := &Variable{Name: "g_u.f0", FieldVarOf: parent, Type: GetIntType()}
+	field := &Variable{Name: "g_u.f0", FieldVarOf: parent, Type: GetIntTypeSess(testAmbientSession)}
 	if field.IsUnionFieldSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsUnionField must fail closed false")
 	}
@@ -393,7 +393,7 @@ func TestFieldVarsCompleteNilIncomplete(t *testing.T) {
 		t.Fatal("nil FieldVarsComplete must be incomplete false")
 	}
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	if !v.FieldVarsCompleteSess(testAmbientSession) {
 		t.Fatal("scalar FieldVarsComplete empty complete")
 	}
@@ -403,7 +403,7 @@ func TestIsValidVolatileInitExprResidualSticky(t *testing.T) {
 	// NotEquals residual soft invent was invent valid-true past incomplete InitExpr shell.
 	ClearErrorSess(testAmbientSession)
 	// const volatile pointer with Type-nil InitExpr residual NotEquals
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{true, false}, []bool{true, false}))
 	if v == nil {
 		t.Fatal("create")
@@ -423,7 +423,7 @@ func TestIsValidVolatileInitExprResidualSticky(t *testing.T) {
 
 func TestIsValidVolatileNonConstResidualHygiene(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	if !v.IsValidVolatileSess(testAmbientSession) {
 		t.Fatal("non-const volatile must be valid")
 	}
@@ -436,7 +436,7 @@ func TestIsValidVolatileNonConstResidualHygiene(t *testing.T) {
 func TestCompatibleIsVolatileResidualSticky(t *testing.T) {
 	// IsVolatile residual soft invent was invent soft-compat past nil subject already sticky.
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	if a.CompatibleSess(testAmbientSession, nil, false) {
 		t.Fatal("nil other Compatible must fail closed false")
 	}
@@ -445,7 +445,7 @@ func TestCompatibleIsVolatileResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete path no sticky
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	if a.CompatibleSess(testAmbientSession, b, false) {
 		// different vars not expand → false complete
 	}
@@ -465,7 +465,7 @@ func TestCompatibleIsVolatileResidualSticky(t *testing.T) {
 func TestCreateFieldVarsIsVolatileResidualSticky(t *testing.T) {
 	// IsAggregate residual soft invent was invent soft-skip create past non-aggregate.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	v.CreateFieldVarsSess(testAmbientSession)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-aggregate CreateFieldVars must SetError sticky")
@@ -484,7 +484,7 @@ func TestIsPointerPtrTypeResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete pointer
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if !p.IsPointerSess(testAmbientSession) {
 		t.Fatal("pointer IsPointer must true")
 	}
@@ -497,7 +497,7 @@ func TestIsPointerPtrTypeResidualSticky(t *testing.T) {
 func TestCreateVariableScalarsVoidIsSimpleResidualSticky(t *testing.T) {
 	// IsSimple residual soft invent was invent void scalar create past void type shell.
 	ClearErrorSess(testAmbientSession)
-	if CreateVariableScalarsSess(testAmbientSession, "g_v", GetSimpleType(EVoid), false, false) != nil {
+	if CreateVariableScalarsSess(testAmbientSession, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), false, false) != nil {
 		t.Fatal("void CreateVariableScalars must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -516,7 +516,7 @@ func TestCreateVariableScalarsVoidIsSimpleResidualSticky(t *testing.T) {
 
 func TestCreateVariableWithInitVoidIsSimpleResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if CreateVariableWithInitSess(testAmbientSession, "g_v", GetSimpleType(EVoid), nil, NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+	if CreateVariableWithInitSess(testAmbientSession, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), nil, NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("void CreateVariableWithInit must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -535,10 +535,10 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetSimpleType(EUInt), Qfer: volQ, BitWidth: 15},
+			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EUInt), Qfer: volQ, BitWidth: 15},
 		},
 	}
-	if !st.IsVolatileStructUnion() {
+	if !st.IsVolatileStructUnionSess(testAmbientSession) {
 		t.Fatal("struct with volatile field must IsVolatileStructUnion")
 	}
 	// Storage qfer non-vol
@@ -556,7 +556,7 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 		t.Fatal("IsVolatile must equal IsVolatileAfterDeref(0)")
 	}
 	// plain int remains non-vol
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), true, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), true, false)
 	if iv.IsVolatileSess(testAmbientSession) {
 		t.Fatal("plain int non-vol")
 	}
@@ -577,8 +577,8 @@ func TestCreateFieldVarsStorageVolOnly(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetSimpleType(EUInt), Qfer: volField, BitWidth: 15},
-			{Name: "f1", Type: GetSimpleType(EInt), Qfer: plainField, BitWidth: -1},
+			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EUInt), Qfer: volField, BitWidth: 15},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EInt), Qfer: plainField, BitWidth: -1},
 		},
 	}
 	// non-vol storage qfer; type is vol-struct via f0

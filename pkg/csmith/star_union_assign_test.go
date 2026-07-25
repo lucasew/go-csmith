@@ -11,18 +11,18 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	g88.CreateFieldVarsSess(testAmbientSession)
 	// pointer to union
-	l90 := CreateVariableQferSess(testAmbientSession, "l_90", PointerTo(ut), NewCVQualifiers([]bool{false}, []bool{false}))
+	l90 := CreateVariableQferSess(testAmbientSession, "l_90", PointerToSess(testAmbientSession, ut), NewCVQualifiers([]bool{false}, []bool{false}))
 	// source union with last=f0
 	src := CreateVariableQferSess(testAmbientSession, "l_89", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	src.CreateFieldVarsSess(testAmbientSession)
 
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// l_90 points to g_88
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(l90, g88)}
@@ -32,7 +32,7 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	// (*l_90) = src  — Lhs desired type is union, indir=1
 	lhs := &Lhs{Var: l90, Type: ut}
 	rhs := &Expression{Term: TermVariable, Var: src, ExprType: ut}
-	indir := lhs.IndirectLevel()
+	indir := lhs.IndirectLevelSess(testAmbientSession)
 	if indir != 1 {
 		t.Fatalf("indir want 1 got %d err=%v", indir, GetErrorSess(testAmbientSession))
 	}

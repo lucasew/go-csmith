@@ -89,11 +89,11 @@ func TestBlockMustReturnLast(t *testing.T) {
 }
 
 func TestNeedReturnStmt(t *testing.T) {
-	f := &Function{ReturnType: GetIntType()}
+	f := &Function{ReturnType: GetIntTypeSess(testAmbientSession)}
 	if !f.NeedReturnStmt() {
 		t.Fatal("int")
 	}
-	f.ReturnType = GetSimpleType(EVoid)
+	f.ReturnType = GetSimpleTypeSess(testAmbientSession, EVoid)
 	if f.NeedReturnStmt() {
 		t.Fatal("void")
 	}
@@ -131,7 +131,7 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 	// IsArray without AsArray is incomplete IR sticky empty (suite hygiene ClearError)
 	ClearErrorSess(testAmbientSession)
 	v := &Variable{
-		Name: "g_p", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{4},
+		Name: "g_p", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{4},
 		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 	}
 	if v.HashOutputSess(testAmbientSession) != "" {
@@ -151,12 +151,12 @@ func TestHashGlobalVarsSharedIndices(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// live AsArray required for GetMaxArrayDimension / hashArrayVariable
 	ga := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		Sizes:    []int{2, 3},
 	}
 	ga.AsArray = ga
 	gb := &ArrayVariable{
-		Variable: Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Variable: Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		Sizes:    []int{4},
 	}
 	gb.AsArray = gb

@@ -6,7 +6,7 @@ import (
 )
 
 func TestOutputAssignSimple(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3)},
@@ -25,7 +25,7 @@ func TestOutputAssignSimple(t *testing.T) {
 func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	// StatementAssign.cpp:515–537 — expr.Output always; sticky no invent "g_1 = "
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
 	if out := OutputAssignSimple(st, false); out != "" {
 		t.Fatal("nil Expr must fail closed", out)
@@ -70,7 +70,7 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 	// ccomp volatile rewrite needs live rhs; sticky no invent "g = g & "
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), true, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), true, true)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignBitAnd,
 		Expr:      &Expression{Term: TermConstant}, // empty Output sticky
@@ -98,8 +98,8 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 }
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntType())
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntTypeSess(testAmbientSession))
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -146,7 +146,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 	opts.StopByStmt = 0 // force return immediately (currentSession().NextStmID >= 0 always)
 	// reset sid
 	currentSession().NextStmID = 0
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// make block — should tend to returns when stop is low
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
@@ -170,10 +170,10 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 
 func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 	// StatementAssign.cpp:552–556 — ccomp + volatile compound → lhs = lhs op rhs
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true) // volatile
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true) // volatile
 	flags := MakeDummyFlags()
 	st := &Stmt{
-		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		AssignOp:  AssignBitAnd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(7)},
 		SafeFlags: flags,
@@ -201,7 +201,7 @@ func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 
 func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
 	// simple assign has no compound_to_binary — stays "lhs = rhs"
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, SafeFlags: MakeDummyFlags(),
@@ -220,8 +220,8 @@ func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
 func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 	// StatementAssign.cpp:543 — avoid_signed_overflow() && op_flags
 	// no soft invent safe_* when SafeMath off despite flags present
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntType())
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntTypeSess(testAmbientSession))
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -241,7 +241,7 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
 	// StatementAssign.cpp:618–619 assert(false) sticky; no invent OutputSimple for *= with flags
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignMul,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(2)},
@@ -264,7 +264,7 @@ func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
 	opts.Consts = true
 	opts.Volatiles = true
 	// with real probs, may get bits; with nil, always non-const/non-vol under Regular*
-	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), false, opts, nil, NewRngSess(testAmbientSession, 1))
+	q := RandomQualifiersDefaultProbs(GetIntTypeSess(testAmbientSession), AccessWrite, EmptyCGContext().WithSession(testAmbientSession), false, opts, nil, NewRngSess(testAmbientSession, 1))
 	if q.IsConstSess(testAmbientSession) || q.IsVolatileSess(testAmbientSession) {
 		t.Fatal("nil probs must not invent non-zero regular const/vol")
 	}
@@ -326,16 +326,16 @@ func TestOutputAssignAsExprNilSticky(t *testing.T) {
 func TestOutputAssignAsExprLhsOutputResidualSticky(t *testing.T) {
 	// Lhs.Output residual soft invent was invent assign rewrite past soft-empty LHS.
 	ClearErrorSess(testAmbientSession)
-	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)}, Sizes: []int{2}}
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:      []int{2},
 		Collective: parent,
 		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Value: "0"}}}, // Type-nil residual
 	}
 	item.AsArray = item
 	st := &Stmt{
-		Kind: StmtAssign, Lhs: &Lhs{Var: &item.Variable, Type: GetIntType()},
+		Kind: StmtAssign, Lhs: &Lhs{Var: &item.Variable, Type: GetIntTypeSess(testAmbientSession)},
 		LhsVar: &item.Variable, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 	}
@@ -351,9 +351,9 @@ func TestOutputAssignAsExprLhsOutputResidualSticky(t *testing.T) {
 func TestOutputAssignAsExprRhsOutputResidualSticky(t *testing.T) {
 	// Expr.Output residual soft invent was soft-continue invent bare lhs / partial assign.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
-		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 		Expr:     &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
 	}

@@ -5,8 +5,8 @@ import "testing"
 func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	// CGContext.cpp copy ctor deep-copies iv_bounds map
 	ClearErrorSess(testAmbientSession)
-	iv1 := CreateVariableScalarsSess(testAmbientSession, "i1", GetIntType(), false, false)
-	iv2 := CreateVariableScalarsSess(testAmbientSession, "i2", GetIntType(), false, false)
+	iv1 := CreateVariableScalarsSess(testAmbientSession, "i1", GetIntTypeSess(testAmbientSession), false, false)
+	iv2 := CreateVariableScalarsSess(testAmbientSession, "i2", GetIntTypeSess(testAmbientSession), false, false)
 	parent := EmptyCGContext().WithSession(testAmbientSession)
 	parent.AddIVBound(iv1, 3)
 	child := parent.CloneSubcontext()
@@ -41,22 +41,22 @@ func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 // Statement.cpp:612 — stm_visit_facts sets curr_blk = parent before visit_facts.
 func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{Func: f, StmID: AllocStmID()}
 	st := &Stmt{Kind: StmtReturn, StmID: AllocStmID(), Expr: &Expression{
-		Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType(),
+		Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession),
 	}}
 	// Return with const may not need RV; still exercise CurrBlk assignment path
 	// via ValidateAndUpdateFacts which sets CurrBlk before StmVisitFacts.
 	fm := NewFactMgrSess(testAmbientSession, f)
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
-	f.ReturnType = GetIntType()
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
+	f.ReturnType = GetIntTypeSess(testAmbientSession)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Valid return expr: variable not pointing to locals
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	st.Expr = &Expression{Term: TermVariable, Var: g, ExprType: GetIntType()}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	st.Expr = &Expression{Term: TermVariable, Var: g, ExprType: GetIntTypeSess(testAmbientSession)}
 	fm.AddNewVarFact(g)
 	facts := CloneFactSlice(fm.GlobalFacts)
 	// Parent block must be on stack for other paths; CurrBlk set from blk arg
@@ -72,8 +72,8 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 // share EffectAccum, IN_LOOP, optional iv bound.
 func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	eff := EmptyEffect()
 	parent := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)

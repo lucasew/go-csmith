@@ -20,7 +20,7 @@ func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
 	_ = rManual.RndUpto(uint32(wantB))
 	_ = rManual.RndFlipcoin(50)
 	rGen := NewRngSess(testAmbientSession, 1)
-	s := GenerateRandomConstantInRange(GetIntType(), 15, opts, rGen)
+	s := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 15, opts, rGen)
 	if s == "" || HasErrorSess(testAmbientSession) {
 		t.Fatal("range const", s, GetErrorSess(testAmbientSession))
 	}
@@ -45,7 +45,7 @@ func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 50; i++ {
-		s := GenerateRandomConstantInRange(GetIntType(), 3, opts, r)
+		s := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 3, opts, r)
 		if s == "" {
 			t.Fatal("empty")
 		}
@@ -66,7 +66,7 @@ func TestGenerateRandomConstantInRangeSignPolarity(t *testing.T) {
 		want = "-" + want
 	}
 	r2 := NewRngSess(testAmbientSession, 2)
-	got := GenerateRandomConstantInRange(GetIntType(), 8, opts, r2)
+	got := GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 8, opts, r2)
 	if got != want {
 		t.Fatalf("sign polarity: got %q want %q (num=%d flipTrue=%v)", got, want, num, pos)
 	}
@@ -81,7 +81,7 @@ func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
 	// Constant.cpp assert path sticky — no invent empty/default past broken range IR
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if GenerateRandomConstantInRange(GetIntType(), 8, opts, nil) != "" {
+	if GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 8, opts, nil) != "" {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -95,14 +95,14 @@ func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
 		t.Fatal("nil type GenerateRandomConstantInRange must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GenerateRandomConstantInRange(GetIntType(), 0, opts, NewRngSess(testAmbientSession, 1)) != "" {
+	if GenerateRandomConstantInRange(GetIntTypeSess(testAmbientSession), 0, opts, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("bound 0 must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("bound 0 GenerateRandomConstantInRange must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GenerateRandomConstantInRange(GetSimpleType(EChar), 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
+	if GenerateRandomConstantInRange(GetSimpleTypeSess(testAmbientSession, EChar), 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("non int/uint simple must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -118,9 +118,9 @@ func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {
 		isStruct:   true,
 		StructName: "Sbf",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: 3, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "pad", Type: GetIntType(), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "pad", Type: GetIntTypeSess(testAmbientSession), BitWidth: 0, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
 	c := MakeStructConstant(NewRngSess(testAmbientSession, 4), opts, probs, st)
@@ -138,13 +138,13 @@ func TestSelectGlobalFlexibleMatchesConvert(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// create a short global; SelectGlobal for int with Flexible may match if MatchFlexible allows
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	sh := GetSimpleType(EShort)
+	sh := GetSimpleTypeSess(testAmbientSession, EShort)
 	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), sh, &q, NewRngSess(testAmbientSession, 1))
 	if g == nil {
 		t.Fatal("no global")
 	}
 	// exact would miss int, flexible may convert short→int depending on Match
-	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 2))
+	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	// should at least not panic; may create new int global
 	if v == nil {
 		t.Fatal("nil")

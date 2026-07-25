@@ -3,11 +3,11 @@ package csmith
 import "testing"
 
 func TestFactPointToNullDead(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), false, false)
 	// default NewFactPointTo starts garbage
 	f := NewFactPointTo(p)
 	// nil PointTo hole fails closed as dead/null (no invent not-dead/not-null)
-	hole := &FactPointTo{Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false), PointTo: []*Variable{nil}}
+	hole := &FactPointTo{Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), PointTo: []*Variable{nil}}
 	if !hole.IsDead() || !hole.IsNull() {
 		t.Fatal("nil pointee hole must fail closed IsDead/IsNull")
 	}
@@ -159,7 +159,7 @@ func TestFactPointToNullDead(t *testing.T) {
 func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 	// Variable.cpp:285–286 — collective==0 → virtual; itemized → not
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
@@ -171,7 +171,7 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 		t.Fatal("itemized member must not be virtual")
 	}
 	// field of parent array is virtual via recurse
-	parent.Type = &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	parent.Type = &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) == 0 {
 		t.Skip("no fields")
@@ -182,7 +182,7 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 	// IsArray without AsArray soft invent was virtual-collective true
 	// fair: sticky false (broken IR, not invent virtual soft-success)
 	ClearErrorSess(testAmbientSession)
-	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	if shell.IsVirtualSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray must fail closed not-virtual")
 	}
@@ -193,8 +193,8 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 }
 
 func TestIsValidPtr(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), false, false)
-	target := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), false, false)
+	target := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	// Variable always live; sticky invalid / dangling
 	ClearErrorSess(testAmbientSession)
 	if IsValidPtr(nil, nil, 0, 0) {
@@ -280,7 +280,7 @@ func TestIsValidPtr(t *testing.T) {
 	if !IsDanglingPtr(p, hole, 0) {
 		t.Fatal("incomplete facts must fail closed as dangling")
 	}
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntType(), hole, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), hole, 0, 0) != 0 {
 		t.Fatal("incomplete facts must reject opportunistic validate")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -292,7 +292,7 @@ func TestIsValidPtr(t *testing.T) {
 func TestFactMgrGlobalFacts(t *testing.T) {
 	f := &Function{Name: "func_1"}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), false, false)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(p, NullPtr))
 	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
 		t.Fatal("lookup")
@@ -301,20 +301,20 @@ func TestFactMgrGlobalFacts(t *testing.T) {
 
 func TestMarkFuncEnd(t *testing.T) {
 	// FactPointTo.cpp:129–154 — stack local pointee → garbage
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_t", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_t", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_t"
 	body := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Blocks = []*Block{body}
 	f.Body = body
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	ft := MakeFactPointTo(p, loc)
 	nf := ft.MarkFuncEnd(f, body)
 	if nf == nil || len(nf.PointTo) != 1 || nf.PointTo[0] != GarbagePtr {
 		t.Fatalf("%+v", nf)
 	}
 	// non-stack target unchanged
-	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), true, false)
 	ft2 := MakeFactPointTo(p, g)
 	if ft2.MarkFuncEnd(f, body) != nil {
 		t.Fatal("global pointee")
@@ -361,14 +361,14 @@ func TestMarkFuncEnd(t *testing.T) {
 
 func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {
 	// remaining global ptr that points at local → garbage after remove
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_t", GetIntType(), false, false)
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_t", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_t"
 	body := &Block{Func: fn, LocalVars: []*Variable{loc}}
 	fn.Blocks = []*Block{body}
 	fn.Body = body
-	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	lp.Name = "l_p"
 	body.LocalVars = append(body.LocalVars, lp)
 	facts := []*FactPointTo{
@@ -385,9 +385,9 @@ func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {
 }
 
 func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
-	idx := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	idx := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	ClearErrorSess(testAmbientSession)
 	if f.UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("nil pointee hole must fail closed")
@@ -412,7 +412,7 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was continue soft-skip → identity success
 	// fair: sticky nil fail closed
-	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	fShell := MakeFactPointTo(p, shell)
 	if fShell.UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("IsArray without AsArray root must fail closed UpdateWithModifiedIndex")
@@ -449,7 +449,7 @@ func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
 	// FactPointTo.cpp:691–696 — assert(exist_fact); if (exist_fact) merge.
 	// NDEBUG: missing related fact skips that pointer (empty complete, not Incomplete).
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// facts empty / no related fact for p — NDEBUG skip → empty complete
 	got := MergePointeesOfPointers([]*Variable{p}, nil)
 	if !VariablesComplete(got) || len(got) != 0 {
@@ -476,7 +476,7 @@ func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete related fact still works
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	got = MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, tgt)})
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != tgt {
 		t.Fatalf("complete related fact: %+v", got)
@@ -487,7 +487,7 @@ func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
 		t.Fatal("specials-only must yield empty complete, not fail closed", sp)
 	}
 	// multi: one missing + one present → only present's pointees
-	p2 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	got = MergePointeesOfPointers([]*Variable{p, p2}, []*FactPointTo{MakeFactPointTo(p, tgt)})
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != tgt {
 		t.Fatalf("partial missing must merge remaining: %+v", got)
@@ -506,7 +506,7 @@ func TestMergePointeesMissingFactNDEBUGSkip(t *testing.T) {
 
 func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// indirect 1 with missing fact → NDEBUG skip → empty complete (not Incomplete)
 	gotMiss := MergePointeesOfPointer(p, 1, nil)
 	if !VariablesComplete(gotMiss) || len(gotMiss) != 0 {
@@ -534,20 +534,20 @@ func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
 func TestUpdateWithModifiedIndex(t *testing.T) {
 	// FactPointTo.cpp:712–748 — a[i] → a[-1] when i modified
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:      []int{4},
 		Collective: parent,
 		Indices:    []string{"i"},
 	}
 	item.AsArray = item
-	idx := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	idx := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	idx.Name = "i"
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := MakeFactPointTo(p, &item.Variable)
 	nf := f.UpdateWithModifiedIndex(idx)
 	if nf == f {
@@ -560,7 +560,7 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 		t.Fatalf("indices %v", got)
 	}
 	// unrelated index → unchanged
-	j := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
+	j := CreateVariableScalarsSess(testAmbientSession, "j", GetIntTypeSess(testAmbientSession), false, false)
 	j.Name = "j"
 	if f.UpdateWithModifiedIndex(j) != f {
 		t.Fatal("j should not rewrite")
@@ -595,7 +595,7 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// offset form "(i + 2)"
 	item2 := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:      []int{4},
 		Collective: parent,
 		Indices:    []string{"(i + 2)"},
@@ -617,7 +617,7 @@ func TestFindRelatedPointToNilSticky(t *testing.T) {
 		t.Fatal("nil subject FindRelatedPointTo must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if FindRelatedPointTo([]*FactPointTo{nil}, p) != nil {
 		t.Fatal("nil fact hole FindRelatedPointTo must fail closed")
 	}
@@ -643,7 +643,7 @@ func TestIsNullIsDeadPointsToNilSticky(t *testing.T) {
 		t.Fatal("nil Fact IsDead must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*FactPointTo)(nil).PointsTo(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)) {
+	if !(*FactPointTo)(nil).PointsTo(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) {
 		t.Fatal("nil Fact PointsTo must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -654,7 +654,7 @@ func TestIsNullIsDeadPointsToNilSticky(t *testing.T) {
 
 func TestFactPointToLatticeTopBottom(t *testing.T) {
 	// FactPointTo.h:93–98 is_top/is_bottom/set_top/set_bottom
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := MakeFactPointTo(p, NullPtr)
 	if f.IsBottom() {
 		t.Fatal("is_bottom always false")
@@ -681,8 +681,8 @@ func TestFactPointToLatticeTopBottom(t *testing.T) {
 
 func TestFactFreeHelpers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
 	cp := CopyFacts(facts)
 	if !SameFacts(cp, facts) {
@@ -696,8 +696,8 @@ func TestFactFreeHelpers(t *testing.T) {
 		t.Fatal("combine")
 	}
 	// AbstractFactForReturn — Fact.cpp:76–83 assign into func.rv
-	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
-	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType()), RV: rv}
+	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	fn := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), RV: rv}
 	// null constant RHS is a complete abstract path
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
 	ClearErrorSess(testAmbientSession)
@@ -723,8 +723,8 @@ func TestFactFreeHelpers(t *testing.T) {
 
 func TestFactPointToPointToAndStr(t *testing.T) {
 	// FactPointTo.cpp:398–405 point_to; 530–540 point_to_str
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := MakeFactPointTo(p, a)
 	if !f.PointsTo(a) {
 		t.Fatal("points to a")

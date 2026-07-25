@@ -37,7 +37,7 @@ func TestIncrCounterAndCalcTotal(t *testing.T) {
 func TestRecordAddressTaken(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	RecordAddressTakenSess(testAmbientSession, v)
 	if !v.IsAddrTaken || currentSession().BK.addressTakenCnt != 1 {
 		t.Fatal(currentSession().BK.addressTakenCnt, v.IsAddrTaken)
@@ -72,7 +72,7 @@ func TestRecordAddressTaken(t *testing.T) {
 func TestRecordVolatileAccess(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	RecordVolatileAccessSess(testAmbientSession, v, 0, false)
 	if currentSession().BK.readVolatileCnt != 1 {
 		t.Fatal(currentSession().BK.readVolatileCnt)
@@ -81,7 +81,7 @@ func TestRecordVolatileAccess(t *testing.T) {
 	if currentSession().BK.writeVolatileCnt != 1 {
 		t.Fatal(currentSession().BK.writeVolatileCnt)
 	}
-	nv := CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntType(), false, false)
+	nv := CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntTypeSess(testAmbientSession), false, false)
 	RecordVolatileAccessSess(testAmbientSession, nv, 0, false)
 	if currentSession().BK.readNonVolatileCnt != 1 {
 		t.Fatal(currentSession().BK.readNonVolatileCnt)
@@ -113,7 +113,7 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 	RecordForwardJumpSess(testAmbientSession)
 	RecordBackwardJumpSess(testAmbientSession)
 	RecordBackwardJumpSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	RecordVarCreatedSess(testAmbientSession, v)
 	RecordVarReusedSess(testAmbientSession)
 	if currentSession().BK.forwardJumpCnt != 1 || currentSession().BK.backwardJumpCnt != 2 {
@@ -193,7 +193,7 @@ func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
 		t.Fatal("nil type RecordTypeWithBitfields must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	RecordTypeWithBitfieldsSess(testAmbientSession, GetIntType())
+	RecordTypeWithBitfieldsSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-aggregate RecordTypeWithBitfields must complete no-op")
 	}
@@ -250,7 +250,7 @@ func TestOutputStatisticsStatResidualSticky(t *testing.T) {
 
 func TestRecordPointerComparisons(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_p", pt, false, false), ExprType: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}, ExprType: pt}
 	RecordPointerComparisonsSess(testAmbientSession, lhs, rhs)
@@ -369,7 +369,7 @@ func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	currentSession().BK.exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
-		{Kind: StmtFor, Loop: &LoopControl{IV: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)}, Then: &Block{}},
+		{Kind: StmtFor, Loop: &LoopControl{IV: CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)}, Then: &Block{}},
 	}}}
 	StatExprDepthsSess(testAmbientSession, []*Function{f})
 	if currentSession().BK.exprDepthCnts != nil {
@@ -425,7 +425,7 @@ func TestRecordTypeWithBitfieldsIsAggregateResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	// non-aggregate complete no-op
-	RecordTypeWithBitfieldsSess(testAmbientSession, GetIntType())
+	RecordTypeWithBitfieldsSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete non-aggregate RecordTypeWithBitfields must not sticky")
 	}
@@ -457,7 +457,7 @@ func TestRecordPointerComparisonsIsPointerLikeResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil GetType residual
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
-	ok := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)}
+	ok := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)}
 	RecordPointerComparisonsSess(testAmbientSession, hole, ok)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetType residual RecordPointerComparisons must SetError sticky")

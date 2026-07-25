@@ -9,11 +9,11 @@ import "testing"
 // (seed-10054 IsValidPtr fail on local pointer arrays during revisit).
 func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	i32 := GetIntType()
+	i32 := GetIntTypeSess(testAmbientSession)
 	// pointee local: int32_t* shell
-	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerTo(i32), false, false)
+	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerToSess(testAmbientSession, i32), false, false)
 	// element type int32_t**
-	elem := PointerTo(PointerTo(i32))
+	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, i32))
 	// address-of l_118 as int32_t**
 	addr := &Expression{Term: TermVariable, Var: l118, ExprType: elem}
 	if n, ok := addr.IndirectLevelComplete(); !ok || n != -1 {
@@ -62,9 +62,9 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 // Nil InitExpr + InitExprs-only: promote InitExprs[0] as primary (no garbage-first).
 func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	i32 := GetIntType()
-	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerTo(i32), false, false)
-	elem := PointerTo(PointerTo(i32))
+	i32 := GetIntTypeSess(testAmbientSession)
+	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerToSess(testAmbientSession, i32), false, false)
+	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, i32))
 	addr := &Expression{Term: TermVariable, Var: l118, ExprType: elem}
 	av := &ArrayVariable{
 		Variable: Variable{

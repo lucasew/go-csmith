@@ -51,7 +51,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
@@ -96,7 +96,7 @@ func TestStmtOKBlockRequiresThen(t *testing.T) {
 
 func TestStmtOKIncompleteForIfAssignFailClosed(t *testing.T) {
 	// no invent usable shells from partial IR
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	if stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{IV: iv}}) {
 		t.Fatal("for IV-only must fail stmtOK")
 	}

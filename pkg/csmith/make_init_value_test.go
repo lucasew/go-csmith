@@ -11,11 +11,11 @@ func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	e := vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, nil, NewRngSess(testAmbientSession, 1))
+	e := vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, nil, NewRngSess(testAmbientSession, 1))
 	if e == nil || e.Term != TermConstant || e.Con == nil {
 		t.Fatalf("want constant, got %#v", e)
 	}
-	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("nil qfer must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -30,12 +30,12 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// pre-create int global to take address of
 	qInt := NewCVQualifiers([]bool{false}, []bool{false})
-	iv := CreateVariableQferSess(testAmbientSession, "g_i", GetIntType(), qInt)
+	iv := CreateVariableQferSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), qInt)
 	iv.Init = MakeInt(0)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, iv)
 
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
 	qPtr := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	// seed scan until we get ExpressionVariable &path (not constant 20% path)
@@ -59,7 +59,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 func TestOutputDefInitExprResidualSticky(t *testing.T) {
 	// InitExpr.Output residual soft invent was soft-continue invent complete def.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	v.Init = nil
 	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
 	if s := v.OutputDefFullSess(testAmbientSession, false, false, false, nil); s != "" {
@@ -73,8 +73,8 @@ func TestOutputDefInitExprResidualSticky(t *testing.T) {
 
 func TestApplyInitExprOutputDef(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
-	pt := PointerTo(GetIntType())
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false, false}, []bool{false, false}))
 	applyInitExpr(pv, &Expression{Term: TermVariable, Var: iv, ExprType: pt})
@@ -109,7 +109,7 @@ func TestGenerateNewNonArrayGlobal(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// many seeds: never array
 	for seed := uint64(1); seed < 30; seed++ {
-		v := vs.GenerateNewNonArrayGlobal(AccessRead, cg, GetIntType(), nil, NewRngSess(testAmbientSession, seed))
+		v := vs.GenerateNewNonArrayGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, seed))
 		if v == nil {
 			t.Fatal("nil")
 		}
@@ -124,12 +124,12 @@ func TestGetAllArrayVars(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, Defaults())
 	// live AsArray required (no invent complete pool of IsArray shells without AsArray)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
 	av.AsArray = av
 	a := &av.Variable
-	s := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), false, false)
+	s := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{a, s}
 	got := vs.GetAllArrayVars()
 	if len(got) != 1 || got[0] != a {
@@ -146,7 +146,7 @@ func TestGetAllArrayVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray sticky incomplete pool
 	vs.Arrays = nil
-	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	vs.GlobalList = []*Variable{shell}
 	if VariablesComplete(vs.GetAllArrayVars()) {
 		t.Fatal("IsArray without AsArray GetAllArrayVars must fail closed Incomplete")
@@ -168,7 +168,7 @@ func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	v := vs.GenerateNewParentLocal(blk, AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 4))
+	v := vs.GenerateNewParentLocal(blk, AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 4))
 	if v == nil || (v.Init == nil && v.InitExpr == nil) {
 		t.Fatal("expected init")
 	}
@@ -182,7 +182,7 @@ func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), q, nil, "l_x", NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), q, nil, "l_x", NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed createAndInitialize")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -195,7 +195,7 @@ func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// empty GlobalList — pointer init must create addressable
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	// force pointer branch across seeds
 	found := false

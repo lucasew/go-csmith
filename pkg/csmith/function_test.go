@@ -50,11 +50,11 @@ func TestMakeRandomSignatureParams(t *testing.T) {
 	// For 1:1 naming, share one GenSym for both
 	sym := &vs.Sym
 	r := NewRngSess(testAmbientSession, 2)
-	f := MakeRandomSignature(r, opts, probs, vs, sym, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), nil, nil)
+	f := MakeRandomSignature(r, opts, probs, vs, sym, EmptyCGContext().WithSession(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EInt), nil, nil)
 	if f == nil || !strings.HasPrefix(f.Name, "func_") {
 		t.Fatalf("name %+v", f)
 	}
-	if f.ReturnType != GetSimpleType(EInt) {
+	if f.ReturnType != GetSimpleTypeSess(testAmbientSession, EInt) {
 		t.Fatal("return type")
 	}
 	if f.RV == nil || !strings.HasSuffix(f.RV.Name, "_rv") {
@@ -178,7 +178,7 @@ func TestMakeRandomSignatureERRORGuard(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	f := MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
+	f := MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, nil)
 	if f != nil {
 		t.Fatal("sticky error must fail closed")
 	}
@@ -193,10 +193,10 @@ func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if MakeRandomSignature(nil, opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+	if MakeRandomSignature(nil, opts, probs, vs, &vs.Sym, cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("nil RNG must not invent signature")
 	}
-	if MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, nil, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+	if MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, nil, vs, &vs.Sym, cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("nil probs must not invent signature")
 	}
 	// MakeFirst same contract
@@ -217,7 +217,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
 	// plant incomplete GlobalList hole
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g, nil}
 	if MakeFirst(NewRngSess(testAmbientSession, 3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
@@ -229,7 +229,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	// MakeRandomFunction same seed gate
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = vs.Types
-	if MakeRandomFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, nil) != nil {
+	if MakeRandomFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -246,8 +246,8 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -267,8 +267,8 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	// sticky no invent empty braces / header-only / if without else / "0"
 	ClearErrorSess(testAmbientSession)
 	f := &Function{
-		Name: "func_x", ReturnType: GetIntType(),
-		RV:           CreateVariableScalarsSess(testAmbientSession, "func_x_rv", GetIntType(), false, false),
+		Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession),
+		RV:           CreateVariableScalarsSess(testAmbientSession, "func_x_rv", GetIntTypeSess(testAmbientSession), false, false),
 		DepthProtect: true,
 	}
 	out := f.Output()
@@ -307,7 +307,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	}
 	// empty ret_c value — sticky no invent "return ;" depth shell (whole emit fail closed)
 	ClearErrorSess(testAmbientSession)
-	f.RetConst = &Constant{Type: GetIntType(), Value: ""}
+	f.RetConst = &Constant{Type: GetIntTypeSess(testAmbientSession), Value: ""}
 	out = f.Output()
 	if out != "" {
 		t.Fatal("empty RetConst.Value must fail closed empty", out)
@@ -328,7 +328,7 @@ func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
 	cg.Types = vs.Types
-	if MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+	if MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomSignature")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -352,7 +352,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	// RV Type-nil sticky (no invent fall through to ReturnType / void)
 	ClearErrorSess(testAmbientSession)
 	f := &Function{
-		Name: "f", ReturnType: GetIntType(),
+		Name: "f", ReturnType: GetIntTypeSess(testAmbientSession),
 		RV: &Variable{Name: "rv", Type: nil},
 	}
 	if s := f.returnTypeC(); s != "" {
@@ -386,8 +386,8 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	}
 	// live RV path
 	f2 := &Function{
-		Name: "h", ReturnType: GetIntType(),
-		RV: CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false),
+		Name: "h", ReturnType: GetIntTypeSess(testAmbientSession),
+		RV: CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false),
 	}
 	if s := f2.returnTypeC(); s == "" {
 		t.Fatal("live RV returnTypeC empty")

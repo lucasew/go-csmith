@@ -41,33 +41,33 @@ func TypeFromStringSess(s *Session, name string) *Type {
 	name = strings.TrimSpace(name)
 	switch name {
 	case "Void":
-		return GetSimpleType(EVoid)
+		return GetSimpleTypeSess(s, EVoid)
 	case "Char":
-		return GetSimpleType(EChar)
+		return GetSimpleTypeSess(s, EChar)
 	case "UChar":
-		return GetSimpleType(EUChar)
+		return GetSimpleTypeSess(s, EUChar)
 	case "Short":
-		return GetSimpleType(EShort)
+		return GetSimpleTypeSess(s, EShort)
 	case "UShort":
-		return GetSimpleType(EUShort)
+		return GetSimpleTypeSess(s, EUShort)
 	case "Int":
-		return GetIntType()
+		return GetIntTypeSess(s)
 	case "UInt":
-		return GetSimpleType(EUInt)
+		return GetSimpleTypeSess(s, EUInt)
 	case "Long":
-		return GetSimpleType(ELong)
+		return GetSimpleTypeSess(s, ELong)
 	case "ULong":
-		return GetSimpleType(EULong)
+		return GetSimpleTypeSess(s, EULong)
 	case "Longlong":
-		return GetSimpleType(ELongLong)
+		return GetSimpleTypeSess(s, ELongLong)
 	case "ULonglong":
-		return GetSimpleType(EULongLong)
+		return GetSimpleTypeSess(s, EULongLong)
 	case "Float":
-		return GetSimpleType(EFloat)
+		return GetSimpleTypeSess(s, EFloat)
 	case "Int128":
-		return GetSimpleType(EInt128)
+		return GetSimpleTypeSess(s, EInt128)
 	case "UInt128":
-		return GetSimpleType(EUInt128)
+		return GetSimpleTypeSess(s, EUInt128)
 	default:
 		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
 		sessNoteError(s, ErrGeneric)

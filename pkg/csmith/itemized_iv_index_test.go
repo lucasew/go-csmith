@@ -9,7 +9,7 @@ func TestItemizedIVAsIndexExpressionOutput(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_106", Type: GetIntType(), IsArray: true, ArraySizes: []int{5}},
+		Variable: Variable{Name: "g_106", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{5}},
 		Sizes:    []int{5},
 	}
 	parent.AsArray = parent
@@ -17,7 +17,7 @@ func TestItemizedIVAsIndexExpressionOutput(t *testing.T) {
 	if item == nil {
 		t.Fatal("itemize", GetErrorSess(testAmbientSession))
 	}
-	e := &Expression{Term: TermVariable, Var: &item.Variable, ExprType: GetIntType()}
+	e := &Expression{Term: TermVariable, Var: &item.Variable, ExprType: GetIntTypeSess(testAmbientSession)}
 	got := e.Output()
 	if got != "g_106[4]" {
 		t.Fatalf("ExpressionVariable of itemized IV: got %q want g_106[4] err=%v", got, GetErrorSess(testAmbientSession))
@@ -34,7 +34,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 1)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	ivParent := &ArrayVariable{
-		Variable: Variable{Name: "g_106", Type: GetIntType(), IsArray: true, ArraySizes: []int{5}},
+		Variable: Variable{Name: "g_106", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{5}},
 		Sizes:    []int{5},
 	}
 	ivParent.AsArray = ivParent
@@ -43,7 +43,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 		t.Fatal("iv itemize")
 	}
 	target1 := &ArrayVariable{
-		Variable: Variable{Name: "l_91", Type: GetIntType(), IsArray: true, ArraySizes: []int{5}},
+		Variable: Variable{Name: "l_91", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{5}},
 		Sizes:    []int{5},
 	}
 	target1.AsArray = target1

@@ -9,7 +9,7 @@ func TestMakeRandomBinarySafeName(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	r := NewRngSess(testAmbientSession, 2)
-	f := MakeRandomBinary(r, opts, probs, GetIntType())
+	f := MakeRandomBinary(r, opts, probs, GetIntTypeSess(testAmbientSession))
 	if f == nil {
 		t.Fatal("nil flags")
 	}
@@ -35,7 +35,7 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	for seed := uint64(1); seed < 20; seed++ {
-		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, nil, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd)
+		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, nil, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd)
 		if f == nil {
 			// size pick may fail closed without call-site probs if process cleared
 			continue
@@ -44,7 +44,7 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 			t.Fatalf("nil probs must not invent signed true at 50%% seed=%d", seed)
 		}
 	}
-	u := MakeRandomUnary(NewRngSess(testAmbientSession, 2), opts, nil, GetIntType(), GetIntType(), UnMinus)
+	u := MakeRandomUnary(NewRngSess(testAmbientSession, 2), opts, nil, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus)
 	if u != nil && u.Op1Signed {
 		t.Fatal("nil probs unary must not invent signed true at 50%")
 	}
@@ -57,7 +57,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// FunctionInvocationBinary.cpp:68 assert(blk) for safe_ops temps
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	// Full eBinaryOps includes cmp/logic; Output uses safe_* only for arith/shift.
@@ -65,7 +65,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntType())
+		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
 		}
@@ -86,12 +86,12 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	// C++ always builds SafeOpFlags; Output must not emit safe_* when SafeMath off.
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 3), opts, probs, vs, tables, &cg, GetIntType())
+	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 3), opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 	if fi == nil {
 		t.Fatal("nil inv")
 	}
@@ -174,14 +174,14 @@ func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
 	// SafeOpFlags.cpp always uses rnd_*; no invent fixed flags
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if f := MakeRandomBinaryKind(nil, opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f != nil {
+	if f := MakeRandomBinaryKind(nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd); f != nil {
 		t.Fatal("nil RNG binary must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomBinaryKind must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f := MakeRandomUnary(nil, opts, NewProbabilities(opts), GetIntType(), GetIntType(), UnMinus); f != nil {
+	if f := MakeRandomUnary(nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus); f != nil {
 		t.Fatal("nil RNG unary must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

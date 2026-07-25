@@ -9,7 +9,7 @@ func TestAssignOpsProbabilitySimpleWhenDisabled(t *testing.T) {
 	opts := Defaults()
 	opts.CompoundAssignment = false
 	tab := NewAssignOpsTable(opts)
-	op := AssignOpsProbability(NewRngSess(testAmbientSession, 2), opts, tab, GetIntType())
+	op := AssignOpsProbability(NewRngSess(testAmbientSession, 2), opts, tab, GetIntTypeSess(testAmbientSession))
 	if op != AssignSimple {
 		t.Fatal(op)
 	}
@@ -21,7 +21,7 @@ func TestAssignOpsProbabilitySignedFiltersIncr(t *testing.T) {
 	// many draws: never ++/-- on signed int
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 100; i++ {
-		op := AssignOpsProbability(r, opts, tab, GetIntType())
+		op := AssignOpsProbability(r, opts, tab, GetIntTypeSess(testAmbientSession))
 		if op.NeedNoRHS() {
 			t.Fatalf("signed should filter incr, got %v", op)
 		}
@@ -33,11 +33,11 @@ func TestMakeRandomAssignAllocatesStmID(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	for seed := uint64(1); seed < 40; seed++ {
 		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-		st := MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &c, GetIntType())
+		st := MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
 		if !stmtOK(st) {
 			continue
 		}
@@ -55,14 +55,14 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// seed globals for selection
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	foundCompound := false
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRngSess(testAmbientSession, seed)
 		st := func() Stmt {
 			c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-			return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType())
+			return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntTypeSess(testAmbientSession))
 		}()
 		// StmtAssign is iota 0 — empty nullptr and success share Kind; use stmtOK
 		if !stmtOK(st) {
@@ -79,7 +79,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 }
 
 func TestAssignOutputIncr(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignPostIncr, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	out := (&Block{Stmts: []Stmt{st}}).Output(0)
 	if !strings.Contains(out, "g_1++") {
@@ -116,13 +116,13 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed a volatile global so volatile qfer can select
 	vq := NewCVQualifiers([]bool{false}, []bool{true})
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &vq, NewRngSess(testAmbientSession, 1))
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &vq, NewRngSess(testAmbientSession, 1))
 	// volatile-only WRITE qfer
 	q := NewCVQualifiers([]bool{false}, []bool{true})
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// should not panic; may fail to find var and return empty assign
-	st := MakeRandomAssignQfer(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), &cg, GetIntType(), &q)
+	st := MakeRandomAssignQfer(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), &q)
 	// global option restored conceptually (opts is by-value); package default unchanged
 	if opts.MatchExactQualifiers {
 		t.Fatal("caller opts mutated")
@@ -148,12 +148,12 @@ func TestMakeRandomAssignCompatibleCheckFails(t *testing.T) {
 
 func TestMakeRandomAssignUpdatesIndirectFacts(t *testing.T) {
 	// make_random update_fact_for_assign with full indir (same as Qfer path)
-	ppT := PointerTo(PointerTo(GetIntType()))
+	ppT := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ppT, false, false)
-	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
-	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())}
+	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fm.UpdateFactForAssign(p, 1, rhs)
 	got := FindRelatedPointTo(fm.GlobalFacts, q)
 	if got == nil || !got.IsNull() {
@@ -167,7 +167,7 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	opts := Defaults()
 	ClearErrorSess(testAmbientSession)
 	// assign: nil cg
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntType())) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil cg assign")
 	}
 	// array op: nil vs sticky
@@ -181,7 +181,7 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// goto: no FM (non-sticky soft re-pick)
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
@@ -206,7 +206,7 @@ func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 		opts,
 		NewProbabilities(opts),
 		NewRngSess(testAmbientSession, 1),
-		GetIntType(),
+		GetIntTypeSess(testAmbientSession),
 		lhs,
 		AssignBitAnd,
 		&Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -264,7 +264,7 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete float → simple
-	ft := GetSimpleType(EFloat)
+	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
 	if AssignOpsProbability(NewRngSess(testAmbientSession, 1), opts, tab, ft) != AssignSimple {
 		t.Fatal("float typ must force AssignSimple")
 	}
@@ -273,7 +273,7 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-simple → simple
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	if AssignOpsProbability(NewRngSess(testAmbientSession, 1), opts, tab, pt) != AssignSimple {
 		t.Fatal("non-simple typ must force AssignSimple")
 	}
@@ -282,7 +282,7 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Type IsFloat residual hygiene for assign make gate
-	if (*Type)(nil).IsFloat() {
+	if (*Type)(nil).IsFloatSess(testAmbientSession) {
 		t.Fatal("nil Type IsFloat must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -304,7 +304,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// nil FM → early empty Stmt before set (callerQf path after FM check)
 	// Use path: set exact, then StrictFloat+rhs GetType residual early return.
 	// Incomplete Expression type triggers GetType residual under StrictFloat.
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// Force early return after exact set: MakeRandomAssignQfer with qf non-nil,
@@ -319,7 +319,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// Use Valid path then corrupt: call with StrictFloat and nil typ so SelectLType runs,
 	// then force HasError during strict float by… hard to hit GetType residual.
 	// Unit the defer contract: after any MakeRandomAssignQfer with qf, process flag restored.
-	_ = MakeRandomAssignQfer(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType(), &q)
+	_ = MakeRandomAssignQfer(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), &q)
 	if ProcessOptionsSess(testAmbientSession).MatchExactQualifiers {
 		t.Fatal("MatchExactQualifiers must restore to false after MakeRandomAssignQfer with qf")
 	}

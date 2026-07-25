@@ -15,10 +15,10 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_ord2", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
-		{Name: "f2", Type: GetIntType(), BitWidth: -1},
-		{Name: "f3", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_ord", ut, false, false)
 	parent.Init = MakeInt(0) // union init abstract → last=0 (f0)
@@ -28,7 +28,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 		t.Fatal("live")
 	}
 	var unionCopy []*FactUnion // MISSING subject after LHS
-	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)})
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.GlobalFacts = []*FactPointTo{}
 
@@ -66,10 +66,10 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_ord_nil", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
-		{Name: "f2", Type: GetIntType(), BitWidth: -1},
-		{Name: "f3", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f3", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_nil", ut, false, false)
 	parent.Init = MakeInt(0)
@@ -81,7 +81,7 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	// nil snapshots == Clone*(nil) after NewFactMgr zero-value maps
 	var factsCopy []*FactPointTo
 	var unionCopy []*FactUnion
-	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)})
 	// post-RHS live (g_u created during RHS of the outer &&)
 	fm.UnionFacts = []*FactUnion{liveU}
 	fm.GlobalFacts = []*FactPointTo{}

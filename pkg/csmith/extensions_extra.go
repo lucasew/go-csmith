@@ -264,7 +264,7 @@ func CoverageOutputDeclsSess(s *Session, values []*ExtensionValue, tests []*Cons
 	}
 	for count, value := range values {
 		b.WriteString(AbsExtensionTab)
-		cn := value.Type.CName()
+		cn := value.Type.CNameSess(s)
 		if sessHasError(s) || cn == "" {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)

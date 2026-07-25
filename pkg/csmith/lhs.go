@@ -457,7 +457,7 @@ func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		ty := t.CName()
+		ty := t.CNameSess(s)
 		// residual ERROR sticky — no invent soft-wrap past CName residual hole
 		if sessHasError(s) {
 			return ""

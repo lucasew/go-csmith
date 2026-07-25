@@ -145,9 +145,9 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	g := NewProgramGenerator(NewSession(opts))
-	built := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
+	built := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
-		RV:   CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false),
+		RV:   CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), false, false),
 	}
 	// hasUser scan: hole first must fail closed (not invent hasUser from built after hole)
 	g.Funcs.Funcs = []*Function{nil, built}
@@ -181,16 +181,16 @@ func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 	// body Output residual soft invent was soft-continue later funcs invent partial section.
 	// incomplete body: Type-nil RV → OutputOpts residual empty sticky
 	bad := &Function{
-		Name: "func_bad", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
+		Name: "func_bad", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
 		RV: &Variable{Name: "func_bad_rv"}, // Type nil
 	}
 	good := &Function{
-		Name: "func_ok", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
+		Name: "func_ok", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 3, Stmts: []Stmt{{Kind: StmtReturn, StmID: 4,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
-		RV: CreateVariableScalarsSess(testAmbientSession, "func_ok_rv", GetIntType(), false, false),
+		RV: CreateVariableScalarsSess(testAmbientSession, "func_ok_rv", GetIntTypeSess(testAmbientSession), false, false),
 	}
 	g := NewProgramGenerator(NewSession(Defaults()))
 	g.Funcs.Funcs = []*Function{bad, good}

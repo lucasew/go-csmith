@@ -14,7 +14,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 	// create several arrays; at least one may be non-simple if structs exist
 	seenSimple, seenAgg := false, false
 	for seed := uint64(1); seed < 40; seed++ {
-		f := &Function{Name: "func_1", ReturnType: GetIntType()}
+		f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 		blk := &Block{Func: f}
 		f.Stack = []*Block{blk}
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -22,7 +22,7 @@ func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 		if av == nil || av.Type == nil {
 			continue
 		}
-		if av.Type.IsSimple() {
+		if av.Type.IsSimpleSess(testAmbientSession) {
 			seenSimple = true
 		}
 		if av.Type.IsAggregateSess(testAmbientSession) {
@@ -42,16 +42,16 @@ func TestChooseRandomNonvoidNonvolatile(t *testing.T) {
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 3), opts, probs, env)
 	// inject volatile struct
 	volt := &Type{isStruct: true, StructName: "SV", Fields: []StructField{
-		{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{true}), BitWidth: -1},
 	}}
 	env.AllTypes = append(env.AllTypes, volt)
 	r := NewRngSess(testAmbientSession, 4)
 	for i := 0; i < 50; i++ {
 		ty := env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
-		if ty != nil && ty.IsVolatileStructUnion() {
+		if ty != nil && ty.IsVolatileStructUnionSess(testAmbientSession) {
 			t.Fatal("volatile aggregate")
 		}
-		if ty != nil && ty.IsSimple() && ty.Simple() == EVoid {
+		if ty != nil && ty.IsSimpleSess(testAmbientSession) && ty.SimpleSess(testAmbientSession) == EVoid {
 			t.Fatal("void")
 		}
 	}
@@ -59,7 +59,7 @@ func TestChooseRandomNonvoidNonvolatile(t *testing.T) {
 
 func TestEffectWriteVar(t *testing.T) {
 	// Effect.cpp:137–146 — non-volatile write keeps pure and SE-free
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	e := EmptyEffect()
 	if !e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("empty")
@@ -72,7 +72,7 @@ func TestEffectWriteVar(t *testing.T) {
 		t.Fatal("non-vol write keeps pure/SE-free")
 	}
 	// volatile write clears SE-free only
-	vv := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	vv := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	e3 := EmptyEffect().WriteVarSess(testAmbientSession, vv)
 	if e3.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
@@ -88,12 +88,12 @@ func TestEffectWriteVar(t *testing.T) {
 
 func TestEffectReadVarPurity(t *testing.T) {
 	// Effect.cpp:116–122
-	c := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false) // const non-vol
+	c := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntTypeSess(testAmbientSession), true, false) // const non-vol
 	e := EmptyEffect().ReadVarSess(testAmbientSession, c)
 	if !e.IsPureSess(testAmbientSession) || !e.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("const non-vol read pure+SE-free")
 	}
-	nv := CreateVariableScalarsSess(testAmbientSession, "g_nv", GetIntType(), false, false)
+	nv := CreateVariableScalarsSess(testAmbientSession, "g_nv", GetIntTypeSess(testAmbientSession), false, false)
 	e2 := EmptyEffect().ReadVarSess(testAmbientSession, nv)
 	if e2.IsPureSess(testAmbientSession) {
 		t.Fatal("non-const read not pure")
@@ -101,7 +101,7 @@ func TestEffectReadVarPurity(t *testing.T) {
 	if !e2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-vol read still SE-free")
 	}
-	vol := CreateVariableScalarsSess(testAmbientSession, "g_vol", GetIntType(), false, true)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_vol", GetIntTypeSess(testAmbientSession), false, true)
 	e3 := EmptyEffect().ReadVarSess(testAmbientSession, vol)
 	if e3.IsSideEffectFreeSess(testAmbientSession) || e3.IsPureSess(testAmbientSession) {
 		t.Fatal("vol read")
@@ -113,9 +113,9 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	opts := Defaults()
 	opts.GlobalVariables = true
 	vs := NewVariableSelector(testAmbientSession, opts)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	vs.Types = env
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed meta so AddNewVarFact creates point-to when pointer; int array still registers
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -140,21 +140,21 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	// FactMgr.cpp:69–110 — assert global when blk nil; push into map_facts_in/out
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed map slots for a statement
 	sid := 42
 	fm.MapFactsIn[sid] = nil
 	fm.MapFactsOut[sid] = nil
 	// non-global with blk==nil must fail closed (assert path)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	before := len(fm.GlobalFacts)
 	fm.AddNewVarFactAndUpdate(nil, loc)
 	if len(fm.GlobalFacts) != before {
 		t.Fatal("non-global must not invent facts when blk==nil")
 	}
 	// global pointer: facts in global + maps
-	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFactAndUpdate(nil, g)
 	if FindRelatedPointTo(fm.GlobalFacts, g) == nil {
 		t.Fatal("global fact missing")
@@ -164,14 +164,14 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	}
 	// incomplete map slot must not invent soft-append past hole (local marker, non-sticky)
 	fm.MapFactsIn[sid] = IncompleteFactSlice()
-	g2 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFactAndUpdate(nil, g2)
 	if FactsComplete(fm.MapFactsIn[sid]) {
 		t.Fatal("incomplete map slot must stay incomplete after AddNewVarFactAndUpdate")
 	}
 	// incomplete GlobalFacts fails closed sticky before add
 	fm.GlobalFacts = IncompleteFactSlice()
-	g3 := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerTo(GetIntType()), false, false)
+	g3 := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFactAndUpdate(nil, g3)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete GlobalFacts must stay wiped")
@@ -189,13 +189,13 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	// (seed-2: post-analysis g_87→g_62 must not be what maps receive — init
 	// g_87→g_64 is appended so for-body map_in restore can re-surface g_64).
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_tgt", GetIntType(), false, false)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_tgt", GetIntTypeSess(testAmbientSession), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// init &g_tgt for abstract_fact_for_var_init
 	// ExprType pointer + Var int → IndirectLevel() == -1 (address-of)
-	g.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
+	g.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// seed GlobalFacts as if RenewFacts already set a *different* points-to
 	fp := MakeFactPointTo(g, NullPtr)
 	if fp == nil {
@@ -257,7 +257,7 @@ func pointToNames(f *FactPointTo) []string {
 // map_in[body] → post_loop reintroduces → outer OOS → garbage → e10107).
 func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// Declaring loop body (no parent needed for in_block of nested stmts)
 	body := &Block{StmID: 90, Func: f}
@@ -270,7 +270,7 @@ func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) 
 	fm.MapFactsOut[body.StmID] = []*FactPointTo{}
 	fm.MapFactsIn[inner.StmID] = []*FactPointTo{}
 	fm.MapFactsOut[inner.StmID] = []*FactPointTo{}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_260", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_260", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.AddNewVarFactAndUpdate(body, loc)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("AddNewVarFactAndUpdate sticky: %v", HasErrorSess(testAmbientSession))
@@ -294,7 +294,7 @@ func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) 
 // (seed-2 func_11: l_1326=&g_99 then reassigned in else → *l_1326 must read g_99).
 func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_11", ReturnType: GetIntType()}
+	f := &Function{Name: "func_11", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// body owns parent-locals; then arm is a nested Block with its own StmID key
 	body := &Block{StmID: 10, Func: f}
@@ -306,9 +306,9 @@ func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
 	fm.MapFactsOut[thenB.StmID] = []*FactPointTo{}
 	fm.MapFactsIn[elseB.StmID] = []*FactPointTo{}
 	fm.MapFactsOut[elseB.StmID] = []*FactPointTo{}
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_99", GetIntType(), false, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1326", PointerTo(GetIntType()), false, false)
-	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_99", GetIntTypeSess(testAmbientSession), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1326", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// create as body parent-local while "in else" (maps already open for both arms)
 	body.LocalVars = append(body.LocalVars, loc)
 	fm.AddNewVarFactAndUpdate(body, loc)
@@ -338,7 +338,7 @@ func TestAddNewVarFactAndUpdatePushesBlockMapOut(t *testing.T) {
 // l_1325 pts=[garbage,g_32] → else FP strip).
 func TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_11", ReturnType: GetIntType()}
+	f := &Function{Name: "func_11", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// Function body (declaring blk for parent-local) — if not yet linked in Stmts
 	body := &Block{StmID: 514, Func: f}
@@ -362,11 +362,11 @@ func TestAddNewVarFactAndUpdatePushesGotoOutMidGeneration(t *testing.T) {
 		fm.MapFactsOut[id] = []*FactPointTo{}
 	}
 	// Parent-local int16_t* created while still under else (block = body)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1325", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1325", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	body.LocalVars = append(body.LocalVars, loc) // visibility at dest via IsVarOnStack
 	loc.Init = nil
-	g32 := CreateVariableScalarsSess(testAmbientSession, "g_32", GetIntType(), false, false)
-	loc.InitExpr = &Expression{Term: TermVariable, Var: g32, ExprType: PointerTo(GetIntType())}
+	g32 := CreateVariableScalarsSess(testAmbientSession, "g_32", GetIntTypeSess(testAmbientSession), false, false)
+	loc.InitExpr = &Expression{Term: TermVariable, Var: g32, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	fm.AddNewVarFactAndUpdate(body, loc)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("AddNewVarFactAndUpdate sticky: err=%v", GetErrorSess(testAmbientSession))
@@ -396,7 +396,7 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		}}, IsArray: true, ArraySizes: []int{2}},
 		Sizes: []int{2},
 	}
@@ -415,7 +415,7 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	if varCollective(fld) != nil {
 		t.Fatal("incomplete array-field path must yield nil collective")
 	}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	before := len(fm.GlobalFacts)
 	ClearErrorSess(testAmbientSession)
@@ -447,11 +447,11 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts.GlobalVariables = true
 	opts.Arrays = false
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewGlobal")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -462,7 +462,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntType(), nil, NewRngSess(testAmbientSession, 2)) != nil {
+	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewNonArrayGlobal")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -475,7 +475,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm3)
-	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntType(), nil, NewRngSess(testAmbientSession, 3)) != nil {
+	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 3)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewParentLocal")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -489,13 +489,13 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// make struct look volatile for AcceptType path
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st, GetIntType()}}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{st, GetIntTypeSess(testAmbientSession)}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// non-SE-free context
-	cg := WithFunc(f, EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false))).WithSession(testAmbientSession)
+	cg := WithFunc(f, EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), true, false))).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	// VariableSelector.cpp — no soft invent int elem; nil OK when AcceptType rejects
 	av := vs.CreateRandomArray(NewRngSess(testAmbientSession, 3), cg)
@@ -507,8 +507,8 @@ func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.GlobalVariables = false
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	f.Stack = []*Block{nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = vs.Types
@@ -537,7 +537,7 @@ func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
 	}}
 	// only broken type so Choose always hits residual IsConstStructUnion
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken}}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = vs.Types
 	// flipcoin(25) gates global create — scan seeds until residual sticky lands
@@ -562,7 +562,7 @@ func TestAddNewVarFactAndUpdateFillsUnionMapFromPTKeys(t *testing.T) {
 	// FactMgr.cpp:69–110 — one FactVec map; eUnionWrite shares keys with ePointTo.
 	// Soft invent iterated only MapUnionFactsIn keys → PT-only slots missed union init.
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// PT map key without union map key (historical dual-map hole)
 	sid := 42
@@ -570,7 +570,7 @@ func TestAddNewVarFactAndUpdateFillsUnionMapFromPTKeys(t *testing.T) {
 	fm.MapFactsOut = map[int][]*FactPointTo{sid: {}}
 	// MapUnionFactsIn intentionally nil / missing key
 	ut := &Type{isUnion: true, StructName: "U_fill", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// Init required for complete union abstract (FactUnion assign transfer)
 	g := &Variable{Name: "g_ufill", Type: ut, Init: MakeInt(0)}

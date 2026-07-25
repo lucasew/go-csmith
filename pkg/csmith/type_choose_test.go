@@ -21,10 +21,10 @@ func TestChooseRandomFromAllTypes(t *testing.T) {
 		if ty == nil {
 			t.Fatal("nil")
 		}
-		if ty.IsSimple() && ty.Simple() == EVoid {
+		if ty.IsSimpleSess(testAmbientSession) && ty.SimpleSess(testAmbientSession) == EVoid {
 			t.Fatal("void")
 		}
-		if ty.IsStruct() {
+		if ty.IsStructSess(testAmbientSession) {
 			seenStruct = true
 		}
 	}
@@ -43,7 +43,7 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	if ty == nil {
 		t.Fatal("nil")
 	}
-	if ty.IsSimple() && ty.Simple() == EVoid {
+	if ty.IsSimpleSess(testAmbientSession) && ty.SimpleSess(testAmbientSession) == EVoid {
 		t.Fatal("void return")
 	}
 	// sticky no invent default int without RNG
@@ -65,7 +65,7 @@ func TestMakeRandomParamNoConstant(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		e := func() *Expression {
 			c := EmptyCGContext().WithSession(testAmbientSession)
-			return MakeRandomParam(NewRngSess(testAmbientSession, seed), opts, tables, vs, &c, GetIntType(), nil, 0)
+			return MakeRandomParam(NewRngSess(testAmbientSession, seed), opts, tables, vs, &c, GetIntTypeSess(testAmbientSession), nil, 0)
 		}()
 		if e != nil && e.Term == TermConstant {
 			t.Fatalf("constant param seed %d", seed)

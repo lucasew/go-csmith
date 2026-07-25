@@ -866,7 +866,7 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 				break
 			}
 			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates
-			ptrLike := p.Type.IsPointerLike()
+			ptrLike := p.Type.IsPointerLikeSess(s)
 			// residual ERROR sticky — no invent soft-skip stats past IsPointerLike residual
 			if sessHasError(s) {
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
@@ -910,7 +910,7 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 					// residual ERROR sticky — no invent soft-continue past IsSimple residual false
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
-				} else if pt.IsStruct() {
+				} else if pt.IsStructSess(s) {
 					// residual ERROR sticky — no invent soft-count past IsStruct residual hole
 					if sessHasError(s) {
 						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0

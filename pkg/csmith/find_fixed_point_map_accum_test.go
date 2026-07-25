@@ -18,8 +18,8 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_map_accum_prog"}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	early := CreateVariableScalarsSess(testAmbientSession, "g_early", GetIntType(), false, false)
-	late := CreateVariableScalarsSess(testAmbientSession, "g_late", GetIntType(), false, false)
+	early := CreateVariableScalarsSess(testAmbientSession, "g_early", GetIntTypeSess(testAmbientSession), false, false)
+	late := CreateVariableScalarsSess(testAmbientSession, "g_late", GetIntTypeSess(testAmbientSession), false, false)
 
 	// Minimal body: two invokes so AnalyzeWithEdgesIn has something to walk.
 	// Use assign with constant RHS so visit_facts stays simple.
@@ -27,13 +27,13 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 		Kind: StmtAssign, StmID: AllocStmID(),
 		AssignOp: AssignSimple,
 		Lhs:      &Lhs{Var: early},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	s1 := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		AssignOp: AssignSimple,
 		Lhs:      &Lhs{Var: late},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	// Manually plant map_stm and pre-seed map_accum as if a polluted second
 	// pass already ran: early's map_accum incorrectly lists late.

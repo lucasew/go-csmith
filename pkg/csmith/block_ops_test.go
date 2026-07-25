@@ -150,7 +150,7 @@ func TestFindJumpSources(t *testing.T) {
 func TestNeedNestedLoop(t *testing.T) {
 	// live ArrayVariable AsArray required for GetDimension (no invent dim from ArraySizes alone)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Variable: Variable{Name: "a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
 	}
 	av.AsArray = av
@@ -176,7 +176,7 @@ func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	// Fair: incomplete MustRead/MustWrite list fails closed sticky true (need nested).
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Variable: Variable{Name: "a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
 	}
 	av.AsArray = av
@@ -268,11 +268,11 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 }
 
 func TestEffectCloneIndependent(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	e := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	c := e.CloneSess(testAmbientSession)
-	e = e.ReadVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false))
-	if c.IsReadSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)) {
+	e = e.ReadVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false))
+	if c.IsReadSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false)) {
 		// different var ptr — just check written still
 	}
 	if !c.IsWrittenSess(testAmbientSession, v) {
@@ -281,7 +281,7 @@ func TestEffectCloneIndependent(t *testing.T) {
 	// mutate original maps should not clear clone if deep
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	c2 := e2.CloneSess(testAmbientSession)
-	_ = e2.WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntType(), false, false))
+	_ = e2.WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntTypeSess(testAmbientSession), false, false))
 	// e2.WriteVar returns new Effect; original e2 maps may be shared with...
 	// Clone deep-copies so c2.written is independent
 	if len(c2.written) != 1 {
@@ -293,8 +293,8 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 10}
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
@@ -306,8 +306,8 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -373,7 +373,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// void: no append_return_stmt during post_creation
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -422,7 +422,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	// incomplete EffectAccum / GlobalFacts / EffectContext must not invent dummy block success
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -437,7 +437,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must not leave partial block registration")
 	}
 	ClearErrorSess(testAmbientSession)
-	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
+	f2 := &Function{Name: "f2", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
@@ -448,7 +448,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must SetError GlobalFacts")
 	}
 	ClearErrorSess(testAmbientSession)
-	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
+	f3 := &Function{Name: "f3", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	cg3 := WithFunc(f3, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f3))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
@@ -466,7 +466,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 
 func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	b := &Block{StmID: AllocStmID(), Func: f}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -527,7 +527,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	}
 	// incomplete LocalVars fails closed sticky (no invent soft-skip hole partial defs)
 	ClearErrorSess(testAmbientSession)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	b2 := &Block{LocalVars: []*Variable{loc, nil}}
 	if out := b2.Output(0); out != "" {
 		t.Fatal("LocalVars hole must fail closed whole block", out)
@@ -538,7 +538,7 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable from ArraySizes
 	// fair: sticky empty whole block (no invent partial def emit)
-	arrShell := &Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	arrShell := &Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	b3 := &Block{LocalVars: []*Variable{arrShell}}
 	if out := b3.Output(0); out != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole block", out)
@@ -551,13 +551,13 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	// Fair: sticky fail closed whole Block.Output (StmID 0 under FM stickies PreOutput).
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	b4 := &Block{
 		Func:   f,
 		EmitFM: fm,
 		Stmts: []Stmt{
 			{Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: good}, // StmID 0 under FM sticky PreOutput
-			{Kind: StmtAssign, StmID: 2, LhsVar: good, Expr: &Expression{Term: TermVariable, Var: good, ExprType: GetIntType()}},
+			{Kind: StmtAssign, StmID: 2, LhsVar: good, Expr: &Expression{Term: TermVariable, Var: good, ExprType: GetIntTypeSess(testAmbientSession)}},
 		},
 	}
 	if out := b4.Output(0); out != "" {
@@ -576,7 +576,7 @@ func TestAddNewVarFactTo(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
-	p := CreateVariableScalarsSess(testAmbientSession, "p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if p == nil || p.Init == nil {
 		t.Fatal("pointer init")
 	}
@@ -616,21 +616,21 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	defer ClearMetaFactsSess(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "p", Type: PointerTo(GetIntType()), BitWidth: -1},
-		{Name: "q", Type: PointerTo(GetIntType()), BitWidth: -1},
+		{Name: "p", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: -1},
+		{Name: "q", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), BitWidth: -1},
 	}}
 	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if v == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateVariableQfer struct with pointer fields", v, HasErrorSess(testAmbientSession))
 	}
 	// CreateFieldVars may have filled; force nil hole + later live pointer field
-	q := CreateVariableScalarsSess(testAmbientSession, "g_s.q", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_s.q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if q == nil {
 		t.Fatal("live pointer field var")
 	}
 	v.FieldVars = []*Variable{nil, q}
 	// seed a prior fact so clear is observable vs empty start
-	prior := MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_other", PointerTo(GetIntType()), false, false), NullPtr)
+	prior := MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_other", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr)
 	facts := []*FactPointTo{prior}
 	AddNewVarFactInto(v, &facts)
 	if FactsComplete(facts) {
@@ -651,7 +651,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// facts always live; sticky (no invent soft-skip makeup past hole)
-	AddNewVarFactInto(CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntType(), false, false), nil)
+	AddNewVarFactInto(CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntTypeSess(testAmbientSession), false, false), nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil facts AddNewVarFactInto must SetError sticky")
 	}
@@ -706,11 +706,11 @@ func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {
 }
 
 func TestFindFixedPointShortcut(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	b := &Block{
 		StmID: 50,
 		Stmts: []Stmt{{
-			Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+			Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
 		}},
 	}
@@ -743,7 +743,7 @@ func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_sync", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_local_u", ut, false, false)
 	loc.CreateFieldVarsSess(testAmbientSession)
@@ -785,18 +785,18 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 	// ContainsBackEdge (dest->parent==this) must NOT invent force FP: that wiped
 	// mid-gen may-null via map_facts_out re-analysis install (seed-2 e10107).
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{StmID: 1, Func: f}
 	inner := &Block{StmID: 50, Func: f, Parent: parent, Looping: false, NeedRevisit: false}
 	// stmt inside inner — back edge dest parent is inner (ContainsBackEdge) but dest != inner
 	st := Stmt{Kind: StmtAssign, StmID: 51,
-		LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false),
-		Lhs:    &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), Type: GetIntType()},
+		LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false),
+		Lhs:    &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)},
 		Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	inner.Stmts = []Stmt{st}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// mid-gen may-null
 	live := MakeFactPointToSet(p, []*Variable{NullPtr})
 	if live == nil {
@@ -811,7 +811,7 @@ func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
 		fm.CFGEdges[len(fm.CFGEdges)-1].DestStmID = 51
 	}
 	// map_facts_in without may-null (stale entry) — FP would reinject issue if forced
-	fm.SetMapFactsIn(50, []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), true, false))})
+	fm.SetMapFactsIn(50, []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), true, false))})
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -832,14 +832,14 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	// Block.cpp:729 — global_facts = map_facts_out[this] after fixed-point path.
 	// After ResetBlockFactMaps deletes out maps, assign must clear GlobalFacts
 	// (C++ map[] empty), not invent keep prior.
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{StmID: 1, Func: f}
 	// incomplete assign fails visit → remove → empty stmts → break without re-set out
 	b := &Block{StmID: 70, Func: f, Parent: parent, Looping: true, NeedRevisit: true,
 		Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}},
 	}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	prior := MakeFactPointTo(p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	fm.SetMapFactsIn(70, []*FactPointTo{prior})
@@ -867,21 +867,21 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	// incomplete MapFactsIn[block] must not invent empty fixed-point re-analysis
 	// (old soft path: FactsComplete fail → treat as nil empty env → FP success)
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{StmID: 1, Func: f}
 	b := &Block{StmID: 80, Func: f, Parent: parent, Looping: true, NeedRevisit: true,
 		Stmts: []Stmt{{Kind: StmtAssign, StmID: 81,
-			LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false),
-			Lhs:    &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), Type: GetIntType()},
+			LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false),
+			Lhs:    &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), Type: GetIntTypeSess(testAmbientSession)},
 			Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 		}},
 	}
 	// fix LhsVar pointer identity
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	b.Stmts[0].LhsVar = v
-	b.Stmts[0].Lhs = &Lhs{Var: v, Type: GetIntType()}
+	b.Stmts[0].Lhs = &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	// plant hole in MapFactsIn (bypass SetMapFactsIn which stores nil for incomplete)
 	fm.MapFactsIn = map[int][]*FactPointTo{
@@ -903,8 +903,8 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 func TestPostCreationAppendsReturn(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -1060,12 +1060,12 @@ func TestFindStmtByID(t *testing.T) {
 
 func TestGetDimension(t *testing.T) {
 	// Variable.h default 0; ArrayVariable sizes
-	sc := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	sc := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	if sc.GetDimensionSess(testAmbientSession) != 0 {
 		t.Fatal("scalar")
 	}
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -1075,7 +1075,7 @@ func TestGetDimension(t *testing.T) {
 	}
 	// IsArray without AsArray soft invent was dim from ArraySizes; fair sticky 0
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	v.IsArray = true
 	v.ArraySizes = []int{5, 6}
 	if v.GetDimensionSess(testAmbientSession) != 0 {
@@ -1089,7 +1089,7 @@ func TestGetDimension(t *testing.T) {
 
 func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_m", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_m", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	av.Sizes = []int{2, 3}
 	// via AsArray on Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -1103,9 +1103,9 @@ func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
 func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 	// FactMgr::set_fact_out on return drops function-locals
 	opts := Defaults()
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerTo(GetIntType()), false, false)
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	loc.Name = "l_1"
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{
@@ -1365,7 +1365,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTable(opts))
 	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	b := &Block{Looping: true, Func: f, StmID: 1}
 	f.Stack = []*Block{b}
 	f.Blocks = []*Block{b}
@@ -1398,7 +1398,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	SetProcessStmtTabSess(testAmbientSession, NewStatementThresholdTable(opts))
 	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	b := &Block{Looping: true, Func: f, StmID: 1}
 	f.Stack = []*Block{b}
 	f.Blocks = []*Block{b}
@@ -1429,7 +1429,7 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	b := &Block{Looping: true}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	b.Func = f
 	f.Stack = []*Block{b}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -1464,12 +1464,12 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	defer SetProcessAssignOpsTableSess(testAmbientSession, prevTab)
 	cq := NewCVQualifiers([]bool{true}, []bool{false})
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: cq},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: cq},
 	}}
-	if !st.IsConstStructUnion() {
+	if !st.IsConstStructUnionSess(testAmbientSession) {
 		t.Fatal("fixture not const struct")
 	}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	got := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, st)
 	if stmtOK(got) {
@@ -1484,7 +1484,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	hole := &Type{isStruct: true, StructName: "H", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if !hole.IsConstStructUnion() || !HasErrorSess(testAmbientSession) {
+	if !hole.IsConstStructUnionSess(testAmbientSession) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("fixture Type-nil field must residual IsConstStructUnion sticky true")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -1514,9 +1514,9 @@ func TestMakeDummyBlockCGFactIn(t *testing.T) {
 	// Block.cpp:95–110 — fact_in + post_creation, not empty shell only
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "builtin_x", ReturnType: GetIntType(), IsBuiltin: true}
+	f := &Function{Name: "builtin_x", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	b := MakeDummyBlockCG(&cg, opts)
@@ -1537,7 +1537,7 @@ func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// void return type makes NeedReturn false; use int return without seed for expr
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// no globals / no params → ExpressionVariable make may fail → AppendReturn fails
 	b := &Block{Func: f, Parent: nil}
 	f.Body = b
@@ -1618,9 +1618,9 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	// map_facts_out from re-analysis outputs only (no invent reinject after strip).
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	// clean entry: g_p → g_t only
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	// live GlobalFacts polluted as if mid-gen assign set may-null then stmt stripped
@@ -1661,16 +1661,16 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	// Statement.cpp:609–626 — does not assign global_facts = inputs.
 	// After visit, mid-gen may-null on GlobalFacts must remain (seed-2 e10107).
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	inputs := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	live := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
 	if live == nil {
 		t.Fatal("live fact")
 	}
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
-		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
@@ -1696,7 +1696,7 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 // ~Block clears stms so find_good_jump filters empty (StatementGoto.cpp:333–336).
 func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	nested := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
 	b := &Block{
 		StmID: AllocStmID(), Func: f,
@@ -1733,7 +1733,7 @@ func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
 // ERROR cleanup (Block.cpp:142–174) leaves entries on Blocks for goto pool size.
 func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	b1 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: AllocStmID()}}}
 	b2 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
 	b3 := &Block{StmID: AllocStmID(), Func: f}
@@ -1765,9 +1765,9 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	// mid-gen: may-null
 	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
 	if mid == nil {
@@ -1803,10 +1803,10 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	// Soft invent was PT-only merge; eUnionWrite half stayed at entry last_write.
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	ut := &Type{isUnion: true, StructName: "U_fpbe", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_fpbe", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -1859,16 +1859,16 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	pointee := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
-	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	pointee := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// may-null entry (as after self-back merge of mid-gen)
 	entry := []*FactPointTo{MakeFactPointToSet(ptr, []*Variable{pointee, NullPtr})}
 	// *g_p = 0
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
-		LhsVar: ptr, Lhs: &Lhs{Var: ptr, Type: GetIntType()}, // deref store
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		LhsVar: ptr, Lhs: &Lhs{Var: ptr, Type: GetIntTypeSess(testAmbientSession)}, // deref store
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
@@ -1896,10 +1896,10 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
-	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
+	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
 	if mid == nil {
@@ -1907,8 +1907,8 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	}
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
-		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple,
 	}
 	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
@@ -1942,12 +1942,12 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerTo(GetIntType()), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	ut := &Type{isUnion: true, StructName: "U_fp", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	lu.Init = MakeInt(0)
@@ -2008,7 +2008,7 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_nr", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if !lu.FieldVarsCompleteSess(testAmbientSession) || len(lu.FieldVars) == 0 {
@@ -2033,16 +2033,16 @@ func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
 func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	outer := CreateVariableScalarsSess(testAmbientSession, "l_outer", pt, false, false)
-	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", GetIntType(), false, false)
+	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", GetIntTypeSess(testAmbientSession), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(outer, bodyLoc)}
-	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
-		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	parent := &Block{StmID: AllocStmID(), Func: f}
@@ -2093,10 +2093,10 @@ func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	SetProcessRngSess(testAmbientSession, NewRngSess(testAmbientSession, 1))
 
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
-	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
+	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)))
 	base := CreateVariableScalarsSess(testAmbientSession, "l_233", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
 	av.IsArray = true
@@ -2160,7 +2160,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 	// Soft invent was MakeupNewVarFacts (PT) only — preUnion map_in missed mid-for unions.
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_nloop", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// Simulate pre-snapshot without g_newu, then live gains union fact (created mid-for).
 	preU := []*FactUnion{}
@@ -2195,21 +2195,21 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U_nofp", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
-	param := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	param := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fn.Param = []*Variable{param}
 	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	// Nested no-FP block: parent != nil so map_out keeps full post-OOS without
 	// remove_function_local; live must OOS lu but not invent map_out install.
 	parent := &Block{StmID: AllocStmID(), Func: fn}
-	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
 	asg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
-		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	inner := &Block{
@@ -2254,7 +2254,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	bodyLoc := CreateVariableQferSess(testAmbientSession, "l_bu", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	bodyAsg := Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
-		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
 	}
 	body := &Block{
@@ -2306,7 +2306,7 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	parent := &Block{StmID: AllocStmID(), Func: fn}
 	// Last stmt is return → must_break_or_return true → is_loop_body false
 	// even though Looping (Block.cpp:729).
@@ -2322,7 +2322,7 @@ func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 		Stmts: []Stmt{ret},
 	}
 	fm := NewFactMgrSess(testAmbientSession, fn)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.UnionFacts = []*FactUnion{}
 	fm.MapStmEffect = map[int]Effect{

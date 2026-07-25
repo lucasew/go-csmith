@@ -16,9 +16,9 @@ import "testing"
 func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	i32 := GetIntType()
-	pt := PointerTo(i32)
-	ppt := PointerTo(pt)
+	i32 := GetIntTypeSess(testAmbientSession)
+	pt := PointerToSess(testAmbientSession, i32)
+	ppt := PointerToSess(testAmbientSession, pt)
 	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", pt, false, false)
 	g99 := CreateVariableScalarsSess(testAmbientSession, "g_99", ppt, false, false)
 	f := &Function{Name: "f", ReturnType: i32}
@@ -26,7 +26,7 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	fm.SetGlobalFacts([]*FactPointTo{MakeFactPointTo(g99, g77)}, "t")
 	lhs := &Lhs{Var: g99, Type: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
-	if !fm.UpdateFactForAssignWant(g99, lhs.IndirectLevel(), lhs.GetType(), rhs) {
+	if !fm.UpdateFactForAssignWant(g99, lhs.IndirectLevelSess(testAmbientSession), lhs.GetType(), rhs) {
 		t.Fatal("UpdateFactForAssignWant returned false")
 	}
 	fg := FindRelatedPointTo(fm.GlobalFacts, g77)
@@ -44,9 +44,9 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 func TestIfThenNullMergeMakesPointeeInvalid(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	i32 := GetIntType()
-	pt := PointerTo(i32)
-	ppt := PointerTo(pt)
+	i32 := GetIntTypeSess(testAmbientSession)
+	pt := PointerToSess(testAmbientSession, i32)
+	ppt := PointerToSess(testAmbientSession, pt)
 	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", pt, false, false)
 	g99 := CreateVariableScalarsSess(testAmbientSession, "g_99", ppt, false, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_18", i32, false, false)

@@ -12,7 +12,7 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -20,7 +20,7 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		// reset tmp vars
 		blk.TmpVars = nil
-		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntType())
+		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 		if fi != nil && fi.Safe != nil && fi.MathNoTmp && fi.Tmp1 != "" && SafeOpsBinary(fi.Binary) {
 			break
 		}
@@ -95,8 +95,8 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	// NoteRead does not update feffect (Function.cpp:657 finalizes from body map).
 	// CommentOutput uses insertion-order read_vars via OutputForComment.
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
+	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	if g == nil {
 		t.Fatal("CreateVariableQfer nil", GetErrorSess(testAmbientSession))
 	}
@@ -113,7 +113,7 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 		t.Fatal("want /* + newline + reads, got", out[:40])
 	}
 	// empty actual name sticky fail closed (OutputForComment — no invent blank token)
-	anon := &Variable{Type: GetIntType()}
+	anon := &Variable{Type: GetIntTypeSess(testAmbientSession)}
 	ClearErrorSess(testAmbientSession)
 	c := EmptyEffect().ReadVarSess(testAmbientSession, anon).WriteVarSess(testAmbientSession, g).CommentOutputSess(testAmbientSession)
 	if c != "" || !HasErrorSess(testAmbientSession) {

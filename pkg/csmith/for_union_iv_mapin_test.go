@@ -18,8 +18,8 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// union with two simple fields
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	g88.CreateFieldVarsSess(testAmbientSession)
@@ -30,7 +30,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 		t.Fatalf("GetFieldID f0=%d f1=%d", g88.FieldVars[0].GetFieldIDSess(testAmbientSession), g88.FieldVars[1].GetFieldIDSess(testAmbientSession))
 	}
 	// pre-init last_write f0 (abstract init of union)
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(g88, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
@@ -48,7 +48,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	iv := g88.FieldVars[1]
 	initSt := &Stmt{
 		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntTypeSess(testAmbientSession)},
 		AssignOp: AssignSimple, StmID: AllocStmID(),
 	}
 	if !VisitFactsStatementAssign(initSt, &cg, opts) {

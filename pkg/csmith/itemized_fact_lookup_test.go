@@ -9,10 +9,10 @@ import "testing"
 func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	i32 := GetIntType()
+	i32 := GetIntTypeSess(testAmbientSession)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", i32, false, false)
-	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerTo(i32), false, false)
-	elem := PointerTo(PointerTo(i32))
+	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerToSess(testAmbientSession, i32), false, false)
+	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, i32))
 	addr := &Expression{Term: TermVariable, Var: l118, ExprType: elem}
 	coll := &ArrayVariable{
 		Variable: Variable{Name: "l_165", Type: elem, IsArray: true, InitExpr: addr},

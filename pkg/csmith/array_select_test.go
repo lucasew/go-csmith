@@ -9,7 +9,7 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("create")
 	}
@@ -39,7 +39,7 @@ func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// create_random_array uses Type env (C++ GenerateSimpleTypes always live)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	r := NewRngSess(testAmbientSession, 2)
 	av := vs.SelectArray(r, EmptyCGContext().WithSession(testAmbientSession))
 	if av == nil || len(vs.Arrays) < 1 {
@@ -53,8 +53,8 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// VariableSelector.cpp:1386 — find_all_visible_vars only (GlobalList / local_vars)
-	a := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
-	b := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_2", GetIntType(), MakeInt(1), q)
+	a := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
+	b := CreateArrayVariable(r, opts, NewProbabilities(opts), vs, nil, nil, "g_2", GetIntTypeSess(testAmbientSession), MakeInt(1), q)
 	if a == nil || b == nil {
 		t.Fatal("create")
 	}
@@ -128,7 +128,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	// force multi-dim array
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil array")
 	}
@@ -139,7 +139,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
@@ -161,7 +161,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(testAmbientSession, Defaults())
-	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), nil}
+	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false), nil}
 	if VariablesComplete(vs.FindAllVisibleVars(nil)) {
 		t.Fatal("GlobalList nil hole must fail closed incomplete")
 	}
@@ -170,7 +170,7 @@ func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	vs.GlobalList = nil
-	blk := &Block{LocalVars: []*Variable{CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false), nil}}
+	blk := &Block{LocalVars: []*Variable{CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false), nil}}
 	if VariablesComplete(vs.FindAllVisibleVars(blk)) {
 		t.Fatal("LocalVars nil hole must fail closed incomplete")
 	}
@@ -193,7 +193,7 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray is incomplete IR — fail closed sticky
-	broken := &Variable{Name: "g_broken", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	broken := &Variable{Name: "g_broken", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	vs.GlobalList = []*Variable{broken}
 	if vs.SelectArray(NewRngSess(testAmbientSession, 3), EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("IsArray without AsArray must fail closed SelectArray")
@@ -231,10 +231,10 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Create without vs/blk registration (orphan array)
-	orphan := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntType(), MakeInt(0), q)
+	orphan := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_orphan", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if orphan == nil {
 		t.Fatal("orphan create")
 	}

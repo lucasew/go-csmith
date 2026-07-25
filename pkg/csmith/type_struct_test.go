@@ -11,10 +11,10 @@ func TestMakeRandomStructType(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	// Type.cpp GenerateSimpleTypes before make_random_struct_type
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	r := NewRngSess(testAmbientSession, 2)
 	st := MakeRandomStructType(r, opts, probs, &env, "S0")
-	if st == nil || !st.IsStruct() || len(st.Fields) < 1 {
+	if st == nil || !st.IsStructSess(testAmbientSession) || len(st.Fields) < 1 {
 		t.Fatal(st)
 	}
 	// Type.cpp:1088–1091 — make_random_struct_type leaves used=false until choose_random*
@@ -51,9 +51,9 @@ func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
 	// Seed AllTypes with simples + one unused prior struct.
 	s0 := &Type{
 		isStruct: true, StructName: "S0", SID: 0, Used: false,
-		Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}},
+		Fields: []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}},
 	}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt), s0}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EUInt), s0}
 	env.StructTypes = []*Type{s0}
 	// Many field picks; S0 may be chosen as nested type — must stay unused.
 	for seed := uint64(1); seed < 80; seed++ {
@@ -90,7 +90,7 @@ func TestAggregateSharedSIDSequence(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType()}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "")
 	if st == nil || st.StructName != "S0" {
 		t.Fatalf("struct: %v name=%q", st, func() string {
@@ -128,7 +128,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0", Packed: true, Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
 	decl := st.OutputStructDecl()
@@ -163,7 +163,7 @@ func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType()}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession)}
 	if MakeRandomStructType(nil, opts, probs, &env, "S0") != nil {
 		t.Fatal("nil RNG struct must fail closed")
 	}
@@ -211,8 +211,8 @@ func TestGenerateSimpleTypesSeedsAllNonVoid(t *testing.T) {
 	// (structs may append further under MoreTypesProbability.)
 	found := map[ESimpleType]bool{}
 	for _, ty := range env.AllTypes {
-		if ty != nil && ty.IsSimple() {
-			found[ty.Simple()] = true
+		if ty != nil && ty.IsSimpleSess(testAmbientSession) {
+			found[ty.SimpleSess(testAmbientSession)] = true
 		}
 	}
 	for st := EChar; int(st) < MaxSimpleTypes; st++ {
@@ -236,21 +236,21 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 		t.Fatal("nil RNG MoreTypesProbability must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0); f.Type != nil {
 		t.Fatal("nil RNG MakeOneStructField must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeOneStructField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f := MakeOneStructField(NewRngSess(testAmbientSession, 1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+	if f := MakeOneStructField(NewRngSess(testAmbientSession, 1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0); f.Type != nil {
 		t.Fatal("nil probs MakeOneStructField must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil probs MakeOneStructField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, 0, true); f.Type != nil {
+	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0, true); f.Type != nil {
 		t.Fatal("nil RNG MakeOneUnionField must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -296,7 +296,7 @@ func TestMakeStructConstant(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 3), opts, probs, &env, "S0")
 	if st == nil {
 		t.Fatal("struct")
@@ -315,7 +315,7 @@ func TestMakeStructConstant(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	if MakeUnionConstant(nil, opts, probs, ut) != nil {
 		t.Fatal("nil RNG union constant")
@@ -351,7 +351,7 @@ func TestCheckImplicitNontrivialAssignOps(t *testing.T) {
 	// non-C++ complete false
 	opts := Defaults()
 	opts.LangCPP = false
-	fields := []StructField{{Name: "f0", Type: GetIntType()}}
+	fields := []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession)}}
 	if CheckImplicitNontrivialAssignOps(opts, fields) {
 		t.Fatal("C mode")
 	}

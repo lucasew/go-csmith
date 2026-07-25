@@ -294,7 +294,7 @@ func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
 
 func TestTypeAttrOnStructDecl(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	attrs := &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
@@ -306,12 +306,12 @@ func TestTypeAttrOnStructDecl(t *testing.T) {
 }
 
 func TestGetEvalToSubexpsComma(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	e := &Expression{
 		Term:     TermCommaExpr,
-		CommaLHS: &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()},
-		CommaRHS: &Expression{Term: TermVariable, Var: b, ExprType: GetIntType()},
+		CommaLHS: &Expression{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)},
+		CommaRHS: &Expression{Term: TermVariable, Var: b, ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	subs := GetEvalToSubexps(e)
 	if len(subs) != 1 || subs[0].Var != b {
@@ -375,18 +375,18 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 
 func TestHaveOverlappingFieldsUnion(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: uv}
-	f1 := &Variable{Name: "g_u.f1", Type: GetIntType(), FieldVarOf: uv}
+	f0 := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: uv}
+	f1 := &Variable{Name: "g_u.f1", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{f0, f1}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{f0, f1})}
 	// indirection: Var type *int, ExprType int → level 1
-	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
-	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
+	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	u1 := FindUnionPointees(facts, e1)
 	if len(u1) == 0 {
 		t.Fatalf("expected union pointees, ind=%d", e1.IndirectLevel())
@@ -400,9 +400,9 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	// soft invent: FindUnionPointees nil → len==0 → no overlap success
 	// fair: incomplete facts/pointees fail closed sticky as overlap
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
-	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
+	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	holeFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	if !HaveOverlappingFields(e1, e2, holeFacts) {
 		t.Fatal("incomplete facts must fail closed as overlap")
@@ -428,12 +428,12 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	// GetContainerUnion residual soft invent was soft-continue later pointees invent empty unions.
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// Type-nil parent ancestry: GetContainerUnion stickies ERROR
 	parent := &Variable{Name: "g_hole"} // Type nil
-	fld := &Variable{Name: "g_hole.f0", Type: GetIntType(), FieldVarOf: parent}
+	fld := &Variable{Name: "g_hole.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld})}
-	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	got := FindUnionPointees(facts, e)
 	if VariablesComplete(got) {
 		t.Fatal("GetContainerUnion residual must fail closed incomplete, not invent empty complete", got)
@@ -453,7 +453,7 @@ func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 }
 
 func TestBuiltinOutputSkipped(t *testing.T) {
-	f := &Function{Name: "__builtin_clz", ReturnType: GetIntType(), IsBuiltin: true}
+	f := &Function{Name: "__builtin_clz", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true}
 	if f.Output() != "" || f.OutputForwardDecl() != "" {
 		t.Fatal("builtin emit")
 	}
@@ -462,18 +462,18 @@ func TestBuiltinOutputSkipped(t *testing.T) {
 func TestVisitFactsReturnDeadPtr(t *testing.T) {
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
-	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
-	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, loc)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := Stmt{
 		Kind: StmtReturn,
-		Expr: &Expression{Term: TermVariable, Var: lp, ExprType: PointerTo(GetIntType())},
+		Expr: &Expression{Term: TermVariable, Var: lp, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))},
 	}
 	if VisitFactsStatementReturn(&st, &cg, opts) {
 		t.Fatal("should reject local-pointing return")
@@ -481,8 +481,8 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 }
 
 func TestVisitFactsLhsCompoundRead(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	lhs := &Lhs{Var: v, Type: GetIntType(), CompoundAssign: true}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession), CompoundAssign: true}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

@@ -7,7 +7,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	pt := env.FindPointerType(GetIntType(), true)
+	pt := env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	if pt == nil || !env.HasPointerType() {
 		t.Fatal("pointer type")
 	}
@@ -59,7 +59,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	if env.FindPointerType(GetIntType(), true) == nil {
+	if env.FindPointerType(GetIntTypeSess(testAmbientSession), true) == nil {
 		t.Fatal("pointer type")
 	}
 	vs.Types = env
@@ -72,7 +72,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	// eq/ne draw alone
 	eqFlip := rFlags.RndFlipcoin(50)
 	_ = eqFlip
-	flags := MakeRandomBinaryKind(rFlags, opts, probs, GetIntType(), nil, nil, SafeOpBinary, BinCmpEq)
+	flags := MakeRandomBinaryKind(rFlags, opts, probs, GetIntTypeSess(testAmbientSession), nil, nil, SafeOpBinary, BinCmpEq)
 	if flags == nil {
 		t.Fatal("flags")
 	}
@@ -121,14 +121,14 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
-	_ = env.FindPointerType(GetIntType(), true)
+	_ = env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	vs.Types = env
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = env
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	for seed := uint64(1); seed < 100; seed++ {
-		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg, GetIntType())
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))
 		if fi != nil && fi.PtrCmp {
 			if fi.Binary != "==" && fi.Binary != "!=" {
 				t.Fatal(fi.Binary)
@@ -141,11 +141,11 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 
 func TestRecordPointerComparisonsGetType(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	lhs := &Expression{Term: TermVariable, Var: p, ExprType: PointerTo(GetIntType())}
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	lhs := &Expression{Term: TermVariable, Var: p, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	rhs := &Expression{
-		Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
-		ExprType: PointerTo(GetIntType()),
+		Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"},
+		ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
 	}
 	RecordPointerComparisonsSess(testAmbientSession, lhs, rhs)
 }
@@ -166,7 +166,7 @@ func TestPtrCmpCastGetTypeResidualNoInventShell(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// CheckAndSetCast residual on incomplete right after live left type
 	rightHole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_r"}}
-	rightHole.CheckAndSetCastOpts(PointerTo(GetIntType()), opts)
+	rightHole.CheckAndSetCastOpts(PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), opts)
 	if rightHole.CastType != nil {
 		t.Fatal("GetTypeUncast residual must not invent CastType on right")
 	}

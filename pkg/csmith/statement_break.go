@@ -37,7 +37,7 @@ func MakeRandomBreak(
 	// StatementBreak.cpp:76 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
 	// StatementBreak.cpp:77–79 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
-	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntTypeSess(sessFromCG(cg)), nil, true, true, TermVariable, cg.ExprDepth)
 	// StatementBreak.cpp:79 — ERROR_GUARD(nullptr)
 	// residual ERROR sticky — no invent soft-return break past condition make residual
 	if expr == nil || hasErrCG(cg) {

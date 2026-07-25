@@ -15,13 +15,13 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	tab := &ThresholdTable{}
 	tab.Add(100, int(StmtAssign))
 	opts.MaxBlockSize = 2
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// plant a known global
-	g1 := CreateVariableQferSess(testAmbientSession, "g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	g1 := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.GlobalList = []*Variable{g1}
 	st := MakeRandomIf(NewRngSess(testAmbientSession, 7), opts, probs, vs, tables, tab, &cg)
 	if st == nil || st.Then == nil || st.Else == nil {
@@ -38,8 +38,8 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 }
 
 func TestMergeEffectsUnion(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	e1 := EmptyEffect().WriteVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, b)
 	// Effect.cpp:write_var — non-volatile write keeps SE-free true
@@ -56,7 +56,7 @@ func TestMergeEffectsUnion(t *testing.T) {
 		t.Fatal("MergeEffects of non-vol writes must stay SE-free")
 	}
 	// volatile write clears SE-free on that arm → merge not SE-free
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	ev := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	if ev.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("volatile WriteVar must clear SE-free")
@@ -73,7 +73,7 @@ func TestMergeEffectsUnion(t *testing.T) {
 func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 	// incomplete arm must not invent pure/empty-complete merge success — sticky
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	ok := EmptyEffect().WriteVarSess(testAmbientSession, a)
 	m := MergeEffectsSess(testAmbientSession, ok, IncompleteEffect())
 	if EffectComplete(m) {
@@ -106,7 +106,7 @@ func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 
 func TestArrayBuildInitRecursive(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -144,8 +144,8 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -173,7 +173,7 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	// missing then-in must not invent pre-branch GlobalFacts for else
 	// Unit: plant missing MapFactsIn after then would have set it — contract of assign
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	prior := MakeFactPointTo(p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	// missing MapFactsIn[5]
@@ -214,8 +214,8 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 	// over-filtered choose_var (seed-7 eligible pool half-size).
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -266,18 +266,18 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	outer := CreateVariableScalarsSess(testAmbientSession, "g_outer", GetIntType(), false, false)
-	inner := CreateVariableScalarsSess(testAmbientSession, "g_inner", GetIntType(), false, false)
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	outer := CreateVariableScalarsSess(testAmbientSession, "g_outer", GetIntTypeSess(testAmbientSession), false, false)
+	inner := CreateVariableScalarsSess(testAmbientSession, "g_inner", GetIntTypeSess(testAmbientSession), false, false)
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	// then: read g_inner via return expr (visit records CheckReadVar)
 	thenRet := Stmt{
 		Kind: StmtReturn, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermVariable, Var: inner, ExprType: GetIntType()},
+		Expr: &Expression{Term: TermVariable, Var: inner, ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	elseRet := Stmt{
 		Kind: StmtReturn, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermVariable, Var: outer, ExprType: GetIntType()},
+		Expr: &Expression{Term: TermVariable, Var: outer, ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	thenBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{thenRet}}
 	elseBlk := &Block{StmID: AllocStmID(), Func: fn, Stmts: []Stmt{elseRet}}
@@ -287,10 +287,10 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
 		Then: thenBlk, Else: elseBlk,
 	}
-	fn.RV = CreateVariableScalarsSess(testAmbientSession, "g_rv", GetIntType(), false, false)
+	fn.RV = CreateVariableScalarsSess(testAmbientSession, "g_rv", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = fn
 	// parent accum already observed g_outer (as if prior statements in the block)
@@ -323,8 +323,8 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U_vif", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_uv", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -337,7 +337,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	if entryU == nil || exitU == nil {
 		t.Fatal("MakeFactUnion")
 	}
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{entryU}
@@ -352,7 +352,7 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	fm.MapVisited = map[int]bool{thenBlk.StmID: true, elseBlk.StmID: true}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: AllocStmID(),
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
 		Then: thenBlk, Else: elseBlk,
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -412,12 +412,12 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	st := MakeRandomIf(NewRngSess(testAmbientSession, 1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
@@ -446,8 +446,8 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	pre := CreateVariableScalarsSess(testAmbientSession, "pre_if_rd", GetIntType(), true, false)
-	g1 := CreateVariableScalarsSess(testAmbientSession, "g_if_arm", GetIntType(), true, false)
+	pre := CreateVariableScalarsSess(testAmbientSession, "pre_if_rd", GetIntTypeSess(testAmbientSession), true, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_if_arm", GetIntTypeSess(testAmbientSession), true, false)
 	vs.GlobalList = append(vs.GlobalList, g1)
 	accum := EmptyEffect().ReadVarSess(testAmbientSession, pre)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -487,11 +487,11 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed globals so MakeIteration can succeed; fail closed is on incomplete EffectAccum after
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
+	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
 	if MakeRandomFor(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {

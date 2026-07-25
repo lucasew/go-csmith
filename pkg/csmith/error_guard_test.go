@@ -7,7 +7,7 @@ func TestMakeRandomStmtErrorGuardNoRepick(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -57,7 +57,7 @@ func TestMakeRandomBlockAbortsOnStickyError(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
@@ -75,8 +75,8 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	tab := &ThresholdTable{}
@@ -97,7 +97,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	f := &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -113,7 +113,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must not leave partial registration")
 	}
 	ClearErrorSess(testAmbientSession)
-	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
+	f2 := &Function{Name: "f2", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
@@ -136,7 +136,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 		t.Fatal("nil block abortBlockMake must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
+	f3 := &Function{Name: "f3", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}
 	cg3 := WithFunc(f3, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f3))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
@@ -159,7 +159,7 @@ func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)

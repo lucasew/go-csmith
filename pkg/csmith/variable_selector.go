@@ -405,7 +405,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		// null op_flags → Output emits plain "a + b" (FunctionInvocationBinary.cpp:357–361)
 		// Indices string form must match Expression.Output (virtual Variable::Output),
 		// not v.Name — itemized array IVs print as name[i]… (seed-48 g_106[4]).
-		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(sessFromCG(&cg))}
 		idx := idxExpr.OutputSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-continue later dims past index Output residual
 		if hasErrVS(vs) {
@@ -420,7 +420,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			off := int(r.RndUpto(uint32(remain)))
 			if off > 0 {
 				offExpr := &Expression{
-					Term: TermConstant, Con: MakeIntSess(sessFromVS(vs), off), ExprType: GetIntType(),
+					Term: TermConstant, Con: MakeIntSess(sessFromVS(vs), off), ExprType: GetIntTypeSess(sessFromCG(&cg)),
 				}
 				fi := &Invocation{
 					IsStd:  true,
@@ -428,7 +428,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 					Args:   []*Expression{idxExpr, offExpr},
 					// Safe nil: ArrayVariable index add must not use safe_* wrappers
 				}
-				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
+				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntTypeSess(sessFromCG(&cg))}
 				idx = idxExpr.OutputSess(sessFromVS(vs))
 				// residual ERROR sticky — no invent soft-continue later dims past index Output residual
 				if hasErrVS(vs) {
@@ -1122,7 +1122,7 @@ func (vs *VariableSelector) MakeInitValue(
 		return nil
 	}
 	// pointer path: select visible var of pointee type
-	pointee := t.PtrType()
+	pointee := t.PtrTypeSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-pointee past PtrType residual
 	if hasErrVS(vs) {
 		return nil
@@ -1530,7 +1530,7 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 			noteErrCG(&cg, ErrGeneric)
 			return false
 		}
-		if typ.IsDereferencedFrom(v.Type) {
+		if typ.IsDereferencedFromSess(sessFromCG(&cg), v.Type) {
 			// residual ERROR sticky — no invent soft-continue then true later past IsDereferencedFrom hole
 			if hasErrCG(&cg) {
 				return false
@@ -2680,7 +2680,7 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		createQfer = qfer
 	case 1:
 		// C++ source has t->ptr_type with t==null (upstream bug); fair uses type->ptr_type
-		pointee := typ.PtrType()
+		pointee := typ.PtrTypeSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-create struct past PtrType residual
 		if hasErrVS(vs) {
 			return nil
@@ -2770,7 +2770,7 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		createQfer = qfer
 	case 1:
 		// fair type->ptr_type (upstream t->ptr_type with t==0)
-		pointee := typ.PtrType()
+		pointee := typ.PtrTypeSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-create local struct past PtrType residual
 		if hasErrVS(vs) {
 			return nil
@@ -2866,7 +2866,7 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 	if hasErrVS(vs) {
 		return nil
 	}
-	if simple && t.Simple() == EVoid {
+	if simple && t.SimpleSess(vsSess(vs)) == EVoid {
 		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
@@ -2905,7 +2905,7 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	ty := GetIntType()
+	ty := GetIntTypeSess(sessFromCG(&cg))
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllNonArrayVisibleVars(blk)
 	// incomplete visible pool — fail closed sticky (no invent loop ctrl from partial)
@@ -3759,9 +3759,9 @@ func (vs *VariableSelector) SelectParentLocalInv(
 		if hasErrVS(vs) {
 			return nil
 		}
-		if simple && t.Simple() != EVoid {
+		if simple && t.SimpleSess(vsSess(vs)) != EVoid {
 			// VariableSelector.cpp:1019–1020 — get_int_type() (upstream type widen for locals)
-			matchT = GetIntType()
+			matchT = GetIntTypeSess(sessFromCG(&cg))
 		} else {
 			// VariableSelector.cpp:1021–1023 — random_type_from_type(type, true, false); ERROR_GUARD
 			matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)

@@ -40,7 +40,7 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 		t.Fatal("*0")
 	}
 	// same expr subtract
-	v := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)}
+	v := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)}
 	fi = &Invocation{IsStd: true, Binary: "-", Args: []*Expression{v, v}}
 	if !fi.EqualsInt(0) {
 		t.Fatal("a-a")
@@ -84,9 +84,9 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 
 func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
 	// start with a
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	eff := EmptyEffect()
@@ -122,8 +122,8 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Manual 2-field union (MakeRandomUnionType may emit 1-field).
-	i32 := GetIntType()
-	i64 := GetSimpleType(ELongLong)
+	i32 := GetIntTypeSess(testAmbientSession)
+	i64 := GetSimpleTypeSess(testAmbientSession, ELongLong)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	ut := &Type{
 		isUnion:    true,
@@ -139,7 +139,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 	}
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
 	// pointer to f1 so *p = … renews union last=f1
-	p := CreateVariableQferSess(testAmbientSession, "l_p", PointerTo(f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableQferSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// post-left lattice: last written f0
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
@@ -184,7 +184,7 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 	// FunctionInvocationUnary.cpp:117 — assert invalid operator sticky; no invent eInt
 	ClearErrorSess(testAmbientSession)
-	arg := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	arg := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "??", Args: []*Expression{arg}}
 	if fi.GetType() != nil {
 		t.Fatal("invalid unary op must fail closed")
@@ -195,7 +195,7 @@ func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 	// valid not
 	ClearErrorSess(testAmbientSession)
 	fi.Unary = "!"
-	if fi.GetType() != GetIntType() {
+	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("!")
 	}
 	// empty args for minus sticky
@@ -215,7 +215,7 @@ func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
 	// StatementAssign.cpp:127 assert(fm) — nullptr empty (stmtOK false; StmtAssign is iota 0)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	st := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntType())
+	st := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil FM must fail closed empty assign, got %#v", st)
 	}
@@ -226,9 +226,9 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.CompoundAssignment = false
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntType())
+	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
 	}
@@ -246,21 +246,21 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntType()); fi != nil {
+	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("nil RNG binary")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG binary must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if fi := MakeRandomUnaryInvocation(nil, opts, vs, tables, &cg, GetIntType()); fi != nil {
+	if fi := MakeRandomUnaryInvocation(nil, opts, vs, tables, &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("nil RNG unary")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG unary must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if fi := MakeRandomInvocation(nil, opts, probs, vs, tables, &cg, nil, GetIntType(), nil, true); fi == nil || !fi.Failed {
+	if fi := MakeRandomInvocation(nil, opts, probs, vs, tables, &cg, nil, GetIntTypeSess(testAmbientSession), nil, true); fi == nil || !fi.Failed {
 		// MakeRandomInvocation may Failed shell without sticky when rng nil early
 		if fi != nil && fi.Failed {
 			// ok
@@ -276,13 +276,13 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
-	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTables(opts), &cg, GetIntType()); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomUnaryInvocation")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -292,7 +292,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	cg2 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
-	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 2), opts, vs, NewExprTables(opts), &cg2, GetIntType()); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 2), opts, vs, NewExprTables(opts), &cg2, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomUnaryInvocation")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -303,7 +303,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTables(opts), &cg3, GetIntType()); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTables(opts), &cg3, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomUnaryInvocation")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -317,7 +317,7 @@ func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
 	// flags+safe_ops+blk (no ambient EffectComplete gate). Incomplete ambient
 	// must not skip gensym t_ while still failing closed.
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	flags := MakeDummyFlags()
@@ -330,7 +330,7 @@ func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
 	// shift always needs flags_to_type(op2); sticky no invent type1 stand-in for type2.
 	// Signed float LHS is simple; unsigned float RHS fails FlagsToType (assert path).
 	badShift := &SafeOpFlags{Op1Signed: true, Op2Signed: false, IsFunc: true, Size: SafeFloat}
-	f2 := &Function{Name: "f2", ReturnType: GetIntType()}
+	f2 := &Function{Name: "f2", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk2 := &Block{Func: f2}
 	f2.Stack = []*Block{blk2}
 	cg2 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession)
@@ -367,14 +367,14 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
 	tables := NewExprTables(opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	foundShift := false
 	for seed := uint64(1); seed < 200; seed++ {
 		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntType())
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 		if fi == nil || !fi.IsStd {
 			continue
 		}
@@ -398,7 +398,7 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, nil, vs, tables, &cg, GetIntType())
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, nil, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 		if fi == nil || (fi.Binary != "<<" && fi.Binary != ">>") {
 			continue
 		}
@@ -422,9 +422,9 @@ func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
 	// Seed a local int so Variable term is available under depth/no_const filters.
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
-	loc := &Variable{Name: "l_shift", Type: GetIntType()}
+	loc := &Variable{Name: "l_shift", Type: GetIntTypeSess(testAmbientSession)}
 	tables := NewExprTables(opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
 	found := 0
@@ -432,7 +432,7 @@ func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 		cg.ExprDepth = 0
-		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntType())
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 		if fi == nil || !fi.IsStd {
 			continue
 		}
@@ -498,7 +498,7 @@ func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {
 	// incomplete GlobalFacts before left snapshot sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -524,13 +524,13 @@ func TestSafeOpsBinaryMatches(t *testing.T) {
 
 func TestInvocationGetTypeUnary(t *testing.T) {
 	// FunctionInvocationUnary.cpp:120–128
-	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleType(ELongLong), Value: "7"}}
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleTypeSess(testAmbientSession, ELongLong), Value: "7"}}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{arg}}
-	if fi.GetType() != GetSimpleType(ELongLong) {
+	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, ELongLong) {
 		t.Fatalf("minus type %v", fi.GetType())
 	}
 	fi.Unary = "!"
-	if fi.GetType() != GetIntType() {
+	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("not → int")
 	}
 }
@@ -541,7 +541,7 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 		{Term: TermConstant, Con: MakeInt(1)},
 		{Term: TermConstant, Con: MakeInt(0)},
 	}}
-	if fi.GetType() != GetIntType() {
+	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("cmp")
 	}
 	// float size flags → float
@@ -553,17 +553,17 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 		},
 		Safe: &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat},
 	}
-	if !fi.IsReturnTypeFloat() || fi.GetType() != GetSimpleType(EFloat) {
+	if !fi.IsReturnTypeFloat() || fi.GetType() != GetSimpleTypeSess(testAmbientSession, EFloat) {
 		t.Fatal("float ret")
 	}
 	// both unsigned → uint
-	u := GetSimpleType(EUInt)
+	u := GetSimpleTypeSess(testAmbientSession, EUInt)
 	cu := &Constant{Type: u, Value: "1"}
 	fi = &Invocation{IsStd: true, Binary: "+", Args: []*Expression{
 		{Term: TermConstant, Con: cu},
 		{Term: TermConstant, Con: cu},
 	}}
-	if fi.GetType() != GetSimpleType(EUInt) {
+	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EUInt) {
 		t.Fatalf("unsigned add %v", fi.GetType())
 	}
 	// shift follows left
@@ -571,7 +571,7 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 		{Term: TermConstant, Con: cu},
 		{Term: TermConstant, Con: MakeInt(1)},
 	}}
-	if fi.GetType() != GetSimpleType(EUInt) {
+	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EUInt) {
 		t.Fatal("ushift")
 	}
 }
@@ -606,13 +606,13 @@ func TestInvocationSafeInvocation(t *testing.T) {
 
 func TestInvocationCompatibleVarUnary(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
 	if !fi.CompatibleVar(v, false) {
 		t.Fatal("self")
 	}
-	if fi.CompatibleVar(CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), true, false), false) {
+	if fi.CompatibleVar(CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false), false) {
 		t.Fatal("other")
 	}
 	// binary never compatible (complete false, not sticky)
@@ -644,15 +644,15 @@ func TestInvocationCompatibleVarUnary(t *testing.T) {
 
 func TestExpressionFuncallGetTypeViaInvoke(t *testing.T) {
 	// ExpressionFuncall.cpp:122–124
-	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleType(EShort), Value: "1"}}
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleTypeSess(testAmbientSession, EShort), Value: "1"}}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{arg}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
-	if e.GetType() != GetSimpleType(EShort) {
+	if e.GetType() != GetSimpleTypeSess(testAmbientSession, EShort) {
 		t.Fatalf("got %v", e.GetType())
 	}
 	// user return type
-	e2 := &Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "f", ReturnType: GetSimpleType(EFloat)}}}
-	if e2.GetType() != GetSimpleType(EFloat) {
+	e2 := &Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EFloat)}}}
+	if e2.GetType() != GetSimpleTypeSess(testAmbientSession, EFloat) {
 		t.Fatal("user")
 	}
 }
@@ -688,7 +688,7 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	// cmp still returns int without consulting operands (C++ switch arm)
 	ClearErrorSess(testAmbientSession)
 	fi = &Invocation{IsStd: true, Binary: "=="}
-	if fi.GetType() != GetIntType() {
+	if fi.GetType() != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("cmp")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -741,7 +741,7 @@ func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
 func TestInvocationOutputArgResidualSticky(t *testing.T) {
 	// Arg Output residual soft invent was soft-continue later args invent partial call.
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{
 		User: f,
 		Args: []*Expression{
@@ -783,14 +783,14 @@ func TestChooseFuncContextMatchResidualTruePathSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{
-		Name: "func_1", ReturnType: GetIntType(),
-		RV:      &Variable{Name: "func_1_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession),
+		RV:      &Variable{Name: "func_1_rv", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		FEffect: IncompleteEffect(),
 		IsBuilt: true, BuildState: BuildBuilt,
 	}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{f}, GetIntType(), nil, &cg, opts, &q) != nil {
+	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{f}, GetIntTypeSess(testAmbientSession), nil, &cg, opts, &q) != nil {
 		t.Fatal("Incomplete FEffect must fail closed ChooseFuncContext")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -815,7 +815,7 @@ func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
 	// For getTypeBinary: after GetType returns type, call IsSigned — residual only on nil Type.
 	// So if GetType returns non-nil, IsSigned residual only ambient.
 	// Stick with: Type-nil GetType residual already covered; add IsSigned on nil Type hygiene:
-	if !((*Type)(nil)).IsSigned() {
+	if !((*Type)(nil)).IsSignedSess(testAmbientSession) {
 		// IsSigned residual returns true (restrictive)
 		t.Fatal("nil Type IsSigned must fail closed true")
 	}
@@ -827,11 +827,11 @@ func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
 	fi := &Invocation{
 		IsStd: true, Binary: "+",
 		Args: []*Expression{
-			{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
-			{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()},
+			{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)},
+			{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)},
 		},
 	}
-	if fi.GetType() != GetSimpleType(EInt) {
+	if fi.GetType() != GetSimpleTypeSess(testAmbientSession, EInt) {
 		t.Fatal("complete signed binary GetType must eInt")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -850,7 +850,7 @@ func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
 	// Force unary branch: PStdUnaryFuncProb=100 so flipcoin always true.
 	probs.single[PStdUnaryFuncProb] = 100
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -895,11 +895,11 @@ func TestBinarySubcontextClearsCurrRHS(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
 	tables := NewExprTables(opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	// seed a global so Select can succeed
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// plant outer CurrRHS as if mid ExpressionAssign Lhs
 	outerRHS := &Expression{Term: TermConstant, Con: MakeInt(42)}
@@ -922,7 +922,7 @@ func TestBinarySubcontextClearsCurrRHS(t *testing.T) {
 		t.Fatal("param/binary subcontext must clear CurrRHS (CGContext.cpp:74–82)")
 	}
 	// Generation with polluted outer CurrRHS must still be non-sticky when subcontexts clear it
-	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 3), opts, probs, vs, tables, &cg, GetIntType())
+	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 3), opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession))
 	if HasErrorSess(testAmbientSession) && fi == nil {
 		// may fail for depth/inventory — but must not be from residual invent
 		ClearErrorSess(testAmbientSession)

@@ -6,7 +6,7 @@ func userCall(name string, args ...*Expression) *Expression {
 	return &Expression{
 		Term: TermFunction,
 		Invoke: &Invocation{
-			User: &Function{Name: name, ReturnType: GetIntType(), IsBuilt: true},
+			User: &Function{Name: name, ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true},
 			Args: args,
 		},
 	}
@@ -20,7 +20,7 @@ func TestFuncCountAndCollectCalls(t *testing.T) {
 	outer := &Expression{
 		Term: TermFunction,
 		Invoke: &Invocation{
-			User: &Function{Name: "func_c", ReturnType: GetIntType(), IsBuilt: true},
+			User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true},
 			Args: []*Expression{c1, c2},
 		},
 	}
@@ -104,10 +104,10 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// StatementArrayOp.h:65–68 — get_exprs is if(init_value) only, not For test.
 	// array_init numeric LoopControl must not fail closed incomplete (seed-2 fair).
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 2,
-		LhsVar:      CreateVariableScalarsSess(testAmbientSession, "a", GetIntType(), false, false),
+		LhsVar:      CreateVariableScalarsSess(testAmbientSession, "a", GetIntTypeSess(testAmbientSession), false, false),
 		Expr:        &Expression{Term: TermConstant, Con: MakeInt(0)},
 		ArrayAccess: "a[i]",
 	}}}
@@ -188,7 +188,7 @@ func TestHasUncertainCall(t *testing.T) {
 	a := userCall("func_a")
 	b := userCall("func_b")
 	fi := &Invocation{
-		User: &Function{Name: "func_c", ReturnType: GetIntType()},
+		User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession)},
 		Args: []*Expression{a, b},
 	}
 	if !fi.HasUncertainCall() {
@@ -196,7 +196,7 @@ func TestHasUncertainCall(t *testing.T) {
 	}
 	// one call arg only
 	fi2 := &Invocation{
-		User: &Function{Name: "func_c", ReturnType: GetIntType()},
+		User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession)},
 		Args: []*Expression{a, &Expression{Term: TermConstant, Con: MakeInt(1)}},
 	}
 	if fi2.HasUncertainCall() {
@@ -207,7 +207,7 @@ func TestHasUncertainCall(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	nestedHole := &Expression{Term: TermFunction, Invoke: nil}
 	fiHole := &Invocation{
-		User: &Function{Name: "func_h", ReturnType: GetIntType()},
+		User: &Function{Name: "func_h", ReturnType: GetIntTypeSess(testAmbientSession)},
 		Args: []*Expression{nestedHole, &Expression{Term: TermConstant, Con: MakeInt(1)}},
 	}
 	if !fiHole.HasUncertainCallRecursive() {
@@ -234,7 +234,7 @@ func TestHasUncertainCall(t *testing.T) {
 func TestHasSimpleParams(t *testing.T) {
 	fi := &Invocation{Args: []*Expression{
 		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)},
+		{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)},
 	}}
 	if !fi.HasSimpleParams() {
 		t.Fatal("simple")
@@ -349,7 +349,7 @@ func TestFindContainedLabels(t *testing.T) {
 
 func TestCombineBranchFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	preU := []*FactUnion{}
 	thenB := &Block{StmID: 10}
@@ -474,8 +474,8 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 	// Full FactVec includes eUnionWrite. Soft invent left UnionFacts at else-exit only.
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -526,7 +526,7 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	elseLocal := CreateVariableScalarsSess(testAmbientSession, "l_else_u", ut, false, false)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_u2", ut, false, false)
@@ -552,17 +552,17 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 }
 
 func TestPostCreationAssignFacts(t *testing.T) {
-	f := &Function{Name: "func_2", ReturnType: GetIntType()}
+	f := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 3,
-		LhsVar: p, Lhs: &Lhs{Var: p, Type: PointerTo(GetIntType())},
+		LhsVar: p, Lhs: &Lhs{Var: p, Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))},
 		Expr:     &Expression{Term: TermVariable, Var: tgt}, // need address? assign ptr = &tgt via expr
 		AssignOp: AssignSimple,
 	}
@@ -583,7 +583,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	// NDEBUG elides assert and still installs outputs + special_handled.
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -594,14 +594,14 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	rhs := &Expression{
 		Term: TermFunction,
 		Invoke: &Invocation{
-			User: &Function{Name: "func_c", ReturnType: GetIntType(), IsBuilt: true},
+			User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true},
 			Args: []*Expression{a, b},
 		},
 	}
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9,
-		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: rhs, AssignOp: AssignSimple,
 	}
 	if !HasUncertainCallRecursiveStmt(st) {
@@ -624,10 +624,10 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	gExtra := CreateVariableScalarsSess(testAmbientSession, "g_extra", GetIntType(), true, false)
-	gKeep := CreateVariableScalarsSess(testAmbientSession, "g_keep", GetIntType(), true, false)
+	gExtra := CreateVariableScalarsSess(testAmbientSession, "g_extra", GetIntTypeSess(testAmbientSession), true, false)
+	gKeep := CreateVariableScalarsSess(testAmbientSession, "g_keep", GetIntTypeSess(testAmbientSession), true, false)
 	// Gen-time effect_stm already includes a global read from a nested call.
 	genEff := EmptyEffect().ReadVarSess(testAmbientSession, gKeep).ReadVarSess(testAmbientSession, gExtra)
 	eff := EmptyEffect()
@@ -640,14 +640,14 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	rhs := &Expression{
 		Term: TermFunction,
 		Invoke: &Invocation{
-			User: &Function{Name: "func_c", ReturnType: GetIntType(), IsBuilt: true, Body: &Block{StmID: AllocStmID()}},
+			User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, Body: &Block{StmID: AllocStmID()}},
 			Args: []*Expression{a, b},
 		},
 	}
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
-		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: rhs, AssignOp: AssignSimple,
 	}
 	if !HasUncertainCallRecursiveStmt(st) {
@@ -726,7 +726,7 @@ func TestHasUncertainCallRecursiveIfElseBaseFalse(t *testing.T) {
 	cond := &Expression{
 		Term: TermFunction,
 		Invoke: &Invocation{
-			User: &Function{Name: "func_c", ReturnType: GetIntType(), IsBuilt: true},
+			User: &Function{Name: "func_c", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true},
 			Args: []*Expression{a, b},
 		},
 	}

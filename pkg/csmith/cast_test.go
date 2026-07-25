@@ -7,32 +7,32 @@ import (
 
 func TestIsEquivalentSameSize(t *testing.T) {
 	// Type.cpp SizeInBytes: int 4, long 4 (fixed; not invent LP64 long==8)
-	if !GetIntType().IsEquivalent(GetIntType()) {
+	if !GetIntTypeSess(testAmbientSession).IsEquivalentSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("int~int")
 	}
-	if GetSimpleType(EChar).IsEquivalent(GetIntType()) {
+	if GetSimpleTypeSess(testAmbientSession, EChar).IsEquivalentSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("char!~int")
 	}
 }
 
 func TestNeedsCastPointerBases(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	pi := PointerTo(GetIntType())
-	pc := PointerTo(GetSimpleType(EChar))
-	if !pi.NeedsCast(pc) && pi.BaseType().SizeInBytes() != pc.BaseType().SizeInBytes() {
+	pi := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	pc := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
+	if !pi.NeedsCastSess(testAmbientSession, pc) && pi.BaseTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) != pc.BaseTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) {
 		// needs cast when bases inequivalent
 	}
-	if pi.BaseType().SizeInBytes() != pc.BaseType().SizeInBytes() {
-		if !pi.NeedsCast(pc) {
+	if pi.BaseTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) != pc.BaseTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) {
+		if !pi.NeedsCastSess(testAmbientSession, pc) {
 			t.Fatal("int* needs cast from char*")
 		}
 	}
-	if pi.NeedsCast(pi) {
+	if pi.NeedsCastSess(testAmbientSession, pi) {
 		t.Fatal("same no cast")
 	}
 	// incomplete Type sticky
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).NeedsCast(pi) {
+	if (*Type)(nil).NeedsCastSess(testAmbientSession, pi) {
 		t.Fatal("nil NeedsCast must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -45,7 +45,7 @@ func TestExpressionCastOutput(t *testing.T) {
 	e := &Expression{
 		Term:     TermConstant,
 		Con:      MakeInt(0),
-		CastType: PointerTo(GetIntType()),
+		CastType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
 	}
 	out := e.Output()
 	// Expression.cpp:228–231 — "(type) " with trailing space
@@ -60,15 +60,15 @@ func TestExpressionCastOutput(t *testing.T) {
 func TestHasBitfields(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
-		{Type: GetIntType(), BitWidth: 3},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: 3},
 	}}
-	if !st.HasBitfields() {
+	if !st.HasBitfieldsSess(testAmbientSession) {
 		t.Fatal("bf")
 	}
 	st2 := &Type{isStruct: true, Fields: []StructField{
-		{Type: GetIntType(), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if st2.HasBitfields() {
+	if st2.HasBitfieldsSess(testAmbientSession) {
 		t.Fatal("no bf")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -80,9 +80,9 @@ func TestHasBitfields(t *testing.T) {
 	innerHole := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
 	outer := &Type{isStruct: true, Fields: []StructField{
 		{Type: innerHole, BitWidth: -1},
-		{Type: GetIntType(), BitWidth: -1},
+		{Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if !outer.HasBitfields() {
+	if !outer.HasBitfieldsSess(testAmbientSession) {
 		t.Fatal("nested residual HasBitfields must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -90,7 +90,7 @@ func TestHasBitfields(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nested ContainPointerField residual same invent soft-continue pointer-free.
-	if !outer.ContainPointerField() {
+	if !outer.ContainPointerFieldSess(testAmbientSession) {
 		t.Fatal("nested residual ContainPointerField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -99,7 +99,7 @@ func TestHasBitfields(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nested HasIntField residual soft invent was soft-continue later fields invent has-int.
 	// Fair: sticky not-has-int false.
-	if outer.HasIntField() {
+	if outer.HasIntFieldSess(testAmbientSession) {
 		t.Fatal("nested residual HasIntField must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -110,11 +110,11 @@ func TestHasBitfields(t *testing.T) {
 
 func TestCheckAndSetCast(t *testing.T) {
 	// int* expr desired as char* → needs cast if bases inequivalent
-	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
-	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
-	want := PointerTo(GetSimpleType(EChar))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), NewCVQualifiers([]bool{false}, []bool{false}))
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
+	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
 	e.CheckAndSetCast(want)
-	if GetIntType().SizeInBytes() != GetSimpleType(EChar).SizeInBytes() {
+	if GetIntTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EChar).SizeInBytesSess(testAmbientSession) {
 		if e.CastType == nil {
 			t.Fatal("expected cast")
 		}
@@ -126,7 +126,7 @@ func TestCheckAndSetCast(t *testing.T) {
 		t.Fatal("nil Expression CheckAndSetCast must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	e2 := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
+	e2 := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	e2.CheckAndSetCast(nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil desired CheckAndSetCast must SetError sticky")
@@ -144,8 +144,8 @@ func TestCheckAndSetCast(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// NeedsCast residual soft invent was CastType set then invent complete cast success.
 	// Fair: sticky no CastType past NeedsCast residual true path (nil shells).
-	src := PointerTo(GetIntType())
-	if src.NeedsCast(nil) {
+	src := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	if src.NeedsCastSess(testAmbientSession, nil) {
 		t.Fatal("NeedsCast nil other must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -153,7 +153,7 @@ func TestCheckAndSetCast(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// residual true path: nil src base via NeedsCast on nil this
-	if (*Type)(nil).NeedsCast(want) {
+	if (*Type)(nil).NeedsCastSess(testAmbientSession, want) {
 		t.Fatal("nil NeedsCast must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -164,9 +164,9 @@ func TestCheckAndSetCast(t *testing.T) {
 
 func TestCheckAndSetCastOptsLangCPP(t *testing.T) {
 	// Expression.cpp:222 — only lang_cpp sets cast
-	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
-	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
-	want := PointerTo(GetSimpleType(EChar))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), NewCVQualifiers([]bool{false}, []bool{false}))
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
+	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
 	opts := Defaults()
 	opts.LangCPP = false
 	e.CheckAndSetCastOpts(want, opts)
@@ -175,23 +175,23 @@ func TestCheckAndSetCastOptsLangCPP(t *testing.T) {
 	}
 	opts.LangCPP = true
 	e.CheckAndSetCastOpts(want, opts)
-	if e.CastType == nil && !PointerTo(GetIntType()).BaseType().IsEquivalent(want.BaseType()) {
+	if e.CastType == nil && !PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)).BaseTypeSess(testAmbientSession).IsEquivalentSess(testAmbientSession, want.BaseTypeSess(testAmbientSession)) {
 		t.Fatal("lang_cpp should set cast for inequivalent pointer bases")
 	}
 }
 
 func TestCheckAndSetCastViaInvokeGetType(t *testing.T) {
 	// check_and_set_cast uses get_type() for all term kinds (not only var/const)
-	arg := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), Value: "0"}}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{arg}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
-	want := PointerTo(GetSimpleType(EChar))
+	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
 	e.CheckAndSetCast(want)
 	if e.GetTypeUncast() == nil {
 		t.Fatal("uncast type")
 	}
 	// + of pointer-typed constant still pointer type via unary get_type
-	if e.CastType == nil && e.GetTypeUncast().NeedsCast(want) {
+	if e.CastType == nil && e.GetTypeUncast().NeedsCastSess(testAmbientSession, want) {
 		t.Fatal("expected cast from invoke type")
 	}
 }
@@ -199,17 +199,17 @@ func TestCheckAndSetCastViaInvokeGetType(t *testing.T) {
 func TestNeedsCastOnlySourcePointer(t *testing.T) {
 	// Type.cpp:1470 — only `this` must be pointer
 	ClearErrorSess(testAmbientSession)
-	pi := PointerTo(GetIntType())
+	pi := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// bases int vs char inequivalent → cast
-	if !pi.NeedsCast(GetSimpleType(EChar)) {
+	if !pi.NeedsCastSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar)) {
 		t.Fatal("int* needs_cast(char)")
 	}
 	// non-pointer source never needs cast
-	if GetIntType().NeedsCast(pi) {
+	if GetIntTypeSess(testAmbientSession).NeedsCastSess(testAmbientSession, pi) {
 		t.Fatal("int does not needs_cast")
 	}
 	// same base → no cast
-	if pi.NeedsCast(GetIntType()) {
+	if pi.NeedsCastSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("int* base int equivalent to int")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -220,26 +220,26 @@ func TestNeedsCastOnlySourcePointer(t *testing.T) {
 
 func TestIsPromotableRanks(t *testing.T) {
 	// Type.cpp:1387–1416
-	if !GetSimpleType(EChar).IsPromotable(GetIntType()) {
+	if !GetSimpleTypeSess(testAmbientSession, EChar).IsPromotableSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("char→int")
 	}
-	if GetIntType().IsPromotable(GetSimpleType(EChar)) {
+	if GetIntTypeSess(testAmbientSession).IsPromotableSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar)) {
 		t.Fatal("int not→char")
 	}
-	if !GetSimpleType(EShort).IsPromotable(GetIntType()) {
+	if !GetSimpleTypeSess(testAmbientSession, EShort).IsPromotableSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("short→int")
 	}
-	if GetIntType().IsPromotable(GetSimpleType(EShort)) {
+	if GetIntTypeSess(testAmbientSession).IsPromotableSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)) {
 		t.Fatal("int not→short")
 	}
-	if !GetSimpleType(EFloat).IsPromotable(GetIntType()) {
+	if !GetSimpleTypeSess(testAmbientSession, EFloat).IsPromotableSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("float→int promotable")
 	}
 }
 
 func TestIsConvertableFloatToIntForbidden(t *testing.T) {
 	// is_convertable: conversion FROM float TO int forbidden
-	// other.IsFloat() && !t.IsFloat() → false when converting int from float?
+	// other.IsFloatSess(testAmbientSession) && !t.IsFloatSess(testAmbientSession) → false when converting int from float?
 	// C++: if (t->is_float() && !is_float()) return false
 	// so target t is float and this is not float → false when converting non-float to float?
 	// Wait: `this->is_convertable(t)` means this converts TO t.
@@ -256,38 +256,38 @@ func TestIsConvertableFloatToIntForbidden(t *testing.T) {
 	// if (t->is_float() && !is_float()) — if TARGET is float and SOURCE is not → return false
 	// That blocks converting TO float FROM non-float. Comment might mean the reverse of code, or they mean assignment of float into int context differently.
 	// Follow code literally:
-	if GetIntType().IsConvertable(GetSimpleType(EFloat)) {
+	if GetIntTypeSess(testAmbientSession).IsConvertableSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EFloat)) {
 		t.Fatal("code blocks non-float→float?")
 	}
 	// float → int allowed by code
-	if !GetSimpleType(EFloat).IsConvertable(GetIntType()) {
+	if !GetSimpleTypeSess(testAmbientSession, EFloat).IsConvertableSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("float→int")
 	}
 }
 
 func TestIsConvertablePtrStrictFloatAndCPP(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	pi := PointerTo(GetIntType())
-	pf := PointerTo(GetSimpleType(EFloat))
+	pi := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	pf := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EFloat))
 	// same size usually float=4 int=4 → C allows by size
 	opts := Defaults()
 	opts.StrictFloat = false
 	opts.LangCPP = false
-	if !pi.IsConvertableOpts(pf, opts) && pi.BaseType().SizeInBytes() == pf.BaseType().SizeInBytes() {
+	if !pi.IsConvertableOptsSess(testAmbientSession, pf, opts) && pi.BaseTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) == pf.BaseTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) {
 		t.Fatal("same size ptr C")
 	}
 	opts.StrictFloat = true
-	if pi.IsConvertableOpts(pf, opts) {
+	if pi.IsConvertableOptsSess(testAmbientSession, pf, opts) {
 		t.Fatal("strict float blocks int*/float*")
 	}
 	opts.StrictFloat = false
 	opts.LangCPP = true
-	if pi.IsConvertableOpts(pf, opts) {
+	if pi.IsConvertableOptsSess(testAmbientSession, pf, opts) {
 		t.Fatal("lang_cpp blocks")
 	}
 	// incomplete Type sticky not-convertable
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsConvertableOpts(pi, opts) {
+	if (*Type)(nil).IsConvertableOptsSess(testAmbientSession, pi, opts) {
 		t.Fatal("nil IsConvertableOpts must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

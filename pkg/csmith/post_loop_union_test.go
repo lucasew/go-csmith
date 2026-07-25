@@ -6,11 +6,11 @@ import "testing"
 // Soft invent rewrote from preUnion + makeup; fair path keeps map_in last_written.
 func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	ut := &Type{isUnion: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f4", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f4", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	oldU := CreateVariableQferSess(testAmbientSession, "g_old", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	oldU.CreateFieldVarsSess(testAmbientSession)
@@ -55,13 +55,13 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "func_t", ReturnType: GetIntType()}
+	f := &Function{Name: "func_t", ReturnType: GetIntTypeSess(testAmbientSession)}
 	f.Stack = []*Block{}
 	ut := &Type{
 		isUnion: true, StructName: "U_pc",
 		Fields: []StructField{
-			{Name: "f0", Type: GetSimpleType(EChar), BitWidth: -1},
-			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1},
+			{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u_pc", ut, NewCVQualifiers([]bool{false}, []bool{false}))

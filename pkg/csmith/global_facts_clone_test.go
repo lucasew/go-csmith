@@ -8,7 +8,7 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -23,11 +23,11 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntTypeSess(testAmbientSession), false, false)
 	b := &Block{StmID: 1, Func: f}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -57,13 +57,13 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	// incomplete ambient/facts must not invent assign shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	vs := NewVariableSelector(testAmbientSession, opts)
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,7 +73,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType())) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -83,7 +83,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	// incomplete EffectStm must not invent assign under hole shell
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg3.EffectStm = IncompleteEffect()
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3, GetIntType())) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("incomplete EffectStm must fail closed MakeRandomAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -95,7 +95,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// after-left snapshot incomplete fails closed (no invent cleaned merge)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -120,7 +120,7 @@ func TestVisitFactsBinaryOrderedVisitResidualSticky(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// incomplete Constant shell residuals VisitFactsExpression
-	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}} // empty Value
+	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession)}} // empty Value
 	good := &Expression{Term: TermConstant, Con: MakeInt(0)}
 	fi := &Invocation{Args: []*Expression{hole, good}, Binary: "&&"}
 	if VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
@@ -147,16 +147,16 @@ func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed a global for expression selection
-	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 3))
+	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 3))
 	if MakeRandomIf(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomIf func_1 path")
 	}
@@ -168,7 +168,7 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -216,7 +216,7 @@ func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	_, _, _, ok := FindFixedPointBlock(b, in, &cg, Defaults(), false)
 	if ok {
@@ -233,7 +233,7 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 			{Term: TermConstant, Con: MakeInt(2)},
 		},
 	}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
@@ -247,13 +247,13 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 
 func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := &Stmt{
-		Kind: StmtAssign, StmID: 3, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: 3, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -281,7 +281,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// StmID 0 — no invent post_creation success without maps
 	st0 := &Stmt{
-		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: IncompleteStmID, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -319,7 +319,7 @@ func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

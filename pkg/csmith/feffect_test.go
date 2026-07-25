@@ -9,10 +9,10 @@ func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
 	// CGContext::write_var does not update Function::feffect (Function.cpp:657
 	// finalizes via map_stm_effect[body] only).
 	opts := Defaults()
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	l := CreateVariableQferSess(testAmbientSession, "l_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	l := CreateVariableQferSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg.NoteWrite(g)
 	cg.NoteWrite(l)
 	if f.FEffect.IsWrittenSess(testAmbientSession, g) || f.FEffect.IsWrittenSess(testAmbientSession, l) {
@@ -30,8 +30,8 @@ func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
 }
 
 func TestFunctionOutputFEffectComment(t *testing.T) {
-	f := &Function{Name: "func_1", ReturnType: GetIntType(), EmitConcise: false}
-	g := CreateVariableQferSess(testAmbientSession, "g_9", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), EmitConcise: false}
+	g := CreateVariableQferSess(testAmbientSession, "g_9", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	f.FEffect = f.FEffect.WriteVarSess(testAmbientSession, g)
 	f.Body = &Block{}
 	out := f.Output()
@@ -62,9 +62,9 @@ func TestGenerateHasEffectComments(t *testing.T) {
 func TestCommentOutputInsertionOrderAndFormat(t *testing.T) {
 	// Effect.cpp:507–529 — vector order; OutputMgr.cpp:318 — "/* " wrap
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableQferSess(testAmbientSession, "g_a", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	b := CreateVariableQferSess(testAmbientSession, "g_b", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	c := CreateVariableQferSess(testAmbientSession, "g_c", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	a := CreateVariableQferSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	b := CreateVariableQferSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
+	c := CreateVariableQferSess(testAmbientSession, "g_c", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	// insert b then a then c — not alphabetical
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, b).ReadVarSess(testAmbientSession, a).ReadVarSess(testAmbientSession, c).WriteVarSess(testAmbientSession, c).WriteVarSess(testAmbientSession, a)
 	out := eff.CommentOutputSess(testAmbientSession)

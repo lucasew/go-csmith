@@ -15,10 +15,10 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 	st := &Type{
 		isStruct:   true,
 		StructName: "S0",
-		Fields:     []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}},
+		Fields:     []StructField{{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}},
 	}
 	vs.Types = &TypeEnv{Sess: testAmbientSession,
-		AllTypes:    []*Type{st, GetIntType()},
+		AllTypes:    []*Type{st, GetIntTypeSess(testAmbientSession)},
 		StructTypes: []*Type{st},
 	}
 	// many draws: never struct/union param when disabled
@@ -31,8 +31,8 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 			continue
 		}
 		p := f.Param[0]
-		if p.Type != nil && (p.Type.IsStruct() || p.Type.IsUnion()) {
-			t.Fatalf("seed %d: got aggregate param %s", seed, p.Type.CName())
+		if p.Type != nil && (p.Type.IsStructSess(testAmbientSession) || p.Type.IsUnionSess(testAmbientSession)) {
+			t.Fatalf("seed %d: got aggregate param %s", seed, p.Type.CNameSess(testAmbientSession))
 		}
 	}
 }
@@ -41,14 +41,14 @@ func TestGenerateParameterVariablePointerChoice(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	pt := PointerTo(GetIntType())
-	vs.Types = &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{pt}, AllTypes: []*Type{GetIntType(), pt}}
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	vs.Types = &TypeEnv{Sess: testAmbientSession, DerivedTypes: []*Type{pt}, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), pt}}
 	foundPtr := false
 	for seed := uint64(1); seed < 50; seed++ {
 		ClearErrorSess(testAmbientSession)
 		f := &Function{Name: "f"}
 		_ = vs.GenerateParameterVariable(f, NewRngSess(testAmbientSession, seed))
-		if len(f.Param) > 0 && f.Param[0].Type != nil && f.Param[0].Type.IsPointerLike() {
+		if len(f.Param) > 0 && f.Param[0].Type != nil && f.Param[0].Type.IsPointerLikeSess(testAmbientSession) {
 			foundPtr = true
 			break
 		}
@@ -65,13 +65,13 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// HasPointerType true via DerivedTypes but ChooseRandomPointerType needs non-empty
 	// empty Derived after flip: HasPointerType false → nonvoid path
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	f := &Function{Name: "f"}
 	v := vs.GenerateParameterVariable(f, NewRngSess(testAmbientSession, 1))
 	if v == nil || v.Type == nil {
 		t.Fatal("expected nonvoid param")
 	}
-	if v.Type.IsPointerLike() {
+	if v.Type.IsPointerLikeSess(testAmbientSession) {
 		t.Fatal("no derived pointers → must not invent pointer param")
 	}
 	// nil Types → fail closed (no GetSimpleType invent)
@@ -85,7 +85,7 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
 	// Function.cpp:517–518 — assert when !return_structs and eStruct return sticky
 	ClearErrorSess(testAmbientSession)
-	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	f := &Function{Name: "f", ReturnType: st}
 	opts := Defaults()
 	opts.ReturnStructs = false
@@ -101,9 +101,9 @@ func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
 func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
 	// Function.cpp:489–490 — assert when !arg_structs and struct param sticky
 	ClearErrorSess(testAmbientSession)
-	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1}}}
 	pv := &Variable{Name: "p", Type: st}
-	f := &Function{Name: "f", ReturnType: GetIntType(), Param: []*Variable{pv}}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Param: []*Variable{pv}}
 	opts := Defaults()
 	opts.ArgStructs = false
 	if f.OutputHeaderOpts(false, opts) != "" {
@@ -120,9 +120,9 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{
 		Name:       "func_p",
-		ReturnType: GetIntType(),
+		ReturnType: GetIntTypeSess(testAmbientSession),
 		Param: []*Variable{
-			{Name: "", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
 	if out := f.OutputHeader(false); out != "" {
@@ -146,10 +146,10 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 func TestOutputHeaderInlineStatic(t *testing.T) {
 	f := &Function{
 		Name:       "func_2",
-		ReturnType: GetIntType(),
+		ReturnType: GetIntTypeSess(testAmbientSession),
 		IsInlined:  true,
 		Param: []*Variable{
-			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false),
 		},
 	}
 	h := f.OutputHeader(true)
@@ -160,14 +160,14 @@ func TestOutputHeaderInlineStatic(t *testing.T) {
 		t.Fatal(h)
 	}
 	// empty params → void
-	f2 := &Function{Name: "f", ReturnType: GetIntType()}
+	f2 := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	if !strings.Contains(f2.OutputHeader(false), "(void)") {
 		t.Fatal(f2.OutputHeader(false))
 	}
 }
 
 func TestOutputForwardDeclUsesHeader(t *testing.T) {
-	f := &Function{Name: "g_1", ReturnType: GetIntType(), IsInlined: true}
+	f := &Function{Name: "g_1", ReturnType: GetIntTypeSess(testAmbientSession), IsInlined: true}
 	d := f.OutputForwardDeclOpts(true, nil, false)
 	if !strings.HasSuffix(d, ";") {
 		t.Fatal(d)
@@ -178,7 +178,7 @@ func TestOutputForwardDeclUsesHeader(t *testing.T) {
 }
 
 func TestOutputHeaderAlias(t *testing.T) {
-	f := &Function{Name: "func_3", AliasName: "func_3_alias", ReturnType: GetIntType()}
+	f := &Function{Name: "func_3", AliasName: "func_3_alias", ReturnType: GetIntTypeSess(testAmbientSession)}
 	a := f.OutputHeaderAlias(true)
 	if !strings.Contains(a, `alias("func_3")`) || !strings.Contains(a, "static ") {
 		t.Fatal(a)
@@ -195,7 +195,7 @@ func TestOutputHeaderReturnStructOptionResidualSticky(t *testing.T) {
 	opts := Defaults()
 	opts.ReturnStructs = false
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	f := &Function{Name: "func_1", ReturnType: st}
 	if s := f.OutputHeaderOpts(false, opts); s != "" {
@@ -213,10 +213,10 @@ func TestParamListArgStructOptionResidualSticky(t *testing.T) {
 	opts := Defaults()
 	opts.ArgStructs = false
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	p := &Variable{Name: "p", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	f := &Function{Name: "func_1", ReturnType: GetIntType(), Param: []*Variable{p}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Param: []*Variable{p}}
 	if s := f.paramListCOpts(opts); s != "" {
 		t.Fatal("ArgStructs off must fail closed paramListC", s)
 	}

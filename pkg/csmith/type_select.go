@@ -129,7 +129,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 	ok := make([]*Type, 0)
 	for _, t := range env.AllTypes {
 		if wantStruct {
-			if !t.IsStruct() {
+			if !t.IsStructSess(sessFromEnv(env)) {
 				// residual ERROR sticky — no invent soft-skip then pick later past IsStruct residual
 				if hasErrEnv(env) {
 					return IncompleteTypes()
@@ -137,7 +137,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 				continue
 			}
 		} else {
-			if !t.IsUnion() {
+			if !t.IsUnionSess(sessFromEnv(env)) {
 				// residual ERROR sticky — no invent soft-skip then pick later past IsUnion residual
 				if hasErrEnv(env) {
 					return IncompleteTypes()
@@ -171,7 +171,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 		if hasErrEnv(env) {
 			return IncompleteTypes()
 		}
-		if needIntField && !t.HasIntField() {
+		if needIntField && !t.HasIntFieldSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past HasIntField hole
 			if hasErrEnv(env) {
 				return IncompleteTypes()
@@ -252,7 +252,7 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 
 // ChooseRandomStructFromTypeOpts is ChooseRandomStructFromType with explicit Options.
 func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile bool, opts Options) *Type {
-	if typ != nil && typ.IsStruct() {
+	if typ != nil && typ.IsStructSess(sessFromEnv(env)) {
 		// residual ERROR sticky — no invent soft-return typ past IsStruct residual hole
 		if hasErrEnv(env) {
 			return nil
@@ -358,20 +358,20 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 		}
 		t := env.AllTypes[i]
 		// pre-validated complete
-		if t.IsSimple() {
+		if t.IsSimpleSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-filter past IsSimple residual true
 			if hasErrEnv(env) {
 				return true
 			}
 			// SIMPLE_TYPES_PROB_FILTER (Type.cpp:226–228)
-			return probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0
+			return probs != nil && probs.SimpleTypeWeight(int(t.SimpleSess(sessFromEnv(env)))) == 0
 		}
 		// residual ERROR sticky — no invent soft-continue filter past IsSimple residual false
 		if hasErrEnv(env) {
 			return true
 		}
 		// Type.cpp:229–231 — !return_structs rejects structs only (not unions)
-		if t.IsStruct() && !opts.ReturnStructs {
+		if t.IsStructSess(sessFromEnv(env)) && !opts.ReturnStructs {
 			// residual ERROR sticky — no invent soft-reject/keep past IsStruct residual
 			if hasErrEnv(env) {
 				return true
@@ -476,10 +476,10 @@ func RandomTypeFromType(
 			}
 			return nil
 		}
-		return GetSimpleType(st)
+		return GetSimpleTypeSess(sessFromEnv(env), st)
 	}
 	// Type.cpp:602–605 — strict simple or non-simple: keep t (assert non-void simple) sticky
-	if simple && typ.Simple() == EVoid {
+	if simple && typ.SimpleSess(sessFromEnv(env)) == EVoid {
 		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
@@ -530,18 +530,18 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		}
 		t := env.AllTypes[i]
 		// pre-validated complete
-		simple := t.IsSimple()
+		simple := t.IsSimpleSess(sessFromEnv(env))
 		// residual ERROR sticky — no invent soft-filter past IsSimple residual
 		if hasErrEnv(env) {
 			return true
 		}
-		if simple && t.Simple() == EVoid {
+		if simple && t.SimpleSess(sessFromEnv(env)) == EVoid {
 			return true
 		}
-		if simple && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
+		if simple && probs != nil && probs.SimpleTypeWeight(int(t.SimpleSess(sessFromEnv(env)))) == 0 {
 			return true
 		}
-		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
+		if noVolatileAgg && t.IsAggregateSess(sessFromEnv(env)) && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past IsVolatileStructUnion hole
 			if hasErrEnv(env) {
 				return true
@@ -554,7 +554,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		}
 		// arg_structs / arg_unions: NonVoidNonVolatileTypeFilter only (Type.cpp:171–177)
 		if noVolatileAgg {
-			if t.IsStruct() && !opts.ArgStructs {
+			if t.IsStructSess(sessFromEnv(env)) && !opts.ArgStructs {
 				if hasErrEnv(env) {
 					return true
 				}
@@ -563,7 +563,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 			if hasErrEnv(env) {
 				return true
 			}
-			if t.IsUnion() && !opts.ArgUnions {
+			if t.IsUnionSess(sessFromEnv(env)) && !opts.ArgUnions {
 				if hasErrEnv(env) {
 					return true
 				}
@@ -626,7 +626,7 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 				return nil
 			}
 			t := env.DerivedTypes[idx]
-			if t.IndirectLevel() < opts.MaxPointerDepth {
+			if t.IndirectLevelSess(sessFromEnv(env)) < opts.MaxPointerDepth {
 				// residual ERROR sticky — no invent soft-return pointer past IndirectLevel residual
 				if hasErrEnv(env) {
 					return nil
@@ -650,12 +650,12 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 		return nil
 	}
 	// Type.cpp:1161–1164 — any eSimple consolidates to get_int_type()
-	if base.IsSimple() {
+	if base.IsSimpleSess(sessFromEnv(env)) {
 		// residual ERROR sticky — no invent soft-consolidate past IsSimple residual hole
 		if hasErrEnv(env) {
 			return nil
 		}
-		base = GetIntType()
+		base = GetIntTypeSess(sessFromEnv(env))
 	} else if hasErrEnv(env) {
 		// residual ERROR sticky — no invent soft-continue past IsSimple residual false
 		return nil
@@ -692,7 +692,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 		if env != nil {
 			typ = env.MakeRandomPointerType(r, opts, probs)
 		}
-		// no soft invent PointerTo(int) when env missing
+		// no soft invent PointerToSess(sessFromEnv(env), int) when env missing
 	}
 	// Type.cpp:1613 — ERROR_GUARD(nullptr) always after pointer branch (before default int)
 	// sticky error must not soft invent get_int_type()
@@ -728,12 +728,12 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			return nil
 		}
 		if opts.EnableFloat {
-			typ = GetSimpleType(EFloat)
+			typ = GetSimpleTypeSess(sessFromEnv(env), EFloat)
 		}
 	}
 	// Type.cpp:1635–1637 — default get_int_type()
 	if typ == nil {
-		typ = GetIntType()
+		typ = GetIntTypeSess(sessFromEnv(env))
 	}
 	return typ
 }

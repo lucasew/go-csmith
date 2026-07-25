@@ -7,27 +7,27 @@ import (
 
 func TestGetTypeFromString(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if GetTypeFromString("Int") != GetIntType() {
+	if GetTypeFromStringSess(testAmbientSession, "Int") != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("Int")
 	}
-	if GetTypeFromString("Void").Simple() != EVoid {
+	if GetTypeFromStringSess(testAmbientSession, "Void").SimpleSess(testAmbientSession) != EVoid {
 		t.Fatal("Void")
 	}
-	if GetTypeFromString("ULonglong").Simple() != EULongLong {
+	if GetTypeFromStringSess(testAmbientSession, "ULonglong").SimpleSess(testAmbientSession) != EULongLong {
 		t.Fatal("ULonglong")
 	}
-	if GetTypeFromString("Nope") != nil {
+	if GetTypeFromStringSess(testAmbientSession, "Nope") != nil {
 		t.Fatal("unknown")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown type string must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GetIntType().TypeNameString() != "Int" {
-		t.Fatal(GetIntType().TypeNameString())
+	if GetIntTypeSess(testAmbientSession).TypeNameStringSess(testAmbientSession) != "Int" {
+		t.Fatal(GetIntTypeSess(testAmbientSession).TypeNameStringSess(testAmbientSession))
 	}
 	// unknown simple TypeNameString — sticky no invent empty token
-	if s := (&Type{simple: ESimpleType(99)}).TypeNameString(); s != "" {
+	if s := (&Type{simple: ESimpleType(99)}).TypeNameStringSess(testAmbientSession); s != "" {
 		t.Fatal("unknown simple TypeNameString invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -35,45 +35,45 @@ func TestGetTypeFromString(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty struct/union tag sticky (parity with CName; no invent empty type-name)
-	if s := (&Type{isStruct: true, StructName: ""}).TypeNameString(); s != "" {
+	if s := (&Type{isStruct: true, StructName: ""}).TypeNameStringSess(testAmbientSession); s != "" {
 		t.Fatal("empty struct tag TypeNameString invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty struct tag TypeNameString must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (&Type{isUnion: true, StructName: ""}).TypeNameString(); s != "" {
+	if s := (&Type{isUnion: true, StructName: ""}).TypeNameStringSess(testAmbientSession); s != "" {
 		t.Fatal("empty union tag TypeNameString invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty union tag TypeNameString must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&Type{isStruct: true, StructName: "S0"}).TypeNameString() != "S0" {
+	if (&Type{isStruct: true, StructName: "S0"}).TypeNameStringSess(testAmbientSession) != "S0" {
 		t.Fatal("struct tag")
 	}
 }
 
 func TestSignedOverflowPossible(t *testing.T) {
-	SetPlatformSizes(4, 8)
-	defer SetPlatformSizes(4, 8)
+	SetPlatformSizesSess(testAmbientSession, 4, 8)
+	defer SetPlatformSizesSess(testAmbientSession, 4, 8)
 	// char size 1 < int 4
-	if GetSimpleType(EChar).SignedOverflowPossible(4) {
+	if GetSimpleTypeSess(testAmbientSession, EChar).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("char")
 	}
-	if !GetIntType().SignedOverflowPossible(4) {
+	if !GetIntTypeSess(testAmbientSession).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("int")
 	}
-	if GetSimpleType(EUInt).SignedOverflowPossible(4) {
+	if GetSimpleTypeSess(testAmbientSession, EUInt).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("unsigned")
 	}
 	// no invent platform int_size when arg is 0
-	if GetIntType().SignedOverflowPossible(0) {
+	if GetIntTypeSess(testAmbientSession).SignedOverflowPossibleSess(testAmbientSession, 0) {
 		t.Fatal("intSize 0 must fail closed false")
 	}
 	// Type* always live; sticky true (no invent overflow-free soft-skip)
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).SignedOverflowPossible(4) {
+	if !(*Type)(nil).SignedOverflowPossibleSess(testAmbientSession, 4) {
 		t.Fatal("nil SignedOverflowPossible must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -85,147 +85,147 @@ func TestSignedOverflowPossible(t *testing.T) {
 func TestTypeNilHardQuerySticky(t *testing.T) {
 	// Type* always live at hard query/emit; sticky no invent soft success past hole
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).Simple() != EVoid {
+	if (*Type)(nil).SimpleSess(testAmbientSession) != EVoid {
 		t.Fatal("nil Simple must fail closed EVoid")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Simple must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).PtrType() != nil {
+	if (*Type)(nil).PtrTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil PtrType must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PtrType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).ToUnsigned() != nil {
+	if (*Type)(nil).ToUnsignedSess(testAmbientSession) != nil {
 		t.Fatal("nil ToUnsigned must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ToUnsigned must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).ContainPointerField() {
+	if !(*Type)(nil).ContainPointerFieldSess(testAmbientSession) {
 		t.Fatal("nil ContainPointerField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ContainPointerField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).HasBitfields() {
+	if !(*Type)(nil).HasBitfieldsSess(testAmbientSession) {
 		t.Fatal("nil HasBitfields must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasBitfields must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).HasPadding() {
+	if !(*Type)(nil).HasPaddingSess(testAmbientSession) {
 		t.Fatal("nil HasPadding must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasPadding must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsBitfieldIndex(0) {
+	if (*Type)(nil).IsBitfieldIndexSess(testAmbientSession, 0) {
 		t.Fatal("nil IsBitfieldIndex must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsBitfieldIndex must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsUnamedPadding(0) {
+	if (*Type)(nil).IsUnamedPaddingSess(testAmbientSession, 0) {
 		t.Fatal("nil IsUnamedPadding must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsUnamedPadding must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsUnnamedPadding(0) {
+	if (*Type)(nil).IsUnnamedPaddingSess(testAmbientSession, 0) {
 		t.Fatal("nil IsUnnamedPadding must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsUnnamedPadding must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (*Type)(nil).TypeNameString(); s != "" {
+	if s := (*Type)(nil).TypeNameStringSess(testAmbientSession); s != "" {
 		t.Fatal("nil TypeNameString invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil TypeNameString must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (*Type)(nil).PrintfDirective(); s != "" {
+	if s := (*Type)(nil).PrintfDirectiveSess(testAmbientSession); s != "" {
 		t.Fatal("nil PrintfDirective invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil PrintfDirective must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).HasIntField() {
+	if (*Type)(nil).HasIntFieldSess(testAmbientSession) {
 		t.Fatal("nil HasIntField must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil HasIntField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).IsFullBitfieldsStruct() {
+	if !(*Type)(nil).IsFullBitfieldsStructSess(testAmbientSession) {
 		t.Fatal("nil IsFullBitfieldsStruct must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsFullBitfieldsStruct must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(*Type)(nil).IsSigned() {
+	if !(*Type)(nil).IsSignedSess(testAmbientSession) {
 		t.Fatal("nil IsSigned must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsSigned must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsFloat() {
+	if (*Type)(nil).IsFloatSess(testAmbientSession) {
 		t.Fatal("nil IsFloat must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsFloat must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsSignedChar() {
+	if (*Type)(nil).IsSignedCharSess(testAmbientSession) {
 		t.Fatal("nil IsSignedChar must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsSignedChar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).MatchSess(testAmbientSession, GetIntType(), MatchExact) {
+	if (*Type)(nil).MatchSess(testAmbientSession, GetIntTypeSess(testAmbientSession), MatchExact) {
 		t.Fatal("nil Match must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Match must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsPromotable(GetIntType()) {
+	if (*Type)(nil).IsPromotableSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("nil IsPromotable must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsPromotable must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsEquivalent(GetIntType()) {
+	if (*Type)(nil).IsEquivalentSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("nil IsEquivalent must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsEquivalent must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsDereferencedFrom(PointerTo(GetIntType())) {
+	if (*Type)(nil).IsDereferencedFromSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil IsDereferencedFrom must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsDereferencedFrom must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IsDerivable(GetIntType()) {
+	if (*Type)(nil).IsDerivableSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("nil IsDerivable must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -237,7 +237,7 @@ func TestTypeNilHardQuerySticky(t *testing.T) {
 func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {
 	// unknown simple — sticky no soft invent platform int size
 	ClearErrorSess(testAmbientSession)
-	if n := (&Type{simple: ESimpleType(99)}).SizeInBytes(); n != 0 {
+	if n := (&Type{simple: ESimpleType(99)}).SizeInBytesSess(testAmbientSession); n != 0 {
 		t.Fatal("unknown simple SizeInBytes invent", n)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -249,7 +249,7 @@ func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {
 func TestSizeInBytesNilSticky(t *testing.T) {
 	// Type* always live at SizeInBytes; sticky no invent zero-size soft-skip
 	ClearErrorSess(testAmbientSession)
-	if n := (*Type)(nil).SizeInBytes(); n != 0 {
+	if n := (*Type)(nil).SizeInBytesSess(testAmbientSession); n != 0 {
 		t.Fatal("nil SizeInBytes invent", n)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -261,14 +261,14 @@ func TestSizeInBytesNilSticky(t *testing.T) {
 func TestIndirectLevelBaseTypeNilSticky(t *testing.T) {
 	// Type* always live; sticky no invent level-0 / missing base soft-skip past hole
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).IndirectLevel() != 0 {
+	if (*Type)(nil).IndirectLevelSess(testAmbientSession) != 0 {
 		t.Fatal("nil IndirectLevel must fail closed 0")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IndirectLevel must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).BaseType() != nil {
+	if (*Type)(nil).BaseTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil BaseType must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -276,12 +276,12 @@ func TestIndirectLevelBaseTypeNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete pointer still peels
-	p := PointerTo(GetIntType())
-	if p.IndirectLevel() != 1 {
-		t.Fatal(p.IndirectLevel())
+	p := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	if p.IndirectLevelSess(testAmbientSession) != 1 {
+		t.Fatal(p.IndirectLevelSess(testAmbientSession))
 	}
-	if p.BaseType() != GetIntType() {
-		t.Fatal(p.BaseType())
+	if p.BaseTypeSess(testAmbientSession) != GetIntTypeSess(testAmbientSession) {
+		t.Fatal(p.BaseTypeSess(testAmbientSession))
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete IndirectLevel/BaseType must not sticky")
@@ -291,25 +291,25 @@ func TestIndirectLevelBaseTypeNilSticky(t *testing.T) {
 
 func TestPrintfDirective(t *testing.T) {
 	// pin platform so int is 4-byte (Generate may leave host int size)
-	SetPlatformSizes(4, 8)
-	defer SetPlatformSizes(4, 8)
-	if GetIntType().PrintfDirective() != "%d" {
-		t.Fatal(GetIntType().PrintfDirective())
+	SetPlatformSizesSess(testAmbientSession, 4, 8)
+	defer SetPlatformSizesSess(testAmbientSession, 4, 8)
+	if GetIntTypeSess(testAmbientSession).PrintfDirectiveSess(testAmbientSession) != "%d" {
+		t.Fatal(GetIntTypeSess(testAmbientSession).PrintfDirectiveSess(testAmbientSession))
 	}
-	if GetSimpleType(EUInt).PrintfDirective() != "%u" {
+	if GetSimpleTypeSess(testAmbientSession, EUInt).PrintfDirectiveSess(testAmbientSession) != "%u" {
 		t.Fatal("uint")
 	}
-	if GetSimpleType(ELongLong).PrintfDirective() != "%lld" {
+	if GetSimpleTypeSess(testAmbientSession, ELongLong).PrintfDirectiveSess(testAmbientSession) != "%lld" {
 		t.Fatal("ll")
 	}
-	if PointerTo(GetIntType()).PrintfDirective() != "0x%0x" {
+	if PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)).PrintfDirectiveSess(testAmbientSession) != "0x%0x" {
 		t.Fatal("ptr")
 	}
 	st := &Type{isStruct: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType()},
-		{Name: "f1", Type: GetSimpleType(EUInt)},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession)},
+		{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt)},
 	}}
-	pd := st.PrintfDirective()
+	pd := st.PrintfDirectiveSess(testAmbientSession)
 	if !strings.Contains(pd, "%d") || !strings.Contains(pd, "%u") {
 		t.Fatal(pd)
 	}
@@ -317,19 +317,19 @@ func TestPrintfDirective(t *testing.T) {
 
 func TestSizeofString(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if GetIntType().SizeofString() != "sizeof(int32_t)" {
-		t.Fatal(GetIntType().SizeofString())
+	if GetIntTypeSess(testAmbientSession).SizeofStringSess(testAmbientSession) != "sizeof(int32_t)" {
+		t.Fatal(GetIntTypeSess(testAmbientSession).SizeofStringSess(testAmbientSession))
 	}
 	// Type* always live; sticky no invent sizeof(void)/sizeof()
 	ClearErrorSess(testAmbientSession)
-	if s := (*Type)(nil).SizeofString(); s != "" {
+	if s := (*Type)(nil).SizeofStringSess(testAmbientSession); s != "" {
 		t.Fatal("nil sizeof invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SizeofString must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (&Type{isStruct: true}).SizeofString(); s != "" {
+	if s := (&Type{isStruct: true}).SizeofStringSess(testAmbientSession); s != "" {
 		t.Fatal("unnamed struct sizeof invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -341,11 +341,11 @@ func TestSizeofString(t *testing.T) {
 func TestPointerToNoInventIntStar(t *testing.T) {
 	// Type.cpp find_pointer_type sticky — no soft invent int* for nil pointee
 	ClearErrorSess(testAmbientSession)
-	if p := PointerTo(nil); p != nil {
-		t.Fatal("PointerTo(nil) must fail closed nil, got", p.CName())
+	if p := PointerToSess(testAmbientSession, nil); p != nil {
+		t.Fatal("PointerToSess(testAmbientSession, nil) must fail closed nil, got", p.CNameSess(testAmbientSession))
 	}
 	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("PointerTo(nil) must SetError sticky")
+		t.Fatal("PointerToSess(testAmbientSession, nil) must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -357,11 +357,11 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 			{Name: "f1", Type: nil, BitWidth: -1},
 		},
 	}
-	if s := st.PrintfDirective(); s != "" {
+	if s := st.PrintfDirectiveSess(testAmbientSession); s != "" {
 		t.Fatal("nil field type must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -374,7 +374,7 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 		isStruct:   true,
 		StructName: "Nest",
 		Fields: []StructField{
-			{Name: "x", Type: GetIntType(), BitWidth: -1},
+			{Name: "x", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 			{Name: "y", Type: nil, BitWidth: -1},
 		},
 	}
@@ -382,12 +382,12 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 		isStruct:   true,
 		StructName: "S1",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 			{Name: "f1", Type: nested, BitWidth: -1},
-			{Name: "f2", Type: GetIntType(), BitWidth: -1},
+			{Name: "f2", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
-	if s := st2.PrintfDirective(); s != "" {
+	if s := st2.PrintfDirectiveSess(testAmbientSession); s != "" {
 		t.Fatal("nested residual must fail closed whole PrintfDirective, not invent partial", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -398,22 +398,22 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 
 func TestHasAggregateAndLongLongField(t *testing.T) {
 	fields := []StructField{
-		{Name: "f0", Type: GetIntType()},
-		{Name: "f1", Type: GetSimpleType(ELongLong)},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession)},
+		{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, ELongLong)},
 	}
-	if HasAggregateField(fields) {
+	if HasAggregateFieldSess(testAmbientSession, fields) {
 		t.Fatal("no aggregate")
 	}
-	if !HasLongLongField(fields) {
+	if !HasLongLongFieldSess(testAmbientSession, fields) {
 		t.Fatal("ll")
 	}
 	fields = append(fields, StructField{Name: "f2", Type: &Type{isStruct: true}})
-	if !HasAggregateField(fields) {
+	if !HasAggregateFieldSess(testAmbientSession, fields) {
 		t.Fatal("agg")
 	}
 	// nil field Type sticky has-aggregate (no invent none / soft re-pick past hole)
 	ClearErrorSess(testAmbientSession)
-	if !HasAggregateField([]StructField{{Name: "f0", Type: nil}}) {
+	if !HasAggregateFieldSess(testAmbientSession, []StructField{{Name: "f0", Type: nil}}) {
 		t.Fatal("nil field Type must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -425,24 +425,24 @@ func TestHasAggregateAndLongLongField(t *testing.T) {
 func TestIsUnnamedPadding(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: 0},
-		{Name: "f1", Type: GetIntType(), BitWidth: 3},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 0},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3},
 	}}
-	if !st.IsUnnamedPadding(0) {
+	if !st.IsUnnamedPaddingSess(testAmbientSession, 0) {
 		t.Fatal("pad")
 	}
-	if st.IsUnnamedPadding(1) {
+	if st.IsUnnamedPaddingSess(testAmbientSession, 1) {
 		t.Fatal("named bitfield")
 	}
 	// Type.cpp assert OOB sticky
-	if st.IsBitfieldIndex(99) {
+	if st.IsBitfieldIndexSess(testAmbientSession, 99) {
 		t.Fatal("OOB IsBitfieldIndex invent")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB IsBitfieldIndex must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if st.IsUnamedPadding(-1) {
+	if st.IsUnamedPaddingSess(testAmbientSession, -1) {
 		t.Fatal("neg IsUnamedPadding invent")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -453,7 +453,7 @@ func TestIsUnnamedPadding(t *testing.T) {
 
 func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), nil}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), nil}}
 	if typesComplete(env.GetAllOKStructUnionTypes(false, false, false, true)) {
 		t.Fatal("nil type hole must fail closed incomplete, not invent empty complete")
 	}
@@ -462,7 +462,7 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete empty filter (no structs) is complete empty non-nil
-	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	ok := env2.GetAllOKStructUnionTypes(false, false, false, true)
 	if !typesComplete(ok) || len(ok) != 0 {
 		t.Fatal("no structs must be complete empty", ok)
@@ -472,28 +472,28 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 func TestGetSimpleTypeOOBNoInventInt(t *testing.T) {
 	// Type.cpp get_simple_type assert path — sticky, no invent eInt for invalid enum
 	ClearErrorSess(testAmbientSession)
-	if GetSimpleType(ESimpleType(-1)) != nil {
+	if GetSimpleTypeSess(testAmbientSession, ESimpleType(-1)) != nil {
 		t.Fatal("negative eSimpleType must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("negative eSimpleType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GetSimpleType(ESimpleType(MaxSimpleTypes)) != nil {
+	if GetSimpleTypeSess(testAmbientSession, ESimpleType(MaxSimpleTypes)) != nil {
 		t.Fatal("OOB eSimpleType must fail closed nil, not invent eInt")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("OOB eSimpleType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GetSimpleType(ESimpleType(MaxSimpleTypes+99)) != nil {
+	if GetSimpleTypeSess(testAmbientSession, ESimpleType(MaxSimpleTypes+99)) != nil {
 		t.Fatal("far OOB must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("far OOB must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if GetSimpleType(EInt) != GetIntType() {
+	if GetSimpleTypeSess(testAmbientSession, EInt) != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("valid eInt must still resolve")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -504,7 +504,7 @@ func TestGetSimpleTypeOOBNoInventInt(t *testing.T) {
 func TestFindTypeNilHole(t *testing.T) {
 	// Type* always live on AllTypes; no invent soft-skip hole then match later
 	ClearErrorSess(testAmbientSession)
-	intT := GetIntType()
+	intT := GetIntTypeSess(testAmbientSession)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{nil, intT}}
 	if env.FindType(intT) != nil {
 		t.Fatal("nil AllTypes hole must fail closed FindType (not soft-skip to match)")
@@ -514,7 +514,7 @@ func TestFindTypeNilHole(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete pool still finds
-	envOK := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleType(EShort), intT}}
+	envOK := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetSimpleTypeSess(testAmbientSession, EShort), intT}}
 	if envOK.FindType(intT) != intT {
 		t.Fatal("complete pool must find type")
 	}
@@ -528,7 +528,7 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 		{Name: "f0", Type: nil},
 	}}
 	good := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType()},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession)},
 	}}
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, good}}
 	if typesComplete(env.GetAllOKStructUnionTypes(true, false, false, true)) {
@@ -561,12 +561,12 @@ func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
 func TestGetAllOKStructUnionTypes(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType()},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession)},
 	}}
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType()},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession)},
 	}}
-	env.AllTypes = []*Type{GetIntType(), st, ut}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), st, ut}
 	structs := env.GetAllOKStructUnionTypes(false, false, true, true)
 	if len(structs) != 1 || structs[0] != st {
 		t.Fatal(structs)
@@ -578,7 +578,7 @@ func TestGetAllOKStructUnionTypes(t *testing.T) {
 	if env.FindType(st) != st {
 		t.Fatal("find")
 	}
-	if env.FindType(GetSimpleType(EChar)) != nil {
+	if env.FindType(GetSimpleTypeSess(testAmbientSession, EChar)) != nil {
 		t.Fatal("not in AllTypes")
 	}
 }
@@ -598,21 +598,21 @@ func TestChooseRandomStructFromType(t *testing.T) {
 
 func TestIfStructAssignOps(t *testing.T) {
 	opts := Defaults()
-	if IfStructWillHaveAssignOps(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts)) {
+	if IfStructWillHaveAssignOpsSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts)) {
 		t.Fatal("C mode false")
 	}
 	opts.LangCPP = true
 	// may or may not flip — just exercise
-	_ = IfUnionWillHaveAssignOps(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts))
+	_ = IfUnionWillHaveAssignOpsSess(testAmbientSession, NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts))
 	// nil probs → 0% (no invent default 50)
 	for seed := uint64(1); seed < 30; seed++ {
-		if IfStructWillHaveAssignOps(NewRngSess(testAmbientSession, seed), opts, nil) {
+		if IfStructWillHaveAssignOpsSess(testAmbientSession, NewRngSess(testAmbientSession, seed), opts, nil) {
 			t.Fatal("nil probs must not invent assign-ops true at 50%")
 		}
 	}
 	// RNG always live under C++; sticky false (no invent no-assign-ops soft-skip)
 	ClearErrorSess(testAmbientSession)
-	if IfStructWillHaveAssignOps(nil, opts, NewProbabilities(opts)) {
+	if IfStructWillHaveAssignOpsSess(testAmbientSession, nil, opts, NewProbabilities(opts)) {
 		t.Fatal("nil RNG IfStructWillHaveAssignOps must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

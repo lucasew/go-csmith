@@ -13,11 +13,11 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f3", Type: GetSimpleType(EShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	f := &Function{Name: "func_30", ReturnType: GetIntType()}
+	f := &Function{Name: "func_30", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{Func: f, StmID: 463}
 	f.Blocks = []*Block{body}
 	f.Stack = []*Block{body}
@@ -51,7 +51,7 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	// UpdateFactsForDest must not mark-dead pointers to the field
-	ptr := CreateVariableScalarsSess(testAmbientSession, "l_1226", PointerTo(GetSimpleType(EShort)), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "l_1226", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
 	factsIn := []*FactPointTo{MakeFactPointTo(ptr, field)}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)

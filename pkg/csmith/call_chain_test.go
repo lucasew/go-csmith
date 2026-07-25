@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestAddExternalEffectGlobalsOnly(t *testing.T) {
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	e := EmptyEffect().WriteVarSess(testAmbientSession, g).WriteVarSess(testAmbientSession, l).ReadVarSess(testAmbientSession, g)
 	ext := EmptyEffect().AddExternalEffectSess(testAmbientSession, e)
 	if !ext.IsWrittenSess(testAmbientSession, g) || ext.IsWrittenSess(testAmbientSession, l) {
@@ -37,8 +37,8 @@ func TestExtendCallChain(t *testing.T) {
 // ExtendCallChain(prev) saw empty callee stack and omitted the caller frame.
 func TestExtendCallChainFromCallerNotCallee(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	caller := &Function{Name: "caller", ReturnType: GetIntType()}
-	callee := &Function{Name: "callee", ReturnType: GetIntType()}
+	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
+	callee := &Function{Name: "callee", ReturnType: GetIntTypeSess(testAmbientSession)}
 	callerBlk := &Block{Func: caller, StmID: AllocStmID()}
 	caller.Stack = []*Block{callerBlk}
 
@@ -72,12 +72,12 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{Types: &TypeEnv{Sess: testAmbientSession}}
-	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi == nil || fi.Failed || fi.User == nil {
 		t.Fatal("fail")
 	}
@@ -94,10 +94,10 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	// Function.cpp:657 finalizes caller feffect from map_stm_effect[body].
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
-	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
+	callee := &Function{Name: "c", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	callee.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, g)
-	caller := &Function{Name: "a", ReturnType: GetIntType()}
+	caller := &Function{Name: "a", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff

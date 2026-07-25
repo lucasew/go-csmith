@@ -9,7 +9,7 @@ func TestMakeRandomBinaryFloatPath(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	opts.EnableFloat = true
-	ft := GetSimpleType(EFloat)
+	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
 	f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
 		t.Fatal("nil")
@@ -30,7 +30,7 @@ func TestMakeRandomBinaryAssignKind(t *testing.T) {
 	opts := Defaults()
 	// assign kind: op2 == op1
 	for seed := uint64(1); seed < 20; seed++ {
-		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpAssign, BinAdd)
+		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpAssign, BinAdd)
 		if f == nil {
 			t.Fatalf("seed %d: nil", seed)
 		}
@@ -43,7 +43,7 @@ func TestMakeRandomBinaryAssignKind(t *testing.T) {
 func TestMakeRandomUnaryFloatPath(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
-	ft := GetSimpleType(EFloat)
+	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
 	f := MakeRandomUnary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, nil, UnMinus)
 	if f == nil {
 		t.Fatal("nil")
@@ -69,7 +69,7 @@ func TestMakeRandomUnaryIntPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
-	f := MakeRandomUnary(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), GetIntType(), nil, UnMinus)
+	f := MakeRandomUnary(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), nil, UnMinus)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -294,10 +294,10 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 	}
 	// ! on bare constant: (!4294967295UL) not (!(4294967295UL)) — Constant may already paren
 	// use a simple non-paren-wrapped path via variable name
-	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), true, false)
 	not := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "!",
-		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntType()}},
+		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	nout := not.Output()
 	if nout != "(!g_x)" {
@@ -306,7 +306,7 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 	// unary plus
 	plus := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "+",
-		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntType()}},
+		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	if plus.Output() != "(+g_x)" {
 		t.Fatalf("ePlus want (+g_x) got %q", plus.Output())
@@ -356,7 +356,7 @@ func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
-	ft := GetSimpleType(EFloat)
+	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
 	f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
 		t.Fatal("MakeRandomBinaryKind nil", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))

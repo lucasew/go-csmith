@@ -11,7 +11,7 @@ func TestExtensionValueAndInitialize(t *testing.T) {
 		t.Fatal("nil type sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if NewExtensionValue(GetIntType(), "") != nil || !HasErrorSess(testAmbientSession) {
+	if NewExtensionValue(GetIntTypeSess(testAmbientSession), "") != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -33,7 +33,7 @@ func TestExtensionValueAndInitialize(t *testing.T) {
 func TestAbsExtensionMakeInvocation(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1"}
-	ev := NewExtensionValue(GetIntType(), "x0")
+	ev := NewExtensionValue(GetIntTypeSess(testAmbientSession), "x0")
 	inv := AbsExtensionMakeFuncInvocation(f, []*ExtensionValue{ev})
 	if inv == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal(HasErrorSess(testAmbientSession))

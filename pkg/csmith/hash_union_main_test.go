@@ -11,8 +11,8 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 		isUnion:    true,
 		StructName: "U0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -37,7 +37,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 	// incomplete GlobalList / UnionFacts fail closed sticky (no invent empty hash)
 	vs := NewVariableSelector(testAmbientSession, Defaults())
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g, nil}
 	ClearErrorSess(testAmbientSession)
 	if HashGlobalVariables(vs) != "" {
@@ -60,9 +60,9 @@ func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 func TestHashGlobalVariablesHashOutputResidualSticky(t *testing.T) {
 	// hashOutput residual soft invent was soft-continue later globals invent partial hash.
 	ClearErrorSess(testAmbientSession)
-	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntTypeSess(testAmbientSession), false, false)
 	// IsArray without AsArray stickies hashOutput
-	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	vs := NewVariableSelector(testAmbientSession, Defaults())
 	vs.GlobalList = []*Variable{good, shell}
 	if s := HashGlobalVariables(vs); s != "" {
@@ -94,7 +94,7 @@ func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
 	if !g.hashFuncDefReady() {
 		t.Fatal("complete empty GlobalList must be ready")
 	}
-	g.VS.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), nil}
+	g.VS.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false), nil}
 	if g.hashFuncDefReady() {
 		t.Fatal("incomplete GlobalList must not invent hashFuncDefReady")
 	}
@@ -112,8 +112,8 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U1",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -140,11 +140,11 @@ func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	e := MakeExpressionAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil)
+	e := MakeExpressionAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), nil)
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {
 		t.Fatal(e)
 	}

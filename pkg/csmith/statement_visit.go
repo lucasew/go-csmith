@@ -665,7 +665,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		noteErrCG(cg, ErrGeneric)
 		return false
 	}
-	if !iv.Type.IsSimple() {
+	if !iv.Type.IsSimpleSess(cgSess(cg)) {
 		// residual ERROR sticky — no invent soft-continue for-visit past IsSimple residual
 		if hasErrCG(cg) {
 			return false

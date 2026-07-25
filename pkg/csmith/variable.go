@@ -277,7 +277,7 @@ func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		ty := v.Type.CName()
+		ty := v.Type.CNameSess(s)
 		// residual ERROR sticky — no invent soft-wrap past CName residual hole
 		if sessHasError(s) {
 			return ""
@@ -351,7 +351,7 @@ func (v *Variable) OutputLhsCOptsSess(s *Session, prefixName bool) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		ty := v.Type.CName()
+		ty := v.Type.CNameSess(s)
 		// residual ERROR sticky — no invent soft-wrap past CName residual hole
 		if sessHasError(s) {
 			return ""
@@ -541,7 +541,7 @@ func NewCtrlVarsSess(s *Session, maxDim int, freshNames bool) []*Variable {
 		}
 		ctrl = append(ctrl, &Variable{
 			Name: nm,
-			Type: GetIntType(),
+			Type: GetIntTypeSess(s),
 			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 		})
 		name++
@@ -794,12 +794,12 @@ func CreateVariableWithInitSess(s *Session, name string, typ *Type, init *Consta
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	simple := typ.IsSimple()
+	simple := typ.IsSimpleSess(s)
 	// residual ERROR sticky — no invent soft-create past IsSimple residual
 	if sessHasError(s) {
 		return nil
 	}
-	if simple && typ.Simple() == EVoid {
+	if simple && typ.SimpleSess(s) == EVoid {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
@@ -853,12 +853,12 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	simple := typ.IsSimple()
+	simple := typ.IsSimpleSess(s)
 	// residual ERROR sticky — no invent soft-create past IsSimple residual
 	if sessHasError(s) {
 		return nil
 	}
-	if simple && typ.Simple() == EVoid {
+	if simple && typ.SimpleSess(s) == EVoid {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
@@ -866,7 +866,7 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 	// Variable.cpp:392–395 — non-union top: Constant::make_random(type); union top: 0
 	// Constant::make_random reads session CGOptions + Probabilities
 	var init *Constant
-	isUn := typ.IsUnion()
+	isUn := typ.IsUnionSess(s)
 	// residual ERROR sticky — no invent soft-create past IsUnion residual
 	if sessHasError(s) {
 		return nil
@@ -1036,7 +1036,7 @@ func (v *Variable) IsValidVolatileSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !v.Type.IsPointerLike() {
+	if !v.Type.IsPointerLikeSess(s) {
 		// residual ERROR sticky — no invent valid-true past IsPointerLike residual hole
 		if sessHasError(s) {
 			return false
@@ -1607,7 +1607,7 @@ func (v *Variable) IsPartialVolatileAfterDerefSess(s *Session, derefLevel int) b
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
-		t = t.PtrType()
+		t = t.PtrTypeSess(s)
 		// residual ERROR sticky — no invent soft-peel past PtrType residual
 		if sessHasError(s) {
 			return true
@@ -1744,7 +1744,7 @@ func (v *Variable) IsAggregateSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := v.Type.IsAggregate()
+	ok := v.Type.IsAggregateSess(s)
 	// residual ERROR sticky — no invent soft not-aggregate past IsAggregate residual
 	if sessHasError(s) {
 		return false
@@ -1896,7 +1896,7 @@ func (v *Variable) MatchSess(s *Session, other *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if v.Type.IsAggregate() {
+	if v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent match path past IsAggregate residual
 		if sessHasError(s) {
 			return false
@@ -2211,7 +2211,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !v.Type.IsAggregate() {
+	if !v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-skip create past IsAggregate residual
 		if sessHasError(s) {
 			return
@@ -2376,7 +2376,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 			Init:       init,
 		}
 		// recursive expand nested structs
-		if f.Type.IsAggregate() {
+		if f.Type.IsAggregateSess(s) {
 			fv.CreateFieldVarsSess(s)
 		}
 		if sessHasError(s) {
@@ -2431,7 +2431,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual false
 		return ""
 	}
-	if v.Type.IsSimple() {
+	if v.Type.IsSimpleSess(s) {
 		// Variable.cpp:1184–1188 — name + printf_directive always live sticky
 		// no invent printf with empty name/directive
 		name := v.GetActualNameSess(s, false)
@@ -2439,7 +2439,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		if sessHasError(s) {
 			return ""
 		}
-		dir := v.Type.PrintfDirective()
+		dir := v.Type.PrintfDirectiveSess(s)
 		// residual ERROR sticky — no invent dump past PrintfDirective residual hole
 		if sessHasError(s) {
 			return ""
@@ -2450,7 +2450,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
-	if v.Type.IsStruct() {
+	if v.Type.IsStructSess(s) {
 		// residual ERROR sticky — no invent soft-dump past IsStruct residual true
 		if sessHasError(s) {
 			return ""
@@ -2475,7 +2475,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 	if sessHasError(s) {
 		return ""
 	}
-	if v.Type.IsUnion() {
+	if v.Type.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-dump past IsUnion residual true
 		if sessHasError(s) {
 			return ""
@@ -2509,9 +2509,9 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		return b.String()
 	}
 	// pointers: dump as pointer directive
-	if v.Type.IsPointerLike() {
+	if v.Type.IsPointerLikeSess(s) {
 		name := v.GetActualNameSess(s, false)
-		dir := v.Type.PrintfDirective()
+		dir := v.Type.PrintfDirectiveSess(s)
 		if name == "" || dir == "" {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
@@ -2560,12 +2560,12 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 		for _, i := range idx {
 			name += "[" + itoa(i) + "]"
 		}
-		if v.Type.IsSimple() {
+		if v.Type.IsSimpleSess(s) {
 			// residual ERROR sticky — no invent soft-dump past IsSimple residual true
 			if sessHasError(s) {
 				return ""
 			}
-			dir := v.Type.PrintfDirective()
+			dir := v.Type.PrintfDirectiveSess(s)
 			if dir == "" {
 				if !sessHasError(s) {
 					sessNoteError(s, ErrGeneric)
@@ -2579,7 +2579,7 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 		if sessHasError(s) {
 			return ""
 		}
-		if v.Type.IsAggregate() && len(v.FieldVars) > 0 {
+		if v.Type.IsAggregateSess(s) && len(v.FieldVars) > 0 {
 			// residual ERROR sticky — no invent soft-dump past IsAggregate residual true
 			if sessHasError(s) {
 				return ""
@@ -2591,7 +2591,7 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 					sessNoteError(s, ErrGeneric)
 					return ""
 				}
-				if v.Type.IsUnion() && !IsFieldReadable(v, fi, unionFacts) {
+				if v.Type.IsUnionSess(s) && !IsFieldReadable(v, fi, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial dump past hole
 					if sessHasError(s) {
 						return ""
@@ -2602,7 +2602,7 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 				if sessHasError(s) {
 					return ""
 				}
-				if !f.Type.IsSimple() {
+				if !f.Type.IsSimpleSess(s) {
 					// residual ERROR sticky — no invent soft-skip field past IsSimple residual
 					if sessHasError(s) {
 						return ""
@@ -2623,7 +2623,7 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 					suffix = ".f" + itoa(fi)
 				}
 				acc := name + suffix
-				dir := f.Type.PrintfDirective()
+				dir := f.Type.PrintfDirectiveSess(s)
 				if dir == "" {
 					// residual ERROR sticky — no invent soft-skip then partial dump past hole
 					if sessHasError(s) {
@@ -2783,7 +2783,7 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 	if v.IsArray && len(v.ArraySizes) > 0 {
 		return hashArrayVariableOptsSess(s, v, ctrl, unionFacts, opts)
 	}
-	if v.Type.IsAggregate() {
+	if v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if sessHasError(s) {
 			return ""
@@ -2953,7 +2953,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			return ""
 		}
 		useSimple = true
-	} else if v.Type.IsAggregate() {
+	} else if v.Type.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if sessHasError(s) {
 			return ""

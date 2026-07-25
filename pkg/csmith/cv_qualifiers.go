@@ -1106,7 +1106,7 @@ func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !t.IsStruct() && !t.IsUnion() {
+	if !t.IsStructSess(s) && !t.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft volatile-OK past IsStruct/IsUnion residual
 		if sessHasError(s) {
 			return false
@@ -1120,7 +1120,7 @@ func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
 	if !t.HasAssignOps {
 		return false
 	}
-	if t.IsStruct() {
+	if t.IsStructSess(s) {
 		// residual ERROR sticky — no invent soft volatile-OK past IsStruct residual
 		if sessHasError(s) {
 			return false
@@ -1139,7 +1139,7 @@ func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		if f.Type.IsStruct() {
+		if f.Type.IsStructSess(s) {
 			// residual ERROR sticky — no invent soft not-OK past nested IsStruct residual true
 			if sessHasError(s) {
 				return false
@@ -1150,7 +1150,7 @@ func isVolatileOKOnOneLevelSess(s *Session, opts Options, t *Type) bool {
 		if sessHasError(s) {
 			return false
 		}
-		if f.Type.IsUnion() {
+		if f.Type.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-continue past nested IsUnion residual
 			if sessHasError(s) {
 				return false
@@ -1209,7 +1209,7 @@ func RandomQualifiersForType(
 
 	// CVQualifiers.cpp:306–330 — pointer levels (t->ptr_type chain).
 	level := 0
-	tmp := t.PtrType()
+	tmp := t.PtrTypeSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent soft-qual levels past PtrType residual
 	if hasErrCG(&cg) {
 		return CVQualifiers{}
@@ -1218,13 +1218,13 @@ func RandomQualifiersForType(
 		level++
 		isConsts = append(isConsts, false)
 		isVolatiles = append(isVolatiles, false)
-		tmp = tmp.PtrType()
+		tmp = tmp.PtrTypeSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-qual levels past nested PtrType residual
 		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}
 	}
-	tmp = t.PtrType()
+	tmp = t.PtrTypeSess(sessFromCG(&cg))
 	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
@@ -1249,7 +1249,7 @@ func RandomQualifiersForType(
 		isConsts[level-1] = isConst
 		isVolatiles[level-1] = isVolatile
 		level--
-		tmp = tmp.PtrType()
+		tmp = tmp.PtrTypeSess(sessFromCG(&cg))
 		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}

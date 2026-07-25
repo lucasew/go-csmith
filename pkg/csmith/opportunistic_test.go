@@ -4,12 +4,12 @@ import "testing"
 
 func TestOpportunisticValidateNoDeref(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), v, GetIntType(), nil, 0, 0) != 1 {
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), v, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 1 {
 		t.Fatal("same level")
 	}
 	// nil var/type sticky — no invent not-valid soft success past hole
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), nil, GetIntType(), nil, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), nil, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 0 {
 		t.Fatal("nil var must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -27,13 +27,13 @@ func TestOpportunisticValidateNoDeref(t *testing.T) {
 
 func TestOpportunisticValidateNullDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// nil facts is complete empty — no related fact → 0
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntType(), nil, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), nil, 0, 0) != 0 {
 		t.Fatal("no fact")
 	}
 	// incomplete map hole → 0 sticky (not invent ok / soft re-pick past hole)
-	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntType(), []*FactPointTo{nil}, 0, 0) != 0 {
+	if OpportunisticValidate(NewRngSess(testAmbientSession, 1), p, GetIntTypeSess(testAmbientSession), []*FactPointTo{nil}, 0, 0) != 0 {
 		t.Fatal("incomplete must reject")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -44,18 +44,18 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	rNull := NewRngSess(testAmbientSession, 1)
 	d0 := rNull.RandDepth()
-	if OpportunisticValidate(rNull, p, GetIntType(), facts, 0, 0) != 0 {
+	if OpportunisticValidate(rNull, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
 		t.Fatal("null blocked")
 	}
 	if rNull.RandDepth() != d0+1 {
 		t.Fatalf("null p=0 must still flipcoin once: depth %d → %d", d0, rNull.RandDepth())
 	}
 	// live target → 1 (no flip when not null/dead)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	facts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	rLive := NewRngSess(testAmbientSession, 1)
 	dLive := rLive.RandDepth()
-	if OpportunisticValidate(rLive, p, GetIntType(), facts, 0, 0) != 1 {
+	if OpportunisticValidate(rLive, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 1 {
 		t.Fatal("live")
 	}
 	if rLive.RandDepth() != dLive {
@@ -65,7 +65,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	facts = []*FactPointTo{NewFactPointTo(p)}
 	rDead := NewRngSess(testAmbientSession, 1)
 	dDead := rDead.RandDepth()
-	if OpportunisticValidate(rDead, p, GetIntType(), facts, 0, 0) != 0 {
+	if OpportunisticValidate(rDead, p, GetIntTypeSess(testAmbientSession), facts, 0, 0) != 0 {
 		t.Fatal("dead blocked")
 	}
 	if rDead.RandDepth() != dDead+1 {
@@ -80,13 +80,13 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	fBoth := MakeFactPointTo(p, NullPtr)
 	// IsDead for null pointees? if only null, one flip. dead-only above. allow-unsafe path:
 	rAllow := NewRngSess(testAmbientSession, 1)
-	if OpportunisticValidate(rAllow, p, GetIntType(), []*FactPointTo{fBoth}, 100, 0) != 2 {
+	if OpportunisticValidate(rAllow, p, GetIntTypeSess(testAmbientSession), []*FactPointTo{fBoth}, 100, 0) != 2 {
 		// p=100 always allows null unsafe when is_null
 		t.Fatal("null with nullProb=100 must allow ret=2")
 	}
 	// nil r on null path sticky (C++ always has process RNG for flipcoin)
 	ClearErrorSess(testAmbientSession)
-	if OpportunisticValidate(nil, p, GetIntType(), []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 0, 0) != 0 {
+	if OpportunisticValidate(nil, p, GetIntTypeSess(testAmbientSession), []*FactPointTo{MakeFactPointTo(p, NullPtr)}, 0, 0) != 0 {
 		t.Fatal("nil r null path must reject")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -99,8 +99,8 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 	// FactPointTo.cpp:448–450 — FactPointTo tmp(var->get_collective()); find_related_fact
 	// Fact is stored on the collective; itemized member must resolve via get_collective.
 	ClearErrorSess(testAmbientSession)
-	elem := GetIntType()
-	pt := PointerTo(elem)
+	elem := GetIntTypeSess(testAmbientSession)
+	pt := PointerToSess(testAmbientSession, elem)
 	// collective array-of-pointer shell (fact subject)
 	coll := &ArrayVariable{
 		Variable: Variable{Name: "g_arr", Type: pt, IsArray: true, ArraySizes: []int{3}},
@@ -162,7 +162,7 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 
 func TestIsNonReadableNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
 	if !cg.IsNonReadable(g) {
 		t.Fatal("nil NoReadVars hole must fail closed as nonreadable")
@@ -183,8 +183,8 @@ func TestIsNonReadableNilHole(t *testing.T) {
 
 func TestVariableCompatible(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	if !a.CompatibleSess(testAmbientSession, a, false) {
 		t.Fatal("self")
 	}
@@ -194,7 +194,7 @@ func TestVariableCompatible(t *testing.T) {
 	if !a.CompatibleSess(testAmbientSession, b, true) {
 		t.Fatal("expand non-field")
 	}
-	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	if vol.CompatibleSess(testAmbientSession, vol, false) {
 		t.Fatal("vol self")
 	}
@@ -203,7 +203,7 @@ func TestVariableCompatible(t *testing.T) {
 func TestCompatibleCheckerDisabled(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	e := &Expression{Term: TermVariable, Var: a}
 	if CompatibleCheckExprVar(opts, a, e) {
 		t.Fatal("disabled")
@@ -214,7 +214,7 @@ func TestCompatibleCheckerDisabled(t *testing.T) {
 		t.Fatal("enabled Variable* overload must fail closed reject")
 	}
 	// unrelated var still rejected (assert(0), not invent compatible)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	eb := &Expression{Term: TermVariable, Var: b}
 	if !CompatibleCheckExprVar(opts, a, eb) {
 		t.Fatal("enabled Variable* overload always rejects")
@@ -223,17 +223,17 @@ func TestCompatibleCheckerDisabled(t *testing.T) {
 
 func TestHasDereferenceableVar(t *testing.T) {
 	opts := Defaults()
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
-	if !HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
+	if !HasDereferenceableVar([]*Variable{p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("valid ptr")
 	}
 	// garbage not valid
 	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(p)}
-	if HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
+	if HasDereferenceableVar([]*Variable{p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("dead")
 	}
 	// Type* always live; sticky no invent no-deref soft-skip
@@ -247,9 +247,9 @@ func TestHasDereferenceableVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was residual soft-continue then true
 	// from later good ptr. Fair: sticky fail closed whole probe.
-	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
-	if HasDereferenceableVar([]*Variable{shell, p}, GetIntType(), cg, opts) {
+	if HasDereferenceableVar([]*Variable{shell, p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("IsArray without AsArray HasDereferenceableVar must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -259,7 +259,7 @@ func TestHasDereferenceableVar(t *testing.T) {
 	// IsValidPtr residual soft invent was soft-continue later good invent true.
 	// Fair: sticky false. incomplete facts on first candidate stickies residual.
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt), nil}
-	if HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
+	if HasDereferenceableVar([]*Variable{p}, GetIntTypeSess(testAmbientSession), cg, opts) {
 		t.Fatal("IsValidPtr residual (incomplete facts) must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -273,10 +273,10 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	// force a volatile field if possible — check method on non-vol struct pointer
-	pt := PointerTo(st)
+	pt := PointerToSess(testAmbientSession, st)
 	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false}, []bool{false}))
 	// if struct has no vol fields, partial is false
 	_ = v.IsPartialVolatileAfterDerefSess(testAmbientSession, 1)
@@ -313,17 +313,17 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	opts.CompatibleCheck = true
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 2))
+	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	if g == nil {
 		t.Fatal("g")
 	}
 	// generate assigns — should not panic; StatementAssign.cpp:127 assert(fm)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	for seed := uint64(1); seed < 10; seed++ {
 		ClearErrorSess(testAmbientSession) // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
 			c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-			return MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
+			return MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
 		}()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)
@@ -335,14 +335,14 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 func TestLhsCompatibleExpr(t *testing.T) {
 	// Lhs.cpp:359–362
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
 	if a == nil || b == nil {
 		t.Fatal("vars")
 	}
-	lhs := &Lhs{Var: a, Type: GetIntType()}
-	ea := &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()}
-	eb := &Expression{Term: TermVariable, Var: b, ExprType: GetIntType()}
+	lhs := &Lhs{Var: a, Type: GetIntTypeSess(testAmbientSession)}
+	ea := &Expression{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)}
+	eb := &Expression{Term: TermVariable, Var: b, ExprType: GetIntTypeSess(testAmbientSession)}
 	if !lhs.CompatibleExpr(ea, false) {
 		t.Fatal("same var")
 	}
@@ -377,17 +377,17 @@ func TestLhsCompatibleExpr(t *testing.T) {
 func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 	// ExpressionFuncall.cpp:206–207 — unary invoke compatible via operand
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	if v == nil {
 		t.Fatal("var")
 	}
-	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
 	if !e.CompatibleWithVar(v, false) {
 		t.Fatal("unary minus of v compatible with v")
 	}
-	other := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), true, false)
+	other := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
 	if e.CompatibleWithVar(other, false) {
 		t.Fatal("not other")
 	}
@@ -406,7 +406,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// int* var with 2-level qfer; desired qfer 1-level for int* type match_indirect
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	vol := CreateVariableScalarsSess(testAmbientSession, "g_p", pt, true, false)
 	if vol == nil {
 		t.Fatal("vol ptr")
@@ -433,9 +433,9 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// from later good volatile. Fair: sticky fail closed whole probe.
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	good := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), true, false)
-	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
+	shell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
+	good := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), true, false)
+	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntTypeSess(testAmbientSession), nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

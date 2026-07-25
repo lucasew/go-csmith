@@ -220,7 +220,7 @@ func TestIsVolatileOKOnOneLevelCPP(t *testing.T) {
 	opts := Defaults()
 	opts.LangCPP = true
 	// non-aggregate always OK
-	if !isVolatileOKOnOneLevel(opts, GetIntType()) {
+	if !isVolatileOKOnOneLevel(opts, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("simple")
 	}
 	// struct without assign ops → false
@@ -242,7 +242,7 @@ func TestIsVolatileOKOnOneLevelCPP(t *testing.T) {
 	}
 	// union of simples OK
 	ut2 := &Type{isUnion: true, HasAssignOps: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	if !isVolatileOKOnOneLevel(opts, ut2) {
 		t.Fatal("union simples")
@@ -258,21 +258,21 @@ func TestIsVolatileOKOnOneLevelCPP(t *testing.T) {
 func TestHasPadding(t *testing.T) {
 	// unpacked struct always pads
 	st := &Type{isStruct: true, Packed: false}
-	if !st.HasPadding() {
+	if !st.HasPaddingSess(testAmbientSession) {
 		t.Fatal("unpacked")
 	}
 	// packed without bitfields → no
 	st2 := &Type{isStruct: true, Packed: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if st2.HasPadding() {
+	if st2.HasPaddingSess(testAmbientSession) {
 		t.Fatal("packed no bitfield")
 	}
 	// packed with bitfield → yes
 	st3 := &Type{isStruct: true, Packed: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: 3},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3},
 	}}
-	if !st3.HasPadding() {
+	if !st3.HasPaddingSess(testAmbientSession) {
 		t.Fatal("bitfield")
 	}
 	// packed nested field Type hole sticky has-padding (no invent padding-free soft-skip)
@@ -280,7 +280,7 @@ func TestHasPadding(t *testing.T) {
 	st4 := &Type{isStruct: true, Packed: true, Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	if !st4.HasPadding() {
+	if !st4.HasPaddingSess(testAmbientSession) {
 		t.Fatal("nil field Type must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -292,9 +292,9 @@ func TestHasPadding(t *testing.T) {
 	innerHole := &Type{isStruct: true, Packed: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
 	outer := &Type{isStruct: true, Packed: true, Fields: []StructField{
 		{Name: "nest", Type: innerHole, BitWidth: -1},
-		{Name: "ok", Type: GetIntType(), BitWidth: -1},
+		{Name: "ok", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if !outer.HasPadding() {
+	if !outer.HasPaddingSess(testAmbientSession) {
 		t.Fatal("nested residual HasPadding must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -308,7 +308,7 @@ func TestRandomQualifiersSimpleNoVolatile(t *testing.T) {
 	// Only const flipcoin(RegularConstProb=10); vol forced false.
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	ty := GetSimpleType(EInt)
+	ty := GetSimpleTypeSess(testAmbientSession, EInt)
 	r := NewRngSess(testAmbientSession, 2)
 	q := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	if len(q.IsConsts) != 1 || len(q.IsVolatiles) != 1 {
@@ -327,7 +327,7 @@ func TestRandomQualifiersSimpleWriteNoConst(t *testing.T) {
 	// WRITE → const_ok false → storage const false (no const flipcoin).
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	ty := GetSimpleType(EInt)
+	ty := GetSimpleTypeSess(testAmbientSession, EInt)
 	r := NewRngSess(testAmbientSession, 2)
 	// no_volatile true so only possible draws: for WRITE, only vol flip if SE-free then cleared.
 	// WRITE: const_ok=false → no const flip. vol flip then cleared.
@@ -340,7 +340,7 @@ func TestRandomQualifiersSimpleWriteNoConst(t *testing.T) {
 func TestRandomQualifiersSideEffectBlocksVolatile(t *testing.T) {
 	// effect_context not SE-free → volatile_ok false for storage → no vol flip for storage.
 	opts := Defaults()
-	ty := GetSimpleType(EInt)
+	ty := GetSimpleTypeSess(testAmbientSession, EInt)
 	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)
 	// Use volatile_prob=100 const=0 so if vol were OK it would always be true.
 	r := NewRngSess(testAmbientSession, 2)
@@ -356,7 +356,7 @@ func TestRandomQualifiersSideEffectBlocksVolatile(t *testing.T) {
 func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 	// incomplete EffectContext fails closed sticky (no invent non-vol qfer past holes)
 	opts := Defaults()
-	ty := GetSimpleType(EInt)
+	ty := GetSimpleTypeSess(testAmbientSession, EInt)
 	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	ClearErrorSess(testAmbientSession)
 	q := RandomQualifiersForType(ty, AccessRead, cg, false, 0, 100, opts, NewRngSess(testAmbientSession, 2))
@@ -397,7 +397,7 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 
 func TestRandomQualifiersSEFreeVolatileAlways(t *testing.T) {
 	opts := Defaults()
-	ty := GetSimpleType(EInt)
+	ty := GetSimpleTypeSess(testAmbientSession, EInt)
 	r := NewRngSess(testAmbientSession, 2)
 	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 0, 100, opts, r)
 	if !q.IsVolatiles[0] {
@@ -408,7 +408,7 @@ func TestRandomQualifiersSEFreeVolatileAlways(t *testing.T) {
 func TestRandomQualifiersDisallowConstVolatile(t *testing.T) {
 	opts := Defaults()
 	opts.AllowConstVolatile = false
-	ty := GetSimpleType(EInt)
+	ty := GetSimpleTypeSess(testAmbientSession, EInt)
 	// Force both flips true with prob 100; const must be cleared when both set.
 	r := NewRngSess(testAmbientSession, 2)
 	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 100, 100, opts, r)
@@ -426,9 +426,9 @@ func TestRandomQualifiersDisallowConstVolatile(t *testing.T) {
 func TestRandomQualifiersPointerLevels(t *testing.T) {
 	// int* → two qualifier levels: [pointee, pointer-var]
 	opts := Defaults()
-	ty := PointerTo(GetSimpleType(EInt))
-	if ty.IndirectLevel() != 1 {
-		t.Fatalf("indirect level: %d", ty.IndirectLevel())
+	ty := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt))
+	if ty.IndirectLevelSess(testAmbientSession) != 1 {
+		t.Fatalf("indirect level: %d", ty.IndirectLevelSess(testAmbientSession))
 	}
 	r := NewRngSess(testAmbientSession, 2)
 	// no_volatile, const_prob 0 → all false; still correct depths
@@ -443,7 +443,7 @@ func TestRandomQualifiersPointerDrawOrderSeed2(t *testing.T) {
 	//   pointee: flip vol, flip const; then storage: flip vol, flip const (if allowed).
 	// no_volatile=false, const=50, vol=50, SE-free READ.
 	opts := Defaults()
-	ty := PointerTo(GetSimpleType(EInt))
+	ty := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EInt))
 	r := NewRngSess(testAmbientSession, 2)
 	q := RandomQualifiersForType(ty, AccessRead, EmptyCGContext().WithSession(testAmbientSession), false, 50, 50, opts, r)
 
@@ -558,7 +558,7 @@ func TestSanityCheckIndirectLevelResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete scalar depth 1
-	if !q.SanityCheckSess(testAmbientSession, GetIntType()) {
+	if !q.SanityCheckSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) {
 		t.Fatal("complete SanityCheck")
 	}
 	if HasErrorSess(testAmbientSession) {

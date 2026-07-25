@@ -77,7 +77,7 @@ func MakeRandomIf(
 	// StatementIf.cpp:70–72 — Expression::make_random(int, nullptr, false, !const_as_condition)
 	// no soft TermVariable/TermConstant retries (ERROR_GUARD on null)
 	noConst := !opts.ConstAsCondition
-	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
+	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntTypeSess(sessFromCG(cg)), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
 	// StatementIf.cpp:72 — ERROR_GUARD(nullptr)
 	// residual ERROR sticky — no invent soft-continue if arms past condition make residual
 	if test == nil || hasErrCG(cg) {

@@ -5,9 +5,9 @@ import "testing"
 func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 	// Function.cpp:469 — global_facts = map_facts_out[body]
 	// missing body out must not invent keep prior GlobalFacts
-	f := &Function{Name: "f", ReturnType: GetIntType(), Body: &Block{StmID: 10}}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{StmID: 10}}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	prior := MakeFactPointTo(p, NullPtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	// no MapFactsOut[10]
@@ -29,9 +29,9 @@ func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 
 func TestBodyOutAssignIncompleteFailClosed(t *testing.T) {
 	// incomplete map_facts_out[body] must not invent cleaned GlobalFacts
-	f := &Function{Name: "f", ReturnType: GetIntType(), Body: &Block{StmID: 11}}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{StmID: 11}}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	fm.MapFactsOut = map[int][]*FactPointTo{
 		11: {MakeFactPointTo(p, NullPtr), nil},
@@ -50,9 +50,9 @@ func TestBodyOutAssignIncompleteFailClosed(t *testing.T) {
 func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	// FunctionInvocationUser.cpp:212 — ret_facts = map_facts_out[body]
 	// no invent GlobalFacts when body out missing
-	callee := &Function{Name: "g", ReturnType: GetIntType(), Body: &Block{StmID: 20}}
+	callee := &Function{Name: "g", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{StmID: 20}}
 	calFM := NewFactMgrSess(testAmbientSession, callee)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	calFM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	// no MapFactsOut[20]
 	var retFacts []*FactPointTo
@@ -142,14 +142,14 @@ func TestMakeRandomFunction(t *testing.T) {
 	opts.MaxBlockDepth = 1
 	opts.MaxFuncs = 5
 	vs := NewVariableSelector(testAmbientSession, opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	list := &FunctionList{}
 	// seed first so list non-empty for choose
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, list)
 	_ = MakeFirst(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Funcs = list
-	f := MakeRandomFunction(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list)
+	f := MakeRandomFunction(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, list)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -162,7 +162,7 @@ func TestMakeRandomFunction(t *testing.T) {
 		t.Log("params", len(f.Param))
 	}
 	// no invent unbuilt success when GenerateBody cannot run (nil RNG)
-	if MakeRandomFunction(nil, opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list) != nil {
+	if MakeRandomFunction(nil, opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, list) != nil {
 		t.Fatal("nil RNG must not invent unbuilt function")
 	}
 }
@@ -201,7 +201,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	seedTypesForTest(NewRngSess(testAmbientSession, 4), opts, probs, vs, list)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g, nil}
 	if MakeFirst(NewRngSess(testAmbientSession, 5), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
@@ -211,9 +211,9 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	vs2 := NewVariableSelector(testAmbientSession, opts)
 	list2 := &FunctionList{}
 	seedTypesForTest(NewRngSess(testAmbientSession, 6), opts, probs, vs2, list2)
-	vs2.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false), nil}
+	vs2.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list2)
-	if MakeRandomFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list2) != nil {
+	if MakeRandomFunction(NewRngSess(testAmbientSession, 7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, list2) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -254,7 +254,7 @@ func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
 	g := NewProgramGenerator(s)
 	g.Initialize()
 	g.GenerateAllTypes()
-	g.VS.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), nil}
+	g.VS.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), nil}
 	g.GenerateFunctions()
 	for _, f := range g.Funcs.Funcs {
 		if f != nil && (f.IsBuilt || f.BuildState == BuildBuilt) {

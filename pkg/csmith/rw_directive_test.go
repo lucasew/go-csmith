@@ -6,8 +6,8 @@ import (
 )
 
 func TestIsNonReadableWritable(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	rw := &RWDirective{
 		NoReadVars:  []*Variable{a},
 		NoWriteVars: []*Variable{b},
@@ -27,7 +27,7 @@ func TestIsNonReadableMatchResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	hole := &Variable{Name: "g_hole"} // Type nil
-	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{hole, good}})
 	if !cg.IsNonReadable(good) {
 		t.Fatal("Match residual must fail closed nonreadable, not invent later readable skip")
@@ -39,7 +39,7 @@ func TestIsNonReadableMatchResidualSticky(t *testing.T) {
 }
 
 func TestIVBoundNonWritable(t *testing.T) {
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 10)
 	if !cg.IsNonWritable(iv) {
@@ -58,7 +58,7 @@ func TestIVBoundNonWritable(t *testing.T) {
 }
 
 func TestIsEligibleNonReadable(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{v}})
 	if IsEligibleVar(v, 0, AccessRead, cg) {
 		t.Fatal("no read")
@@ -73,8 +73,8 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	opts.MaxBlockSize = 2
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// reset sid for stable-ish ids
 	currentSession().NextStmID = 0
@@ -104,7 +104,7 @@ func TestMakeRandomForIVBoundDuringBody(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	iv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 2))
+	iv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 5)
 	if IsEligibleVar(iv, 0, AccessWrite, cg) {

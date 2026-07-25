@@ -590,12 +590,12 @@ func makePossibleCompoundAssign(
 			}
 			st1 := EInt
 			if t := flags.LHSType(); t != nil {
-				if t.IsSimple() {
+				if t.IsSimpleSess(sessFromCG(&cg)) {
 					// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
 					if hasErrCG(&cg) {
 						return Stmt{}
 					}
-					st1 = t.Simple()
+					st1 = t.SimpleSess(sessFromCG(&cg))
 				} else if hasErrCG(&cg) {
 					// residual ERROR sticky — no invent soft-tmp past IsSimple residual false
 					return Stmt{}
@@ -604,11 +604,11 @@ func makePossibleCompoundAssign(
 			st2 := st1
 			if bop == BinLShift || bop == BinRShift {
 				if t := flags.RHSType(); t != nil {
-					if t.IsSimple() {
+					if t.IsSimpleSess(sessFromCG(&cg)) {
 						if hasErrCG(&cg) {
 							return Stmt{}
 						}
-						st2 = t.Simple()
+						st2 = t.SimpleSess(sessFromCG(&cg))
 					} else if hasErrCG(&cg) {
 						return Stmt{}
 					}

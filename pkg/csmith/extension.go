@@ -72,11 +72,11 @@ func AbsExtensionInitializeSess(s *Session, num int, r *Rng, probs *Probabilitie
 	}
 	values := make([]*ExtensionValue, 0, num)
 	for i := 0; i < num; i++ {
-		st := ChooseRandomNonvoidSimple(r, probs)
+		st := ChooseRandomNonvoidSimpleSess(s, r, probs)
 		if sessHasError(s) {
 			return nil
 		}
-		typ := GetSimpleType(st)
+		typ := GetSimpleTypeSess(s, st)
 		if typ == nil {
 			sessNoteError(s, ErrGeneric)
 			return nil
@@ -110,7 +110,7 @@ func AbsExtensionDefaultOutputDefinitionsSess(s *Session, values []*ExtensionVal
 	for _, v := range values {
 		b.WriteString(AbsExtensionTab)
 		// Type::Output
-		cn := v.Type.CName()
+		cn := v.Type.CNameSess(s)
 		if sessHasError(s) || cn == "" {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)

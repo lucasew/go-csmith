@@ -27,7 +27,7 @@ func TestOutputHeaderWrapVolatiles(t *testing.T) {
 }
 
 func TestVolLValLhs(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, true)
 	v.UseVolRVal = true
 	if v.OutputLhsCOptsSess(testAmbientSession, false) != "VOL_LVAL(g_1, int32_t)" {
 		t.Fatal(v.OutputLhsCOptsSess(testAmbientSession, false))

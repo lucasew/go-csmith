@@ -95,9 +95,9 @@ func MakeOneBitfieldSess(s *Session, r *Rng, opts Options, probs *Probabilities,
 	}
 	var ft *Type
 	if sign {
-		ft = GetIntType()
+		ft = GetIntTypeSess(s)
 	} else {
-		ft = GetSimpleType(EUInt)
+		ft = GetSimpleTypeSess(s, EUInt)
 	}
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
@@ -204,7 +204,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	// Type.cpp:1100–1110 — packed_struct; ccomp skips when aggregate/longlong fields
 	packed := false
 	if opts.PackedStruct {
-		if opts.CComp && (HasAggregateField(fields) || HasLongLongFieldSess(sessFromEnv(env), fields)) {
+		if opts.CComp && (HasAggregateFieldSess(sessFromEnv(env), fields) || HasLongLongFieldSess(sessFromEnv(env), fields)) {
 			// leave packed false
 		} else {
 			packed = r.RndFlipcoin(50)
@@ -213,7 +213,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			}
 		}
 	}
-	hasAssign := IfStructWillHaveAssignOps(r, opts, probs)
+	hasAssign := IfStructWillHaveAssignOpsSess(sessFromEnv(env), r, opts, probs)
 	if hasErrEnv(env) {
 		return nil
 	}
@@ -293,7 +293,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	// not AllTypes population (seed-2 first choose was n=13 vs upstream n=14).
 	if len(env.AllTypes) == 0 {
 		for st := EChar; int(st) < MaxSimpleTypes; st++ {
-			env.AllTypes = append(env.AllTypes, GetSimpleType(st))
+			env.AllTypes = append(env.AllTypes, GetSimpleTypeSess(sessFromEnv(env), st))
 		}
 	}
 	// struct/union generation draws RNG + probs; no invent fixed S0 shells without them
@@ -385,7 +385,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			if !f.Type.IsSimple() {
+			if !f.Type.IsSimpleSess(s) {
 				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
 				if sessHasError(s) {
 					return ""
@@ -398,7 +398,7 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 			if sessHasError(s) {
 				return ""
 			}
-			st := f.Type.Simple()
+			st := f.Type.SimpleSess(s)
 			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
 			if sessHasError(s) {
 				return ""
@@ -506,7 +506,7 @@ func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Op
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if !typ.IsSimple() {
+	if !typ.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent soft-empty range past IsSimple residual
 		if sessHasError(s) {
 			return ""
@@ -518,7 +518,7 @@ func GenerateRandomConstantInRangeSess(s *Session, typ *Type, bound int, opts Op
 	if sessHasError(s) {
 		return ""
 	}
-	st := typ.Simple()
+	st := typ.SimpleSess(s)
 	if st != EInt && st != EUInt {
 		// assert(0) for other simples — sticky no soft invent generic decimal
 		sessNoteError(s, ErrGeneric)
@@ -601,7 +601,7 @@ func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabiliti
 			if sessHasError(s) {
 				return nil
 			}
-		} else if f.Type.IsStruct() {
+		} else if f.Type.IsStructSess(s) {
 			// residual ERROR sticky — no invent soft-field past IsStruct residual true
 			if sessHasError(s) {
 				return nil
@@ -615,7 +615,7 @@ func MakeStructConstantSess(s *Session, r *Rng, opts Options, probs *Probabiliti
 		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent soft-continue past IsStruct residual false
 			return nil
-		} else if f.Type.IsUnion() {
+		} else if f.Type.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-field past IsUnion residual true
 			if sessHasError(s) {
 				return nil
@@ -768,7 +768,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			if hasErrEnv(env) {
 				return StructField{}
 			}
-			if probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
+			if probs.SimpleTypeWeight(int(cand.SimpleSess(sessFromEnv(env)))) == 0 {
 				if hasErrEnv(env) {
 					return StructField{}
 				}
@@ -844,7 +844,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		prevZero = f.BitWidth == 0
 		fields = append(fields, f)
 	}
-	hasAssign := IfUnionWillHaveAssignOps(r, opts, probs)
+	hasAssign := IfUnionWillHaveAssignOpsSess(sessFromEnv(env), r, opts, probs)
 	if hasErrEnv(env) {
 		return nil
 	}
@@ -933,7 +933,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			if !f.Type.IsSimple() {
+			if !f.Type.IsSimpleSess(s) {
 				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
 				if sessHasError(s) {
 					return ""
@@ -945,7 +945,7 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 			if sessHasError(s) {
 				return ""
 			}
-			st := f.Type.Simple()
+			st := f.Type.SimpleSess(s)
 			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
 			if sessHasError(s) {
 				return ""
@@ -1039,7 +1039,7 @@ func MakeUnionConstantSess(s *Session, r *Rng, opts Options, probs *Probabilitie
 		return nil
 	}
 	var val string
-	if f0.Type.IsStruct() {
+	if f0.Type.IsStructSess(s) {
 		// residual ERROR sticky — no invent soft-union past IsStruct residual true
 		if sessHasError(s) {
 			return nil
@@ -1052,7 +1052,7 @@ func MakeUnionConstantSess(s *Session, r *Rng, opts Options, probs *Probabilitie
 		}
 	} else if sessHasError(s) {
 		return nil
-	} else if f0.Type.IsUnion() {
+	} else if f0.Type.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-union past IsUnion residual true
 		if sessHasError(s) {
 			return nil

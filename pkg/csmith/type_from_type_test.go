@@ -11,7 +11,7 @@ func TestRandomTypeFromTypeNil(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	ty := RandomTypeFromType(NewRngSess(testAmbientSession, 3), env, opts, probs, nil, false, false)
-	if ty == nil || (ty.IsSimple() && ty.Simple() == EVoid) {
+	if ty == nil || (ty.IsSimpleSess(testAmbientSession) && ty.SimpleSess(testAmbientSession) == EVoid) {
 		t.Fatalf("%v", ty)
 	}
 }
@@ -23,11 +23,11 @@ func TestRandomTypeFromTypeSimpleRerolls(t *testing.T) {
 	seen := map[ESimpleType]bool{}
 	r := NewRngSess(testAmbientSession, 5)
 	for i := 0; i < 40; i++ {
-		ty := RandomTypeFromType(r, nil, opts, probs, GetIntType(), false, false)
-		if ty == nil || !ty.IsSimple() {
+		ty := RandomTypeFromType(r, nil, opts, probs, GetIntTypeSess(testAmbientSession), false, false)
+		if ty == nil || !ty.IsSimpleSess(testAmbientSession) {
 			t.Fatalf("%v", ty)
 		}
-		seen[ty.Simple()] = true
+		seen[ty.SimpleSess(testAmbientSession)] = true
 	}
 	if len(seen) < 2 {
 		t.Log("only one simple type in sample", seen)
@@ -38,7 +38,7 @@ func TestRandomTypeFromTypeStrictSimpleKeeps(t *testing.T) {
 	// Type.cpp:599 — strict_simple_type skips choose_random_simple re-roll
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	want := GetIntType()
+	want := GetIntTypeSess(testAmbientSession)
 	for seed := uint64(1); seed < 20; seed++ {
 		ty := RandomTypeFromType(NewRngSess(testAmbientSession, seed), nil, opts, probs, want, false, true)
 		if ty != want {
@@ -57,14 +57,14 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	}
 	// nil type / simple re-roll need RNG sticky; no invent pick/keep-simple shells
 	ClearErrorSess(testAmbientSession)
-	if RandomTypeFromType(nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}, opts, probs, nil, false, false) != nil {
+	if RandomTypeFromType(nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil RNG + nil type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG + nil type must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if RandomTypeFromType(nil, nil, opts, probs, GetIntType(), false, false) != nil {
+	if RandomTypeFromType(nil, nil, opts, probs, GetIntTypeSess(testAmbientSession), false, false) != nil {
 		t.Fatal("nil RNG + simple re-roll must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

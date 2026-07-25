@@ -8,14 +8,14 @@ import (
 func TestFunctionIsVarOnStack(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)
 	f.Param = []*Variable{p}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	if !f.IsVarOnStack(p, blk) || !f.IsVarOnStack(loc, blk) {
 		t.Fatal("stack")
 	}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	if f.IsVarOnStack(g, blk) {
 		t.Fatal("global")
 	}
@@ -30,7 +30,7 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	// Aggregate local match(field) via has_field_var → field is on-stack so
 	// mark_func_end / eReturn set_fact_out garbage field pointees (seed-30).
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	agg := CreateVariableScalarsSess(testAmbientSession, "l_s", st, false, false)
 	agg.CreateFieldVarsSess(testAmbientSession)
@@ -67,8 +67,8 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	// fair: StackScanComplete false; MarkFuncEndOnFacts / RemoveFunctionLocal clear sticky
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	if f.StackScanComplete(blk) {
 		t.Fatal("LocalVars hole must be incomplete stack scan")
@@ -113,7 +113,7 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 func TestFunctionIsVarOOS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	inner := &Block{Func: f, LocalVars: []*Variable{loc}}
 	// at function body root with empty parent chain, loc not on stack
 	if !f.IsVarOOS(loc, nil) {
@@ -137,7 +137,7 @@ func TestAddBackReturnFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	retFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	st := Stmt{Kind: StmtReturn, StmID: 42}
 	fm.SetMapFactsOutPair(42, retFacts, []*FactUnion{})
@@ -171,8 +171,8 @@ func TestAddBackReturnFactsMergesUnionWrite(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -202,8 +202,8 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// first return incomplete out
 	fm.MapFactsOut = map[int][]*FactPointTo{
 		10: {MakeFactPointTo(p, NullPtr), nil},
@@ -253,11 +253,11 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 }
 
 func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{
 		MakeFactPointTo(p, loc),
-		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false), NullPtr),
+		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr),
 	}
 	// second fact subject is l_p local-named — Match with l_1? no
 	lp := facts[1].Var
@@ -305,7 +305,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Match residual: Type-nil OOS var soft invent was soft-continue keep later fact.
 	// Fair: sticky IncompleteFactSlice.
-	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(GetIntType()), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts2 := []*FactPointTo{MakeFactPointTo(p2, NullPtr)}
 	holeOOS := &Variable{Name: "l_hole", Type: nil, FieldVars: nil}
 	// FieldVarsComplete for Type-nil with empty FieldVars is true (no nil holes)
@@ -340,7 +340,7 @@ func TestOutputCommentLine(t *testing.T) {
 }
 
 func TestFunctionOutputSeparator(t *testing.T) {
-	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{}}
 	out := f.Output()
 	if !strings.Contains(out, "/* ------------------------------------------ */") {
 		t.Fatal(out)

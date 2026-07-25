@@ -17,11 +17,11 @@ func TestEagerCreateGlobalStruct(t *testing.T) {
 	}
 	// want int — eager create struct then field match
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 5), MatchFlexible)
+	v := vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 5), MatchFlexible)
 	// may fail if no int fields
 	if v != nil && v.Type != nil {
-		if !GetIntType().MatchSess(testAmbientSession, v.Type, MatchFlexible) {
-			t.Log("matched", v.Type.CName())
+		if !GetIntTypeSess(testAmbientSession).MatchSess(testAmbientSession, v.Type, MatchFlexible) {
+			t.Log("matched", v.Type.CNameSess(testAmbientSession))
 		}
 	}
 }
@@ -38,15 +38,15 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// empty GlobalList → expand or create
-	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 7))
+	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 7))
 	if v == nil {
 		t.Fatal("nil")
 	}
 }
 
 func TestMergeEffectsMergesReads(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().ReadVarSess(testAmbientSession, b)
 	m := MergeEffectsSess(testAmbientSession, e1, e2)
@@ -87,13 +87,13 @@ func TestExpandStructUnionVars(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("no fields")
 	}
-	got := ExpandStructUnionVars([]*Variable{sv}, GetIntType())
+	got := ExpandStructUnionVars([]*Variable{sv}, GetIntTypeSess(testAmbientSession))
 	// parent removed when want is not the struct type itself
 	for _, v := range got {
 		if v == sv {
@@ -110,7 +110,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	}
 	// nil candidate / field hole fails closed sticky incomplete (not invent empty complete)
 	ClearErrorSess(testAmbientSession)
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{nil}, GetIntType())) {
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{nil}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil var hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -118,7 +118,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	sv.FieldVars = append(sv.FieldVars, nil)
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{sv}, GetIntType())) {
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{sv}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -127,7 +127,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special sticky incomplete (no invent keep shell as complete candidate)
 	hole := &Variable{Name: "g_hole", Type: nil}
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{hole}, GetIntType())) {
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{hole}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("Type-nil expand must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -136,8 +136,8 @@ func TestExpandStructUnionVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was IsVirtual residual false soft-continue
 	// fair: sticky IncompleteVariables
-	arrShell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{arrShell}, GetIntType())) {
+	arrShell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{arrShell}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("IsArray without AsArray expand must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -147,10 +147,10 @@ func TestExpandStructUnionVars(t *testing.T) {
 	// FieldVarOf ancestry IsArray-without-AsArray: IsVirtual residual ERROR+false.
 	// Soft invent was soft-continue keep child then expand later good as complete pool.
 	// Fair: sticky IncompleteVariables whole expand.
-	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	child := &Variable{Name: "g_arr.f0", Type: GetIntType(), FieldVarOf: shell}
-	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	if VariablesComplete(ExpandStructUnionVars([]*Variable{child, good}, GetIntType())) {
+	shell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
+	child := &Variable{Name: "g_arr.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: shell}
+	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{child, good}, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("IsVirtual ancestry residual must fail closed incomplete, not invent later good")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -172,16 +172,16 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	if len(env.StructTypes) == 0 {
 		t.Skip("no structs")
 	}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 9), MatchFlexible)
+	v := vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 9), MatchFlexible)
 	if len(blk.LocalVars) == 0 {
 		t.Fatal("no local created")
 	}
-	if v != nil && v.Type != nil && !GetIntType().MatchSess(testAmbientSession, v.Type, MatchFlexible) {
-		t.Log("field", v.Name, v.Type.CName())
+	if v != nil && v.Type != nil && !GetIntTypeSess(testAmbientSession).MatchSess(testAmbientSession, v.Type, MatchFlexible) {
+		t.Log("field", v.Name, v.Type.CNameSess(testAmbientSession))
 	}
 }
 
@@ -198,31 +198,31 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	vs.Probs = probs
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 5), MatchFlexible) != nil {
+	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 5), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateGlobalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 5), MatchFlexible, IncompleteVariables()) != nil {
+	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 5), MatchFlexible, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed EagerCreateGlobalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete invalidVars must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
-	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 9), MatchFlexible) != nil {
+	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 9), MatchFlexible) != nil {
 		t.Fatal("incomplete EffectContext must fail closed EagerCreateLocalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete EffectContext local must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), &q, NewRngSess(testAmbientSession, 9), MatchFlexible, IncompleteVariables()) != nil {
+	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 9), MatchFlexible, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed EagerCreateLocalStruct")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -241,12 +241,12 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 	vs.Types = env
 	vs.Probs = probs
 	vs.Opts = opts
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	v := vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 11), MatchFlexible)
+	v := vs.SelectParentLocal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 11), MatchFlexible)
 	if v == nil {
 		t.Fatal("nil")
 	}
@@ -256,13 +256,13 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	// VariableSelector.cpp:991–1003 — empty stack assert; ERROR_GUARD after rnd_upto
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// empty stack → fail closed (no soft invent param/global)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	if vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 1), MatchFlexible) != nil {
+	if vs.SelectParentLocal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 1), MatchFlexible) != nil {
 		t.Fatal("empty stack must not invent parent local")
 	}
 	// sticky error after stack pick → ERROR_GUARD
@@ -270,7 +270,7 @@ func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 1), MatchFlexible) != nil {
+	if vs.SelectParentLocal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 1), MatchFlexible) != nil {
 		t.Fatal("sticky error must fail SelectParentLocal")
 	}
 }

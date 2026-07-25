@@ -1472,13 +1472,13 @@ func makeRandomStmtForced(
 		}
 		// Statement.cpp:167–169 — void functions cannot return
 		if k == StmtReturn && cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil {
-			isSimple := cg.CurrentFunc.ReturnType.IsSimple()
+			isSimple := cg.CurrentFunc.ReturnType.IsSimpleSess(cgSess(cg))
 			// residual ERROR sticky — no invent filter keep/reject past IsSimple residual
 			if hasErrCG(cg) {
 				return true
 			}
 			if isSimple {
-				st := cg.CurrentFunc.ReturnType.Simple()
+				st := cg.CurrentFunc.ReturnType.SimpleSess(cgSess(cg))
 				// residual ERROR sticky — no invent filter keep/reject past Simple residual
 				if hasErrCG(cg) {
 					return true
@@ -1826,8 +1826,8 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			// StatementArrayOp.cpp:237–248
 			if st.ArrayAccess != "" && st.Expr != nil &&
 				st.Expr.Term == TermConstant && st.LhsVar != nil &&
-				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
-				ty := st.LhsVar.Type.CName()
+				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregateSess(s) {
+				ty := st.LhsVar.Type.CNameSess(s)
 				// residual ERROR sticky — no invent soft-continue past CName residual
 				if sessHasError(s) {
 					return ""
@@ -2010,8 +2010,8 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 				content.WriteString(pad + "{\n")
 				// StatementArrayOp.cpp:237–254 — aggregate constant → tmp; else direct
 				assignPad := strings.Repeat("    ", indent+1)
-				if st.Expr.Term == TermConstant && st.LhsVar != nil && st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
-					ty := st.LhsVar.Type.CName()
+				if st.Expr.Term == TermConstant && st.LhsVar != nil && st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregateSess(s) {
+					ty := st.LhsVar.Type.CNameSess(s)
 					rhs := st.Expr.OutputOptsSess(s, opts)
 					if sessHasError(s) {
 						return ""
@@ -2188,12 +2188,12 @@ func (b *Block) OutputOptsSess(s *Session, indent int, opts Options) string {
 			}
 			// eSimpleType always valid in macro_tmp_vars; OOB/invalid sticky fail closed
 			// (GetSimpleType nil — no invent "int" for broken tmp type)
-			ty := GetSimpleType(b.TmpVars[name])
+			ty := GetSimpleTypeSess(s, b.TmpVars[name])
 			if ty == nil {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			cn := ty.CName()
+			cn := ty.CNameSess(s)
 			// residual ERROR sticky — no invent soft-continue tmp decl past CName residual
 			if sessHasError(s) {
 				return ""

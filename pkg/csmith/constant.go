@@ -36,7 +36,7 @@ func MakeRandomSess(s *Session, typ *Type, opts Options, probs *Probabilities, r
 		if sessHasError(s) {
 			return nil
 		}
-		st := typ.Simple()
+		st := typ.SimpleSess(s)
 		// residual ERROR sticky — no invent soft-continue void check past Simple residual
 		if sessHasError(s) {
 			return nil
@@ -286,7 +286,7 @@ func (c *Constant) OutputOptsSess(s *Session, opts Options) string {
 		return "(" + c.Value + ")"
 	}
 	// pointer zero
-	if c.Type.PtrType() != nil {
+	if c.Type.PtrTypeSess(s) != nil {
 		// residual ERROR sticky — no invent soft-null past PtrType residual
 		if sessHasError(s) {
 			return ""
@@ -435,7 +435,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if typ.IsStruct() {
+	if typ.IsStructSess(s) {
 		// residual ERROR sticky — no invent soft-continue const past IsStruct residual hole
 		if sessHasError(s) {
 			return ""
@@ -462,7 +462,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 	if sessHasError(s) {
 		return ""
 	}
-	if typ.IsUnion() {
+	if typ.IsUnionSess(s) {
 		// residual ERROR sticky — no invent soft-continue const past IsUnion residual hole
 		if sessHasError(s) {
 			return ""
@@ -513,7 +513,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 		return ""
 	}
 	// Constant.cpp:312 — assert(st != eVoid); no soft invent comment literal sticky
-	if typ.Simple() == EVoid {
+	if typ.SimpleSess(s) == EVoid {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -522,7 +522,7 @@ func generateRandomConstantSess(s *Session, typ *Type, opts Options, probs *Prob
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	st := typ.Simple()
+	st := typ.SimpleSess(s)
 
 	var v string
 	// pure_rnd_flipcoin(50) — in random mode == rnd_flipcoin(50)

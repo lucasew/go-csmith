@@ -489,7 +489,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	b.WriteString("/* --- Struct/Union Declarations --- */\n")
 	// reset printed for this emit pass (Type.cpp printed_ is process-lifetime; one emit per run)
 	for _, t := range g.Types.AllTypes {
-		if t != nil && t.IsAggregate() {
+		if t != nil && t.IsAggregateSess(g.Sess) {
 			t.Printed = false
 		}
 	}
@@ -501,7 +501,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		}
 		// Aggregates are heap-local to the run bag (Type.Used); package simples
 		// use Session.simpleUsed and are skipped by !IsAggregate.
-		if !typeIsUsed(g.Sess, t) || !t.IsAggregate() {
+		if !typeIsUsed(g.Sess, t) || !t.IsAggregateSess(g.Sess) {
 			continue
 		}
 		if !g.outputStructUnion(t, &b, structAttr, unionAttr) {
@@ -514,7 +514,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 // outputStructUnion mirrors Type.cpp:1811–1888 OutputStructUnion.
 // Emits nested aggregate field types first; skips when already Printed.
 func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, structAttr, unionAttr *AttributeGenerator) bool {
-	if t == nil || !t.IsAggregate() {
+	if t == nil || !t.IsAggregateSess(g.Sess) {
 		g.noteErr(ErrGeneric)
 		return false
 	}

@@ -7,13 +7,13 @@ import (
 
 func TestTypeFromString(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if TypeFromString("Int") != GetIntType() {
+	if TypeFromString("Int") != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("Int")
 	}
-	if TypeFromString("UInt") == nil || !TypeFromString("UInt").IsSimple() {
+	if TypeFromString("UInt") == nil || !TypeFromString("UInt").IsSimpleSess(testAmbientSession) {
 		t.Fatal("UInt")
 	}
-	if TypeFromString("Void").Simple() != EVoid {
+	if TypeFromString("Void").SimpleSess(testAmbientSession) != EVoid {
 		t.Fatal("Void")
 	}
 	if TypeFromString("NoSuch") != nil {
@@ -168,8 +168,8 @@ func TestGenerateWithBuiltins(t *testing.T) {
 }
 
 func TestHasRaceWith(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, a)
 	if !e1.HasRaceWithSess(testAmbientSession, e2) {
@@ -203,9 +203,9 @@ func TestChooseFuncCanPickBuiltin(t *testing.T) {
 	opts := Defaults()
 	opts.Builtins = true
 	opts.BuiltinFunctionProb = 100
-	bi := &Function{Name: "__builtin_clz", ReturnType: GetIntType(), IsBuiltin: true, BuildState: BuildBuilt, IsBuilt: true}
-	user := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
-	got := ChooseFuncContext(NewRngSess(testAmbientSession, 3), []*Function{user, bi}, GetIntType(), nil, nil, opts, nil)
+	bi := &Function{Name: "__builtin_clz", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true, BuildState: BuildBuilt, IsBuilt: true}
+	user := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
+	got := ChooseFuncContext(NewRngSess(testAmbientSession, 3), []*Function{user, bi}, GetIntTypeSess(testAmbientSession), nil, nil, opts, nil)
 	if got != bi {
 		t.Fatalf("want builtin got %v", got)
 	}

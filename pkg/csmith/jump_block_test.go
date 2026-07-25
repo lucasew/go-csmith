@@ -8,7 +8,7 @@ import (
 func TestHasInitSkippedVars(t *testing.T) {
 	outer := &Block{}
 	inner := &Block{Parent: outer}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	inner.LocalVars = []*Variable{loc}
 	// jump from outer into inner skips l_1
 	if !HasInitSkippedVars(outer, inner) {
@@ -100,7 +100,7 @@ func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 	src := &Block{}
 	src.LocalVars = []*Variable{nil}                  // incomplete: IsVisibleLocal hits nil hole
 	mid := &Block{}                                   // no Parent chain to src → !reachedSrc
-	loc := &Variable{Name: "l_x", Type: GetIntType()} // non-global local
+	loc := &Variable{Name: "l_x", Type: GetIntTypeSess(testAmbientSession)} // non-global local
 	mid.LocalVars = []*Variable{loc}
 	got := CollectInitSkippedVars(src, mid)
 	if VariablesComplete(got) {
@@ -120,7 +120,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	// uses Constant::make_random so library test can omit VS/CGContext.
 	opts.StrictConstArrays = true
 	_ = GetNewCtrlVarsSess(testAmbientSession, opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -131,7 +131,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	// ArrayVariable.cpp:649 — missing init sticky fail closed (no invent "0" shell)
 	ClearErrorSess(testAmbientSession)
 	av2 := &ArrayVariable{
-		Variable: Variable{Name: "g_b", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Name: "g_b", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
 	av2.AsArray = av2
@@ -153,7 +153,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 
 func TestClearEffectStm(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false))
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false))
 	cg.ClearEffectStm()
 	if !cg.EffectStm.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("clear")
@@ -164,7 +164,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	// StatementGoto.cpp:117–132 — cond from choose_visible_read_var only
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// two stmts so dest (last) != other candidate
 	b1 := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: AllocStmID()},
@@ -175,7 +175,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 2))
+	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg.EffectAccum = &eff
 	for i := range b1.Stmts {

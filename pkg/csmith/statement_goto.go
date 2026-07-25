@@ -647,13 +647,13 @@ func MakeRandomGoto(
 	}
 	var cond *Expression
 	if len(readVars) > 0 {
-		if v := ChooseVisibleReadVarOptsSess(sessFromCG(cg), r, condBlk, readVars, GetIntType(), uf, sessOpts(sessFromCG(cg))); v != nil {
+		if v := ChooseVisibleReadVarOptsSess(sessFromCG(cg), r, condBlk, readVars, GetIntTypeSess(sessFromCG(cg)), uf, sessOpts(sessFromCG(cg))); v != nil {
 			// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only.
 			// C++ does not call read_var here; visit_facts later uses check_read_var.
 			// Soft invent was NoteRead/ReadVar during make_random, which pushed the
 			// cond into effect_accum+effect_stm early and bloated map_accum_effect
 			// / later ambient (binary RHS seFree / write filters).
-			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(sessFromCG(cg))}
 		}
 	}
 	// StatementGoto.cpp:130–132 — return nullptr when cond_var missing

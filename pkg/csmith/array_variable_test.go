@@ -10,7 +10,7 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	opts := Defaults()
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if av == nil || av.DimensionSess(testAmbientSession) < 1 {
 		t.Fatal(av)
 	}
@@ -32,7 +32,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), MakeInt(0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -46,7 +46,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 		t.Fatal("nil element must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntType(), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -55,7 +55,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntTypeSess(testAmbientSession), MakeInt(0), q) != nil {
 		t.Fatal("sticky error after dim draw must fail closed")
 	}
 }
@@ -67,7 +67,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
 	opts.MaxArrayLength = 0
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -82,9 +82,9 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	opts := Defaults()
 	env := &TypeEnv{Sess: testAmbientSession}
 	probs := NewProbabilities(opts)
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, env, "S0")
-	if st == nil || !st.IsStruct() {
+	if st == nil || !st.IsStructSess(testAmbientSession) {
 		t.Skip("no struct")
 	}
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 3), opts, probs, nil, nil, nil, "g_s", st, MakeRandom(st, opts, probs, NewRngSess(testAmbientSession, 4)), NewCVQualifiers([]bool{false}, []bool{false}))
@@ -104,7 +104,7 @@ func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 	opts.MaxArrayLenPerDim = 4
 	opts.MaxArrayLength = 4
 	st := &Type{isStruct: true, StructName: "SAlt", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// large init_num path still must not invent aggregate alt values without probs
 	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, nil, nil, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -125,7 +125,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	opts.MaxArrayLenPerDim = 8
 	opts.MaxArrayLength = 8
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	// without VS/CG: when alt init_num > 0 fail closed non-sticky soft re-pick (no invent Constant stand-in)
 	sawFail := false
 	for seed := uint64(1); seed < 40; seed++ {
@@ -146,8 +146,8 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	// with VS+CG: make_init_value path is live
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = NewProbabilities(opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
@@ -169,7 +169,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 
 func TestArrayCDecl(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Variable: Variable{Name: "a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
 	}
 	d := av.CDeclTypeSess(testAmbientSession)
@@ -209,7 +209,7 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 	vs.Probs.single[PNewArrayVariableProb] = 100
 	r := NewRngSess(testAmbientSession, 2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	v := vs.createAndInitialize(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), q, nil, "g_9", r)
+	v := vs.createAndInitialize(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), q, nil, "g_9", r)
 	if v == nil || !v.IsArray {
 		t.Fatalf("%+v arrays=%d", v, len(vs.Arrays))
 	}
@@ -218,19 +218,19 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 	// ArrayVariable.cpp:539–552 — itemized emits name[expr]
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
-	off := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
-	ivExpr := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
+	off := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
+	ivExpr := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ivExpr, off}}
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{8}},
 		Sizes:      []int{8},
 		Collective: parent,
-		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}},
+		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntTypeSess(testAmbientSession)}},
 		Indices:    []string{"stale"},
 	}
 	item.AsArray = item
@@ -253,12 +253,12 @@ func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
 	// ArrayVariable.cpp:544–545 — assert(!indices.empty()); no invent from sizes / bare name
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4, 5}},
 		Sizes:    []int{4, 5},
 	}
 	parent.AsArray = parent
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4, 5}},
 		Sizes:      []int{4, 5},
 		Collective: parent,
 	}
@@ -283,7 +283,7 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:250 — assert(collective == 0) on the receiver sticky
 	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
@@ -348,9 +348,9 @@ func TestArrayCDeclTypeNoInventInt(t *testing.T) {
 
 func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 	// ArrayVariable.cpp:548 — indices[i]->Output always live; no invent "g_a[]"
-	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)}, Sizes: []int{2}}
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType()},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:      []int{2},
 		Collective: parent,
 		IndexExprs: []*Expression{{Term: TermConstant}}, // nil Con → empty Output
@@ -382,7 +382,7 @@ func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 func TestOutputWithIndicesNoInventEmptyBracket(t *testing.T) {
 	// ArrayVariable.cpp:708 — cvs[i] always live; sticky no invent "g_a[]"
 	ClearErrorSess(testAmbientSession)
-	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)}, Sizes: []int{2, 3}}
 	if s := av.OutputWithIndicesSess(testAmbientSession, []string{"i"}); s != "" {
 		t.Fatal("short ctrl must fail closed", s)
 	}
@@ -407,7 +407,7 @@ func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
 	av.AsArray = av
@@ -423,7 +423,7 @@ func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 
 func TestOutputUpperBoundArray(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4, 5}},
 		Sizes:    []int{4, 5},
 	}
 	av.AsArray = av
@@ -435,7 +435,7 @@ func TestOutputUpperBoundArray(t *testing.T) {
 	}
 	// ArrayVariable.cpp:575 — always sizes[i]-1 (no soft "0" for empty dim)
 	z := &ArrayVariable{
-		Variable: Variable{Name: "g_z", Type: GetIntType(), IsArray: true, ArraySizes: []int{0}},
+		Variable: Variable{Name: "g_z", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{0}},
 		Sizes:    []int{0},
 	}
 	z.AsArray = z
@@ -448,7 +448,7 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 	// ArrayVariable.cpp:227–231 — push/set Expression*; sticky no invent "0" for nil/empty
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
@@ -475,12 +475,12 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		t.Fatal("nil av AddIndex must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*ArrayVariable)(nil).AddIndexExprSess(testAmbientSession, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()})
+	(*ArrayVariable)(nil).AddIndexExprSess(testAmbientSession, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av AddIndexExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	av.SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()})
+	av.SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntTypeSess(testAmbientSession)})
 	if len(av.Indices) != 1 || av.Indices[0] != "3" {
 		t.Fatal(av.Indices)
 	}
@@ -508,7 +508,7 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		t.Fatal("nil av SetIndex must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	(*ArrayVariable)(nil).SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()})
+	(*ArrayVariable)(nil).SetIndexExprSess(testAmbientSession, 0, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)})
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil av SetIndexExpr must SetError sticky")
 	}
@@ -519,7 +519,7 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	// ArrayVariable.cpp:703–711 — cvs[i] only; no soft i/j/k invent
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
 	}
 	av.AsArray = av
@@ -538,7 +538,7 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	// Array IsGlobal is Block==nil; attach a block so loop-initializer path is live.
 	ClearErrorSess(testAmbientSession)
 	loc := &ArrayVariable{
-		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Init: MakeInt(0)},
+		Variable: Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}, Init: MakeInt(0)},
 		Sizes:    []int{2, 3},
 		Block:    &Block{},
 	}
@@ -563,24 +563,24 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 }
 
 func TestToUnsignedSimple(t *testing.T) {
-	if GetIntType().ToUnsigned() != GetSimpleType(EUInt) {
+	if GetIntTypeSess(testAmbientSession).ToUnsignedSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EUInt) {
 		t.Fatal("int")
 	}
-	if GetSimpleType(EChar).ToUnsigned() != GetSimpleType(EUChar) {
+	if GetSimpleTypeSess(testAmbientSession, EChar).ToUnsignedSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EUChar) {
 		t.Fatal("char")
 	}
-	u := GetSimpleType(EUInt)
-	if u.ToUnsigned() != u {
+	u := GetSimpleTypeSess(testAmbientSession, EUInt)
+	if u.ToUnsignedSess(testAmbientSession) != u {
 		t.Fatal("uint identity")
 	}
-	if GetSimpleType(EFloat).ToUnsigned() != nil {
+	if GetSimpleTypeSess(testAmbientSession, EFloat).ToUnsignedSess(testAmbientSession) != nil {
 		t.Fatal("float has no unsigned")
 	}
 }
 
 func TestOutputIndexModuloSignedCast(t *testing.T) {
 	av := &ArrayVariable{Sizes: []int{10}}
-	idx := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false), ExprType: GetIntType()}
+	idx := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false), ExprType: GetIntTypeSess(testAmbientSession)}
 	got := av.OutputIndexModuloSess(testAmbientSession, 0, idx)
 	if !strings.Contains(got, "% 10") {
 		t.Fatal(got)
@@ -611,7 +611,7 @@ func TestOutputDefInitExprOutputResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
 			// incomplete InitExpr → Output residual
 			InitExpr: &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}, // Type-nil
 		},
@@ -649,9 +649,9 @@ func TestNoLoopInitializerNilSticky(t *testing.T) {
 func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
 	// index Output residual soft invent was soft-continue later indices invent partial access.
 	ClearErrorSess(testAmbientSession)
-	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)}, Sizes: []int{2, 3}}
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType()},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession)},
 		Sizes:      []int{2, 3},
 		Collective: parent,
 		IndexExprs: []*Expression{
@@ -673,8 +673,8 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	// names use ArrayVariable::Output (name[idx]…) + ".fN", not bare collective name.
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: st, IsArray: true, ArraySizes: []int{3}},
@@ -709,7 +709,7 @@ func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 	// Variable.cpp:350–352 — isArray parent uses Output not bare name for field paths.
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetSimpleType(EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		{Name: "f0", Type: GetSimpleTypeSess(testAmbientSession, EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_42", Type: st, IsArray: true, ArraySizes: []int{2}},
@@ -735,7 +735,7 @@ func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
 	// CreateFieldVars residual soft invent was invent complete itemize shell past hole.
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		{Name: "f1", Type: nil, BitWidth: -1}, // incomplete field type
 	}}
 	av := &ArrayVariable{
@@ -761,10 +761,10 @@ func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
 
 func TestSizeInBytesArray(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Variable: Variable{Name: "a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
 	}
-	want := GetIntType().SizeInBytes() * 2 * 3
+	want := GetIntTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) * 2 * 3
 	if got := av.SizeInBytesArraySess(testAmbientSession); got != want {
 		t.Fatalf("got %d want %d", got, want)
 	}
@@ -864,24 +864,24 @@ func TestContainsBackEdgeDestParentOnly(t *testing.T) {
 
 func TestCountAndFindExprKeyVar(t *testing.T) {
 	// ArrayVariable.cpp:66–119
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
-	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
+	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}
 	if CountExprKeyVarSess(testAmbientSession, ev) != 1 || FindExprKeyVarSess(testAmbientSession, ev) != iv {
 		t.Fatal("var")
 	}
-	c := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
+	c := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntTypeSess(testAmbientSession)}
 	if CountExprKeyVarSess(testAmbientSession, c) != 0 || FindExprKeyVarSess(testAmbientSession, c) != nil {
 		t.Fatal("const")
 	}
 	// i + 2 → one key var i
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, c}}
-	bin := &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
+	bin := &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntTypeSess(testAmbientSession)}
 	if CountExprKeyVarSess(testAmbientSession, bin) != 1 || FindExprKeyVarSess(testAmbientSession, bin) != iv {
 		t.Fatalf("bin count=%d key=%v", CountExprKeyVarSess(testAmbientSession, bin), FindExprKeyVarSess(testAmbientSession, bin))
 	}
 	// i + j → two keys
-	jv := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
-	ej := &Expression{Term: TermVariable, Var: jv, ExprType: GetIntType()}
+	jv := CreateVariableScalarsSess(testAmbientSession, "j", GetIntTypeSess(testAmbientSession), false, false)
+	ej := &Expression{Term: TermVariable, Var: jv, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ej}}
 	bin2 := &Expression{Term: TermFunction, Invoke: fi2}
 	if CountExprKeyVarSess(testAmbientSession, bin2) != 2 || FindExprKeyVarSess(testAmbientSession, bin2) != nil {
@@ -956,36 +956,36 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 func TestIsVariantKeyVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
-	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
-	off := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
+	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}
+	off := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
 	// a[i] and a[i+1] share key i
 	a1 := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:    []int{8}, Collective: parent,
 		IndexExprs: []*Expression{ev},
 	}
 	a1.AsArray = a1
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, off}}
 	a2 := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:    []int{8}, Collective: parent,
-		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}},
+		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	a2.AsArray = a2
 	if !a1.IsVariantSess(testAmbientSession, &a2.Variable) {
 		t.Fatal("same key i")
 	}
 	// a[j] different key
-	jv := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
+	jv := CreateVariableScalarsSess(testAmbientSession, "j", GetIntTypeSess(testAmbientSession), false, false)
 	a3 := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:    []int{8}, Collective: parent,
-		IndexExprs: []*Expression{{Term: TermVariable, Var: jv, ExprType: GetIntType()}},
+		IndexExprs: []*Expression{{Term: TermVariable, Var: jv, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	a3.AsArray = a3
 	if a1.IsVariantSess(testAmbientSession, &a3.Variable) {
@@ -998,21 +998,21 @@ func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
 	// FindExprKeyVar residual soft invent was nil==nil invent variant-true past Type-nil key.
 	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
 	}
 	parent.AsArray = parent
 	// Count==1 (TermVariable) but Type-nil Find residual nil — no invent variant true
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "i_hole", Type: nil}}
 	a1 := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:      []int{8},
 		Collective: parent,
 		IndexExprs: []*Expression{hole},
 	}
 	a1.AsArray = a1
 	a2 := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:      []int{8},
 		Collective: parent,
 		IndexExprs: []*Expression{hole},
@@ -1028,7 +1028,7 @@ func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
 	// Count residual soft invent was soft-continue Find invent variant
 	emptyCon := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual count
 	a3 := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:      []int{8},
 		Collective: parent,
 		IndexExprs: []*Expression{emptyCon},
@@ -1045,7 +1045,7 @@ func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
 
 func TestItemizeConstIndices(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4, 5}},
 		Sizes:    []int{4, 5},
 	}
 	av.AsArray = av
@@ -1062,7 +1062,7 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
-	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), true, false)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), true, false)
 	vol.Qfer = NewCVQualifiers([]bool{false}, []bool{true})
 	// ensure IsVolatile true
 	if !vol.IsVolatileSess(testAmbientSession) {
@@ -1070,7 +1070,7 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 		vol.Qfer.IsVolatiles = []bool{true}
 	}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if !HasEligibleVolatileVar([]*Variable{vol}, GetIntType(), AccessRead, cg) {
+	if !HasEligibleVolatileVar([]*Variable{vol}, GetIntTypeSess(testAmbientSession), AccessRead, cg) {
 		t.Fatal("eligible")
 	}
 	if VolatileAvailCount() != 1 {
@@ -1082,7 +1082,7 @@ func TestSetIndexNoInventNilPad(t *testing.T) {
 	// IndexExprs lag Indices: sticky must not invent nil pad slots
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Indices:  []string{"0", "1"},
 		// IndexExprs empty lag
 	}
@@ -1108,7 +1108,7 @@ func TestOutputWithIndicesGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was invent "[i]" access past empty name shell.
 	ClearErrorSess(testAmbientSession)
 	av := &ArrayVariable{
-		Variable: Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
 	av.AsArray = av
@@ -1167,19 +1167,19 @@ func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_83", Type: GetSimpleType(EULong), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_83", Type: GetSimpleTypeSess(testAmbientSession, EULong), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_83", Type: GetSimpleType(EULong), IsArray: true, ArraySizes: []int{4}},
+		Variable:   Variable{Name: "g_83", Type: GetSimpleTypeSess(testAmbientSession, EULong), IsArray: true, ArraySizes: []int{4}},
 		Sizes:      []int{4},
 		Collective: parent,
-		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: "1"}, ExprType: GetIntType()}},
+		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "1"}, ExprType: GetIntTypeSess(testAmbientSession)}},
 	}
 	item.AsArray = item
 	// want type is pointer to element so indirect_level = 0 - 1 = -1 for &
-	want := PointerTo(GetSimpleType(EULong))
+	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EULong))
 	got := outputExpressionVariable(&item.Variable, want)
 	if got != "&g_83[1]" {
 		t.Fatalf("got %q want &g_83[1]", got)
@@ -1192,7 +1192,7 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 	// storage-volatile pointer array: "int32_t * volatile g_38[1]" not "volatile int32_t* g_38[1]"
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name:       "g_38",
@@ -1227,7 +1227,7 @@ func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 	// Variable.cpp:662–664 + OutputMgr.cpp:318 — ";/* VOLATILE GLOBAL name */"
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	v.Init = MakeInt(0)
 	s := v.OutputDefFullSess(testAmbientSession, true, false, false, nil)
 	if !strings.Contains(s, ";/* VOLATILE GLOBAL g_v */") {
@@ -1246,8 +1246,8 @@ func TestOutputInitNegativeConstParen(t *testing.T) {
 	blk := &Block{}
 	av := &ArrayVariable{
 		Variable: Variable{
-			Name: "l_52", Type: GetIntType(), IsArray: true, ArraySizes: []int{3},
-			Init: &Constant{Type: GetIntType(), Value: "-3L"},
+			Name: "l_52", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{3},
+			Init: &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "-3L"},
 		},
 		Sizes: []int{3},
 		Block: blk,

@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestMarkDeadVar(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	f := MakeFactPointTo(p, tgt)
 	nf := f.MarkDeadVar(tgt)
 	if nf == nil || !nf.IsDead() {
@@ -16,17 +16,17 @@ func TestMarkDeadVar(t *testing.T) {
 	if nf2 == nil || len(nf2.PointTo) != 1 || nf2.PointTo[0] != GarbagePtr {
 		t.Fatalf("%+v", nf2)
 	}
-	if f.MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)) != nil {
+	if f.MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) != nil {
 		t.Fatal("unrelated")
 	}
 }
 
 func TestUpdateFactsForOOSVars(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	// fact for local pointer removed when oos
-	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(lp, loc),
 		MakeFactPointTo(p, loc),
@@ -57,7 +57,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 
 func TestChooseOKVarItemizesArray(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil || av.AsArray == nil {
 		t.Fatal("av")
 	}
@@ -88,7 +88,7 @@ func TestVariableMatchAggregate(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	st := MakeRandomStructType(NewRngSess(testAmbientSession, 2), opts, probs, &env, "S0")
 	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
@@ -101,15 +101,15 @@ func TestVariableMatchAggregate(t *testing.T) {
 
 func TestMarkDeadVarNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)) != nil {
+	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)) != nil {
 		t.Fatal("nil Fact MarkDeadVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact MarkDeadVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	f := MakeFactPointTo(p, tgt)
 	if f.MarkDeadVar(nil) != nil {
 		t.Fatal("nil var MarkDeadVar must fail closed")
@@ -125,7 +125,7 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 	// field pointees (l_531.f0) as garbage — seed-30 g_113 held l_531.f0 live.
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	agg := CreateVariableScalarsSess(testAmbientSession, "l_531", st, false, false)
 	agg.CreateFieldVarsSess(testAmbientSession)
@@ -133,7 +133,7 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 		t.Fatal("need field")
 	}
 	fld := agg.FieldVars[0]
-	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	f := MakeFactPointToSet(p, []*Variable{fld, NullPtr})
 	nf := f.MarkDeadVar(agg)
 	if nf == nil {
@@ -157,12 +157,12 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 func TestMarkFuncEndLocalsStructFieldPointee(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	agg := CreateVariableScalarsSess(testAmbientSession, "l_531", st, false, false)
 	agg.CreateFieldVarsSess(testAmbientSession)
 	fld := agg.FieldVars[0]
-	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld, NullPtr})}
 	nf := facts[0].MarkFuncEndLocals([]*Variable{agg})
 	if nf == nil || !nf.IsDead() {

@@ -10,9 +10,9 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 5), opts, probs, &env, "U0")
-	if ut == nil || !ut.IsUnion() {
+	if ut == nil || !ut.IsUnionSess(testAmbientSession) {
 		t.Skip("no union")
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -27,7 +27,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	if bodyU == nil {
 		t.Fatal("MakeFactUnion body", HasErrorSess(testAmbientSession))
 	}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), true, false)
 	pt := MakeFactPointTo(p, NullPtr)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{pt}
@@ -58,7 +58,7 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 7), opts, probs, &env, "U0")
 	if ut == nil {
 		t.Skip("no union")
@@ -69,7 +69,7 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	}
 	preU := MakeFactUnion(uv, 0)
 	liveU := MakeFactUnion(uv, FactUnionBottom)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntTypeSess(testAmbientSession), true, false)
 	prePT := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
@@ -91,7 +91,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 9), opts, probs, &env, "U0")
 	if ut == nil {
 		t.Skip("no union")
@@ -116,8 +116,8 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_goto", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -140,7 +140,7 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 		t.Fatalf("dest last=0 ⊕ missing goto_out must BOTTOM, got %#v", got)
 	}
 	// set_fact_out pairs then AssignGlobalFactsFromMapOut rewinds live
-	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)})
 	// live still last=0 (as before fix)
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
 	fm.GlobalFacts = []*FactPointTo{}
@@ -171,11 +171,11 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_dest", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_u_dest", ut, false, false)
 	g.CreateFieldVarsSess(testAmbientSession)
-	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	fn := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{Func: fn}
 	fn.Body = body
 	// local union is OOS at dest outside its block — use global only
@@ -208,13 +208,13 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_keep", ut, false, false)
 	g.CreateFieldVarsSess(testAmbientSession)
 	loc := CreateVariableScalarsSess(testAmbientSession, "l_arm", ut, false, false)
 	loc.CreateFieldVarsSess(testAmbientSession)
-	fn := &Function{Name: "f_goto_u", ReturnType: GetIntType()}
+	fn := &Function{Name: "f_goto_u", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// then-arm holds local; dest is body (sibling path) where local is OOS
 	body := &Block{Func: fn, StmID: AllocStmID()}
 	thenArm := &Block{Func: fn, Parent: body, StmID: AllocStmID(), LocalVars: []*Variable{loc}}
@@ -260,7 +260,7 @@ func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 13), opts, probs, &env, "U0")
 	if ut == nil {
 		t.Skip("no union")

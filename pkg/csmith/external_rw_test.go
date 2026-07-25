@@ -5,8 +5,8 @@ import (
 )
 
 func TestGetExternalNoReadsWrites(t *testing.T) {
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{
 		NoReadVars:  []*Variable{g, loc},
 		NoWriteVars: []*Variable{g},
@@ -41,7 +41,7 @@ func TestFindMustUseArraysNilHole(t *testing.T) {
 }
 
 func TestFindRelatedPointToNilHole(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	facts := []*FactPointTo{nil, MakeFactPointTo(p, NullPtr)}
 	if FindRelatedPointTo(facts, p) != nil {
 		t.Fatal("nil fact hole must fail closed (no invent skip to later)")
@@ -52,14 +52,14 @@ func TestFindRelatedPointToNilHole(t *testing.T) {
 }
 
 func TestPtrModifiedInRhsNilPointees(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
-	lhs := &Lhs{Var: p, Type: GetIntType()} // indir via type peel — set IndirectLevel path
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	lhs := &Lhs{Var: p, Type: GetIntTypeSess(testAmbientSession)} // indir via type peel — set IndirectLevel path
 	// force multi-level via Type pointer chain
-	pt := PointerTo(PointerTo(GetIntType()))
+	pt := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))
 	pp := CreateVariableScalarsSess(testAmbientSession, "g_pp", pt, true, false)
-	lhs2 := &Lhs{Var: pp, Type: GetIntType()}
+	lhs2 := &Lhs{Var: pp, Type: GetIntTypeSess(testAmbientSession)}
 	// IndirectLevel for Lhs
-	if lhs2.IndirectLevel() <= 1 {
+	if lhs2.IndirectLevelSess(testAmbientSession) <= 1 {
 		// still exercise MergePointees nil path via incomplete facts with hole
 		_ = lhs
 	}
@@ -69,7 +69,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 	// for indir > 1 need multi-level pointer
 	// Lhs IndirectLevel = var.Type.IndirectLevel - want.IndirectLevel
 	// pp is **int, Type GetIntType → indir 2
-	if lhs2.IndirectLevel() > 1 {
+	if lhs2.IndirectLevelSess(testAmbientSession) > 1 {
 		if !cg.PtrModifiedInRhs(lhs2, facts) {
 			t.Fatal("nil pointee hole must fail closed as modified")
 		}
@@ -78,7 +78,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 
 func TestGetExternalNoWritesFromIV(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(g, 10)
 	_, nw := cg.GetExternalNoReadsWrites(nil)
@@ -89,7 +89,7 @@ func TestGetExternalNoWritesFromIV(t *testing.T) {
 
 func TestBuildCalleeRWDirective(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	rwd := cg.BuildCalleeRWDirective(nil)
 	if rwd == nil || len(rwd.NoWriteVars) != 1 {
@@ -108,7 +108,7 @@ func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 		t.Fatal(got)
 	}
 	// incomplete fact map fails closed nil
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if VariablesComplete(cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("incomplete facts must fail closed incomplete")
 	}
@@ -118,9 +118,9 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	// soft invent: incomplete frame → nil RW (no restrictions)
 	// fair: inherit full NoWrite without inventing unrestricted nil; sticky
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	rwd := cg.BuildCalleeRWDirective([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
 	if rwd == nil {
 		t.Fatal("incomplete must not invent nil unrestricted RW")
@@ -135,12 +135,12 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 }
 
 func TestVisitFactsInvocationParams(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	fi := &Invocation{
 		Args: []*Expression{
-			{Term: TermVariable, Var: a, ExprType: GetIntType()},
-			{Term: TermVariable, Var: b, ExprType: GetIntType()},
+			{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)},
+			{Term: TermVariable, Var: b, ExprType: GetIntTypeSess(testAmbientSession)},
 		},
 	}
 	eff := EmptyEffect()
@@ -157,11 +157,11 @@ func TestVisitFactsInvocationParams(t *testing.T) {
 func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 	// Visit residual soft invent was soft-continue later args invent visit success.
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession)}}
 	fi := &Invocation{
 		Args: []*Expression{
-			{Term: TermVariable, Var: a, ExprType: GetIntType()},
+			{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)},
 			hole,
 		},
 	}
@@ -181,7 +181,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	// FunctionInvocation.cpp:530–551 — always revisit user callees in visit_facts.
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	callee := &Function{Name: "c", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: nil}
 	fm := callee.ensurePairedFactMgr()
 	// NeedsRevisit false (no FactChanged / ptrs) — visit_facts still revisits
@@ -189,7 +189,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 		t.Fatal("fixture must not NeedsRevisit; testing always-revisit gate")
 	}
 	fi := &Invocation{User: callee}
-	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{StmID: 1, Func: caller}
 	caller.Stack = []*Block{blk}
 	// caller FM for GlobalFacts work set; revisit uses callee.PairedFactMgr
@@ -218,18 +218,18 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	g := CreateVariableScalarsSess(testAmbientSession, "g_overlap", GetIntType(), false, false)
-	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_overlap", GetIntTypeSess(testAmbientSession), false, false)
+	callee := &Function{Name: "c", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	// body: g_overlap = 1
 	st := Stmt{
 		Kind: StmtAssign, StmID: 51, AssignOp: AssignSimple,
-		LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntType()},
+		LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 	}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{st}}
 	_ = callee.ensurePairedFactMgr()
 	fi := &Invocation{User: callee}
-	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{StmID: 1, Func: caller, LocalVars: nil}
 	caller.Stack = []*Block{blk}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
@@ -237,7 +237,7 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	// Outer assign-like pollution that must not reach nested Lhs visit.
 	outerEff := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	cg.EffectAccum = &outerEff
-	cg.CurrRHS = &Expression{Term: TermVariable, Var: g, ExprType: GetIntType()}
+	cg.CurrRHS = &Expression{Term: TermVariable, Var: g, ExprType: GetIntTypeSess(testAmbientSession)}
 	// Ambient context already has g written — nested body write of g would fail
 	// CheckWriteVar if effect_context wrongly included that write via shared state.
 	// C++ new_context keeps parent effect_context (same ambient) but fresh accum.
@@ -257,13 +257,13 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 	// Legacy name kept: ambient write conflict on static path removed with always-revisit.
 	// Soft analysis fail remains non-sticky (RevisitUserInvocation ClearError on body fail).
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
-	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
+	callee := &Function{Name: "c", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	// body with *p write under may-null would fail; use incomplete as soft fail
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}}} // StmID 0 sticky fail
 	_ = callee.ensurePairedFactMgr()
 	fi := &Invocation{User: callee}
-	caller := &Function{Name: "caller", ReturnType: GetIntType()}
+	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{StmID: 1, Func: caller}
 	caller.Stack = []*Block{blk}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
@@ -280,7 +280,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 
 func TestFactMgrMapStmEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	eff := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	fm.SetMapStmEffect(3, eff)
 	got := fm.GetMapStmEffect(3)
@@ -290,7 +290,7 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 	if fm.GetMapStmEffect(9).IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("empty")
 	}
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.SetMapFactsIn(1, facts)
 	fm.SetMapFactsOut(1, facts)
@@ -301,9 +301,9 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 
 func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	st := Stmt{
-		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	// Block::stm_id always live when FM bound
@@ -327,11 +327,11 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 // visit_facts does not consult failed; generation-time Failed is not analysis fail.
 func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	fi := &Invocation{
 		Failed: true,
 		Args: []*Expression{
-			{Term: TermVariable, Var: a, ExprType: GetIntType()},
+			{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)},
 		},
 	}
 	eff := EmptyEffect()

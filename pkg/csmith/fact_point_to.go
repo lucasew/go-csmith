@@ -847,7 +847,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
-		} else if fn.RV.Type.IsAggregate() {
+		} else if fn.RV.Type.IsAggregateSess(s) {
 			// residual ERROR sticky — no invent soft-transfer past IsAggregate residual true
 			if sessHasError(s) {
 				return IncompleteFactSlice()
@@ -967,14 +967,14 @@ func AbstractFactForAssignSess(s *Session, factsIn []*FactPointTo, lhs *Variable
 	// Lhs type is var type after get_indirect_level peels; mirror by peeling ptrTo.
 	lhsTy := lhs.Type
 	for i := 0; i < lhsIndir && lhsTy != nil; i++ {
-		lhsTy = lhsTy.PtrType()
+		lhsTy = lhsTy.PtrTypeSess(s)
 		// residual ERROR sticky — no invent soft-peel past PtrType residual
 		if sessHasError(s) {
 			return IncompleteFactSlice(), 0
 		}
 	}
 	if lhsTy != nil {
-		pt := lhsTy.PtrType()
+		pt := lhsTy.PtrTypeSess(s)
 		// residual ERROR sticky — no invent soft-store path past PtrType residual
 		if sessHasError(s) {
 			return IncompleteFactSlice(), 0

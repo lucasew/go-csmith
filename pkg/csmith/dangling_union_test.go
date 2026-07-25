@@ -21,7 +21,7 @@ func TestGetContainerUnion(t *testing.T) {
 	if uv.FieldVars[0].GetContainerUnionSess(testAmbientSession) != uv {
 		t.Fatal("field container")
 	}
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	if iv.GetContainerUnionSess(testAmbientSession) != nil {
 		t.Fatal("int")
 	}
@@ -36,7 +36,7 @@ func TestGetContainerUnion(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil on ancestry sticky (no invent skip hole as no-container)
 	parent := &Variable{Name: "g_u"} // Type nil
-	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	field := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	if field.GetContainerUnionSess(testAmbientSession) != nil {
 		t.Fatal("Type-nil parent GetContainerUnion must fail closed nil")
 	}
@@ -50,7 +50,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("need union with 2+ fields")
@@ -106,7 +106,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	f := &Function{Name: "func_1"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// dead global pointer
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(p)}
 	fm.FindDanglingGlobalPtrs(f)
 	if len(f.DeadGlobals) != 1 || f.DeadGlobals[0] != p {
@@ -114,7 +114,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	}
 	// const not listed
 	f.DeadGlobals = nil
-	cp := CreateVariableScalarsSess(testAmbientSession, "g_cp", PointerTo(GetIntType()), true, false)
+	cp := CreateVariableScalarsSess(testAmbientSession, "g_cp", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(cp)}
 	fm.FindDanglingGlobalPtrs(f)
 	if len(f.DeadGlobals) != 0 {
@@ -134,8 +134,8 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsDead residual: PointTo nil hole stickies ERROR+true. Soft invent was append as
 	// dead then soft-continue later complete sibling into DeadGlobals. Fair: wipe incomplete.
-	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(GetIntType()), false, false)
-	goodDead := CreateVariableScalarsSess(testAmbientSession, "g_p3", PointerTo(GetIntType()), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	goodDead := CreateVariableScalarsSess(testAmbientSession, "g_p3", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{
 		{Var: p2, PointTo: []*Variable{nil}}, // residual IsDead
 		NewFactPointTo(goodDead),
@@ -153,7 +153,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 
 func TestOutputPtrResets(t *testing.T) {
 	CtrlVarsDoFinalizationSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	out := OutputPtrResets([]*Variable{p}, Defaults())
 	if !strings.Contains(out, "g_p = 0") {
 		t.Fatal(out)
@@ -171,7 +171,7 @@ func TestOutputPtrResets(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was synthetic ArrayVariable shell
-	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
+	shell := &Variable{Name: "g_a", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), IsArray: true, ArraySizes: []int{2}}
 	if OutputPtrResets([]*Variable{shell}, Defaults()) != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole resets")
 	}
@@ -197,7 +197,7 @@ func TestLooseMatchUnion(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 7), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")

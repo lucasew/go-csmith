@@ -7,8 +7,8 @@ import (
 
 func TestPtrModifiedInRhs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	lhs := &Lhs{Var: p, Type: GetIntType()} // *p
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	lhs := &Lhs{Var: p, Type: GetIntTypeSess(testAmbientSession)} // *p
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// RHS wrote the pointer itself
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, p)
@@ -26,8 +26,8 @@ func TestPtrModifiedInRhs(t *testing.T) {
 	// IsWritten residual soft invent was soft-continue unmodified past Type-nil parent shell.
 	// Fair: sticky modified true.
 	parentHole := &Variable{Name: "g_s"} // Type nil
-	field := &Variable{Name: "g_s.f0", Type: PointerTo(GetIntType()), FieldVarOf: parentHole}
-	lhs2 := &Lhs{Var: field, Type: GetIntType()}
+	field := &Variable{Name: "g_s.f0", Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), FieldVarOf: parentHole}
+	lhs2 := &Lhs{Var: field, Type: GetIntTypeSess(testAmbientSession)}
 	// IndirectLevelComplete may fail on Type-nil field path — use multi-level pointer with Type-nil parent write
 	// Simpler: incomplete EffectStm IsWritten residual true.
 	cg.EffectStm = IncompleteEffect()
@@ -43,7 +43,7 @@ func TestPtrModifiedInRhs(t *testing.T) {
 }
 
 func TestOutputDefWithAttrs(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	v.Init = MakeInt(0)
 	// force attrs with 100% boolean
 	ClearAttrGeneratorsSess(testAmbientSession)
@@ -58,7 +58,7 @@ func TestOutputDefWithAttrs(t *testing.T) {
 }
 
 func TestOutputFuncWithAttrs(t *testing.T) {
-	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{}}
 	ClearAttrGeneratorsSess(testAmbientSession)
 	currentSession().FuncAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "noinline", Prob: 100},
@@ -72,7 +72,7 @@ func TestOutputFuncWithAttrs(t *testing.T) {
 
 func TestArrayOutputInitNoPostIncr(t *testing.T) {
 	av := &ArrayVariable{
-		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}},
+		Variable: Variable{Name: "l_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{3}},
 		Sizes:    []int{3},
 		Block:    &Block{}, // local
 	}

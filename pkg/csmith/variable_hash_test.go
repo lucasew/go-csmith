@@ -7,13 +7,13 @@ import (
 
 func TestHashSimpleInt(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	out := v.HashOutputSess(testAmbientSession)
 	if !strings.Contains(out, `transparent_crc(g_1, "g_1"`) {
 		t.Fatal(out)
 	}
 	// empty name sticky — no invent transparent_crc(,"")
-	anon := &Variable{Name: "", Type: GetIntType()}
+	anon := &Variable{Name: "", Type: GetIntTypeSess(testAmbientSession)}
 	if anon.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("empty name must fail closed hash")
 	}
@@ -24,7 +24,7 @@ func TestHashSimpleInt(t *testing.T) {
 }
 
 func TestHashPointerEmpty(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_2", PointerTo(GetIntType()), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if v.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("pointers must not hash")
 	}
@@ -35,8 +35,8 @@ func TestHashStructFields(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
-			{Name: "f1", Type: GetSimpleType(EUInt), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EUInt), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
 		},
 	}
 	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -59,7 +59,7 @@ func TestHashArrayLoops(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name:       "g_4",
-			Type:       GetIntType(),
+			Type:       GetIntTypeSess(testAmbientSession),
 			IsArray:    true,
 			ArraySizes: []int{3},
 			Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
@@ -87,7 +87,7 @@ func TestHashArrayLoops(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray sticky empty
-	shell := &Variable{Name: "g_5", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}}
+	shell := &Variable{Name: "g_5", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{3}}
 	if shell.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("IsArray without AsArray HashOutput must fail closed empty")
 	}
@@ -108,7 +108,7 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	_ = GetNewCtrlVarsSess(testAmbientSession, opts)
 	parent := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_62", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3},
+			Name: "g_62", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3},
 			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 		},
 		Sizes: []int{2, 3},
@@ -116,7 +116,7 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	parent.AsArray = parent
 	item := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_62", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3},
+			Name: "g_62", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 3},
 			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 		},
 		Sizes: []int{2, 3}, Collective: parent, Indices: []string{"1", "0"},
@@ -155,8 +155,8 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 		isUnion:    true,
 		StructName: "U2",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	av := &ArrayVariable{
@@ -203,7 +203,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	_ = GetNewCtrlVarsSess(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_x", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			Name: "g_x", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2},
 			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 		},
 		Sizes: []int{2},

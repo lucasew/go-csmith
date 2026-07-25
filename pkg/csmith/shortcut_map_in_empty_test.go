@@ -9,7 +9,7 @@ import "testing"
 // map_stm_effect (seed-90 nested-call IV reads dropped from caller feffect).
 func TestShortcutAnalysisBlockMissingMapInIsEmpty(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	b := &Block{Func: f, StmID: AllocStmID(), Looping: true, Stmts: []Stmt{}}
 	f.Body = b
 	fm := NewFactMgrSess(testAmbientSession, f)

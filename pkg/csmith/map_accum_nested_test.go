@@ -7,16 +7,16 @@ import "testing"
 func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
-	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false)
+	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntTypeSess(testAmbientSession), false, false)
 
 	st := Stmt{
 		Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID(),
 		LhsVar: g1,
-		Expr:   &Expression{Term: TermVariable, Var: g1, ExprType: GetIntType()},
+		Expr:   &Expression{Term: TermVariable, Var: g1, ExprType: GetIntTypeSess(testAmbientSession)},
 	}
 	blk := &Block{Func: f, StmID: AllocStmID(), Stmts: []Stmt{st}}
 	f.Blocks = []*Block{blk}
@@ -64,10 +64,10 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false)
 
 	// Assign with nil Lhs will fail visit — still must record map_accum
 	st := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
@@ -97,8 +97,8 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 
 func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false)
 	live2 := EmptyEffect().ReadVarSess(testAmbientSession, g1)
 	stored := live2.CloneSess(testAmbientSession)
 	live2 = live2.ReadVarSess(testAmbientSession, g2)
@@ -115,10 +115,10 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 // n=26 vs UP n=56 when effect_context seFree poisoned by shared write sets).
 func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
-	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
-	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntType(), false, false)
+	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)})
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), false, false)
+	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntTypeSess(testAmbientSession), false, false)
 
 	live := EmptyEffect().WriteVarSess(testAmbientSession, g1).WriteVarSess(testAmbientSession, g2)
 	id := AllocStmID()

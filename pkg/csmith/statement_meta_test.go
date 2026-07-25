@@ -285,7 +285,7 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 func TestIsPtrUsedForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs → test; ptr in for-test must count (no invent skip)
 	ClearErrorSess(testAmbientSession)
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	pv := CreateVariableScalarsSess(testAmbientSession, "p", pt, false, false)
 	test := &Expression{Term: TermVariable, Var: pv, ExprType: pt}
 	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}}
@@ -305,12 +305,12 @@ func TestIsPtrUsedForTestExpr(t *testing.T) {
 }
 
 func TestIsPtrUsed(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: p, Expr: &Expression{Term: TermVariable, Var: p}}
 	if !IsPtrUsedSess(testAmbientSession, st) {
 		t.Fatal("ptr")
 	}
-	st2 := &Stmt{Kind: StmtAssign, LhsVar: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false),
+	st2 := &Stmt{Kind: StmtAssign, LhsVar: CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false),
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	if IsPtrUsedSess(testAmbientSession, st2) {
 		t.Fatal("no ptr")
@@ -431,7 +431,7 @@ func TestNeedReturnStmtIncompleteSticky(t *testing.T) {
 		t.Fatal("nil ReturnType NeedReturnStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&Function{Name: "f", ReturnType: GetSimpleType(EVoid)}).NeedReturnStmt() {
+	if (&Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EVoid)}).NeedReturnStmt() {
 		t.Fatal("void must not need return")
 	}
 	if HasErrorSess(testAmbientSession) {

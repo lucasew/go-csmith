@@ -4,7 +4,7 @@ import "testing"
 
 func TestWriteVarNonVolatileKeepsSEFree(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntType(), false, false)
+	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntTypeSess(testAmbientSession), false, false)
 	if g8.IsVolatileSess(testAmbientSession) {
 		t.Fatal("g_8 must not be volatile")
 	}
@@ -30,7 +30,7 @@ func TestWriteVarNonVolatileKeepsSEFree(t *testing.T) {
 func TestZeroAccumEffContextAddExternal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	var zero Effect // Go zero — not C++ Effect()
-	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntType(), false, false)
+	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntTypeSess(testAmbientSession), false, false)
 	ctx := EmptyEffect().WriteVarSess(testAmbientSession, g8)
 	if !ctx.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-vol write context must be SE-free")
@@ -46,7 +46,7 @@ func TestZeroAccumEffContextAddExternal(t *testing.T) {
 		t.Fatalf("BUILD effect_context must stay SE-free, SE=%v", merged.IsSideEffectFreeSess(testAmbientSession))
 	}
 	// Factory initializes AccumEffContext
-	f := &Function{Name: "func_x", ReturnType: GetIntType(), AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
+	f := &Function{Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession), AccumEffContext: EmptyEffect(), FEffect: EmptyEffect()}
 	if !f.AccumEffContext.IsSideEffectFreeSess(testAmbientSession) || !f.FEffect.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("Function AccumEffContext/FEffect EmptyEffect must be SE-free")
 	}
@@ -55,7 +55,7 @@ func TestZeroAccumEffContextAddExternal(t *testing.T) {
 
 func TestAddExternalEffectGlobalWriteKeepsSEFree(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntType(), false, false)
+	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntTypeSess(testAmbientSession), false, false)
 	if !g8.IsGlobalSess(testAmbientSession) {
 		t.Fatal("g_8 name must be IsGlobal")
 	}

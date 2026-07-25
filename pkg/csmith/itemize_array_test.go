@@ -7,7 +7,7 @@ import (
 
 func TestIsPackedAggregateFieldVar(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Packed: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(parent.FieldVars) == 0 {
@@ -17,7 +17,7 @@ func TestIsPackedAggregateFieldVar(t *testing.T) {
 	if !f0.IsPackedAggregateFieldVarSess(testAmbientSession) {
 		t.Fatal("want packed field")
 	}
-	plain := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	plain := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	if plain.IsPackedAggregateFieldVarSess(testAmbientSession) {
 		t.Fatal("scalar")
 	}
@@ -27,14 +27,14 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// size 8 so remain > 1 when bound is 0 → offset possible
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	// force size
 	if av == nil {
 		t.Fatal("nil av")
 	}
 	av.Sizes = []int{8}
 	av.ArraySizes = []int{8}
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	// scan seeds for offset form
@@ -76,11 +76,11 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: InvalidIVBound}
 	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
@@ -94,11 +94,11 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{nil: 0, iv: 0}
 	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
@@ -115,11 +115,11 @@ func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
@@ -143,7 +143,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	if vs.ItemizeArray(NewRngSess(testAmbientSession, 1), cg, av) != nil {
@@ -155,7 +155,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IV Type-nil sticky — no invent OK-IV soft pool past hole
 	av2 := &ArrayVariable{
-		Variable: Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_b", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	av2.AsArray = av2
@@ -196,7 +196,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
 	// mark partially written → filtered → CreateRandomArray may still run
@@ -216,12 +216,12 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
-	av2 := CreateArrayVariable(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av2 := CreateArrayVariable(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av, av2}
 	vs.GlobalList = []*Variable{&av.Variable, &av2.Variable}
 	// incomplete NoWriteVars hole stickies IsNonWritable residual during filter of av
@@ -253,8 +253,8 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	opts.CComp = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("array")
 	}
@@ -262,11 +262,11 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable}
 	// Type-nil parent field IV: packed sticky residual during IV filter
 	parent := &Variable{Name: "g_u"} // Type nil
-	fieldIV := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
-	goodIV := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	fieldIV := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
+	goodIV := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = append(vs.GlobalList, fieldIV, goodIV)
 	vs.AllVars = append([]*Variable{&av.Variable}, fieldIV, goodIV)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f, LocalVars: []*Variable{fieldIV, goodIV}}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -296,12 +296,12 @@ func TestItemizeIndexOutputResidualSticky(t *testing.T) {
 	// SetIndexExpr residual: Type-nil index Output stickies without inventing index slot.
 	ClearErrorSess(testAmbientSession)
 	parent := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
 	item := &ArrayVariable{
-		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Variable:   Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
 		Sizes:      []int{4},
 		Collective: parent,
 	}
@@ -329,7 +329,7 @@ func TestItemizeIndexOutputResidualSticky(t *testing.T) {
 func TestFactUnionOutputGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was invent " last written field: N" past empty name.
 	ClearErrorSess(testAmbientSession)
-	f := &FactUnion{Var: &Variable{Type: GetIntType()}, LastWrittenFID: 0}
+	f := &FactUnion{Var: &Variable{Type: GetIntTypeSess(testAmbientSession)}, LastWrittenFID: 0}
 	if s := f.Output(); s != "" {
 		t.Fatal("empty name residual must fail closed FactUnion.Output", s)
 	}

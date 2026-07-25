@@ -97,7 +97,7 @@ func TestChooseRandomNonvoidSimpleNeverVoid(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	seen := map[ESimpleType]int{}
 	for i := 0; i < 200; i++ {
-		st := ChooseRandomNonvoidSimple(r, p)
+		st := ChooseRandomNonvoidSimpleSess(testAmbientSession, r, p)
 		if st == EVoid {
 			t.Fatalf("iter %d: void chosen", i)
 		}
@@ -116,7 +116,7 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	// First genrand = 1959434203; scan until weight>0.
 	p := NewProbabilities(Defaults())
 	r := NewRngSess(testAmbientSession, 2)
-	st := ChooseRandomNonvoidSimple(r, p)
+	st := ChooseRandomNonvoidSimpleSess(testAmbientSession, r, p)
 	// Manual: try v = raw%14 until not filtered.
 	r2 := NewRngSess(testAmbientSession, 2)
 	raw := r2.Genrand()
@@ -130,14 +130,14 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	}
 	// C++ always has RNG+probs sticky — no invent EInt when missing
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomNonvoidSimple(nil, p) != EVoid {
+	if ChooseRandomNonvoidSimpleSess(testAmbientSession, nil, p) != EVoid {
 		t.Fatal("nil RNG must fail closed EVoid")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG ChooseRandomNonvoidSimple must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ChooseRandomNonvoidSimple(NewRngSess(testAmbientSession, 1), nil) != EVoid {
+	if ChooseRandomNonvoidSimpleSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil) != EVoid {
 		t.Fatal("nil probs must fail closed EVoid")
 	}
 	if !HasErrorSess(testAmbientSession) {

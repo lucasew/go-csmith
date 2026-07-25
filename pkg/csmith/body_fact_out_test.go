@@ -8,13 +8,13 @@ import "testing"
 // FunctionInvocationUser.cpp:212–221 — ret_facts = map_facts_out[body]; renew_facts.
 func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	fn := &Function{Name: "func_x", ReturnType: GetIntType()}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
+	fn := &Function{Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession)}
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if p == nil {
 		t.Fatal("param")
 	}
 	fn.Param = []*Variable{p}
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if g == nil {
 		t.Fatal("global")
 	}

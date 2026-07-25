@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestAddEffect(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, b)
 	m := e1.AddEffectSess(testAmbientSession, e2)
@@ -16,7 +16,7 @@ func TestAddEffect(t *testing.T) {
 		t.Fatal("non-vol stays SE-free")
 	}
 	// volatile write in add_effect union clears SE-free
-	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	m2 := EmptyEffect().AddEffectSess(testAmbientSession, EmptyEffect().WriteVarSess(testAmbientSession, vol))
 	if m2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
@@ -36,7 +36,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 3), opts, probs, &env, "U0")
 	if ut == nil {
 		t.Skip("no union")
@@ -70,7 +70,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil parent sticky true (restrictive — no invent not-inside soft-skip)
 	parent := &Variable{Name: "g_u"} // Type nil
-	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	field := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	if !field.IsInsideUnionFieldSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsInsideUnionField must fail closed true restrictive")
 	}
@@ -82,7 +82,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 	if !f0.IsInsideUnionFieldSess(testAmbientSession) {
 		// f0 is real union field — should be true; use scalar
 	}
-	scalar := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	scalar := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntTypeSess(testAmbientSession), false, false)
 	if scalar.IsInsideUnionFieldSess(testAmbientSession) {
 		t.Fatal("scalar IsInsideUnionField must be false complete")
 	}
@@ -97,7 +97,7 @@ func TestIsNonreadableField(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
@@ -161,7 +161,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
-	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUInt)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 7), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 1 {
 		t.Skip("union")
@@ -183,8 +183,8 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	// && : after left writes a, RHS generation sees pre-left context only
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = []*Variable{a, b}
 	eff := EmptyEffect()

@@ -423,7 +423,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		Kind:      StmtAssign,
 		LhsVar:    iv,
 		Lhs:       lhs,
-		Expr:      &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntType()},
+		Expr:      &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntTypeSess(sessFromCG(cg))},
 		AssignOp:  AssignSimple,
 		SafeFlags: flags1,
 		StmID:     AllocStmIDSess(sessFromCG(cg)),
@@ -444,7 +444,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// test: FunctionInvocation::make_binary(test_op, ExpressionVariable(iv), limit)
 	// StatementFor.cpp:255–263 — ERROR_GUARD on null (no soft bare Invocation)
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
-	cLimit := &Expression{Term: TermConstant, Con: MakeIntSess(sessFromCG(cg), limitN), ExprType: GetIntType()}
+	cLimit := &Expression{Term: TermConstant, Con: MakeIntSess(sessFromCG(cg), limitN), ExprType: GetIntTypeSess(sessFromCG(cg))}
 	testFi := MakeBinary(r, opts, probs, *cg, testOp, vExpr, cLimit)
 	if testFi == nil || hasErrCG(cg) {
 		return nil
@@ -458,7 +458,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 
 	// incr assign (StatementFor.cpp:273–281)
 	lhs1 := &Lhs{Var: iv, Type: iv.Type}
-	cIncr := &Expression{Term: TermConstant, Con: MakeIntSess(sessFromCG(cg), incrN), ExprType: GetIntType()}
+	cIncr := &Expression{Term: TermConstant, Con: MakeIntSess(sessFromCG(cg), incrN), ExprType: GetIntTypeSess(sessFromCG(cg))}
 	var incrSt Stmt
 	if arrayBound {
 		// plain compound assign (no make_possible_compound)

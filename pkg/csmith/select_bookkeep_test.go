@@ -5,12 +5,12 @@ import "testing"
 func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
 	// seed one global so reuse is possible
-	g := vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	g := vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	if g == nil {
 		t.Fatal("seed global")
 	}
@@ -21,7 +21,7 @@ func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	for seed := uint64(2); seed < 40; seed++ {
 		beforeOld := currentSession().BK.useOldVarCnt
 		beforeNew := currentSession().BK.useNewVarCnt
-		v := vs.Select(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, seed), MatchFlexible)
+		v := vs.Select(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, seed), MatchFlexible)
 		if v == nil {
 			continue
 		}
@@ -54,7 +54,7 @@ func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 	outerN, innerN := 0, 0
 	for seed := uint64(1); seed < 30; seed++ {
 		beforeO, beforeI := len(outer.LocalVars), len(inner.LocalVars)
-		v := vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, seed))
+		v := vs.GenerateNewVariable(AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, seed))
 		if v == nil {
 			t.Fatal("nil")
 		}
@@ -69,7 +69,7 @@ func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 		t.Fatalf("want both stack frames used: outer=%d inner=%d", outerN, innerN)
 	}
 	// VariableSelector.cpp always has RNG; no invent scope/type without it
-	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, nil) != nil {
+	if vs.GenerateNewVariable(AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("nil RNG must not invent new variable")
 	}
 }
@@ -79,13 +79,13 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.EffectAccum = &inc
-	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, NewRngSess(testAmbientSession, 1)) != nil {
+	if vs.GenerateNewVariable(AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed GenerateNewVariable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -95,7 +95,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	if vs.GenerateNewVariable(AccessWrite, cg2, GetIntType(), nil, NewRngSess(testAmbientSession, 2)) != nil {
+	if vs.GenerateNewVariable(AccessWrite, cg2, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 2)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewVariable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -105,7 +105,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	cg3 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
-	if vs.GenerateNewVariable(AccessWrite, cg3, GetIntType(), nil, NewRngSess(testAmbientSession, 3)) != nil {
+	if vs.GenerateNewVariable(AccessWrite, cg3, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 3)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed GenerateNewVariable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -117,12 +117,12 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 func TestSelectGlobalMTInvalidVars(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{a, b}
 	vs.GlobalNonvolatilesList = []*Variable{a, b}
 	// invalidate a → only b
-	got := vs.SelectGlobalMT(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 3), MatchFlexible, []*Variable{a})
+	got := vs.SelectGlobalMT(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 3), MatchFlexible, []*Variable{a})
 	if got != b {
 		// may create new if choose fails eligibility — accept b or new
 		if got == a {
@@ -135,7 +135,7 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// int* global nonvol
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	vs.GlobalList = []*Variable{pv}
@@ -144,7 +144,7 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	got := selectDerefPointer(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, cg, GetIntType(), &q, AccessRead)
+	got := selectDerefPointer(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, cg, GetIntTypeSess(testAmbientSession), &q, AccessRead)
 	if got != pv {
 		// may create — ensure not nil
 		if got == nil {
@@ -158,7 +158,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	vs.GlobalList = []*Variable{pv}
@@ -168,7 +168,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	f.Stack = []*Block{blk}
 	probs := NewProbabilities(opts)
 	cg := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
-	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg, GetIntType(), &q, AccessRead, nil) != nil {
+	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg, GetIntTypeSess(testAmbientSession), &q, AccessRead, nil) != nil {
 		t.Fatal("incomplete EffectContext must fail closed selectDerefPointerInv")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -176,7 +176,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, IncompleteVariables()) != nil {
+	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, GetIntTypeSess(testAmbientSession), &q, AccessRead, IncompleteVariables()) != nil {
 		t.Fatal("incomplete invalidVars must fail closed selectDerefPointerInv")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -184,7 +184,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	vs.GlobalNonvolatilesList = IncompleteVariables()
-	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, nil) != nil {
+	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, GetIntTypeSess(testAmbientSession), &q, AccessRead, nil) != nil {
 		t.Fatal("incomplete GlobalNonvolatilesList must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -193,7 +193,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type + RNG always live; sticky
 	vs.GlobalNonvolatilesList = []*Variable{pv}
-	if selectDerefPointerInv(nil, opts, probs, vs, cg2, GetIntType(), &q, AccessRead, nil) != nil {
+	if selectDerefPointerInv(nil, opts, probs, vs, cg2, GetIntTypeSess(testAmbientSession), &q, AccessRead, nil) != nil {
 		t.Fatal("nil RNG selectDerefPointerInv must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -208,7 +208,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// assert(qfer) sticky
-	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, GetIntType(), nil, AccessRead, nil) != nil {
+	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, GetIntTypeSess(testAmbientSession), nil, AccessRead, nil) != nil {
 		t.Fatal("nil qfer selectDerefPointerInv must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

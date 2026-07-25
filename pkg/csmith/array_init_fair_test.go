@@ -14,7 +14,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
 	av := &ArrayVariable{
@@ -22,7 +22,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalarsSess(testAmbientSession, "g_1287.f3", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_1287.f3", GetIntTypeSess(testAmbientSession), false, false)
 	if iv == nil {
 		t.Fatal("iv")
 	}
@@ -54,11 +54,11 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 	// non-aggregate: direct assign (StatementArrayOp.cpp:248–254)
 	ClearErrorSess(testAmbientSession)
 	avInt := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:    []int{2},
 	}
 	avInt.AsArray = avInt
-	rhsInt := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	rhsInt := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
 	stInt := Stmt{
 		Kind:        StmtArrayOp,
 		Loop:        &LoopControl{IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
@@ -90,7 +90,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -101,11 +101,11 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	vs.GlobalNonvolatilesList = []*Variable{&av.Variable}
 	// seed IVs
 	for i := 0; i < 3; i++ {
-		iv := CreateVariableQferSess(testAmbientSession, "g_i"+string(rune('0'+i)), GetIntType(), q)
+		iv := CreateVariableQferSess(testAmbientSession, "g_i"+string(rune('0'+i)), GetIntTypeSess(testAmbientSession), q)
 		vs.GlobalList = append(vs.GlobalList, iv)
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, iv)
 	}
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -153,7 +153,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	av.Sizes = nil
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -173,11 +173,11 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	// no float types in simple select — just ensure no panic with empty filter path
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	av.Sizes = []int{4}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntTypeSess(testAmbientSession), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
@@ -198,11 +198,11 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
-	v := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
+	v := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntTypeSess(testAmbientSession), false, false)
 	// FactMgr required when condition may build ExpressionAssign
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = vs.Types

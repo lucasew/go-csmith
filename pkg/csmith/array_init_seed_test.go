@@ -13,7 +13,7 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 
 	// First array: size 1, pool {"A"} → one leaf, seed advances once
 	a1 := &ArrayVariable{
-		Variable: Variable{Name: "a1", Type: GetIntType(), IsArray: true, ArraySizes: []int{1}},
+		Variable: Variable{Name: "a1", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{1}},
 		Sizes:    []int{1},
 	}
 	s1 := a1.buildInitRecursiveSess(testAmbientSession, 0, []string{"A"})
@@ -26,7 +26,7 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 
 	// Second array: size 2, pool {"X","Y"} — first leaf uses seed 0xABCDEF+1 not reset
 	a2 := &ArrayVariable{
-		Variable: Variable{Name: "a2", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Variable: Variable{Name: "a2", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
 	}
 	s2 := a2.buildInitRecursiveSess(testAmbientSession, 0, []string{"X", "Y"})
@@ -56,7 +56,7 @@ func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 	opts.ForceNonUniformArrayInit = true
 	SetProcessOptionsSess(testAmbientSession, opts)
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 2}},
+		Variable: Variable{Name: "g", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2, 2}},
 		Sizes:    []int{2, 2},
 	}
 	// four leaves with pool of 3

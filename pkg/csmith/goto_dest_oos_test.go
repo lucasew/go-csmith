@@ -15,10 +15,10 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	f := &Function{Name: "func_61", ReturnType: GetIntType()}
+	f := &Function{Name: "func_61", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{StmID: 8, Func: f}
 	for106 := &Block{StmID: 106, Func: f, Parent: body, Looping: true}
 	for146 := &Block{StmID: 146, Func: f, Parent: body, Looping: true}
@@ -58,10 +58,10 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	f := &Function{Name: "func_61", ReturnType: GetIntType()}
+	f := &Function{Name: "func_61", ReturnType: GetIntTypeSess(testAmbientSession)}
 	body := &Block{StmID: 8, Func: f}
 	for146 := &Block{StmID: 146, Func: f, Parent: body, Looping: true}
 	l298 := CreateVariableScalarsSess(testAmbientSession, "l_298", st, false, false)
@@ -71,8 +71,8 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 	f.Blocks = []*Block{body, for146}
 	f.Stack = []*Block{body}
 
-	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", PointerTo(GetIntType()), false, false)
-	g67 := CreateVariableScalarsSess(testAmbientSession, "g_67", GetIntType(), false, false)
+	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	g67 := CreateVariableScalarsSess(testAmbientSession, "g_67", GetIntTypeSess(testAmbientSession), false, false)
 	factsIn := []*FactPointTo{MakeFactPointToSet(g77, []*Variable{g67, f0})}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)

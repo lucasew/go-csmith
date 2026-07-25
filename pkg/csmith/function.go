@@ -246,7 +246,7 @@ func MakeRandomSignature(
 		}
 	}
 	// Function.cpp:407 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunction, nullptr)
-	if DepthGuardByTypeSess(s, opts, DtFunction) == BadDepth {
+	if DepthGuardByTypeSess(sessFromCG(&cg), opts, DtFunction) == BadDepth {
 		return nil
 	}
 	// Function.cpp:408 ERROR_GUARD after DEPTH_GUARD
@@ -272,13 +272,13 @@ func MakeRandomSignature(
 	if sessHasError(s) {
 		return nil
 	}
-	f.RV = CreateVariableQferSess(s, name+"_rv", retType, retQ)
+	f.RV = CreateVariableQferSess(sessFromCG(&cg), name+"_rv", retType, retQ)
 	// Function.cpp:419–420 — CreateVariable + ERROR_GUARD path; no soft invent signature without rv
 	if f.RV == nil || sessHasError(s) {
 		return nil
 	}
 	// GenerateParameterList: for i=0; i<=max; i++
-	max := ParamListProbabilitySess(s, r, opts)
+	max := ParamListProbabilitySess(sessFromCG(&cg), r, opts)
 	if sessHasError(s) {
 		return nil
 	}
@@ -290,7 +290,7 @@ func MakeRandomSignature(
 		}
 	}
 	// Function.cpp:422 — FMList.push_back(new FactMgr(f)); always at signature
-	f.ensurePairedFactMgrSess(s)
+	f.ensurePairedFactMgrSess(sessFromCG(&cg))
 	// inline flip if enabled
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
@@ -330,7 +330,7 @@ func MakeRandomFunction(
 	}
 	// Function.cpp:422 FMList entry from signature — get_fact_mgr_for_func (no invent second)
 	// sticky no invent GenerateBody without live FactMgr
-	fm := f.PairedFactMgrSess(s)
+	fm := f.PairedFactMgrSess(sessFromCG(&cg))
 	if fm == nil {
 		sessNoteError(s, ErrGeneric)
 		return nil
@@ -1047,7 +1047,7 @@ func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 			return ""
 		}
 		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions) sticky
-		if !opts.ArgStructs && p.Type.IsStruct() {
+		if !opts.ArgStructs && p.Type.IsStructSess(s) {
 			// residual ERROR sticky — no invent soft-empty param past IsStruct residual
 			if sessHasError(s) {
 				return ""
@@ -1059,7 +1059,7 @@ func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 		if sessHasError(s) {
 			return ""
 		}
-		if !opts.ArgUnions && p.Type.IsUnion() {
+		if !opts.ArgUnions && p.Type.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-empty param past IsUnion residual
 			if sessHasError(s) {
 				return ""
@@ -1126,7 +1126,7 @@ func (f *Function) OutputHeaderOptsSess(s *Session, forceStatic bool, opts Optio
 		rt = f.RV.Type
 	}
 	if rt != nil {
-		if !opts.ReturnStructs && rt.IsStruct() {
+		if !opts.ReturnStructs && rt.IsStructSess(s) {
 			// residual ERROR sticky — no invent soft-empty header past IsStruct residual
 			if sessHasError(s) {
 				return ""
@@ -1138,7 +1138,7 @@ func (f *Function) OutputHeaderOptsSess(s *Session, forceStatic bool, opts Optio
 		if sessHasError(s) {
 			return ""
 		}
-		if !opts.ReturnUnions && rt.IsUnion() {
+		if !opts.ReturnUnions && rt.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-empty header past IsUnion residual
 			if sessHasError(s) {
 				return ""

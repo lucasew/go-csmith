@@ -3,30 +3,30 @@ package csmith
 import "testing"
 
 func TestIsSignedChar(t *testing.T) {
-	if !GetSimpleType(EChar).IsSignedChar() {
+	if !GetSimpleTypeSess(testAmbientSession, EChar).IsSignedCharSess(testAmbientSession) {
 		t.Fatal("eChar")
 	}
-	if GetSimpleType(EUChar).IsSignedChar() {
+	if GetSimpleTypeSess(testAmbientSession, EUChar).IsSignedCharSess(testAmbientSession) {
 		t.Fatal("uChar")
 	}
-	if GetIntType().IsSignedChar() {
+	if GetIntTypeSess(testAmbientSession).IsSignedCharSess(testAmbientSession) {
 		t.Fatal("int")
 	}
 }
 
 func TestIsFullBitfieldsStruct(t *testing.T) {
 	full := &Type{isStruct: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: 3},
-		{Name: "f1", Type: GetIntType(), BitWidth: 5},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: 5},
 	}}
-	if !full.IsFullBitfieldsStruct() {
+	if !full.IsFullBitfieldsStructSess(testAmbientSession) {
 		t.Fatal("full")
 	}
 	mixed := &Type{isStruct: true, Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: 3},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: 3},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
-	if mixed.IsFullBitfieldsStruct() {
+	if mixed.IsFullBitfieldsStructSess(testAmbientSession) {
 		t.Fatal("mixed")
 	}
 }
@@ -35,31 +35,31 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// struct containing pointer must not appear as union field
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	withPtr := &Type{isStruct: true, StructName: "Sp", Fields: []StructField{
 		{Name: "p", Type: pt, BitWidth: -1},
 	}}
 	// ContainPointerField true for pointer field type
-	if !withPtr.ContainPointerField() {
+	if !withPtr.ContainPointerFieldSess(testAmbientSession) {
 		// fields[0].Type is pointer → ContainPointerField walks fields
 		// Type.ContainPointerField checks ptrTo or field.ContainPointerField
 		// f.Type is pointer so f.Type.ContainPointerField is true
-		if !pt.ContainPointerField() {
+		if !pt.ContainPointerFieldSess(testAmbientSession) {
 			t.Fatal("ptr type")
 		}
 	}
 	env := &TypeEnv{Sess: testAmbientSession,
 		StructTypes: []*Type{withPtr},
-		AllTypes:    []*Type{GetIntType(), withPtr},
+		AllTypes:    []*Type{GetIntTypeSess(testAmbientSession), withPtr},
 	}
 	// many seeds: never get pointer-containing struct
 	for seed := uint64(1); seed < 60; seed++ {
 		ClearErrorSess(testAmbientSession)
 		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, true)
-		if f.Type != nil && f.Type.IsStruct() && f.Type.ContainPointerField() {
+		if f.Type != nil && f.Type.IsStructSess(testAmbientSession) && f.Type.ContainPointerFieldSess(testAmbientSession) {
 			t.Fatalf("pointer struct in union field seed %d", seed)
 		}
-		if f.Type != nil && f.Type.IsPointerLike() {
+		if f.Type != nil && f.Type.IsPointerLikeSess(testAmbientSession) {
 			t.Fatalf("raw pointer in union seed %d", seed)
 		}
 	}
@@ -76,7 +76,7 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 	// AllTypes like GenerateSimpleTypes: eChar.. (includes float with weight 0)
 	env := TypeEnv{Sess: testAmbientSession}
 	for st := EChar; int(st) < MaxSimpleTypes; st++ {
-		env.AllTypes = append(env.AllTypes, GetSimpleType(st))
+		env.AllTypes = append(env.AllTypes, GetSimpleTypeSess(testAmbientSession, st))
 	}
 	// float must have weight 0 under defaults
 	if probs.SimpleTypeWeight(int(EFloat)) != 0 {
@@ -90,11 +90,11 @@ func TestMakeOneUnionFieldKeepsWeight0SimplesInPool(t *testing.T) {
 		if f.Type == nil || HasErrorSess(testAmbientSession) {
 			continue
 		}
-		if !f.Type.IsSimple() || f.Type.Simple() == EVoid {
+		if !f.Type.IsSimpleSess(testAmbientSession) || f.Type.SimpleSess(testAmbientSession) == EVoid {
 			t.Fatalf("unexpected field type %v seed %d", f.Type, seed)
 		}
-		if probs.SimpleTypeWeight(int(f.Type.Simple())) == 0 {
-			t.Fatalf("picked weight-0 simple %v seed %d", f.Type.Simple(), seed)
+		if probs.SimpleTypeWeight(int(f.Type.SimpleSess(testAmbientSession))) == 0 {
+			t.Fatalf("picked weight-0 simple %v seed %d", f.Type.SimpleSess(testAmbientSession), seed)
 		}
 		ok++
 	}
@@ -113,7 +113,7 @@ func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
 	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, GetIntType()}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{broken, GetIntTypeSess(testAmbientSession)}}
 	// disable bitfield path so we always hit type-pool filter
 	opts.Bitfields = false
 	f := MakeOneUnionField(NewRngSess(testAmbientSession, 1), opts, probs, env, 0, true)
@@ -130,16 +130,16 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	plain := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	env := &TypeEnv{Sess: testAmbientSession,
 		StructTypes: []*Type{plain},
-		AllTypes:    []*Type{GetIntType(), plain},
+		AllTypes:    []*Type{GetIntTypeSess(testAmbientSession), plain},
 	}
 	found := false
 	for seed := uint64(1); seed < 100; seed++ {
 		f := MakeOneUnionField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, true)
-		if f.Type != nil && f.Type.IsStruct() && f.Type.StructName == "S0" {
+		if f.Type != nil && f.Type.IsStructSess(testAmbientSession) && f.Type.StructName == "S0" {
 			found = true
 			break
 		}
@@ -152,7 +152,7 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 	// non-global on call chain block is tracked
 	ClearErrorSess(testAmbientSession)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	if loc == nil {
 		t.Fatal("create local")
 	}
@@ -176,7 +176,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort)}}
+	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EUInt), GetSimpleTypeSess(testAmbientSession, EShort)}}
 	// After normal field: prevZero false — length 0 must be keepable when drawn.
 	// Search seeds that draw bitfield with length 0 under prevZero=false.
 	foundPad := false
@@ -201,7 +201,7 @@ func TestMakeOneUnionFieldPrevZero(t *testing.T) {
 	// MakeRandomUnionType: after first non-bitfield, second field bitfield with
 	// prevZero=false can keep length 0 (Type.cpp:640 back()!=0 → no force).
 	ClearErrorSess(testAmbientSession)
-	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType(), GetSimpleType(EUInt), GetSimpleType(EShort), GetSimpleType(EUShort)}}
+	env2 := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession), GetSimpleTypeSess(testAmbientSession, EUInt), GetSimpleTypeSess(testAmbientSession, EShort), GetSimpleTypeSess(testAmbientSession, EUShort)}}
 	// Craft: first field normal (BitWidth -1) → prevZero becomes false;
 	// second call with prevZero=false can return pad.
 	f0 := MakeOneUnionField(NewRngSess(testAmbientSession, 1), opts, probs, env2, 0, true)

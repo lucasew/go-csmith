@@ -110,7 +110,7 @@ func TestInitFromOptions(t *testing.T) {
 
 func TestVisitFactsJumpStoresEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff

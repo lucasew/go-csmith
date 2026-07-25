@@ -51,8 +51,8 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 	CreateRandomNumberInstanceSess(testAmbientSession, RngKindDefault, 2)
 	o := Defaults()
 	SetProcessOptionsSess(testAmbientSession, o)
-	v1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	v2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), true, false)
+	v1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	v2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
 	out := RandomOutputVarDefs([]*Variable{v1, v2}, 2, true)
 	if out == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("var defs", HasErrorSess(testAmbientSession))

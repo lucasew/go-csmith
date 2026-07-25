@@ -19,7 +19,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Prefer multi-dim so nested shells exist
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, probs, nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("CreateArrayVariable")
 	}
@@ -28,10 +28,10 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable}
 	// Loop IVs for both dims
 	for _, name := range []string{"i", "j", "k"} {
-		iv := CreateVariableQferSess(testAmbientSession, name, GetIntType(), q)
+		iv := CreateVariableQferSess(testAmbientSession, name, GetIntTypeSess(testAmbientSession), q)
 		vs.GlobalList = append(vs.GlobalList, iv)
 	}
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f, StmID: 1}
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
@@ -83,18 +83,18 @@ func TestMultiDimArrayOpLabelOnce(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	// 3-dim shells: outer + 2 nested
-	iv0 := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
-	iv1 := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
-	iv2 := CreateVariableScalarsSess(testAmbientSession, "k", GetIntType(), false, false)
+	iv0 := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
+	iv1 := CreateVariableScalarsSess(testAmbientSession, "j", GetIntTypeSess(testAmbientSession), false, false)
+	iv2 := CreateVariableScalarsSess(testAmbientSession, "k", GetIntTypeSess(testAmbientSession), false, false)
 	if iv0 == nil || iv1 == nil || iv2 == nil {
 		t.Fatal("iv")
 	}
 	av := &ArrayVariable{
-		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Variable: Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true},
 		Sizes:    []int{2, 3, 1},
 	}
 	av.AsArray = av
-	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntTypeSess(testAmbientSession)}
 	// Innermost → mid → outer (same StmID)
 	sid := 42
 	inner := Stmt{

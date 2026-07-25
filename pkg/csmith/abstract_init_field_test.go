@@ -17,10 +17,10 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f1", Type: GetSimpleType(EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f2", Type: GetSimpleType(EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-			{Name: "f3", Type: GetSimpleType(EShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EULongLong), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f2", Type: GetSimpleTypeSess(testAmbientSession, EChar), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f3", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
 	av := &ArrayVariable{
@@ -51,7 +51,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 			av.FieldVars[3], av.FieldVars[3].Name, collF3, collF3.Name)
 	}
 
-	ptrType := PointerTo(GetSimpleType(EShort))
+	ptrType := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort))
 	init := &Expression{Term: TermVariable, Var: f3, ExprType: ptrType}
 	if n, ok := init.IndirectLevelComplete(); !ok || n != -1 {
 		t.Fatalf("want address-of -1 got n=%d ok=%v", n, ok)

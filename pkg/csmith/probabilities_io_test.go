@@ -103,8 +103,8 @@ func TestKleeCrestCoverageEmit(t *testing.T) {
 		t.Fatal(init)
 	}
 	// Crest
-	if CrestTypeToString(GetIntType()) != "int" {
-		t.Fatal(CrestTypeToString(GetIntType()))
+	if CrestTypeToString(GetIntTypeSess(testAmbientSession)) != "int" {
+		t.Fatal(CrestTypeToString(GetIntTypeSess(testAmbientSession)))
 	}
 	cinit := CrestOutputInit(vals)
 	if !strings.Contains(cinit, "CREST_") {

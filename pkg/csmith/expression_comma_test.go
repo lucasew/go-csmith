@@ -18,7 +18,7 @@ func TestMakeExpressionComma(t *testing.T) {
 		// ExpressionFuncall / make_random paths need get_fact_mgr
 		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = vs.Types
-		return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntType(), nil)
+		return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntTypeSess(testAmbientSession), nil)
 	}()
 	if e == nil || e.Term != TermCommaExpr || e.CommaLHS == nil || e.CommaRHS == nil {
 		t.Fatalf("%+v", e)
@@ -40,7 +40,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-constant complete no-op
-	castIfNeeded(testAmbientSession, &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)})
+	castIfNeeded(testAmbientSession, &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)})
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-constant castIfNeeded must complete no-op")
 	}
@@ -77,7 +77,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Expression.cpp always has RNG sticky; no invent param shell
-	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(testAmbientSession, opts), &c, GetIntType(), nil, 0); e != nil {
+	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -98,7 +98,7 @@ func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	e := func() *Expression {
 		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = vs.Types
-		return MakeExpressionComma(NewRngSess(testAmbientSession, 11), opts, probs, vs, tables, &c, GetIntType(), nil)
+		return MakeExpressionComma(NewRngSess(testAmbientSession, 11), opts, probs, vs, tables, &c, GetIntTypeSess(testAmbientSession), nil)
 	}()
 	if e == nil || e.CommaLHS == nil {
 		t.Fatal("lhs")
@@ -136,7 +136,7 @@ func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
-	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
+	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionComma")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -149,14 +149,14 @@ func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), ptrEmptyCG(), GetIntType(), nil) != nil {
+	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), ptrEmptyCG(), GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeExpressionComma must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntType(), nil) != nil {
+	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -179,7 +179,7 @@ func TestCastIfNeededGetTypeResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty Value → EqualsInt residual after live pointer type; no invent cast
-	pt := PointerTo(GetIntType())
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	eqHole := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: ""}}
 	castIfNeeded(testAmbientSession, eqHole)
 	if eqHole.CastType != nil {
@@ -213,7 +213,7 @@ func TestHaveOverlappingFieldsFindUnionResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special expr → FindUnionPointees incomplete → overlap sticky
 	e1 := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
-	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)}
+	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)}
 	if !HaveOverlappingFields(e1, e2, nil) {
 		t.Fatal("Type-nil FindUnion residual must fail closed overlap true")
 	}

@@ -18,7 +18,7 @@ func TestAccessOnceMarking(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRngSess(testAmbientSession, seed)
-		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
+		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, r)
 		if v != nil && v.IsAccessOnce {
 			found = true
 			if !strings.Contains(v.OutputCSess(testAmbientSession, false), "ACCESS_ONCE") {
@@ -44,7 +44,7 @@ func TestAccessOnceWrapRequiresOption(t *testing.T) {
 	opts.AccessOnce = false
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	v.IsAccessOnce = true
 	out := v.OutputCSess(testAmbientSession, false)
 	if strings.Contains(out, "ACCESS_ONCE") {

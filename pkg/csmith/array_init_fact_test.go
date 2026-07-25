@@ -11,8 +11,8 @@ func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	r := NewRngSess(testAmbientSession, 42)
 	SetProcessRngSess(testAmbientSession, r)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
-	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)), false, false)
+	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort)))
 	ie := &Expression{Term: TermVariable, Var: g, ExprType: elem}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "l_233", elem, nil, q)

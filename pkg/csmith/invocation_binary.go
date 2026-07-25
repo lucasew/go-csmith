@@ -117,7 +117,7 @@ func (fi *Invocation) getTypeUnarySess(s *Session) *Type {
 	// FunctionInvocationUnary.cpp:116–129 — switch on known ops only
 	switch fi.Unary {
 	case "!":
-		return GetIntType()
+		return GetIntTypeSess(s)
 	case "+", "-", "~":
 		// C++ param_value[0]->get_type(); missing operand → incomplete IR sticky
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
@@ -147,7 +147,7 @@ func (fi *Invocation) getTypeBinary() *Type {
 func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 	// FunctionInvocationBinary.cpp:193–194
 	if fi.IsReturnTypeFloatSess(s) {
-		return GetSimpleType(EFloat)
+		return GetSimpleTypeSess(s, EFloat)
 	}
 	op, ok := BinaryOpFromString(fi.Binary)
 	// FunctionInvocationBinary.cpp:196–199 — assert invalid operator sticky; no soft invent eInt
@@ -178,11 +178,11 @@ func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 			return nil
 		}
 		if ls && rs {
-			return GetSimpleType(EInt)
+			return GetSimpleTypeSess(s, EInt)
 		}
-		return GetSimpleType(EUInt)
+		return GetSimpleTypeSess(s, EUInt)
 	case BinCmpGt, BinCmpLt, BinCmpGe, BinCmpLe, BinCmpEq, BinCmpNe, BinAnd, BinOr:
-		return GetIntType()
+		return GetIntTypeSess(s)
 	case BinLShift, BinRShift:
 		// FunctionInvocationBinary.cpp:229–238 — param_value[0]->get_type always sticky
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
@@ -204,9 +204,9 @@ func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 			return nil
 		}
 		if ls {
-			return GetSimpleType(EInt)
+			return GetSimpleTypeSess(s, EInt)
 		}
-		return GetSimpleType(EUInt)
+		return GetSimpleTypeSess(s, EUInt)
 	default:
 		// FunctionInvocationBinary.cpp:240–241 — assert(0) sticky; no soft invent eInt
 		sessNoteError(s, ErrGeneric)

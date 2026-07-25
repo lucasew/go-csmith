@@ -288,7 +288,7 @@ func (e *Expression) checkAndSetCastCoreSess(s *Session, desired *Type) {
 	if sessHasError(s) {
 		return
 	}
-	if src.NeedsCast(desired) {
+	if src.NeedsCastSess(s, desired) {
 		// residual ERROR sticky — no invent CastType past NeedsCast residual hole
 		if sessHasError(s) {
 			return
@@ -1347,7 +1347,7 @@ func MakeRandomExpression(
 				return nil
 			}
 			// Expression.cpp:151–152 — constant structs not as subexpression
-			if typ != nil && typ.IsStruct() && tt == TermConstant {
+			if typ != nil && typ.IsStructSess(sessFromCG(cg)) && tt == TermConstant {
 				continue
 			}
 			if typ != nil {
@@ -1372,7 +1372,7 @@ func MakeRandomExpression(
 		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
-	if typ != nil && typ.IsStruct() && tt == TermConstant {
+	if typ != nil && typ.IsStructSess(sessFromCG(cg)) && tt == TermConstant {
 		// was soft invent TermVariable — C++ assert sticky, not rewrite
 		noteErrCG(cg, ErrGeneric)
 		return nil
@@ -1397,12 +1397,12 @@ func MakeRandomExpression(
 	case TermConstant:
 		// Expression.cpp:185–188 — assert simple != eVoid sticky
 		if typ != nil {
-			simple := typ.IsSimple()
+			simple := typ.IsSimpleSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-const past IsSimple residual
 			if hasErrCG(cg) {
 				return nil
 			}
-			if simple && typ.Simple() == EVoid {
+			if simple && typ.SimpleSess(sessFromCG(cg)) == EVoid {
 				noteErrCG(cg, ErrGeneric)
 				return nil
 			}
@@ -1604,7 +1604,7 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			if isArg && v.Type.IsDereferencedFrom(typ) {
+			if isArg && v.Type.IsDereferencedFromSess(sessFromCG(cg), typ) {
 				// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
 				if hasErrCG(cg) {
 					if cg.EffectAccum != nil {
@@ -1645,7 +1645,7 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			if (isArg || isLoc) && v.Type.IsDereferencedFrom(typ) {
+			if (isArg || isLoc) && v.Type.IsDereferencedFromSess(sessFromCG(cg), typ) {
 				// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
 				if hasErrCG(cg) {
 					if cg.EffectAccum != nil {
@@ -1997,12 +1997,12 @@ func makeExpressionFuncall(
 	stdFunc := ExpressionFunctionProbability(r, list, opts)
 	// ExpressionFuncall.cpp:71–73 — unary/binary only for non-void simple types
 	if typ != nil {
-		simple := typ.IsSimple()
+		simple := typ.IsSimpleSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-std path past IsSimple residual
 		if hasErrCG(cg) {
 			return nil
 		}
-		if !simple || typ.Simple() == EVoid {
+		if !simple || typ.SimpleSess(sessFromCG(cg)) == EVoid {
 			stdFunc = false
 		}
 	}

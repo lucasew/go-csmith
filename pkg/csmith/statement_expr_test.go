@@ -81,7 +81,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// max funcs 0 means ReachMaxFunctions may block creation
 	opts.MaxFuncs = 0
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	eff := EmptyEffect().WriteVarSess(testAmbientSession, p)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -112,7 +112,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// mutate during a call that fails by using Failed invocation manually
 	// Directly verify RestoreFacts + accum restore pattern used in MakeRandomExprStmt
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(
-		CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false), NullPtr))
+		CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false), NullPtr))
 	cg.FM.RestoreFacts(preFacts)
 	if FindRelatedPointTo(fm.GlobalFacts, p) == nil || len(fm.GlobalFacts) < 1 {
 		t.Fatal("restore")
@@ -128,8 +128,8 @@ func TestFailedInvokeRestoreRewindsUnionWrite(t *testing.T) {
 	// so IsNonreadableField over-filtered choose_var (seed-7 eligible pool half size).
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
-		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+		{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
 	parent.CreateFieldVarsSess(testAmbientSession)
@@ -189,8 +189,8 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed a built function to call
 	callee := &Function{
-		Name: "func_x", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
-		RV:   CreateVariableQferSess(testAmbientSession, "func_x_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
+		Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true, BuildState: BuildBuilt,
+		RV:   CreateVariableQferSess(testAmbientSession, "func_x_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
 		Body: &Block{},
 	}
 	list.Funcs = []*Function{callee}

@@ -7,8 +7,8 @@ import (
 
 func TestAddExternalEffectWithCallers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
 	// other has global + local write
@@ -62,7 +62,7 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	// fair: StackScanComplete false → OOS true sticky
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false)
 	f.Param = []*Variable{p, nil}
 	body := &Block{Func: f, LocalVars: nil}
 	if f.IsVarVisible(p, body) {
@@ -82,7 +82,7 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	// Blocks hole residual: soft invent was soft-skip hole then not-OOS / invent match later.
 	// Fair: sticky OOS true fail closed (hole before match).
 	f2 := &Function{Name: "f2"}
-	loc := &Variable{Name: "l_1", Type: GetIntType()}
+	loc := &Variable{Name: "l_1", Type: GetIntTypeSess(testAmbientSession)}
 	okBlk := &Block{Func: f2, LocalVars: []*Variable{loc}}
 	f2.Blocks = []*Block{nil, okBlk}
 	// nil dest: not visible; scan Blocks hits nil hole before okBlk match
@@ -98,7 +98,7 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 func TestAddVisibleEffectUsesChain(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1"}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	if loc == nil {
 		t.Fatal("loc")
 	}
@@ -117,8 +117,8 @@ func TestAddVisibleEffectUsesChain(t *testing.T) {
 }
 
 func TestOutputVariableList(t *testing.T) {
-	a := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
-	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
 	out := OutputVariableList([]*Variable{a, b}, "  ", true)
 	// Variable.cpp:858–860 — vector order (no invent name-sort)
 	ia := strings.Index(out, "g_a")
@@ -128,7 +128,7 @@ func TestOutputVariableList(t *testing.T) {
 	}
 	// incomplete OutputDef — sticky no invent indent-only blank lines
 	ClearErrorSess(testAmbientSession)
-	broken := &Variable{Name: "g_x", Type: GetIntType()} // no init
+	broken := &Variable{Name: "g_x", Type: GetIntTypeSess(testAmbientSession)} // no init
 	if s := OutputVariableList([]*Variable{broken}, "    ", true); s != "" {
 		t.Fatal("empty defs must fail closed empty list", s)
 	}
@@ -153,7 +153,7 @@ func TestOutputVariableList(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray soft invent was scalar OutputDef path
 	// fair: sticky empty whole list
-	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
+	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
 	if s := OutputVariableList([]*Variable{arrShell}, "  ", true); s != "" {
 		t.Fatal("IsArray without AsArray must fail closed whole list", s)
 	}
@@ -164,7 +164,7 @@ func TestOutputVariableList(t *testing.T) {
 }
 
 func TestOutputGlobalVariables(t *testing.T) {
-	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	out := OutputGlobalVariables([]*Variable{v})
 	if !strings.Contains(out, "GLOBAL VARIABLES") || !strings.Contains(out, "g_1") {
 		t.Fatal(out)
@@ -174,7 +174,7 @@ func TestOutputGlobalVariables(t *testing.T) {
 		t.Fatal(decl)
 	}
 	// no invent section-only header when all defs empty
-	if s := OutputGlobalVariables([]*Variable{{Name: "g_x", Type: GetIntType()}}); s != "" {
+	if s := OutputGlobalVariables([]*Variable{{Name: "g_x", Type: GetIntTypeSess(testAmbientSession)}}); s != "" {
 		t.Fatal("empty globals must fail closed section", s)
 	}
 	if s := OutputGlobalVariablesDecls(nil, "extern "); s != "" {
@@ -190,10 +190,10 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
-	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	fm := NewFactMgrSess(testAmbientSession, f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

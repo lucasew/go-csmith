@@ -11,9 +11,9 @@ func TestMakeRandomUnionType(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	// Type.cpp shared sid: after any prior aggregates, next union is U{seq} not always U0
-	env.AllTypes = []*Type{GetIntType()}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession)}
 	ut := MakeRandomUnionType(NewRngSess(testAmbientSession, 3), opts, probs, &env, "")
-	if ut == nil || !ut.IsUnion() || len(ut.Fields) < 1 {
+	if ut == nil || !ut.IsUnionSess(testAmbientSession) || len(ut.Fields) < 1 {
 		t.Fatal(ut)
 	}
 	if ut.StructName != "U0" || ut.SID != 0 {
@@ -48,8 +48,8 @@ func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
 		isUnion:    true,
 		StructName: "U0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	c := MakeUnionConstant(NewRngSess(testAmbientSession, 2), opts, probs, ut)
@@ -89,8 +89,8 @@ func TestCreateFieldVarsUnion(t *testing.T) {
 		isUnion:    true,
 		StructName: "U0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
-			{Name: "f1", Type: GetSimpleType(EShort), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+			{Name: "f1", Type: GetSimpleTypeSess(testAmbientSession, EShort), BitWidth: -1},
 		},
 	}
 	ClearErrorSess(testAmbientSession)

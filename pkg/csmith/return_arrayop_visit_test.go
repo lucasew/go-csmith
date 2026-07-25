@@ -11,7 +11,7 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 	opts.DepthProtect = true
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	st := Stmt{
 		Kind: StmtReturn,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
@@ -38,7 +38,7 @@ func TestArrayInitAggregateTmpEmit(t *testing.T) {
 		isStruct:   true,
 		StructName: "S0",
 		Fields: []StructField{
-			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 		},
 	}
 	av := CreateVariableQferSess(testAmbientSession, "g_a", st, NewCVQualifiers([]bool{false}, []bool{false}))
@@ -61,13 +61,13 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeInt(0), q)
 	av.Sizes = []int{3}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	iv := CreateVariableQferSess(testAmbientSession, "i", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -88,11 +88,11 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
+	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRngSess(testAmbientSession, 1))
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	st := MakeRandomReturn(NewRngSess(testAmbientSession, 3), opts, vs, &cg)

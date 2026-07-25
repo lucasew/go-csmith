@@ -8,7 +8,7 @@ import (
 func TestMakeRandomSignatureSetsAlias(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
+	f := MakeRandomSignature(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, nil)
 	if f == nil || f.AliasName != f.Name+"_alias" {
 		t.Fatalf("%+v", f)
 	}
@@ -17,8 +17,8 @@ func TestMakeRandomSignatureSetsAlias(t *testing.T) {
 func TestOutputForwardDeclAlias(t *testing.T) {
 	f := &Function{
 		Name: "func_1", AliasName: "func_1_alias",
-		ReturnType: GetIntType(),
-		RV:         CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
+		ReturnType: GetIntTypeSess(testAmbientSession),
+		RV:         CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
 	}
 	out := f.OutputForwardDeclAlias(true)
 	if !strings.Contains(out, "static ") ||
@@ -34,9 +34,9 @@ func TestOutputFunctionsEmitsAliasDecls(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	g.Funcs.Funcs = []*Function{{
 		Name: "func_1", AliasName: "func_1_alias",
-		ReturnType: GetIntType(),
+		ReturnType: GetIntTypeSess(testAmbientSession),
 		IsBuilt:    true, BuildState: BuildBuilt,
-		RV:   CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:   CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
 		Body: &Block{},
 	}}
 	out := g.OutputFunctions()
@@ -54,16 +54,16 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	// StructDepth of plain S0 with no nested fields is 1 → >= max 1 → rejected
 	env := &TypeEnv{Sess: testAmbientSession}
 	deep := &Type{isStruct: true, StructName: "Sdeep", Fields: []StructField{
-		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	// depth 1 — AllTypes is ChooseRandomTypeFilter pool (Type.cpp:687)
 	env.StructTypes = []*Type{deep}
-	env.AllTypes = []*Type{GetIntType(), deep}
+	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), deep}
 	// force nested pick: many trials with seed that might pick nest — with max 1, all rejected → simple
 	for seed := uint64(1); seed < 40; seed++ {
 		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
-		if f.Type != nil && f.Type.IsStruct() {
-			t.Fatalf("nested not allowed at max=1 got %s depth %d", f.Type.StructName, f.Type.StructDepth())
+		if f.Type != nil && f.Type.IsStructSess(testAmbientSession) {
+			t.Fatalf("nested not allowed at max=1 got %s depth %d", f.Type.StructName, f.Type.StructDepthSess(testAmbientSession))
 		}
 	}
 	// max=2 allows depth-1 structs
@@ -71,7 +71,7 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
 		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
-		if f.Type != nil && f.Type.IsStruct() && f.Type.StructName == "Sdeep" {
+		if f.Type != nil && f.Type.IsStructSess(testAmbientSession) && f.Type.StructName == "Sdeep" {
 			found = true
 			break
 		}

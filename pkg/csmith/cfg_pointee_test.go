@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestMergePointeesOfPointer(t *testing.T) {
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	// indirect 0 → just p itself? while(indirect-- > 0) so 0 means no steps → [p]
 	got0 := MergePointeesOfPointer(p, 0, facts)
@@ -19,12 +19,12 @@ func TestMergePointeesOfPointer(t *testing.T) {
 }
 
 func TestRhsTransferUsesMergePointees(t *testing.T) {
-	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerTo(GetIntType()), false, false)
-	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	in := []*FactPointTo{MakeFactPointTo(p2, tgt)}
 	// p2 as pointer expr: level 1 - 1 = 0, merge(indirect+1)=1
-	rhs := &Expression{Term: TermVariable, Var: p2, ExprType: PointerTo(GetIntType())}
+	rhs := &Expression{Term: TermVariable, Var: p2, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	facts := RhsToLhsTransfer(in, []*Variable{p1}, rhs)
 	if len(facts) != 1 || facts[0].PointTo[0] != tgt {
 		t.Fatalf("%+v", facts)
@@ -57,7 +57,7 @@ func TestClosestLoopingBlock(t *testing.T) {
 func TestBreakContinueCFGEdges(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	loop := &Block{Func: f, Looping: true}
 	inner := &Block{Func: f, Parent: loop, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	f.Stack = []*Block{loop, inner}
@@ -65,7 +65,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	// need globals for break test expr
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRngSess(testAmbientSession, 2))
+	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
 	br := MakeRandomBreak(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTables(opts), &cg)
 	if br.Kind != StmtBreak || br.StmID == 0 {
 		t.Fatal("break")
@@ -87,7 +87,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	inner.Stmts = []Stmt{{Kind: StmtAssign}}
 	f.Stack = []*Block{loop, inner}
-	_ = vs.GenerateNewGlobal(AccessRead, cg2, GetIntType(), &q, NewRngSess(testAmbientSession, 4))
+	_ = vs.GenerateNewGlobal(AccessRead, cg2, GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 4))
 	cont := MakeRandomContinue(NewRngSess(testAmbientSession, 5), opts, vs, NewExprTables(opts), &cg2, inner)
 	if cont.Kind != StmtContinue {
 		t.Fatal("cont")
@@ -111,7 +111,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	old := []*FactPointTo{}
 	// pointer with const null init (CreateVariableScalars → Constant "0")
-	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	if p == nil || p.Init == nil {
 		t.Fatal("pointer init")
 	}
@@ -141,8 +141,8 @@ func TestMakeupNewVarFacts(t *testing.T) {
 		t.Fatal("dup")
 	}
 	// address-of init preserved
-	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
-	pt := PointerTo(GetIntType())
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	q := CreateVariableQferSess(testAmbientSession, "g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
 	q.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	old2 := []*FactPointTo{}
@@ -152,7 +152,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 		t.Fatalf("want &g_t fact, got %+v", fq)
 	}
 	// nil hole fails closed sticky — no invent skip past hole to makeup later vars
-	r := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerTo(GetIntType()), false, false)
+	r := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	old3 := []*FactPointTo{}
 	MakeupNewVarFacts(&old3, []*FactPointTo{nil, MakeFactPointTo(r, NullPtr)})
 	if FindRelatedPointTo(old3, r) != nil {
@@ -167,11 +167,11 @@ func TestMakeupNewVarFacts(t *testing.T) {
 func TestIsPointingToLocalsMultiLevel(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	blk.LocalVars = []*Variable{loc}
 	// p2 → p1 → loc
-	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerTo(GetIntType()), false, false)
-	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(PointerTo(GetIntType())), false, false)
+	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))), false, false)
 	facts := []*FactPointTo{
 		MakeFactPointTo(p1, loc),
 		MakeFactPointTo(p2, p1),
@@ -185,7 +185,7 @@ func TestMakeRandomContinueRejectsFirstStmt(t *testing.T) {
 	// StatementContinue.cpp:63–66 — first stmt → nullptr
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)
-	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	empty := &Block{Func: f, Looping: true}
 	f.Stack = []*Block{empty}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
