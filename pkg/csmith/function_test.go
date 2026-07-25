@@ -43,7 +43,7 @@ func TestMakeRandomSignatureParams(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// GenerateParameterVariable needs Type env (no soft invent simple)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// share gensym counters: use vs.Sym for params and separate for funcs is OK upstream-global
@@ -80,7 +80,7 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	var list FunctionList
@@ -148,7 +148,7 @@ func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	foundEarly := false
 	for seed := uint64(1); seed < 50; seed++ {
-		vs := NewVariableSelector(opts)
+		vs := NewVariableSelector(testAmbientSession, opts)
 		r := NewRng(seed)
 		seedTypesForTest(r, opts, probs, vs, nil)
 		f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
@@ -175,7 +175,7 @@ func TestMakeRandomSignatureERRORGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	f := MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
@@ -190,7 +190,7 @@ func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if MakeRandomSignature(nil, opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
@@ -214,7 +214,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// plant incomplete GlobalList hole
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -244,7 +244,7 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -322,7 +322,7 @@ func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)

@@ -6,7 +6,7 @@ func TestBuildStateTransitions(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
 	// Function.cpp FMList at create — pair before GenerateBody (no invent inside)
@@ -30,7 +30,7 @@ func TestPointerParamTBD(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
@@ -98,7 +98,7 @@ func TestMakeFirstMarksBuilt(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil)
 	if f == nil || !f.IsEffectKnown() {
@@ -122,7 +122,7 @@ func TestGenerateBodyIncompleteAmbientResidualSticky(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildUnbuilt}
 	prev := EmptyCGContext().WithSession(testAmbientSession)
 	prev.EffectStm = IncompleteEffect()
-	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if f.BuildState != BuildUnbuilt {
 		t.Fatal("incomplete ambient must leave Unbuilt", f.BuildState)
 	}

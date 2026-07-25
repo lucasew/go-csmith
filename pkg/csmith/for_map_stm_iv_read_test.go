@@ -21,7 +21,7 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{}
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = append(vs.GlobalList, g)
 	vs.AllVars = append(vs.AllVars, g)
 	cg := WithFunc(fn, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

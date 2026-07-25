@@ -6,7 +6,7 @@ func TestEagerCreateGlobalStruct(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	vs.Types = env
@@ -30,7 +30,7 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(3), opts, probs, env)
 	vs.Types = env
@@ -163,7 +163,7 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(4), opts, probs, env)
 	vs.Types = env
@@ -191,7 +191,7 @@ func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	vs.Types = env
@@ -235,7 +235,7 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(6), opts, probs, env)
 	vs.Types = env
@@ -255,7 +255,7 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
 	// VariableSelector.cpp:991–1003 — empty stack assert; ERROR_GUARD after rnd_upto
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})

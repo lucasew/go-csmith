@@ -148,7 +148,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 		t.Fatal("itemized array must use collective points-to (FactPointTo.cpp:506–508)")
 	}
 	// as_return ExpressionVariable must reject itemized local-pointing array
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: elemT, RV: CreateVariableScalarsSess(testAmbientSession, "rv", elemT, false, false)}
 	f.Stack = []*Block{blk}
 	blk.Func = f
@@ -269,7 +269,7 @@ func TestIsPointingToLocals(t *testing.T) {
 
 func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// plain int global
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
@@ -286,7 +286,7 @@ func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -319,7 +319,7 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	holeTy := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
 	hole := &Variable{Name: "g_hole", Type: holeTy}
 	good := &Variable{Name: "g_1", Type: GetIntType()}
@@ -343,7 +343,7 @@ func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
 		{Name: "x", Type: nil, BitWidth: -1},
 	}}
 	uvar := &Variable{Name: "g_u", Type: unionOKThenHole}
-	vs2 := NewVariableSelector(opts)
+	vs2 := NewVariableSelector(testAmbientSession, opts)
 	vs2.GlobalList = []*Variable{uvar, good}
 	f2 := &Function{Name: "f", ReturnType: GetIntType()}
 	blk2 := &Block{Func: f2}
@@ -378,7 +378,7 @@ func TestAddNewVarFactPointer(t *testing.T) {
 func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

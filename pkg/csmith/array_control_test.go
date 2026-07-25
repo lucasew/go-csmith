@@ -86,7 +86,7 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
 	if av == nil {
@@ -118,7 +118,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -192,7 +192,7 @@ func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
 	opts := Defaults()
 	opts.MaxArrayNumInLoop = 3
 	opts.GlobalVariables = false // CreateRandomArray needs stack for local
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// no Types env → CreateRandomArray fails closed
 	vs.Types = nil
 	vs.Arrays = nil
@@ -210,7 +210,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	opts := Defaults()
 	opts.MaxArrayNumInLoop = 4
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -271,7 +271,7 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -299,7 +299,7 @@ func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxArrayNumInLoop = 3
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// no Types → CreateRandomArray fails → SelectArray nil
 	vs.Types = nil
 	vs.Arrays = nil
@@ -322,7 +322,7 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient / RW combine must sticky ERROR (no invent array loop soft re-pick)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
@@ -361,7 +361,7 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc

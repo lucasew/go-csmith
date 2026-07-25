@@ -70,7 +70,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxFuncs = 5
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{Types: &TypeEnv{Sess: testAmbientSession}}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
@@ -93,7 +93,7 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	// CGContext::add_external_effect merges into accum/stm only (not caller feffect).
 	// Function.cpp:657 finalizes caller feffect from map_stm_effect[body].
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	callee.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, g)

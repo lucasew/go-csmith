@@ -30,7 +30,7 @@ func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &c, nil); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, nil); fi != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -87,7 +87,7 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 	opts := Defaults()
 	opts.DepthProtect = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)

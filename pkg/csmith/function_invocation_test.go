@@ -34,7 +34,7 @@ func TestReachMaxFunctions(t *testing.T) {
 func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// FunctionInvocationBinary.cpp:68 assert(blk) — need live block for safe_ops temps
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -64,7 +64,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	// incomplete EffectAccum after lhs must sticky ERROR (no invent RHS / soft re-pick)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -104,7 +104,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky before choose/build
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	list := &FunctionList{Funcs: []*Function{f}}
@@ -138,7 +138,7 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	// incomplete DerivedTypes must not invent scalar binary past HasPointerType hole
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := TypeEnv{Sess: testAmbientSession}
 	env.DerivedTypes = IncompleteTypes()
 	vs.Types = &env
@@ -177,7 +177,7 @@ func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 	// FunctionInvocation.cpp:208–221 — LHS under dedicated accum; merge_param_context
 	// folds reads into caller's effect_accum and raises expr_depth.
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -277,7 +277,7 @@ func TestGenerateEmitsBinaryOrCall(t *testing.T) {
 func TestGenerateNewParentLocal(t *testing.T) {
 	ReinstallTestProcessSingletons()
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRng(2)
 	blk := &Block{}
 	v := vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
@@ -291,7 +291,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	_ = env.FindPointerType(GetIntType(), true)
@@ -329,7 +329,7 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 	// FunctionInvocation.cpp:95–97
 	opts := Defaults()
 	opts.MaxFuncs = 5
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	probs := NewProbabilities(opts)
 	list := &FunctionList{}

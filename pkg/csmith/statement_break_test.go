@@ -8,7 +8,7 @@ import (
 func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
@@ -106,7 +106,7 @@ func TestArrayLoopKeepsStmtForKind(t *testing.T) {
 	// no soft invent StmtArrayOp kind over for IR
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -169,7 +169,7 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	// StatementBreak.cpp:72 assert(b) sticky — no soft invent break without looping parent
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	// non-looping block only
 	blk := &Block{Func: f, Looping: false}
@@ -193,7 +193,7 @@ func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
 	// StatementBreak/Continue always have RNG + CGContext; sticky no invent shells
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{loop}
@@ -217,7 +217,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR before EffectStm clear / soft re-pick
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{loop}
@@ -291,7 +291,7 @@ func TestArrayOpHeaderNumeric(t *testing.T) {
 func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// empty block → nullptr (empty Stmt; no Kind shell invent)
 	// first-stmt reject is non-sticky soft re-pick (StatementContinue.cpp:63–66)
@@ -312,7 +312,7 @@ func TestMakeRandomContinueRequiresLoop(t *testing.T) {
 	// StatementContinue.cpp:71 assert(b) sticky — no soft invent without looping parent
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	// prior stmt so first-stmt gate passes; non-looping parent only
 	blk := &Block{Func: f, Looping: false, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
@@ -332,7 +332,7 @@ func TestMakeRandomContinueRequiresLoop(t *testing.T) {
 func TestMakeRandomContinueWithPrior(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	probs := NewProbabilities(opts)
@@ -382,7 +382,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	// StatementBreak.cpp:79–81 — only break_stms push; edges in post_loop_analysis
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)

@@ -8,7 +8,7 @@ import (
 func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
@@ -91,7 +91,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	preEff := eff.CloneSess(testAmbientSession)
 	preFacts := CloneFactSlice(fm.GlobalFacts)
 	// invoke may fail or succeed; if fail, empty Stmt + state restored
-	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg)
+	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg)
 	if !stmtOK(st) {
 		// rollback path (nullptr factory)
 		if st.Kind != 0 {
@@ -186,7 +186,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	list := &FunctionList{}
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed a built function to call
 	callee := &Function{
 		Name: "func_x", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,

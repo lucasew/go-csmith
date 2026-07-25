@@ -59,7 +59,7 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 
 func TestMakeRandomParamNoConstant(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// force many picks — constant weight 0 + filtered
 	for seed := uint64(1); seed < 40; seed++ {

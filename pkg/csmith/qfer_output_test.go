@@ -62,7 +62,7 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 	opts.ExpandStruct = true
 	opts.Volatiles = true
 	opts.VolatilePointers = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -799,7 +799,7 @@ func TestOutputGlobalsOutputDefResidualSticky(t *testing.T) {
 	opts := Defaults()
 	sess := NewSession(opts)
 	g := NewProgramGenerator(sess)
-	g.VS = NewVariableSelector(opts)
+	g.VS = NewVariableSelector(testAmbientSession, opts)
 	// Type-nil InitExpr residual on OutputDefFull
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	v.Init = nil

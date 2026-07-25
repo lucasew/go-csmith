@@ -148,7 +148,7 @@ func TestEffectReadVarsInsertionOrder(t *testing.T) {
 
 func TestGotoCreatesCFGEdge(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	// prior statement as target
@@ -202,7 +202,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// StatementGoto.cpp:74/110 ERROR_GUARD after flipcoin / rnd_upto
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}

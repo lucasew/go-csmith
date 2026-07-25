@@ -6,7 +6,7 @@ func TestMakeRandomStmtErrorGuardNoRepick(t *testing.T) {
 	// Statement.cpp:309 — ERROR_GUARD after factory; sticky error skips re-pick
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -36,14 +36,14 @@ func TestMakeRandomBlockRequiresCurrentFunc(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
+	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CurrentFunc must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeRandomBlock(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
+	if MakeRandomBlock(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -56,7 +56,7 @@ func TestMakeRandomBlockAbortsOnStickyError(t *testing.T) {
 	// Block.cpp:157–161 — error after stmts → delete block (nil)
 	opts := Defaults()
 	opts.MaxBlockSize = 0
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
@@ -74,7 +74,7 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 	// Block.cpp:187 — set_error(SUCCESS) on success
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -96,7 +96,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 0
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
@@ -158,7 +158,7 @@ func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

@@ -27,7 +27,7 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 
 func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g, nil}
 	if VariablesComplete(vs.FindAllNonArrayVisibleVars(nil)) {
@@ -100,7 +100,7 @@ func TestIsEligibleVarConstWrite(t *testing.T) {
 
 func TestFindAllVisibleVars(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	outer := &Block{}
@@ -260,7 +260,7 @@ func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
 
 func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{}
 	f.Stack = []*Block{blk}
@@ -334,7 +334,7 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	// assert(qf.sanity_check(t)) — incomplete/mismatched qfer fails closed sticky
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// nil qfer
 	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil qfer must fail closed MakeInitValue")
@@ -358,7 +358,7 @@ func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky before const/pointer pick
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)

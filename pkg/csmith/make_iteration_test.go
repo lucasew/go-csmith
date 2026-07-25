@@ -9,7 +9,7 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	// StatementFor.cpp:170 assert(fm); soft re-pick without FactMgr
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -35,7 +35,7 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	// StatementFor.cpp:244–245 — assert(visited); failed init visit → no loop IR
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -60,7 +60,7 @@ func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	// StatementFor.cpp:200 / 223–226 — free loop leaves bound = INVALID_BOUND
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -88,7 +88,7 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 
 func TestMakeIterationBuildsIR(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -129,7 +129,7 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 
 func TestMakeIterationArrayBoundPath(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	av.Sizes = []int{5}
 	f := &Function{Name: "f"}
@@ -157,7 +157,7 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -178,7 +178,7 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 
 func TestVisitFactsForUsesInitStmt(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f, StmID: AllocStmID()}
 	f.Stack = []*Block{blk}
@@ -201,7 +201,7 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// need live block for MakeIteration
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -229,7 +229,7 @@ func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

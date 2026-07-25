@@ -9,7 +9,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// ExpressionComma lhs uses type nullptr → needs Type env (GenerateSimpleTypes)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	tables := NewExprTables(opts)
@@ -69,7 +69,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(opts), &c, nil, nil, 0); e != nil {
+	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(testAmbientSession, opts), &c, nil, nil, 0); e != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -77,7 +77,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Expression.cpp always has RNG sticky; no invent param shell
-	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(opts), &c, GetIntType(), nil, 0); e != nil {
+	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(testAmbientSession, opts), &c, GetIntType(), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -91,7 +91,7 @@ func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	tables := NewExprTables(opts)
 	// Many seeds: LHS should not always be a bare hex constant-only pattern... soft check
@@ -132,7 +132,7 @@ func TestGenerateCanEmitCommaExpr(t *testing.T) {
 func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
@@ -149,14 +149,14 @@ func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), ptrEmptyCG(), GetIntType(), nil) != nil {
+	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), ptrEmptyCG(), GetIntType(), nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeExpressionComma must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), nil, GetIntType(), nil) != nil {
+	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntType(), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

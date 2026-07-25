@@ -10,7 +10,7 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 	opts.SafeMath = true
 	opts.MathNoTmp = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}

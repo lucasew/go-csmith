@@ -135,7 +135,7 @@ func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {
 
 func TestSelectGlobalFlexibleMatchesConvert(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// create a short global; SelectGlobal for int with Flexible may match if MatchFlexible allows
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	sh := GetSimpleType(EShort)

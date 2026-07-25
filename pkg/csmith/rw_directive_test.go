@@ -72,7 +72,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	opts.ComputeHash = true
 	opts.MaxBlockSize = 2
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -102,7 +102,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 func TestMakeRandomForIVBoundDuringBody(t *testing.T) {
 	// for body: IV is nonwritable via iv_bounds
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	iv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(2))
 	cg := EmptyCGContext().WithSession(testAmbientSession)

@@ -25,7 +25,7 @@ func TestIsPackedAggregateFieldVar(t *testing.T) {
 
 func TestItemizeArrayOffsetBinary(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// size 8 so remain > 1 when bound is 0 → offset possible
 	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	// force size
@@ -74,7 +74,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 
 func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -92,7 +92,7 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	// Variable* always live as IVBounds keys; nil key must not soft-skip to other IVs
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -113,7 +113,7 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -137,7 +137,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 	// type always live at itemize; Type-nil no invent soft-success item
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: nil, IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -175,7 +175,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 	// av->type always live; Type-nil no invent soft-include / CreateRandom soft-success
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: nil, IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -195,7 +195,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -215,7 +215,7 @@ func TestSelectArrayFilterResidualSticky(t *testing.T) {
 	// Fair: sticky fail closed whole SelectArray.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
@@ -252,7 +252,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	opts := Defaults()
 	opts.CComp = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	av := CreateArrayVariable(NewRng(2), opts, probs, nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {

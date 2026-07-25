@@ -5,7 +5,7 @@ import "testing"
 func TestCreateRandomArrayUsesEnvTypes(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	vs.Types = env
@@ -112,7 +112,7 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	// VariableSelector.cpp:1371–1377 — AddNewVarFactAndUpdate for new arrays
 	opts := Defaults()
 	opts.GlobalVariables = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Types = env
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
@@ -446,7 +446,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.GlobalVariables = true
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
@@ -487,7 +487,7 @@ func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
 func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	// AcceptType false for volatile struct when context not SE-free
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -506,7 +506,7 @@ func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.GlobalVariables = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.Stack = []*Block{nil}
@@ -531,7 +531,7 @@ func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.GlobalVariables = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}

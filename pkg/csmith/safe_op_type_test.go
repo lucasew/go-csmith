@@ -21,7 +21,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	opts := Defaults()
 	opts.SafeMath = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// find an arithmetic safe op invocation
 	var fi *Invocation

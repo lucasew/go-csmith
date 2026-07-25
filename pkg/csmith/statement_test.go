@@ -55,7 +55,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := makeRandomStmtKind(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts),
+	st := makeRandomStmtKind(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, MaxStatementType)
 	if stmtOK(st) {
 		t.Fatal("unknown kind must not invent usable stmt")
@@ -74,7 +74,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil RNG sticky — no invent Kind-only shell
-	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(opts),
+	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, StmtAssign)
 	if stmtOK(st3) || st3.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st3)

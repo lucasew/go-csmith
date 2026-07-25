@@ -183,7 +183,7 @@ func TestIfMergesFacts(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)

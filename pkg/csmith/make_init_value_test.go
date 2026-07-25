@@ -8,7 +8,7 @@ import (
 func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	e := vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, nil, NewRng(1))
@@ -27,7 +27,7 @@ func TestMakeInitValueNonPointerConstant(t *testing.T) {
 func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	opts := Defaults()
 	// force pointer path: RndFlipcoin(20) never true if we retry until address form
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// pre-create int global to take address of
 	qInt := NewCVQualifiers([]bool{false}, []bool{false})
 	iv := CreateVariableQferSess(testAmbientSession, "g_i", GetIntType(), qInt)
@@ -99,7 +99,7 @@ func TestApplyInitExprOutputDef(t *testing.T) {
 func TestGenerateNewNonArrayGlobal(t *testing.T) {
 	opts := Defaults()
 	opts.Arrays = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// high array prob would flip in createAndInitialize; NonArray path must not
 	if vs.Probs != nil {
 		// force max array prob if table allows
@@ -121,7 +121,7 @@ func TestGenerateNewNonArrayGlobal(t *testing.T) {
 
 func TestGetAllArrayVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	// live AsArray required (no invent complete pool of IsArray shells without AsArray)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
@@ -160,7 +160,7 @@ func TestGetAllArrayVars(t *testing.T) {
 func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
 	opts := Defaults()
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// disable access_once noise
 	opts.AccessOnce = false
 	vs.Opts = opts
@@ -179,7 +179,7 @@ func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), q, nil, "l_x", NewRng(1)) != nil {
@@ -193,7 +193,7 @@ func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
 
 func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// empty GlobalList — pointer init must create addressable
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
@@ -201,7 +201,7 @@ func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 100; seed++ {
 		// fresh selector each time to avoid polluted state
-		vs2 := NewVariableSelector(opts)
+		vs2 := NewVariableSelector(testAmbientSession, opts)
 		e := vs2.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), pt, &q, nil, NewRng(seed))
 		if e != nil && e.Term == TermVariable {
 			found = true

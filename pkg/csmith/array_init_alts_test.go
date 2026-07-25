@@ -22,7 +22,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 		ResetArrayInitSeedSess(testAmbientSession)
 		r := NewRng(seed)
 		SetProcessRngSess(testAmbientSession, r)
-		vs := NewVariableSelector(opts)
+		vs := NewVariableSelector(testAmbientSession, opts)
 		vs.Probs = probs
 		blk := &Block{StmID: 1}
 		init := MakeRandom(elem, opts, probs, r)

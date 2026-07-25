@@ -111,7 +111,7 @@ func TestMakeFirstSetupInOutMaps(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 2
 	opts.MaxBlockDepth = 2
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	fmMap := NewFactMgrMapSess(testAmbientSession)
 	seedTypesForTest(NewRng(5), opts, NewProbabilities(opts), vs, list)
@@ -141,7 +141,7 @@ func TestMakeRandomFunction(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	opts.MaxFuncs = 5
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	list := &FunctionList{}
 	// seed first so list non-empty for choose
@@ -172,7 +172,7 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// empty Types → RandomReturnType nil
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	list := &FunctionList{Types: vs.Types}
@@ -198,7 +198,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	seedTypesForTest(NewRng(4), opts, probs, vs, list)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -208,7 +208,7 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// MakeRandomFunction same seed path
-	vs2 := NewVariableSelector(opts)
+	vs2 := NewVariableSelector(testAmbientSession, opts)
 	list2 := &FunctionList{}
 	seedTypesForTest(NewRng(6), opts, probs, vs2, list2)
 	vs2.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false), nil}

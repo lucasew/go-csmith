@@ -10,8 +10,9 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - residual non-Sess duals: NewVariableSelector ambient install,
-//     rSess/vsSess/… nil→ambient owner helpers, ArrayVariable/bookkeeper/…
+//   - residual: rSess/vsSess/… nil→ambient owner helpers, ArrayVariable/
+//     bookkeeper/vector_filter duals, Rng duals without Sess
+//   - NewVariableSelector requires *Session (no ambient install)
 //   - CVQualifiers + statement_meta + Effect + Variable duals deleted (*Sess only)
 //   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set
 //   - EmptyCGContext/WithFunc leave Sess nil — callers WithSession(…)

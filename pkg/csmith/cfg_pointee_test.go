@@ -56,7 +56,7 @@ func TestClosestLoopingBlock(t *testing.T) {
 
 func TestBreakContinueCFGEdges(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	loop := &Block{Func: f, Looping: true}
 	inner := &Block{Func: f, Parent: loop, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -184,7 +184,7 @@ func TestIsPointingToLocalsMultiLevel(t *testing.T) {
 func TestMakeRandomContinueRejectsFirstStmt(t *testing.T) {
 	// StatementContinue.cpp:63–66 — first stmt → nullptr
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	empty := &Block{Func: f, Looping: true}
 	f.Stack = []*Block{empty}

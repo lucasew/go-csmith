@@ -8,7 +8,7 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	// caller context with a no-write on global
 	caller := &Function{Name: "func_1"}
@@ -52,7 +52,7 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 5
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	_ = caller.ensurePairedFactMgr()
 	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(caller.PairedFactMgr())
@@ -83,7 +83,7 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.MaxBlockSize = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	iv := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntType(), false, false)
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	_ = caller.ensurePairedFactMgr()
@@ -119,7 +119,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), vs, nil, nil, "g_16", GetIntType(), MakeInt(0), q)
 	if av == nil {
@@ -217,7 +217,7 @@ func TestGenerateBodyBuiltinDummy(t *testing.T) {
 	}
 	// Function.cpp:757–758 FMList at create; GenerateBody uses get_fact_mgr (no invent)
 	_ = f.ensurePairedFactMgr()
-	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
+	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body == nil {
 		t.Fatal("dummy body")
 	}
@@ -229,7 +229,7 @@ func TestGenerateBodyBuiltinDummy(t *testing.T) {
 func TestGenerateBodyFailsClosedWithoutFactMgr(t *testing.T) {
 	// Function.cpp:635 get_fact_mgr_for_func; null → fail closed (no invent NewFactMgr)
 	f := &Function{Name: "func_x", ReturnType: GetIntType()}
-	f.GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
+	f.GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(testAmbientSession, Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil || f.BuildState == BuildBuilt {
 		t.Fatal("must not invent body/FM without paired FactMgr")
 	}
@@ -240,7 +240,7 @@ func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_x", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
-	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
+	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(testAmbientSession, Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil || f.BuildState != BuildUnbuilt {
 		t.Fatalf("nil RNG must not invent body/Built, state=%v body=%v", f.BuildState, f.Body != nil)
 	}
@@ -249,7 +249,7 @@ func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Function always live; sticky (no invent soft-skip body gen past hole)
-	(*Function)(nil).GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
+	(*Function)(nil).GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(testAmbientSession, Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext().WithSession(testAmbientSession))
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function GenerateBody must SetError sticky")
 	}
@@ -261,7 +261,7 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "func_w", ReturnType: GetIntType(), Param: []*Variable{nil}}
 	_ = f.ensurePairedFactMgr()
 	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(f.PairedFactMgr()))
@@ -317,7 +317,7 @@ func TestGenerateBodyIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "func_amb", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
 	prev := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(f.PairedFactMgr())
@@ -334,7 +334,7 @@ func TestGenerateBodyIncompleteAmbientSticky(t *testing.T) {
 func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 	// Function.cpp:422 — FMList.push_back at make_random_signature
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
 	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, nil)
 	if f == nil {
@@ -389,7 +389,7 @@ func TestMakeExpressionCommaNilLHSType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	e := func() *Expression {

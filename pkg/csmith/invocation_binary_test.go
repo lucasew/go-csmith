@@ -215,7 +215,7 @@ func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
 	// StatementAssign.cpp:127 assert(fm) — nullptr empty (stmtOK false; StmtAssign is iota 0)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType())
+	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntType())
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil FM must fail closed empty assign, got %#v", st)
 	}
@@ -228,7 +228,7 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 	opts.CompoundAssignment = false
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType())
+	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntType())
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
 	}
@@ -243,7 +243,7 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntType()); fi != nil {
@@ -275,7 +275,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR (no invent unary / soft re-pick past holes)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -322,7 +322,7 @@ func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
 	f.Stack = []*Block{blk}
 	flags := MakeDummyFlags()
 	cg := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
-	t1, t2 := createBinarySafeTmps(cg, NewVariableSelector(Defaults()), flags, BinAdd)
+	t1, t2 := createBinarySafeTmps(cg, NewVariableSelector(testAmbientSession, Defaults()), flags, BinAdd)
 	if t1 == "" || t2 == "" {
 		t.Fatalf("Create* path must still allocate tmps under incomplete ambient, got %q %q", t1, t2)
 	}
@@ -334,7 +334,7 @@ func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
 	blk2 := &Block{Func: f2}
 	f2.Stack = []*Block{blk2}
 	cg2 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession)
-	if t1, t2 := createBinarySafeTmps(cg2, NewVariableSelector(Defaults()), badShift, BinLShift); t1 != "" || t2 != "" {
+	if t1, t2 := createBinarySafeTmps(cg2, NewVariableSelector(testAmbientSession, Defaults()), badShift, BinLShift); t1 != "" || t2 != "" {
 		t.Fatalf("bad shift RHS type must fail closed, got %q %q", t1, t2)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -342,14 +342,14 @@ func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// unary Create* also only needs flags+blk
-	tmp := createUnarySafeTmp(cg, NewVariableSelector(Defaults()), flags)
+	tmp := createUnarySafeTmp(cg, NewVariableSelector(testAmbientSession, Defaults()), flags)
 	if tmp == "" {
 		t.Fatal("Create* unary must allocate tmp under incomplete ambient")
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil block: soft miss (no sticky invent)
 	cgNoBlk := EmptyCGContext().WithSession(testAmbientSession)
-	if t1, t2 := createBinarySafeTmps(cgNoBlk, NewVariableSelector(Defaults()), flags, BinAdd); t1 != "" || t2 != "" {
+	if t1, t2 := createBinarySafeTmps(cgNoBlk, NewVariableSelector(testAmbientSession, Defaults()), flags, BinAdd); t1 != "" || t2 != "" {
 		t.Fatalf("nil block must soft-skip tmps, got %q %q", t1, t2)
 	}
 	ClearErrorSess(testAmbientSession)
@@ -364,7 +364,7 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, probs)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
 	tables := NewExprTables(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -420,7 +420,7 @@ func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, probs)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	// Seed a local int so Variable term is available under depth/no_const filters.
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
 	loc := &Variable{Name: "l_shift", Type: GetIntType()}
 	tables := NewExprTables(opts)
@@ -849,7 +849,7 @@ func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
 	probs := NewProbabilities(opts)
 	// Force unary branch: PStdUnaryFuncProb=100 so flipcoin always true.
 	probs.single[PStdUnaryFuncProb] = 100
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -892,7 +892,7 @@ func TestBinarySubcontextClearsCurrRHS(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
 	tables := NewExprTables(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}

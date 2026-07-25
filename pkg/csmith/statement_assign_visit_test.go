@@ -61,7 +61,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// RHS make_random may pick comma (type nullptr) — needs Type env
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// seed a global
@@ -303,7 +303,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	opts.MaxBlockSize = 1
 	opts.MaxFuncs = 3
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{Types: &TypeEnv{Sess: testAmbientSession}}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
@@ -378,7 +378,7 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	r := NewRng(42)
 	SetProcessRngSess(testAmbientSession, r)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	vs.GlobalList = append(vs.GlobalList, g)
 	vs.AllVars = append(vs.AllVars, g)

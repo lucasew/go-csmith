@@ -122,7 +122,7 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 		Sizes: []int{2, 3}, Collective: parent, Indices: []string{"1", "0"},
 	}
 	item.AsArray = item
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// C++ create_array_and_itemize: collective then itemized on GlobalList
 	vs.GlobalList = []*Variable{&parent.Variable, &item.Variable}
 	out := HashGlobalVariables(vs)

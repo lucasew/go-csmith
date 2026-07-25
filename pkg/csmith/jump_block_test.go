@@ -163,7 +163,7 @@ func TestClearEffectStm(t *testing.T) {
 func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	// StatementGoto.cpp:117–132 — cond from choose_visible_read_var only
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	// two stmts so dest (last) != other candidate
 	b1 := &Block{Func: f, Stmts: []Stmt{

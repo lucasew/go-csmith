@@ -92,7 +92,7 @@ func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	cg.CurrentFunc = f
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), NewRng(1), NewVariableSelector(Defaults()))
+	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), NewRng(1), NewVariableSelector(testAmbientSession, Defaults()))
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("post_creation", GetErrorSess(testAmbientSession))
 	}

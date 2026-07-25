@@ -27,7 +27,7 @@ func TestMatchVarName(t *testing.T) {
 
 func TestFindVarByName(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, v)
 	if vs.FindVarByName("g_x") != v {
@@ -92,7 +92,7 @@ func TestIsSeenName(t *testing.T) {
 
 func TestItemizeArrayWithIV(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
@@ -127,7 +127,7 @@ func TestItemizeArrayWithIV(t *testing.T) {
 
 func TestItemizeArrayTooFewIV(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntType()},
 		Sizes:    []int{2, 3},
@@ -173,7 +173,7 @@ func TestOutputCallChain(t *testing.T) {
 }
 
 func TestVariableSelectorDoFinalization(t *testing.T) {
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	vs.AllVars = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)}
 	vs.GlobalList = vs.AllVars
 	vs.DoFinalization()

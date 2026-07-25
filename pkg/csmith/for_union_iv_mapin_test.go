@@ -15,7 +15,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	r := NewRng(177)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// union with two simple fields
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},

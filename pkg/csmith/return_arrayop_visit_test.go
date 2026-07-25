@@ -59,7 +59,7 @@ func TestArrayInitAggregateTmpEmit(t *testing.T) {
 
 func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{3}
@@ -87,7 +87,7 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	// StatementReturn.cpp:54–72 — make_random does not visit_facts; append_return does
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	blk := &Block{Func: f}

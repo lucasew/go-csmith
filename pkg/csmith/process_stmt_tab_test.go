@@ -36,7 +36,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(f.ensurePairedFactMgr())
-	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
+	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType())
 	if stmtOK(st) {
 		t.Fatal("nil assignOpsTable must fail closed")
 	}
@@ -45,7 +45,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	InitSessionProbabilityTablesSess(testAmbientSession, opts)
-	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
+	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType())
 	// may still fail for other reasons; at least table is live
 	_ = st
 	ClearErrorSess(testAmbientSession)
@@ -79,7 +79,7 @@ func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	defer SetProcessStmtTabSess(testAmbientSession, prev)
 	opts := Defaults()
 	opts.MaxFuncs = 10
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{Funcs: nil, Types: vs.Types}
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
@@ -138,13 +138,13 @@ func TestNewVariableSelectorNoInventProbs(t *testing.T) {
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	if vs.Probs != nil {
 		t.Fatal("must not invent NewProbabilities when process unset")
 	}
 	p := NewProbabilities(Defaults())
 	SetProcessProbabilitiesSess(testAmbientSession, p)
-	vs2 := NewVariableSelector(Defaults())
+	vs2 := NewVariableSelector(testAmbientSession, Defaults())
 	if vs2.Probs != p {
 		t.Fatal("must share process Probabilities")
 	}

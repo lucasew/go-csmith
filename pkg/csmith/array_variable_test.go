@@ -144,7 +144,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// with VS+CG: make_init_value path is live
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = NewProbabilities(opts)
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -204,7 +204,7 @@ func TestGenerateCanEmitArrayDecl(t *testing.T) {
 func TestCreateAndInitializeArrayFlip(t *testing.T) {
 	opts := Defaults()
 	// force high array prob
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// hack probs
 	vs.Probs.single[PNewArrayVariableProb] = 100
 	r := NewRng(2)

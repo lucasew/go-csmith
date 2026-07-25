@@ -32,7 +32,7 @@ func TestMakeRandomLoopControlRanges(t *testing.T) {
 func TestMakeRandomIfHasBranches(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	var list FunctionList
@@ -69,7 +69,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
@@ -96,7 +96,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	// StatementFor.cpp always has RNG+CG sticky; nil FM soft re-pick
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
+	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -104,7 +104,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cgEmpty := EmptyCGContext().WithSession(testAmbientSession)
-	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
+	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
 		t.Fatal("nil RNG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -115,7 +115,7 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession) // no FM
-	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
+	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatalf("nil FM must return nil, got %#v", st)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -160,7 +160,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)

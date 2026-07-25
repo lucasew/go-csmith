@@ -39,7 +39,7 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	fm.GlobalFacts = []*FactPointTo{}
 	fm.UnionFacts = []*FactUnion{}
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = append(vs.GlobalList, parent)
 	for _, f := range parent.FieldVars {
 		vs.AllVars = append(vs.AllVars, f)

@@ -296,7 +296,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 	// force map accum effect for forward path cond
 	fm.MapAccumEffect = map[int]Effect{10: EmptyEffect().ReadVarSess(testAmbientSession, g)}
 	// plant globals for ChooseVisibleReadVar
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = []*Variable{g}
 	// many seeds: if any succeeds with Kind Goto, fail
 	for seed := uint64(1); seed < 40; seed++ {

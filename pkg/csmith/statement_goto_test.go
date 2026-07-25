@@ -10,7 +10,7 @@ func TestMakeRandomGotoEmptyBlockReturnsNull(t *testing.T) {
 	// StatementGoto.cpp:86–87 / 130–132 — no soft makeForwardGotoOnly
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -29,7 +29,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	// StatementGoto.cpp:138–150 — back-edge with choose_visible_read_var
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
@@ -73,7 +73,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
@@ -335,7 +335,7 @@ func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 	// StatementGoto.cpp:66–67 get_fact_mgr; non-sticky soft re-pick without FM
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
@@ -478,7 +478,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 	// Force forward path (as_dest=false) via seed scan; expect side-effect insert.
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// source block (forward ok_blk) — two assigns so insert after first is possible
@@ -579,7 +579,7 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// single block: other candidate + dest last (pre-sized capacity so insert
@@ -752,7 +752,7 @@ func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
-	st := MakeRandomGoto(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
+	st := MakeRandomGoto(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, blk)
 	if st.Kind == StmtGoto && st.Label != "" {
 		t.Fatal("nil Blocks hole must fail closed MakeRandomGoto")
 	}
@@ -773,7 +773,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	st := MakeRandomGoto(NewRng(4), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
+	st := MakeRandomGoto(NewRng(4), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, blk)
 	if st.Kind == StmtGoto && st.Label != "" {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomGoto")
 	}
@@ -784,7 +784,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	cg2 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
-	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg2, blk)
+	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg2, blk)
 	if st2.Kind == StmtGoto && st2.Label != "" {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomGoto")
 	}
@@ -796,7 +796,7 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 	fm3 := NewFactMgrSess(testAmbientSession, f)
 	fm3.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm3)
-	st3 := MakeRandomGoto(NewRng(6), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg3, blk)
+	st3 := MakeRandomGoto(NewRng(6), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg3, blk)
 	if st3.Kind == StmtGoto && st3.Label != "" {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomGoto")
 	}
@@ -909,7 +909,7 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	r := NewRng(1)
 	// Force goto: may still fail soft if no good block; ensure we don't panic
 	// and that FindGoodJumpBlock is only given func.Blocks (size 1), not 2.
-	_ = MakeRandomGoto(r, Defaults(), ProcessProbabilitiesSess(testAmbientSession), NewVariableSelector(Defaults()), nil, &cg, curr)
+	_ = MakeRandomGoto(r, Defaults(), ProcessProbabilitiesSess(testAmbientSession), NewVariableSelector(testAmbientSession, Defaults()), nil, &cg, curr)
 	// If invent-append were present, first RndUpto would see n=2 for seed paths;
 	// unit documents the contract: Blocks list is source of truth.
 	if len(f.Blocks) != 1 {
@@ -1029,7 +1029,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	}
 
 	// Wire MakeRandomGoto forward path: live UF would fail; MapUnionFactsOut succeeds.
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = append(vs.GlobalList, uv)
 	vs.AllVars = append(vs.AllVars, uv, f0)
 	tables := NewExprTables(opts)

@@ -37,7 +37,7 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// create_random_array uses Type env (C++ GenerateSimpleTypes always live)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	r := NewRng(2)
@@ -49,7 +49,7 @@ func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
 
 func TestSelectArrayChoosesExisting(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// VariableSelector.cpp:1386 — find_all_visible_vars only (GlobalList / local_vars)
@@ -68,7 +68,7 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
@@ -122,7 +122,7 @@ func TestGenerateArrayOpOrDecl(t *testing.T) {
 func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
@@ -160,7 +160,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 
 func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), nil}
 	if VariablesComplete(vs.FindAllVisibleVars(nil)) {
 		t.Fatal("GlobalList nil hole must fail closed incomplete")
@@ -183,7 +183,7 @@ func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = []*Variable{nil}
 	if vs.SelectArray(NewRng(1), EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("visible list hole must fail closed SelectArray")
@@ -230,7 +230,7 @@ func TestSelectArrayDoesNotInventFromArraysList(t *testing.T) {
 	// second inventory. Array only on Arrays (not GlobalList/local) → create_random_array.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Create without vs/blk registration (orphan array)

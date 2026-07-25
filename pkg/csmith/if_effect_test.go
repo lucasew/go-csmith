@@ -8,7 +8,7 @@ import (
 func TestIfBranchesIsolateEffect(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	// assign-only so arms write
@@ -142,7 +142,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -378,7 +378,7 @@ func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
+	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil RNG+cg")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -386,7 +386,7 @@ func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
+	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatal("nil RNG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -411,7 +411,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	inc := IncompleteEffect()
@@ -433,7 +433,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	// assign-only arms so generation writes/reads globals into shared accum
@@ -485,7 +485,7 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 0
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed globals so MakeIteration can succeed; fail closed is on incomplete EffectAccum after
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgrSess(testAmbientSession, f)

@@ -8,7 +8,7 @@ import (
 func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRng(3)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
@@ -27,7 +27,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	vs.Types = env
 	// seed an int* global — qfer depth must be indirect+1 (pointer: 2 levels)
@@ -60,7 +60,7 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
 	broken.Type = nil
@@ -86,7 +86,7 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	// must_use Type-nil stickies SelectMustUseVar residual; must not invent soft select Lhs
 	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
@@ -276,7 +276,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	vs.Types = env
 	p := env.FindPointerType(GetIntType(), true)
@@ -298,7 +298,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
 	// Lhs.cpp:110–113 — no_signed_overflow rejects signed / bitfield for ++/--
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// only a signed int global
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g}
@@ -329,7 +329,7 @@ func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
 func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
 	// Lhs.cpp:105 — !effect_stm.is_written(var)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -346,7 +346,7 @@ func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
 func TestMakeRandomLhsUsesProvidedQferWildcard(t *testing.T) {
 	// Lhs.cpp:90–93 — wildcard skips Restrict
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -363,7 +363,7 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	// Lhs::make_random visit_facts must update caller's effect_accum / effect_stm
 	// so StatementAssign can merge_param_context(lhs_cg).
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -391,7 +391,7 @@ func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 	// Lhs::make_random always has type + RNG + VS + CG sticky
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
@@ -414,7 +414,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR (no invent LHS / soft re-pick past holes)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -441,7 +441,7 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalList hole fails closed sticky via selectWritable pool scan
-	vs2 := NewVariableSelector(opts)
+	vs2 := NewVariableSelector(testAmbientSession, opts)
 	vs2.GlobalList = []*Variable{g, nil}
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	eff := EmptyEffect()
@@ -461,7 +461,7 @@ func TestSelectWritableNilTypSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -770,7 +770,7 @@ func TestMakeRandomLhsFilterRejectKeepsIsEligiblePollution(t *testing.T) {
 	// Residual pollution (as after filter-reject keep) must survive a successful Lhs
 	// that does not itself re-run is_eligible on the itemized member.
 	ClearErrorSess(testAmbientSession)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = []*Variable{ok}
 	vs.AllVars = []*Variable{ok}
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, iv)

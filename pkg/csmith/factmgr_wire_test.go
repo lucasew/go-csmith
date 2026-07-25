@@ -9,7 +9,7 @@ func TestMakeFirstCreatesFactMgr(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 2
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	m := NewFactMgrMapSess(testAmbientSession)
 	list := FunctionList{}
 	seedTypesForTest(NewRng(2), opts, probs, vs, &list)

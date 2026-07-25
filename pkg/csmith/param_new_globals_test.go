@@ -39,7 +39,7 @@ func TestMergeParamContext(t *testing.T) {
 func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
 	ClearErrorSess(testAmbientSession) // ERROR_GUARD on GenerateNewGlobal must not see prior test sticky error
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -55,7 +55,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	opts.MaxBlockSize = 2
 	opts.MaxFuncs = 5
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	caller := &Function{Name: "caller", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list.Funcs = []*Function{caller}
@@ -87,7 +87,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 func TestBuildUserInvocationParamMerge(t *testing.T) {
 	// FunctionInvocationUser.cpp:252–268 — param_cg + merge_param_context raises expr_depth
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
@@ -117,7 +117,7 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 	// FunctionInvocationUser.cpp:259 — ERROR_GUARD(false) sticky error → failed
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	callee := &Function{
 		Name:       "c",
 		ReturnType: GetIntType(),
@@ -139,7 +139,7 @@ func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
 	// Function.cpp:419–420 — CreateVariable ERROR_GUARD; sticky error aborts signature
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	vs.Types = env
 	cg := EmptyCGContext().WithSession(testAmbientSession)
@@ -156,7 +156,7 @@ func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	// FunctionInvocation.cpp:157–159 — operand make_random mutates cg.expr_depth
 	// FunctionInvocationUnary.cpp:57 assert(blk) — need stack for safe tmp
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

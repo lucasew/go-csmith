@@ -44,7 +44,7 @@ func TestMakeRandomExpressionConstant(t *testing.T) {
 func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 	opts := Defaults()
 	tables := NewExprTables(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	e := func() *Expression {
@@ -482,7 +482,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	// ExpressionVariable.cpp:78 — select(..., dummy invalid_vars)
 	// After rejecting a float for non-float want, select must not keep returning it forever.
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// only a float global
 	fv := CreateVariableScalarsSess(testAmbientSession, "g_f", GetSimpleType(EFloat), true, false)
 	vs.GlobalList = []*Variable{fv}
@@ -546,7 +546,7 @@ func TestMakeExpressionVariableIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR (no invent var expr soft re-pick)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{v}
 	vs.AllVars = []*Variable{v}
@@ -576,7 +576,7 @@ func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
 	// ExpressionVariable.cpp:122–123 — indirection 0 → ExpressionVariable(*var) without forced type
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{v}
 	vs.AllVars = []*Variable{v}
@@ -603,7 +603,7 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 	// ExpressionVariable::make_random visit_facts must update caller's effect_accum /
 	// effect_stm so assign RHS merge_param_context and param effects see the read.
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
@@ -625,7 +625,7 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 func TestSelectWithInvalidRejectsVolatileWhenImpure(t *testing.T) {
 	// VariableSelector.cpp:1225–1227 — assert(!var->is_volatile()) under impure effect_context
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts = opts
 	vq := NewCVQualifiers([]bool{false}, []bool{true})
 	vol := CreateVariableQferSess(testAmbientSession, "g_v", GetIntType(), vq)
@@ -646,7 +646,7 @@ func TestSelectWithInvalidExpandStructNewValueErrors(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true
 	opts.GlobalVariables = true
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts = opts
 	// scan until ScopeNewValue (rnd_upto(100) in [95,100) with globals table)
 	hit := false
@@ -672,7 +672,7 @@ func TestSelectWithInvalidExpandStructNewValueErrors(t *testing.T) {
 
 func TestSelectWithInvalidExcludesDummy(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{a, b}
@@ -877,7 +877,7 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	// ExpressionFuncall.cpp:71–73 — struct/union never std unary/binary
 	opts := Defaults()
 	opts.MaxFuncs = 4
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -907,7 +907,7 @@ func TestMakeExpressionFuncallRequiresFactMgr(t *testing.T) {
 	// ExpressionFuncall.cpp:75 get_fact_mgr — no invent without FM
 	opts := Defaults()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if makeExpressionFuncall(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType(), nil, nil) != nil {
+	if makeExpressionFuncall(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntType(), nil, nil) != nil {
 		t.Fatal("nil FM must fail closed")
 	}
 }
@@ -916,7 +916,7 @@ func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / facts fail closed sticky (no invent funcall soft re-pick)
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -954,7 +954,7 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	// ExpressionFuncall.cpp:84–90 — restore facts when invocation failed
 	opts := Defaults()
 	opts.MaxFuncs = 0 // force failure to create user funcs; may still get std
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed globals for variable fallback
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g}
@@ -989,7 +989,7 @@ func TestExpressionVariableAddrOfArgForbiddenAsParam(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.AddrTakenOfLocals = true // only as_param rule under test
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	pt := PointerTo(GetIntType())
 	// sole candidate: int argument (address would yield int*)
 	arg := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
@@ -1032,7 +1032,7 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 	// Fair: sticky fail closed whole makeExpressionVariableFlags.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
 	broken.Type = nil

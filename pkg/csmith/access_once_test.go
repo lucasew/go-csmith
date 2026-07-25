@@ -12,7 +12,7 @@ func TestAccessOnceMarking(t *testing.T) {
 	prev := ProcessOptionsSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = NewProbabilities(opts)
 	// force many creates until AccessOnce set
 	found := false
@@ -60,7 +60,7 @@ func TestForSafeIncrEmit(t *testing.T) {
 	opts := Defaults()
 	opts.SafeMath = true
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)

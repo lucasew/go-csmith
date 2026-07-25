@@ -16,7 +16,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 		},
 	}
 	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	vs.GlobalList = []*Variable{uv}
 	// nil facts → all fields
 	all := HashGlobalVariables(vs)
@@ -36,7 +36,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 
 func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 	// incomplete GlobalList / UnionFacts fail closed sticky (no invent empty hash)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g, nil}
 	ClearErrorSess(testAmbientSession)
@@ -63,7 +63,7 @@ func TestHashGlobalVariablesHashOutputResidualSticky(t *testing.T) {
 	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
 	// IsArray without AsArray stickies hashOutput
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	vs.GlobalList = []*Variable{good, shell}
 	if s := HashGlobalVariables(vs); s != "" {
 		t.Fatal("hashOutput residual must fail closed whole HashGlobalVariables, not invent partial", s)
@@ -139,7 +139,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)

@@ -185,7 +185,7 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	opts := Defaults()
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.GlobalList = []*Variable{a, b}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)

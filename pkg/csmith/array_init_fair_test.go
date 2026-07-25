@@ -88,7 +88,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 
 func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	if av == nil {
@@ -151,7 +151,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1 / [0]
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntType(), MakeInt(0), q)
 	av.Sizes = nil
@@ -171,7 +171,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	opts := Defaults()
 	// no float types in simple select — just ensure no panic with empty filter path
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{4}
@@ -195,7 +195,7 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}

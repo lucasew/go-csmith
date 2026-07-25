@@ -9,7 +9,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	// Block::make_random(CGContext&) — shared effect_accum sees stmt writes.
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	// Force assign-only statement table
 	tab := &ThresholdTable{}
@@ -123,7 +123,7 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)

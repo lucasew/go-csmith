@@ -4,7 +4,7 @@ import "testing"
 
 func TestSelectRecordsReuseAndCreate(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -44,7 +44,7 @@ func TestSelectRecordsReuseAndCreate(t *testing.T) {
 func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 	opts := Defaults()
 	opts.GlobalVariables = false // force parent local
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
@@ -78,7 +78,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / facts fail closed sticky before scope pick
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -116,7 +116,7 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 
 func TestSelectGlobalMTInvalidVars(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{a, b}
@@ -133,7 +133,7 @@ func TestSelectGlobalMTInvalidVars(t *testing.T) {
 
 func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// int* global nonvol
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -157,7 +157,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	// Incomplete ambient / invalidVars / pools must not invent soft re-pick success
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)

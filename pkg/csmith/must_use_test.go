@@ -46,7 +46,7 @@ func TestFindMustUseArrays(t *testing.T) {
 
 func TestSelectMustUseVar(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -65,7 +65,7 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	// Variable::type always live; Type-nil must not soft-skip to a later candidate
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -99,7 +99,7 @@ func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
 	// Incomplete EffectContext / GlobalFacts must not invent soft re-pick success
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -165,7 +165,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 	// residual ERROR soft-continue invents later must-use pick. Fair: sticky whole select.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -202,7 +202,7 @@ func TestSelectMustUseVarResidualSticky(t *testing.T) {
 
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	av := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
@@ -233,7 +233,7 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	rw := &RWDirective{}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(rw)
 	if vs.SelectMustUseVar(NewRng(1), AccessWrite, cg, nil, nil) != nil {
@@ -255,7 +255,7 @@ func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
 
 func TestMakeRandomLhsMustUse(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_w", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	rw := &RWDirective{MustWriteVars: []*Variable{g}}

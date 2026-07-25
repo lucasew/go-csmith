@@ -184,7 +184,7 @@ func TestExpandBlockForGotoMidGenUnlinkedThenArm(t *testing.T) {
 	}
 	// Create local on thenArm must land on parent after expand
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f.Stack = []*Block{parent, thenArm}
 	beforeP, beforeT := len(parent.LocalVars), len(thenArm.LocalVars)
 	v := vs.GenerateNewParentLocal(thenArm, AccessWrite, cg, GetIntType(), nil, NewRng(5))
@@ -277,7 +277,7 @@ func TestLowerBlockForVars(t *testing.T) {
 
 func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
@@ -311,7 +311,7 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 
 func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// volatile field → IsVolatileStructUnion
 	st := &Type{
 		isStruct:   true,

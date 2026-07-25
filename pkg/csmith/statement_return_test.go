@@ -9,7 +9,7 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 	// StatementReturn.cpp:60–66 — ExpressionVariable only; nullptr on fail (no const fallback)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
@@ -63,7 +63,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	// sticky without RNG
-	if stmtOK(MakeRandomReturn(nil, opts, NewVariableSelector(opts), nil)) {
+	if stmtOK(MakeRandomReturn(nil, opts, NewVariableSelector(testAmbientSession, opts), nil)) {
 		t.Fatal("nil RNG/cg must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,7 +73,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	st := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(opts), &cg)
+	st := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), &cg)
 	if st.Expr != nil {
 		t.Fatal("nil FM must fail closed empty return")
 	}
@@ -84,7 +84,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	f.RV = nil
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	st2 := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(opts), &cg2)
+	st2 := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), &cg2)
 	if st2.Expr != nil {
 		t.Fatal("nil RV must fail closed empty return")
 	}
@@ -100,7 +100,7 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc

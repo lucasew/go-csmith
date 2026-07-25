@@ -110,7 +110,7 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 	opts := Defaults()
 	InitScopeTableSess(testAmbientSession, opts)
 	defer SetProcessScopeTabSess(testAmbientSession, nil)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRng(3)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
@@ -173,7 +173,7 @@ func TestMakeRandomIterCtrl(t *testing.T) {
 func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)

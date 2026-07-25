@@ -297,7 +297,7 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 10}
-	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
+	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil || !b.InArrayLoop {
 		t.Fatal("InArrayLoop", b)
 	}
@@ -314,7 +314,7 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	cg.EffectAccum = &eff
 	b := &Block{Func: f, StmID: AllocStmID(), Parent: nil}
 	f.Stack = []*Block{b}
-	st := b.AppendReturnStmt(NewRng(1), opts, NewVariableSelector(opts), &cg)
+	st := b.AppendReturnStmt(NewRng(1), opts, NewVariableSelector(testAmbientSession, opts), &cg)
 	if st == nil || st.Kind != StmtReturn {
 		t.Fatal(st)
 	}
@@ -328,14 +328,14 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 		t.Fatal("facts out")
 	}
 	// Block.cpp always has RNG for make_random(eReturn)
-	if st2 := b.AppendReturnStmt(nil, opts, NewVariableSelector(opts), &cg); st2 != nil {
+	if st2 := b.AppendReturnStmt(nil, opts, NewVariableSelector(testAmbientSession, opts), &cg); st2 != nil {
 		t.Fatal("nil RNG must not invent return")
 	}
 	// Block StmID 0 + FM fails closed (no invent fold into key 0)
 	ClearErrorSess(testAmbientSession)
 	bad := &Block{Func: f, StmID: IncompleteStmID, Parent: nil}
 	f.Stack = []*Block{bad}
-	if bad.AppendReturnStmt(NewRng(2), opts, NewVariableSelector(opts), &cg) != nil {
+	if bad.AppendReturnStmt(NewRng(2), opts, NewVariableSelector(testAmbientSession, opts), &cg) != nil {
 		t.Fatal("block StmID 0 must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -909,7 +909,7 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	b := MakeRandomBlock(NewRng(7), opts, NewProbabilities(opts), NewVariableSelector(opts),
+	b := MakeRandomBlock(NewRng(7), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil")
@@ -1119,7 +1119,7 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	st := body.AppendReturnStmt(NewRng(3), opts, NewVariableSelector(opts), &cg)
+	st := body.AppendReturnStmt(NewRng(3), opts, NewVariableSelector(testAmbientSession, opts), &cg)
 	if st == nil || st.Kind != StmtReturn {
 		t.Fatal(st)
 	}
@@ -1376,7 +1376,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 
 	pre := cg.BlkDepth
-	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	// Whether for succeeds or null-fails, outer depth must restore (Statement.cpp:315–317).
 	if cg.BlkDepth != pre {
 		t.Fatalf("AppendNestedLoop must restore BlkDepth: got %d want %d", cg.BlkDepth, pre)
@@ -1409,7 +1409,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	cg.ExprDepth = 7 // leftover from prior sibling assign
 
 	preBlk := cg.BlkDepth
-	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	_ = b.AppendNestedLoop(NewRng(42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if cg.BlkDepth != preBlk {
 		t.Fatalf("BlkDepth restore after make_random(eFor): got %d want %d", cg.BlkDepth, preBlk)
 	}
@@ -1434,18 +1434,18 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	f.Stack = []*Block{b}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if b.AppendNestedLoop(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if b.AppendNestedLoop(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("sticky error must not append nested for")
 	}
 	ClearErrorSess(testAmbientSession)
 	// Block.cpp always has RNG for make_random(eFor)
-	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("nil RNG must not invent nested for")
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete ambient must not invent nested for past holes
 	cgInc := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
-	if b.AppendNestedLoop(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgInc) != nil {
+	if b.AppendNestedLoop(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgInc) != nil {
 		t.Fatal("incomplete EffectContext must fail closed AppendNestedLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1471,7 +1471,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	got := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, st)
+	got := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, st)
 	if stmtOK(got) {
 		t.Fatal("const struct assign must fail closed")
 	}
@@ -1488,7 +1488,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 		t.Fatal("fixture Type-nil field must residual IsConstStructUnion sticky true")
 	}
 	ClearErrorSess(testAmbientSession)
-	got2 := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, hole)
+	got2 := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, hole)
 	if stmtOK(got2) {
 		t.Fatal("IsConstStructUnion residual must fail closed assign")
 	}
@@ -1500,7 +1500,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	optsSV := Defaults()
 	optsSV.StrictVolatileRule = true
 	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTable(optsSV))
-	got3 := MakeRandomAssign(NewRng(1), optsSV, NewProbabilities(optsSV), NewVariableSelector(optsSV), NewExprTables(optsSV), &cg, hole)
+	got3 := MakeRandomAssign(NewRng(1), optsSV, NewProbabilities(optsSV), NewVariableSelector(testAmbientSession, optsSV), NewExprTables(optsSV), &cg, hole)
 	if stmtOK(got3) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed assign")
 	}
@@ -1547,7 +1547,7 @@ func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
 	// MakeRandomReturn with empty selector may still invent globals via select
 	// Force error by sticky error before append path visit
 	// Direct path: call AppendReturn with vs that cannot create
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Opts.GlobalVariables = false
 	st := b.AppendReturnStmt(NewRng(1), opts, vs, &cg)
 	// either success or fail with SetError on visit fail; must not leave incomplete without error if visit fails

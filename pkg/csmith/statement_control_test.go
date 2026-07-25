@@ -148,7 +148,7 @@ func TestHashGlobalVarsSharedIndices(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// live AsArray required for GetMaxArrayDimension / hashArrayVariable
 	ga := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},

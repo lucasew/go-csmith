@@ -36,12 +36,15 @@ func vsSess(vs *VariableSelector) *Session {
 	return vs.Sess
 }
 
-// NewVariableSelector constructs an empty selector for unit tests on the ambient bag.
-// Probs from ReinstallTestProcessSingletons; Sess is testAmbientSession.
-// Generate uses NewVariableSelectorProbs + explicit vs.Sess = run bag (no ambient install).
-func NewVariableSelector(opts Options) *VariableSelector {
-	vs := NewVariableSelectorProbs(opts, ProcessProbabilitiesSess(testAmbientSession))
-	vs.Sess = testAmbientSession
+// NewVariableSelector constructs an empty selector bound to s (unit tests pass
+// testAmbientSession; Generate uses NewVariableSelectorProbs + vs.Sess = run bag).
+// Nil s panics — no silent ambient install.
+func NewVariableSelector(s *Session, opts Options) *VariableSelector {
+	if s == nil {
+		panic("NewVariableSelector: nil session")
+	}
+	vs := NewVariableSelectorProbs(opts, ProcessProbabilitiesSess(s))
+	vs.Sess = s
 	return vs
 }
 

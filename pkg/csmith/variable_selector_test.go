@@ -87,7 +87,7 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	opts := Defaults()
 	// force scalar path — NewArrayVariableProb can flip to array (collective+member on list)
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRng(2)
 	tInt := GetSimpleType(EInt)
 	// Fixed qfer — no RNG for quals
@@ -113,7 +113,7 @@ func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -158,7 +158,7 @@ func TestMaxGlobalsFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.Arrays = false
 	opts.MaxGlobals = 1
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(2))
 	if v == nil {
@@ -177,7 +177,7 @@ func TestMaxGlobalsFailClosed(t *testing.T) {
 	opts2 := Defaults()
 	opts2.MaxGlobals = 1
 	opts2.GlobalVariables = true
-	vs2 := NewVariableSelector(opts2)
+	vs2 := NewVariableSelector(testAmbientSession, opts2)
 	vs2.GlobalList = []*Variable{v}
 	vs2.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntType()}}
 	// force asGlobal by only allowing global path — stack empty + GlobalVariables
@@ -203,7 +203,7 @@ func TestDefaultsMaxGlobalsUnlimited(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// Past the old unfair default of 80 — still create (upstream has no cap).
 	for i := 0; i < 85; i++ {
@@ -261,7 +261,7 @@ func TestSelectGlobalEmptyCreates(t *testing.T) {
 	// SelectGlobal empty → GenerateNewGlobal
 	ResetDefaultGensym()
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	v := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), &q, r)
@@ -272,7 +272,7 @@ func TestSelectGlobalEmptyCreates(t *testing.T) {
 
 func TestSelectGlobalChoosesExisting(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	a := CreateVariableQferSess(testAmbientSession, "g_1", GetSimpleType(EInt), q)
 	// non-convertible pointer won't match int under Flexible
@@ -301,7 +301,7 @@ func TestSelectGlobalChoosesExisting(t *testing.T) {
 
 func TestSelectGlobalMultiMatchUpto(t *testing.T) {
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	a := CreateVariableQferSess(testAmbientSession, "g_1", GetSimpleType(EInt), q)
 	b := CreateVariableQferSess(testAmbientSession, "g_2", GetSimpleType(EInt), q)
@@ -320,7 +320,7 @@ func TestSelectGlobalMultiMatchUpto(t *testing.T) {
 func TestGenerateNewGlobalRandomQferConsumesRNG(t *testing.T) {
 	// nil qfer → random_qualifiers (2 flips) + Constant::make_random (more draws).
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	r := NewRng(2)
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), nil, r)
 	if v == nil || v.Init == nil || v.Init.Value == "" {
@@ -335,7 +335,7 @@ func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
 	// Scalar create_and_initialize path (not array itemize): make_init_value applied.
 	opts := Defaults()
 	opts.Arrays = false
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	r := NewRng(2)
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), &q, r)
@@ -389,7 +389,7 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 func TestCreateRandomArrayIncompleteAmbientSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
@@ -442,7 +442,7 @@ func TestMakeInitValueSelectLoopCtrlNilDepsSticky(t *testing.T) {
 	// MakeInitValue / SelectLoopCtrl / SelectParentLocal always have VS+RNG sticky
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, nil, nil) != nil {
 		t.Fatal("nil RNG MakeInitValue must fail closed")
@@ -492,7 +492,7 @@ func TestCreateSelectArrayNilDepsSticky(t *testing.T) {
 		t.Fatal("nil VS SelectArray must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	vs := NewVariableSelector(Defaults())
+	vs := NewVariableSelector(testAmbientSession, Defaults())
 	if vs.SelectArray(nil, EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("nil RNG SelectArray must fail closed")
 	}
@@ -513,7 +513,7 @@ func TestGenerateNewParentLocalNilDepsSticky(t *testing.T) {
 	// parent-local always has VS + block + type + RNG; sticky no invent shells
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	blk := &Block{}
 	if vs.GenerateNewParentLocal(nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(1)) != nil {
 		t.Fatal("nil block must fail closed")
@@ -544,7 +544,7 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.Arrays = false // force scalar path
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	// nil qfer sanity: MakeInitValue requires non-nil qf
 	// createAndInitialize always builds qfer; force fail via void type
 	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_v", NewRng(1)) != nil {
@@ -571,7 +571,7 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	vs := NewVariableSelector(opts)
+	vs := NewVariableSelector(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	// Stack with nil hole
 	f.Stack = []*Block{nil}
@@ -656,7 +656,7 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GlobalList on SelectGlobalMT
-	vs2 := NewVariableSelector(opts)
+	vs2 := NewVariableSelector(testAmbientSession, opts)
 	vs2.GlobalList = []*Variable{nil}
 	if vs2.SelectGlobalMT(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, NewRng(8), MatchFlexible, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed SelectGlobalMT")
