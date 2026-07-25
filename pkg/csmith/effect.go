@@ -954,28 +954,32 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 // Effect.cpp:56–69 — any pair where va[i]->match(vb[j]) || vb[j]->match(va[i]).
 // Nil entries in either list fail closed sticky true (restrictive race).
 func NonEmptyIntersection(va, vb []*Variable) bool {
+	return NonEmptyIntersectionSess(nil, va, vb)
+}
+
+func NonEmptyIntersectionSess(s *Session, va, vb []*Variable) bool {
 	for _, a := range va {
 		for _, b := range vb {
 			if a == nil || b == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
 			if a.Match(b) {
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			if b.Match(a) {
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
@@ -985,7 +989,8 @@ func NonEmptyIntersection(va, vb []*Variable) bool {
 
 // HasRaceWith mirrors Effect::has_race_with.
 // Effect.cpp:480–484 — read∩write || write∩read || write∩write via non_empty_intersection.
-// Incomplete either side fails closed sticky as race (no invent race-free / soft re-pick).
+// Incomplete either side fails closed sticky as race (no invent race-free / soft re-pick).}
+
 func (e Effect) HasRaceWith(other Effect) bool {
 	if !EffectComplete(e) || !EffectComplete(other) {
 		sessNoteError(nil, ErrGeneric)
@@ -1497,8 +1502,12 @@ func (e Effect) CommentOutput() string {
 // Uses is_read/is_written gates and preserves a-then-b insertion order (fair with
 // C++ vector merges that skip already-covered vars).
 func MergeEffects(a, b Effect) Effect {
+	return MergeEffectsSess(nil, a, b)
+}
+
+func MergeEffectsSess(s *Session, a, b Effect) Effect {
 	if !EffectComplete(a) || !EffectComplete(b) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteEffect()
 	}
 	out := Effect{
@@ -1507,16 +1516,16 @@ func MergeEffects(a, b Effect) Effect {
 	}
 	// a first, then b — push if not already is_read/is_written on out
 	for _, v := range a.ReadVars() {
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.IsRead(v) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.read == nil {
@@ -1526,16 +1535,16 @@ func MergeEffects(a, b Effect) Effect {
 		out.readOrder = append(out.readOrder, v)
 	}
 	for _, v := range b.ReadVars() {
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.IsRead(v) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.read == nil {
@@ -1545,16 +1554,16 @@ func MergeEffects(a, b Effect) Effect {
 		out.readOrder = append(out.readOrder, v)
 	}
 	for _, v := range a.WrittenVars() {
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.IsWritten(v) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.written == nil {
@@ -1564,16 +1573,16 @@ func MergeEffects(a, b Effect) Effect {
 		out.writeOrder = append(out.writeOrder, v)
 	}
 	for _, v := range b.WrittenVars() {
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.IsWritten(v) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteEffect()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteEffect()
 		}
 		if out.written == nil {

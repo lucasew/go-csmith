@@ -518,8 +518,12 @@ func OOBCount() int { return sessBK(nil).oobCnt }
 // Incomplete IR fails closed sticky as -1 (no invent leaf depth 0 / soft re-pick
 // stats past partial nest counts).
 func ExpressionComplexity(e *Expression) int {
+	return ExpressionComplexitySess(nil, e)
+}
+
+func ExpressionComplexitySess(s *Session, e *Expression) int {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	switch e.Term {
@@ -527,7 +531,7 @@ func ExpressionComplexity(e *Expression) int {
 		// Constant always has live Type* + Value; incomplete shell sticky → -1
 		// (no invent leaf complexity 0 for Type-nil / empty-value shell)
 		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		return 0
@@ -535,11 +539,11 @@ func ExpressionComplexity(e *Expression) int {
 		// ExpressionVariable always has live Variable*; incomplete sticky → -1
 		// Type-nil non-special sticky (no invent leaf complexity 0 past type hole)
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		return 0
@@ -547,7 +551,7 @@ func ExpressionComplexity(e *Expression) int {
 		// ExpressionFuncall::get_complexity — live invoke only
 		// no soft invent complexity 0/1 for nil Invoke IR sticky
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		comp := 0
@@ -557,7 +561,7 @@ func ExpressionComplexity(e *Expression) int {
 			// user-defined path: Function* always live; incomplete sticky
 			// (no invent complexity 0 shell past missing User as non-call)
 			if e.Invoke.User == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return -1
 			}
 			comp++ // function call itself
@@ -565,13 +569,13 @@ func ExpressionComplexity(e *Expression) int {
 		for _, a := range e.Invoke.Args {
 			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed sticky
 			if a == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return -1
 			}
-			c := ExpressionComplexity(a)
+			c := ExpressionComplexitySess(s, a)
 			if c < 0 {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return -1
 			}
@@ -581,13 +585,13 @@ func ExpressionComplexity(e *Expression) int {
 	case TermAssignment:
 		// incomplete Assign IR sticky — no invent complexity 1 shell
 		if e.Assign == nil || e.Assign.Expr == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
-		c := ExpressionComplexity(e.Assign.Expr)
+		c := ExpressionComplexitySess(s, e.Assign.Expr)
 		if c < 0 {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return -1
 		}
@@ -595,28 +599,29 @@ func ExpressionComplexity(e *Expression) int {
 	case TermCommaExpr:
 		// both sides always live; incomplete sticky → -1
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
-		cl := ExpressionComplexity(e.CommaLHS)
-		cr := ExpressionComplexity(e.CommaRHS)
+		cl := ExpressionComplexitySess(s, e.CommaLHS)
+		cr := ExpressionComplexitySess(s, e.CommaRHS)
 		if cl < 0 || cr < 0 {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return -1
 		}
 		return 1 + cl + cr
 	default:
 		// unknown term kind — incomplete IR sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 }
 
 // collectStmtExprs appends expressions like Statement::get_exprs + get_blocks.
 // Bookkeeper.cpp:209–221 / Statement.cpp get_exprs virtuals.
-// Returns false on incomplete IR sticky (no invent partial expr list / soft re-pick past holes).
+// Returns false on incomplete IR sticky (no invent partial expr list / soft re-pick past holes).}
+
 func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
 		if out != nil {
@@ -706,7 +711,7 @@ func StatExprDepthsSess(s *Session, funcs []*Function) {
 				return
 			}
 			for _, e := range exprs {
-				c := ExpressionComplexity(e)
+				c := ExpressionComplexitySess(s, e)
 				if c < 0 {
 					// ExpressionComplexity may already sticky
 					sessBK(s).exprDepthCnts = nil

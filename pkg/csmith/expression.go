@@ -1304,7 +1304,7 @@ func MakeRandomExpression(
 		}
 		// Expression.cpp:188 — Constant::make_random; ERROR_GUARD after
 		// no invent TermConstant shell with nil Con when make_random fails
-		con := MakeRandom(typ, opts, probs, r)
+		con := MakeRandomSess(cgSess(cg), typ, opts, probs, r)
 		if con == nil || sessHasError(cgSess(cg)) {
 			return nil
 		}

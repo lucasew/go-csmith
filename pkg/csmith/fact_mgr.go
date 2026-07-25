@@ -250,7 +250,7 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 	if b.Parent == nil {
 		// stm is the body; is_var_on_stack uses stm->parent (== nil) so only params
 		// match as stack subjects; mark_func_end still marks param pointees garbage.
-		cp = RemoveFunctionLocalFactsAt(facts, b.Func, b.Parent)
+		cp = RemoveFunctionLocalFactsAtSess(fmSess(fm), facts, b.Func, b.Parent)
 		if !FactsComplete(cp) {
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			if !sessHasError(fmSess(fm)) {
@@ -290,7 +290,7 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 		}
 	}
 	if b.Parent == nil && b.Func != nil {
-		outU = RemoveFunctionLocalUnionFactsAt(outU, b.Func, b.Parent)
+		outU = RemoveFunctionLocalUnionFactsAtSess(fmSess(fm), outU, b.Func, b.Parent)
 		if !UnionFactsComplete(outU) {
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			if !sessHasError(fmSess(fm)) {
@@ -672,8 +672,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	case StmtReturn:
 		// FactMgr.cpp:268–270 — remove_function_local_facts(facts_copy, s)
 		// stack check uses s->parent (blk); no invent f.Body-only walk
-		cp = RemoveFunctionLocalFactsAt(cp, fm.Func, blk)
-		outU = RemoveFunctionLocalUnionFactsAt(outU, fm.Func, blk)
+		cp = RemoveFunctionLocalFactsAtSess(fmSess(fm), cp, fm.Func, blk)
+		outU = RemoveFunctionLocalUnionFactsAtSess(fmSess(fm), outU, fm.Func, blk)
 	case StmtGoto:
 		// FactMgr.cpp:263–266 — update_facts_for_dest(facts, facts_copy, sg->dest)
 		// Full FactVec: ePointTo + eUnionWrite both OOS-drop subjects not visible
@@ -699,18 +699,18 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 			sessNoteError(fmSess(fm), ErrGeneric)
 		} else {
 			out := []*FactPointTo{}
-			UpdateFactsForDest(cp, &out, fm.Func, dp)
+			UpdateFactsForDestSess(fmSess(fm), cp, &out, fm.Func, dp)
 			cp = out
 			// FactMgr.cpp:450–482 — same OOS filter on eUnionWrite partition
 			var outUnions []*FactUnion
-			UpdateUnionFactsForDest(outU, &outUnions, fm.Func, dp)
+			UpdateUnionFactsForDestSess(fmSess(fm), outU, &outUnions, fm.Func, dp)
 			outU = outUnions
 		}
 	default:
 		// FactMgr.cpp:268 — eReturn || s->parent == nullptr → remove function locals
 		if blk == nil {
-			cp = RemoveFunctionLocalFactsAt(cp, fm.Func, nil)
-			outU = RemoveFunctionLocalUnionFactsAt(outU, fm.Func, nil)
+			cp = RemoveFunctionLocalFactsAtSess(fmSess(fm), cp, fm.Func, nil)
+			outU = RemoveFunctionLocalUnionFactsAtSess(fmSess(fm), outU, fm.Func, nil)
 		}
 	}
 	// incomplete after filter/dest — store hole sticky (no invent complete out map)
@@ -1137,22 +1137,26 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 // FactsComplete(nil)==true invents empty-complete dest facts / soft re-pick past wipe).
 // factsOut always live; sticky (no invent soft-skip dest update past hole).
 func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
+	UpdateFactsForDestSess(nil, factsIn, factsOut, f, destParent)
+}
+
+func UpdateFactsForDestSess(s *Session, factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
 	if factsOut == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:427–428 — dest->func; assert(func)
 	// no soft invent dest facts without function (OOS walk needs f)
 	if f == nil {
 		*factsOut = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// Fact* always live; nil hole fails closed sticky (no invent skip partial dest update)
 	for _, fact := range factsIn {
 		if fact == nil || fact.Var == nil {
 			*factsOut = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 	}
@@ -1172,12 +1176,12 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		}
 		if f.IsVarOOS(fact.Var, destParent) {
 			// residual ERROR sticky — no invent soft-continue OOS scan past hard IR hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*factsOut = IncompleteFactSlice()
 				return
 			}
 			addOOS(fact.Var)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent not-OOS soft-skip past hard IR hole
 			*factsOut = IncompleteFactSlice()
 			return
@@ -1187,16 +1191,16 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 			// (no invent soft-skip hole and still OOS-scan later pointees)
 			if p == nil {
 				*factsOut = IncompleteFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return
 			}
 			if !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					*factsOut = IncompleteFactSlice()
 					return
 				}
 				addOOS(p)
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				*factsOut = IncompleteFactSlice()
 				return
 			}
@@ -1204,8 +1208,8 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		merged := MergeFactInto(*factsOut, fact)
 		if !FactsComplete(merged) {
 			*factsOut = IncompleteFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return
 		}
@@ -1213,7 +1217,7 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 	}
 	UpdateFactsForOOSVars(oosVars, factsOut)
 	// residual ERROR sticky — no invent complete dest facts past OOS update hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*factsOut = IncompleteFactSlice()
 	}
 }
@@ -1221,20 +1225,25 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 // UpdateUnionFactsForDest is the eUnionWrite half of FactMgr::update_facts_for_dest.
 // FactMgr.cpp:450–482 — merge non-rv facts into facts_out; drop OOS subjects.
 // Used by StatementGoto forward path (full FactVec with UpdateFactsForDest).
-// Incomplete inputs fail closed sticky IncompleteUnionFactSlice.
+// Incomplete inputs fail closed sticky IncompleteUnionFactSlice.}
+
 func UpdateUnionFactsForDest(factsIn []*FactUnion, factsOut *[]*FactUnion, f *Function, destParent *Block) {
+	UpdateUnionFactsForDestSess(nil, factsIn, factsOut, f, destParent)
+}
+
+func UpdateUnionFactsForDestSess(s *Session, factsIn []*FactUnion, factsOut *[]*FactUnion, f *Function, destParent *Block) {
 	if factsOut == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if f == nil {
 		*factsOut = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !UnionFactsComplete(factsIn) {
 		*factsOut = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if *factsOut == nil {
@@ -1252,35 +1261,35 @@ func UpdateUnionFactsForDest(factsIn []*FactUnion, factsOut *[]*FactUnion, f *Fu
 	for _, fact := range factsIn {
 		if fact == nil || fact.Var == nil {
 			*factsOut = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return
 		}
 		if isReturnVar(fact.Var) {
 			continue
 		}
 		if f.IsVarOOS(fact.Var, destParent) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*factsOut = IncompleteUnionFactSlice()
 				return
 			}
 			addOOS(fact.Var)
-		} else if sessHasError(nil) {
+		} else if sessHasError(s) {
 			*factsOut = IncompleteUnionFactSlice()
 			return
 		}
 		// FactMgr.cpp:479 — merge_fact(facts_out, f) for every non-rv subject
-		merged := MergeUnionFact(*factsOut, fact)
+		merged := MergeUnionFactSess(s, *factsOut, fact)
 		if !UnionFactsComplete(merged) {
 			*factsOut = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return
 		}
 		*factsOut = merged
 	}
 	UpdateUnionFactsForOOSVars(oosVars, factsOut)
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		*factsOut = IncompleteUnionFactSlice()
 	}
 }
@@ -1288,7 +1297,8 @@ func UpdateUnionFactsForDest(factsIn []*FactUnion, factsOut *[]*FactUnion, f *Fu
 // ClearMapVisited mirrors FactMgr::clear_map_visited.
 // FactMgr.cpp:510–514 — set all visited flags false (keep keys).
 // FactMgr always live; sticky (no invent soft-skip clear past hole).
-// Nil MapVisited is complete no-op (no keys to clear).
+// Nil MapVisited is complete no-op (no keys to clear).}
+
 func (fm *FactMgr) ClearMapVisited() {
 	if fm == nil {
 		sessNoteError(fmSess(fm), ErrGeneric)
@@ -1354,7 +1364,7 @@ func (fm *FactMgr) RestoreFactsPair(oldPT []*FactPointTo, oldUnion []*FactUnion)
 		workU = []*FactUnion{}
 	}
 	// Pull union subjects present in live but missing from old (created mid-body).
-	if !makeupNewUnionFacts(&workU, fm.UnionFacts) {
+	if !makeupNewUnionFactsSess(fmSess(fm), &workU, fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		if !sessHasError(fmSess(fm)) {
@@ -1384,7 +1394,7 @@ func (fm *FactMgr) restoreFactsPT(oldFacts []*FactPointTo) {
 	// FactMgr.cpp:489–492 only — makeup then assign. No invent re-join of live
 	// may-null into the restored snapshot (SPEC: no invent may-null reinject).
 	work := append([]*FactPointTo(nil), oldFacts...)
-	if !MakeupNewVarFacts(&work, fm.GlobalFacts) {
+	if !MakeupNewVarFactsSess(fmSess(fm), &work, fm.GlobalFacts) {
 		// incomplete GlobalFacts or mid-makeup hole — fail closed sticky
 		fm.GlobalFacts = IncompleteFactSlice()
 		if !sessHasError(fmSess(fm)) {
@@ -1399,63 +1409,67 @@ func (fm *FactMgr) restoreFactsPT(oldFacts []*FactPointTo) {
 // FactMgr.cpp:494–508 — for each new_facts entry missing in old, add_new_var_fact.
 // Here we only re-add init FactUnion for union subjects present in live but not old.
 func makeupNewUnionFacts(oldFacts *[]*FactUnion, live []*FactUnion) bool {
+	return makeupNewUnionFactsSess(nil, oldFacts, live)
+}
+
+func makeupNewUnionFactsSess(s *Session, oldFacts *[]*FactUnion, live []*FactUnion) bool {
 	if oldFacts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if !UnionFactsComplete(*oldFacts) || !UnionFactsComplete(live) {
 		*oldFacts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for _, f := range live {
 		if f == nil || f.Var == nil {
 			*oldFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if FindRelatedUnion(*oldFacts, f.Var) != nil {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*oldFacts = IncompleteUnionFactSlice()
 				return false
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*oldFacts = IncompleteUnionFactSlice()
 			return false
 		}
 		// FactMgr.cpp:503–504 — add_new_var_fact(v, old_facts) for missing subjects
 		v := f.Var
 		if !v.IsGlobal() && !v.IsLocal() {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*oldFacts = IncompleteUnionFactSlice()
 				return false
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*oldFacts = IncompleteUnionFactSlice()
 			return false
 		}
-		_, unInit := AbstractFactForVarInit(v)
+		_, unInit := AbstractFactForVarInitSess(s, v)
 		if !UnionFactsComplete(unInit) {
 			*oldFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return false
 		}
 		for _, init := range unInit {
 			if init == nil {
 				*oldFacts = IncompleteUnionFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
-			merged := MergeUnionFact(*oldFacts, init)
+			merged := MergeUnionFactSess(s, *oldFacts, init)
 			if !UnionFactsComplete(merged) {
 				*oldFacts = IncompleteUnionFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 			*oldFacts = merged
@@ -1468,7 +1482,8 @@ func makeupNewUnionFacts(oldFacts *[]*FactUnion, live []*FactUnion) bool {
 // FactMgr.cpp:208–246 — first_time clones into final; else combine.
 // Fact* always live; incomplete source maps fail closed sticky (final hole marker —
 // no invent cleaned partial clone / soft re-pick past incomplete finals).
-// FactMgr always live; sticky (no invent soft-skip setup past hole).
+// FactMgr always live; sticky (no invent soft-skip setup past hole).}
+
 func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm == nil {
 		sessNoteError(fmSess(fm), ErrGeneric)
@@ -2002,15 +2017,19 @@ func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo 
 // stack lists fail closed sticky (no invent keep stack locals when IsVarOnStack
 // returns false past a hole, or soft re-pick past wiped return out maps).
 func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
+	return RemoveFunctionLocalFactsAtSess(nil, facts, f, stParent)
+}
+
+func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
 	if !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// StackScanComplete(nil) still validates Param completeness
 	if f != nil && !f.StackScanComplete(stParent) {
 		// residual ERROR sticky — no invent soft-clean facts past StackScan residual
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return IncompleteFactSlice()
 	}
@@ -2018,7 +2037,7 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 	for _, fact := range facts {
 		// Fact* always live after FactsComplete
 		if fact == nil || fact.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:191–195 — is_var_on_stack OR other-function RV
@@ -2026,32 +2045,32 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 		// matches params (Function.cpp:187–190).
 		if f != nil && f.IsVarOnStack(fact.Var, stParent) {
 			// residual ERROR sticky — no invent soft-skip stack fact past hard IR hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue keep fact past IsVarOnStack hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
 			// residual ERROR sticky — no invent soft-skip RV past Match hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteFactSlice()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		cl := fact.Clone()
 		// residual ERROR sticky — no invent soft-keep past Clone residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
 		if cl == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, cl)
@@ -2060,8 +2079,8 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 	MarkFuncEndOnFacts(&out, f, stParent)
 	// MarkFuncEndOnFacts clears *facts on incomplete after mark sticky
 	if !FactsComplete(out) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return IncompleteFactSlice()
 	}
@@ -2071,46 +2090,51 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 // RemoveFunctionLocalUnionFactsAt is the eUnionWrite half of
 // FactMgr::remove_function_local_facts (FactMgr.cpp:179–195 subject erase).
 // Category-agnostic erase by is_var_on_stack / other-function RV; no mark_func_end
-// (ePointTo only). Incomplete maps fail closed IncompleteUnionFactSlice.
+// (ePointTo only). Incomplete maps fail closed IncompleteUnionFactSlice.}
+
 func RemoveFunctionLocalUnionFactsAt(facts []*FactUnion, f *Function, stParent *Block) []*FactUnion {
+	return RemoveFunctionLocalUnionFactsAtSess(nil, facts, f, stParent)
+}
+
+func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Function, stParent *Block) []*FactUnion {
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if f != nil && !f.StackScanComplete(stParent) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return IncompleteUnionFactSlice()
 	}
 	out := make([]*FactUnion, 0, len(facts))
 	for _, fact := range facts {
 		if fact == nil || fact.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		if f != nil && f.IsVarOnStack(fact.Var, stParent) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
 		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
 			continue
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
 		cl := fact.Clone()
-		if cl == nil || sessHasError(nil) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if cl == nil || sessHasError(s) {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return IncompleteUnionFactSlice()
 		}
@@ -2121,7 +2145,8 @@ func RemoveFunctionLocalUnionFactsAt(facts []*FactUnion, f *Function, stParent *
 
 // filterFactsNotInVars drops subjects in drop. Fact* always live;
 // incomplete maps/pointees or incomplete drop list fail closed sticky
-// (no invent keep subjects that match only after a drop-list hole).
+// (no invent keep subjects that match only after a drop-list hole).}
+
 func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
 	if len(drop) == 0 {
 		return facts
@@ -2570,7 +2595,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				sessNoteError(fmSess(fm), ErrGeneric)
 				return
 			}
-			merged := MergeUnionFact(fm.UnionFacts, uf)
+			merged := MergeUnionFactSess(fmSess(fm), fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				fm.GlobalFacts = IncompleteFactSlice()
@@ -3146,15 +3171,19 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 // closed without wiping prior complete *facts (factory re-pick must not poison FM).
 // empty complete newFacts is ok with changed=false.
 func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo, lvarCnt int) (changed bool, ok bool) {
+	return applyPointToAssignFactsSess(nil, facts, lhs, lhsIndir, newFacts, lvarCnt)
+}
+
+func applyPointToAssignFactsSess(s *Session, facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo, lvarCnt int) (changed bool, ok bool) {
 	// facts accumulator always live; sticky (no invent soft-skip assign apply past hole)
 	if facts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false, false
 	}
 	if !FactsComplete(*facts) {
 		// incomplete subject map wiped — sticky (no invent soft re-pick past wiped FM)
 		*facts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false, false
 	}
 	// incomplete abstract must not invent empty-apply success (len(nil)==0)
@@ -3170,11 +3199,11 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	if lvarCnt == 1 && newFacts[0] != nil && newFacts[0].Var != nil && !newFacts[0].Var.IsArray {
 		// definitive assignment — renew (strong replace)
 		// residual ERROR sticky — no invent soft-continue merge later past RenewFact hole
-		if !RenewFact(facts, newFacts[0]) && sessHasError(nil) {
+		if !RenewFact(facts, newFacts[0]) && sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -3182,13 +3211,13 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 			merged := MergeFactInto(*facts, newFacts[j])
 			if !FactsComplete(merged) {
 				*facts = IncompleteFactSlice()
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return false, false
 			}
 			// residual ERROR sticky — no invent soft-continue merge past MergeFact hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*facts = IncompleteFactSlice()
 				return false, false
 			}
@@ -3200,12 +3229,12 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 		merged := MergeFactInto(*facts, f)
 		if !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return false, false
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -3216,7 +3245,8 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 
 // UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts)
 // with bare Variable (lhsWant = Variable.Type). Prefer UpdateFactForAssignWant when
-// Lhs::get_type() is available (deref-to-union / ExpressionAssign).
+// Lhs::get_type() is available (deref-to-union / ExpressionAssign).}
+
 func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
 	return fm.UpdateFactForAssignWant(lhs, lhsIndir, nil, rhs)
 }
@@ -3236,7 +3266,7 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 	changed := false
 	newFacts, lvarCnt := AbstractFactForAssignSess(fmSess(fm), fm.GlobalFacts, lhs, lhsIndir, rhs)
 	// incomplete abstract must not invent empty apply success then union merge
-	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts, lvarCnt)
+	ptChanged, ptOK := applyPointToAssignFactsSess(fmSess(fm), &fm.GlobalFacts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// if GlobalFacts was wiped (was already incomplete), also wipe union;
 		// incomplete newFacts alone leaves complete GlobalFacts for factory re-pick
@@ -3283,7 +3313,7 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 			continue
 		}
 		// may-assign — merge_fact lattice join
-		merged := MergeUnionFact(fm.UnionFacts, uf)
+		merged := MergeUnionFactSess(fmSess(fm), fm.UnionFacts, uf)
 		if !UnionFactsComplete(merged) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			if !sessHasError(fmSess(fm)) {
@@ -3307,17 +3337,21 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 // FactUnion* always live; nil f or map hole fails closed sticky IncompleteUnionFactSlice
 // (no invent empty-complete via UnionFactsComplete(nil) / soft re-pick past wipe).
 func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
+	return MergeUnionFactSess(nil, facts, f)
+}
+
+func MergeUnionFactSess(s *Session, facts []*FactUnion, f *FactUnion) []*FactUnion {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if !UnionFactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	for i, old := range facts {
 		if old == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		if old.Var != f.Var {
@@ -3325,23 +3359,23 @@ func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 		}
 		// Fact.cpp:155–163 — if old.imply(new) keep old; else copy=new.clone(); copy.join(old)
 		if old.Imply(f) {
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
 			return facts
 		}
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
 		cp := f.Clone()
-		if cp == nil || sessHasError(nil) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if cp == nil || sessHasError(s) {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return IncompleteUnionFactSlice()
 		}
 		cp.Join(old)
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
 		facts[i] = cp
@@ -3354,7 +3388,8 @@ func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 // CreateCFGEdge mirrors FactMgr::create_cfg_edge when dest is a Block*.
 // FactMgr.cpp:597–598 — CFGEdge dest is Statement* (Block is Statement).
 // Store DestStmID = dest.StmID so Statement::find_edges_in / has_edge_in
-// (e->dest == this) match via DestStmID; DestStmID 0 forced FindEdgesInToBlock invent.
+// (e->dest == this) match via DestStmID; DestStmID 0 forced FindEdgesInToBlock invent.}
+
 func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool) {
 	destStmID := 0
 	if dest != nil {
@@ -3400,59 +3435,63 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 // partial makeup, or re-accumulate later vars after *oldFacts was cleared).
 // Returns true when makeup completed with a complete *oldFacts accumulator.
 func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	return MakeupNewVarFactsSess(nil, oldFacts, newFacts)
+}
+
+func MakeupNewVarFactsSess(s *Session, oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	// FactMgr always has live old_facts accumulator; sticky no invent soft-skip makeup
 	if oldFacts == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// incomplete working/snapshot sets fail closed sticky before partial makeup
 	if !FactsComplete(*oldFacts) || !FactsComplete(newFacts) {
 		*oldFacts = IncompleteFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for _, f := range newFacts {
 		// no invent soft-continue past nil fact holes (also covered by FactsComplete)
 		if f == nil || f.Var == nil {
 			*oldFacts = IncompleteFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		v := f.Var
 		if !v.IsGlobal() && !v.IsLocal() {
 			// residual ERROR sticky — no invent soft-continue makeup past IsGlobal/IsLocal hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*oldFacts = IncompleteFactSlice()
 				return false
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue non-global past IsGlobal residual false path
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*oldFacts = IncompleteFactSlice()
 			return false
 		}
 		related := FindRelatedPointTo(*oldFacts, v)
 		// residual ERROR sticky — no invent soft-continue makeup later past FindRelated hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			*oldFacts = IncompleteFactSlice()
 			return false
 		}
 		if related == nil {
 			// FactMgr.cpp:504 — add_new_var_fact(v, old_facts) → abstract_fact_for_var_init
 			// no invent NewFactPointTo garbage (tbd/garbage default) for live inits
-			AddNewVarFactInto(v, oldFacts)
+			AddNewVarFactIntoSess(s, v, oldFacts)
 			// AddNewVarFactInto may clear *oldFacts on FieldVars/abstract holes;
 			// stop sticky — no invent continue loop and re-append later vars onto nil.
 			if *oldFacts == nil || !FactsComplete(*oldFacts) {
 				*oldFacts = IncompleteFactSlice()
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return false
 			}
 			// residual ERROR sticky — no invent soft-continue later makeup past AddNewVar hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				*oldFacts = IncompleteFactSlice()
 				return false
 			}
@@ -3467,7 +3506,8 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // soft-skip hole and still makeup later fields as complete).
 // Type* always live for non-special subjects; Type-nil sticky clear (no invent
 // empty-FieldVars aggregate complete / field walk past Type-nil shell via IsPointer residual).
-// facts always live; sticky (no invent soft-skip makeup past hole).
+// facts always live; sticky (no invent soft-skip makeup past hole).}
+
 func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	AddNewVarFactIntoSess(nil, v, facts)
 }
@@ -3865,7 +3905,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 	}
 	changed := false
 	newFacts, lvarCnt := AbstractFactForAssignSess(fmSess(fm), *facts, lhs, lhsIndir, rhs)
-	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts, lvarCnt)
+	ptChanged, ptOK := applyPointToAssignFactsSess(fmSess(fm), facts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// only wipe union when *facts was incomplete (wiped); incomplete abstract alone
 		// leaves prior complete map for factory re-pick
@@ -3904,7 +3944,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 				}
 				continue
 			}
-			merged := MergeUnionFact(fm.UnionFacts, uf)
+			merged := MergeUnionFactSess(fmSess(fm), fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				if !sessHasError(fmSess(fm)) {

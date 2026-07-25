@@ -146,19 +146,24 @@ const (
 // CoverageGenerateValues mirrors CoverageTestExtension::GenerateValues.
 // CoverageTestExtension.cpp:52–61 — make_random per value × inputs_size.
 func CoverageGenerateValues(values []*ExtensionValue, inputsSize int, r *Rng, opts Options, probs *Probabilities) []*Constant {
+	return CoverageGenerateValuesSess(nil, values, inputsSize, r, opts, probs)
+}
+
+// CoverageGenerateValuesSess is CoverageGenerateValues with sticky on run bag.
+func CoverageGenerateValuesSess(s *Session, values []*ExtensionValue, inputsSize int, r *Rng, opts Options, probs *Probabilities) []*Constant {
 	if inputsSize <= 0 || r == nil || probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var out []*Constant
 	for _, value := range values {
 		for j := 0; j < inputsSize; j++ {
-			c := MakeRandom(value.Type, opts, probs, r)
-			if c == nil || sessHasError(nil) {
+			c := MakeRandomSess(s, value.Type, opts, probs, r)
+			if c == nil || sessHasError(s) {
 				return nil
 			}
 			out = append(out, c)
@@ -341,7 +346,7 @@ func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilit
 		return
 	}
 	if s.ExtKind == "coverage" {
-		s.CoverageTests = CoverageGenerateValues(s.ExtValues, s.CoverageSize, r, opts, probs)
+		s.CoverageTests = CoverageGenerateValuesSess(s, s.ExtValues, s.CoverageSize, r, opts, probs)
 		if s.CoverageTests == nil || sessHasError(s) {
 			s.ExtKind = ""
 			s.ExtValues = nil

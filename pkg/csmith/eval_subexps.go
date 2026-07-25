@@ -8,8 +8,12 @@ package csmith
 // ExpressionsComplete(nil)/len==0 invents empty-complete eval list / soft re-pick skip overlap).
 // Complete expressions always yield ≥1 subexp.
 func GetEvalToSubexps(e *Expression) []*Expression {
+	return GetEvalToSubexpsSess(nil, e)
+}
+
+func GetEvalToSubexpsSess(s *Session, e *Expression) []*Expression {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteExpressions()
 	}
 	switch e.Term {
@@ -17,66 +21,66 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 		// Constant always has live Type* + Value; Type-nil sticky
 		// (no invent self-eval complete list past incomplete Constant shell)
 		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return []*Expression{e}
 	case TermVariable, TermLhs:
 		// ExpressionVariable / Lhs always have live Variable*
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteExpressions()
 		}
 		// Type* always live on Variable for eval; Type-nil sticky
 		// Special null/garbage/tbd have Type nil by design — complete self-eval
 		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return []*Expression{e}
 	case TermFunction:
 		// ExpressionFuncall always live invoke (eval is the call itself)
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return []*Expression{e}
 	case TermCommaExpr:
 		// ExpressionComma.cpp:102–105 — only RHS evaluates to the value
 		if e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteExpressions()
 		}
-		sub := GetEvalToSubexps(e.CommaRHS)
+		sub := GetEvalToSubexpsSess(s, e.CommaRHS)
 		// residual ERROR sticky — no invent self-eval complete list past RHS residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteExpressions()
 		}
 		return sub
 	case TermAssignment:
 		// ExpressionAssign.cpp:107–111 — get_lhs()->get_eval_to_subexps (Lhs pushes self)
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteExpressions()
 		}
 		if e.Assign.Lhs != nil {
 			// Lhs always live Var
 			if e.Assign.Lhs.Var == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteExpressions()
 			}
 			// Type* always live for eval; Type-nil sticky (specials exempt)
 			if e.Assign.Lhs.Var.Type == nil && !IsSpecialPtr(e.Assign.Lhs.Var) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteExpressions()
 			}
 			sub := LhsAsExpression(e.Assign.Lhs)
 			// residual ERROR sticky — no invent self-eval list past LhsAsExpression residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return IncompleteExpressions()
 			}
 			if sub == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteExpressions()
 			}
 			return []*Expression{sub}
@@ -85,7 +89,7 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 			// Type* always live; Type-nil sticky (no invent untyped LHS eval shell)
 			// Special null/garbage/tbd have Type nil by design — complete path
 			if e.Assign.LhsVar.Type == nil && !IsSpecialPtr(e.Assign.LhsVar) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return IncompleteExpressions()
 			}
 			ty := e.Assign.LhsVar.Type
@@ -96,11 +100,11 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 			}}
 		}
 		// assign without lhs — incomplete IR sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteExpressions()
 	default:
 		// unknown term — incomplete IR sticky (no invent self-eval shell)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteExpressions()
 	}
 }
@@ -109,43 +113,48 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 // FactPointTo.cpp:807–829 — union fields referred via pointer expression.
 // Incomplete facts/pointees/expr fail closed sticky IncompleteVariables (not bare nil —
 // VariablesComplete(nil)/len(nil)==0 invent empty-complete "no union" success / soft re-pick).
-// Complete empty (no union pointees) returns non-nil empty.
+// Complete empty (no union pointees) returns non-nil empty.}
+
 func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
+	return FindUnionPointeesSess(nil, facts, e)
+}
+
+func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*Variable {
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	// incomplete fact map fails closed sticky before merge_pointees
 	if facts != nil && !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteVariables()
 	}
 	var vars []*Variable
 	switch e.Term {
 	case TermVariable, TermLhs:
 		if e.Var == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		// incomplete type IR must not invent level-0 merge as empty unions
 		ind, iok := e.IndirectLevelComplete()
 		if !iok {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		coll := e.Var.GetCollective()
 		// residual ERROR sticky — no invent soft-merge past GetCollective residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		vars = MergePointeesOfPointer(coll, ind, facts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		// incomplete merge; empty non-nil = no pointees
 		if !VariablesComplete(vars) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 	default:
@@ -155,23 +164,23 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	unions := make([]*Variable, 0)
 	for _, v := range vars {
 		if v == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		u := v.GetContainerUnion()
 		// residual ERROR sticky — no invent soft-continue later pointees past GetContainerUnion residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteVariables()
 		}
 		// only care referenced union fields, not the union itself
 		if u != nil && v != u {
 			if !IsVariableInSet(unions, u) {
 				// residual ERROR sticky — no invent soft-continue set past IsVariableInSet residual
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return IncompleteVariables()
 				}
 				unions = append(unions, u)
-			} else if sessHasError(nil) {
+			} else if sessHasError(s) {
 				// residual ERROR sticky — no invent soft-skip dupe past IsVariableInSet residual true
 				return IncompleteVariables()
 			}
@@ -183,61 +192,66 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 // HaveOverlappingFields mirrors have_overlapping_fields.
 // Lhs.cpp:287–298 — shared union pointee between e1 and e2.
 // Incomplete fact maps / pointees / exprs fail closed sticky as overlap
-// (no invent conflict-free / soft re-pick past holes).
+// (no invent conflict-free / soft re-pick past holes).}
+
 func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
+	return HaveOverlappingFieldsSess(nil, e1, e2, facts)
+}
+
+func HaveOverlappingFieldsSess(s *Session, e1, e2 *Expression, facts []*FactPointTo) bool {
 	if facts != nil && !FactsComplete(facts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// incomplete expression shells sticky as overlap
 	if e1 == nil || e2 == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if (e1.Term == TermVariable || e1.Term == TermLhs) && e1.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	if (e2.Term == TermVariable || e2.Term == TermLhs) && e2.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	vars1 := FindUnionPointees(facts, e1)
+	vars1 := FindUnionPointeesSess(s, facts, e1)
 	// residual ERROR sticky — no invent soft-continue overlap past FindUnion residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	// incomplete → sticky overlap; complete empty → no union pointees on e1
 	if !VariablesComplete(vars1) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
 	if len(vars1) == 0 {
 		return false
 	}
-	vars2 := FindUnionPointees(facts, e2)
+	vars2 := FindUnionPointeesSess(s, facts, e2)
 	// residual ERROR sticky — no invent soft-continue overlap past e2 FindUnion residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	if !VariablesComplete(vars2) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return true
 	}
 	for _, v := range vars2 {
 		if IsVariableInSet(vars1, v) {
 			// residual ERROR sticky — no invent overlap-true past IsVariableInSet residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue no-overlap past IsVariableInSet residual false
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 	}
@@ -245,11 +259,16 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 }
 
 // LhsAsExpression builds a TermVariable expression for Lhs (for overlap checks).
-// Incomplete Lhs shell sticky nil (no invent soft-skip / empty expression past hole).
+// Incomplete Lhs shell sticky nil (no invent soft-skip / empty expression past hole).}
+
 func LhsAsExpression(lhs *Lhs) *Expression {
+	return LhsAsExpressionSess(nil, lhs)
+}
+
+func LhsAsExpressionSess(s *Session, lhs *Lhs) *Expression {
 	// Lhs always live with Variable*; sticky incomplete no invent nil soft-skip
 	if lhs == nil || lhs.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	ty := lhs.Type
@@ -259,7 +278,7 @@ func LhsAsExpression(lhs *Lhs) *Expression {
 	// Type* always live for non-special Lhs; Type-nil sticky (no invent untyped
 	// TermVariable shell past incomplete Lhs type IR)
 	if ty == nil && !IsSpecialPtr(lhs.Var) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return &Expression{Term: TermVariable, Var: lhs.Var, ExprType: ty}
@@ -269,11 +288,16 @@ func LhsAsExpression(lhs *Lhs) *Expression {
 // ExpressionVariable.cpp:221–227 — self if indirect_level > 0.
 // Incomplete IR fails closed sticky IncompleteExpressions (not bare nil invent
 // empty-complete deref list / soft re-pick past holes).
-// Complete no-deref cases return empty non-nil slice so callers can distinguish.
+// Complete no-deref cases return empty non-nil slice so callers can distinguish.}
+
 func GetDereferencedPtrs(e *Expression) []*Expression {
+	return GetDereferencedPtrsSess(nil, e)
+}
+
+func GetDereferencedPtrsSess(s *Session, e *Expression) []*Expression {
 	out, ok := collectDereferencedPtrs(e)
 	if !ok {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteExpressions()
 	}
 	return out

@@ -1947,7 +1947,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	}
 	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
 	if c.CurrRHS != nil {
-		lhsExpr := LhsAsExpression(lhs)
+		lhsExpr := LhsAsExpressionSess(cgSess(c), lhs)
 		// Lhs always live for this check; incomplete shell sticky
 		if lhsExpr == nil {
 			sessNoteError(cgSess(c), ErrGeneric)
@@ -1955,7 +1955,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		}
 		// complete get_eval_to_subexps always ≥1 entry; incomplete sticky via GetEvalToSubexps
 		// (IncompleteExpressions — no invent skip overlap as success past incomplete RHS)
-		subs := GetEvalToSubexps(c.CurrRHS)
+		subs := GetEvalToSubexpsSess(cgSess(c), c.CurrRHS)
 		// residual ERROR sticky — no invent soft-skip overlap past GetEvalToSubexps residual
 		if sessHasError(cgSess(c)) {
 			return false
@@ -1966,7 +1966,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		}
 		for _, sub := range subs {
 			if sub.Term == TermVariable || sub.Term == TermLhs {
-				if HaveOverlappingFields(sub, lhsExpr, facts) {
+				if HaveOverlappingFieldsSess(cgSess(c), sub, lhsExpr, facts) {
 					// policy / incomplete overlap fail closed false (FindUnion may sticky)
 					return false
 				}

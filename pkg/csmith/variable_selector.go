@@ -1042,7 +1042,7 @@ func (vs *VariableSelector) MakeInitValue(
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		c := MakeRandom(t, vs.Opts, vs.Probs, r)
+		c := MakeRandomSess(vsSess(vs), t, vs.Opts, vs.Probs, r)
 		// VariableSelector.cpp:842 ERROR_GUARD after make_random
 		if c == nil || sessHasError(vsSess(vs)) {
 			return nil
@@ -2111,7 +2111,7 @@ func (vs *VariableSelector) createAndInitialize(
 		if vs.Opts.StrictConstArrays {
 			// VariableSelector.cpp:526–527 — Constant::make_random; ERROR_GUARD
 			// no invent array with nil init when make_random fails
-			init = MakeRandom(t, vs.Opts, vs.Probs, r)
+			init = MakeRandomSess(vsSess(vs), t, vs.Opts, vs.Probs, r)
 			if init == nil || sessHasError(vsSess(vs)) {
 				return nil
 			}
@@ -3267,7 +3267,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	// VariableSelector.cpp:1364 — Constant::make_random(type); ERROR_GUARD path
 	// no invent CreateArrayVariable with nil init when make_random fails
-	init := MakeRandom(elem, vs.Opts, vs.Probs, r)
+	init := MakeRandomSess(vsSess(vs), elem, vs.Opts, vs.Probs, r)
 	if init == nil || sessHasError(vsSess(vs)) {
 		return nil
 	}

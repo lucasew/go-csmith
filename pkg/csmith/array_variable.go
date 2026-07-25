@@ -163,7 +163,7 @@ func CreateArrayVariable(
 			return nil
 		}
 		if !ptrLike || opts.StrictConstArrays {
-			c := MakeRandom(elem, opts, probs, r)
+			c := MakeRandomSess(cgSess(cg), elem, opts, probs, r)
 			if sessHasError(cgSess(cg)) {
 				return nil
 			}
