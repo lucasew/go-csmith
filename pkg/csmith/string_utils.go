@@ -289,6 +289,11 @@ func SplitIntString(str, seps string) []int {
 // StringUtils.cpp:214–227 — "a=1; b=2" → vars/values pairs (split on ';' then '=').
 // StringUtils.cpp:222 — assert(pair.size() == 2); malformed stmt fails whole parse.
 func BreakupAssigns(assigns string) (vars, values []string) {
+	return BreakupAssignsSess(nil, assigns)
+}
+
+// BreakupAssignsSess is BreakupAssigns with explicit session residual sticky.
+func BreakupAssignsSess(s *Session, assigns string) (vars, values []string) {
 	stmts := SplitString(assigns, ';')
 	for _, st := range stmts {
 		st = Chop(st)
@@ -299,7 +304,7 @@ func BreakupAssigns(assigns string) (vars, values []string) {
 		pair := SplitString(st, '=')
 		if len(pair) != 2 {
 			// sticky fail closed — no soft invent skip of broken assignment
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil, nil
 		}
 		vars = append(vars, Chop(pair[0]))

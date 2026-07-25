@@ -33,7 +33,7 @@ func MakeRandomContinue(
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
-	loop := ClosestLoopingBlock(cg.CurrentBlock())
+	loop := ClosestLoopingBlockSess(cgSess(cg), cg.CurrentBlock())
 	// StatementContinue.cpp:71 — assert(b) sticky; no soft invent continue without looping block
 	if loop == nil {
 		sessNoteError(cgSess(cg), ErrGeneric)

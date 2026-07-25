@@ -546,13 +546,18 @@ func (o Options) VolTestsMachValue() string { return o.VolTestsMach }
 // Last known body (csmith-2.1.0 CGOptions.cpp): accept "x86"|"x86_64", store mach, return true.
 // enable_vol_tests flag was removed from the pin; only vol_tests_mach_ remains (Variable dump).
 // Incomplete/unknown mach fails closed false (no invent silent store of invalid host string).
-func (o *Options) SetVolTests(s string) bool {
+func (o *Options) SetVolTests(mach string) bool {
+	return o.SetVolTestsSess(nil, mach)
+}
+
+// SetVolTestsSess is SetVolTests with explicit session residual sticky.
+func (o *Options) SetVolTestsSess(s *Session, mach string) bool {
 	if o == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if s == "x86" || s == "x86_64" {
-		o.VolTestsMach = s
+	if mach == "x86" || mach == "x86_64" {
+		o.VolTestsMach = mach
 		return true
 	}
 	return false

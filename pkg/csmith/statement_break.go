@@ -28,7 +28,7 @@ func MakeRandomBreak(
 		return Stmt{}
 	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
-	loop := ClosestLoopingBlock(cg.CurrentBlock())
+	loop := ClosestLoopingBlockSess(cgSess(cg), cg.CurrentBlock())
 	// StatementBreak.cpp:72 — assert(b) sticky; no soft invent break without looping block
 	if loop == nil {
 		sessNoteError(cgSess(cg), ErrGeneric)

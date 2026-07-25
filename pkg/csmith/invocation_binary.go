@@ -57,9 +57,14 @@ func GetBinopString(op BinaryOp) string {
 // Missing Safe is complete non-float (not sticky) — Safe is optional on std binary
 // shells; invent would be treating nil as float, not non-float.
 func (fi *Invocation) IsReturnTypeFloat() bool {
+	return fi.IsReturnTypeFloatSess(nil)
+}
+
+// IsReturnTypeFloatSess is IsReturnTypeFloat with explicit session residual sticky.
+func (fi *Invocation) IsReturnTypeFloatSess(s *Session) bool {
 	// nil inv sticky incomplete; missing Safe alone → complete false (not float)
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if fi.Safe == nil {
@@ -141,7 +146,7 @@ func (fi *Invocation) getTypeBinary() *Type {
 
 func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 	// FunctionInvocationBinary.cpp:193–194
-	if fi.IsReturnTypeFloat() {
+	if fi.IsReturnTypeFloatSess(s) {
 		return GetSimpleType(EFloat)
 	}
 	op, ok := BinaryOpFromString(fi.Binary)
