@@ -540,7 +540,8 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			}
 			// Statement.cpp:1008–1010 — assert(0) if !validate; NDEBUG continues.
 			okV := ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
-			ClearError()
+			// NDEBUG continue: sticky from validate must not poison later soft paths.
+			sessClearError(cgSess(cg))
 			if okV {
 				if !FactsComplete(outputs) || !UnionFactsComplete(fm.UnionFacts) {
 					fm.GlobalFacts = IncompleteFactSlice()

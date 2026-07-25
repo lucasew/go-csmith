@@ -279,6 +279,10 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		g.noteErr(ErrGeneric)
 		return
 	}
+	// ERROR_RETURN: residual sticky already set must not invent first/unbuilt bodies
+	if g.hasErr() {
+		return
+	}
 	// Function::FMList is session state from NewProgramGenerator; sticky no invent mid-run miss
 	if g.FactMgrs == nil {
 		g.noteErr(ErrGeneric)

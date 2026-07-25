@@ -394,6 +394,10 @@ func MakeFirst(
 	if fmMap != nil && fmMap.Sess != nil {
 		runSess = firstSess(runSess, fmMap.Sess)
 	}
+	// ERROR_RETURN: residual sticky already set must not invent first body
+	if sessHasError(runSess) {
+		return nil
+	}
 	// Function.cpp:443+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
 		sessNoteError(runSess, ErrGeneric)

@@ -1390,7 +1390,7 @@ func ChooseRandomNonvoidSimpleSess(s *Session, r *Rng, probs *Probabilities) ESi
 		sessNoteError(s, ErrGeneric)
 		return EVoid
 	}
-	v := r.RndUptoFilter(uint32(MaxSimpleTypes), probs.SimpleTypesFilter())
+	v := r.RndUptoFilterSess(s, uint32(MaxSimpleTypes), probs.SimpleTypesFilter())
 	return ESimpleType(v)
 }
 

@@ -413,7 +413,7 @@ func pickSafeOpSizeSess(s *Session, r *Rng, probs *Probabilities) (SafeOpSize, b
 		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
-	v := r.RndUptoFilter(uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())
+	v := r.RndUptoFilterSess(s, uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())
 	if sessHasError(s) {
 		return 0, false
 	}

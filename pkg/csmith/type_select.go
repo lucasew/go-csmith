@@ -410,7 +410,7 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 		}
 		return false
 	})
-	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
+	idx := r.RndUptoFilterSess(envSess(env), uint32(len(env.AllTypes)), filt)
 	// Type.cpp:1208–1209 — ERROR_GUARD(nullptr) after rnd_upto
 	if sessHasError(envSess(env)) {
 		return nil
@@ -584,7 +584,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		}
 		return false
 	})
-	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
+	idx := r.RndUptoFilterSess(envSess(env), uint32(len(env.AllTypes)), filt)
 	// Type.cpp:1221–1224 — ERROR_GUARD(nullptr); assert(typ)
 	if sessHasError(envSess(env)) {
 		return nil

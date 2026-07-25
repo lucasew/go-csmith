@@ -3467,7 +3467,7 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 	filt := variableSelectFilter(tab, cg)
 	// C++ unbounded do-while; cap high (no soft invent MAX early)
 	for tries := 0; tries < 256; tries++ {
-		i := r.RndUptoFilter(100, filt)
+		i := r.RndUptoFilterSess(cgSess(cg), 100, filt)
 		if sessHasError(cgSess(cg)) {
 			return MaxVarScope
 		}

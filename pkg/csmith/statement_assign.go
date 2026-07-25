@@ -78,7 +78,7 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 			f.Add(int(AssignPreIncr)).Add(int(AssignPreDecr)).Add(int(AssignPostIncr)).Add(int(AssignPostDecr))
 		}
 	}
-	v := r.RndUptoFilter(uint32(f.MaxProb()), f)
+	v := r.RndUptoFilterSess(s, uint32(f.MaxProb()), f)
 	return AssignOp(f.Lookup(int(v)))
 }
 

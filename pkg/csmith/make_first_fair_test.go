@@ -221,15 +221,15 @@ func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
 
 func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
 	// Function.cpp:797/805 ERROR_RETURN after make_first / GenerateBody
-	ClearError()
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
-	g := NewProgramGenerator(NewSession(opts))
-	// poison after types so make_first fails
+	s := NewSession(opts)
+	g := NewProgramGenerator(s)
+	// poison after types so make_first fails (bag-local sticky; no ambient dual-sync)
 	g.Initialize()
 	g.GenerateAllTypes()
-	SetError(ErrGeneric)
+	SetErrorSess(s, ErrGeneric)
 	g.GenerateFunctions()
 	// with sticky error, first may fail; must not invent many built funcs
 	built := 0
@@ -241,17 +241,17 @@ func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
 	if built > 0 {
 		t.Log("unexpected built with sticky error", built)
 	}
-	ClearError()
+	ClearErrorSess(s)
 }
 
 func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
 	// GenerateFunctions FM seed (MakeFirst + unbuilt loop) shares VariablesComplete /
 	// FactsComplete gate — incomplete GlobalList must not invent built bodies.
-	ClearError()
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
-	g := NewProgramGenerator(NewSession(opts))
+	s := NewSession(opts)
+	g := NewProgramGenerator(s)
 	g.Initialize()
 	g.GenerateAllTypes()
 	g.VS.GlobalList = []*Variable{CreateVariableScalars("g_x", GetIntType(), false, false), nil}
@@ -261,10 +261,10 @@ func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
 			t.Fatal("incomplete GlobalList seed must not invent built body")
 		}
 	}
-	if !HasError() {
+	if !HasErrorSess(s) {
 		t.Fatal("incomplete GlobalList seed must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(s)
 }
 
 func TestGenerateFunctionsNoInventNilFuncHole(t *testing.T) {

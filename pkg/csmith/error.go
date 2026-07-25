@@ -37,39 +37,38 @@ func HasError() bool { return HasErrorSess(nil) }
 // HasErrorSess reports sticky error on an explicit session bag.
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
-// sessNoteError writes GenError on s when non-nil and dual-syncs ambient GenError
-// while call sites still use SetError/HasError and sessHasError(nil) residual
-// checks (pure-session bridge until emit paths stop reading ambient).
-// Nil s targets only the Process* ambient bag.
+// sessNoteError writes GenError on s when non-nil; nil s targets the Process*
+// ambient bag (defaultSession / activeSession). Explicit bags no longer dual-sync
+// ambient — pure-session sticky stays on the bag (Generate still activates s so
+// residual Process* readers that share the active bag continue to see it).
 func sessNoteError(s *Session, code int) {
 	if s != nil {
 		s.GenError = code
+		return
 	}
-	// Ambient bridge: activeSession or defaultSession (may equal s when activated).
 	sessOrAmbient(nil).GenError = code
 }
 
 // sessHasError reports sticky error on s when non-nil, else ambient.
-// When s is non-nil, also ORs ambient so residual Output/HasError paths that
-// still read Process* see sticky written via dual-sync.
 func sessHasError(s *Session) bool {
-	if s != nil && s.GenError != ErrSuccess {
-		return true
+	if s != nil {
+		return s.GenError != ErrSuccess
 	}
 	return sessOrAmbient(nil).GenError != ErrSuccess
 }
 
-// sessClearError clears sticky error on s when non-nil and ambient.
+// sessClearError clears sticky error on s when non-nil, else ambient.
 func sessClearError(s *Session) {
 	if s != nil {
 		s.GenError = ErrSuccess
+		return
 	}
 	sessOrAmbient(nil).GenError = ErrSuccess
 }
 
-// sessErrorCode returns sticky code preferring s, else ambient.
+// sessErrorCode returns sticky code on s when non-nil, else ambient.
 func sessErrorCode(s *Session) int {
-	if s != nil && s.GenError != ErrSuccess {
+	if s != nil {
 		return s.GenError
 	}
 	return sessOrAmbient(nil).GenError

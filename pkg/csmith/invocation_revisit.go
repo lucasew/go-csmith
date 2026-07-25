@@ -727,7 +727,8 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		// ERROR from incomplete IR during nested visit would poison subsequent soft paths.
 		restore()
 		fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_516")
-		ClearError()
+		// Soft analysis fail must not leave sticky ERROR for later soft paths.
+		sessClearError(cgSess(cg))
 		return false
 	}
 	// incomplete body GlobalFacts sticky
