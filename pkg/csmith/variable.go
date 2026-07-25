@@ -619,20 +619,25 @@ func CtrlVarsDoFinalizationSess(s *Session) {
 // Variable* always live; incomplete list fails closed sticky IncompleteLabelsSlice
 // (not bare nil invent empty-complete name list / soft re-pick past hole).
 func CtrlVarNames(ctrl []*Variable) []string {
+	return CtrlVarNamesSess(nil, ctrl)
+}
+
+// CtrlVarNamesSess is CtrlVarNames with sticky errors on bag s.
+func CtrlVarNamesSess(s *Session, ctrl []*Variable) []string {
 	if !VariablesComplete(ctrl) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
 		name := v.GetActualName(false)
 		// residual ERROR sticky — no invent soft-continue later names past GetActualName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return IncompleteLabelsSlice()
 		}
 		if name == "" {
 			// empty actual name is broken IR — fail closed sticky incomplete names
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteLabelsSlice()
 		}
 		out[i] = name
@@ -645,6 +650,11 @@ func CtrlVarNames(ctrl []*Variable) []string {
 // Incomplete ctrl list fails closed sticky empty (no invent "int , j;" / empty-complete
 // decl for nil slots via soft return "").
 func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
+	return OutputArrayCtrlVarsSess(nil, ctrl, dimen, indent)
+}
+
+// OutputArrayCtrlVarsSess is OutputArrayCtrlVars with sticky errors on bag s.
+func OutputArrayCtrlVarsSess(s *Session, ctrl []*Variable, dimen int, indent string) string {
 	// dimen<=0 or empty/undersized ctrl: config soft re-pick (non-sticky empty)
 	// Variable.cpp:802 assert(dimen <= size) — soft empty when MaxArrayDim < rank
 	// (sticky here poisons Generate when array rank exceeds MaxArrayDim)
@@ -656,18 +666,18 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	}
 	// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); always live names
 	if !VariablesComplete(ctrl[:dimen]) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for i := 0; i < dimen; i++ {
 		// Variable.cpp:806 — get_actual_name always live; sticky no invent "int i, ;"
 		nm := ctrl[i].GetActualName(false)
 		// residual ERROR sticky — no invent soft-continue later ctrl past GetActualName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if nm == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -679,7 +689,7 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 		}
 		nm := ctrl[i].GetActualName(false)
 		// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		b.WriteString(nm)
@@ -694,8 +704,13 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 // soft re-pick zero-dim success past holes). Complete empty / no arrays → 0.
 // IsArray without AsArray sticky -1 (no invent dim from ArraySizes past broken shell).
 func GetMaxArrayDimension(vars []*Variable) int {
+	return GetMaxArrayDimensionSess(nil, vars)
+}
+
+// GetMaxArrayDimensionSess is GetMaxArrayDimension with sticky errors on bag s.
+func GetMaxArrayDimensionSess(s *Session, vars []*Variable) int {
 	if !VariablesComplete(vars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	dimen := 0
@@ -706,7 +721,7 @@ func GetMaxArrayDimension(vars []*Variable) int {
 		// C++ ArrayVariable* always live when isArray; missing AsArray sticky
 		// (no invent max-dim from ArraySizes alone past incomplete shell)
 		if v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		n := len(v.AsArray.Sizes)
@@ -725,25 +740,35 @@ func GetMaxArrayDimension(vars []*Variable) int {
 // Incomplete vars list (GetMaxArrayDimension -1) fails closed sticky empty
 // (no invent treat incomplete as zero-dim empty success).
 func OutputArrayInitializers(vars []*Variable, opts Options, indent string) string {
-	dimen := GetMaxArrayDimension(vars)
+	return OutputArrayInitializersSess(nil, vars, opts, indent)
+}
+
+// OutputArrayInitializersSess is OutputArrayInitializers on an explicit session bag
+// (ctrl pool + residual sticky).
+func OutputArrayInitializersSess(s *Session, vars []*Variable, opts Options, indent string) string {
+	dimen := GetMaxArrayDimensionSess(s, vars)
 	// dimen < 0 = incomplete; dimen == 0 = complete empty / no arrays
 	if dimen < 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if dimen == 0 {
 		return ""
 	}
-	ctrl := GetNewCtrlVars(opts)
+	ctrl := GetNewCtrlVarsSess(s, opts)
 	// Variable.cpp:802 assert(dimen <= ctrl_vars.size()); no invent inits without decl
 	// undersize MaxArrayDim is config soft re-pick (non-sticky); broken name/IR sticky inside OutputArrayCtrlVars
-	decl := OutputArrayCtrlVars(ctrl, dimen, indent)
+	decl := OutputArrayCtrlVarsSess(s, ctrl, dimen, indent)
 	if decl == "" {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(decl)
-	names := CtrlVarNames(ctrl)
+	names := CtrlVarNamesSess(s, ctrl)
+	// residual ERROR sticky — no invent soft-continue past CtrlVarNames residual
+	if sessHasError(s) {
+		return ""
+	}
 	// vars pre-validated complete by GetMaxArrayDimension
 	for _, v := range vars {
 		if !v.IsArray {
@@ -752,7 +777,7 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 		// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
 		// sticky (no invent synthetic shell from ArraySizes / soft re-pick partial inits)
 		if v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		av := v.AsArray
@@ -762,23 +787,25 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 		}
 		if av.NoLoopInitializer() {
 			// residual ERROR sticky — no invent soft-skip then partial inits past hole
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue past NoLoopInitializer hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
-		initOut := av.OutputInit(indent, names)
+		// OutputInit defaults postIncr true (Variable.cpp output_init); CGOptions
+		// post_incr is applied on forced/reset paths that read opts explicitly.
+		initOut := av.OutputInitOptsSess(s, indent, names, true)
 		// residual ERROR sticky — no invent soft-continue later arrays past OutputInit residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		// incomplete loop-init IR sticky — fail closed whole initializers
 		if initOut == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString(initOut)

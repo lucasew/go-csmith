@@ -875,7 +875,7 @@ func (g *ProgramGenerator) OutputMain() string {
 		b.WriteString("int main (void)\n{\n")
 	}
 	// OutputMgr.cpp:104 — OutputArrayInitializers for global arrays (ctrl vars + loop inits)
-	b.WriteString(OutputArrayInitializers(g.VS.GlobalList, g.Opts, "    "))
+	b.WriteString(OutputArrayInitializersSess(g.Sess, g.VS.GlobalList, g.Opts, "    "))
 	// residual ERROR sticky — no invent main body past array-init residual hole
 	if g.hasErr() {
 		return ""
@@ -908,7 +908,7 @@ func (g *ProgramGenerator) OutputMain() string {
 			if inv.Failed {
 				return ""
 			}
-			firstInv = inv.Output()
+			firstInv = inv.OutputOptsSess(g.Sess, g.Opts)
 			// residual ERROR sticky — no invent main body past inv.Output residual hole
 			if g.hasErr() {
 				return ""
@@ -963,7 +963,7 @@ func (g *ProgramGenerator) OutputMain() string {
 		b.WriteString("    " + firstInv + ";\n")
 		// OutputMgr.cpp:136–140 — OutputPtrResets when !dangling_global_ptrs
 		if f0 != nil && !g.Opts.DanglingGlobalPointers {
-			resets := OutputPtrResets(f0.DeadGlobals, g.Opts)
+			resets := OutputPtrResetsSess(g.Sess, f0.DeadGlobals, g.Opts)
 			// incomplete dead_globals IR fails closed sticky whole main
 			if len(f0.DeadGlobals) > 0 && resets == "" {
 				if !g.hasErr() {
@@ -1049,26 +1049,35 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 // OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init(&zero).
 // Incomplete dead_globals fails closed empty (no invent soft-skip hole as partial resets).
 func OutputPtrResets(ptrs []*Variable, opts Options) string {
+	return OutputPtrResetsSess(nil, ptrs, opts)
+}
+
+// OutputPtrResetsSess is OutputPtrResets on an explicit session bag (ctrl pool + sticky).
+func OutputPtrResetsSess(s *Session, ptrs []*Variable, opts Options) string {
 	// incomplete ptr list fails closed sticky (no invent empty-reset success past holes)
 	if !VariablesComplete(ptrs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if len(ptrs) == 0 {
 		return ""
 	}
 	// OutputMgr.cpp:332 — Variable::get_last_ctrl_vars() (no GetNew soft-fallback)
-	ctrl := GetLastCtrlVarsSess(nil)
-	names := CtrlVarNames(ctrl)
+	ctrl := GetLastCtrlVarsSess(s)
+	names := CtrlVarNamesSess(s, ctrl)
+	// residual ERROR sticky — no invent soft-continue past ctrl-name residual
+	if sessHasError(s) {
+		return ""
+	}
 	// OutputMgr.cpp:331 — Constant zero(get_int_type(), "0"); always live Expression*
-	zero := MakeInt(0)
+	zero := MakeIntSess(s, 0)
 	var b strings.Builder
 	for _, v := range ptrs {
 		// pre-validated VariablesComplete
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent synthetic shell from ArraySizes / soft re-pick partial resets)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		av := v.AsArray
@@ -1080,8 +1089,8 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			if len(names) == 0 {
 				// C++ assumes get_last_ctrl_vars() non-empty after OutputArrayInitializers
 				// incomplete ctrl IR sticky — fail closed whole resets
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
 				}
 				return ""
 			}
@@ -1090,28 +1099,28 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			savedInit, savedExpr := av.Init, av.InitExpr
 			av.Init = zero
 			av.InitExpr = nil
-			initOut := outputArrayInitForced(av, "    ", names, opts.PostIncrOperator)
+			initOut := outputArrayInitForcedSess(s, av, "    ", names, opts.PostIncrOperator)
 			av.Init, av.InitExpr = savedInit, savedExpr
 			// residual ERROR sticky — no invent soft-continue later resets past init residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return ""
 			}
 			// incomplete array init IR sticky — fail closed whole resets
 			if initOut == "" {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			b.WriteString(initOut)
 			continue
 		}
 		// OutputMgr.cpp:337 — Variable::Output always live sticky; no invent " = 0;" without name
-		out := v.OutputCOptsWith(false, opts)
+		out := v.OutputCOptsWithSess(s, false, opts)
 		// residual ERROR sticky — no invent soft-continue later resets past OutputC residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		if out == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString("    " + out + " = 0;\n")
@@ -1123,9 +1132,14 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 // Used by OutputPtrResets (upstream always loops for array dead_globals).
 // ArrayVariable.cpp:619–655 — init->Output only; no invent "0" when init missing.
 func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {
+	return outputArrayInitForcedSess(nil, av, indent, ctrl, postIncr)
+}
+
+// outputArrayInitForcedSess is outputArrayInitForced with sticky errors on bag s.
+func outputArrayInitForcedSess(s *Session, av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {
 	// ArrayVariable always live for forced init; sticky incomplete no invent empty reset
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:622–623 — collective itemized members skip (policy empty)
@@ -1134,28 +1148,28 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	}
 	// undersized / empty ctrl sticky — no invent letter names
 	if len(ctrl) < len(av.Sizes) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
 	// ArrayVariable.cpp:649 — init->Output; always live Expression* sticky (no invent "0")
 	var initVal string
 	if av.InitExpr != nil {
-		initVal = av.InitExpr.Output()
+		initVal = av.InitExpr.OutputOptsSess(s, sessOpts(s))
 		// residual ERROR sticky — no invent forced loop-init past Output residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	} else if av.Init != nil {
 		initVal = av.Init.Value
 	}
 	if initVal == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -1173,13 +1187,13 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 		}
 	}
 	// ArrayVariable::output_with_indices always live access sticky; no invent " = init;" without LHS
-	access := av.OutputWithIndices(ctrl)
+	access := av.OutputWithIndicesSess(s, ctrl)
 	// residual ERROR sticky — no invent forced loop-init past OutputWithIndices residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if access == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")

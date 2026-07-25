@@ -1016,28 +1016,33 @@ func (av *ArrayVariable) OutputLowerBound() string {
 // OutputWithIndices mirrors ArrayVariable::output_with_indices.
 // ArrayVariable.cpp:703–711 — cvs[i]->Output only (no letter-name invent).
 func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
+	return av.OutputWithIndicesSess(nil, ctrl)
+}
+
+// OutputWithIndicesSess is OutputWithIndices with sticky errors on bag s.
+func (av *ArrayVariable) OutputWithIndicesSess(s *Session, ctrl []string) string {
 	// ArrayVariable always live at index emit; sticky no invent empty access
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	name := av.GetActualName(false)
 	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// C++ cvs sized for get_dimension(); sticky no invent empty "[]" when ctrl short/empty
 	if len(ctrl) < len(av.Sizes) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -1062,21 +1067,26 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 // OutputInitOpts is OutputInit with post_incr_operator control.
 // ArrayVariable.cpp:619–655 — cvs[i] names only (no letter-name soft invent).
 func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr bool) string {
+	return av.OutputInitOptsSess(nil, indent, ctrl, postIncr)
+}
+
+// OutputInitOptsSess is OutputInitOpts with sticky errors on bag s.
+func (av *ArrayVariable) OutputInitOptsSess(s *Session, indent string, ctrl []string, postIncr bool) string {
 	// ArrayVariable always live at init emit; sticky no invent empty loop-init without it
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// no_loop_initializer: soft empty (brace def path used instead)
 	if av.NoLoopInitializer() {
 		// residual ERROR sticky — no invent empty soft-success past NoLoopInitializer residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 		return ""
 	}
 	// residual ERROR sticky — no invent loop-init past NoLoopInitializer residual false
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return ""
 	}
 	// ArrayVariable.cpp:622–623 — collective itemized members skip output_init
@@ -1085,12 +1095,12 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	}
 	// C++ requires cvs sized for get_dimension(); undersized sticky → no invent i/j/k
 	if len(ctrl) < len(av.Sizes) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 	}
@@ -1099,28 +1109,28 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	// Soft invent Init.Value skipped Output → " = -3L;" vs " = (-3L);" (seed-353 l_52).
 	var initVal string
 	if av.InitExpr != nil {
-		initVal = av.InitExpr.Output()
+		initVal = av.InitExpr.OutputOptsSess(s, sessOpts(s))
 		// residual ERROR sticky — no invent loop-init past Output residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	} else if av.Init != nil {
-		initVal = av.Init.Output()
+		initVal = av.Init.OutputOptsSess(s, sessOpts(s))
 		// residual ERROR sticky — no invent loop-init past Constant Output residual hole
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return ""
 		}
 	}
 	if initVal == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:649 + output_with_indices — access always live
 	// sticky no invent for-loops + " = init;" without LHS
-	access := av.OutputWithIndices(ctrl)
+	access := av.OutputWithIndicesSess(s, ctrl)
 	if access == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}

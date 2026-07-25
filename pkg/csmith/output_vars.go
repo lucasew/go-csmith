@@ -70,7 +70,7 @@ func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceSt
 		if sessHasError(s) {
 			return ""
 		}
-		inits := OutputArrayInitializers(vars, opts, indent)
+		inits := OutputArrayInitializersSess(s, vars, opts, indent)
 		// residual ERROR sticky — no invent soft-return defs-only past OutputArrayInitializers residual
 		if sessHasError(s) {
 			return ""
