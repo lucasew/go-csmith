@@ -199,9 +199,14 @@ func FindTypedStmtsInBlockSess(s *Session, b *Block, stms *[]*Stmt, kinds []Stat
 // Incomplete Statement/parent sticky false (no invent is-first / soft re-pick past holes).}
 
 func Is1stStm(st *Stmt, parent *Block) bool {
+	return Is1stStmSess(nil, st, parent)
+}
+
+// Is1stStmSess is Is1stStm with explicit session residual sticky.
+func Is1stStmSess(s *Session, st *Stmt, parent *Block) bool {
 	// Statement + parent always live; sticky incomplete no invent is-first soft-skip
 	if st == nil || parent == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if len(parent.Stmts) == 0 {
@@ -221,8 +226,13 @@ func Is1stStm(st *Stmt, parent *Block) bool {
 // Missing parent is complete nil (root block — not incomplete).
 // Incomplete parent get_blocks hole sticky nil (no invent soft-skip missing container).
 func FindContainerStm(b *Block) *Stmt {
+	return FindContainerStmSess(nil, b)
+}
+
+// FindContainerStmSess is FindContainerStm with explicit session residual sticky.
+func FindContainerStmSess(s *Session, b *Block) *Stmt {
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// root is complete nil (not incomplete)
@@ -230,8 +240,8 @@ func FindContainerStm(b *Block) *Stmt {
 		return nil
 	}
 	for i := range b.Parent.Stmts {
-		s := &b.Parent.Stmts[i]
-		blks := GetBlocksStmt(s)
+		st := &b.Parent.Stmts[i]
+		blks := GetBlocksStmtSess(s, st)
 		// incomplete get_blocks (if arms / for body / block holes) sticky no invent miss
 		// scan all arms first — no invent match Then then soft-skip nil Else
 		incomplete := false
@@ -247,11 +257,11 @@ func FindContainerStm(b *Block) *Stmt {
 		}
 		if incomplete {
 			// get_blocks arms always live when Kind exposes them; nil hole sticky
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
 		if matched {
-			return s
+			return st
 		}
 	}
 	return nil
@@ -278,7 +288,7 @@ func DominateSess(sess *Session, a *Stmt, aParent *Block, s *Stmt, sParent *Bloc
 	}
 	// s is nested inside a (get_blocks of a includes s's parent block)
 	if sParent != nil {
-		blks := GetBlocksStmt(a)
+		blks := GetBlocksStmtSess(sess, a)
 		incomplete := false
 		matched := false
 		for _, nb := range blks {
@@ -323,7 +333,7 @@ func DominateSess(sess *Session, a *Stmt, aParent *Block, s *Stmt, sParent *Bloc
 	// walk container of s (if/for that owns sParent)
 	// FindContainerStm stickies incomplete arms; residual ERROR fails closed
 	if sParent != nil {
-		container := FindContainerStm(sParent)
+		container := FindContainerStmSess(sess, sParent)
 		if container != nil {
 			return DominateSess(sess, a, aParent, container, sParent.Parent)
 		}
@@ -397,9 +407,14 @@ func IsPtrUsedSess(s *Session, st *Stmt) bool {
 // Statement.cpp:684–694 — s's parent chain includes block.
 // Incomplete block root sticky false (no invent not-contain / soft re-pick past hole).
 func ContainsStmtInBlock(b *Block, stParent *Block) bool {
+	return ContainsStmtInBlockSess(nil, b, stParent)
+}
+
+// ContainsStmtInBlockSess is ContainsStmtInBlock with explicit session residual sticky.
+func ContainsStmtInBlockSess(s *Session, b *Block, stParent *Block) bool {
 	// Block root always live; sticky incomplete no invent not-contain
 	if b == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return StmtInBlock(stParent, b)
@@ -410,9 +425,14 @@ func ContainsStmtInBlock(b *Block, stParent *Block) bool {
 // Incomplete Block* hole fails closed sticky false (no invent membership / soft re-pick).
 // Walks only get_blocks kinds (no invent search via stray Then on assign).
 func ContainsStmtTree(root, s *Stmt) bool {
+	return ContainsStmtTreeSess(nil, root, s)
+}
+
+// ContainsStmtTreeSess is ContainsStmtTree with explicit session residual sticky.
+func ContainsStmtTreeSess(sess *Session, root, s *Stmt) bool {
 	// both Statement* always live; sticky incomplete no invent not-contain soft-skip
 	if root == nil || s == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return false
 	}
 	if root == s || (!StmIDUnset(root.StmID) && root.StmID == s.StmID) {
@@ -421,17 +441,17 @@ func ContainsStmtTree(root, s *Stmt) bool {
 	if StmIDUnset(s.StmID) {
 		return false
 	}
-	blks := GetBlocksStmt(root)
+	blks := GetBlocksStmtSess(sess, root)
 	// pre-validate complete get_blocks (if always has both arms)
 	// nil hole sticky before invent membership from a partial arm scan
 	for _, b := range blks {
 		if b == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(sess, ErrGeneric)
 			return false
 		}
 	}
 	for _, b := range blks {
-		if blockHasStmtIDDeep(b, s.StmID) {
+		if blockHasStmtIDDeepSess(sess, b, s.StmID) {
 			return true
 		}
 	}
@@ -442,8 +462,13 @@ func ContainsStmtTree(root, s *Stmt) bool {
 // Block + live StmID always required; sticky false (no invent not-found soft-skip past hole).
 // Incomplete arm sticky false (no invent membership via partial arm scan before hole).
 func blockHasStmtIDDeep(b *Block, id int) bool {
+	return blockHasStmtIDDeepSess(nil, b, id)
+}
+
+// blockHasStmtIDDeepSess is blockHasStmtIDDeep with explicit session residual sticky.
+func blockHasStmtIDDeepSess(s *Session, b *Block, id int) bool {
 	if b == nil || id <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if b.StmID == id {
@@ -454,15 +479,15 @@ func blockHasStmtIDDeep(b *Block, id int) bool {
 			return true
 		}
 		// pre-validate complete get_blocks before invent match past incomplete arm
-		blks := GetBlocksStmt(&b.Stmts[i])
+		blks := GetBlocksStmtSess(s, &b.Stmts[i])
 		for _, nb := range blks {
 			if nb == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return false
 			}
 		}
 		for _, nb := range blks {
-			if blockHasStmtIDDeep(nb, id) {
+			if blockHasStmtIDDeepSess(s, nb, id) {
 				return true
 			}
 		}
