@@ -12,12 +12,17 @@ import (
 // MoreTypesProbability mirrors Type.cpp MoreTypesProbability.
 // Always true while AllTypes-like count < 10; else 50% MoreStructUnionProb.
 func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
+	return MoreTypesProbabilitySess(nil, r, probs, typeCount)
+}
+
+// MoreTypesProbabilitySess is MoreTypesProbability with explicit session residual sticky.
+func MoreTypesProbabilitySess(s *Session, r *Rng, probs *Probabilities, typeCount int) bool {
 	if typeCount < 10 {
 		return true
 	}
 	// C++ always has RNG; sticky no invent always-true past threshold when r nil
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)
@@ -25,7 +30,7 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 	if probs != nil {
 		p = probs.Single(PMoreStructUnionProb)
 	}
-	return r.RndFlipcoin(uint32(p))
+	return r.RndFlipcoinSess(s, uint32(p))
 }
 
 // MakeOneStructField mirrors Type::make_one_struct_field.
@@ -234,7 +239,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		Used:         false,
 		HasAssignOps: hasAssign,
 		// Type.cpp:1094–1096 — hasAssignOps || checkImplicitNontrivialAssignOps(fields)
-		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOps(opts, fields),
+		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOpsSess(envSess(env), opts, fields),
 	}
 	if env != nil {
 		env.StructTypes = append(env.StructTypes, st)
@@ -248,13 +253,19 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 // Type* always live on Fields; nil hole sticky true (no invent no-nontrivial /
 // soft re-pick past incomplete field Type that would skip C++ assign-op bans).
 func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
+	return CheckImplicitNontrivialAssignOpsSess(nil, opts, fields)
+}
+
+// CheckImplicitNontrivialAssignOpsSess is CheckImplicitNontrivialAssignOps with
+// explicit session residual sticky.
+func CheckImplicitNontrivialAssignOpsSess(s *Session, opts Options, fields []StructField) bool {
 	if !opts.LangCPP {
 		return false
 	}
 	for _, f := range fields {
 		if f.Type == nil {
 			// incomplete field Type sticky has-nontrivial (restrictive)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if f.Type.HasImplicitNontrivialAssignOps {
@@ -283,7 +294,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	// struct/union generation draws RNG + probs; no invent fixed S0 shells without them
 	// Tag names come from Type.cpp shared sid sequence (env.AggregateSeq), not per-kind 0-based.
 	if opts.Structs && r != nil && probs != nil {
-		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
+		for MoreTypesProbabilitySess(envSess(env), r, probs, len(env.AllTypes)) {
 			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
 			if MakeRandomStructType(r, opts, probs, env, "") == nil || sessHasError(envSess(env)) {
 				break
@@ -294,7 +305,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		}
 	}
 	if opts.Unions && r != nil && probs != nil {
-		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
+		for MoreTypesProbabilitySess(envSess(env), r, probs, len(env.AllTypes)) {
 			if MakeRandomUnionType(r, opts, probs, env, "") == nil || sessHasError(envSess(env)) {
 				break
 			}
@@ -843,7 +854,7 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		Used:         false,
 		HasAssignOps: hasAssign,
 		// Type.cpp:1146–1148 — hasAssignOps || checkImplicitNontrivialAssignOps
-		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOps(opts, fields),
+		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOpsSess(envSess(env), opts, fields),
 	}
 	if env != nil {
 		env.UnionTypes = append(env.UnionTypes, ut)
