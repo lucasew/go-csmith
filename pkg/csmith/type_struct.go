@@ -277,12 +277,16 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if env.Sess == nil {
 		panic("GenerateAllTypesEnv: Sess unset (set TypeEnv.Sess)")
 	}
-	// Type.cpp:1170–1176 GenerateSimpleTypes — push eChar..eUInt128 always.
-	// Float/int64/int128 gates are probability filters + ChooseRandomTypeFilter,
-	// not AllTypes population (seed-2 first choose was n=13 vs upstream n=14).
-	if len(env.AllTypes) == 0 {
-		for st := EChar; int(st) < MaxSimpleTypes; st++ {
-			env.AllTypes = append(env.AllTypes, GetSimpleTypeSess(sessFromEnv(env), st))
+	// Type.cpp:1145–1151 GenerateSimpleTypes — always push NEW eChar..eUInt128
+	// entries (does not skip if get_simple_type already pushed during CreateExtension).
+	// That intentional multiset (e.g. klee seed-2: 3 early + 13 = AllTypes n=16) is
+	// required for rnd_upto(AllTypes.size()) parity in make_one_struct_field.
+	for st := EChar; int(st) < MaxSimpleTypes; st++ {
+		// Append cache pointer again even if already registered (C++ allocates a
+		// second Type*; we re-list the package simple for size/order parity).
+		env.AllTypes = append(env.AllTypes, simpleTypes[st])
+		if env.Sess != nil {
+			env.Sess.simpleAllTypesReg[st] = true
 		}
 	}
 	// struct/union generation draws RNG + probs; no invent fixed S0 shells without them

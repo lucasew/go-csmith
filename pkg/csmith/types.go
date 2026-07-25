@@ -138,7 +138,15 @@ func GetSimpleTypeSess(s *Session, st ESimpleType) *Type {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	return simpleTypes[st]
+	t := simpleTypes[st]
+	// Type.cpp get_simple_type — first materialization pushes to AllTypes.
+	// Package simples are pre-built; register once per run when a ProgramGen bag
+	// is live so CreateExtension (before GenerateSimpleTypes) matches C++ size.
+	if s != nil && s.ProgramGen != nil && !s.simpleAllTypesReg[st] {
+		s.simpleAllTypesReg[st] = true
+		s.ProgramGen.Types.AllTypes = append(s.ProgramGen.Types.AllTypes, t)
+	}
+	return t
 }
 
 // IsSimple reports eType == eSimple.
@@ -807,6 +815,7 @@ func TypeDoFinalizationSess(s *Session) {
 	s = sessOrAmbient(s)
 	s.PointerCache = map[*Type]*Type{}
 	s.simpleUsed = [MaxSimpleTypes]bool{}
+	s.simpleAllTypesReg = [MaxSimpleTypes]bool{}
 }
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).

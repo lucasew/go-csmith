@@ -56,6 +56,9 @@ type Session struct {
 	// cache must not carry run-local used marks — C++ process-static Used would
 	// race multi-Generate; library bags keep marks session-local).
 	simpleUsed [MaxSimpleTypes]bool
+	// simpleAllTypesReg tracks Type.cpp get_simple_type first-time AllTypes.push_back
+	// (CreateExtension may materialize simples before GenerateSimpleTypes).
+	simpleAllTypesReg [MaxSimpleTypes]bool
 
 	// Bookkeeper static counters (subset; full fields inlined via package funcs)
 	BK bookkeeperState
