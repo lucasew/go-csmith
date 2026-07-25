@@ -364,14 +364,25 @@ func ClearOutputMgrSess(s *Session) {
 }
 
 // ProcessOutputMgrKind returns active OutputMgr kind.
-func ProcessOutputMgrKind() OutputMgrKind { return sessOrAmbient(nil).OutputMgrKind }
+func ProcessOutputMgrKind() OutputMgrKind { return ProcessOutputMgrKindSess(nil) }
+
+// ProcessOutputMgrKindSess returns OutputMgrKind on an explicit session bag.
+func ProcessOutputMgrKindSess(s *Session) OutputMgrKind {
+	return sessOrAmbient(s).OutputMgrKind
+}
 
 // ProcessStructOutput returns DFSOutputMgr::struct_output_.
-func ProcessStructOutput() string { return sessOrAmbient(nil).StructOutput }
+func ProcessStructOutput() string { return ProcessStructOutputSess(nil) }
+
+// ProcessStructOutputSess returns StructOutput on an explicit session bag.
+func ProcessStructOutputSess(s *Session) string { return sessOrAmbient(s).StructOutput }
 
 // ProcessSplitPaths returns a copy of DefaultOutputMgr split file paths.
-func ProcessSplitPaths() []string {
-	s := sessOrAmbient(nil)
+func ProcessSplitPaths() []string { return ProcessSplitPathsSess(nil) }
+
+// ProcessSplitPathsSess returns SplitPaths on an explicit session bag.
+func ProcessSplitPathsSess(s *Session) []string {
+	s = sessOrAmbient(s)
 	if len(s.SplitPaths) == 0 {
 		return nil
 	}
@@ -379,7 +390,10 @@ func ProcessSplitPaths() []string {
 }
 
 // ProcessOutputFile returns DefaultOutputMgr ofile path (empty → stdout).
-func ProcessOutputFile() string { return sessOrAmbient(nil).OutputFile }
+func ProcessOutputFile() string { return ProcessOutputFileSess(nil) }
+
+// ProcessOutputFileSess returns OutputFile on an explicit session bag.
+func ProcessOutputFileSess(s *Session) string { return sessOrAmbient(s).OutputFile }
 
 // GetMainOutPath mirrors DefaultOutputMgr::get_main_out target name.
 // DefaultOutputMgr.cpp:197–205 — split → outs[0]; ofile_; else "" (stdout).
@@ -556,9 +570,13 @@ func DFSOutputHeader(header string, compact bool) string {
 }
 
 // DFSStructOutputPath mirrors DFSOutputMgr::struct_output_ path for structs file.
-func DFSStructOutputPath() string {
-	if sessOrAmbient(nil).StructOutput == "" {
+func DFSStructOutputPath() string { return DFSStructOutputPathSess(nil) }
+
+// DFSStructOutputPathSess is DFSStructOutputPath on an explicit session bag.
+func DFSStructOutputPathSess(s *Session) string {
+	so := sessOrAmbient(s).StructOutput
+	if so == "" {
 		return DefaultStructOutputName
 	}
-	return sessOrAmbient(nil).StructOutput
+	return so
 }

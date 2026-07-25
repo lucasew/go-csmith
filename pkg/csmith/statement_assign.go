@@ -361,31 +361,36 @@ func MakeRandomAssignQfer(
 	lhsCG.CurrRHS = rhs
 
 	// StatementAssign.cpp:190–203 — CGOptions::match_exact_qualifiers(true) when qf
-	// process-wide for CVQualifiers::match / choose_var; restore after Lhs.
-	// Must restore on every early return (no invent sticky process MatchExactQualifiers
+	// for CVQualifiers::match / choose_var; restore after Lhs.
+	// Must restore on every early return (no invent sticky MatchExactQualifiers
 	// that over-restricts later choose_var qfer match — seed-2 OK-list shrink).
-	// Write both ambient ProcessOptions and cg.Sess.Opts when set so ChooseVarFull
-	// (sessOpts(cg.Sess)) and process MatchExact OR see the force without relying
-	// solely on activateSession identity.
+	// Prefer run bag: force local opts + cg.Sess.Opts (ChooseVarFull → sessOpts(cg.Sess)).
+	// Ambient SetProcessOptions only when cg.Sess is nil (unit tests without a run bag).
 	prevExact := opts.MatchExactQualifiers
-	prevProc := sessOpts(cgSess(cg))
 	var prevSessExact bool
+	var prevProc Options
+	usedAmbientExact := false
 	if cg.Sess != nil {
 		prevSessExact = cg.Sess.Opts.MatchExactQualifiers
 	}
 	if callerQf {
 		opts.MatchExactQualifiers = true
-		po := prevProc
-		po.MatchExactQualifiers = true
-		SetProcessOptions(po)
 		if cg.Sess != nil {
 			cg.Sess.Opts.MatchExactQualifiers = true
+		} else {
+			prevProc = ProcessOptions()
+			po := prevProc
+			po.MatchExactQualifiers = true
+			SetProcessOptions(po)
+			usedAmbientExact = true
 		}
 		defer func() {
 			opts.MatchExactQualifiers = prevExact
-			SetProcessOptions(prevProc)
 			if cg.Sess != nil {
 				cg.Sess.Opts.MatchExactQualifiers = prevSessExact
+			}
+			if usedAmbientExact {
+				SetProcessOptions(prevProc)
 			}
 		}()
 	}

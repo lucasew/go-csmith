@@ -1431,7 +1431,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 		var db strings.Builder
 		if structsFile != "" {
 			db.WriteString("/* --- ")
-			db.WriteString(DFSStructOutputPath())
+			db.WriteString(DFSStructOutputPathSess(g.Sess))
 			db.WriteString(" ---\n")
 			db.WriteString(structsFile)
 			db.WriteString("--- end structs --- */\n")
@@ -1593,7 +1593,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 	}
 	if structsFile != "" {
 		all.WriteString("/* --- ")
-		all.WriteString(DFSStructOutputPath())
+		all.WriteString(DFSStructOutputPathSess(g.Sess))
 		all.WriteString(" ---\n")
 		all.WriteString(structsFile)
 		all.WriteString("--- end structs --- */\n")
