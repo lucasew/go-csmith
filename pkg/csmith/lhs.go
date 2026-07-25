@@ -18,8 +18,13 @@ type Lhs struct {
 // Lhs.cpp:174 — new Lhs(*this).
 // Incomplete Lhs sticky nil (no invent empty Lhs shell).
 func (l *Lhs) Clone() *Lhs {
+	return l.CloneSess(nil)
+}
+
+// CloneSess is Clone with explicit session residual sticky.
+func (l *Lhs) CloneSess(s *Session) *Lhs {
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	cp := *l
@@ -29,8 +34,13 @@ func (l *Lhs) Clone() *Lhs {
 // GetComplexity mirrors Expression::get_complexity for Lhs — ExpressionVariable leaf.
 // ExpressionVariable is complexity 0 (Bookkeeper ExpressionComplexity TermVariable).
 func (l *Lhs) GetComplexity() int {
+	return l.GetComplexitySess(nil)
+}
+
+// GetComplexitySess is GetComplexity with explicit session residual sticky.
+func (l *Lhs) GetComplexitySess(s *Session) int {
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	return 0
@@ -40,11 +50,16 @@ func (l *Lhs) GetComplexity() int {
 // Lhs.cpp:225–232 — self ExpressionVariable when indirect_level > 0.
 // Incomplete Lhs sticky IncompleteExpressions.
 func (l *Lhs) GetDereferencedPtrs() []*Expression {
+	return l.GetDereferencedPtrsSess(nil)
+}
+
+// GetDereferencedPtrsSess is GetDereferencedPtrs with explicit session residual sticky.
+func (l *Lhs) GetDereferencedPtrsSess(s *Session) []*Expression {
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return IncompleteExpressions()
 	}
-	n, ok := l.IndirectLevelComplete()
+	n, ok := l.IndirectLevelCompleteSess(s)
 	if !ok {
 		return IncompleteExpressions()
 	}
@@ -370,13 +385,18 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 // Lhs.cpp:364.
 // Lhs + Var always live; sticky false (no invent not-compatible soft-skip past hole).
 func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
+	return l.CompatibleVarSess(nil, v, expandStruct)
+}
+
+// CompatibleVarSess is CompatibleVar with explicit session residual sticky.
+func (l *Lhs) CompatibleVarSess(s *Session, v *Variable, expandStruct bool) bool {
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	ok := l.Var.Compatible(v, expandStruct)
 	// residual ERROR sticky — no invent soft-compat past Compatible residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -386,8 +406,13 @@ func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
 // Lhs.cpp:359–362 — exp->compatible(&var).
 // Lhs + Var + Expression always live; sticky false (no invent not-compatible soft-skip).
 func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
+	return l.CompatibleExprSess(nil, exp, expandStruct)
+}
+
+// CompatibleExprSess is CompatibleExpr with explicit session residual sticky.
+func (l *Lhs) CompatibleExprSess(s *Session, exp *Expression, expandStruct bool) bool {
 	if l == nil || l.Var == nil || exp == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return exp.CompatibleWithVar(l.Var, expandStruct)
@@ -406,7 +431,7 @@ func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 		return ""
 	}
 	// ExpressionVariable::Output for (var, type)
-	ev := outputExpressionVariable(l.Var, l.Type)
+	ev := outputExpressionVariableOptsSess(s, l.Var, l.Type, sessOpts(s))
 	// residual ERROR sticky — no invent soft-empty LHS past outputExpressionVariable residual
 	if sessHasError(s) {
 		return ""
