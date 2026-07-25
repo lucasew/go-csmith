@@ -554,6 +554,11 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 // IsArray without AsArray sticky fails closed (no invent soft-skip broken array
 // as absent then complete empty must-use pool / soft re-pick past hole).
 func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
+	return rw.FindMustUseArraysSess(nil)
+}
+
+// FindMustUseArraysSess is FindMustUseArrays with explicit session residual sticky.
+func (rw *RWDirective) FindMustUseArraysSess(s *Session) []*ArrayVariable {
 	// RWDirective always live when queried; nil RW complete empty (no must-use)
 	if rw == nil {
 		return nil
@@ -563,7 +568,7 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 	add := func(v *Variable) bool {
 		if v == nil {
 			// incomplete must-use list sticky (no invent soft-skip hole as absent)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if !v.IsArray || seen[v] {
@@ -573,7 +578,7 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent soft-skip shell as absent then empty complete pool)
 		if v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		out = append(out, v.AsArray)

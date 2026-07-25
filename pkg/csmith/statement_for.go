@@ -338,7 +338,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// (seed-2 e358: Go choose_ok_var n=2 vs upstream n=1 after itemize).
 	bound := InvalidIVBound
 	if cg.RW != nil {
-		mustArr := cg.RW.FindMustUseArrays()
+		mustArr := cg.RW.FindMustUseArraysSess(cgSess(cg))
 		// FindMustUseArrays nil = incomplete must-use lists (no invent empty)
 		if mustArr == nil {
 			// residual ERROR already sticky, or empty complete nil slice?
