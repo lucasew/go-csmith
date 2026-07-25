@@ -319,7 +319,15 @@ func (t *Type) OutputStructDeclSess(s *Session, r *Rng, attrs *AttributeGenerato
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 // OutputStructDeclWith is OutputStructDeclOpts with explicit session Options (ccomp pack).
+// attrs is the struct-type generator only; callers that mirror OutputStructUnion must also
+// burn the union generator after `}` (see outputStructUnion). Prefer OutputStructDeclBothAttrs.
 func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
+	return t.OutputStructDeclBothAttrsSess(s, r, attrs, nil, opts)
+}
+
+// OutputStructDeclBothAttrsSess mirrors Type.cpp:1871–1875 — after `}`, always run
+// struct_type_attr_generator.Output then union_type_attr_generator.Output (both, even for structs).
+func (t *Type) OutputStructDeclBothAttrsSess(s *Session, r *Rng, structAttr, unionAttr *AttributeGenerator, opts Options) string {
 	// Type* always live at struct emit; sticky no invent decl without it
 	if t == nil {
 		sessNoteError(s, ErrGeneric)
@@ -343,15 +351,9 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 		}
 		b.WriteString("#pragma pack(1)\n")
 	}
+	// Type.cpp:1836–1837 — type->Output + " {" (attrs come after closing brace)
 	b.WriteString("struct ")
 	b.WriteString(t.StructName)
-	if attrs != nil && r != nil {
-		b.WriteString(attrs.OutputSess(s, r))
-		// residual ERROR sticky — no invent soft-continue fields past attr residual
-		if sessHasError(s) {
-			return ""
-		}
-	}
 	b.WriteString(" {\n")
 	j := 0
 	for i, f := range t.Fields {
@@ -452,7 +454,23 @@ func (t *Type) OutputStructDeclWithSess(s *Session, r *Rng, attrs *AttributeGene
 		b.WriteString(";\n")
 		j++
 	}
-	b.WriteString("};")
+	// Type.cpp:1871–1875 — "}" then both type attr generators then ";"
+	b.WriteString("}")
+	if r != nil {
+		if structAttr != nil {
+			b.WriteString(structAttr.OutputSess(s, r))
+			if sessHasError(s) {
+				return ""
+			}
+		}
+		if unionAttr != nil {
+			b.WriteString(unionAttr.OutputSess(s, r))
+			if sessHasError(s) {
+				return ""
+			}
+		}
+	}
+	b.WriteString(";")
 	// Type.cpp:1877–1887 — after `;`: really_outputln; if packed then pack(pop|()) + ln; always extra blank.
 	b.WriteString("\n")
 	if t.Packed {
@@ -856,7 +874,13 @@ func (t *Type) OutputUnionDeclSess(s *Session, r *Rng, attrs *AttributeGenerator
 // OutputUnionDeclOpts optionally emits type attributes.
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 // OutputUnionDeclWith is OutputUnionDeclOpts with explicit session Options.
+// attrs is the union-type generator only; OutputStructUnion always runs both generators.
 func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGenerator, opts Options) string {
+	return t.OutputUnionDeclBothAttrsSess(s, r, nil, attrs, opts)
+}
+
+// OutputUnionDeclBothAttrsSess mirrors Type.cpp:1871–1875 for unions.
+func (t *Type) OutputUnionDeclBothAttrsSess(s *Session, r *Rng, structAttr, unionAttr *AttributeGenerator, opts Options) string {
 	// Type* always live at union emit; sticky no invent decl without it
 	if t == nil {
 		sessNoteError(s, ErrGeneric)
@@ -872,15 +896,9 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 		return ""
 	}
 	var b strings.Builder
+	// Type.cpp:1836–1837 — attrs after closing brace, not after the tag name
 	b.WriteString("union ")
 	b.WriteString(t.StructName)
-	if attrs != nil && r != nil {
-		b.WriteString(attrs.OutputSess(s, r))
-		// residual ERROR sticky — no invent soft-continue fields past attr residual
-		if sessHasError(s) {
-			return ""
-		}
-	}
 	b.WriteString(" {\n")
 	j := 0
 	for _, f := range t.Fields {
@@ -969,9 +987,25 @@ func (t *Type) OutputUnionDeclWithSess(s *Session, r *Rng, attrs *AttributeGener
 		b.WriteString(";\n")
 		j++
 	}
-	// Type.cpp:1871–1887 — `};` + really_outputln; unions are not packed in make_random_union;
+	// Type.cpp:1871–1875 — "}" then both type attr generators then ";"
+	b.WriteString("}")
+	if r != nil {
+		if structAttr != nil {
+			b.WriteString(structAttr.OutputSess(s, r))
+			if sessHasError(s) {
+				return ""
+			}
+		}
+		if unionAttr != nil {
+			b.WriteString(unionAttr.OutputSess(s, r))
+			if sessHasError(s) {
+				return ""
+			}
+		}
+	}
+	// Type.cpp:1871–1887 — `;` + really_outputln; unions are not packed in make_random_union;
 	// then really_outputln after printed (blank line after decl).
-	b.WriteString("};\n\n")
+	b.WriteString(";\n\n")
 	return b.String()
 }
 

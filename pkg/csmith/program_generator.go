@@ -392,6 +392,8 @@ func (g *ProgramGenerator) OutputHeader() string {
 	if g.Opts.EnableFloat {
 		b.WriteString("#include <float.h>\n#include <math.h>\n")
 	}
+	// OutputMgr.cpp:278–281 — ExtensionMgr::OutputHeader before csmith.h
+	b.WriteString(ExtensionMgrOutputHeaderSess(g.Sess))
 	b.WriteString("#include \"csmith.h\"\n\n")
 	if !g.Opts.ComputeHash {
 		if g.Opts.AllowInt64() {
@@ -538,19 +540,12 @@ func (g *ProgramGenerator) outputStructUnion(t *Type, b *strings.Builder, struct
 			return false
 		}
 	}
+	// Type.cpp:1871–1875 — always both attr generators after `}` (struct and union).
 	var decl string
 	if t.IsStructSess(g.Sess) {
-		if structAttr != nil {
-			decl = t.OutputStructDeclWithSess(g.Sess, g.Rng, structAttr, g.Opts)
-		} else {
-			decl = t.OutputStructDeclWithSess(g.Sess, nil, nil, g.Opts)
-		}
+		decl = t.OutputStructDeclBothAttrsSess(g.Sess, g.Rng, structAttr, unionAttr, g.Opts)
 	} else {
-		if unionAttr != nil {
-			decl = t.OutputUnionDeclWithSess(g.Sess, g.Rng, unionAttr, g.Opts)
-		} else {
-			decl = t.OutputUnionDeclWithSess(g.Sess, nil, nil, g.Opts)
-		}
+		decl = t.OutputUnionDeclBothAttrsSess(g.Sess, g.Rng, structAttr, unionAttr, g.Opts)
 	}
 	if g.hasErr() {
 		return false
@@ -852,7 +847,7 @@ func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
 	return out
 }
 
-// OutputMain mirrors OutputMgr::OutputMain (no extension).
+// OutputMain mirrors OutputMgr::OutputMain (with ExtensionMgr when klee/crest/coverage).
 // OutputMgr.cpp:92–153.
 func (g *ProgramGenerator) OutputMain() string {
 	// --nomain: soft empty (optionally omit main)
@@ -868,10 +863,10 @@ func (g *ProgramGenerator) OutputMain() string {
 	b.WriteString("\n\n")
 	// OutputMgr.cpp:99 — output_comment_line("----------------------------------------")
 	b.WriteString(OutputCommentLineSess(g.Sess, "----------------------------------------", g.Opts.Quiet, g.Opts.Concise))
-	if g.Opts.AcceptArgc {
-		b.WriteString("int main (int argc, char* argv[])\n{\n")
-	} else {
-		b.WriteString("int main (void)\n{\n")
+	// OutputMgr.cpp:101 — ExtensionMgr::OutputInit (null → main signature + "{")
+	b.WriteString(ExtensionMgrOutputInitSess(g.Sess, g.Opts.AcceptArgc))
+	if g.hasErr() {
+		return ""
 	}
 	// OutputMgr.cpp:104 — OutputArrayInitializers for global arrays (ctrl vars + loop inits)
 	b.WriteString(OutputArrayInitializersSess(g.Sess, g.VS.GlobalList, g.Opts, "    "))
@@ -881,7 +876,8 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 
 	// first-function invocation builder (shared by blind_check and normal path)
-	// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation always live when Funcs non-empty
+	// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation when extension active;
+	// null extension → BuildUserInvocation for random args.
 	var firstInv string
 	var f0 *Function
 	if len(g.Funcs.Funcs) > 0 {
@@ -893,9 +889,15 @@ func (g *ProgramGenerator) OutputMain() string {
 		f0 = g.Funcs.Funcs[0]
 		// skip builtin first (unlikely); still need live invoke for user first
 		if !f0.IsBuiltin {
-			cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
-			cg.Types = &g.Types
-			inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
+			var inv *Invocation
+			if ExtensionActiveSess(g.Sess) {
+				// AbsExtension::MakeFuncInvocation — ExpressionVariable args from ExtValues
+				inv = AbsExtensionMakeFuncInvocationSess(g.Sess, f0, ExtensionValuesSess(g.Sess))
+			} else {
+				cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
+				cg.Types = &g.Types
+				inv = BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
+			}
 			// no soft invent name()+"()" or main without call when build/output fails
 			// Failed soft re-pick; nil/empty output sticky incomplete IR
 			if inv == nil {
@@ -922,7 +924,10 @@ func (g *ProgramGenerator) OutputMain() string {
 	// OutputMgr.cpp:106–111 — blind_check_global: invoke + output_value_dump per global
 	if g.Opts.BlindCheckGlobal {
 		if firstInv != "" {
-			b.WriteString("    " + firstInv + ";\n")
+			b.WriteString(ExtensionMgrOutputFirstFunInvocationSess(g.Sess, firstInv))
+			if g.hasErr() {
+				return ""
+			}
 		}
 		// program end facts for union readability (FactMgr::get_program_end_facts)
 		var endUnion []*FactUnion
@@ -943,13 +948,15 @@ func (g *ProgramGenerator) OutputMain() string {
 			}
 			b.WriteString(dump)
 		}
-		b.WriteString("    return 0;\n")
+		// OutputMgr.cpp:150–152 — ExtensionMgr::OutputTail then closing brace
+		b.WriteString(ExtensionMgrOutputTailSess(g.Sess))
 		b.WriteString("}\n")
 		return b.String()
 	}
 
 	b.WriteString("    int print_hash_value = 0;\n")
-	if g.Opts.AcceptArgc {
+	if g.Opts.AcceptArgc && !ExtensionActiveSess(g.Sess) {
+		// Klee/Crest OutputInit always uses main(void); argc branch only on null extension
 		b.WriteString("    if (argc == 2 && strcmp(argv[1], \"1\") == 0) print_hash_value = 1;\n")
 	}
 	b.WriteString("    platform_main_begin();\n")
@@ -959,7 +966,10 @@ func (g *ProgramGenerator) OutputMain() string {
 	// ExtensionMgr::OutputFirstFunInvocation
 	// OutputMgr.cpp:127–136 — always emit live first invoke when present
 	if firstInv != "" {
-		b.WriteString("    " + firstInv + ";\n")
+		b.WriteString(ExtensionMgrOutputFirstFunInvocationSess(g.Sess, firstInv))
+		if g.hasErr() {
+			return ""
+		}
 		// OutputMgr.cpp:136–140 — OutputPtrResets when !dangling_global_ptrs
 		if f0 != nil && !g.Opts.DanglingGlobalPointers {
 			resets := OutputPtrResetsSess(g.Sess, f0.DeadGlobals, g.Opts)
@@ -995,7 +1005,7 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 	// ExtensionMgr::OutputTail — return 0 when extension null
 	// ExtensionMgr.cpp:109–111
-	b.WriteString("    return 0;\n")
+	b.WriteString(ExtensionMgrOutputTailSess(g.Sess))
 	b.WriteString("}\n")
 	return b.String()
 }

@@ -643,19 +643,23 @@ func SanitizeForBodyParityFuzz(o Options) Options {
 	} else {
 		o.SequenceNamePrefix = false
 	}
-	// Cap DFS so drop-in fuzz stays finite (full exhaustive can hang for minutes+).
+	// Cap DFS so drop-in fuzz stays finite (full exhaustive can hang for minutes+
+	// and golden may segfault; depth>2 routinely burns the whole campaign budget).
 	if o.DFSExhaustive {
 		if o.MaxExhaustiveDepth < 0 {
 			o.MaxExhaustiveDepth = 0
 		}
-		if o.MaxExhaustiveDepth > 8 {
-			o.MaxExhaustiveDepth = 8
+		if o.MaxExhaustiveDepth > 2 {
+			o.MaxExhaustiveDepth = 2
 		}
-		if o.MaxFuncs > 4 {
-			o.MaxFuncs = 4
+		if o.MaxFuncs > 3 {
+			o.MaxFuncs = 3
 		}
-		if o.MaxBlockSize > 4 {
-			o.MaxBlockSize = 4
+		if o.MaxBlockSize > 2 {
+			o.MaxBlockSize = 2
+		}
+		if o.MaxBlockDepth > 3 {
+			o.MaxBlockDepth = 3
 		}
 	}
 	// Platform sizes: only 2/4/8 (int) or 4/8 (ptr); else leave Defaults (4).

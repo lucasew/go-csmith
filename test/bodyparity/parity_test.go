@@ -40,6 +40,7 @@ var bodyParityBattery = []uint64{
 }
 
 const upstreamGenTimeout = 120 * time.Second
+const upstreamDFSTimeout = 20 * time.Second
 
 var (
 	reBodyStartStatic = regexp.MustCompile(`(?m)^static long __undefined;`)
@@ -101,7 +102,12 @@ func upstreamGenerate(tb testing.TB, opts csmith.Options) string {
 	tb.Helper()
 	bin := upstreamCsmith(tb)
 	args := opts.CLIArgs()
-	ctx, cancel := context.WithTimeout(tb.Context(), upstreamGenTimeout)
+	// Exhaustive mode is often minutes-long; keep campaign budget for random-mode cases.
+	to := upstreamGenTimeout
+	if opts.DFSExhaustive {
+		to = upstreamDFSTimeout
+	}
+	ctx, cancel := context.WithTimeout(tb.Context(), to)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, args...)
 	var stdout, stderr bytes.Buffer
@@ -110,7 +116,7 @@ func upstreamGenerate(tb testing.TB, opts csmith.Options) string {
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
 		// Upstream too slow/hang for this config — not a Go body mismatch to fix here.
-		tb.Skipf("upstream csmith hang/timeout after %s args=%v (%s)", upstreamGenTimeout, args, bin)
+		tb.Skipf("upstream csmith hang/timeout after %s args=%v (%s)", to, args, bin)
 	}
 	// Upstream often prints "error: options conflict …" on stdout (not stderr).
 	combined := strings.TrimSpace(stderr.String() + "\n" + stdout.String())
@@ -122,6 +128,11 @@ func upstreamGenerate(tb testing.TB, opts csmith.Options) string {
 		// Shared invalid config: skip rather than fail the corpus entry.
 		if isUpstreamConflict(msg) {
 			tb.Skipf("upstream rejects config %v: %s", args, firstLine(msg))
+		}
+		// Upstream crash/abort on exotic flag combos (e.g. DFS+float) is not a
+		// Go body-mismatch to chase here — skip and let campaign continue.
+		if isUpstreamCrash(msg) {
+			tb.Skipf("upstream crash %v: %s", args, firstLine(msg))
 		}
 		tb.Fatalf("upstream csmith %v (%s): %s", args, bin, firstLine(msg))
 	}
@@ -146,6 +157,19 @@ func isUpstreamConflict(msg string) bool {
 		strings.Contains(low, "error:") ||
 		strings.Contains(low, "cannot") ||
 		strings.Contains(low, "invalid")
+}
+
+// isUpstreamCrash detects golden binary faults (segfault, abort, signal).
+// Those are upstream defects or unsupported combos, not Go emit parity bugs.
+func isUpstreamCrash(msg string) bool {
+	low := strings.ToLower(msg)
+	return strings.Contains(low, "segmentation fault") ||
+		strings.Contains(low, "signal:") ||
+		strings.Contains(low, "core dumped") ||
+		strings.Contains(low, "aborted") ||
+		strings.Contains(low, "sigsegv") ||
+		strings.Contains(low, "sigabrt") ||
+		strings.Contains(low, "bus error")
 }
 
 // goGenTimeout bounds one Go Generate in bodyparity. Larger than typical cases;
