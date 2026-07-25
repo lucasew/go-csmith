@@ -167,7 +167,17 @@ func (r *Rng) RndUptoFilterSess(s *Session, n uint32, f Filter) uint32 {
 	r.randDepth++
 	tries := uint32(0)
 	if f != nil {
-		for f.Filter(v) {
+		filterAt := func(x uint32) bool {
+			switch ff := f.(type) {
+			case *VectorFilter:
+				return ff.FilterSess(s, x)
+			case *ProbabilityFilter:
+				return ff.FilterSess(s, x)
+			default:
+				return f.Filter(x)
+			}
+		}
+		for filterAt(v) {
 			// residual ERROR sticky — no invent soft-retry filter past hard IR residual hole
 			// (e.g. IsVolatileStructUnion field-Type residual soft-rejects then hangs forever)
 			if sessHasError(s) {

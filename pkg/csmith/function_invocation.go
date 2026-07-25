@@ -1171,9 +1171,9 @@ func MakeRandomBinaryInvocation(
 	if binProbs == nil {
 		binProbs = sessProbs(cgSess(cg))
 	}
-	op := PickBinaryOpProbs(r, opts, binProbs)
+	op := PickBinaryOpProbsSess(cgSess(cg), r, opts, binProbs)
 	if typ != nil {
-		isF := typ.IsFloat()
+		isF := typ.IsFloatSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-continue pick past IsFloat residual
 		if sessHasError(cgSess(cg)) {
 			return nil
@@ -1186,7 +1186,7 @@ func MakeRandomBinaryInvocation(
 					validB = true
 					break
 				}
-				op = PickBinaryOpProbs(r, opts, binProbs)
+				op = PickBinaryOpProbsSess(cgSess(cg), r, opts, binProbs)
 			}
 			if !validB {
 				return nil

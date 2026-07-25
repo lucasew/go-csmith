@@ -39,7 +39,7 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 	}
 	// StatementAssign.cpp:92–95 — non-simple or base float → simple assign
 	if typ != nil {
-		simple := typ.IsSimple()
+		simple := typ.IsSimpleSess(s)
 		// residual ERROR sticky — no invent soft-simple past IsSimple residual
 		if sessHasError(s) {
 			return AssignOp(-1)
@@ -47,7 +47,7 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 		if !simple {
 			return AssignSimple
 		}
-		isF := typ.IsFloat()
+		isF := typ.IsFloatSess(s)
 		// residual ERROR sticky — no invent soft-simple past IsFloat residual
 		if sessHasError(s) {
 			return AssignOp(-1)
@@ -69,7 +69,7 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 	f := NewVectorFilterSess(s, table)
 	// signed ints: filter out ++/-- (upstream avoids for signed)
 	if typ != nil {
-		signed := typ.IsSigned()
+		signed := typ.IsSignedSess(s)
 		// residual ERROR sticky — no invent soft-filter past IsSigned residual
 		if sessHasError(s) {
 			return AssignOp(-1)
@@ -174,7 +174,7 @@ func MakeRandomAssignQfer(
 	}
 	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()) sticky
 	if typ != nil {
-		isCSU := typ.IsConstStructUnion()
+		isCSU := typ.IsConstStructUnionSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-continue assign past IsConstStructUnion residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
@@ -186,7 +186,7 @@ func MakeRandomAssignQfer(
 	}
 	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work
 	if typ != nil {
-		isF := typ.IsFloat()
+		isF := typ.IsFloatSess(cgSess(cg))
 		// residual ERROR sticky — no invent soft-continue float op past IsFloat residual
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
@@ -439,7 +439,7 @@ func MakeRandomAssignQfer(
 	}
 	// StatementAssign.cpp:211–216 — float base forces simple op
 	if lhsVar != nil && lhsVar.Type != nil {
-		if bt := lhsVar.Type.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
+		if bt := lhsVar.Type.BaseType(); bt != nil && bt.IsFloatSess(cgSess(cg)) && !AssignOpWorksForFloat(op) {
 			// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
@@ -456,7 +456,7 @@ func MakeRandomAssignQfer(
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
-			if bt := rt.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
+			if bt := rt.BaseType(); bt != nil && bt.IsFloatSess(cgSess(cg)) && !AssignOpWorksForFloat(op) {
 				// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
 				if sessHasError(cgSess(cg)) {
 					return Stmt{}

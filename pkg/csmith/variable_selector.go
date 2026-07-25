@@ -1059,7 +1059,7 @@ func (vs *VariableSelector) MakeInitValue(
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	if !qf.SanityCheck(t) {
+	if !qf.SanityCheckSess(vsSess(vs), t) {
 		// residual ERROR sticky — no invent soft-init past SanityCheck residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -3026,7 +3026,7 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	// VariableSelector.cpp:938 — restrict(access, cg_context)
 	varQfer.Restrict(access, cg)
 	// VariableSelector.cpp:939 — assert(var_qfer.sanity_check(t)); no soft invent bad qfer
-	if !varQfer.SanityCheck(t) {
+	if !varQfer.SanityCheckSess(vsSess(vs), t) {
 		// residual ERROR sticky — no invent soft-local past SanityCheck residual
 		if sessHasError(vsSess(vs)) {
 			return nil

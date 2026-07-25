@@ -463,7 +463,7 @@ func RandomTypeFromType(
 	}
 	// Type.cpp:599–601 — eSimple && !strict_simple_type → choose_random_simple
 	// no soft invent re-roll when strict_simple_type (make_init_value pointer create)
-	simple := typ.IsSimple()
+	simple := typ.IsSimpleSess(envSess(env))
 	// residual ERROR sticky — no invent soft-type past IsSimple residual
 	if sessHasError(envSess(env)) {
 		return nil
@@ -474,10 +474,10 @@ func RandomTypeFromType(
 			return nil
 		}
 		// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
-		if DepthGuardByType(opts, DtTypeChooseSimple) == BadDepth {
+		if DepthGuardByTypeSess(envSess(env), opts, DtTypeChooseSimple) == BadDepth {
 			return nil
 		}
-		st := ChooseRandomNonvoidSimple(r, probs)
+		st := ChooseRandomNonvoidSimpleSess(envSess(env), r, probs)
 		// Type.cpp:603–605 — assert(simple != eVoid) sticky; no soft invent int for void
 		if st == EVoid {
 			if !sessHasError(envSess(env)) {
