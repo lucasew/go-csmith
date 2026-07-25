@@ -171,7 +171,7 @@ func (f *VectorFilter) MaxProbSess(s *Session) int {
 	if f.table == nil {
 		return 100
 	}
-	return f.table.Max()
+	return f.table.MaxSess(s)
 }
 
 // Lookup mirrors VectorFilter::lookup.
@@ -190,7 +190,7 @@ func (f *VectorFilter) LookupSess(s *Session, v int) int {
 	if !f.ValidFilterSess(s) || f.table == nil {
 		return v
 	}
-	return f.table.RndNumToKey(v)
+	return f.table.RndNumToKeySess(s, v)
 }
 
 // Filter implements Filter — true means reject this rnd draw.
