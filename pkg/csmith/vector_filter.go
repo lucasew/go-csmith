@@ -62,8 +62,13 @@ func NewVectorFilterItems(items []int, mode FilterMode) *VectorFilter {
 
 // Enable mirrors Filter::enable.
 func (f *VectorFilter) Enable(kind FilterKind) {
+	f.EnableSess(nil, kind)
+}
+
+// EnableSess is Enable with explicit session residual sticky.
+func (f *VectorFilter) EnableSess(s *Session, kind FilterKind) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if kind < 0 || kind >= FilterKindMax {
@@ -74,8 +79,13 @@ func (f *VectorFilter) Enable(kind FilterKind) {
 
 // Disable mirrors Filter::disable.
 func (f *VectorFilter) Disable(kind FilterKind) {
+	f.DisableSess(nil, kind)
+}
+
+// DisableSess is Disable with explicit session residual sticky.
+func (f *VectorFilter) DisableSess(s *Session, kind FilterKind) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if kind < 0 || kind >= FilterKindMax {
@@ -87,7 +97,12 @@ func (f *VectorFilter) Disable(kind FilterKind) {
 // CurrentKind mirrors Filter::current_kind.
 // Filter.cpp:63–68 — random_based → fDefault; dfs_exhaustive → fDFS; else MAX.
 func (f *VectorFilter) CurrentKind() FilterKind {
-	return f.CurrentKindOpts(sessOpts(nil))
+	return f.CurrentKindSess(nil)
+}
+
+// CurrentKindSess is CurrentKind with explicit session residual sticky.
+func (f *VectorFilter) CurrentKindSess(s *Session) FilterKind {
+	return f.CurrentKindOpts(sessOpts(s))
 }
 
 // CurrentKindOpts is CurrentKind with explicit session Options.
@@ -104,11 +119,16 @@ func (f *VectorFilter) CurrentKindOpts(o Options) FilterKind {
 // ValidFilter mirrors Filter::valid_filter.
 // Filter.cpp:74–79 — kinds_.test(current_kind); false if kind is MAX or disabled.
 func (f *VectorFilter) ValidFilter() bool {
+	return f.ValidFilterSess(nil)
+}
+
+// ValidFilterSess is ValidFilter with explicit session residual sticky.
+func (f *VectorFilter) ValidFilterSess(s *Session) bool {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	k := f.CurrentKind()
+	k := f.CurrentKindSess(s)
 	if k < 0 || k >= FilterKindMax {
 		return false
 	}
@@ -117,8 +137,13 @@ func (f *VectorFilter) ValidFilter() bool {
 
 // Add mirrors VectorFilter::add — push item if not already present.
 func (f *VectorFilter) Add(item int) *VectorFilter {
+	return f.AddSess(nil, item)
+}
+
+// AddSess is Add with explicit session residual sticky.
+func (f *VectorFilter) AddSess(s *Session, item int) *VectorFilter {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return f
 	}
 	for _, x := range f.items {
@@ -134,8 +159,13 @@ func (f *VectorFilter) Add(item int) *VectorFilter {
 // VectorFilter.cpp:75–77 — ptable ? ptable->get_max() : 100.
 // Nil receiver is a Go hole (C++ would not call through null); fail closed 0.
 func (f *VectorFilter) MaxProb() int {
+	return f.MaxProbSess(nil)
+}
+
+// MaxProbSess is MaxProb with explicit session residual sticky.
+func (f *VectorFilter) MaxProbSess(s *Session) int {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	if f.table == nil {
@@ -148,11 +178,16 @@ func (f *VectorFilter) MaxProb() int {
 // VectorFilter.cpp:79–83 — if !valid_filter() || ptable==nullptr return v;
 // else ptable->rnd_num_to_key(v).
 func (f *VectorFilter) Lookup(v int) int {
+	return f.LookupSess(nil, v)
+}
+
+// LookupSess is Lookup with explicit session residual sticky.
+func (f *VectorFilter) LookupSess(s *Session, v int) int {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
-	if !f.ValidFilter() || f.table == nil {
+	if !f.ValidFilterSess(s) || f.table == nil {
 		return v
 	}
 	return f.table.RndNumToKey(v)
@@ -162,15 +197,20 @@ func (f *VectorFilter) Lookup(v int) int {
 // VectorFilter.cpp:58–66.
 // Nil receiver: Go hole fail-closed reject (C++ null would crash).
 func (f *VectorFilter) Filter(v uint32) bool {
+	return f.FilterSess(nil, v)
+}
+
+// FilterSess is Filter with explicit session residual sticky.
+func (f *VectorFilter) FilterSess(s *Session, v uint32) bool {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	// VectorFilter.cpp:59–60 — invalid filter never rejects
-	if !f.ValidFilter() {
+	if !f.ValidFilterSess(s) {
 		return false
 	}
-	key := f.Lookup(int(v))
+	key := f.LookupSess(s, int(v))
 	found := false
 	for _, x := range f.items {
 		if x == key {
