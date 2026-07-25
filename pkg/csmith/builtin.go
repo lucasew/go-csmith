@@ -270,7 +270,7 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 		return nil
 	}
 	// Function.cpp:757–758 — FMList.push_back(new FactMgr(f)) at builtin create
-	fm := f.ensurePairedFactMgr()
+	fm := f.ensurePairedFactMgrSess(s)
 	if fmMap != nil {
 		_ = fmMap.ForFuncSess(s, f)
 	}

@@ -117,11 +117,12 @@ func NewFactMgr(f *Function) *FactMgr {
 	return NewFactMgrSess(nil, f)
 }
 
-// NewFactMgrSess constructs a FactMgr on an explicit session bag (nil → ambient).
+// NewFactMgrSess constructs a FactMgr on an explicit session bag.
+// Nil s leaves Sess nil for unit tests that install later; pureGenStrict must
+// pass a bag (no ambient dual-install).
 func NewFactMgrSess(s *Session, f *Function) *FactMgr {
 	return &FactMgr{
-		// Prefer explicit s; else active run bag under Generate; unit tests → defaultSession.
-		Sess:             sessOrAmbient(s),
+		Sess:             s,
 		Func:             f,
 		MapStmEffect:     make(map[int]Effect),
 		MapFactsIn:       make(map[int][]*FactPointTo),

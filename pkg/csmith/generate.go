@@ -24,9 +24,9 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 
 // Generate runs one generation using s as the only mutable bag for the run.
 // Bag-local: mid-gen paths pass s / g.Sess / cg.Sess; no activateSession dual-install.
-// pureGenStrict is opt-in (TestPureGenStrictResidual / PURE_GEN_STRICT=1) until residual
-// multi-seed ambient call sites are fully Sess-wired. Package-level bags remain only
-// for unit tests outside Generate.
+// pureGenStrict is on for the duration so residual Process*/sessOrAmbient(nil) panics
+// instead of writing defaultSession. Package-level bags remain only for unit tests
+// outside Generate (Process* helpers).
 func (s *Session) Generate(ctx context.Context) (string, error) {
 	if s == nil {
 		return "", fmt.Errorf("nil session")
@@ -34,6 +34,11 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+
+	// Lock bag-local purity for this run (panic on residual ambient Process*).
+	prevStrict := pureGenStrict
+	pureGenStrict = true
+	defer func() { pureGenStrict = prevStrict }()
 
 	opts := s.Opts
 	// Platform resolve when sizes needed later
