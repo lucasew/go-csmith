@@ -957,10 +957,15 @@ func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabil
 // Function always has return_type in C++; no soft invent "void" when missing.
 // RV present with Type-nil sticky (no invent fall through to ReturnType / void past
 // incomplete return-variable type shell).
-// Ambient ProcessOptions bridge; emit paths prefer returnTypeCOpts.}
+// Ambient ProcessOptions bridge; emit paths prefer returnTypeCSess / returnTypeCOptsSess.}
 
 func (f *Function) returnTypeC() string {
-	return f.returnTypeCOpts(ProcessOptions())
+	return f.returnTypeCSess(nil)
+}
+
+// returnTypeCSess is returnTypeC with Options/sticky from an explicit session bag.
+func (f *Function) returnTypeCSess(s *Session) string {
+	return f.returnTypeCOptsSess(s, sessOpts(s))
 }
 
 // returnTypeCOpts is returnTypeC with explicit session Options (const/volatile asserts).
@@ -1013,7 +1018,12 @@ func (f *Function) returnTypeCOptsSess(s *Session, opts Options) string {
 // opts nil uses ProcessOptions for arg_structs/arg_unions asserts.}
 
 func (f *Function) paramListC() string {
-	return f.paramListCOpts(ProcessOptions())
+	return f.paramListCSess(nil)
+}
+
+// paramListCSess is paramListC with Options/sticky from an explicit session bag.
+func (f *Function) paramListCSess(s *Session) string {
+	return f.paramListCOptsSess(s, sessOpts(s))
 }
 
 // paramListCOpts returns param C list, or "" if IR violates arg_structs/arg_unions asserts.
@@ -1088,7 +1098,12 @@ func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 // Function.cpp:516–531 — optional inline/static + qualified return + name(params).}
 
 func (f *Function) OutputHeader(forceStatic bool) string {
-	return f.OutputHeaderOpts(forceStatic, ProcessOptions())
+	return f.OutputHeaderSess(nil, forceStatic)
+}
+
+// OutputHeaderSess is OutputHeader with Options/sticky from an explicit session bag.
+func (f *Function) OutputHeaderSess(s *Session, forceStatic bool) string {
+	return f.OutputHeaderOptsSess(s, forceStatic, sessOpts(s))
 }
 
 // OutputHeaderOpts is OutputHeader with explicit Options for return/arg struct/union asserts.
@@ -1195,7 +1210,12 @@ func (f *Function) OutputForwardDecl() string {
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
 // Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
-	return f.OutputForwardDeclWith(forceStatic, r, withAttrs, ProcessOptions())
+	return f.OutputForwardDeclSess(nil, forceStatic, r, withAttrs)
+}
+
+// OutputForwardDeclSess is OutputForwardDeclOpts with Options/sticky from an explicit bag.
+func (f *Function) OutputForwardDeclSess(s *Session, forceStatic bool, r *Rng, withAttrs bool) string {
+	return f.OutputForwardDeclWithSess(s, forceStatic, r, withAttrs, sessOpts(s))
 }
 
 // OutputForwardDeclWith is OutputForwardDeclOpts with explicit session Options.
@@ -1239,7 +1259,12 @@ func (f *Function) OutputForwardDeclWithSess(sess *Session, forceStatic bool, r 
 // Function.cpp:533–541 — static? + type alias_name(params) __attribute__((alias("name"))).
 // Incomplete Function sticky empty (no invent alias shell without function).
 func (f *Function) OutputHeaderAlias(forceStatic bool) string {
-	return f.OutputHeaderAliasOpts(forceStatic, ProcessOptions())
+	return f.OutputHeaderAliasSess(nil, forceStatic)
+}
+
+// OutputHeaderAliasSess is OutputHeaderAlias with Options/sticky from an explicit bag.
+func (f *Function) OutputHeaderAliasSess(s *Session, forceStatic bool) string {
+	return f.OutputHeaderAliasOptsSess(s, forceStatic, sessOpts(s))
 }
 
 // OutputHeaderAliasOpts is OutputHeaderAlias with explicit session Options.
@@ -1294,7 +1319,12 @@ func (f *Function) OutputHeaderAliasOptsSess(s *Session, forceStatic bool, opts 
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
 // Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
-	return f.OutputForwardDeclAliasOpts(forceStatic, ProcessOptions())
+	return f.OutputForwardDeclAliasSess(nil, forceStatic)
+}
+
+// OutputForwardDeclAliasSess is OutputForwardDeclAlias with Options/sticky from an explicit bag.
+func (f *Function) OutputForwardDeclAliasSess(s *Session, forceStatic bool) string {
+	return f.OutputForwardDeclAliasOptsSess(s, forceStatic, sessOpts(s))
 }
 
 // OutputForwardDeclAliasOpts is OutputForwardDeclAlias with explicit session Options.
@@ -1326,12 +1356,17 @@ func (f *Function) OutputForwardDeclAliasOptsSess(s *Session, forceStatic bool, 
 // Output emits a C function definition (minimal statements).
 // Function.cpp:565–598 — builtins emit nothing.
 func (f *Function) Output() string {
-	return f.OutputOpts(false, false, nil)
+	return f.OutputSess(nil, false, false, nil)
+}
+
+// OutputSess is Output with Options/sticky from an explicit session bag.
+func (f *Function) OutputSess(s *Session, forceStatic, withAttrs bool, r *Rng) string {
+	return f.OutputOptsWithSess(s, forceStatic, withAttrs, r, sessOpts(s))
 }
 
 // OutputOpts adds force_static and optional function attributes on the header.
 func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
-	return f.OutputOptsWith(forceStatic, withAttrs, r, ProcessOptions())
+	return f.OutputSess(nil, forceStatic, withAttrs, r)
 }
 
 // OutputOptsWith is OutputOpts with explicit session Options (header asserts + body emit).

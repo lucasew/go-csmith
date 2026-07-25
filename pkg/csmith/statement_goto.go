@@ -346,7 +346,7 @@ func variableInitOutputSess(s *Session, v *Variable) string {
 	}
 	// Variable.cpp:656 / OutputDef — InitExpr first
 	if v.InitExpr != nil {
-		out := v.InitExpr.Output()
+		out := v.InitExpr.OutputSess(s)
 		// residual ERROR sticky — no invent soft-fallback Init past Output residual hole
 		if sessHasError(s) {
 			return ""

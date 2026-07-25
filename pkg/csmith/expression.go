@@ -1794,9 +1794,14 @@ func makeExpressionVariableFlags(
 
 // Output is a minimal C fragment (Expression::Output + optional cast).
 // Expression.cpp:227–232 output_cast — "(type) " prefix when cast_type set.
-// Ambient ProcessOptions bridge; emit paths prefer OutputOpts.
+// Ambient ProcessOptions bridge; emit paths prefer OutputSess / OutputOptsSess.
 func (e *Expression) Output() string {
-	return e.OutputOpts(ProcessOptions())
+	return e.OutputSess(nil)
+}
+
+// OutputSess is Output with Options/sticky from an explicit session bag.
+func (e *Expression) OutputSess(s *Session) string {
+	return e.OutputOptsSess(s, sessOpts(s))
 }
 
 // OutputOpts is Output with explicit session Options (const emit / access_once / lang_cpp).
@@ -1838,7 +1843,12 @@ func (e *Expression) OutputOptsSess(s *Session, opts Options) string {
 // IndentedOutput mirrors Expression::indented_output.
 // Expression.cpp:133–136 — output_tab(indent) + Output.
 func (e *Expression) IndentedOutput(indent int) string {
-	return e.IndentedOutputOpts(indent, ProcessOptions())
+	return e.IndentedOutputSess(nil, indent)
+}
+
+// IndentedOutputSess is IndentedOutput with Options/sticky from an explicit session bag.
+func (e *Expression) IndentedOutputSess(s *Session, indent int) string {
+	return e.IndentedOutputOptsSess(s, indent, sessOpts(s))
 }
 
 // IndentedOutputOpts is IndentedOutput with explicit session Options.
@@ -1857,7 +1867,11 @@ func (e *Expression) IndentedOutputOptsSess(s *Session, indent int, opts Options
 }
 
 func (e *Expression) outputBody() string {
-	return e.outputBodyOpts(ProcessOptions())
+	return e.outputBodySess(nil)
+}
+
+func (e *Expression) outputBodySess(s *Session) string {
+	return e.outputBodyOptsSess(s, sessOpts(s))
 }
 
 func (e *Expression) outputBodyOpts(opts Options) string {

@@ -381,7 +381,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		// Indices string form must match Expression.Output (virtual Variable::Output),
 		// not v.Name — itemized array IVs print as name[i]… (seed-48 g_106[4]).
 		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
-		idx := idxExpr.Output()
+		idx := idxExpr.OutputSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-continue later dims past index Output residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -395,7 +395,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			off := int(r.RndUpto(uint32(remain)))
 			if off > 0 {
 				offExpr := &Expression{
-					Term: TermConstant, Con: MakeInt(off), ExprType: GetIntType(),
+					Term: TermConstant, Con: MakeIntSess(vsSess(vs), off), ExprType: GetIntType(),
 				}
 				fi := &Invocation{
 					IsStd:  true,
@@ -404,7 +404,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 					// Safe nil: ArrayVariable index add must not use safe_* wrappers
 				}
 				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
-				idx = idxExpr.Output()
+				idx = idxExpr.OutputSess(vsSess(vs))
 				// residual ERROR sticky — no invent soft-continue later dims past index Output residual
 				if sessHasError(vsSess(vs)) {
 					return nil

@@ -95,7 +95,12 @@ func (v *Variable) OutputDecl(forceStatic bool) string {
 
 // OutputDeclOpts includes prefix_name option (ambient ProcessOptions for CV asserts).
 func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
-	return v.OutputDeclWith(forceStatic, prefixName, ProcessOptions())
+	return v.OutputDeclSess(nil, forceStatic, prefixName)
+}
+
+// OutputDeclSess is OutputDeclOpts with Options/sticky from an explicit session bag.
+func (v *Variable) OutputDeclSess(s *Session, forceStatic, prefixName bool) string {
+	return v.OutputDeclWithSess(s, forceStatic, prefixName, sessOpts(s))
 }
 
 // OutputDeclWith is OutputDeclOpts with explicit session Options (const/volatile asserts).
@@ -182,7 +187,7 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	// Variable.cpp:659 — assert(init); sticky no soft invent empty "= ;" RHS
 	var initOut string
 	if v.InitExpr != nil {
-		initOut = v.InitExpr.Output()
+		initOut = v.InitExpr.OutputSess(s)
 		// residual ERROR sticky — no invent soft-continue def past InitExpr Output residual
 		if sessHasError(s) {
 			return ""
@@ -254,7 +259,12 @@ func (v *Variable) OutputC() string {
 
 // OutputCOpts is Output with prefix_name (ambient ProcessOptions for access_once).
 func (v *Variable) OutputCOpts(prefixName bool) string {
-	return v.OutputCOptsWith(prefixName, ProcessOptions())
+	return v.OutputCSess(nil, prefixName)
+}
+
+// OutputCSess is OutputCOpts with Options/sticky from an explicit session bag.
+func (v *Variable) OutputCSess(s *Session, prefixName bool) string {
+	return v.OutputCOptsWithSess(s, prefixName, sessOpts(s))
 }
 
 // OutputCOptsWith is OutputCOpts with explicit session Options (access_once).

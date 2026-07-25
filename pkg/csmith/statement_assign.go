@@ -715,7 +715,7 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	rhs := st.Expr.Output()
+	rhs := st.Expr.OutputSess(s)
 	if rhs == "" {
 		if !sessHasError(s) {
 			sessNoteError(s, ErrGeneric)
@@ -765,7 +765,12 @@ func assignLhsTextSess(s *Session, st *Stmt, wrapVol bool) string {
 // Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).}
 
 func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
-	return OutputAssignAsExprOpts(st, wrapVol, ProcessOptions())
+	return OutputAssignAsExprSess(nil, st, wrapVol)
+}
+
+// OutputAssignAsExprSess is OutputAssignAsExpr with Options/sticky from an explicit bag.
+func OutputAssignAsExprSess(s *Session, st *Stmt, wrapVol bool) string {
+	return OutputAssignAsExprOptsSess(s, st, wrapVol, sessOpts(s))
 }
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.

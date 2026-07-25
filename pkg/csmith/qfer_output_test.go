@@ -796,9 +796,9 @@ func TestOutputForwardDeclHeaderResidualSticky(t *testing.T) {
 
 func TestOutputGlobalsOutputDefResidualSticky(t *testing.T) {
 	// OutputDef residual soft invent was soft-continue later globals invent partial section.
-	ClearError()
 	opts := Defaults()
-	g := NewProgramGenerator(NewSession(opts))
+	sess := NewSession(opts)
+	g := NewProgramGenerator(sess)
 	g.VS = NewVariableSelector(opts)
 	// Type-nil InitExpr residual on OutputDefFull
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
@@ -808,10 +808,11 @@ func TestOutputGlobalsOutputDefResidualSticky(t *testing.T) {
 	if s := g.OutputGlobals(); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed OutputGlobals", s)
 	}
-	if !HasError() {
+	// bag-local sticky (no ambient dual-sync)
+	if !HasErrorSess(sess) {
 		t.Fatal("InitExpr Output residual OutputGlobals must SetError sticky")
 	}
-	ClearError()
+	ClearErrorSess(sess)
 }
 
 func TestReturnTypeCNameResidualSticky(t *testing.T) {

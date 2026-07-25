@@ -1748,7 +1748,7 @@ func stmtOK(st Stmt) bool {
 // outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
 // indent is statement base indent (spaces/4); uses Emit* flags on b.
 func (b *Block) outputStmtsOnly(indent int) string {
-	return b.outputStmtsOnlyOpts(indent, false, ProcessOptions())
+	return b.outputStmtsOnlySess(nil, indent, false, sessOpts(nil))
 }
 
 // outputStmtsOnlyOpts is outputStmtsOnly with optional PreOutput skip.
@@ -2136,7 +2136,12 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 
 // Output emits C for the block with indent levels.
 func (b *Block) Output(indent int) string {
-	return b.OutputOpts(indent, ProcessOptions())
+	return b.OutputSess(nil, indent)
+}
+
+// OutputSess is Output with Options/sticky from an explicit session bag.
+func (b *Block) OutputSess(s *Session, indent int) string {
+	return b.OutputOptsSess(s, indent, sessOpts(s))
 }
 
 // OutputOpts is Block.Output with explicit session Options (no ambient ProcessOptions).

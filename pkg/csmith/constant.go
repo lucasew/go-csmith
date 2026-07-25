@@ -88,7 +88,7 @@ func MakeRandomUptoSess(s *Session, limit uint32, r *Rng) *Constant {
 // MakeInt mirrors Constant::make_int.
 // Constant.cpp:449–481 — optional mark_mutable_const wraps "(v)".
 func MakeInt(v int) *Constant {
-	return MakeIntOpts(v, ProcessOptions())
+	return MakeIntSess(nil, v)
 }
 
 // MakeIntSess is MakeInt with Options from an explicit session bag.
@@ -252,7 +252,12 @@ func (c *Constant) CompatibleWithExprSess(s *Session, exp *Expression) bool {
 // Constant.cpp:532–553 — paren negatives; pointer-0 → (void*)0 / nullptr; else cast+value.
 // Incomplete Constant sticky "" (no invent bare "0" for Type-nil shell).
 func (c *Constant) Output() string {
-	return c.OutputOpts(ProcessOptions())
+	return c.OutputSess(nil)
+}
+
+// OutputSess is Output with Options/sticky from an explicit session bag.
+func (c *Constant) OutputSess(s *Session) string {
+	return c.OutputOptsSess(s, sessOpts(s))
 }
 
 // OutputOpts is Output with explicit session Options (lang_cpp nullptr).

@@ -187,7 +187,7 @@ func CreateArrayVariable(
 		}
 		av.InitExprs = append(av.InitExprs, e)
 		// Keep InitValues for legacy tests / Fact paths that read strings
-		val := e.Output()
+		val := e.OutputSess(cgSess(cg))
 		if sessHasError(cgSess(cg)) {
 			return nil
 		}
@@ -268,7 +268,12 @@ func (av *ArrayVariable) IsGlobalSess(s *Session) bool {
 // ArrayVariable.cpp:512–521 OutputDecl — output_qualified_type + name + [sizes].
 // Do not invent bare Type.CName + storage IsVolatile (misplaces pointer vol).
 func (av *ArrayVariable) CDeclType() string {
-	return av.CDeclTypeOpts(ProcessOptions())
+	return av.CDeclTypeSess(nil)
+}
+
+// CDeclTypeSess is CDeclType with Options/sticky from an explicit session bag.
+func (av *ArrayVariable) CDeclTypeSess(s *Session) string {
+	return av.CDeclTypeOptsSess(s, sessOpts(s))
 }
 
 // CDeclTypeOpts is CDeclType with explicit session Options (const/volatile asserts).
@@ -884,7 +889,7 @@ func (av *ArrayVariable) buildInitRecursiveSess(s *Session, dimen int, initStrin
 // buildInitializerStr mirrors ArrayVariable::build_initializer_str.
 // ArrayVariable.cpp:450–474 — force_non_uniform → recursive seed path; else nested dims.
 func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
-	return av.buildInitializerStrOpts(initStrings, ProcessOptions())
+	return av.buildInitializerStrSess(nil, initStrings, sessOpts(nil))
 }
 
 // buildInitializerStrOpts is buildInitializerStr with explicit session Options (ambient seed).
@@ -936,7 +941,7 @@ func (av *ArrayVariable) buildInitializerStrSess(s *Session, initStrings []strin
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
 // ArrayVariable.cpp:491–520 — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
-	return av.OutputDefOpts(ProcessOptions())
+	return av.OutputDefSess(nil, sessOpts(nil))
 }
 
 // OutputDefOpts is OutputDef with explicit session Options (ambient ArrayInitSeed bag).
@@ -989,7 +994,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 	// init_values[i]->to_string() (Expression::Output at emit time, not cached Value).
 	vals := make([]string, 0, 1+len(av.InitExprs))
 	if av.InitExpr != nil {
-		out := av.InitExpr.Output()
+		out := av.InitExpr.OutputSess(s)
 		if sessHasError(s) {
 			return ""
 		}
@@ -997,7 +1002,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 			vals = append(vals, out)
 		}
 	} else if av.Init != nil {
-		out := av.Init.Output()
+		out := av.Init.OutputSess(s)
 		if sessHasError(s) {
 			return ""
 		}
@@ -1010,7 +1015,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		out := e.Output()
+		out := e.OutputSess(s)
 		if sessHasError(s) {
 			return ""
 		}
@@ -1375,7 +1380,7 @@ func (av *ArrayVariable) OutputAccessSess(s *Session) string {
 		for _, e := range av.IndexExprs {
 			// ArrayVariable.cpp:548–552 — indices[i]->Output always live Expression*
 			// sticky no invent empty brackets "[]" for empty index Output
-			idx := e.Output()
+			idx := e.OutputSess(s)
 			// residual ERROR sticky — no invent soft-continue later indices past Output residual
 			if sessHasError(s) {
 				return ""
@@ -1460,7 +1465,7 @@ func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expressio
 	if i >= 0 && i < len(av.Sizes) && av.Sizes[i] > 0 {
 		size = av.Sizes[i]
 	}
-	body := idx.Output()
+	body := idx.OutputSess(s)
 	// residual ERROR sticky — no invent soft-empty modulo past Output residual hole
 	if sessHasError(s) {
 		return ""

@@ -65,9 +65,14 @@ func (fi *Invocation) wrapperOpts() Options {
 // Output C for the invocation.
 // FunctionInvocationUnary::Output / FunctionInvocationBinary::Output —
 // safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
-// Ambient ProcessOptions bridge; emit prefers OutputOpts.
+// Ambient ProcessOptions bridge; emit prefers OutputSess / OutputOptsSess.
 func (fi *Invocation) Output() string {
-	return fi.OutputOpts(ProcessOptions())
+	return fi.OutputSess(nil)
+}
+
+// OutputSess is Output with Options/sticky from an explicit session bag.
+func (fi *Invocation) OutputSess(s *Session) string {
+	return fi.OutputOptsSess(s, sessOpts(s))
 }
 
 // OutputOpts is Output with explicit session Options (arg / wrapper emit).
