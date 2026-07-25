@@ -589,8 +589,13 @@ func rootBlock(b *Block) *Block {
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findParentOfStmIDInTree(root *Block, stmID int) *Block {
+	return findParentOfStmIDInTreeSess(nil, root, stmID)
+}
+
+// findParentOfStmIDInTreeSess is findParentOfStmIDInTree with explicit session residual sticky.
+func findParentOfStmIDInTreeSess(s *Session, root *Block, stmID int) *Block {
 	if root == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var walk func(b *Block) *Block
@@ -603,11 +608,11 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 			if st.StmID == stmID {
 				return b
 			}
-			blks := GetBlocksStmt(st)
+			blks := GetBlocksStmtSess(s, st)
 			for _, nb := range blks {
 				if nb == nil {
 					// incomplete get_blocks arm sticky fail whole search
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return nil
 				}
 			}
@@ -627,8 +632,13 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 // (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findStmtByIDInTree(root *Block, stmID int) *Stmt {
+	return findStmtByIDInTreeSess(nil, root, stmID)
+}
+
+// findStmtByIDInTreeSess is findStmtByIDInTree with explicit session residual sticky.
+func findStmtByIDInTreeSess(s *Session, root *Block, stmID int) *Stmt {
 	if root == nil || StmIDUnset(stmID) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	var walk func(b *Block) *Stmt
@@ -641,17 +651,17 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 			if st.StmID == stmID {
 				return st
 			}
-			blks := GetBlocksStmt(st)
+			blks := GetBlocksStmtSess(s, st)
 			for _, nb := range blks {
 				if nb == nil {
 					// incomplete get_blocks arm sticky fail whole search
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(s, ErrGeneric)
 					return nil
 				}
 			}
 			for _, nb := range blks {
-				if s := walk(nb); s != nil {
-					return s
+				if found := walk(nb); found != nil {
+					return found
 				}
 			}
 		}
@@ -683,7 +693,7 @@ func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
 	}
 	// Resolve owning parent of stmID (C++ s->parent).
 	// 1) Under b only — works when dest is in current then-arm mid-gen.
-	owner := findParentOfStmIDInTree(b, stmID)
+	owner := findParentOfStmIDInTreeSess(s, b, stmID)
 	if sessHasError(s) {
 		return false
 	}
@@ -749,7 +759,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				return nil
 			}
 			if src == nil {
-				src = findStmtByIDInTree(rootBlock(b), e.SrcID)
+				src = findStmtByIDInTreeSess(cg.Sess, rootBlock(b), e.SrcID)
 				// residual ERROR sticky — no invent soft-continue expand past tree FindStmt hole
 				if sessHasError(cg.Sess) {
 					return nil
@@ -768,7 +778,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				}
 			}
 			if srcParent == nil {
-				srcParent = findParentOfStmIDInTree(rootBlock(b), e.SrcID)
+				srcParent = findParentOfStmIDInTreeSess(cg.Sess, rootBlock(b), e.SrcID)
 				if sessHasError(cg.Sess) {
 					return nil
 				}
@@ -791,13 +801,13 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			// VariableSelector.cpp:773–779
 			// b->contains_stmt(edge->dest) && !b->contains_stmt(edge->src)
-			if !BlockContainsStmID(b, destID) {
+			if !BlockContainsStmIDSess(cg.Sess, b, destID) {
 				if sessHasError(cg.Sess) {
 					return nil
 				}
 				continue
 			}
-			if BlockContainsStmID(b, e.SrcID) {
+			if BlockContainsStmIDSess(cg.Sess, b, e.SrcID) {
 				if sessHasError(cg.Sess) {
 					return nil
 				}
@@ -808,7 +818,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			// climb until block contains goto src (C++ while (!b->contains_stmt(src)))
 			cur := b
-			for cur != nil && !BlockContainsStmID(cur, e.SrcID) {
+			for cur != nil && !BlockContainsStmIDSess(cg.Sess, cur, e.SrcID) {
 				if sessHasError(cg.Sess) {
 					return nil
 				}
@@ -835,15 +845,20 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 // Block*/Variable* always live; nil hole or incomplete LocalVars fails closed
 // (nil blk, IncompleteVariables remaining — no invent empty remaining past hole).
 func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
+	return LowerBlockForVarsSess(nil, blks, vars)
+}
+
+// LowerBlockForVarsSess is LowerBlockForVars with explicit session residual sticky.
+func LowerBlockForVarsSess(s *Session, blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
 	if !VariablesComplete(vars) {
 		// incomplete vars/blocks fail closed sticky (no invent soft re-pick remaining)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil, IncompleteVariables()
 	}
 	remaining = append([]*Variable(nil), vars...)
 	for _, b := range blks {
 		if b == nil || !VariablesComplete(b.LocalVars) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil, IncompleteVariables()
 		}
 		var next []*Variable
@@ -925,10 +940,15 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 // Variable* always live on LocalVars; nil hole fails closed IncompleteVariables
 // (not bare nil invent empty-complete local pool).
 func GetAllLocalVars(b *Block) []*Variable {
+	return GetAllLocalVarsSess(nil, b)
+}
+
+// GetAllLocalVarsSess is GetAllLocalVars with explicit session residual sticky.
+func GetAllLocalVarsSess(s *Session, b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, b.LocalVars...)
@@ -1107,7 +1127,7 @@ func (vs *VariableSelector) MakeInitValue(
 			invalid, true, true, noUnion)
 	} else {
 		if !vs.Opts.AddrTakenOfLocals {
-			invalid = GetAllLocalVars(b)
+			invalid = GetAllLocalVarsSess(vsSess(vs), b)
 			if !VariablesComplete(invalid) {
 				sessNoteError(vsSess(vs), ErrGeneric)
 				return nil
@@ -1242,7 +1262,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
 	// Incomplete GetCollective fails closed sticky (no invent not-eligible past hole)
-	coll := v.GetCollective()
+	coll := v.GetCollectiveSess(cg.Sess)
 	// residual ERROR sticky — no invent soft not-eligible past GetCollective residual
 	if sessHasError(cg.Sess) {
 		return false
@@ -2065,6 +2085,11 @@ func ChooseOKVarMatchOptsSess(s *Session, r *Rng, vars []*Variable, want *Type, 
 }
 
 func typesMatchExact(a, b *Type) bool {
+	return typesMatchExactSess(nil, a, b)
+}
+
+// typesMatchExactSess is typesMatchExact with explicit session residual sticky.
+func typesMatchExactSess(s *Session, a, b *Type) bool {
 	// Type::match eExact is pointer identity (cached simple/pointer types).
 	// MatchExact does not read Options; Defaults avoids ambient ProcessOptions.
 	if a == nil || b == nil {
@@ -2072,7 +2097,7 @@ func typesMatchExact(a, b *Type) bool {
 	}
 	ok := a.MatchOpts(b, MatchExact, Defaults())
 	// residual ERROR sticky — no invent soft-match past Match residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -2082,8 +2107,13 @@ func typesMatchExact(a, b *Type) bool {
 // Variable always live; sticky (no invent soft-skip init bind past hole).
 // Nil init is complete no-op (nothing to store).
 func applyInitExpr(v *Variable, init *Expression) {
+	applyInitExprSess(nil, v, init)
+}
+
+// applyInitExprSess is applyInitExpr with explicit session residual sticky.
+func applyInitExprSess(s *Session, v *Variable, init *Expression) {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if init == nil {
@@ -2199,7 +2229,7 @@ func (vs *VariableSelector) createAndInitialize(
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	applyInitExpr(v, ie)
+	applyInitExprSess(vsSess(vs), v, ie)
 	vs.AllVars = append(vs.AllVars, v)
 	vs.VarCreated = true
 	return v
@@ -2208,16 +2238,21 @@ func (vs *VariableSelector) createAndInitialize(
 // varCollective returns get_collective() for FM (itemized array → parent collective).
 // Variable always live; sticky nil (no invent soft-skip collective past hole).
 func varCollective(v *Variable) *Variable {
+	return varCollectiveSess(nil, v)
+}
+
+// varCollectiveSess is varCollective with explicit session residual sticky.
+func varCollectiveSess(s *Session, v *Variable) *Variable {
 	if v == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	if v.AsArray != nil && v.AsArray.Collective != nil {
 		return &v.AsArray.Collective.Variable
 	}
-	coll := v.GetCollective()
+	coll := v.GetCollectiveSess(s)
 	// residual ERROR sticky — no invent soft-collective past GetCollective residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	return coll
@@ -2287,7 +2322,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	if v == nil {
 		return nil
 	}
-	applyInitExpr(v, ie)
+	applyInitExprSess(vsSess(vs), v, ie)
 	// VariableSelector.cpp:147–149 new_variable → AllVars
 	vs.AllVars = append(vs.AllVars, v)
 	vs.GlobalList = append(vs.GlobalList, v)
@@ -2295,7 +2330,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
-		coll := varCollective(v)
+		coll := varCollectiveSess(vsSess(vs), v)
 		if coll == nil {
 			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
 				vs.GlobalList = vs.GlobalList[:n-1]
@@ -2401,7 +2436,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
-		coll := varCollective(v)
+		coll := varCollectiveSess(vsSess(vs), v)
 		if coll == nil {
 			// drop partial GlobalList registration (no invent orphan global past hole)
 			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
@@ -3003,7 +3038,7 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
-		coll := varCollective(v)
+		coll := varCollectiveSess(vsSess(vs), v)
 		if coll == nil {
 			if n := len(block.LocalVars); n > 0 && block.LocalVars[n-1] == v {
 				block.LocalVars = block.LocalVars[:n-1]
@@ -3452,14 +3487,19 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 // VariableCreationProbability mirrors VariableCreationProbability.
 // VariableSelector.cpp:1063–1070 — flipcoin(10) global if allowed else local.
 func VariableCreationProbability(r *Rng, opts Options) VariableScope {
+	return VariableCreationProbabilitySess(nil, r, opts)
+}
+
+// VariableCreationProbabilitySess is VariableCreationProbability with explicit session residual sticky.
+func VariableCreationProbabilitySess(s *Session, r *Rng, opts Options) VariableScope {
 	// VariableSelector.cpp:1065 — ERROR_GUARD(MAX_VAR_SCOPE) sticky; no soft invent ParentLocal without RNG
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return MaxVarScope
 	}
 	flag := opts.GlobalVariables && r.RndFlipcoin(10)
 	// VariableSelector.cpp:1065 ERROR_GUARD after flipcoin
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return MaxVarScope
 	}
 	if flag {
@@ -3812,7 +3852,7 @@ func (vs *VariableSelector) GenerateNewVariable(
 	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtGenerateNewVariable) == BadDepth {
 		return nil
 	}
-	scope := VariableCreationProbability(r, vs.Opts)
+	scope := VariableCreationProbabilitySess(vsSess(vs), r, vs.Opts)
 	// VariableSelector.cpp:1096–1097 — ERROR_GUARD(nullptr) when creation scope is MAX
 	if scope == MaxVarScope || sessHasError(vsSess(vs)) {
 		return nil

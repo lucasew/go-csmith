@@ -411,7 +411,7 @@ func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts
 		return 0
 	}
 	// FactPointTo.cpp:448–450 — FactPointTo tmp(var->get_collective()); find_related_fact
-	coll := varCollective(v)
+	coll := varCollectiveSess(s, v)
 	if coll == nil {
 		// residual ERROR sticky — no invent soft-miss fact past get_collective hole
 		if !sessHasError(s) {
@@ -2145,7 +2145,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 		return true
 	}
 	if v.IsArray || isAF {
-		coll := varCollective(v)
+		coll := varCollectiveSess(s, v)
 		if sessHasError(s) {
 			return true
 		}
