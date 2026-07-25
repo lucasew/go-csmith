@@ -19,14 +19,19 @@ type ExtensionValue struct {
 // NewExtensionValue mirrors ExtensionValue::ExtensionValue(type, name).
 // ExtensionValue.cpp:42–52 — qfer non-const non-vol at depth 0.
 func NewExtensionValue(typ *Type, name string) *ExtensionValue {
+	return NewExtensionValueSess(nil, typ, name)
+}
+
+// NewExtensionValueSess is NewExtensionValue with explicit session residual sticky.
+func NewExtensionValueSess(s *Session, typ *Type, name string) *ExtensionValue {
 	// Type always live; sticky nil (no invent void/default type shell)
 	if typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	// empty name sticky (no invent base_name_only)
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return &ExtensionValue{
@@ -76,7 +81,7 @@ func AbsExtensionInitializeSess(s *Session, num int, r *Rng, probs *Probabilitie
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		ev := NewExtensionValue(typ, fmt.Sprintf("%s%d", AbsExtensionBaseName, i))
+		ev := NewExtensionValueSess(s, typ, fmt.Sprintf("%s%d", AbsExtensionBaseName, i))
 		if ev == nil || sessHasError(s) {
 			return nil
 		}
@@ -126,11 +131,17 @@ func AbsExtensionDefaultOutputDefinitionsSess(s *Session, values []*ExtensionVal
 
 // AbsExtensionOutputFirstFunInvocation mirrors OutputFirstFunInvocation.
 // AbsExtension.cpp:107–113 — "    " + invoke.Output + ";\n".
-// Incomplete invoke string sticky "" (no invent bare ";" call).}
+// Incomplete invoke string sticky "" (no invent bare ";" call).
 
 func AbsExtensionOutputFirstFunInvocation(invokeOut string) string {
+	return AbsExtensionOutputFirstFunInvocationSess(nil, invokeOut)
+}
+
+// AbsExtensionOutputFirstFunInvocationSess is AbsExtensionOutputFirstFunInvocation
+// with explicit session residual sticky.
+func AbsExtensionOutputFirstFunInvocationSess(s *Session, invokeOut string) string {
 	if invokeOut == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	return AbsExtensionTab + invokeOut + ";\n"
@@ -392,7 +403,7 @@ func ExtensionMgrOutputFirstFunInvocationSess(s *Session, invokeOut string) stri
 	if s.ExtensionActive {
 		switch s.ExtKind {
 		case "klee", "crest":
-			return AbsExtensionOutputFirstFunInvocation(invokeOut)
+			return AbsExtensionOutputFirstFunInvocationSess(s, invokeOut)
 		case "coverage":
 			return CoverageOutputFirstFunInvocationSess(s, s.ExtValues, invokeOut, s.CoverageSize)
 		default:
@@ -400,7 +411,7 @@ func ExtensionMgrOutputFirstFunInvocationSess(s *Session, invokeOut string) stri
 			return ""
 		}
 	}
-	return AbsExtensionOutputFirstFunInvocation(invokeOut)
+	return AbsExtensionOutputFirstFunInvocationSess(s, invokeOut)
 }
 
 // ExtensionValues returns active extension values_ (may be nil).
