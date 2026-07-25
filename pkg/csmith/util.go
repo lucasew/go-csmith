@@ -20,7 +20,7 @@ func Gensym(basename string) string {
 
 // GensymSess is Gensym on an explicit session bag.
 func GensymSess(s *Session, basename string) string {
-	return sessOrAmbient(s).GenSym.Next(basename)
+	return sessOrAmbient(s).GenSym.NextSess(s, basename)
 }
 
 // ResetDefaultGensym mirrors reset_gensym on the session counter.
@@ -45,11 +45,16 @@ func (g *GenSym) Reset() {
 // Nil receiver uses session GenSym (not a one-shot local counter).
 // empty basename is broken IR sticky — no invent bare "1"/"2" numeric names
 func (g *GenSym) Next(basename string) string {
+	return g.NextSess(nil, basename)
+}
+
+// NextSess is Next with explicit session residual sticky.
+func (g *GenSym) NextSess(s *Session, basename string) string {
 	if g == nil {
-		return Gensym(basename)
+		return GensymSess(s, basename)
 	}
 	if basename == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	g.count++
@@ -111,10 +116,15 @@ func OutputOpenEncloser(symbol string, indent int) (out string, newIndent int) {
 // OutputCloseEncloser mirrors util.cpp output_close_encloser.
 // util.cpp:166–174 — optional newline, indent--, tab + symbol.
 func OutputCloseEncloser(symbol string, indent int, noNewline bool) (out string, newIndent int) {
+	return OutputCloseEncloserSess(nil, symbol, indent, noNewline)
+}
+
+// OutputCloseEncloserSess is OutputCloseEncloser with explicit session residual sticky.
+func OutputCloseEncloserSess(s *Session, symbol string, indent int, noNewline bool) (out string, newIndent int) {
 	newIndent = indent - 1
 	if newIndent < 0 {
 		// incomplete indent sticky — fail closed clamp (no invent negative indent)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		newIndent = 0
 	}
 	var b strings.Builder
