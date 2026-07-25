@@ -1,35 +1,27 @@
-// Session owns all mutable generation state for one run (or the unit-test bag).
+// Session owns all mutable generation state for one run (or a unit-test bag).
 //
 // Public pure API:
 //
 //	out, err := NewSession(opts).Generate(ctx)
 //
-// Rule: generation mutables live only on *Session. Generate is bag-local
-// (g.Sess / cg.Sess); it never installs the unit-test ambient bag and does
-// not toggle any package meta lock (pureGenStrict deleted).
+// Rule: generation mutables live only on *Session. Generate is bag-local pure
+// (g.Sess / cg.Sess); no package-level mutable generation state.
 //
-// Quarantined ambient (unit tests only):
-//   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - cgSess/vsSess/fmSess/gSess/envSess panic on nil (no dual-fill)
-//   - nil-owner residual sticky: noteErr*/hasErr*/sessFrom* → ambient explicitly
-//   - residual: Filter() interface duals (ProbabilityFilter → throwaway NewSession;
-//     VectorFilter → vfSess which panics if Sess unset). noteErr*/hasErr* nil-owner:
-//     no ambient dual-fill (fail-closed only). sessFrom* nil → ambient read-only residual
-//     for unit tests. sessBK/vfSess/rSess panic on nil/unset. Most dual wrappers deleted.
-//   - NewVariableSelector requires *Session (no ambient install)
-//   - CVQualifiers + statement_meta + Effect + Variable duals deleted (*Sess only)
-//   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set
-//   - EmptyCGContext/WithFunc leave Sess nil — callers WithSession(…)
-//   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag
-//   - sessOrAmbient/sessNoteError/sessOpts/sessProbs/sessRng(nil) panics
+// Session purity:
+//   - noteErr*/hasErr* nil-owner: fail-closed only (no package ambient write)
+//   - sessFrom* nil-owner: throwaway NewSession (no package ambient dual-fill);
+//     cgSess/vsSess/fmSess/gSess/envSess/rSess/sessBK/vfSess panic on nil/unset
+//   - Filter() interface duals: ProbabilityFilter uses throwaway NewSession;
+//     VectorFilter.Filter requires f.Sess set
+//   - NewVariableSelector / NewFactMgrSess / EmptyCGContext.WithSession require bag
+//   - Unit tests hold their own *Session (ambient_test.go testAmbientSession)
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
-// (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not
+// (canonical eSimple *Type cache - Used marks live on Session.simpleUsed, not
 // on the package Type objects).
 //
 // Concurrent Generate in one process is unsupported (upstream: one gen/process).
 // Fuzz workers are separate OS processes.
-// Generate is not fully pure while testAmbientSession + residual duals remain.
 //
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
@@ -173,12 +165,6 @@ type bookkeeperState struct {
 	relyOnPtrSize                    bool
 }
 
-// testAmbientSession is the quarantined Process* bag for unit tests outside
-// Generate. Generate never installs or writes this object. Non-Sess Process*
-// wrappers pass it explicitly into *Sess helpers. Delete once unit tests pass
-// explicit *Session and non-Sess bridges are removed.
-var testAmbientSession = newSession()
-
 func newSession() *Session {
 	s := &Session{
 		Opts:                   Defaults(),
@@ -194,15 +180,8 @@ func newSession() *Session {
 	return s
 }
 
-// currentSession returns the quarantined unit-test ambient bag.
-// Not used by Generate (bag-local s / g.Sess / cg.Sess only).
-func currentSession() *Session {
-	return testAmbientSession
-}
-
 // sessOrAmbient returns s when non-nil; panics on nil.
-// Unit-test bridges must pass testAmbientSession (or vsSess/cgSess/fmSess/envSess)
-// explicitly — no silent ambient dual-fill from residual *Sess(nil).
+// No package ambient dual-fill.
 func sessOrAmbient(s *Session) *Session {
 	if s != nil {
 		return s
@@ -211,8 +190,7 @@ func sessOrAmbient(s *Session) *Session {
 }
 
 // firstSess returns the first non-nil session among a, b.
-// Both nil panics — no silent ambient dual-fill (pass vsSess/cgSess/gSess or
-// testAmbientSession explicitly).
+// Both nil panics - no package ambient dual-fill.
 func firstSess(a, b *Session) *Session {
 	if a != nil {
 		return a
@@ -220,7 +198,7 @@ func firstSess(a, b *Session) *Session {
 	if b != nil {
 		return b
 	}
-	panic("firstSess: both nil (pass vsSess/cgSess or testAmbientSession)")
+	panic("firstSess: both nil (pass vsSess/cgSess/gSess or run bag)")
 }
 
 // NewSession constructs a pure run bag with the given options (no ambient write).
@@ -229,7 +207,3 @@ func NewSession(opts Options) *Session {
 	s.Opts = opts
 	return s
 }
-
-// CurrentSession returns the quarantined unit-test ambient bag.
-// Prefer holding *Session from NewSession; do not use from Generate paths.
-func CurrentSession() *Session { return currentSession() }

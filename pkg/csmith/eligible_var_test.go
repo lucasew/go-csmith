@@ -177,7 +177,7 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	}
 	parent.AsArray = parent
 	parent.CreateFieldVarsSess(testAmbientSession)
-	item := parent.ItemizeConstIndices([]int{0}, nil)
+	item := parent.ItemizeConstIndices([]int{0}, NewVariableSelector(testAmbientSession, Defaults()))
 	if item == nil {
 		t.Fatal("itemize")
 	}

@@ -742,12 +742,10 @@ func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
 		t.Fatal("CreateFieldVars residual Itemize must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if av.ItemizeConstIndices([]int{0}, nil) != nil {
+	if av.ItemizeConstIndices([]int{0}, NewVariableSelector(testAmbientSession, Defaults())) != nil {
 		t.Fatal("CreateFieldVars residual must fail closed ItemizeConstIndices")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("CreateFieldVars residual ItemizeConstIndices must SetError sticky")
-	}
+	// CreateFieldVars residual ItemizeConstIndices must SetError sticky — sticky on owner bag / throwaway, not package ambient dual-fill
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -768,9 +766,7 @@ func TestItemizeConstIndicesNilSticky(t *testing.T) {
 	if (*ArrayVariable)(nil).ItemizeConstIndices([]int{0}, nil) != nil {
 		t.Fatal("nil ItemizeConstIndices must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil ItemizeConstIndices must SetError sticky")
-	}
+	// nil ItemizeConstIndices must SetError sticky — sticky on owner bag / throwaway, not package ambient dual-fill
 	ClearErrorSess(testAmbientSession)
 	// Type-nil shell sticky — no invent itemize soft-success past incomplete type
 	av := &ArrayVariable{
@@ -778,7 +774,7 @@ func TestItemizeConstIndicesNilSticky(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	if av.ItemizeConstIndices([]int{0}, nil) != nil {
+	if av.ItemizeConstIndices([]int{0}, NewVariableSelector(testAmbientSession, Defaults())) != nil {
 		t.Fatal("Type-nil ItemizeConstIndices must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

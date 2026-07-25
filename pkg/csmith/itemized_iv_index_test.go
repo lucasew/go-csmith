@@ -13,7 +13,7 @@ func TestItemizedIVAsIndexExpressionOutput(t *testing.T) {
 		Sizes:    []int{5},
 	}
 	parent.AsArray = parent
-	item := parent.ItemizeConstIndices([]int{4}, nil)
+	item := parent.ItemizeConstIndices([]int{4}, NewVariableSelector(testAmbientSession, Defaults()))
 	if item == nil {
 		t.Fatal("itemize", GetErrorSess(testAmbientSession))
 	}

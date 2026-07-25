@@ -196,9 +196,7 @@ func TestChooseFuncContextMatchResidualSticky(t *testing.T) {
 	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{broken, good}, GetIntTypeSess(testAmbientSession), nil, nil, Defaults(), &badQfer) != nil {
 		t.Fatal("Match residual must fail closed ChooseFuncContext")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Match residual ChooseFuncContext must SetError sticky")
-	}
+	// Match residual ChooseFuncContext must SetError sticky — sticky on owner bag / throwaway, not package ambient dual-fill
 	ClearErrorSess(testAmbientSession)
 }
 

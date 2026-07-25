@@ -184,7 +184,7 @@ func TestGetCollectiveTopLevelArray(t *testing.T) {
 		t.Fatal("top-level collective GetCollective must not sticky", GetErrorSess(testAmbientSession))
 	}
 	// itemized member → collective parent
-	item := av.ItemizeConstIndices([]int{3}, nil)
+	item := av.ItemizeConstIndices([]int{3}, NewVariableSelector(testAmbientSession, Defaults()))
 	if item == nil {
 		t.Fatal("itemize")
 	}
@@ -217,7 +217,7 @@ func TestGetCollectiveArrayField(t *testing.T) {
 	if len(parent.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
-	item := parent.ItemizeConstIndices([]int{1}, nil)
+	item := parent.ItemizeConstIndices([]int{1}, NewVariableSelector(testAmbientSession, Defaults()))
 	if item == nil {
 		t.Fatal("itemize")
 	}

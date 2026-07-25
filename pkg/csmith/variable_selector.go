@@ -3445,23 +3445,34 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 		noteErrCG(cg, ErrGeneric)
 		return MaxVarScope
 	}
-	// VariableSelector.cpp:1050 — InitScopeTableSess(testAmbientSession); use session scopeTable_ only
-	// (no invent NewScopeThresholdTable per draw)
-	tab := sessScopeTab(sessFromCG(cg))
+	// Scope table lives on Session (InitScopeTableSess). Prefer CG bag; else Rng.Sess
+	// (unit tests / library with NewRngSess); else throwaway (no package ambient).
+	var s *Session
+	if cg != nil {
+		s = sessFromCG(cg)
+	} else if r.Sess != nil {
+		s = r.Sess
+	} else {
+		s = NewSession(opts)
+	}
+	tab := sessScopeTab(s)
 	if tab == nil {
 		// library path without InitScopeTable — sticky ERROR_GUARD MAX
 		_ = opts
 		noteErrCG(cg, ErrGeneric)
+		if cg == nil {
+			sessNoteError(s, ErrGeneric)
+		}
 		return MaxVarScope
 	}
 	filt := variableSelectFilter(tab, cg)
 	// C++ unbounded do-while; cap high (no soft invent MAX early)
 	for tries := 0; tries < 256; tries++ {
-		i := r.RndUptoFilterSess(sessFromCG(cg), 100, filt)
+		i := r.RndUptoFilterSess(s, 100, filt)
 		if hasErrCG(cg) {
 			return MaxVarScope
 		}
-		sc := VariableScope(tab.GetValueSess(sessFromCG(cg), int(i)))
+		sc := VariableScope(tab.GetValueSess(s, int(i)))
 		if sc < 0 {
 			return MaxVarScope
 		}

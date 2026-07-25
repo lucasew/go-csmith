@@ -19,7 +19,7 @@ func TestArrayInitAccessUsesItemizedIVOutput(t *testing.T) {
 		Sizes:    []int{5},
 	}
 	parent.AsArray = parent
-	iv := parent.ItemizeConstIndices([]int{4}, nil)
+	iv := parent.ItemizeConstIndices([]int{4}, NewVariableSelector(testAmbientSession, Defaults()))
 	if iv == nil {
 		t.Fatal("itemize")
 	}

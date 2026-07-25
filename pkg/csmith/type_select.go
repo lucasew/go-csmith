@@ -680,9 +680,18 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
+	// Prefer TypeEnv bag; else Rng.Sess; else throwaway (no package ambient).
+	var s *Session
+	if env != nil {
+		s = sessFromEnv(env)
+	} else if r.Sess != nil {
+		s = r.Sess
+	} else {
+		s = NewSession(opts)
+	}
 	var typ *Type
 	// Type.cpp:1609–1614 — pointer as LType (simple assign only); ERROR_GUARD after flip + make
-	if op == AssignSimple && probs != nil && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PPointerAsLTypeProb))) {
+	if op == AssignSimple && probs != nil && r.RndFlipcoinSess(s, uint32(probs.SingleSess(s, PPointerAsLTypeProb))) {
 		// Type.cpp:1610 — ERROR_GUARD(nullptr) after flipcoin
 		if hasErrEnv(env) {
 			return nil
@@ -690,7 +699,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 		if env != nil {
 			typ = env.MakeRandomPointerType(r, opts, probs)
 		}
-		// no soft invent PointerToSess(sessFromEnv(env), int) when env missing
+		// no soft invent PointerToSess(s, int) when env missing
 	}
 	// Type.cpp:1613 — ERROR_GUARD(nullptr) always after pointer branch (before default int)
 	// sticky error must not soft invent get_int_type()
@@ -706,11 +715,11 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
-		if len(cands) > 0 && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PStructAsLTypeProb))) {
+		if len(cands) > 0 && r.RndFlipcoinSess(s, uint32(probs.SingleSess(s, PStructAsLTypeProb))) {
 			if hasErrEnv(env) {
 				return nil
 			}
-			s := sessFromEnv(env)
+			s := s
 			typ = ChooseRandomStructUnionTypeSess(s, r, cands)
 			// Type.cpp:526 ERROR_GUARD inside choose_random_struct_union_type
 			if sessHasError(s) {
@@ -721,17 +730,17 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 
 	// Type.cpp:1628–1633 — float as LType
 	if typ == nil && AssignOpWorksForFloat(op) && probs != nil &&
-		r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PFloatAsLTypeProb))) {
+		r.RndFlipcoinSess(s, uint32(probs.SingleSess(s, PFloatAsLTypeProb))) {
 		if hasErrEnv(env) {
 			return nil
 		}
 		if opts.EnableFloat {
-			typ = GetSimpleTypeSess(sessFromEnv(env), EFloat)
+			typ = GetSimpleTypeSess(s, EFloat)
 		}
 	}
 	// Type.cpp:1635–1637 — default get_int_type()
 	if typ == nil {
-		typ = GetIntTypeSess(sessFromEnv(env))
+		typ = GetIntTypeSess(s)
 	}
 	return typ
 }

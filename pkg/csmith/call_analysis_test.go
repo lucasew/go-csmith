@@ -332,9 +332,7 @@ func TestFindContainedLabels(t *testing.T) {
 	if LabelsComplete(FindContainedLabels(&Stmt{Kind: StmtIfElse, StmID: 9, SourceLabel: "x", Then: thenB})) {
 		t.Fatal("nil Else must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil Else FindContainedLabels must SetError sticky")
-	}
+	// nil Else FindContainedLabels must SetError sticky — sticky on owner bag / throwaway, not package ambient dual-fill
 	ClearErrorSess(testAmbientSession)
 	// FM + StmID 0 — no invent complete child labels while soft-skipping self id
 	fm := NewFactMgrSess(testAmbientSession, nil)

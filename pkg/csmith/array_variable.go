@@ -616,8 +616,14 @@ func (av *ArrayVariable) IsVariantSess(s *Session, other *Variable) bool {
 // Itemized member (Collective set) is complete soft miss (not incomplete IR).}
 
 func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSelector) *ArrayVariable {
-	// Explicit bag: VS when present, else unit-test ambient (ItemizeConstIndices(nil vs)).
-	bag := sessFromVS(vs)
+	// Prefer VS bag; library/tests without VS use throwaway (no package ambient).
+	// Sticky residual for CreateFieldVars stays on bag only when VS provides it.
+	var bag *Session
+	if vs != nil {
+		bag = sessFromVS(vs)
+	} else {
+		bag = NewSession(Defaults())
+	}
 	if av == nil {
 		sessNoteError(bag, ErrGeneric)
 		return nil

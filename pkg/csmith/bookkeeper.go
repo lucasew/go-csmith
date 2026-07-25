@@ -12,7 +12,7 @@ import (
 // sessBK returns the bookkeeper counters for s. Nil s panics — no ambient dual-fill.
 func sessBK(s *Session) *bookkeeperState {
 	if s == nil {
-		panic("sessBK: nil Session (pass run bag or testAmbientSession)")
+		panic("sessBK: nil Session (pass run bag)")
 	}
 	return &s.BK
 }

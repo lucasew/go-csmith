@@ -15,7 +15,7 @@ const (
 
 // GetErrorSess returns GenError on an explicit session bag.
 // Non-Sess GetError/SetError/ClearError/HasError bridges are deleted — unit
-// tests pass testAmbientSession explicitly.
+// tests pass an explicit *Session (see ambient_test.go).
 func GetErrorSess(s *Session) int { return sessOrAmbient(s).GenError }
 
 // SetErrorSess sets GenError on an explicit session bag.
@@ -28,8 +28,7 @@ func ClearErrorSess(s *Session) { sessOrAmbient(s).GenError = ErrSuccess }
 func HasErrorSess(s *Session) bool { return sessOrAmbient(s).GenError != ErrSuccess }
 
 // sessNoteError writes GenError on an explicit bag. Nil s panics — residual
-// sticky must not dual-fill testAmbientSession (unit tests use *Sess helpers
-// or pass testAmbientSession / vsSess/cgSess/envSess/fmSess).
+// sticky must not dual-fill any package ambient (unit tests pass explicit bags).
 func sessNoteError(s *Session, code int) {
 	if s == nil {
 		panic("residual sessNoteError(nil)")
@@ -152,48 +151,48 @@ func hasErrEnv(env *TypeEnv) bool {
 	return sessHasError(env.Sess)
 }
 
-// sessFromCG returns c.Sess. Nil c → testAmbientSession (explicit unit-test nil-CG residual).
+// sessFromCG returns c.Sess. Nil owner → throwaway NewSession (no package ambient).
 // Unset Sess on live c still panics via cgSess.
 func sessFromCG(c *CGContext) *Session {
 	if c == nil {
-		// Unit-test residual when cg pointer absent — Generate always passes live cg.
-		return testAmbientSession
+		// Library residual without owner: throwaway bag (no package ambient).
+		return NewSession(Defaults())
 	}
 	return cgSess(c)
 }
 
-// sessFromFM returns fm.Sess. Nil fm → testAmbientSession.
+// sessFromFM returns fm.Sess. Nil owner → throwaway NewSession (no package ambient).
 func sessFromFM(fm *FactMgr) *Session {
 	if fm == nil {
-		// Unit-test residual when fm pointer absent — Generate always passes live fm.
-		return testAmbientSession
+		// Library residual without owner: throwaway bag (no package ambient).
+		return NewSession(Defaults())
 	}
 	return fmSess(fm)
 }
 
-// sessFromVS returns vs.Sess. Nil vs → testAmbientSession.
+// sessFromVS returns vs.Sess. Nil owner → throwaway NewSession (no package ambient).
 func sessFromVS(vs *VariableSelector) *Session {
 	if vs == nil {
-		// Unit-test residual when vs pointer absent — Generate always passes live vs.
-		return testAmbientSession
+		// Library residual without owner: throwaway bag (no package ambient).
+		return NewSession(Defaults())
 	}
 	return vsSess(vs)
 }
 
-// sessFromEnv returns env.Sess. Nil env → testAmbientSession.
+// sessFromEnv returns env.Sess. Nil owner → throwaway NewSession (no package ambient).
 func sessFromEnv(env *TypeEnv) *Session {
 	if env == nil {
-		// Unit-test residual when env pointer absent — Generate always passes live env.
-		return testAmbientSession
+		// Library residual without owner: throwaway bag (no package ambient).
+		return NewSession(Defaults())
 	}
 	return envSess(env)
 }
 
-// sessFromG returns g.Sess. Nil g → testAmbientSession.
+// sessFromG returns g.Sess. Nil owner → throwaway NewSession (no package ambient).
 func sessFromG(g *ProgramGenerator) *Session {
 	if g == nil {
-		// Unit-test residual when g pointer absent — Generate always passes live g.
-		return testAmbientSession
+		// Library residual without owner: throwaway bag (no package ambient).
+		return NewSession(Defaults())
 	}
 	return gSess(g)
 }

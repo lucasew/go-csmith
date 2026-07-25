@@ -84,7 +84,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 	if len(parent.FieldVars) < 2 {
 		t.Skip("need 2 fields")
 	}
-	item := parent.ItemizeConstIndices([]int{0}, nil)
+	item := parent.ItemizeConstIndices([]int{0}, NewVariableSelector(testAmbientSession, Defaults()))
 	item.CreateFieldVarsSess(testAmbientSession)
 	if len(item.FieldVars) < 1 {
 		t.Skip("item fields")

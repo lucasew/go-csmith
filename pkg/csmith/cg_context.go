@@ -60,7 +60,7 @@ type CGContext struct {
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
-// Sess is left nil — callers must WithSession(run bag) or WithSession(testAmbientSession).
+// Sess is left nil — callers must WithSession(run bag).
 // No ambient install (Generate-path purity).
 func EmptyCGContext() CGContext {
 	return CGContext{effectContext: EmptyEffect()}
@@ -68,7 +68,7 @@ func EmptyCGContext() CGContext {
 
 // ptrEmptyCG returns a heap EmptyCGContext for unit-test APIs that take *CGContext.
 func ptrEmptyCG() *CGContext {
-	c := EmptyCGContext().WithSession(testAmbientSession)
+	c := EmptyCGContext().WithSession(NewSession(Defaults()))
 	return &c
 }
 
@@ -136,7 +136,7 @@ func WithEffectContext(eff Effect) CGContext {
 }
 
 // WithFunc returns a context for generating inside f.
-// Sess is left nil — callers must WithSession(run bag) or WithSession(testAmbientSession).
+// Sess is left nil — callers must WithSession(run bag).
 func WithFunc(f *Function, eff Effect) CGContext {
 	return CGContext{effectContext: eff, CurrentFunc: f}
 }

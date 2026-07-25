@@ -133,7 +133,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 	}
 	collAV.AsArray = collAV
 	collAV.IsArray = true
-	item := collAV.ItemizeConstIndices([]int{1}, nil)
+	item := collAV.ItemizeConstIndices([]int{1}, NewVariableSelector(testAmbientSession, Defaults()))
 	if item == nil {
 		t.Fatal("itemize")
 	}
