@@ -115,7 +115,7 @@ func (v *Variable) OutputDeclWithSess(s *Session, forceStatic, prefixName bool, 
 		return ""
 	}
 	// Variable.cpp:670–676 — output_qualified_type always live type; sticky no invent " name"
-	ty := v.Qfer.OutputQualifiedTypeOpts(v.Type, opts)
+	ty := v.Qfer.OutputQualifiedTypeOptsSess(s, v.Type, opts)
 	// residual ERROR sticky — no invent soft-continue decl past OutputQualifiedType residual
 	if sessHasError(s) {
 		return ""
@@ -229,12 +229,12 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	b.WriteString(";")
 	// Variable.cpp:662–667 — is_volatile() only (locals too; comment text still says GLOBAL)
 	// OutputMgr.cpp:314–319 — immediately "/* " + comment + " */" (no invent space before /*)
-	if v.IsVolatile() {
+	if v.IsVolatileSess(s) {
 		// residual ERROR sticky — no invent soft-skip comment past IsVolatile residual
 		if sessHasError(s) {
 			return ""
 		}
-		nm := v.GetActualName(prefixName)
+		nm := v.GetActualNameSess(s, prefixName)
 		// residual ERROR sticky — no invent complete def past GetActualName residual
 		if sessHasError(s) {
 			return ""
@@ -1784,7 +1784,7 @@ func (v *Variable) IsPartialVolatileAfterDerefSess(s *Session, derefLevel int) b
 			return true
 		}
 	}
-	ok := t.IsVolatileStructUnion()
+	ok := t.IsVolatileStructUnionSess(s)
 	// residual ERROR sticky — no invent not-partial soft-skip past IsVolatileStructUnion hole
 	if sessHasError(s) {
 		return true

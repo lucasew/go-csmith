@@ -292,7 +292,7 @@ func (av *ArrayVariable) CDeclTypeOptsSess(s *Session, opts Options) string {
 		return ""
 	}
 	// ArrayVariable.cpp:517 — output_qualified_type(out)
-	ty := av.Qfer.OutputQualifiedTypeOpts(av.Type, opts)
+	ty := av.Qfer.OutputQualifiedTypeOptsSess(s, av.Type, opts)
 	// residual ERROR sticky — no invent soft-empty decl past OutputQualifiedType residual
 	if sessHasError(s) {
 		return ""
@@ -334,7 +334,15 @@ func (av *ArrayVariable) NoLoopInitializerSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if av.Type.IsAggregate() {
+	if av.Type.IsAggregateSess(s) {
+		// residual ERROR sticky — no invent no-loop true past IsAggregate residual
+		if sessHasError(s) {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue past IsAggregate residual false
+	if sessHasError(s) {
 		return true
 	}
 	if av.IsConstSess(s) {
@@ -966,7 +974,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 		return ""
 	}
 	// ArrayVariable.cpp:494–507 — OutputDecl always live; sticky no invent bare ";" / " = …"
-	decl := av.CDeclTypeOpts(opts)
+	decl := av.CDeclTypeOptsSess(s, opts)
 	// residual ERROR sticky — no invent soft-empty def past CDeclType residual
 	if sessHasError(s) {
 		return ""
@@ -976,7 +984,7 @@ func (av *ArrayVariable) OutputDefSess(s *Session, opts Options) string {
 		return ""
 	}
 	var b strings.Builder
-	if !av.NoLoopInitializer() {
+	if !av.NoLoopInitializerSess(s) {
 		// residual ERROR sticky — no invent decl-only path past NoLoopInitializer residual
 		if sessHasError(s) {
 			return ""

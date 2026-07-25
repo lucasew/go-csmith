@@ -1024,7 +1024,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 	}
 	// CVQualifiers.cpp:533 — assert(sanity_check(t)); sticky no invent bare CName for bad layout
 	if !q.Wildcard && len(q.IsConsts) > 0 {
-		if !q.SanityCheck(t) {
+		if !q.SanityCheckSess(s, t) {
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
 			}
@@ -1069,7 +1069,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 			// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
 			return ""
 		}
-		cn := t.CName()
+		cn := t.CNameSess(s)
 		// residual ERROR sticky — no invent soft-empty type past CName residual
 		if sessHasError(s) {
 			return ""
@@ -1083,7 +1083,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 		b.WriteString(" ")
 		return b.String()
 	}
-	base := t.BaseType()
+	base := t.BaseTypeSess(s)
 	// residual ERROR sticky — no invent soft-continue bare base past BaseType residual
 	if sessHasError(s) {
 		return ""
@@ -1093,7 +1093,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 	}
 	// For simple types with one qualifier level: "const volatile int "
 	// CVQualifiers.cpp:534–561 — single-level loop: quals then base + " "
-	if t.IsSimple() || t.IsAggregate() {
+	if t.IsSimpleSess(s) || t.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-qual emit past IsSimple/IsAggregate residual true
 		if sessHasError(s) {
 			return ""
@@ -1113,7 +1113,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 			}
 			b.WriteString("volatile ")
 		}
-		cn := t.CName()
+		cn := t.CNameSess(s)
 		// residual ERROR sticky — no invent soft-empty type past CName residual
 		if sessHasError(s) {
 			return ""
@@ -1161,7 +1161,7 @@ func (q CVQualifiers) OutputQualifiedTypeOptsSess(s *Session, t *Type, opts Opti
 			b.WriteString("volatile ")
 		}
 		if i == 0 {
-			cn := base.CName()
+			cn := base.CNameSess(s)
 			// residual ERROR sticky — no invent soft-empty pointer base past CName residual
 			if sessHasError(s) {
 				return ""
