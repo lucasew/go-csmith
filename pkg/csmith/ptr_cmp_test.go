@@ -72,7 +72,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 	// eq/ne draw alone
 	eqFlip := rFlags.RndFlipcoin(50)
 	_ = eqFlip
-	flags := MakeRandomBinaryKind(rFlags, opts, probs, GetIntTypeSess(testAmbientSession), nil, nil, SafeOpBinary, BinCmpEq)
+	flags := MakeRandomBinaryKindSess(testAmbientSession, rFlags, opts, probs, GetIntTypeSess(testAmbientSession), nil, nil, SafeOpBinary, BinCmpEq)
 	if flags == nil {
 		t.Fatal("flags")
 	}

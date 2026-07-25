@@ -10,7 +10,7 @@ func TestMakeRandomBinaryFloatPath(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
 	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
-	f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
+	f := MakeRandomBinaryKindSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -20,8 +20,8 @@ func TestMakeRandomBinaryFloatPath(t *testing.T) {
 	if !f.Op1Signed || !f.Op2Signed {
 		t.Fatal("float always signed")
 	}
-	if f.SizeToken() != "float" {
-		t.Fatal(f.SizeToken())
+	if f.SizeTokenSess(testAmbientSession) != "float" {
+		t.Fatal(f.SizeTokenSess(testAmbientSession))
 	}
 }
 
@@ -30,7 +30,7 @@ func TestMakeRandomBinaryAssignKind(t *testing.T) {
 	opts := Defaults()
 	// assign kind: op2 == op1
 	for seed := uint64(1); seed < 20; seed++ {
-		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpAssign, BinAdd)
+		f := MakeRandomBinaryKindSess(testAmbientSession, NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpAssign, BinAdd)
 		if f == nil {
 			t.Fatalf("seed %d: nil", seed)
 		}
@@ -44,7 +44,7 @@ func TestMakeRandomUnaryFloatPath(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = true
 	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
-	f := MakeRandomUnary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, nil, UnMinus)
+	f := MakeRandomUnarySess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), ft, nil, UnMinus)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -56,7 +56,7 @@ func TestMakeRandomUnaryFloatPath(t *testing.T) {
 	}
 	// SafeOpFlags.cpp:325 — assert no float unary; fail closed empty non-sticky (no invent int32)
 	ClearErrorSess(testAmbientSession)
-	if name := f.UnaryMinusFuncName(); name != "" {
+	if name := f.UnaryMinusFuncNameSess(testAmbientSession); name != "" {
 		t.Fatalf("float unary must fail closed, got %q", name)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -69,14 +69,14 @@ func TestMakeRandomUnaryIntPath(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.EnableFloat = false
-	f := MakeRandomUnary(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), nil, UnMinus)
+	f := MakeRandomUnarySess(testAmbientSession, NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), nil, UnMinus)
 	if f == nil {
 		t.Fatal("nil")
 	}
 	if f.Size == SafeFloat {
 		t.Fatal("int unary must not pick SafeFloat")
 	}
-	name := f.UnaryMinusFuncName()
+	name := f.UnaryMinusFuncNameSess(testAmbientSession)
 	if !strings.HasPrefix(name, "safe_unary_minus_func_") {
 		t.Fatalf("%q", name)
 	}
@@ -86,28 +86,28 @@ func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
 	// sticky no soft invent default int32 name / SizeToken for nil flags
 	ClearErrorSess(testAmbientSession)
 	var f *SafeOpFlags
-	if f.UnaryMinusFuncName() != "" {
+	if f.UnaryMinusFuncNameSess(testAmbientSession) != "" {
 		t.Fatal("nil flags must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil UnaryMinusFuncName must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f.BinaryFuncName("+") != "" {
+	if f.BinaryFuncNameSess(testAmbientSession, "+") != "" {
 		t.Fatal("nil BinaryFuncName must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil BinaryFuncName must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f.SizeToken() != "" {
+	if f.SizeTokenSess(testAmbientSession) != "" {
 		t.Fatal("nil SizeToken must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil SizeToken must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f.LHSType() != nil || f.RHSType() != nil {
+	if f.LHSTypeSess(testAmbientSession) != nil || f.RHSTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil LHS/RHS type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -152,14 +152,14 @@ func TestBinaryFuncNameInvalidSizeFailClosed(t *testing.T) {
 	// SafeOpFlags.cpp:239 assert invalid size; sticky no invent safe_add_func__s_s
 	ClearErrorSess(testAmbientSession)
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeOpSize(99)}
-	if got := f.BinaryFuncName("+"); got != "" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "+"); got != "" {
 		t.Fatal("invalid size must fail closed BinaryFuncName", got)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid size BinaryFuncName must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if got := f.BinaryFuncName("<<"); got != "" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "<<"); got != "" {
 		t.Fatal("invalid size shift must fail closed", got)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -171,19 +171,19 @@ func TestBinaryFuncNameInvalidSizeFailClosed(t *testing.T) {
 func TestBinaryFuncNameFloat(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat}
-	if got := f.BinaryFuncName("+"); got != "safe_add_func_float_f_f" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "+"); got != "safe_add_func_float_f_f" {
 		t.Fatalf("add %q", got)
 	}
-	if got := f.BinaryFuncName("-"); got != "safe_sub_func_float_f_f" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "-"); got != "safe_sub_func_float_f_f" {
 		t.Fatalf("sub %q", got)
 	}
-	if got := f.BinaryFuncName("*"); got != "safe_mul_func_float_f_f" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "*"); got != "safe_mul_func_float_f_f" {
 		t.Fatalf("mul %q", got)
 	}
-	if got := f.BinaryFuncName("/"); got != "safe_div_func_float_f_f" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "/"); got != "safe_div_func_float_f_f" {
 		t.Fatalf("div %q", got)
 	}
-	if got := f.BinaryFuncName("%"); got != "" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "%"); got != "" {
 		t.Fatalf("mod should be empty for float, got %q", got)
 	}
 	// float mod empty is non-sticky (no wrapper, not broken IR)
@@ -191,7 +191,7 @@ func TestBinaryFuncNameFloat(t *testing.T) {
 		t.Fatal("float mod empty must stay non-sticky")
 	}
 	// float unary minus name non-sticky empty (cast emit fallthrough)
-	if f.UnaryMinusFuncName() != "" {
+	if f.UnaryMinusFuncNameSess(testAmbientSession) != "" {
 		t.Fatal("float unary safe name must fail closed")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -244,7 +244,7 @@ func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
 	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
 	// pre-register so id is known; filter only id 1 — deny if id != 1
 	fname := "safe_unary_minus_func_int32_t_s"
-	id := SafeOpFlagsToID(fname)
+	id := SafeOpFlagsToIDSess(testAmbientSession, fname)
 	arg := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
@@ -357,7 +357,7 @@ func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = false
 	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
-	f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
+	f := MakeRandomBinaryKindSess(testAmbientSession, NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
 	if f == nil {
 		t.Fatal("MakeRandomBinaryKind nil", HasErrorSess(testAmbientSession), GetErrorSess(testAmbientSession))
 	}
@@ -370,16 +370,16 @@ func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 func TestOutputWrapperH(t *testing.T) {
 	ClearSafeOpWrapperNamesSess(testAmbientSession)
 	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
-	if OutputWrapperH() != "#define N_WRAP 0\n" {
-		t.Fatal(OutputWrapperH())
+	if OutputWrapperHSess(testAmbientSession, ) != "#define N_WRAP 0\n" {
+		t.Fatal(OutputWrapperHSess(testAmbientSession, ))
 	}
-	_ = SafeOpFlagsToID("func_add_int32_t")
-	_ = SafeOpFlagsToID("func_sub_int32_t")
+	_ = SafeOpFlagsToIDSess(testAmbientSession, "func_add_int32_t")
+	_ = SafeOpFlagsToIDSess(testAmbientSession, "func_sub_int32_t")
 	if WrapperNamesCountSess(testAmbientSession) != 2 {
 		t.Fatal(WrapperNamesCountSess(testAmbientSession))
 	}
-	if OutputWrapperH() != "#define N_WRAP 2\n" {
-		t.Fatal(OutputWrapperH())
+	if OutputWrapperHSess(testAmbientSession, ) != "#define N_WRAP 2\n" {
+		t.Fatal(OutputWrapperHSess(testAmbientSession, ))
 	}
 }
 

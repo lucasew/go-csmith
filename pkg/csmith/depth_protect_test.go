@@ -53,7 +53,7 @@ func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
 		t.Fatal("dtSafeOpFlags")
 	}
 	probs := NewProbabilities(opts)
-	if f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, 1), opts, probs, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd); f == nil {
+	if f := MakeRandomBinaryKindSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, probs, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd); f == nil {
 		t.Fatal("binary flags")
 	}
 	if t2 := RandomTypeFromType(NewRngSess(testAmbientSession, 1), nil, opts, probs, GetIntTypeSess(testAmbientSession), false, false); t2 == nil {

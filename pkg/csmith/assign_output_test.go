@@ -99,7 +99,7 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntTypeSess(testAmbientSession))
+	flags := MakeRandomBinarySess(testAmbientSession, NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntTypeSess(testAmbientSession))
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
@@ -131,9 +131,9 @@ func TestSafeMathWrapperAllowed(t *testing.T) {
 
 func TestSafeOpFlagsToIDStable(t *testing.T) {
 	ClearSafeOpWrapperNamesSess(testAmbientSession)
-	id1 := SafeOpFlagsToID("safe_add_func_int32_t_s_s")
-	id2 := SafeOpFlagsToID("safe_add_func_int32_t_s_s")
-	id3 := SafeOpFlagsToID("safe_sub_func_int32_t_s_s")
+	id1 := SafeOpFlagsToIDSess(testAmbientSession, "safe_add_func_int32_t_s_s")
+	id2 := SafeOpFlagsToIDSess(testAmbientSession, "safe_add_func_int32_t_s_s")
+	id3 := SafeOpFlagsToIDSess(testAmbientSession, "safe_sub_func_int32_t_s_s")
 	if id1 != id2 || id3 == id1 {
 		t.Fatal(id1, id2, id3)
 	}
@@ -221,7 +221,7 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 	// StatementAssign.cpp:543 — avoid_signed_overflow() && op_flags
 	// no soft invent safe_* when SafeMath off despite flags present
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
-	flags := MakeRandomBinary(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntTypeSess(testAmbientSession))
+	flags := MakeRandomBinarySess(testAmbientSession, NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), GetIntTypeSess(testAmbientSession))
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
 		Expr:      &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},

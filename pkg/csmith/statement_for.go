@@ -412,7 +412,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		return nil
 	}
 	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
-	// StatementFor.cpp:236–239 — not MakeRandomBinary (sOpBinary/BinAdd soft invent)
+	// StatementFor.cpp:236–239 — not MakeRandomBinarySess(s, sOpBinary/BinAdd soft invent)
 	incrBop, _ := incrOp.CompoundToBinaryOps()
 	// when no compound map, incrBop is MaxBinaryOp (C++ MAX_BINARY_OP)
 	flags1 := MakeRandomBinaryKindSess(sessFromCG(cg), r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)

@@ -213,7 +213,7 @@ func (fi *Invocation) outputUnarySess(s *Session, a0 string) string {
 		fname := fi.Safe.UnaryMinusFuncNameSess(s)
 		// SafeOpFlags.cpp:325 assert / empty name → cast path (no invent wrapper name)
 		if fname == "" {
-			return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
+			return unaryCastMinusSess(s, fi.Safe.SizeTokenSess(s), a0)
 		}
 		id := SafeOpFlagsToIDSess(s, fname)
 		// FunctionInvocationUnary.cpp:208–218 — safe_math_wrapper filter
@@ -236,12 +236,12 @@ func (fi *Invocation) outputUnarySess(s *Session, a0 string) string {
 		}
 		// wrapper denied → cast + standard (need_cast fallthrough)
 		// FunctionInvocationUnary.cpp:226–239
-		return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
+		return unaryCastMinusSess(s, fi.Safe.SizeTokenSess(s), a0)
 	}
 	// FunctionInvocationUnary.cpp:229–240 — ePlus/eNot/eBitNot or non-safe minus
 	if fi.Unary == "-" && fi.Safe != nil && !fi.OutSafeMath {
 		// need_cast when Safe flags exist but avoid_signed_overflow off
-		return unaryCastMinusSess(s, fi.Safe.SizeToken(), a0)
+		return unaryCastMinusSess(s, fi.Safe.SizeTokenSess(s), a0)
 	}
 	// FunctionInvocationUnary.cpp:192–242 — outer "(" + op + [cast] + arg.Output + ")"
 	// C++ does NOT wrap arg in extra parens after op (param_value[0]->Output only).
@@ -310,12 +310,12 @@ func (fi *Invocation) outputBinarySess(s *Session, a0, a1 string) string {
 			}
 			// wrapper denied → cast both operands (need_cast fallthrough)
 			// FunctionInvocationBinary.cpp:400–414
-			return binaryCastOpSess(s, fi.Safe.SizeToken(), a0, fi.Binary, a1)
+			return binaryCastOpSess(s, fi.Safe.SizeTokenSess(s), a0, fi.Binary, a1)
 		}
 	}
 	// need_cast when Safe present but SafeMath off for arith/shift
 	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && !fi.OutSafeMath {
-		return binaryCastOpSess(s, fi.Safe.SizeToken(), a0, fi.Binary, a1)
+		return binaryCastOpSess(s, fi.Safe.SizeTokenSess(s), a0, fi.Binary, a1)
 	}
 	return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
 }
@@ -1209,8 +1209,8 @@ func MakeRandomBinaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:219–221 — assert(lhs_type && rhs_type) sticky
-	lhsTy = flags.LHSType()
-	rhsTy = flags.RHSType()
+	lhsTy = flags.LHSTypeSess(sessFromCG(cg))
+	rhsTy = flags.RHSTypeSess(sessFromCG(cg))
 	if lhsTy == nil || rhsTy == nil {
 		noteErrCG(cg, ErrGeneric)
 		return nil
@@ -1752,7 +1752,7 @@ func MakeRandomUnaryInvocation(
 	if flags == nil {
 		return nil
 	}
-	argTy := flags.LHSType()
+	argTy := flags.LHSTypeSess(sessFromCG(cg))
 	if argTy == nil {
 		noteErrCG(cg, ErrGeneric)
 		return nil
@@ -1792,7 +1792,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		return "", ""
 	}
 	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield simple type sticky
-	ty1 := flags.LHSType()
+	ty1 := flags.LHSTypeSess(sessFromCG(&cg))
 	if ty1 == nil {
 		noteErrCG(&cg, ErrGeneric)
 		return "", ""
@@ -1819,7 +1819,7 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	// FunctionInvocationBinary.cpp:64–78 — flags_to_type(op2) always live for shifts;
 	// sticky no invent type1 stand-in for type2 past missing/non-simple RHS type shell
 	if op == BinLShift || op == BinRShift {
-		ty := flags.RHSType()
+		ty := flags.RHSTypeSess(sessFromCG(&cg))
 		if ty == nil {
 			noteErrCG(&cg, ErrGeneric)
 			return "", ""
@@ -1854,7 +1854,7 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 		return ""
 	}
 	// flags_to_type must yield simple type sticky
-	ty := flags.LHSType()
+	ty := flags.LHSTypeSess(sessFromCG(&cg))
 	if ty == nil {
 		noteErrCG(&cg, ErrGeneric)
 		return ""

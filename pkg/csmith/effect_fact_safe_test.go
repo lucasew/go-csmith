@@ -535,20 +535,20 @@ func TestSafeOpFlagsDummyAndFloat(t *testing.T) {
 	if d == nil || d.Size != SafeInt8 || d.Op1Signed || d.IsFunc {
 		t.Fatal(d)
 	}
-	c := d.Clone()
+	c := d.CloneSess(testAmbientSession)
 	if c == d || *c != *d {
 		t.Fatal("clone")
 	}
 	opts := Defaults()
 	opts.EnableFloat = false
-	if ReturnFloatTypeBinary(opts, GetSimpleTypeSess(testAmbientSession, EFloat), nil, nil, BinAdd) {
+	if ReturnFloatTypeBinarySess(testAmbientSession, opts, GetSimpleTypeSess(testAmbientSession, EFloat), nil, nil, BinAdd) {
 		t.Fatal("float off")
 	}
 	opts.EnableFloat = true
-	if !ReturnFloatTypeBinary(opts, GetSimpleTypeSess(testAmbientSession, EFloat), nil, nil, BinAdd) {
+	if !ReturnFloatTypeBinarySess(testAmbientSession, opts, GetSimpleTypeSess(testAmbientSession, EFloat), nil, nil, BinAdd) {
 		t.Fatal("rv float")
 	}
-	if !ReturnFloatTypeUnary(opts, nil, GetSimpleTypeSess(testAmbientSession, EFloat), UnMinus) {
+	if !ReturnFloatTypeUnarySess(testAmbientSession, opts, nil, GetSimpleTypeSess(testAmbientSession, EFloat), UnMinus) {
 		t.Fatal("unary float op")
 	}
 	if UnaryOpWorksForFloat(UnBitNot) {

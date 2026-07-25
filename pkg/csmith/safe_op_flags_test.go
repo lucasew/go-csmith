@@ -9,11 +9,11 @@ func TestMakeRandomBinarySafeName(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	r := NewRngSess(testAmbientSession, 2)
-	f := MakeRandomBinary(r, opts, probs, GetIntTypeSess(testAmbientSession))
+	f := MakeRandomBinarySess(testAmbientSession, r, opts, probs, GetIntTypeSess(testAmbientSession))
 	if f == nil {
 		t.Fatal("nil flags")
 	}
-	name := f.BinaryFuncName("+")
+	name := f.BinaryFuncNameSess(testAmbientSession, "+")
 	if !strings.HasPrefix(name, "safe_add_func_") {
 		t.Fatalf("%q", name)
 	}
@@ -35,7 +35,7 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	for seed := uint64(1); seed < 20; seed++ {
-		f := MakeRandomBinaryKind(NewRngSess(testAmbientSession, seed), opts, nil, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd)
+		f := MakeRandomBinaryKindSess(testAmbientSession, NewRngSess(testAmbientSession, seed), opts, nil, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd)
 		if f == nil {
 			// size pick may fail closed without call-site probs if process cleared
 			continue
@@ -44,7 +44,7 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 			t.Fatalf("nil probs must not invent signed true at 50%% seed=%d", seed)
 		}
 	}
-	u := MakeRandomUnary(NewRngSess(testAmbientSession, 2), opts, nil, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus)
+	u := MakeRandomUnarySess(testAmbientSession, NewRngSess(testAmbientSession, 2), opts, nil, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus)
 	if u != nil && u.Op1Signed {
 		t.Fatal("nil probs unary must not invent signed true at 50%")
 	}
@@ -135,7 +135,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearErrorSess(testAmbientSession)
 	// nil probs arg + nil process → sticky fail closed
-	if _, ok := pickSafeOpSize(NewRngSess(testAmbientSession, 1), nil); ok {
+	if _, ok := pickSafeOpSizeSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil); ok {
 		t.Fatal("nil probs must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -143,7 +143,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil RNG sticky
-	if _, ok := pickSafeOpSize(nil, probs); ok {
+	if _, ok := pickSafeOpSizeSess(testAmbientSession, nil, probs); ok {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -151,7 +151,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// explicit probs works
-	sz, ok := pickSafeOpSize(NewRngSess(testAmbientSession, 2), probs)
+	sz, ok := pickSafeOpSizeSess(testAmbientSession, NewRngSess(testAmbientSession, 2), probs)
 	if !ok || int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat {
 		t.Fatalf("got %v ok=%v", sz, ok)
 	}
@@ -160,7 +160,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	opts.UInt8 = false
 	probs2 := NewProbabilities(opts)
 	for i := 0; i < 100; i++ {
-		sz, ok := pickSafeOpSize(NewRngSess(testAmbientSession, uint64(i+1)), probs2)
+		sz, ok := pickSafeOpSizeSess(testAmbientSession, NewRngSess(testAmbientSession, uint64(i+1)), probs2)
 		if !ok {
 			t.Fatal("want size")
 		}
@@ -174,14 +174,14 @@ func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
 	// SafeOpFlags.cpp always uses rnd_*; no invent fixed flags
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if f := MakeRandomBinaryKind(nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd); f != nil {
+	if f := MakeRandomBinaryKindSess(testAmbientSession, nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd); f != nil {
 		t.Fatal("nil RNG binary must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeRandomBinaryKind must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if f := MakeRandomUnary(nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus); f != nil {
+	if f := MakeRandomUnarySess(testAmbientSession, nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus); f != nil {
 		t.Fatal("nil RNG unary must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -193,7 +193,7 @@ func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
 func TestSafeOpFlagsCloneNilSticky(t *testing.T) {
 	// SafeOpFlags* always live at clone; sticky no invent soft-skip past hole
 	ClearErrorSess(testAmbientSession)
-	if (*SafeOpFlags)(nil).Clone() != nil {
+	if (*SafeOpFlags)(nil).CloneSess(testAmbientSession) != nil {
 		t.Fatal("nil Clone must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -217,10 +217,10 @@ func TestSafeOpsSizeWeightNilSticky(t *testing.T) {
 func TestMakeDummyFlagsAndGetters(t *testing.T) {
 	// SafeOpFlags.cpp:61–63 make_dummy_flags; get_op*_sign / get_op_size
 	f := MakeDummyFlags()
-	if f.Op1Sign() || f.Op2Sign() || f.OpSize() != SafeInt8 || f.IsFunc {
+	if f.Op1SignSess(testAmbientSession) || f.Op2SignSess(testAmbientSession) || f.OpSizeSess(testAmbientSession) != SafeInt8 || f.IsFunc {
 		t.Fatalf("dummy: %+v", f)
 	}
-	if f.Clone().Size != SafeInt8 {
+	if f.CloneSess(testAmbientSession).Size != SafeInt8 {
 		t.Fatal("clone")
 	}
 	// SafeOpKind order matches C++ enum class
@@ -234,7 +234,7 @@ func TestMakeDummyFlagsAndGetters(t *testing.T) {
 		t.Fatal("unary minimal depth")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*SafeOpFlags)(nil).Op1Sign() || !HasErrorSess(testAmbientSession) {
+	if (*SafeOpFlags)(nil).Op1SignSess(testAmbientSession) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Op1Sign sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -243,36 +243,36 @@ func TestMakeDummyFlagsAndGetters(t *testing.T) {
 func TestSafeOpFlagsOutputPieces(t *testing.T) {
 	// SafeOpFlags.cpp:219–255 OutputSize/FuncOrMacro/Sign/Op1/Op2
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: false, IsFunc: true, Size: SafeInt32}
-	if f.OutputFuncOrMacro() != "func_" || f.OutputOp1() != "_s" || f.OutputOp2() != "_u" {
-		t.Fatalf("pieces: %q %q %q", f.OutputFuncOrMacro(), f.OutputOp1(), f.OutputOp2())
+	if f.OutputFuncOrMacroSess(testAmbientSession) != "func_" || f.OutputOp1Sess(testAmbientSession) != "_s" || f.OutputOp2Sess(testAmbientSession) != "_u" {
+		t.Fatalf("pieces: %q %q %q", f.OutputFuncOrMacroSess(testAmbientSession), f.OutputOp1Sess(testAmbientSession), f.OutputOp2Sess(testAmbientSession))
 	}
-	if f.OutputSize() != "int32_t" {
-		t.Fatal(f.OutputSize())
+	if f.OutputSizeSess(testAmbientSession) != "int32_t" {
+		t.Fatal(f.OutputSizeSess(testAmbientSession))
 	}
 	// unsigned op1 prefixes size with u
 	f.Op1Signed = false
-	if f.OutputSize() != "uint32_t" {
-		t.Fatal(f.OutputSize())
+	if f.OutputSizeSess(testAmbientSession) != "uint32_t" {
+		t.Fatal(f.OutputSizeSess(testAmbientSession))
 	}
 	// float size token
 	f.Size = SafeFloat
-	if f.OutputSize() != "float" {
-		t.Fatal(f.OutputSize())
+	if f.OutputSizeSess(testAmbientSession) != "float" {
+		t.Fatal(f.OutputSizeSess(testAmbientSession))
 	}
 	// to_string binary via Output pieces
 	f = &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
-	if got := f.BinaryFuncName("+"); got != "safe_add_func_int32_t_s_s" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "+"); got != "safe_add_func_int32_t_s_s" {
 		t.Fatal(got)
 	}
 	f.Op2Signed = false
-	if got := f.BinaryFuncName("<<"); got != "safe_lshift_func_int32_t_s_u" {
+	if got := f.BinaryFuncNameSess(testAmbientSession, "<<"); got != "safe_lshift_func_int32_t_s_u" {
 		t.Fatal(got)
 	}
-	if got := f.UnaryMinusFuncName(); got != "safe_unary_minus_func_int32_t_s" {
+	if got := f.UnaryMinusFuncNameSess(testAmbientSession); got != "safe_unary_minus_func_int32_t_s" {
 		t.Fatal(got)
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*SafeOpFlags)(nil).OutputSize() != "" || !HasErrorSess(testAmbientSession) {
+	if (*SafeOpFlags)(nil).OutputSizeSess(testAmbientSession) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputSize sticky")
 	}
 	ClearErrorSess(testAmbientSession)

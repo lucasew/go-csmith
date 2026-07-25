@@ -328,7 +328,7 @@ func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// shift always needs flags_to_type(op2); sticky no invent type1 stand-in for type2.
-	// Signed float LHS is simple; unsigned float RHS fails FlagsToType (assert path).
+	// Signed float LHS is simple; unsigned float RHS fails FlagsToTypeSess(testAmbientSession, assert path).
 	badShift := &SafeOpFlags{Op1Signed: true, Op2Signed: false, IsFunc: true, Size: SafeFloat}
 	f2 := &Function{Name: "f2", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk2 := &Block{Func: f2}

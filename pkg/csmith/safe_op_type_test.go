@@ -6,13 +6,13 @@ import (
 )
 
 func TestFlagsToTypeSignedSizes(t *testing.T) {
-	if FlagsToType(true, SafeInt8).SimpleSess(testAmbientSession) != EChar {
+	if FlagsToTypeSess(testAmbientSession, true, SafeInt8).SimpleSess(testAmbientSession) != EChar {
 		t.Fatal("int8")
 	}
-	if FlagsToType(false, SafeInt32).SimpleSess(testAmbientSession) != EUInt {
+	if FlagsToTypeSess(testAmbientSession, false, SafeInt32).SimpleSess(testAmbientSession) != EUInt {
 		t.Fatal("uint32")
 	}
-	if FlagsToType(true, SafeInt64).SimpleSess(testAmbientSession) != ELongLong {
+	if FlagsToTypeSess(testAmbientSession, true, SafeInt64).SimpleSess(testAmbientSession) != ELongLong {
 		t.Fatal("ll")
 	}
 }
@@ -42,7 +42,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 		t.Fatal(out)
 	}
 	// LHS/RHS types are simple
-	if fi.Safe.LHSType() == nil || !fi.Safe.LHSType().IsSimpleSess(testAmbientSession) {
+	if fi.Safe.LHSTypeSess(testAmbientSession) == nil || !fi.Safe.LHSTypeSess(testAmbientSession).IsSimpleSess(testAmbientSession) {
 		t.Fatal("lhs type")
 	}
 }
@@ -75,7 +75,7 @@ func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
 	opts.EnableFloat = true
 	// nil Type IsFloat residual false with SetError - but we skip nil checks
 	// Type-nil: IsFloat SetError + false
-	if ReturnFloatTypeBinary(opts, (*Type)(nil), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
+	if ReturnFloatTypeBinarySess(testAmbientSession, opts, (*Type)(nil), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
 		t.Fatal("nil rv must not invent float true")
 	}
 	// nil rv skipped by rv != nil check - no residual
@@ -84,7 +84,7 @@ func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 	}
 	// complete non-float
-	if ReturnFloatTypeBinary(opts, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
+	if ReturnFloatTypeBinarySess(testAmbientSession, opts, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
 		t.Fatal("int binary must not invent float")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -93,7 +93,7 @@ func TestReturnFloatTypeBinaryIsFloatResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// float rv
 	ft := GetSimpleTypeSess(testAmbientSession, EFloat)
-	if !ReturnFloatTypeBinary(opts, ft, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
+	if !ReturnFloatTypeBinarySess(testAmbientSession, opts, ft, GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), BinAdd) {
 		t.Fatal("float rv must return float true")
 	}
 	if HasErrorSess(testAmbientSession) {
