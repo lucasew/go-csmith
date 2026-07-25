@@ -1135,7 +1135,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if !UnionFactsComplete(inU) {
 		return ShortcutNone
 	}
-	if !SameFactVec(*facts, fm.UnionFacts, in, inU) {
+	if !SameFactVecSess(cgSess(cg), *facts, fm.UnionFacts, in, inU) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
 		if sessHasError(cgSess(cg)) {
 			return ShortcutNone
@@ -1147,7 +1147,7 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	// Statement.cpp:552 — !contains_unfixed_goto()
-	if ContainsUnfixedGotoBlock(b, fm) {
+	if ContainsUnfixedGotoBlockSess(cgSess(cg), b, fm) {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past unfixed residual true
 		if sessHasError(cgSess(cg)) {
 			return ShortcutNone
