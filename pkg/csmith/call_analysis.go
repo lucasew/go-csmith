@@ -29,13 +29,17 @@ func IncompleteInvocationsSlice() []*Invocation {
 // len(nil)==0 invents empty-complete call list / soft re-pick past holes).
 // out always live; sticky (no invent soft-skip collect past hole).
 func CollectCalledInvocationsExpr(e *Expression, out *[]*Invocation) {
+	CollectCalledInvocationsExprSess(nil, e, out)
+}
+
+func CollectCalledInvocationsExprSess(s *Session, e *Expression, out *[]*Invocation) {
 	if out == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !collectCalledInvocationsExpr(e, out) {
 		*out = IncompleteInvocationsSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 	}
 }
 
@@ -88,13 +92,17 @@ func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil invent empty).
 // out always live; sticky (no invent soft-skip collect past hole).
 func CollectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) {
+	CollectCalledInvocationsStmtSess(nil, st, out)
+}
+
+func CollectCalledInvocationsStmtSess(s *Session, st *Stmt, out *[]*Invocation) {
 	if out == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !collectCalledInvocationsStmt(st, out) {
 		*out = IncompleteInvocationsSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 	}
 }
 
@@ -154,13 +162,17 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil invent empty).
 // out always live; sticky (no invent soft-skip collect past hole).
 func CollectCalledInvocationsBlock(b *Block, out *[]*Invocation) {
+	CollectCalledInvocationsBlockSess(nil, b, out)
+}
+
+func CollectCalledInvocationsBlockSess(s *Session, b *Block, out *[]*Invocation) {
 	if out == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if !collectCalledInvocationsBlock(b, out) {
 		*out = IncompleteInvocationsSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 	}
 }
 
@@ -180,8 +192,12 @@ func collectCalledInvocationsBlock(b *Block, out *[]*Invocation) bool {
 // Expression.cpp:114–118.
 // Incomplete IR fails closed as -1 (no invent empty call count past holes).
 func FuncCount(e *Expression) int {
+	return FuncCountSess(nil, e)
+}
+
+func FuncCountSess(s *Session, e *Expression) int {
 	var calls []*Invocation
-	CollectCalledInvocationsExpr(e, &calls)
+	CollectCalledInvocationsExprSess(s, e, &calls)
 	if !InvocationsComplete(calls) {
 		return -1
 	}
@@ -193,21 +209,25 @@ func FuncCount(e *Expression) int {
 // Nil invoke / nil arg / incomplete FuncCount sticky true
 // (no invent certain order / no-call soft-skip past hole).
 func (fi *Invocation) HasUncertainCall() bool {
+	return fi.HasUncertainCallSess(nil)
+}
+
+func (fi *Invocation) HasUncertainCallSess(s *Session) bool {
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	cnt := 0
 	for _, a := range fi.Args {
 		if a == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		n := FuncCount(a)
+		n := FuncCountSess(s, a)
 		if n < 0 {
 			// FuncCount incomplete already stickies when needed; keep restrictive true
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
 			}
 			return true
 		}
@@ -222,36 +242,40 @@ func (fi *Invocation) HasUncertainCall() bool {
 // FunctionInvocation.cpp:396–406.
 // Nil invoke / nil arg sticky true (no invent skip hole as non-call).
 func (fi *Invocation) HasUncertainCallRecursive() bool {
+	return fi.HasUncertainCallRecursiveSess(nil)
+}
+
+func (fi *Invocation) HasUncertainCallRecursiveSess(s *Session) bool {
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, a := range fi.Args {
 		if a == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
 		if a.Term == TermFunction {
 			if a.Invoke == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(s, ErrGeneric)
 				return true
 			}
-			if a.Invoke.HasUncertainCallRecursive() {
+			if a.Invoke.HasUncertainCallRecursiveSess(s) {
 				// residual ERROR sticky — no invent uncertain true past nested recurse hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later args past nested residual
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
 	}
-	ok := fi.HasUncertainCall()
+	ok := fi.HasUncertainCallSess(s)
 	// residual ERROR sticky — no invent certain soft-skip past HasUncertainCall hole
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	return ok
@@ -261,16 +285,20 @@ func (fi *Invocation) HasUncertainCallRecursive() bool {
 // FunctionInvocation.cpp:408–416 — no TermFunction args.
 // Nil invoke / nil arg sticky false (no invent simple past hole).
 func (fi *Invocation) HasSimpleParams() bool {
+	return fi.HasSimpleParamsSess(nil)
+}
+
+func (fi *Invocation) HasSimpleParamsSess(s *Session) bool {
 	// C++ always has live FunctionInvocation*; nil shell sticky not-simple
 	// (no invent simple-params success without args IR)
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	for _, a := range fi.Args {
 		// param_value[i] always live; nil hole sticky not-simple
 		if a == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return false
 		}
 		if a.Term == TermFunction {
@@ -298,7 +326,7 @@ func HasUncertainCallRecursiveExprSess(s *Session, e *Expression) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		ok := e.Invoke.HasUncertainCallRecursive()
+		ok := e.Invoke.HasUncertainCallRecursiveSess(s)
 		// residual ERROR sticky — no invent certain soft-skip past Invoke recurse residual
 		if sessHasError(s) {
 			return true
@@ -335,7 +363,7 @@ func HasUncertainCallRecursiveExprSess(s *Session, e *Expression) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		ok := HasUncertainCallRecursiveStmt(e.Assign)
+		ok := HasUncertainCallRecursiveStmtSess(s, e.Assign)
 		// residual ERROR sticky — no invent certain soft-skip past Assign recurse hole
 		if sessHasError(s) {
 			return true
