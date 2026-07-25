@@ -53,6 +53,11 @@ const (
 // BinaryOpC returns the C operator token for eBinaryOps.
 // FunctionInvocationBinary::Output / GetOpString subset.
 func (op BinaryOp) BinaryOpC() string {
+	return op.BinaryOpCSess(nil)
+}
+
+// BinaryOpCSess is BinaryOpC with explicit session residual sticky.
+func (op BinaryOp) BinaryOpCSess(s *Session) string {
 	switch op {
 	case BinAdd:
 		return "+"
@@ -92,19 +97,24 @@ func (op BinaryOp) BinaryOpC() string {
 		return "<<"
 	default:
 		// invalid op sticky; no soft invent "+"
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
 
 // CmpOpC returns the C operator string for a comparison (for-loop tests).
 func (op BinaryOp) CmpOpC() string {
+	return op.CmpOpCSess(nil)
+}
+
+// CmpOpCSess is CmpOpC with explicit session residual sticky.
+func (op BinaryOp) CmpOpCSess(s *Session) string {
 	switch op {
 	case BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe:
-		return op.BinaryOpC()
+		return op.BinaryOpCSess(s)
 	default:
 		// invalid cmp sticky; no soft invent "<"
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
@@ -138,14 +148,19 @@ func PickBinaryOp(r *Rng, opts Options) BinaryOp {
 
 // PickBinaryOpSess is PickBinaryOp using session Probabilities.
 func PickBinaryOpSess(s *Session, r *Rng, opts Options) BinaryOp {
-	return PickBinaryOpProbs(r, opts, sessProbs(s))
+	return PickBinaryOpProbsSess(s, r, opts, sessProbs(s))
 }
 
 // PickBinaryOpProbs is PickBinaryOp with an explicit Probabilities bag.
 func PickBinaryOpProbs(r *Rng, opts Options, probs *Probabilities) BinaryOp {
+	return PickBinaryOpProbsSess(nil, r, opts, probs)
+}
+
+// PickBinaryOpProbsSess is PickBinaryOpProbs with explicit session residual sticky.
+func PickBinaryOpProbsSess(s *Session, r *Rng, opts Options, probs *Probabilities) BinaryOp {
 	// FunctionInvocation.cpp:179–183 — always rnd_upto; sticky no invent eAdd without draw
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return BinaryOp(MaxBinaryOp)
 	}
 	// BINARY_OPS_PROB_FILTER uses session Probabilities group (no invent opts-only
@@ -156,7 +171,7 @@ func PickBinaryOpProbs(r *Rng, opts Options, probs *Probabilities) BinaryOp {
 		_ = opts
 		return BinaryOp(MaxBinaryOp)
 	}
-	return BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), probs.BinaryOpsFilter()))
+	return BinaryOp(r.RndUptoFilterSess(s, uint32(MaxBinaryOp), probs.BinaryOpsFilter()))
 }
 
 // IsOrderedBinary mirrors FunctionInvocation::IsOrderedStandardFunc (&& / ||).
@@ -201,6 +216,11 @@ const MaxUnaryOp = int(UnBitNot) + 1
 
 // UnaryOpC returns the C token for eUnaryOps.
 func (op UnaryOp) UnaryOpC() string {
+	return op.UnaryOpCSess(nil)
+}
+
+// UnaryOpCSess is UnaryOpC with explicit session residual sticky.
+func (op UnaryOp) UnaryOpCSess(s *Session) string {
 	switch op {
 	case UnPlus:
 		return "+"
@@ -212,7 +232,7 @@ func (op UnaryOp) UnaryOpC() string {
 		return "~"
 	default:
 		// invalid unary sticky; no soft invent "-"
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
@@ -245,14 +265,19 @@ func PickUnaryOp(r *Rng, opts Options) UnaryOp {
 
 // PickUnaryOpSess is PickUnaryOp using session Probabilities.
 func PickUnaryOpSess(s *Session, r *Rng, opts Options) UnaryOp {
-	return PickUnaryOpProbs(r, opts, sessProbs(s))
+	return PickUnaryOpProbsSess(s, r, opts, sessProbs(s))
 }
 
 // PickUnaryOpProbs is PickUnaryOp with an explicit Probabilities bag.
 func PickUnaryOpProbs(r *Rng, opts Options, probs *Probabilities) UnaryOp {
+	return PickUnaryOpProbsSess(nil, r, opts, probs)
+}
+
+// PickUnaryOpProbsSess is PickUnaryOpProbs with explicit session residual sticky.
+func PickUnaryOpProbsSess(s *Session, r *Rng, opts Options, probs *Probabilities) UnaryOp {
 	// FunctionInvocation.cpp:146–148 — always rnd_upto; sticky no invent eMinus without draw
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return UnaryOp(MaxUnaryOp)
 	}
 	if probs == nil {
@@ -261,7 +286,7 @@ func PickUnaryOpProbs(r *Rng, opts Options, probs *Probabilities) UnaryOp {
 		_ = opts
 		return UnaryOp(MaxUnaryOp)
 	}
-	return UnaryOp(r.RndUptoFilter(uint32(MaxUnaryOp), probs.UnaryOpsFilter()))
+	return UnaryOp(r.RndUptoFilterSess(s, uint32(MaxUnaryOp), probs.UnaryOpsFilter()))
 }
 
 // NeedNoRHS mirrors StatementAssign::need_no_rhs.
@@ -303,12 +328,17 @@ func (op AssignOp) CompoundToBinaryOps() (BinaryOp, bool) {
 // StatementAssign.cpp:515–537 — lhs always live; rhs live when op needs it.
 // sticky no invent " = x" / "++" / "g = " empty-side shells
 func (op AssignOp) AssignOpC(name, rhs string) string {
+	return op.AssignOpCSess(nil, name, rhs)
+}
+
+// AssignOpCSess is AssignOpC with explicit session residual sticky.
+func (op AssignOp) AssignOpCSess(s *Session, name, rhs string) string {
 	if name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if !op.NeedNoRHS() && rhs == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	switch op {
@@ -344,7 +374,7 @@ func (op AssignOp) AssignOpC(name, rhs string) string {
 		return name + "--"
 	default:
 		// invalid assign op sticky; no soft invent simple assign
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
