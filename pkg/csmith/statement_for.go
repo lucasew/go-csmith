@@ -323,7 +323,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
-	signed := iv.Type.IsSigned()
+	signed := iv.Type.IsSignedSess(cgSess(cg))
 	// residual ERROR sticky — no invent for bounds past IsSigned residual hole
 	if sessHasError(cgSess(cg)) {
 		return nil

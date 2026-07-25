@@ -1585,12 +1585,12 @@ func MakeRandomBinaryPtrComparison(
 		return nil
 	}
 	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed (lang_cpp)
-	lt := left.GetType()
+	lt := left.GetTypeSess(cgSess(cg))
 	// residual ERROR sticky — no invent ptr-cmp past GetType residual hole
 	if sessHasError(cgSess(cg)) {
 		return nil
 	}
-	right.CheckAndSetCastOpts(lt, opts)
+	right.CheckAndSetCastOptsSess(cgSess(cg), lt, opts)
 	// residual ERROR sticky — no invent ptr-cmp past CheckAndSetCast residual hole
 	if sessHasError(cgSess(cg)) {
 		return nil
@@ -1651,13 +1651,13 @@ func MakeBinary(
 		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
-	lt, rt := lhs.GetType(), rhs.GetType()
+	lt, rt := lhs.GetTypeSess(cg.Sess), rhs.GetTypeSess(cg.Sess)
 	// residual ERROR sticky — no invent binary shell past GetType residual hole
 	if sessHasError(cg.Sess) {
 		return nil
 	}
 	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
-	flags := MakeRandomBinaryKind(r, opts, probs, nil, lt, rt, SafeOpBinary, op)
+	flags := MakeRandomBinaryKindSess(cg.Sess, r, opts, probs, nil, lt, rt, SafeOpBinary, op)
 	// FunctionInvocation.cpp:568 — ERROR_GUARD; no soft invent binary without flags
 	if flags == nil {
 		return nil

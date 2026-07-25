@@ -93,7 +93,7 @@ func MakeExpressionAssign(
 	// ExpressionAssign value type is LHS type (ExpressionAssign.h:get_type)
 	exprType := typ
 	if st.Lhs != nil {
-		if t := st.Lhs.GetType(); t != nil {
+		if t := st.Lhs.GetTypeSess(cgSess(cg)); t != nil {
 			// residual ERROR sticky — no invent ExpressionAssign shell past GetType residual
 			if sessHasError(cgSess(cg)) {
 				return nil

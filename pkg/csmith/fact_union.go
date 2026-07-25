@@ -876,7 +876,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 			return IncompleteUnionFactSlice()
 		}
 		// incomplete type IR sticky (no invent level-0 union transfer)
-		indirect, iok := rhs.IndirectLevelComplete()
+		indirect, iok := rhs.IndirectLevelCompleteSess(s)
 		if !iok {
 			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()

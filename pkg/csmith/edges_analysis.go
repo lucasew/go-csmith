@@ -586,13 +586,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			if st.Lhs != nil {
 				lhs = st.Lhs.Var
 				// incomplete Lhs type IR must not invent indir 0 assign facts
-				n, iok := st.Lhs.IndirectLevelComplete()
+				n, iok := st.Lhs.IndirectLevelCompleteSess(cgSess(cg))
 				if !iok {
 					sessNoteError(cgSess(cg), ErrGeneric)
 					return
 				}
 				indir = n
-				lhsWant = st.Lhs.GetType()
+				lhsWant = st.Lhs.GetTypeSess(cgSess(cg))
 				if sessHasError(cgSess(cg)) {
 					return
 				}

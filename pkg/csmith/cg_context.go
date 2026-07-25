@@ -643,7 +643,7 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 				sessNoteError(c.Sess, ErrGeneric)
 				return true
 			}
-			if nw.LooseMatch(v) || v.LooseMatch(nw) {
+			if nw.LooseMatchSess(c.Sess, v) || v.LooseMatchSess(c.Sess, nw) {
 				// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
 				if sessHasError(c.Sess) {
 					return true
@@ -663,7 +663,7 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 			sessNoteError(c.Sess, ErrGeneric)
 			return true
 		}
-		if v.LooseMatch(iv) {
+		if v.LooseMatchSess(c.Sess, iv) {
 			// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
 			if sessHasError(c.Sess) {
 				return true
@@ -1928,7 +1928,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	v := lhs.Var
 	// compound assign: validate as read first (Lhs.cpp:307–311)
 	if lhs.CompoundAssign {
-		ty := lhs.GetType()
+		ty := lhs.GetTypeSess(cgSess(c))
 		// residual ERROR sticky — no invent soft-continue visit past GetType residual
 		if sessHasError(cgSess(c)) {
 			return false

@@ -286,7 +286,7 @@ func RecordPointerComparisonsSess(s *Session, lhs, rhs *Expression) {
 	if lhs.Term == TermFunction || rhs.Term == TermFunction {
 		return
 	}
-	lt, rt := lhs.GetType(), rhs.GetType()
+	lt, rt := lhs.GetTypeSess(s), rhs.GetTypeSess(s)
 	// residual ERROR sticky — no invent soft-skip cmp stats past GetType residual hole
 	if sessHasError(s) {
 		return
@@ -296,12 +296,12 @@ func RecordPointerComparisonsSess(s *Session, lhs, rhs *Expression) {
 	if lt == nil || rt == nil {
 		return
 	}
-	lPtr := lt.IsPointerLike()
+	lPtr := lt.IsPointerLikeSess(s)
 	// residual ERROR sticky — no invent soft-skip cmp stats past IsPointerLike residual
 	if sessHasError(s) {
 		return
 	}
-	rPtr := rt.IsPointerLike()
+	rPtr := rt.IsPointerLikeSess(s)
 	// residual ERROR sticky — no invent soft-skip cmp stats past RHS IsPointerLike residual
 	if sessHasError(s) {
 		return
@@ -317,8 +317,8 @@ func RecordPointerComparisonsSess(s *Session, lhs, rhs *Expression) {
 	}
 	if lhs.Term == TermVariable && rhs.Term == TermVariable {
 		// incomplete type IR sticky — no invent ptr-vs-ptr counts via invented level 0
-		li, lok := lhs.IndirectLevelComplete()
-		ri, rok := rhs.IndirectLevelComplete()
+		li, lok := lhs.IndirectLevelCompleteSess(s)
+		ri, rok := rhs.IndirectLevelCompleteSess(s)
 		if !lok || !rok {
 			sessNoteError(s, ErrGeneric)
 			return
@@ -353,7 +353,7 @@ func RecordVarsWithBitfieldsSess(s *Session, t *Type) {
 	if sessHasError(s) {
 		return
 	}
-	level := t.IndirectLevel()
+	level := t.IndirectLevelSess(s)
 	// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
 	if sessHasError(s) {
 		return
@@ -1002,7 +1002,7 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 					hasNull++
 				}
 			}
-			if p.Type.IndirectLevel() > 1 {
+			if p.Type.IndirectLevelSess(s) > 1 {
 				// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
 				if sessHasError(s) {
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
@@ -1013,13 +1013,13 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 				// residual ERROR sticky — no invent soft-continue stats past IndirectLevel residual false
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 				break
-			} else if pt := p.Type.PtrType(); pt != nil {
+			} else if pt := p.Type.PtrTypeSess(s); pt != nil {
 				// residual ERROR sticky — no invent soft-count past PtrType residual hole
 				if sessHasError(s) {
 					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
 					break
 				}
-				if pt.IsSimple() {
+				if pt.IsSimpleSess(s) {
 					// residual ERROR sticky — no invent soft-count past IsSimple residual hole
 					if sessHasError(s) {
 						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0

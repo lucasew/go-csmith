@@ -36,7 +36,7 @@ func ReturnFloatTypeBinarySess(s *Session, opts Options, rv, op1, op2 *Type, bop
 	if !opts.EnableFloat {
 		return false
 	}
-	if rv != nil && rv.IsFloat() {
+	if rv != nil && rv.IsFloatSess(s) {
 		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
 		if sessHasError(s) {
 			return false
@@ -47,7 +47,7 @@ func ReturnFloatTypeBinarySess(s *Session, opts Options, rv, op1, op2 *Type, bop
 	if sessHasError(s) {
 		return false
 	}
-	if op1 != nil && op1.IsFloat() {
+	if op1 != nil && op1.IsFloatSess(s) {
 		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
 		if sessHasError(s) {
 			return false
@@ -58,7 +58,7 @@ func ReturnFloatTypeBinarySess(s *Session, opts Options, rv, op1, op2 *Type, bop
 	if sessHasError(s) {
 		return false
 	}
-	if op2 != nil && op2.IsFloat() {
+	if op2 != nil && op2.IsFloatSess(s) {
 		// residual ERROR sticky — no invent float-true past op2 IsFloat residual hole
 		if sessHasError(s) {
 			return false
@@ -86,7 +86,7 @@ func ReturnFloatTypeUnarySess(s *Session, opts Options, rv, op1 *Type, uop Unary
 	if !opts.EnableFloat {
 		return false
 	}
-	if rv != nil && rv.IsFloat() {
+	if rv != nil && rv.IsFloatSess(s) {
 		// residual ERROR sticky — no invent float-true past rv IsFloat residual hole
 		if sessHasError(s) {
 			return false
@@ -97,7 +97,7 @@ func ReturnFloatTypeUnarySess(s *Session, opts Options, rv, op1 *Type, uop Unary
 	if sessHasError(s) {
 		return false
 	}
-	if op1 != nil && op1.IsFloat() {
+	if op1 != nil && op1.IsFloatSess(s) {
 		// residual ERROR sticky — no invent float-true past op1 IsFloat residual hole
 		if sessHasError(s) {
 			return false
@@ -336,7 +336,7 @@ func MakeRandomBinaryKindSess(s *Session,
 	bop BinaryOp,
 ) *SafeOpFlags {
 	// SafeOpFlags.cpp:174–175 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtSafeOpFlags, op_kind, nullptr)
-	if DepthGuardByTypeFlag(opts, DtSafeOpFlags, int(opKind)) == BadDepth {
+	if DepthGuardByTypeFlagSess(s, opts, DtSafeOpFlags, int(opKind)) == BadDepth {
 		return nil
 	}
 	// SafeOpFlags.cpp:176+ — always uses rnd_* sticky; no soft invent fixed flags

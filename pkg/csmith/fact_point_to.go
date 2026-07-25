@@ -403,7 +403,7 @@ func OpportunisticValidateSess(s *Session, r *Rng, v *Variable, typ *Type, facts
 		return 0
 	}
 	// no extra indirection needed
-	if v.Type.IndirectLevel() <= typ.IndirectLevel() {
+	if v.Type.IndirectLevelSess(s) <= typ.IndirectLevelSess(s) {
 		return 1
 	}
 	// residual ERROR sticky — no invent soft-validate past IndirectLevel residual
@@ -2211,7 +2211,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 			if sessHasError(s) {
 				return true
 			}
-			il := p.Type.IndirectLevel()
+			il := p.Type.IndirectLevelSess(s)
 			// residual ERROR sticky — no invent soft-recurse past IndirectLevel residual
 			if sessHasError(s) {
 				return true

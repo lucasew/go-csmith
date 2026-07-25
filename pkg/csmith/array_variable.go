@@ -1487,12 +1487,12 @@ func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expressio
 		return ""
 	}
 	// cast signed index type to unsigned before %
-	if t.IsSigned() {
+	if t.IsSignedSess(s) {
 		// residual ERROR sticky — no invent cast path past IsSigned residual hole
 		if sessHasError(s) {
 			return ""
 		}
-		u := t.ToUnsigned()
+		u := t.ToUnsignedSess(s)
 		if u == nil {
 			// incomplete to_unsigned sticky — no invent bare modulo past hole
 			if !sessHasError(s) {
@@ -1504,7 +1504,7 @@ func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expressio
 		if sessHasError(s) {
 			return ""
 		}
-		cn := u.CName()
+		cn := u.CNameSess(s)
 		if cn == "" {
 			// incomplete unsigned CName sticky — no invent bare cast shell
 			if !sessHasError(s) {

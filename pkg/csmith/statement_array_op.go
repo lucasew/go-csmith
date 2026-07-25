@@ -316,7 +316,7 @@ func MakeRandomArrayInit(
 	var dims []*LoopControl
 	invalid := map[*Variable]bool{}
 	volCount := 0
-	if av.IsVolatile() {
+	if av.IsVolatileSess(cgSess(cg)) {
 		// residual ERROR sticky — no invent volCount past IsVolatile residual hole
 		if sessHasError(cgSess(cg)) {
 			return Stmt{}
@@ -349,7 +349,7 @@ func MakeRandomArrayInit(
 				iv = nil
 				break
 			}
-			if iv.Type.IsFloat() {
+			if iv.Type.IsFloatSess(cgSess(cg)) {
 				// residual ERROR sticky — no invent soft-continue then later IV past IsFloat hole
 				if sessHasError(cgSess(cg)) {
 					iv = nil
@@ -363,7 +363,7 @@ func MakeRandomArrayInit(
 				iv = nil
 				break
 			}
-			if iv.IsVolatile() {
+			if iv.IsVolatileSess(cgSess(cg)) {
 				// residual ERROR sticky — no invent soft-continue past IsVolatile hole
 				if sessHasError(cgSess(cg)) {
 					iv = nil
@@ -376,15 +376,15 @@ func MakeRandomArrayInit(
 				break
 			}
 			// StatementArrayOp.cpp:118–123 — strict_volatile / ccomp packed / signed_char
-			packed := opts.CComp && iv.IsPackedAggregateFieldVar()
+			packed := opts.CComp && iv.IsPackedAggregateFieldVarSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-continue past packed-field IR hole
 			if sessHasError(cgSess(cg)) {
 				iv = nil
 				break
 			}
-			if (opts.StrictVolatileRule && volCount > 1 && iv.IsVolatile()) ||
+			if (opts.StrictVolatileRule && volCount > 1 && iv.IsVolatileSess(cgSess(cg))) ||
 				packed ||
-				(!opts.SignedCharIndex && iv.Type.IsSignedChar()) {
+				(!opts.SignedCharIndex && iv.Type.IsSignedCharSess(cgSess(cg))) {
 				// residual from second IsVolatile sticky
 				if sessHasError(cgSess(cg)) {
 					iv = nil
@@ -507,7 +507,7 @@ func MakeRandomArrayInit(
 		}
 		return Stmt{}
 	}
-	parent := blk.RandomParentBlock(r, opts.GlobalVariables)
+	parent := blk.RandomParentBlockSess(cgSess(cg), r, opts.GlobalVariables)
 	// nil parent is valid when allowGlobal (global init site). ERROR_GUARD only on RNG error.
 	if sessHasError(cgSess(cg)) {
 		for _, d := range dims {

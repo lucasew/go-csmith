@@ -447,7 +447,7 @@ func (t *Type) ContainPointerFieldSess(s *Session) bool {
 	if t.ptrTo != nil {
 		return true
 	}
-	if t.IsAggregate() {
+	if t.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-continue scan past IsAggregate residual
 		if sessHasError(s) {
 			return true
@@ -458,7 +458,7 @@ func (t *Type) ContainPointerFieldSess(s *Session) bool {
 				sessNoteError(s, ErrGeneric)
 				return true
 			}
-			if f.Type.ContainPointerField() {
+			if f.Type.ContainPointerFieldSess(s) {
 				// residual ERROR sticky — no invent has-pointer true past nested hole
 				if sessHasError(s) {
 					return true
@@ -785,7 +785,7 @@ func (t *Type) CNameSess(s *Session) string {
 			}
 			return ""
 		}
-		signed := t.IsSigned()
+		signed := t.IsSignedSess(s)
 		if sessHasError(s) {
 			return ""
 		}
@@ -1038,12 +1038,12 @@ func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool
 		if t.ptrTo == other.ptrTo {
 			return true
 		}
-		ts := t.ptrTo.IsSimple()
+		ts := t.ptrTo.IsSimpleSess(s)
 		// residual ERROR sticky — no invent soft-convert past subject pointee IsSimple residual
 		if sessHasError(s) {
 			return false
 		}
-		os := other.ptrTo.IsSimple()
+		os := other.ptrTo.IsSimpleSess(s)
 		// residual ERROR sticky — no invent soft-convert past other pointee IsSimple residual
 		if sessHasError(s) {
 			return false
@@ -1054,12 +1054,12 @@ func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool
 			}
 			// Type.cpp:1439–1449
 			if opts.StrictFloat {
-				tf := t.ptrTo.IsFloat()
+				tf := t.ptrTo.IsFloatSess(s)
 				// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
 				if sessHasError(s) {
 					return false
 				}
-				of := other.ptrTo.IsFloat()
+				of := other.ptrTo.IsFloatSess(s)
 				if sessHasError(s) {
 					return false
 				}
@@ -1070,12 +1070,12 @@ func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool
 			if opts.LangCPP {
 				return false
 			}
-			sb1 := t.ptrTo.SizeInBytes()
+			sb1 := t.ptrTo.SizeInBytesSess(s)
 			// residual ERROR sticky — no invent size-equal past SizeInBytes residual
 			if sessHasError(s) {
 				return false
 			}
-			sb2 := other.ptrTo.SizeInBytes()
+			sb2 := other.ptrTo.SizeInBytesSess(s)
 			if sessHasError(s) {
 				return false
 			}
@@ -1163,17 +1163,17 @@ func (t *Type) IsEquivalentSess(s *Session, other *Type) bool {
 	if t == other {
 		return true
 	}
-	if t.IsSimpleSess(s) && other.IsSimple() {
+	if t.IsSimpleSess(s) && other.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent soft-equal past IsSimple residual hole
 		if sessHasError(s) {
 			return false
 		}
-		s1 := t.IsSigned()
+		s1 := t.IsSignedSess(s)
 		// residual ERROR sticky — no invent soft-equal past IsSigned residual hole
 		if sessHasError(s) {
 			return false
 		}
-		s2 := other.IsSigned()
+		s2 := other.IsSignedSess(s)
 		if sessHasError(s) {
 			return false
 		}
@@ -1182,7 +1182,7 @@ func (t *Type) IsEquivalentSess(s *Session, other *Type) bool {
 		if sessHasError(s) {
 			return false
 		}
-		n2 := other.SizeInBytes()
+		n2 := other.SizeInBytesSess(s)
 		if sessHasError(s) {
 			return false
 		}
@@ -1438,7 +1438,7 @@ func (t *Type) SignedOverflowPossibleSess(s *Session, intSize int) bool {
 	if sessHasError(s) {
 		return true
 	}
-	if !t.IsSigned() {
+	if !t.IsSignedSess(s) {
 		// residual ERROR sticky — no invent overflow-free soft-skip past IsSigned residual
 		if sessHasError(s) {
 			return true
@@ -1637,7 +1637,7 @@ func (t *Type) PrintfDirectiveSess(s *Session) string {
 			return ""
 		}
 		if sz >= 8 {
-			if t.IsSigned() {
+			if t.IsSignedSess(s) {
 				// residual ERROR sticky — no invent %lld past IsSigned residual hole
 				if sessHasError(s) {
 					return ""
@@ -1650,7 +1650,7 @@ func (t *Type) PrintfDirectiveSess(s *Session) string {
 			}
 			return "%llu"
 		}
-		if t.IsSigned() {
+		if t.IsSignedSess(s) {
 			// residual ERROR sticky — no invent %d past IsSigned residual hole
 			if sessHasError(s) {
 				return ""
@@ -1738,7 +1738,7 @@ func HasLongLongFieldSess(s *Session, fields []StructField) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if f.Type.IsSimple() {
+		if f.Type.IsSimpleSess(s) {
 			// residual ERROR sticky — no invent soft has-longlong past IsSimple residual
 			if sessHasError(s) {
 				return true
@@ -1749,7 +1749,7 @@ func HasLongLongFieldSess(s *Session, fields []StructField) bool {
 		} else if sessHasError(s) {
 			return true
 		}
-		if f.Type.IsAggregate() {
+		if f.Type.IsAggregateSess(s) {
 			// residual ERROR sticky — no invent soft has-longlong past IsAggregate residual
 			if sessHasError(s) {
 				return true

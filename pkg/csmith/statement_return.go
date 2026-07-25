@@ -27,7 +27,7 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		v := st.Expr.Var
 		// incomplete type IR sticky (no invent level-0 skip / soft re-pick)
-		ind, iok := st.Expr.IndirectLevelComplete()
+		ind, iok := st.Expr.IndirectLevelCompleteSess(cgSess(cg))
 		if !iok {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false

@@ -402,7 +402,7 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:195–200 — strict_float uses RHS type for Lhs
 	lhsType := typ
 	if opts.StrictFloat && rhs != nil {
-		if rt := rhs.GetType(); rt != nil {
+		if rt := rhs.GetTypeSess(cgSess(cg)); rt != nil {
 			// residual ERROR sticky — no invent Lhs type soft-fallback past GetType residual
 			if sessHasError(cgSess(cg)) {
 				return Stmt{}
@@ -565,7 +565,7 @@ func makePossibleCompoundAssign(
 	}
 	lt := typ
 	if lhs != nil {
-		if t := lhs.GetType(); t != nil {
+		if t := lhs.GetTypeSess(cg.Sess); t != nil {
 			// residual ERROR sticky — no invent compound binary past GetType residual
 			if sessHasError(cg.Sess) {
 				return Stmt{}
@@ -591,7 +591,7 @@ func makePossibleCompoundAssign(
 			sessNoteError(cg.Sess, ErrGeneric)
 			return Stmt{}
 		}
-		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
+		flags = MakeRandomBinaryKindSess(cg.Sess, r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
 		if flags == nil || sessHasError(cg.Sess) {
 			return Stmt{}
@@ -1284,7 +1284,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		lhsVar = st.Lhs.Var
-		indir = st.Lhs.IndirectLevel()
+		indir = st.Lhs.IndirectLevelSess(cgSess(cg))
 		// residual ERROR sticky — no invent visit success past IndirectLevel residual
 		if sessHasError(cgSess(cg)) {
 			return false
@@ -1322,7 +1322,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		// Soft invent UpdateFactForAssign(var,…) missed (*union*) eUnionWrite transfer.
 		var lhsWant *Type
 		if st.Lhs != nil {
-			lhsWant = st.Lhs.GetType()
+			lhsWant = st.Lhs.GetTypeSess(cgSess(cg))
 			if sessHasError(cgSess(cg)) {
 				return false
 			}

@@ -1201,12 +1201,12 @@ func (vs *VariableSelector) MakeInitValue(
 				return nil
 			}
 			if chosen.Type != nil {
-				ci := chosen.Type.IndirectLevel()
+				ci := chosen.Type.IndirectLevelSess(vsSess(vs))
 				// residual ERROR sticky — no invent soft-count past IndirectLevel residual
 				if sessHasError(vsSess(vs)) {
 					return nil
 				}
-				ti := tt.IndirectLevel()
+				ti := tt.IndirectLevelSess(vsSess(vs))
 				// residual ERROR sticky — no invent soft-count past want IndirectLevel residual
 				if sessHasError(vsSess(vs)) {
 					return nil
@@ -1235,12 +1235,12 @@ func (vs *VariableSelector) MakeInitValue(
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		lv := chosen.Type.IndirectLevel()
+		lv := chosen.Type.IndirectLevelSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-address-taken past subject IndirectLevel residual
 		if sessHasError(vsSess(vs)) {
 			return nil
 		}
-		lw := t.IndirectLevel()
+		lw := t.IndirectLevelSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-address-taken past desired IndirectLevel residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -1641,9 +1641,9 @@ func (vs *VariableSelector) SelectMustUseVar(
 				continue
 			}
 		}
-		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
+		deref := v.Type.IndirectLevelSess(vsSess(vs)) - typ.IndirectLevelSess(vsSess(vs))
 		// VariableSelector.cpp:1529–1532 — WRITE rejects const after deref
-		if access == AccessWrite && v.IsConstAfterDeref(deref) {
+		if access == AccessWrite && v.IsConstAfterDerefSess(vsSess(vs), deref) {
 			// residual ERROR sticky — no invent soft-continue past incomplete const peel
 			if sessHasError(vsSess(vs)) {
 				return nil
@@ -1871,12 +1871,12 @@ func ChooseVarFull(
 			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
-		lv := x.Type.IndirectLevel()
+		lv := x.Type.IndirectLevelSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-pick past subject IndirectLevel residual
 		if sessHasError(cg.Sess) {
 			return nil
 		}
-		lw := want.IndirectLevel()
+		lw := want.IndirectLevelSess(cg.Sess)
 		// residual ERROR sticky — no invent soft-pick past desired IndirectLevel residual
 		if sessHasError(cg.Sess) {
 			return nil
@@ -1915,13 +1915,13 @@ func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Op
 	// VariableSelector.cpp:459–471 — artificially increase odds of dereferencing
 	if want != nil && len(ok) > 1 {
 		var ptrs []*Variable
-		wantInd := want.IndirectLevel()
+		wantInd := want.IndirectLevelSess(s)
 		// residual ERROR sticky — no invent soft-bias past want IndirectLevel residual
 		if sessHasError(s) {
 			return nil
 		}
 		for _, vv := range ok {
-			lv := vv.Type.IndirectLevel()
+			lv := vv.Type.IndirectLevelSess(s)
 			// residual ERROR sticky — no invent soft-bias past candidate IndirectLevel residual
 			if sessHasError(s) {
 				return nil
@@ -1935,15 +1935,15 @@ func chooseVarFromOKSess(s *Session, r *Rng, want *Type, ok []*Variable, opts Op
 		}
 	}
 	// VariableSelector.cpp:484–514 — artificially increase odds of taking address
-	if want != nil && want.IsPointerLike() && len(ok) > 1 {
+	if want != nil && want.IsPointerLikeSess(s) && len(ok) > 1 {
 		var addressable []*Variable
-		wantInd := want.IndirectLevel()
+		wantInd := want.IndirectLevelSess(s)
 		// residual ERROR sticky — no invent soft-bias past want IndirectLevel residual
 		if sessHasError(s) {
 			return nil
 		}
 		for _, vv := range ok {
-			lv := vv.Type.IndirectLevel()
+			lv := vv.Type.IndirectLevelSess(s)
 			// residual ERROR sticky — no invent soft-bias past candidate IndirectLevel residual
 			if sessHasError(s) {
 				return nil
@@ -2644,7 +2644,7 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	level := typ.IndirectLevel()
+	level := typ.IndirectLevelSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-create struct past IndirectLevel residual
 	if sessHasError(vsSess(vs)) {
 		return nil
@@ -2735,7 +2735,7 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		sessNoteError(vsSess(vs), ErrGeneric)
 		return nil
 	}
-	level := typ.IndirectLevel()
+	level := typ.IndirectLevelSess(vsSess(vs))
 	// residual ERROR sticky — no invent soft-create local struct past IndirectLevel residual
 	if sessHasError(vsSess(vs)) {
 		return nil

@@ -502,7 +502,7 @@ func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 			return CVQualifiers{}
 		}
 		if e.Assign.Lhs != nil {
-			q := e.Assign.Lhs.GetQualifiers()
+			q := e.Assign.Lhs.GetQualifiersSess(s)
 			// residual ERROR sticky — no invent assign quals past Lhs GetQualifiers residual
 			if sessHasError(s) {
 				return CVQualifiers{}
@@ -1675,7 +1675,7 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			lv := v.Type.IndirectLevel()
+			lv := v.Type.IndirectLevelSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-filter past subject IndirectLevel residual
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {
@@ -1684,7 +1684,7 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			lw := typ.IndirectLevel()
+			lw := typ.IndirectLevelSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-filter past desired IndirectLevel residual
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {

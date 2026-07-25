@@ -73,7 +73,7 @@ func castIfNeeded(s *Session, exp *Expression) {
 	if exp.Term != TermConstant || exp.Con == nil {
 		return
 	}
-	ty := exp.GetType()
+	ty := exp.GetTypeSess(s)
 	// residual ERROR sticky — no invent soft-skip cast past GetType residual hole
 	if sessHasError(s) {
 		return
@@ -81,7 +81,7 @@ func castIfNeeded(s *Session, exp *Expression) {
 	if ty == nil {
 		return
 	}
-	isPtr := ty.IsPointerLike()
+	isPtr := ty.IsPointerLikeSess(s)
 	// residual ERROR sticky — no invent soft-continue cast past IsPointerLike residual
 	if sessHasError(s) {
 		return

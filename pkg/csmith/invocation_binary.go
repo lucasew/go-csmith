@@ -172,7 +172,7 @@ func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		ls, rs := lt.IsSigned(), rt.IsSigned()
+		ls, rs := lt.IsSignedSess(s), rt.IsSignedSess(s)
 		// residual ERROR sticky — no invent eInt/eUInt past IsSigned residual hole
 		if sessHasError(s) {
 			return nil
@@ -198,7 +198,7 @@ func (fi *Invocation) getTypeBinarySess(s *Session) *Type {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		ls := lt.IsSigned()
+		ls := lt.IsSignedSess(s)
 		// residual ERROR sticky — no invent eInt/eUInt past IsSigned residual hole
 		if sessHasError(s) {
 			return nil

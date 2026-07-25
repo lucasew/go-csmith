@@ -121,12 +121,12 @@ func (l *Lhs) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 		sessNoteError(s, ErrGeneric)
 		return 0, false
 	}
-	lv := l.Var.Type.IndirectLevel()
+	lv := l.Var.Type.IndirectLevelSess(s)
 	// residual ERROR sticky — no invent level-0 past subject IndirectLevel residual
 	if sessHasError(s) {
 		return 0, false
 	}
-	lw := want.IndirectLevel()
+	lw := want.IndirectLevelSess(s)
 	// residual ERROR sticky — no invent level-0 past desired IndirectLevel residual
 	if sessHasError(s) {
 		return 0, false
@@ -503,12 +503,12 @@ func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts 
 		if wt == nil {
 			wt = v.Type
 		}
-		vi := v.Type.IndirectLevel()
+		vi := v.Type.IndirectLevelSess(s)
 		// residual ERROR sticky — no invent soft-level past IndirectLevel residual hole
 		if sessHasError(s) {
 			return ""
 		}
-		wi := wt.IndirectLevel()
+		wi := wt.IndirectLevelSess(s)
 		// residual ERROR sticky — no invent soft-level past want IndirectLevel residual
 		if sessHasError(s) {
 			return ""
@@ -1114,7 +1114,7 @@ func selectDerefPointerInv(
 		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
-	il := typ.IndirectLevel()
+	il := typ.IndirectLevelSess(cg.Sess)
 	// residual ERROR sticky — no invent soft-create ptr past IndirectLevel residual
 	if sessHasError(cg.Sess) {
 		return nil

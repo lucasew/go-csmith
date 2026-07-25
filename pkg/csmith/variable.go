@@ -1719,7 +1719,7 @@ func (v *Variable) IsVolatileAfterDerefSess(s *Session, derefLevel int) bool {
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
-		t = t.PtrType()
+		t = t.PtrTypeSess(s)
 		// residual ERROR sticky — no invent soft-peel past PtrType residual
 		if sessHasError(s) {
 			return true
@@ -1730,7 +1730,7 @@ func (v *Variable) IsVolatileAfterDerefSess(s *Session, derefLevel int) bool {
 			return true
 		}
 	}
-	ok := t.IsVolatileStructUnion()
+	ok := t.IsVolatileStructUnionSess(s)
 	// residual ERROR sticky — no invent non-vol soft-skip past IsVolatileStructUnion hole
 	if sessHasError(s) {
 		return true
@@ -1969,7 +1969,7 @@ func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 	}
 	// special handling for array fields only (Variable.cpp:583–612)
 	// is_array_field is true for top-level arrays too, but those took the override above.
-	isAF := v.IsArrayField()
+	isAF := v.IsArrayFieldSess(s)
 	// residual ERROR sticky — no invent soft-collective past IsArrayField residual
 	if sessHasError(s) {
 		return nil
@@ -1994,7 +1994,7 @@ func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 		return nil
 	}
 	// incomplete field IR on path or parent sticky (no invent soft self-collective)
-	if !v.FieldVarsCompleteSess(s) || !parent.FieldVarsComplete() {
+	if !v.FieldVarsCompleteSess(s) || !parent.FieldVarsCompleteSess(s) {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
@@ -2184,7 +2184,7 @@ func (v *Variable) GetContainerUnionSess(s *Session) *Variable {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		if p.Type.IsUnion() {
+		if p.Type.IsUnionSess(s) {
 			// residual ERROR sticky — no invent soft-container past IsUnion residual true
 			if sessHasError(s) {
 				return nil
@@ -2233,12 +2233,12 @@ func (v *Variable) LooseMatchSess(s *Session, other *Variable) bool {
 	if sessHasError(s) {
 		return false
 	}
-	meU := me.GetContainerUnion()
+	meU := me.GetContainerUnionSess(s)
 	// residual ERROR sticky — no invent soft-continue past GetContainerUnion hole
 	if sessHasError(s) {
 		return false
 	}
-	youU := you.GetContainerUnion()
+	youU := you.GetContainerUnionSess(s)
 	if sessHasError(s) {
 		return false
 	}
