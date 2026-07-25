@@ -237,7 +237,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg *CGContext) *LoopControl {
 	// StatementFor always has RNG + VS + CG; sticky no invent iteration shell without them
 	if r == nil || vs == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:170–172 — assert(fm); assert(blk)
@@ -249,11 +249,11 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:176 — clear effect_stm before select
@@ -265,26 +265,26 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	var iv *Variable
 	for tries := 0; tries < 256; tries++ {
 		iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
-		if iv == nil || sessHasError(nil) {
+		if iv == nil || sessHasError(cgSess(cg)) {
 			return nil
 		}
 		// reject volatile IVs (infinite-loop / SE issues)
 		if iv.IsVolatile() {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile hole
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return nil
 			}
 			invalid[iv] = true
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue non-vol IV past IsVolatile residual false
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky on loop-ctrl pick
 		// (no invent IV shell past broken array IR)
 		if iv.IsArray && iv.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		break
@@ -299,28 +299,28 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 	if !cg.ReadIndices(iv, facts) {
 		// assert(read); no soft invent continue after failed index visit
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return nil
 	}
 	cg.WriteVar(iv)
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	cg.ReadVar(iv)
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 
 	// StatementFor.cpp:222 — assert(var->type)
 	if iv.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	signed := iv.Type.IsSigned()
 	// residual ERROR sticky — no invent for bounds past IsSigned residual hole
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	var initN, limitN, incrN int
@@ -338,7 +338,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		if mustArr == nil {
 			// residual ERROR already sticky, or empty complete nil slice?
 			// FindMustUseArrays returns nil only on sticky hole; empty is non-nil empty
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return nil
 			}
 		}
@@ -348,7 +348,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			arrVars := make([]*Variable, 0, len(mustArr))
 			for _, av := range mustArr {
 				if av == nil {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(cgSess(cg), ErrGeneric)
 					return nil
 				}
 				arrVars = append(arrVars, &av.Variable)
@@ -356,8 +356,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			pick := ChooseOKVar(r, arrVars)
 			// StatementFor.cpp:210–211 — assert(av); library fail closed
 			if pick == nil || pick.AsArray == nil {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return nil
 			}
@@ -394,16 +394,16 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		bound = InvalidIVBound
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
 		// StatementFor.cpp:79/82/102 ERROR_RETURN inside make_random_loop_control
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 	}
 
 	// --- build IR: init attach flags for incr (StatementFor.cpp:229–245) ---
 	lhs := &Lhs{Var: iv, Type: iv.Type}
-	cInit := MakeInt(initN)
+	cInit := MakeIntSess(cgSess(cg), initN)
 	// StatementFor.cpp:229–230 — Constant::make_int; ERROR_GUARD(nullptr)
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
@@ -411,7 +411,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	incrBop, _ := incrOp.CompoundToBinaryOps()
 	// when no compound map, incrBop is MaxBinaryOp (C++ MAX_BINARY_OP)
 	flags1 := MakeRandomBinaryKind(r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
-	if flags1 == nil || sessHasError(nil) {
+	if flags1 == nil || sessHasError(cgSess(cg)) {
 		return nil
 	}
 	initSt := &Stmt{
@@ -426,8 +426,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited) sticky
 	if !VisitFactsStatementAssign(initSt, cg, opts) {
 		// C++ assert(visited); sticky make_iteration failure (no invent soft re-pick past fail)
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return nil
 	}
@@ -439,21 +439,21 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// test: FunctionInvocation::make_binary(test_op, ExpressionVariable(iv), limit)
 	// StatementFor.cpp:255–263 — ERROR_GUARD on null (no soft bare Invocation)
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
-	cLimit := &Expression{Term: TermConstant, Con: MakeInt(limitN), ExprType: GetIntType()}
+	cLimit := &Expression{Term: TermConstant, Con: MakeIntSess(cgSess(cg), limitN), ExprType: GetIntType()}
 	testFi := MakeBinary(r, opts, probs, *cg, testOp, vExpr, cLimit)
-	if testFi == nil || sessHasError(nil) {
+	if testFi == nil || sessHasError(cgSess(cg)) {
 		return nil
 	}
 	testTy := testFi.GetType()
 	// residual ERROR sticky — no invent for-test ExprType past GetType residual hole
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testTy}
 
 	// incr assign (StatementFor.cpp:273–281)
 	lhs1 := &Lhs{Var: iv, Type: iv.Type}
-	cIncr := &Expression{Term: TermConstant, Con: MakeInt(incrN), ExprType: GetIntType()}
+	cIncr := &Expression{Term: TermConstant, Con: MakeIntSess(cgSess(cg), incrN), ExprType: GetIntType()}
 	var incrSt Stmt
 	if arrayBound {
 		// plain compound assign (no make_possible_compound)
@@ -630,18 +630,18 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	if body == nil || StmIDUnset(body.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// Full FactVec: point-to + eUnionWrite (AssignGlobalFactsFromMapIn).
 	fm.AssignGlobalFactsFromMapIn(body.StmID)
 	// residual ERROR sticky — no invent soft-must-return path past map_in assign residual
-	if sessHasError(nil) || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
+	if sessHasError(cgSess(cg)) || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return
 	}
@@ -655,8 +655,8 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return
 		}
@@ -671,7 +671,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// preUnion is still used by the must_return path below.
 	if body.MustReturn() {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
@@ -680,11 +680,11 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		if !FactsComplete(preFacts) || !UnionFactsComplete(preUnion) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return
 		}
 		fm.RestoreFactsPair(preFacts, preUnion)
-	} else if sessHasError(nil) {
+	} else if sessHasError(cgSess(cg)) {
 		// residual ERROR sticky — no invent soft-continue break-merge past MustReturn residual false
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
@@ -703,21 +703,21 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 				!UnionFactsComplete(outU) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
 			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return
 			}
 			// eUnionWrite half of merge_jump_facts on full FactVec
 			if !mergeJumpUnionFacts(&fm.UnionFacts, outU) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return
 			}
@@ -727,17 +727,17 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// for-stmt stm_id always live; incomplete body/pre effect fails closed sticky
 	if cg != nil && forSt != nil {
 		if StmIDUnset(forSt.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return
 		}
 		bodyEff := fm.GetMapStmEffect(body.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(preEffect) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return
 		}
 		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, preEffect)
 		if !EffectComplete(fm.GetMapStmEffect(forSt.StmID)) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 	}
 }

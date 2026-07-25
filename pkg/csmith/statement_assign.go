@@ -120,7 +120,7 @@ func MakeRandomAssignQfer(
 ) Stmt {
 	// StatementAssign.cpp always has RNG + CGContext; sticky no invent assign shell without them
 	if r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// StatementAssign.cpp:127 — assert(fm); nullptr empty Stmt (no Kind shell)
@@ -131,11 +131,11 @@ func MakeRandomAssignQfer(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return Stmt{}
 	}
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
@@ -158,12 +158,12 @@ func MakeRandomAssignQfer(
 		// Type::SelectLType(!SE-free, op)
 		seFree := cg.EffectContext().IsSideEffectFree()
 		// residual ERROR sticky — no invent soft-no-vol SelectLType past IsSideEffectFree residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		typ = SelectLType(r, opts, probs, cg.Types, !seFree, op)
 		// ERROR_GUARD after SelectLType RNG paths
-		if sessHasError(nil) || typ == nil {
+		if sessHasError(cgSess(cg)) || typ == nil {
 			return Stmt{}
 		}
 	}
@@ -171,11 +171,11 @@ func MakeRandomAssignQfer(
 	if typ != nil {
 		isCSU := typ.IsConstStructUnion()
 		// residual ERROR sticky — no invent soft-continue assign past IsConstStructUnion residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if isCSU {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return Stmt{}
 		}
 	}
@@ -183,7 +183,7 @@ func MakeRandomAssignQfer(
 	if typ != nil {
 		isF := typ.IsFloat()
 		// residual ERROR sticky — no invent soft-continue float op past IsFloat residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if isF && !AssignOpWorksForFloat(op) {
@@ -219,7 +219,7 @@ func MakeRandomAssignQfer(
 	}
 	if op.NeedNoRHS() {
 		// StatementAssign.cpp:138–144 — Constant::make_int(1); wildcard when no qf
-		rhs = &Expression{Term: TermConstant, Con: MakeInt(1)}
+		rhs = &Expression{Term: TermConstant, Con: MakeIntSess(cgSess(cg), 1)}
 		if !callerQf {
 			qfer.Wildcard = true
 		}
@@ -228,7 +228,7 @@ func MakeRandomAssignQfer(
 		if typ != nil {
 			isVSU := typ.IsVolatileStructUnion()
 			// residual ERROR sticky — no invent soft-continue RHS past IsVolatileStructUnion residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			if isVSU {
@@ -238,7 +238,7 @@ func MakeRandomAssignQfer(
 		}
 		// StatementAssign.cpp:148 — Expression::make_random; ERROR_GUARD (no const soft-fallback)
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
-		if rhs == nil || sessHasError(nil) {
+		if rhs == nil || sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if !callerQf {
@@ -255,11 +255,11 @@ func MakeRandomAssignQfer(
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
 			// residual ERROR sticky — no invent soft-continue compound past AddEffect residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			if !EffectComplete(runningEff) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return Stmt{}
 			}
 			// StatementAssign.cpp:156–159 — compound always set_volatile(false),
@@ -269,29 +269,29 @@ func MakeRandomAssignQfer(
 		// StatementAssign.cpp:161 — always fold RHS into running under strict_volatile
 		runningEff = runningEff.AddEffect(rhsAccum)
 		// residual ERROR sticky — no invent soft-continue strict-vol past AddEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if !EffectComplete(runningEff) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return Stmt{}
 		}
 		// StatementAssign.cpp:163–165 — not gated on qf:
 		// if (qfer.get_volatiles().size() && qfer.is_volatile()) set_volatile(false)
 		if qfer.IsVolatile() {
 			// residual ERROR sticky — no invent soft-clear vol past IsVolatile residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			qfer.SetVolatile(false, 0)
-		} else if sessHasError(nil) {
+		} else if sessHasError(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
 			return Stmt{}
 		}
 	} else {
 		// StatementAssign.cpp:168–181
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
-		if rhs == nil || sessHasError(nil) {
+		if rhs == nil || sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if !callerQf {
@@ -307,11 +307,11 @@ func MakeRandomAssignQfer(
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
 			// residual ERROR sticky — no invent soft-continue compound past AddEffect residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			if !EffectComplete(runningEff) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return Stmt{}
 			}
 			// StatementAssign.cpp:176–179 — compound always set_volatile(false)
@@ -322,9 +322,9 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:181 — merge_param_context(rhs_cg_context, true)
 	cg.MergeParamContext(rhsCG, true)
 	// incomplete effect after RHS merge fails closed sticky (no invent LHS / soft re-pick)
-	if sessHasError(nil) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return Stmt{}
 	}
@@ -334,18 +334,18 @@ func MakeRandomAssignQfer(
 	// when LhsWriteVars used bare nil on incomplete rhs_accum).
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		// residual ERROR sticky — no invent soft-skip WriteVarSet past LhsWriteVars residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		runningEff = runningEff.WriteVarSet(lw)
 		// residual ERROR sticky — no invent soft-continue LHS past WriteVarSet residual
-		if sessHasError(nil) || !EffectComplete(runningEff) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !EffectComplete(runningEff) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return Stmt{}
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(cgSess(cg)) {
 		// residual ERROR sticky — no invent soft-empty LhsWriteVars past residual hole
 		return Stmt{}
 	}
@@ -399,11 +399,11 @@ func MakeRandomAssignQfer(
 	if opts.StrictFloat && rhs != nil {
 		if rt := rhs.GetType(); rt != nil {
 			// residual ERROR sticky — no invent Lhs type soft-fallback past GetType residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			lhsType = rt
-		} else if sessHasError(nil) {
+		} else if sessHasError(cgSess(cg)) {
 			// residual ERROR sticky — no invent Lhs past GetType residual nil
 			return Stmt{}
 		}
@@ -423,7 +423,7 @@ func MakeRandomAssignQfer(
 	if rhs != nil && typ != nil {
 		rhs.CheckAndSetCastOpts(typ, opts)
 		// residual ERROR sticky — no invent Assign past CheckAndSetCast residual hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 	}
@@ -436,11 +436,11 @@ func MakeRandomAssignQfer(
 	if lhsVar != nil && lhsVar.Type != nil {
 		if bt := lhsVar.Type.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
 			// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			op = AssignSimple
-		} else if sessHasError(nil) {
+		} else if sessHasError(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue op past BaseType residual false
 			return Stmt{}
 		}
@@ -448,20 +448,20 @@ func MakeRandomAssignQfer(
 	if rhs != nil {
 		if rt := rhs.GetType(); rt != nil {
 			// residual ERROR sticky — no invent float-op soft-continue past GetType residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 			if bt := rt.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
 				// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
-				if sessHasError(nil) {
+				if sessHasError(cgSess(cg)) {
 					return Stmt{}
 				}
 				op = AssignSimple
-			} else if sessHasError(nil) {
+			} else if sessHasError(cgSess(cg)) {
 				// residual ERROR sticky — no invent soft-continue op past BaseType residual false
 				return Stmt{}
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue op past GetType residual nil
 			return Stmt{}
 		}
@@ -483,9 +483,9 @@ func MakeRandomAssignQfer(
 
 	// StatementAssign.cpp:225 — merge_param_context(lhs_cg_context, true)
 	cg.MergeParamContext(lhsCG, true)
-	if sessHasError(nil) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return Stmt{}
 	}
@@ -493,25 +493,25 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:228 — make_possible_compound_assign (safe math flags/tmps)
 	st := makePossibleCompoundAssign(*cg, opts, probs, r, typ, lhs, op, rhs, gensymFromVS(vs))
 	// residual ERROR sticky — no invent ArrayAccess/complete assign past compound residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return Stmt{}
 	}
 	lhsIndir := 0
 	if st.Lhs != nil {
 		lhsIndir = st.Lhs.IndirectLevel()
 		// residual ERROR sticky — no invent ArrayAccess past IndirectLevel residual hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		isVol := opts.WrapVolatiles && st.Lhs.IsVolatile()
 		// residual ERROR sticky — no invent ArrayAccess past IsVolatile residual hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return Stmt{}
 		}
 		if lhsIndir > 0 || isVol {
 			st.ArrayAccess = st.Lhs.Output(opts.WrapVolatiles)
 			// residual ERROR sticky — no invent soft-empty ArrayAccess past Output residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return Stmt{}
 			}
 		}
@@ -555,18 +555,18 @@ func makePossibleCompoundAssign(
 	// compound always maps to a live binary token; sticky no invent empty Binary shell
 	opStr := bop.BinaryOpC()
 	if int(bop) < 0 || int(bop) >= MaxBinaryOp || opStr == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return Stmt{}
 	}
 	lt := typ
 	if lhs != nil {
 		if t := lhs.GetType(); t != nil {
 			// residual ERROR sticky — no invent compound binary past GetType residual
-			if sessHasError(nil) {
+			if sessHasError(cg.Sess) {
 				return Stmt{}
 			}
 			lt = t
-		} else if sessHasError(nil) {
+		} else if sessHasError(cg.Sess) {
 			// residual ERROR sticky — no invent compound binary past GetType residual nil
 			return Stmt{}
 		}
@@ -583,12 +583,12 @@ func makePossibleCompoundAssign(
 		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
 		// always has RNG for non-safe compounds; sticky no invent nil-flags shell
 		if r == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return Stmt{}
 		}
 		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
-		if flags == nil || sessHasError(nil) {
+		if flags == nil || sessHasError(cg.Sess) {
 			return Stmt{}
 		}
 		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
@@ -605,11 +605,11 @@ func makePossibleCompoundAssign(
 			if t := flags.LHSType(); t != nil {
 				if t.IsSimple() {
 					// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
-					if sessHasError(nil) {
+					if sessHasError(cg.Sess) {
 						return Stmt{}
 					}
 					st1 = t.Simple()
-				} else if sessHasError(nil) {
+				} else if sessHasError(cg.Sess) {
 					// residual ERROR sticky — no invent soft-tmp past IsSimple residual false
 					return Stmt{}
 				}
@@ -618,11 +618,11 @@ func makePossibleCompoundAssign(
 			if bop == BinLShift || bop == BinRShift {
 				if t := flags.RHSType(); t != nil {
 					if t.IsSimple() {
-						if sessHasError(nil) {
+						if sessHasError(cg.Sess) {
 							return Stmt{}
 						}
 						st2 = t.Simple()
-					} else if sessHasError(nil) {
+					} else if sessHasError(cg.Sess) {
 						return Stmt{}
 					}
 				}
@@ -637,7 +637,7 @@ func makePossibleCompoundAssign(
 	lhsExpr := LhsAsExpression(lhs)
 	if lhsExpr == nil {
 		// C++ always has live Lhs; incomplete IR sticky empty assign
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return Stmt{}
 	}
 	// e.clone() — Expression is value-like; shallow copy of the root is enough
@@ -921,14 +921,14 @@ func expressionQualifiers(e *Expression) *CVQualifiers {
 func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 	// incomplete call / shells sticky (no soft invent visit success / soft re-pick)
 	if e == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermConstant:
 		// Constant.cpp always has live value string; incomplete Con sticky
 		if e.Con == nil || e.Con.Value == "" {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		return true
@@ -936,37 +936,37 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 		return cg.VisitFactsExpressionVariable(e, opts)
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !VisitFactsExpression(e.CommaLHS, cg, opts) {
 			return false
 		}
 		// residual ERROR sticky — no invent soft-continue RHS past LHS visit residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		ok := VisitFactsExpression(e.CommaRHS, cg, opts)
 		// residual ERROR sticky — no invent visit success past RHS visit residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		return ok
 	case TermAssignment:
 		if e.Assign == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		return VisitFactsStatementAssign(e.Assign, cg, opts)
 	case TermFunction:
 		if e.Invoke == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		return VisitFactsInvocation(e.Invoke, cg, opts)
 	default:
 		// unknown term hard IR sticky
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 }
@@ -984,7 +984,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	// Generation-time Failed must not invent re-analysis failure (would strip
 	// compound containers and drop mid-gen may-null — seed-2 e10107 path).
 	if fi == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// FunctionInvocationBinary.cpp:487–490 — ordered standard ops
@@ -1001,12 +1001,12 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 		if cg.FM != nil {
 			// incomplete GlobalFacts sticky (no invent cleaned visit / soft re-pick)
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			facts = CloneFactSlice(cg.FM.GlobalFacts)
 			// residual ERROR sticky — no invent soft-visit past CloneFactSlice residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 		}
@@ -1022,7 +1022,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			// FunctionInvocation.cpp: param_value[i] always non-null after ERROR_GUARD sticky
 			if arg == nil {
 				_ = i
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			paramAccum := EmptyEffect()
@@ -1036,28 +1036,28 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			// residual ERROR sticky — no invent soft-continue later args past visit residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			// Incomplete param accum sticky (no invent visit more args under incomplete)
 			running = running.AddEffect(paramAccum)
 			// residual ERROR sticky — no invent soft-continue later args past AddEffect residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			if !EffectComplete(running) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return false
 			}
 			// merge_param_context; include_lhs for std ops only
 			cg.MergeParamContext(paramCG, !isFuncCall)
 			// residual ERROR sticky — no invent soft-continue later args past MergeParam residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 			if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-				if !sessHasError(nil) {
-					sessNoteError(nil, ErrGeneric)
+				if !sessHasError(cgSess(cg)) {
+					sessNoteError(cgSess(cg), ErrGeneric)
 				}
 				return false
 			}
@@ -1074,11 +1074,11 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		// FunctionInvocation.cpp:536–541 —
@@ -1099,7 +1099,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 		newCG.BlkDepth = 0
 		newCG.ExtendCallChain(*cg)
 		// residual ERROR sticky — no invent soft-revisit past ExtendCallChain residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		// FunctionInvocation.cpp:539–540 — revisit(inputs, new_context)
@@ -1107,8 +1107,8 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -1119,27 +1119,27 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 		// curr_blk is set in stm_visit_facts (Statement.cpp:612), not stack-top alone.
 		blk := cg.AnalysisBlock()
 		if blk == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		if !EffectComplete(effectAccum) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		cg.AddVisibleEffectAt(effectAccum, blk)
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		if !EffectComplete(fi.User.FEffect) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		fi.User.FEffect = fi.User.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
 		if !EffectComplete(fi.User.FEffect) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
@@ -1155,27 +1155,27 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 // context; write_var_set of RHS lhs_write_vars; update_fact_for_assign; map_stm_effect.
 func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtAssign {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementAssign.cpp always has live Lhs and Expression* sticky
 	if st.Expr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// StatementAssign.cpp:362–367 — RHS in its own accum context
 	// Incomplete ambient/stm/accum sticky (no invent visit under incomplete shell)
 	runningEff := cg.EffectContext().detachMaps()
 	if !EffectComplete(runningEff) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if !EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	rhsAccum := EmptyEffect()
@@ -1198,18 +1198,18 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	if st.AssignOp != AssignSimple {
 		runningEff = runningEff.AddEffect(rhsAccum)
 		// residual ERROR sticky — no invent soft-continue LHS visit past AddEffect residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		if !EffectComplete(runningEff) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 	}
 	cg.MergeParamContext(rhsCG, true)
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -1217,18 +1217,18 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	// IncompleteVariables → WriteVarSet IncompleteEffect sticky
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		// residual ERROR sticky — no invent soft-skip WriteVarSet past LhsWriteVars residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 		runningEff = runningEff.WriteVarSet(lw)
 		// residual ERROR sticky — no invent soft-continue LHS past WriteVarSet residual
-		if sessHasError(nil) || !EffectComplete(runningEff) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !EffectComplete(runningEff) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
-	} else if sessHasError(nil) {
+	} else if sessHasError(cgSess(cg)) {
 		// residual ERROR sticky — no invent soft-empty LhsWriteVars past residual hole
 		return false
 	}
@@ -1251,7 +1251,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		lhsVar = st.Lhs.Var
 		indir = st.Lhs.IndirectLevel()
 		// residual ERROR sticky — no invent visit success past IndirectLevel residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return false
 		}
 	} else if st.LhsVar != nil {
@@ -1262,13 +1262,13 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		lhsVar = st.LhsVar
 	} else {
 		// incomplete assign IR sticky (no invent visit success without LHS)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	cg.MergeParamContext(lhsCG, true)
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return false
 	}
@@ -1278,7 +1278,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil && lhsVar != nil {
 		// Statement::stm_id always live; StmID 0 sticky
 		if StmIDUnset(st.StmID) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
@@ -1288,21 +1288,21 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		var lhsWant *Type
 		if st.Lhs != nil {
 			lhsWant = st.Lhs.GetType()
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return false
 			}
 		}
 		_ = cg.FM.UpdateFactForAssignWant(lhsVar, indir, lhsWant, st.GetAssignRhs())
 		// incomplete assign sticky (no invent visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return false
 		}
 		// Incomplete EffectStm sticky
 		if !EffectComplete(cg.EffectStm) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
 		// StatementAssign.cpp:388–389 — map_stm_effect only; set_fact_out is
