@@ -34,12 +34,12 @@ func TestFunctionOutputFEffectComment(t *testing.T) {
 	g := CreateVariableQferSess(testAmbientSession, "g_9", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false}))
 	f.FEffect = f.FEffect.WriteVarSess(testAmbientSession, g)
 	f.Body = &Block{}
-	out := f.Output()
+	out := f.OutputSess(testAmbientSession, false, false, nil)
 	if !strings.Contains(out, "writes:") || !strings.Contains(out, "g_9") {
 		t.Fatal(out)
 	}
 	f.EmitConcise = true
-	out2 := f.Output()
+	out2 := f.OutputSess(testAmbientSession, false, false, nil)
 	if strings.Contains(out2, "writes:") {
 		t.Fatal("concise should skip")
 	}

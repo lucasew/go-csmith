@@ -46,7 +46,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Paired FactMgr + function body on stack (generation context)
-	fm := f.PairedFactMgr()
+	fm := f.PairedFactMgrSess(testAmbientSession)
 	if fm == nil {
 		fm = NewFactMgrSess(testAmbientSession, f)
 	}

@@ -251,7 +251,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	// signature so clear after MakeRandomSignature inside is not injectable.
 	// Exercise PairedFactMgr sticky on cleared function used as BuildUserInvocation
 	// static path does not need calFM. Direct sticky:
-	if (*Function)(nil).PairedFactMgr() != nil {
+	if (*Function)(nil).PairedFactMgrSess(testAmbientSession) != nil {
 		t.Fatal("nil Function PairedFactMgr must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -259,7 +259,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f2 := &Function{Name: "no_fm", ReturnType: GetIntTypeSess(testAmbientSession)}
-	if f2.PairedFactMgr() != nil {
+	if f2.PairedFactMgrSess(testAmbientSession) != nil {
 		t.Fatal("unpaired Function PairedFactMgr must be nil")
 	}
 	// unpaired is complete miss (no invent FM) — not sticky until generate path
@@ -397,7 +397,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 		AccumEffContext: EmptyEffect(),
 		Body:            &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
 	}
-	callee.ensurePairedFactMgr()
+	callee.ensurePairedFactMgrSess(testAmbientSession)
 	list.Funcs = []*Function{caller, callee}
 	cg.CurrBlk = outer
 	cg.EffectAccum = &eff
@@ -430,7 +430,7 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 		Body:            &Block{StmID: 10, Stmts: []Stmt{}},
 		Param:           nil,
 	}
-	callee.ensurePairedFactMgr()
+	callee.ensurePairedFactMgrSess(testAmbientSession)
 	caller := &Function{Name: "func_11", ReturnType: GetIntTypeSess(testAmbientSession)}
 	list := &FunctionList{Funcs: []*Function{caller, callee}}
 	fm := NewFactMgrSess(testAmbientSession, caller)
@@ -560,8 +560,8 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 	}
 	callee.Body.Func = callee
 	// FunctionInvocationUser.cpp:311 — revisit uses get_fact_mgr_for_func(callee)
-	_ = callee.ensurePairedFactMgr()
-	callee.ensurePairedFactMgr().SetMapStmEffect(callee.Body.StmID, EmptyEffect())
+	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
+	callee.ensurePairedFactMgrSess(testAmbientSession).SetMapStmEffect(callee.Body.StmID, EmptyEffect())
 	caller := &Function{Name: "func_1"}
 	list := &FunctionList{Funcs: []*Function{caller, callee}}
 	blk := &Block{Func: caller}

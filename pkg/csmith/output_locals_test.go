@@ -61,7 +61,7 @@ func TestFunctionParamQualified(t *testing.T) {
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), true, false)
 	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), true, true)
 	f.Param = []*Variable{p}
-	decl := f.OutputForwardDecl()
+	decl := f.OutputForwardDeclSess(testAmbientSession, false, nil, false)
 	if !strings.Contains(decl, "const") || !strings.Contains(decl, "p_1") {
 		t.Fatal(decl)
 	}

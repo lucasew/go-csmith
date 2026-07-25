@@ -8,12 +8,12 @@ import (
 func TestRandomFunctionName(t *testing.T) {
 	// Function.cpp:249 — util.cpp gensym process-wide; private GenSym ignored
 	ResetDefaultGensym()
-	if RandomFunctionName(nil) != "func_1" || RandomFunctionName(nil) != "func_2" {
+	if RandomFunctionNameSess(testAmbientSession, nil) != "func_1" || RandomFunctionNameSess(testAmbientSession, nil) != "func_2" {
 		t.Fatal("func gensym")
 	}
 	// private GenSym must not invent a separate stream
 	var g GenSym
-	if RandomFunctionName(&g) != "func_3" {
+	if RandomFunctionNameSess(testAmbientSession, &g) != "func_3" {
 		t.Fatal("must use process gensym, not private GenSym")
 	}
 }
@@ -23,14 +23,14 @@ func TestParamListProbabilityRange(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 2)
 	// max_params=5 → rnd_upto(5) in 0..4
 	for i := 0; i < 20; i++ {
-		p := ParamListProbability(r, opts)
+		p := ParamListProbabilitySess(testAmbientSession, r, opts)
 		if p >= 5 {
 			t.Fatalf("param list prob %d", p)
 		}
 	}
 	// sticky no invent param count 0 without RNG draw
 	ClearErrorSess(testAmbientSession)
-	if ParamListProbability(nil, opts) != 0 {
+	if ParamListProbabilitySess(testAmbientSession, nil, opts) != 0 {
 		t.Fatal("nil RNG ParamListProbability must fail closed 0")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -70,7 +70,7 @@ func TestMakeRandomSignatureParams(t *testing.T) {
 			t.Fatalf("param %v", p)
 		}
 	}
-	proto := f.OutputForwardDecl()
+	proto := f.OutputForwardDeclSess(testAmbientSession, false, nil, false)
 	if !strings.Contains(proto, f.Name) || !strings.HasSuffix(proto, ");") {
 		t.Fatalf("proto %q", proto)
 	}
@@ -100,7 +100,7 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 	if list.Funcs[0] != f {
 		t.Fatal("first func not registered first")
 	}
-	out := f.Output()
+	out := f.OutputSess(testAmbientSession, false, false, nil)
 	if !strings.Contains(out, f.Name) || !strings.Contains(out, "{") {
 		t.Fatalf("output %q", out)
 	}
@@ -271,7 +271,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 		RV:           CreateVariableScalarsSess(testAmbientSession, "func_x_rv", GetIntTypeSess(testAmbientSession), false, false),
 		DepthProtect: true,
 	}
-	out := f.Output()
+	out := f.OutputSess(testAmbientSession, false, false, nil)
 	if out != "" {
 		t.Fatal("nil Body must fail closed empty, got", out)
 	}
@@ -281,7 +281,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	// RetConst only — sticky no invent if/else without body
 	ClearErrorSess(testAmbientSession)
 	f.RetConst = MakeIntSess(testAmbientSession, 42)
-	out = f.Output()
+	out = f.OutputSess(testAmbientSession, false, false, nil)
 	if out != "" {
 		t.Fatal("RetConst without Body must fail closed empty", out)
 	}
@@ -292,7 +292,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f.RetConst = nil
 	f.Body = &Block{Func: f}
-	out = f.Output()
+	out = f.OutputSess(testAmbientSession, false, false, nil)
 	if !strings.Contains(out, "{") {
 		t.Fatal("want body braces", out)
 	}
@@ -301,14 +301,14 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	}
 	// complete depth_protect IR
 	f.RetConst = MakeIntSess(testAmbientSession, 42)
-	out = f.Output()
+	out = f.OutputSess(testAmbientSession, false, false, nil)
 	if !strings.Contains(out, "if (DEPTH < MAX_DEPTH)") || !strings.Contains(out, "return 42") {
 		t.Fatal("complete depth_protect IR", out)
 	}
 	// empty ret_c value — sticky no invent "return ;" depth shell (whole emit fail closed)
 	ClearErrorSess(testAmbientSession)
 	f.RetConst = &Constant{Type: GetIntTypeSess(testAmbientSession), Value: ""}
-	out = f.Output()
+	out = f.OutputSess(testAmbientSession, false, false, nil)
 	if out != "" {
 		t.Fatal("empty RetConst.Value must fail closed empty", out)
 	}
@@ -339,7 +339,7 @@ func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
 
 func TestOutputHeaderNilFunctionSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Function)(nil).OutputHeader(false) != "" {
+	if (*Function)(nil).OutputHeaderSess(testAmbientSession, false) != "" {
 		t.Fatal("nil Function OutputHeader must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -355,14 +355,14 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 		Name: "f", ReturnType: GetIntTypeSess(testAmbientSession),
 		RV: &Variable{Name: "rv", Type: nil},
 	}
-	if s := f.returnTypeC(); s != "" {
+	if s := f.returnTypeCSess(testAmbientSession); s != "" {
 		t.Fatal("RV Type-nil returnTypeC invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("RV Type-nil returnTypeC must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := f.OutputHeader(false); s != "" {
+	if s := f.OutputHeaderSess(testAmbientSession, false); s != "" {
 		t.Fatal("RV Type-nil OutputHeader invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -370,7 +370,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Function paramList sticky empty (no invent "void")
-	if s := (*Function)(nil).paramListC(); s != "" {
+	if s := (*Function)(nil).paramListCSess(testAmbientSession); s != "" {
 		t.Fatal("nil Function paramListC invent", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -378,7 +378,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty Param is complete void
-	if s := (&Function{Name: "g"}).paramListC(); s != "void" {
+	if s := (&Function{Name: "g"}).paramListCSess(testAmbientSession); s != "void" {
 		t.Fatal("empty Param want void, got", s)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -389,7 +389,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 		Name: "h", ReturnType: GetIntTypeSess(testAmbientSession),
 		RV: CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false),
 	}
-	if s := f2.returnTypeC(); s == "" {
+	if s := f2.returnTypeCSess(testAmbientSession); s == "" {
 		t.Fatal("live RV returnTypeC empty")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -400,7 +400,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 
 func TestFunctionOutputNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Function)(nil).Output() != "" {
+	if (*Function)(nil).OutputSess(testAmbientSession, false, false, nil) != "" {
 		t.Fatal("nil Function Output must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -408,7 +408,7 @@ func TestFunctionOutputNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// builtin soft empty
-	if (&Function{IsBuiltin: true, Name: "b"}).Output() != "" {
+	if (&Function{IsBuiltin: true, Name: "b"}).OutputSess(testAmbientSession, false, false, nil) != "" {
 		t.Fatal("builtin Function Output must soft empty")
 	}
 	if HasErrorSess(testAmbientSession) {

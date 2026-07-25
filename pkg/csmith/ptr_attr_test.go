@@ -63,7 +63,7 @@ func TestOutputFuncWithAttrs(t *testing.T) {
 	currentSession().FuncAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "noinline", Prob: 100},
 	}}
-	d := f.OutputForwardDeclOpts(true, NewRngSess(testAmbientSession, 1), true)
+	d := f.OutputForwardDeclSess(testAmbientSession, true, NewRngSess(testAmbientSession, 1), true)
 	if !strings.Contains(d, "static ") || !strings.Contains(d, "noinline") {
 		t.Fatal(d)
 	}

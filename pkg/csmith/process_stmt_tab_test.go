@@ -35,7 +35,7 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	defer SetProcessAssignOpsTableSess(testAmbientSession, prev)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
-	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(f.ensurePairedFactMgr())
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(f.ensurePairedFactMgrSess(testAmbientSession))
 	st := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))
 	if stmtOK(st) {
 		t.Fatal("nil assignOpsTable must fail closed")
@@ -82,9 +82,9 @@ func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{Funcs: nil, Types: vs.Types}
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
-	_ = f.ensurePairedFactMgr()
+	_ = f.ensurePairedFactMgrSess(testAmbientSession)
 	list.Funcs = []*Function{f}
-	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(f.PairedFactMgr())
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(f.PairedFactMgrSess(testAmbientSession))
 	cg.CurrentFunc = f
 	// force user path that would create a new function
 	fi := MakeRandomInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil, false)

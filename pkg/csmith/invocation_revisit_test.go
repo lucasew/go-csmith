@@ -403,7 +403,7 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 	}
 	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_x_rv", GetIntTypeSess(testAmbientSession), false, false)
 	// FunctionInvocationUser.cpp:311 — get_fact_mgr_for_func(func) is the callee FM
-	fm := callee.ensurePairedFactMgr()
+	fm := callee.ensurePairedFactMgrSess(testAmbientSession)
 	callee.Body.Func = callee
 	eff := EmptyEffect()
 	// caller context may hold a different FM; revisit must use callee.PairedFactMgr()
@@ -436,7 +436,7 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 		FactChanged: true,
 	}
 	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_u_rv", GetIntTypeSess(testAmbientSession), false, false)
-	calFM := callee.ensurePairedFactMgr()
+	calFM := callee.ensurePairedFactMgrSess(testAmbientSession)
 	callee.Body.Func = callee
 	// Stale last-written field on callee from a prior visit (g_ prefix → IsGlobal)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
@@ -506,7 +506,7 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	}
 	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_p_rv", GetIntTypeSess(testAmbientSession), false, false)
 	callee.Body.Func = callee
-	calFM := callee.ensurePairedFactMgr()
+	calFM := callee.ensurePairedFactMgrSess(testAmbientSession)
 	calFM.SetMapStmEffect(300, EmptyEffect())
 	calFM.SetMapFactsOut(300, []*FactPointTo{})
 	// Caller lattice: global union only.
@@ -550,7 +550,7 @@ func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
 		Body: &Block{StmID: 201, Stmts: nil},
 	}
 	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_v_rv", GetIntTypeSess(testAmbientSession), false, false)
-	calFM := callee.ensurePairedFactMgr()
+	calFM := callee.ensurePairedFactMgrSess(testAmbientSession)
 	callee.Body.Func = callee
 	calFM.SetMapStmEffect(201, EmptyEffect())
 	calFM.UnionFacts = []*FactUnion{}

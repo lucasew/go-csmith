@@ -95,7 +95,7 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	if len(f.Param) != 1 {
 		t.Fatal("params", f.Param)
 	}
-	if f.Body == nil || !f.IsEffectKnown() {
+	if f.Body == nil || !f.IsEffectKnownSess(testAmbientSession) {
 		t.Fatal("body/built")
 	}
 	if len(list.Funcs) != 1 {

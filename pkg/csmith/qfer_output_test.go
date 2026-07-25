@@ -133,7 +133,7 @@ func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
 	// Function always has return_type; sticky no invent void when missing
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_x"}
-	if out := f.OutputHeader(false); out != "" {
+	if out := f.OutputHeaderSess(testAmbientSession, false); out != "" {
 		t.Fatal("missing return type must fail closed header", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -141,14 +141,14 @@ func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f.ReturnType = GetSimpleTypeSess(testAmbientSession, EVoid)
-	out := f.OutputHeader(false)
+	out := f.OutputHeaderSess(testAmbientSession, false)
 	if !strings.Contains(out, "void func_x(void)") {
 		t.Fatal(out)
 	}
 	// sticky no invent "void (void)" without name
 	ClearErrorSess(testAmbientSession)
 	f.Name = ""
-	if out := f.OutputHeader(false); out != "" {
+	if out := f.OutputHeaderSess(testAmbientSession, false); out != "" {
 		t.Fatal("empty name must fail closed header", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -511,7 +511,7 @@ func TestOutputHeaderAliasNoInvent(t *testing.T) {
 	// sticky no invent Name+"_alias" when AliasName empty
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
-	if out := f.OutputHeaderAlias(false); out != "" {
+	if out := f.OutputHeaderAliasSess(testAmbientSession, false); out != "" {
 		t.Fatal("missing AliasName must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -519,7 +519,7 @@ func TestOutputHeaderAliasNoInvent(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f.AliasName = "func_1_alias"
-	out := f.OutputHeaderAlias(true)
+	out := f.OutputHeaderAliasSess(testAmbientSession, true)
 	if !strings.Contains(out, "static int32_t func_1_alias(void)") ||
 		!strings.Contains(out, `alias("func_1")`) {
 		t.Fatal(out)
@@ -601,14 +601,14 @@ func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
 	// incomplete header sticky → empty, not bare ";"
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_x"}
-	if out := f.OutputForwardDecl(); out != "" {
+	if out := f.OutputForwardDeclSess(testAmbientSession, false, nil, false); out != "" {
 		t.Fatal("incomplete forward decl must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete forward decl must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if out := f.OutputForwardDeclAlias(false); out != "" {
+	if out := f.OutputForwardDeclAliasSess(testAmbientSession, false); out != "" {
 		t.Fatal("incomplete alias decl must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -616,14 +616,14 @@ func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Function always live at emit; sticky empty (no invent bare ";")
-	if out := (*Function)(nil).OutputForwardDecl(); out != "" {
+	if out := (*Function)(nil).OutputForwardDeclSess(testAmbientSession, false, nil, false); out != "" {
 		t.Fatal("nil OutputForwardDecl must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil OutputForwardDecl must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if out := (*Function)(nil).OutputForwardDeclAlias(false); out != "" {
+	if out := (*Function)(nil).OutputForwardDeclAliasSess(testAmbientSession, false); out != "" {
 		t.Fatal("nil OutputForwardDeclAlias must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -631,7 +631,7 @@ func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// builtins complete empty (compiler-provided)
-	if out := (&Function{Name: "abs", IsBuiltin: true}).OutputForwardDecl(); out != "" {
+	if out := (&Function{Name: "abs", IsBuiltin: true}).OutputForwardDeclSess(testAmbientSession, false, nil, false); out != "" {
 		t.Fatal("builtin OutputForwardDecl must stay complete empty", out)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -785,7 +785,7 @@ func TestOutputForwardDeclHeaderResidualSticky(t *testing.T) {
 	// OutputHeader residual soft invent was invent bare ";" past empty header shell.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "", ReturnType: GetIntTypeSess(testAmbientSession)} // empty name residual
-	if s := f.OutputForwardDecl(); s != "" {
+	if s := f.OutputForwardDeclSess(testAmbientSession, false, nil, false); s != "" {
 		t.Fatal("OutputHeader residual must fail closed OutputForwardDecl", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -819,14 +819,14 @@ func TestReturnTypeCNameResidualSticky(t *testing.T) {
 	// CName residual soft invent was invent "void"/partial header past hole.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1", ReturnType: &Type{isStruct: true}} // unnamed struct CName residual
-	if s := f.returnTypeC(); s != "" {
+	if s := f.returnTypeCSess(testAmbientSession); s != "" {
 		t.Fatal("CName residual must fail closed returnTypeC", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CName residual returnTypeC must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := f.OutputHeader(false); s != "" {
+	if s := f.OutputHeaderSess(testAmbientSession, false); s != "" {
 		t.Fatal("CName residual must fail closed OutputHeader", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

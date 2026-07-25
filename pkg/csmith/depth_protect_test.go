@@ -98,7 +98,7 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 	if f.NeedReturnStmt() && f.RetConst == nil {
 		t.Fatal("expected ret_c")
 	}
-	out := f.Output()
+	out := f.OutputSess(testAmbientSession, false, false, nil)
 	if !strings.Contains(out, "if (DEPTH < MAX_DEPTH)") {
 		t.Fatal(out)
 	}

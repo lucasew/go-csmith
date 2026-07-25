@@ -89,7 +89,7 @@ func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: st}
 	opts := Defaults()
 	opts.ReturnStructs = false
-	if f.OutputHeaderOpts(false, opts) != "" {
+	if f.OutputHeaderOptsSess(testAmbientSession, false, opts) != "" {
 		t.Fatal("struct return with ReturnStructs off must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -106,7 +106,7 @@ func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession), Param: []*Variable{pv}}
 	opts := Defaults()
 	opts.ArgStructs = false
-	if f.OutputHeaderOpts(false, opts) != "" {
+	if f.OutputHeaderOptsSess(testAmbientSession, false, opts) != "" {
 		t.Fatal("struct arg with ArgStructs off must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -125,7 +125,7 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 			{Name: "", Type: GetIntTypeSess(testAmbientSession), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		},
 	}
-	if out := f.OutputHeader(false); out != "" {
+	if out := f.OutputHeaderSess(testAmbientSession, false); out != "" {
 		t.Fatal("empty param name must fail closed header", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -134,7 +134,7 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f.Param[0].Name = "p_1"
 	f.Param[0].Type = nil
-	if out := f.OutputHeader(false); out != "" {
+	if out := f.OutputHeaderSess(testAmbientSession, false); out != "" {
 		t.Fatal("nil param type must fail closed header", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -152,7 +152,7 @@ func TestOutputHeaderInlineStatic(t *testing.T) {
 			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntTypeSess(testAmbientSession), false, false),
 		},
 	}
-	h := f.OutputHeader(true)
+	h := f.OutputHeaderSess(testAmbientSession, true)
 	if !strings.Contains(h, "inline ") || !strings.Contains(h, "static ") {
 		t.Fatal(h)
 	}
@@ -161,14 +161,14 @@ func TestOutputHeaderInlineStatic(t *testing.T) {
 	}
 	// empty params → void
 	f2 := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
-	if !strings.Contains(f2.OutputHeader(false), "(void)") {
-		t.Fatal(f2.OutputHeader(false))
+	if !strings.Contains(f2.OutputHeaderSess(testAmbientSession, false), "(void)") {
+		t.Fatal(f2.OutputHeaderSess(testAmbientSession, false))
 	}
 }
 
 func TestOutputForwardDeclUsesHeader(t *testing.T) {
 	f := &Function{Name: "g_1", ReturnType: GetIntTypeSess(testAmbientSession), IsInlined: true}
-	d := f.OutputForwardDeclOpts(true, nil, false)
+	d := f.OutputForwardDeclSess(testAmbientSession, true, nil, false)
 	if !strings.HasSuffix(d, ";") {
 		t.Fatal(d)
 	}
@@ -179,13 +179,13 @@ func TestOutputForwardDeclUsesHeader(t *testing.T) {
 
 func TestOutputHeaderAlias(t *testing.T) {
 	f := &Function{Name: "func_3", AliasName: "func_3_alias", ReturnType: GetIntTypeSess(testAmbientSession)}
-	a := f.OutputHeaderAlias(true)
+	a := f.OutputHeaderAliasSess(testAmbientSession, true)
 	if !strings.Contains(a, `alias("func_3")`) || !strings.Contains(a, "static ") {
 		t.Fatal(a)
 	}
 	// forward decl ends with ;
-	if !strings.HasSuffix(f.OutputForwardDeclAlias(false), ";") {
-		t.Fatal(f.OutputForwardDeclAlias(false))
+	if !strings.HasSuffix(f.OutputForwardDeclAliasSess(testAmbientSession, false), ";") {
+		t.Fatal(f.OutputForwardDeclAliasSess(testAmbientSession, false))
 	}
 }
 
@@ -198,7 +198,7 @@ func TestOutputHeaderReturnStructOptionResidualSticky(t *testing.T) {
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
 	}}
 	f := &Function{Name: "func_1", ReturnType: st}
-	if s := f.OutputHeaderOpts(false, opts); s != "" {
+	if s := f.OutputHeaderOptsSess(testAmbientSession, false, opts); s != "" {
 		t.Fatal("ReturnStructs off must fail closed OutputHeader", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -217,7 +217,7 @@ func TestParamListArgStructOptionResidualSticky(t *testing.T) {
 	}}
 	p := &Variable{Name: "p", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Param: []*Variable{p}}
-	if s := f.paramListCOpts(opts); s != "" {
+	if s := f.paramListCOptsSess(testAmbientSession, opts); s != "" {
 		t.Fatal("ArgStructs off must fail closed paramListC", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

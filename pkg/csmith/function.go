@@ -70,10 +70,6 @@ type Function struct {
 // PairedFactMgr returns the FactMgr registered with this function at create time.
 // Mirrors get_fact_mgr_for_func when the function is on FuncList/FMList.
 // Incomplete Function sticky nil (no invent soft-miss FM past hole).
-func (f *Function) PairedFactMgr() *FactMgr {
-	return f.PairedFactMgrSess(testAmbientSession)
-}
-
 // PairedFactMgrSess is PairedFactMgr with explicit session residual sticky.
 func (f *Function) PairedFactMgrSess(s *Session) *FactMgr {
 	// Function always live; sticky incomplete no invent nil FM soft-skip
@@ -86,10 +82,6 @@ func (f *Function) PairedFactMgrSess(s *Session) *FactMgr {
 
 // ensurePairedFactMgr returns the paired FactMgr, creating once at signature-time
 // semantics (Function.cpp FMList.push_back(new FactMgr(f))).
-func (f *Function) ensurePairedFactMgr() *FactMgr {
-	return f.ensurePairedFactMgrSess(testAmbientSession)
-}
-
 // ensurePairedFactMgrSess is ensurePairedFactMgr on an explicit session bag.
 func (f *Function) ensurePairedFactMgrSess(s *Session) *FactMgr {
 	// Function always live; sticky incomplete no invent FM without function
@@ -108,10 +100,6 @@ func (f *Function) ensurePairedFactMgrSess(s *Session) *FactMgr {
 // IsEffectKnown mirrors Function::is_effect_known — true only when Built.
 // Function.h:96–97.
 // Incomplete Function sticky false (no invent effect-known / soft re-pick past hole).
-func (f *Function) IsEffectKnown() bool {
-	return f.IsEffectKnownSess(testAmbientSession)
-}
-
 // IsEffectKnownSess is IsEffectKnown with explicit session residual sticky.
 func (f *Function) IsEffectKnownSess(s *Session) bool {
 	// Function always live; sticky incomplete no invent effect-known soft-skip
@@ -124,10 +112,6 @@ func (f *Function) IsEffectKnownSess(s *Session) bool {
 
 // markBuilt sets Built state and IsBuilt flag.
 // Function always live; sticky (no invent soft-skip Built past hole).
-func (f *Function) markBuilt() {
-	f.markBuiltSess(testAmbientSession)
-}
-
 // markBuiltSess is markBuilt with explicit session residual sticky.
 func (f *Function) markBuiltSess(s *Session) {
 	if f == nil {
@@ -148,10 +132,6 @@ type FunctionList struct {
 // RandomFunctionName mirrors Function.cpp RandomFunctionName → gensym("func_").
 // Function.cpp:249 — util.cpp gensym_count is process-wide; sym is ignored
 // (no invent private GenSym counter desynced from g_/t_).
-func RandomFunctionName(sym *GenSym) string {
-	return RandomFunctionNameSess(testAmbientSession, sym)
-}
-
 // RandomFunctionNameSess is RandomFunctionName on an explicit session bag.
 func RandomFunctionNameSess(s *Session, sym *GenSym) string {
 	_ = sym
@@ -174,10 +154,6 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 }
 
 // ParamListProbability mirrors Function.cpp ParamListProbability → rnd_upto(max_params).
-func ParamListProbability(r *Rng, opts Options) uint32 {
-	return ParamListProbabilitySess(testAmbientSession, r, opts)
-}
-
 // ParamListProbabilitySess is ParamListProbability with explicit session residual sticky.
 func ParamListProbabilitySess(s *Session, r *Rng, opts Options) uint32 {
 	// C++ always has RNG; sticky no invent param count 0 without draw
@@ -904,10 +880,6 @@ func (f *Function) generateBodyCore(
 // probs is session Probabilities (C++ singleton); no invent NewProbabilities(opts).
 // Function always live; sticky (no invent soft-skip ret_c past hole).
 // DepthProtect off / no return needed is complete no-op.
-func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
-	f.MakeReturnConstSess(testAmbientSession, opts, probs, r)
-}
-
 func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabilities, r *Rng) {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -956,20 +928,12 @@ func (f *Function) MakeReturnConstSess(s *Session, opts Options, probs *Probabil
 // incomplete return-variable type shell).
 // Ambient ProcessOptions bridge; emit paths prefer returnTypeCSess / returnTypeCOptsSess.}
 
-func (f *Function) returnTypeC() string {
-	return f.returnTypeCSess(testAmbientSession)
-}
-
 // returnTypeCSess is returnTypeC with Options/sticky from an explicit session bag.
 func (f *Function) returnTypeCSess(s *Session) string {
 	return f.returnTypeCOptsSess(s, sessOpts(s))
 }
 
 // returnTypeCOpts is returnTypeC with explicit session Options (const/volatile asserts).
-func (f *Function) returnTypeCOpts(opts Options) string {
-	return f.returnTypeCOptsSess(testAmbientSession, opts)
-}
-
 func (f *Function) returnTypeCOptsSess(s *Session, opts Options) string {
 	// Function always live at emit; sticky no invent "void" without it
 	if f == nil {
@@ -1014,10 +978,6 @@ func (f *Function) returnTypeCOptsSess(s *Session, opts Options) string {
 // Function.cpp:501–512 — empty → void.
 // opts nil uses ProcessOptions for arg_structs/arg_unions asserts.}
 
-func (f *Function) paramListC() string {
-	return f.paramListCSess(testAmbientSession)
-}
-
 // paramListCSess is paramListC with Options/sticky from an explicit session bag.
 func (f *Function) paramListCSess(s *Session) string {
 	return f.paramListCOptsSess(s, sessOpts(s))
@@ -1026,10 +986,6 @@ func (f *Function) paramListCSess(s *Session) string {
 // paramListCOpts returns param C list, or "" if IR violates arg_structs/arg_unions asserts.
 // Function always live at emit; nil shell sticky empty (no invent "void" param list
 // past missing Function IR). Empty Param is complete "void".
-func (f *Function) paramListCOpts(opts Options) string {
-	return f.paramListCOptsSess(testAmbientSession, opts)
-}
-
 func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 	if f == nil {
 		sessNoteError(s, ErrGeneric)
@@ -1094,20 +1050,12 @@ func (f *Function) paramListCOptsSess(s *Session, opts Options) string {
 // OutputHeader mirrors Function::OutputHeader.
 // Function.cpp:516–531 — optional inline/static + qualified return + name(params).}
 
-func (f *Function) OutputHeader(forceStatic bool) string {
-	return f.OutputHeaderSess(testAmbientSession, forceStatic)
-}
-
 // OutputHeaderSess is OutputHeader with Options/sticky from an explicit session bag.
 func (f *Function) OutputHeaderSess(s *Session, forceStatic bool) string {
 	return f.OutputHeaderOptsSess(s, forceStatic, sessOpts(s))
 }
 
 // OutputHeaderOpts is OutputHeader with explicit Options for return/arg struct/union asserts.
-func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
-	return f.OutputHeaderOptsSess(testAmbientSession, forceStatic, opts)
-}
-
 func (f *Function) OutputHeaderOptsSess(s *Session, forceStatic bool, opts Options) string {
 	// Function always live at emit; sticky no invent "int (void)" without it
 	if f == nil {
@@ -1198,28 +1146,16 @@ func (f *Function) OutputHeaderOptsSess(s *Session, forceStatic bool, opts Optio
 // OutputForwardDecl emits a C prototype.
 // Function.cpp:555–561 — builtins emit nothing (compiler-provided).}
 
-func (f *Function) OutputForwardDecl() string {
-	return f.OutputForwardDeclOpts(false, nil, false)
-}
-
 // OutputForwardDeclOpts adds optional func __attribute__ and force_static.
 // Function.cpp:547–553 — OutputHeader + attrs + ";".
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
 // Builtins are complete empty (compiler-provided; not incomplete IR).
-func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
-	return f.OutputForwardDeclSess(testAmbientSession, forceStatic, r, withAttrs)
-}
-
 // OutputForwardDeclSess is OutputForwardDeclOpts with Options/sticky from an explicit bag.
 func (f *Function) OutputForwardDeclSess(s *Session, forceStatic bool, r *Rng, withAttrs bool) string {
 	return f.OutputForwardDeclWithSess(s, forceStatic, r, withAttrs, sessOpts(s))
 }
 
 // OutputForwardDeclWith is OutputForwardDeclOpts with explicit session Options.
-func (f *Function) OutputForwardDeclWith(forceStatic bool, r *Rng, withAttrs bool, opts Options) string {
-	return f.OutputForwardDeclWithSess(testAmbientSession, forceStatic, r, withAttrs, opts)
-}
-
 // OutputForwardDeclWithSess is OutputForwardDeclWith on an explicit session bag.
 func (f *Function) OutputForwardDeclWithSess(sess *Session, forceStatic bool, r *Rng, withAttrs bool, opts Options) string {
 	if f == nil {
@@ -1255,20 +1191,12 @@ func (f *Function) OutputForwardDeclWithSess(sess *Session, forceStatic bool, r 
 // OutputHeaderAlias mirrors Function::OutputHeaderAlias.
 // Function.cpp:533–541 — static? + type alias_name(params) __attribute__((alias("name"))).
 // Incomplete Function sticky empty (no invent alias shell without function).
-func (f *Function) OutputHeaderAlias(forceStatic bool) string {
-	return f.OutputHeaderAliasSess(testAmbientSession, forceStatic)
-}
-
 // OutputHeaderAliasSess is OutputHeaderAlias with Options/sticky from an explicit bag.
 func (f *Function) OutputHeaderAliasSess(s *Session, forceStatic bool) string {
 	return f.OutputHeaderAliasOptsSess(s, forceStatic, sessOpts(s))
 }
 
 // OutputHeaderAliasOpts is OutputHeaderAlias with explicit session Options.
-func (f *Function) OutputHeaderAliasOpts(forceStatic bool, opts Options) string {
-	return f.OutputHeaderAliasOptsSess(testAmbientSession, forceStatic, opts)
-}
-
 // OutputHeaderAliasOptsSess is OutputHeaderAliasOpts with explicit session residual sticky.
 func (f *Function) OutputHeaderAliasOptsSess(s *Session, forceStatic bool, opts Options) string {
 	// Function always live at emit; sticky incomplete no invent empty alias shell
@@ -1314,20 +1242,12 @@ func (f *Function) OutputHeaderAliasOptsSess(s *Session, forceStatic bool, opts 
 // Function.cpp:555–559 — OutputHeaderAlias + ";".
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
 // Builtins are complete empty (compiler-provided; not incomplete IR).
-func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
-	return f.OutputForwardDeclAliasSess(testAmbientSession, forceStatic)
-}
-
 // OutputForwardDeclAliasSess is OutputForwardDeclAlias with Options/sticky from an explicit bag.
 func (f *Function) OutputForwardDeclAliasSess(s *Session, forceStatic bool) string {
 	return f.OutputForwardDeclAliasOptsSess(s, forceStatic, sessOpts(s))
 }
 
 // OutputForwardDeclAliasOpts is OutputForwardDeclAlias with explicit session Options.
-func (f *Function) OutputForwardDeclAliasOpts(forceStatic bool, opts Options) string {
-	return f.OutputForwardDeclAliasOptsSess(testAmbientSession, forceStatic, opts)
-}
-
 // OutputForwardDeclAliasOptsSess is OutputForwardDeclAliasOpts with explicit session residual sticky.
 func (f *Function) OutputForwardDeclAliasOptsSess(s *Session, forceStatic bool, opts Options) string {
 	if f == nil {
@@ -1350,25 +1270,13 @@ func (f *Function) OutputForwardDeclAliasOptsSess(s *Session, forceStatic bool, 
 
 // Output emits a C function definition (minimal statements).
 // Function.cpp:565–598 — builtins emit nothing.
-func (f *Function) Output() string {
-	return f.OutputSess(testAmbientSession, false, false, nil)
-}
-
 // OutputSess is Output with Options/sticky from an explicit session bag.
 func (f *Function) OutputSess(s *Session, forceStatic, withAttrs bool, r *Rng) string {
 	return f.OutputOptsWithSess(s, forceStatic, withAttrs, r, sessOpts(s))
 }
 
 // OutputOpts adds force_static and optional function attributes on the header.
-func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
-	return f.OutputSess(testAmbientSession, forceStatic, withAttrs, r)
-}
-
 // OutputOptsWith is OutputOpts with explicit session Options (header asserts + body emit).
-func (f *Function) OutputOptsWith(forceStatic, withAttrs bool, r *Rng, opts Options) string {
-	return f.OutputOptsWithSess(testAmbientSession, forceStatic, withAttrs, r, opts)
-}
-
 // OutputOptsWithSess is OutputOptsWith on an explicit session bag.
 func (f *Function) OutputOptsWithSess(sess *Session, forceStatic, withAttrs bool, r *Rng, opts Options) string {
 	// Function always live at def emit; sticky no invent empty def without it

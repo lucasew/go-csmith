@@ -321,7 +321,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	callee := &Function{Name: "callee", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	callee.Body = &Block{Func: callee, StmID: AllocStmID()}
 	callee.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
-	_ = callee.ensurePairedFactMgr()
+	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	fi := &Invocation{User: callee}
 	// Empty body visit should succeed; AddVisibleEffect must use CurrBlk not stack top
 	ok := VisitFactsInvocation(fi, &cg, opts)

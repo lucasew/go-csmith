@@ -454,7 +454,7 @@ func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 
 func TestBuiltinOutputSkipped(t *testing.T) {
 	f := &Function{Name: "__builtin_clz", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true}
-	if f.Output() != "" || f.OutputForwardDecl() != "" {
+	if f.OutputSess(testAmbientSession, false, false, nil) != "" || f.OutputForwardDeclSess(testAmbientSession, false, nil, false) != "" {
 		t.Fatal("builtin emit")
 	}
 }

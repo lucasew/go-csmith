@@ -81,7 +81,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	if fi == nil || fi.Failed || fi.User == nil {
 		t.Fatal("fail")
 	}
-	if !fi.User.IsEffectKnown() {
+	if !fi.User.IsEffectKnownSess(testAmbientSession) {
 		t.Fatal("callee built")
 	}
 	if len(list.Funcs) < 2 {

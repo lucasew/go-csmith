@@ -20,7 +20,7 @@ func TestOutputForwardDeclAlias(t *testing.T) {
 		ReturnType: GetIntTypeSess(testAmbientSession),
 		RV:         CreateVariableQferSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), NewCVQualifiers([]bool{false}, []bool{false})),
 	}
-	out := f.OutputForwardDeclAlias(true)
+	out := f.OutputForwardDeclAliasSess(testAmbientSession, true)
 	if !strings.Contains(out, "static ") ||
 		!strings.Contains(out, "func_1_alias") ||
 		!strings.Contains(out, `__attribute__((alias("func_1")))`) {

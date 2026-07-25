@@ -341,7 +341,7 @@ func TestOutputCommentLine(t *testing.T) {
 
 func TestFunctionOutputSeparator(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), Body: &Block{}}
-	out := f.Output()
+	out := f.OutputSess(testAmbientSession, false, false, nil)
 	if !strings.Contains(out, "/* ------------------------------------------ */") {
 		t.Fatal(out)
 	}

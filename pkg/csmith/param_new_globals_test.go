@@ -79,7 +79,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	}
 	// caller may receive new_globals from callee
 	_ = caller.NewGlobals
-	if !fi.User.IsEffectKnown() {
+	if !fi.User.IsEffectKnownSess(testAmbientSession) {
 		t.Fatal("built")
 	}
 }

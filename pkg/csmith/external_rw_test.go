@@ -183,7 +183,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	callee := &Function{Name: "c", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: nil}
-	fm := callee.ensurePairedFactMgr()
+	fm := callee.ensurePairedFactMgrSess(testAmbientSession)
 	// NeedsRevisit false (no FactChanged / ptrs) — visit_facts still revisits
 	if callee.NeedsRevisit() {
 		t.Fatal("fixture must not NeedsRevisit; testing always-revisit gate")
@@ -227,7 +227,7 @@ func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)},
 	}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{st}}
-	_ = callee.ensurePairedFactMgr()
+	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	fi := &Invocation{User: callee}
 	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{StmID: 1, Func: caller, LocalVars: nil}
@@ -261,7 +261,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 	callee := &Function{Name: "c", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	// body with *p write under may-null would fail; use incomplete as soft fail
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}}} // StmID 0 sticky fail
-	_ = callee.ensurePairedFactMgr()
+	_ = callee.ensurePairedFactMgrSess(testAmbientSession)
 	fi := &Invocation{User: callee}
 	caller := &Function{Name: "caller", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{StmID: 1, Func: caller}

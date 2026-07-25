@@ -494,7 +494,7 @@ func TestNeedNestedLoopIsEffectKnownSticky(t *testing.T) {
 		t.Fatal("nil Block NeedNestedLoop must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Function)(nil).IsEffectKnown() {
+	if (*Function)(nil).IsEffectKnownSess(testAmbientSession) {
 		t.Fatal("nil Function IsEffectKnown must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

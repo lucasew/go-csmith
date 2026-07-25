@@ -10,12 +10,12 @@ func TestBuildStateTransitions(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntTypeSess(testAmbientSession), false, false)
 	// Function.cpp FMList at create — pair before GenerateBody (no invent inside)
-	_ = f.ensurePairedFactMgr()
-	if f.BuildState != BuildUnbuilt || f.IsEffectKnown() {
+	_ = f.ensurePairedFactMgrSess(testAmbientSession)
+	if f.BuildState != BuildUnbuilt || f.IsEffectKnownSess(testAmbientSession) {
 		t.Fatal("unbuilt")
 	}
 	f.GenerateBody(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), WithFunc(f, EmptyEffect()).WithSession(testAmbientSession))
-	if f.BuildState != BuildBuilt || !f.IsBuilt || !f.IsEffectKnown() {
+	if f.BuildState != BuildBuilt || !f.IsBuilt || !f.IsEffectKnownSess(testAmbientSession) {
 		t.Fatalf("built %v", f.BuildState)
 	}
 	// regenerate ignored
@@ -36,7 +36,7 @@ func TestPointerParamTBD(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	f.Param = []*Variable{p}
 	// pair FactMgr at create (Function.cpp FMList); pass same via CGContext
-	fm := f.ensurePairedFactMgr()
+	fm := f.ensurePairedFactMgrSess(testAmbientSession)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	f.GenerateBody(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), cg)
 	// after build, may still have fact (or oos); at least was added during building
@@ -101,7 +101,7 @@ func TestMakeFirstMarksBuilt(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
 	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil, nil)
-	if f == nil || !f.IsEffectKnown() {
+	if f == nil || !f.IsEffectKnownSess(testAmbientSession) {
 		t.Fatal("built")
 	}
 }
