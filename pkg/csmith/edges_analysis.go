@@ -170,16 +170,16 @@ func mergeJumpUnionFactsSess(s *Session, facts *[]*FactUnion, jumpFacts []*FactU
 func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdge {
 	// FactMgr always live for CFG lookup; sticky no invent empty edges without it
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return nil
 	}
 	// StmID ≤0 incomplete key sticky (no invent Map miss as empty edges / soft re-pick)
 	if StmIDUnset(destStmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return nil
 	}
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return nil
 	}
 	out := make([]*CFGEdge, 0)
@@ -196,16 +196,16 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*CFGEdge {
 	// FactMgr always live for CFG lookup; sticky no invent empty edges without it
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return nil
 	}
 	// nil DestBlock incomplete sticky (no invent empty edges past hole / soft re-pick)
 	if dest == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return nil
 	}
 	if !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return nil
 	}
 	out := make([]*CFGEdge, 0)
@@ -226,14 +226,14 @@ func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*C
 func (fm *FactMgr) HasEdgeIn(destStmID int, postDest, backLink bool) bool {
 	if fm == nil {
 		// assert(fm) path — sticky has-edge (conservative revisit; no invent no-edge)
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return true
 	}
 	edges := fm.FindEdgesIn(destStmID, postDest, backLink)
 	if edges == nil {
 		// FindEdgesIn already SetError sticky on incomplete CFG
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return true
 	}
@@ -248,7 +248,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 	// Statement.cpp:808+ — always live Statement* + inputs + cg_context
 	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	fm := cg.FM
@@ -256,7 +256,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 		// Statement::stm_id always live; StmID 0 fails closed sticky (no invent
 		// soft-skip edge merge then validate as complete analysis)
 		if StmIDUnset(st.StmID) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return false
 		}
 		// back edges only if already visited
@@ -265,8 +265,8 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			// nil = incomplete CFG (hole); empty non-nil = no matching edges
 			// FindEdgesIn already SetError sticky on incomplete CFG
 			if back == nil {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return false
 			}
@@ -280,27 +280,27 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				// Incomplete out fails closed sticky (no invent partial jump merge)
 				// FactMgr.cpp:569–588 — full FactVec (ePointTo + eUnionWrite)
 				out := fm.GetMapFactsOut(e.SrcID)
-				if _, ok := tryMergeJumpFactsSess(cgSess(cg), facts, out); !ok {
+				if _, ok := tryMergeJumpFactsSess(sessFromCG(cg), facts, out); !ok {
 					// tryMergeJumpFacts already SetError sticky
 					return false
 				}
 				outU := fm.GetMapUnionFactsOut(e.SrcID)
-				if !mergeJumpUnionFactsSess(cgSess(cg), &fm.UnionFacts, outU) {
+				if !mergeJumpUnionFactsSess(sessFromCG(cg), &fm.UnionFacts, outU) {
 					return false
 				}
 				// map_accum_effect[src] — missing live id → empty; SrcID 0 IncompleteEffect
 				// Incomplete accum fails closed sticky (no invent AddEffect poison then still ok)
 				accE := fm.GetMapAccumEffect(e.SrcID)
 				if !EffectComplete(accE) {
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return false
 				}
 				cg.AddEffect(accE, false)
 				if !EffectComplete(cg.EffectStm) {
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return false
 				}
@@ -309,8 +309,8 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 		// always consider forward edges
 		fwd := fm.FindEdgesIn(st.StmID, false, false)
 		if fwd == nil {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return false
 		}
@@ -320,24 +320,24 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			}
 			// Statement.cpp:830–831 — always merge_jump_facts / add_effect (full FactVec)
 			out := fm.GetMapFactsOut(e.SrcID)
-			if _, ok := tryMergeJumpFactsSess(cgSess(cg), facts, out); !ok {
+			if _, ok := tryMergeJumpFactsSess(sessFromCG(cg), facts, out); !ok {
 				return false
 			}
 			outU := fm.GetMapUnionFactsOut(e.SrcID)
-			if !mergeJumpUnionFactsSess(cgSess(cg), &fm.UnionFacts, outU) {
+			if !mergeJumpUnionFactsSess(sessFromCG(cg), &fm.UnionFacts, outU) {
 				return false
 			}
 			accE := fm.GetMapAccumEffect(e.SrcID)
 			if !EffectComplete(accE) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return false
 			}
 			cg.AddEffect(accE, false)
 			if !EffectComplete(cg.EffectStm) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return false
 			}
@@ -355,7 +355,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 // Nil FM / StmID≤0 is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext, preStm Effect) {
 	if st == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	if cg.FM == nil || StmIDUnset(st.StmID) {
@@ -365,18 +365,18 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 	// or soft re-pick past holes as recorded success)
 	if !EffectComplete(preStm) || !EffectComplete(blockEffect) {
 		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
-	eff := preStm.AddEffectSess(cgSess(cg), blockEffect)
+	eff := preStm.AddEffectSess(sessFromCG(cg), blockEffect)
 	// residual ERROR sticky — no invent soft-complete map past AddEffect residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
 		return
 	}
 	if !EffectComplete(eff) {
 		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	cg.FM.SetMapStmEffect(st.StmID, eff)
@@ -391,7 +391,7 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 // Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUnion, preEffect Effect, cg *CGContext, opts Options) {
 	if st == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	if cg.FM == nil {
@@ -403,21 +403,21 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	if !FactsComplete(preFacts) || !UnionFactsComplete(preUnion) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	// incomplete GlobalFacts: makeup/branch combine must not invent past holes
 	if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent post_creation
 	// success without map_facts_in/out / map_visited)
 	if StmIDUnset(st.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	// Statement.cpp:847–852 — makeup / combine on full FactVec pre_facts.
@@ -429,24 +429,24 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	if st.Kind == StmtIfElse {
 		// StatementIf.cpp:208–231 — combine_branch_facts mutates pre_facts + sets global_facts
 		CombineBranchFacts(st, &preFacts, &workPreUnion, fm)
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return
 		}
 	} else {
 		// MakeupNewVarFacts fails closed sticky (nils preFacts) on holes; pre already complete
-		if !MakeupNewVarFactsSess(cgSess(cg), &preFacts, fm.GlobalFacts) {
+		if !MakeupNewVarFactsSess(sessFromCG(cg), &preFacts, fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return
 		}
-		if !makeupNewUnionFactsSess(cgSess(cg), &workPreUnion, fm.UnionFacts) {
+		if !makeupNewUnionFactsSess(sessFromCG(cg), &workPreUnion, fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return
 		}
@@ -456,7 +456,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	if !IsCompound(st.Kind) {
 		if !EffectComplete(cg.EffectStm) {
 			fm.GlobalFacts = IncompleteFactSlice()
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return
 		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -464,9 +464,9 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	specialHandled := false
 	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
 	if cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop() {
-		unc := HasUncertainCallRecursiveStmtSess(cgSess(cg), st)
+		unc := HasUncertainCallRecursiveStmtSess(sessFromCG(cg), st)
 		// residual ERROR sticky — no invent soft-validate past HasUncertain residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
@@ -474,7 +474,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// preFacts complete above; still re-check after makeup
 			if !FactsComplete(preFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
 			// Statement.cpp:1006–1012 — FactVec outputs = pre_facts (after makeup);
@@ -505,13 +505,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
 			if !UnionFactsComplete(workPreUnion) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
 			// Shallow Fact* copies (C++ FactVec assignment) for point-to;
@@ -519,20 +519,20 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			postGenFacts := append([]*FactPointTo(nil), fm.GlobalFacts...)
 			postGenUnion := append([]*FactUnion(nil), fm.UnionFacts...)
 			outputs := append([]*FactPointTo(nil), preFacts...)
-			preUnionWork := CloneUnionFactSliceDeepSess(cgSess(cg), workPreUnion)
-			if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnionWork) {
+			preUnionWork := CloneUnionFactSliceDeepSess(sessFromCG(cg), workPreUnion)
+			if hasErrCG(cg) || !UnionFactsComplete(preUnionWork) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return
 			}
 			fm.UnionFacts = preUnionWork
 			// Statement.cpp:1007 — reset_effect_accum(pre_effect)
 			if cg.EffectAccum != nil {
-				*cg.EffectAccum = preEffect.CloneSess(cgSess(cg))
-				if sessHasError(cgSess(cg)) {
+				*cg.EffectAccum = preEffect.CloneSess(sessFromCG(cg))
+				if hasErrCG(cg) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					return
@@ -541,12 +541,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// Statement.cpp:1008–1010 — assert(0) if !validate; NDEBUG continues.
 			okV := ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
 			// NDEBUG continue: sticky from validate must not poison later soft paths.
-			sessClearError(cgSess(cg))
+			sessClearError(sessFromCG(cg))
 			if okV {
 				if !FactsComplete(outputs) || !UnionFactsComplete(fm.UnionFacts) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return
 				}
 				fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
@@ -562,7 +562,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 				if !FactsComplete(postGenFacts) || !UnionFactsComplete(postGenUnion) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return
 				}
 				fm.SetGlobalFacts(postGenFacts, "auto_edges_analysis_408")
@@ -586,28 +586,28 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			if st.Lhs != nil {
 				lhs = st.Lhs.Var
 				// incomplete Lhs type IR must not invent indir 0 assign facts
-				n, iok := st.Lhs.IndirectLevelCompleteSess(cgSess(cg))
+				n, iok := st.Lhs.IndirectLevelCompleteSess(sessFromCG(cg))
 				if !iok {
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return
 				}
 				indir = n
-				lhsWant = st.Lhs.GetTypeSess(cgSess(cg))
-				if sessHasError(cgSess(cg)) {
+				lhsWant = st.Lhs.GetTypeSess(sessFromCG(cg))
+				if hasErrCG(cg) {
 					return
 				}
 			}
 			if lhs == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
 			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs() + lhs
 			// incomplete assign fails closed sticky — no invent mark visited with wiped facts
-			_ = fm.UpdateFactForAssignWant(lhs, indir, lhsWant, st.GetAssignRhsSess(cgSess(cg)))
+			_ = fm.UpdateFactForAssignWant(lhs, indir, lhsWant, st.GetAssignRhsSess(sessFromCG(cg)))
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return
 			}
@@ -615,15 +615,15 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			// curr_func + rv + return expr always live for return after make
 			// incomplete → ERROR (no invent garbage transfer from nil Expression*)
 			if cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil || st.Expr == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
 			_ = fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 			// residual ERROR sticky — no invent mark visited / soft-continue past return residual
-			if sessHasError(cgSess(cg)) || !FactsComplete(fm.GlobalFacts) {
+			if hasErrCG(cg) || !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return
 			}
@@ -632,8 +632,8 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	fm.RemoveRVFacts(&fm.GlobalFacts)
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return
 	}
@@ -641,8 +641,8 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	if !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return
 	}
@@ -653,12 +653,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 	acc := cg.AccumEffect()
 	if !EffectComplete(acc) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	fm.SetMapAccumEffect(st.StmID, acc)
 	// residual ERROR sticky — no invent post_creation success past SetMapAccum residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
@@ -684,29 +684,29 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Options, visitOnce bool) (facts []*FactPointTo, unions []*FactUnion, failIndex int, ok bool) {
 	// Block.cpp:513+ — always live this + cg_context; sticky no soft invent success on nil
 	if b == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return inputs, nil, -1, false
 	}
 	// incomplete input env fails closed sticky (no invent cleaned fixed-point from holes)
 	if !FactsComplete(inputs) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return inputs, nil, -1, false
 	}
 	fm := cg.FM
-	currentInputs := CloneFactSliceSess(cgSess(cg), inputs)
+	currentInputs := CloneFactSliceSess(sessFromCG(cg), inputs)
 	// currentUnions is the eUnionWrite half of C++ current_inputs (FactVec).
 	// Only back-edge merge_facts grow it — not sequential stmt analyze (Block.cpp:520–536).
 	// Soft invent reused post-analyze live UnionFacts as entry → same_facts / map_in skew.
 	var currentUnions []*FactUnion
 	if fm != nil {
 		if !UnionFactsComplete(fm.UnionFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return inputs, nil, -1, false
 		}
-		currentUnions = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
+		currentUnions = CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.UnionFacts)
 		if !UnionFactsComplete(currentUnions) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return inputs, nil, -1, false
 		}
@@ -760,7 +760,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			back := fm.FindEdgesIn(b.StmID, false, true)
 			// nil = incomplete CFG; no invent skip holes as absent back-edges
 			if back == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
 			for _, e := range back {
@@ -769,42 +769,42 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				// C++ map[] always; missing → empty merge; incomplete fails closed
 				out := fm.GetMapFactsOut(e.SrcID)
 				if !FactsComplete(currentInputs) || !FactsComplete(out) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return currentInputs, nil, -1, false
 				}
 				// MergeFacts clears on mid-join failure — fail closed fixed-point
-				_ = MergeFactsSess(cgSess(cg), &currentInputs, out)
+				_ = MergeFactsSess(sessFromCG(cg), &currentInputs, out)
 				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					return currentInputs, nil, -1, false
 				}
 				if !FactsComplete(currentInputs) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return currentInputs, nil, -1, false
 				}
 				outU := fm.GetMapUnionFactsOut(e.SrcID)
 				if !UnionFactsComplete(currentUnions) || !UnionFactsComplete(outU) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return currentInputs, nil, -1, false
 				}
 				for _, uf := range outU {
 					if uf == nil {
-						sessNoteError(cgSess(cg), ErrGeneric)
+						noteErrCG(cg, ErrGeneric)
 						return currentInputs, nil, -1, false
 					}
 					// MergeUnionFact appends without clone on new subject; deep-clone
 					// so map_facts_out lattice is not aliased into current_inputs.
-					cp := uf.CloneSess(cgSess(cg))
-					if cp == nil || sessHasError(cgSess(cg)) {
-						if !sessHasError(cgSess(cg)) {
-							sessNoteError(cgSess(cg), ErrGeneric)
+					cp := uf.CloneSess(sessFromCG(cg))
+					if cp == nil || hasErrCG(cg) {
+						if !hasErrCG(cg) {
+							noteErrCG(cg, ErrGeneric)
 						}
 						return currentInputs, nil, -1, false
 					}
-					currentUnions = MergeUnionFactSess(cgSess(cg), currentUnions, cp)
+					currentUnions = MergeUnionFactSess(sessFromCG(cg), currentUnions, cp)
 					if !UnionFactsComplete(currentUnions) {
-						if !sessHasError(cgSess(cg)) {
-							sessNoteError(cgSess(cg), ErrGeneric)
+						if !hasErrCG(cg) {
+							noteErrCG(cg, ErrGeneric)
 						}
 						return currentInputs, nil, -1, false
 					}
@@ -820,17 +820,17 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// already OOS-drops locals (FactMgr.cpp:601–611 / block post-OOS). Go's Drop
 		// at set_fact_in must be paired with Drop before shortcut for a stable lattice.
 		if len(b.LocalVars) > 0 {
-			currentInputs = DropFactSubjectsByVarsSess(cgSess(cg), currentInputs, b.LocalVars)
+			currentInputs = DropFactSubjectsByVarsSess(sessFromCG(cg), currentInputs, b.LocalVars)
 			if !FactsComplete(currentInputs) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
-			currentUnions = DropUnionSubjectsByVarsSess(cgSess(cg), currentUnions, b.LocalVars)
+			currentUnions = DropUnionSubjectsByVarsSess(sessFromCG(cg), currentUnions, b.LocalVars)
 			if !UnionFactsComplete(currentUnions) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
@@ -838,13 +838,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Install entry eUnionWrite as live before shortcut / sequential (C++ one FactVec).
 		if fm != nil {
 			if !UnionFactsComplete(currentUnions) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
-			liveU := CloneUnionFactSliceDeepSess(cgSess(cg), currentUnions)
+			liveU := CloneUnionFactSliceDeepSess(sessFromCG(cg), currentUnions)
 			if !UnionFactsComplete(liveU) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
@@ -854,10 +854,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		if !visitOnce && fm != nil {
 			// currentInputs kept complete; incomplete after merge fails closed above
 			if !FactsComplete(currentInputs) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
-			work := CloneFactSliceSess(cgSess(cg), currentInputs)
+			work := CloneFactSliceSess(sessFromCG(cg), currentInputs)
 			sc := ShortcutAnalysisBlock(b, &work, cg)
 			switch sc {
 			case ShortcutOK:
@@ -878,7 +878,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 		}
 		if !FactsComplete(currentInputs) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return currentInputs, nil, -1, false
 		}
 		// Entry eUnionWrite for set_fact_in (C++ current_inputs unchanged by analyze).
@@ -886,68 +886,68 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		var entryUnions []*FactUnion
 		if fm != nil {
 			if !UnionFactsComplete(currentUnions) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
-			entryUnions = CloneUnionFactSliceDeepSess(cgSess(cg), currentUnions)
+			entryUnions = CloneUnionFactSliceDeepSess(sessFromCG(cg), currentUnions)
 			if !UnionFactsComplete(entryUnions) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
 		}
-		outputs := CloneFactSliceSess(cgSess(cg), currentInputs)
+		outputs := CloneFactSliceSess(sessFromCG(cg), currentInputs)
 		// Block.cpp:546–549 — facts for locals (full FactVec: ePointTo + eUnionWrite)
 		// Variable* always live on LocalVars; nil hole fails closed (no invent skip)
 		workUnions := entryUnions
 		if fm != nil {
-			workUnions = CloneUnionFactSliceDeepSess(cgSess(cg), currentUnions)
+			workUnions = CloneUnionFactSliceDeepSess(sessFromCG(cg), currentUnions)
 			if !UnionFactsComplete(workUnions) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
 		}
 		for _, v := range b.LocalVars {
 			if v == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return nil, nil, -1, false
 			}
-			AddNewVarFactToSess(cgSess(cg), v, &outputs)
+			AddNewVarFactToSess(sessFromCG(cg), v, &outputs)
 			// AddNewVarFactInto may clear on field/abstract holes
 			if !FactsComplete(outputs) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return nil, nil, -1, false
 			}
 			// FactMgr.cpp:118–131 add_new_var_fact — eUnionWrite half into outputs FactVec
-			if fm != nil && MetaFactUnionEnabledSess(cgSess(cg)) {
-				_, unInit := AbstractFactForVarInitSess(fmSess(fm), v)
-				if sessHasError(cgSess(cg)) || !UnionFactsComplete(unInit) {
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+			if fm != nil && MetaFactUnionEnabledSess(sessFromCG(cg)) {
+				_, unInit := AbstractFactForVarInitSess(sessFromFM(fm), v)
+				if hasErrCG(cg) || !UnionFactsComplete(unInit) {
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return nil, nil, -1, false
 				}
 				for _, uf := range unInit {
 					if uf == nil || uf.Var == nil {
-						sessNoteError(cgSess(cg), ErrGeneric)
+						noteErrCG(cg, ErrGeneric)
 						return nil, nil, -1, false
 					}
 					if FindRelatedUnion(workUnions, uf.Var) != nil {
-						if sessHasError(cgSess(cg)) {
+						if hasErrCG(cg) {
 							return nil, nil, -1, false
 						}
 						continue
 					}
-					if sessHasError(cgSess(cg)) {
+					if hasErrCG(cg) {
 						return nil, nil, -1, false
 					}
 					cp := uf.Clone()
-					if cp == nil || sessHasError(cgSess(cg)) {
-						if !sessHasError(cgSess(cg)) {
-							sessNoteError(cgSess(cg), ErrGeneric)
+					if cp == nil || hasErrCG(cg) {
+						if !hasErrCG(cg) {
+							noteErrCG(cg, ErrGeneric)
 						}
 						return nil, nil, -1, false
 					}
@@ -957,13 +957,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		}
 		// incomplete after local makeup fails closed
 		if !FactsComplete(outputs) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return outputs, nil, -1, false
 		}
 		// Sequential analyze uses outputs FactVec = PT + live unions (with locals).
 		if fm != nil {
 			if !UnionFactsComplete(workUnions) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return outputs, nil, -1, false
 			}
 			fm.UnionFacts = workUnions
@@ -981,24 +981,24 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block::stm_id always live when FM bound; StmID 0 fails closed
 		// (no invent soft single-pass success without map_facts_in/out)
 		if StmIDUnset(b.StmID) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return outputs, nil, -1, false
 		}
 		// Block.cpp:557 — set_fact_in(this, current_inputs) full FactVec entry env.
 		// Strip this block's LocalVars subjects if back-edge merge reintroduced them
 		// (see DropFactSubjectsByVars). Entry must not list body locals.
 		if len(b.LocalVars) > 0 {
-			currentInputs = DropFactSubjectsByVarsSess(cgSess(cg), currentInputs, b.LocalVars)
+			currentInputs = DropFactSubjectsByVarsSess(sessFromCG(cg), currentInputs, b.LocalVars)
 			if !FactsComplete(currentInputs) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
-			entryUnions = DropUnionSubjectsByVarsSess(cgSess(cg), entryUnions, b.LocalVars)
+			entryUnions = DropUnionSubjectsByVarsSess(sessFromCG(cg), entryUnions, b.LocalVars)
 			if !UnionFactsComplete(entryUnions) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return currentInputs, nil, -1, false
 			}
@@ -1016,13 +1016,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block.cpp:558 — post_facts = outputs (pre-OOS)
 		// incomplete outputs after analyze fail closed (no invent cleaned out)
 		if !FactsComplete(outputs) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return outputs, nil, -1, false
 		}
-		lastPreOOS = CloneFactSliceSess(cgSess(cg), outputs)
-		if sessHasError(cgSess(cg)) || !FactsComplete(lastPreOOS) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		lastPreOOS = CloneFactSliceSess(sessFromCG(cg), outputs)
+		if hasErrCG(cg) || !FactsComplete(lastPreOOS) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return outputs, nil, -1, false
 		}
@@ -1030,13 +1030,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Capture eUnionWrite now — live still pre-OOS; later ShortcutAnalysis
 		// installs map_union_out (post-OOS) into live before return.
 		if !UnionFactsComplete(fm.UnionFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return outputs, nil, -1, false
 		}
-		lastPreOOSUnions = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(lastPreOOSUnions) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		lastPreOOSUnions = CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.UnionFacts)
+		if hasErrCG(cg) || !UnionFactsComplete(lastPreOOSUnions) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return outputs, nil, -1, false
 		}
@@ -1048,12 +1048,12 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// fm.UpdateFactsForOOSVars on a GlobalFacts temp swap, which also
 		// OOS-stripped live UnionFacts permanently. PT-only OOS on outCopy;
 		// SetMapFactsOutForBlock clones+OOS live unions for map_union_out.
-		outCopy := CloneFactSliceSess(cgSess(cg), outputs)
+		outCopy := CloneFactSliceSess(sessFromCG(cg), outputs)
 		if len(b.LocalVars) > 0 {
-			UpdateFactsForOOSVarsSess(cgSess(cg), b.LocalVars, &outCopy)
+			UpdateFactsForOOSVarsSess(sessFromCG(cg), b.LocalVars, &outCopy)
 			if !FactsComplete(outCopy) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return outCopy, nil, -1, false
 			}
@@ -1063,7 +1063,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Do not mergeMayNullFromLive / SetGlobalFacts here (Block.cpp:513–568
 		// never assigns global_facts; post_creation installs map_facts_out at 729).
 		fm.SetMapFactsOutForBlock(b, outCopy)
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return outCopy, nil, -1, false
 		}
 		if fm.MapVisited == nil {

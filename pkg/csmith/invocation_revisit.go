@@ -464,33 +464,33 @@ func permuteInts(a []int) [][]int {
 func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
 	// FunctionInvocation.cpp:457+ — always live this + facts sticky
 	if fi == nil || facts == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	// incomplete working facts sticky (no invent cleaned permute base / soft re-pick)
 	if !FactsComplete(*facts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
-	inputsCopy := CloneFactSliceSess(cgSess(cg), *facts)
-	orders := fi.PermuteParamOrdersSess(cgSess(cg))
+	inputsCopy := CloneFactSliceSess(sessFromCG(cg), *facts)
+	orders := fi.PermuteParamOrdersSess(sessFromCG(cg))
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
 	if len(orders) == 0 {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	var merged []*FactPointTo
 	for i, order := range orders {
-		cur := CloneFactSliceSess(cgSess(cg), inputsCopy)
+		cur := CloneFactSliceSess(sessFromCG(cg), inputsCopy)
 		for _, paramID := range order {
 			if paramID < 0 || paramID >= len(fi.Args) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return false
 			}
 			arg := fi.Args[paramID]
 			// param_value[i] always non-null after ERROR_GUARD sticky
 			if arg == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return false
 			}
 			// visit under working facts
@@ -503,36 +503,36 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 			if cg.FM != nil {
 				// incomplete GlobalFacts after arg visit sticky
 				if !FactsComplete(cg.FM.GlobalFacts) {
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return false
 				}
-				cur = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
+				cur = CloneFactSliceSess(sessFromCG(cg), cg.FM.GlobalFacts)
 			}
 		}
 		if i == 0 {
 			merged = cur
 		} else {
 			if !FactsComplete(merged) || !FactsComplete(cur) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return false
 			}
 			// MergeFacts sticky on incomplete mid-join
-			_ = MergeFactsSess(cgSess(cg), &merged, cur)
+			_ = MergeFactsSess(sessFromCG(cg), &merged, cur)
 			if !FactsComplete(merged) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return false
 			}
 		}
 	}
 	if !FactsComplete(merged) {
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
@@ -599,12 +599,12 @@ func (f *Function) IsPointerReferencedSess(s *Session) bool {
 func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
 	// FunctionInvocationUser.cpp:309+ — get_fact_mgr_for_func + body always live sticky
 	if fi == nil || fi.User == nil || facts == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	f := fi.User
 	if f.Body == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	// FunctionInvocationUser.cpp:311 — FactMgr *fm = get_fact_mgr_for_func(func);
@@ -612,35 +612,35 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// the caller's cg.FM. Using caller maps made VisitFactsBlock fail on nested
 	// calls in if-conditions, fixed-point stripped the if, and func->blocks lost
 	// nested arms (seed-2 e2342: goto nblocks 8 vs UP 10).
-	fm := f.PairedFactMgrSess(cgSess(cg))
+	fm := f.PairedFactMgrSess(sessFromCG(cg))
 	if fm == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	// incomplete caller facts sticky (no invent cleaned revisit / soft re-pick)
 	if !FactsComplete(*facts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	// backup maps — FactVec partitions (ePointTo + eUnionWrite) + effects
 	// FactMgr.cpp map_facts_in/out are full FactVec; Go splits PT/union maps.
-	inCopy := cloneFactMapSess(cgSess(cg), fm.MapFactsIn)
-	outCopy := cloneFactMapSess(cgSess(cg), fm.MapFactsOut)
-	unionInCopy := cloneUnionFactMapSess(cgSess(cg), fm.MapUnionFactsIn)
-	unionOutCopy := cloneUnionFactMapSess(cgSess(cg), fm.MapUnionFactsOut)
-	effCopy := cloneEffectMapSess(cgSess(cg), fm.MapStmEffect)
-	accCopy := cloneEffectMapSess(cgSess(cg), fm.MapAccumEffect)
+	inCopy := cloneFactMapSess(sessFromCG(cg), fm.MapFactsIn)
+	outCopy := cloneFactMapSess(sessFromCG(cg), fm.MapFactsOut)
+	unionInCopy := cloneUnionFactMapSess(sessFromCG(cg), fm.MapUnionFactsIn)
+	unionOutCopy := cloneUnionFactMapSess(sessFromCG(cg), fm.MapUnionFactsOut)
+	effCopy := cloneEffectMapSess(sessFromCG(cg), fm.MapStmEffect)
+	accCopy := cloneEffectMapSess(sessFromCG(cg), fm.MapAccumEffect)
 	// Live UnionFacts on callee FM (replaced for visit; restored on fail).
 	savedUnion := fm.UnionFacts
 	// FunctionInvocationUser.cpp:315 — inputs_copy = inputs (pre-handover caller lattice).
 	// Deep-clone so handover/body cannot orphan mid-gen may-null on the live *facts slice
 	// when *facts aliases caller GlobalFacts (build_invocation passes global_facts by ref).
-	inputsCopy := CloneFactSliceSess(cgSess(cg), *facts)
+	inputsCopy := CloneFactSliceSess(sessFromCG(cg), *facts)
 	// Working lattice for handover + body visit. C++ mutates `inputs` in place for the
 	// visit_facts walk; we keep a separate work slice so callee FactMgr.GlobalFacts is
 	// never aliased to the caller's GlobalFacts slice (that alias polluted callee FM
 	// and could leave caller on a post-handover slice without frame locals).
-	work := CloneFactSliceSess(cgSess(cg), *facts)
+	work := CloneFactSliceSess(sessFromCG(cg), *facts)
 
 	restore := func() {
 		fm.MapFactsIn = inCopy
@@ -660,9 +660,9 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	}
 	// IsValidPtr collective fallback for itemized arrays only while revisiting.
 	// Prefer callee FM session / cg.Sess over ambient.
-	revisitSess := fmSess(fm)
+	revisitSess := sessFromFM(fm)
 	if revisitSess == nil {
-		revisitSess = cgSess(cg)
+		revisitSess = sessFromCG(cg)
 	}
 	revisitSess = sessOrAmbient(revisitSess)
 	prevRevisit := revisitSess.InUserInvocationRevisit
@@ -678,38 +678,38 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if cg.FM != nil && cg.FM != fm {
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return false
 		}
 		clU := CloneUnionFactSlice(cg.FM.UnionFacts)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
+		if hasErrCG(cg) || !UnionFactsComplete(clU) {
 			restore()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return false
 		}
 		fm.UnionFacts = clU
 	} else if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	// handover params into working lattice (not directly into caller GlobalFacts)
 	fm.CallerToCalleeHandover(fi.Args, &work)
 	if !FactsComplete(work) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
 	// FactMgr.cpp:324–353 — drop union subjects not kept by PT partition
 	fm.FilterUnionFactsForHandover(work)
-	if sessHasError(cgSess(cg)) || !UnionFactsComplete(fm.UnionFacts) {
+	if hasErrCG(cg) || !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
@@ -728,46 +728,46 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		restore()
 		fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_516")
 		// Soft analysis fail must not leave sticky ERROR for later soft paths.
-		sessClearError(cgSess(cg))
+		sessClearError(sessFromCG(cg))
 		return false
 	}
 	// incomplete body GlobalFacts sticky
 	if !FactsComplete(fm.GlobalFacts) {
 		restore()
 		fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_523")
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
-	work = CloneFactSliceSess(cgSess(cg), fm.GlobalFacts)
+	work = CloneFactSliceSess(sessFromCG(cg), fm.GlobalFacts)
 	// Restore callee GlobalFacts immediately — do not leave caller lattice installed.
 	fm.SetGlobalFacts(savedGlobal, "auto_invocation_revisit_531")
 	// body Block::stm_id always live; StmID 0 sticky
 	if StmIDUnset(f.Body.StmID) {
 		restore()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return false
 	}
 	// Incomplete body map_stm_effect sticky
 	bodyEff := fm.GetMapStmEffect(f.Body.StmID)
 	if !EffectComplete(bodyEff) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
 	cg.AddEffect(bodyEff, false)
 	// residual ERROR sticky — no invent soft-continue ret-facts past AddEffect residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		restore()
 		return false
 	}
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
@@ -779,64 +779,64 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if !AddBackReturnFacts(f.Body, fm, &retFacts, &retUnions) ||
 		!FactsComplete(retFacts) || !UnionFactsComplete(retUnions) || !FactsComplete(work) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
 	// FunctionInvocationUser.cpp:358–365 — save full FactVec matching rv (ePointTo + eUnionWrite).
-	fi.SaveReturnFactsSess(cgSess(cg), retFacts)
-	fi.SaveReturnUnionFactsSess(cgSess(cg), retUnions)
-	if sessHasError(cgSess(cg)) {
+	fi.SaveReturnFactsSess(sessFromCG(cg), retFacts)
+	fi.SaveReturnUnionFactsSess(sessFromCG(cg), retUnions)
+	if hasErrCG(cg) {
 		restore()
 		return false
 	}
-	_ = MergeFactsSess(cgSess(cg), &work, retFacts)
+	_ = MergeFactsSess(sessFromCG(cg), &work, retFacts)
 	if !FactsComplete(work) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
 	// eUnionWrite half of merge_facts(inputs, ret_facts)
 	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
 	for _, nf := range retUnions {
 		if nf == nil {
 			restore()
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return false
 		}
-		fm.UnionFacts = MergeUnionFactSess(cgSess(cg), fm.UnionFacts, nf)
+		fm.UnionFacts = MergeUnionFactSess(sessFromCG(cg), fm.UnionFacts, nf)
 		if !UnionFactsComplete(fm.UnionFacts) {
 			restore()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return false
 		}
 	}
 	// FunctionInvocationUser.cpp:344 — update_facts_for_oos_vars(func->param, inputs)
 	// Full FactVec: ePointTo + eUnionWrite.
-	UpdateFactsForOOSVarsSess(cgSess(cg), f.Param, &work)
+	UpdateFactsForOOSVarsSess(sessFromCG(cg), f.Param, &work)
 	if !FactsComplete(work) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
-	UpdateUnionFactsForOOSVarsSess(cgSess(cg), f.Param, &fm.UnionFacts)
+	UpdateUnionFactsForOOSVarsSess(sessFromCG(cg), f.Param, &fm.UnionFacts)
 	if !UnionFactsComplete(fm.UnionFacts) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
@@ -844,16 +844,16 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// Incomplete external merge sticky
 	if !EffectComplete(cg.EffectContext()) || !EffectComplete(f.AccumEffContext) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
-	f.AccumEffContext = f.AccumEffContext.AddExternalEffectSess(cgSess(cg), cg.EffectContext())
+	f.AccumEffContext = f.AccumEffContext.AddExternalEffectSess(sessFromCG(cg), cg.EffectContext())
 	if !EffectComplete(f.AccumEffContext) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
@@ -861,11 +861,11 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// Restore pre-handover caller lattice (incl. frame-local may-null) then apply body deltas.
 	// Full FactVec renew: ePointTo + global eUnionWrite (build path
 	// function_invocation.go GlobalUnionFactsOnly + RenewUnionFacts).
-	_ = RenewFactsSess(cgSess(cg), &inputsCopy, work)
+	_ = RenewFactsSess(sessFromCG(cg), &inputsCopy, work)
 	if !FactsComplete(inputsCopy) {
 		restore()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return false
 	}
@@ -874,22 +874,22 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if cg.FM != nil && cg.FM != fm {
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return false
 		}
-		retUF := GlobalUnionFactsOnlySess(cgSess(cg), fm.UnionFacts)
+		retUF := GlobalUnionFactsOnlySess(sessFromCG(cg), fm.UnionFacts)
 		if !UnionFactsComplete(retUF) {
 			restore()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return false
 		}
-		_ = RenewUnionFactsSess(cgSess(cg), &cg.FM.UnionFacts, retUF)
+		_ = RenewUnionFactsSess(sessFromCG(cg), &cg.FM.UnionFacts, retUF)
 		if !UnionFactsComplete(cg.FM.UnionFacts) {
 			restore()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return false
 		}

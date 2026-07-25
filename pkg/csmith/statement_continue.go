@@ -19,24 +19,24 @@ func MakeRandomContinue(
 	}
 	// StatementContinue always has RNG + CGContext; sticky no invent continue shell without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
-	loop := ClosestLoopingBlockSess(cgSess(cg), cg.CurrentBlock())
+	loop := ClosestLoopingBlockSess(sessFromCG(cg), cg.CurrentBlock())
 	// StatementContinue.cpp:71 — assert(b) sticky; no soft invent continue without looping block
 	if loop == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// StatementContinue.cpp:72 — clear effect_stm before condition
@@ -44,15 +44,15 @@ func MakeRandomContinue(
 	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	// residual ERROR sticky — no invent soft-return continue past condition make residual
-	if expr == nil || sessHasError(cgSess(cg)) {
+	if expr == nil || hasErrCG(cg) {
 		return Stmt{}
 	}
-	st := Stmt{Kind: StmtContinue, Expr: expr, StmID: AllocStmIDSess(cgSess(cg))}
+	st := Stmt{Kind: StmtContinue, Expr: expr, StmID: AllocStmIDSess(sessFromCG(cg))}
 	// FactMgr::create_cfg_edge(sc, b, false, true) — StatementContinue.cpp:83
 	if cg.FM != nil {
 		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)
 		// residual ERROR sticky — no invent soft-return continue past CreateCFGEdge residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return Stmt{}
 		}
 	}

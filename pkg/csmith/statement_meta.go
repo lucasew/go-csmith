@@ -305,19 +305,19 @@ func DominateSess(sess *Session, a *Stmt, aParent *Block, s *Stmt, sParent *Bloc
 
 func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, srcParentOf map[int]*Block) bool {
 	if StmIDUnset(destStmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return true
 	}
 	// FactMgr always live for CFG jump sources; sticky fail closed jump-target
 	// (no invent "not target" without CFG / soft re-pick past hole)
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return true
 	}
 	srcs := fm.FindJumpSources(destStmID)
 	// incomplete CFG (nil sources) sticky fail closed as jump-target
 	if srcs == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return true
 	}
 	for _, srcID := range srcs {

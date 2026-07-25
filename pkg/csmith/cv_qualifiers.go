@@ -584,30 +584,30 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent empty shells when missing
 	if r == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent looser/stricter qfer past holes)
 	if !EffectComplete(cg.EffectContext()) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 	var vols []bool
 	if noVolatile {
 		vols = make([]bool, len(q.IsVolatiles))
 	} else if !q.AcceptStricter {
-		vols = q.RandomLooserVolatilesSess(cgSess(&cg), r, opts, probs)
+		vols = q.RandomLooserVolatilesSess(sessFromCG(&cg), r, opts, probs)
 	} else {
-		vols = q.RandomStricterVolatilesSess(cgSess(&cg), r, opts, probs)
+		vols = q.RandomStricterVolatilesSess(sessFromCG(&cg), r, opts, probs)
 	}
 	// CVQualifiers.cpp:209 — ERROR_GUARD after random_*_volatiles
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return NewCVQualifiers(nil, vols)
 	}
 	if !noVolatile {
-		seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg))
+		seFree := cg.EffectContext().IsSideEffectFreeSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-clear/keep vol past IsSideEffectFree residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}
 		if !seFree && len(vols) > 0 {
@@ -616,19 +616,19 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	}
 	MakeScalarVolatiles(opts, vols)
 	// CVQualifiers.cpp:215 — ERROR_GUARD
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return NewCVQualifiers(nil, vols)
 	}
 
 	var consts []bool
 	if !q.AcceptStricter {
-		consts = q.RandomLooserConstsSess(cgSess(&cg), r, opts, probs)
+		consts = q.RandomLooserConstsSess(sessFromCG(&cg), r, opts, probs)
 	} else {
-		consts = q.RandomStricterConstsSess(cgSess(&cg), r, opts, probs)
+		consts = q.RandomStricterConstsSess(sessFromCG(&cg), r, opts, probs)
 	}
 	MakeScalarConsts(opts, consts)
 	// CVQualifiers.cpp:219 — ERROR_GUARD after random_*_consts
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return NewCVQualifiers(consts, vols)
 	}
 	if access == AccessWrite && len(consts) > 0 {
@@ -652,38 +652,38 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent fixed looser shells
 	if r == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent looser qfer past holes)
 	if !EffectComplete(cg.EffectContext()) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 	var vols []bool
 	if noVolatile {
 		vols = make([]bool, len(q.IsVolatiles))
 	} else {
-		vols = q.RandomLooserVolatilesSess(cgSess(&cg), r, opts, probs)
+		vols = q.RandomLooserVolatilesSess(sessFromCG(&cg), r, opts, probs)
 		// residual ERROR sticky — no invent soft-continue looser past RandomLooserVolatiles residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}
-		if !cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg)) && len(vols) > 0 {
+		if !cg.EffectContext().IsSideEffectFreeSess(sessFromCG(&cg)) && len(vols) > 0 {
 			// residual ERROR sticky — no invent soft-clear vol past IsSideEffectFree residual
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return CVQualifiers{}
 			}
 			vols[len(vols)-1] = false
-		} else if sessHasError(cgSess(&cg)) {
+		} else if hasErrCG(&cg) {
 			// residual ERROR sticky — no invent soft-continue past IsSideEffectFree residual true
 			return CVQualifiers{}
 		}
 	}
 	MakeScalarVolatiles(opts, vols)
-	consts := q.RandomLooserConstsSess(cgSess(&cg), r, opts, probs)
+	consts := q.RandomLooserConstsSess(sessFromCG(&cg), r, opts, probs)
 	// residual ERROR sticky — no invent soft-continue looser past RandomLooserConsts residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
 	MakeScalarConsts(opts, consts)
@@ -692,7 +692,7 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	}
 	out := NewCVQualifiers(consts, vols)
 	// residual ERROR sticky — no invent soft-qfer past NewCVQualifiers residual (mismatch)
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
 	return out
@@ -895,7 +895,7 @@ func (q *CVQualifiers) SetVolatileSess(s *Session, isVol bool, pos int) {
 // Wildcard is complete no-op (not incomplete IR).
 func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	if q == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return
 	}
 	if q.Wildcard {
@@ -903,19 +903,19 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	}
 	// incomplete ambient fails closed sticky (no invent clear-vol via IncompleteEffect SE-false)
 	if !EffectComplete(cg.EffectContext()) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return
 	}
 	if access == AccessWrite {
-		q.SetConstSess(cgSess(&cg), false, 0)
+		q.SetConstSess(sessFromCG(&cg), false, 0)
 	}
-	seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg))
+	seFree := cg.EffectContext().IsSideEffectFreeSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent soft-restrict past IsSideEffectFree residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return
 	}
 	if !seFree {
-		q.SetVolatileSess(cgSess(&cg), false, 0)
+		q.SetVolatileSess(sessFromCG(&cg), false, 0)
 	}
 }
 
@@ -1189,18 +1189,18 @@ func RandomQualifiersForType(
 ) CVQualifiers {
 	// Type always live; sticky empty (no invent soft-skip qfer past hole)
 	if t == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// CVQualifiers.cpp:295+ — always has RNG sticky; no invent empty shells without draw
 	// (align RandomQualifiersFrom / RandomLooseQualifiers)
 	if r == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent non-vol qfer / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return CVQualifiers{}
 	}
 
@@ -1211,7 +1211,7 @@ func RandomQualifiersForType(
 	level := 0
 	tmp := t.PtrType()
 	// residual ERROR sticky — no invent soft-qual levels past PtrType residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
 	for tmp != nil {
@@ -1220,18 +1220,18 @@ func RandomQualifiersForType(
 		isVolatiles = append(isVolatiles, false)
 		tmp = tmp.PtrType()
 		// residual ERROR sticky — no invent soft-qual levels past nested PtrType residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}
 	}
 	tmp = t.PtrType()
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
 	for tmp != nil {
 		volatileOK := isVolatileOKOnOneLevel(opts, tmp)
 		// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}
 		isVolatile := false
@@ -1250,20 +1250,20 @@ func RandomQualifiersForType(
 		isVolatiles[level-1] = isVolatile
 		level--
 		tmp = tmp.PtrType()
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return CVQualifiers{}
 		}
 	}
 
 	// CVQualifiers.cpp:332–343 — variable itself.
-	seFree := effectCtx.IsSideEffectFreeSess(cgSess(&cg))
+	seFree := effectCtx.IsSideEffectFreeSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent soft-qual past IsSideEffectFree residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
 	volOK1 := isVolatileOKOnOneLevel(opts, t)
 	// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return CVQualifiers{}
 	}
 	volatileOK := seFree && volOK1

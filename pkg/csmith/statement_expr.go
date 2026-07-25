@@ -15,18 +15,18 @@ func MakeRandomExprStmt(
 ) Stmt {
 	// StatementExpr.cpp always has RNG + CGContext; sticky no invent Kind-only shell
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent expr stmt / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// StatementExpr.cpp:53 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementExpr, nullptr)
-	if DepthGuardByTypeSess(cgSess(cg), opts, DtStatementExpr) == BadDepth {
+	if DepthGuardByTypeSess(sessFromCG(cg), opts, DtStatementExpr) == BadDepth {
 		return Stmt{}
 	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback
@@ -34,9 +34,9 @@ func MakeRandomExprStmt(
 	var preEffect Effect
 	if cg.EffectAccum != nil {
 		// pre-validated EffectComplete
-		preEffect = cg.EffectAccum.CloneSess(cgSess(cg))
+		preEffect = cg.EffectAccum.CloneSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-expr stmt past Effect Clone residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return Stmt{}
 		}
 	}
@@ -48,7 +48,7 @@ func MakeRandomExprStmt(
 	var unionCopy []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return Stmt{}
 		}
 		// shallow Fact* vector snapshot (C++ facts_copy = global_facts)
@@ -59,7 +59,7 @@ func MakeRandomExprStmt(
 	// is_std_func=false (StatementExpr.cpp:60)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, nil, nil, false)
 	// StatementExpr.cpp:61 ERROR_GUARD(nullptr)
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preEffect
 		}
@@ -77,14 +77,14 @@ func MakeRandomExprStmt(
 			cg.FM.RestoreFactsPair(factsCopy, unionCopy)
 		}
 		// residual ERROR sticky — no invent soft re-pick past Failed residual (restore may residual)
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return Stmt{}
 		}
 		// Statement::make_random retries on null
 		return Stmt{}
 	}
 	// residual ERROR sticky — no invent invoke stmt past MakeRandomInvocation residual success path
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preEffect
 		}
@@ -97,6 +97,6 @@ func MakeRandomExprStmt(
 	return Stmt{
 		Kind:  StmtInvoke,
 		Expr:  &Expression{Term: TermFunction, Invoke: fi},
-		StmID: AllocStmIDSess(cgSess(cg)),
+		StmID: AllocStmIDSess(sessFromCG(cg)),
 	}
 }

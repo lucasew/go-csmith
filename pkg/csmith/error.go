@@ -37,6 +37,163 @@ func sessNoteError(s *Session, code int) {
 	s.GenError = code
 }
 
+// noteErrFM notes sticky on fm.Sess. Nil fm uses testAmbientSession explicitly
+// (unit-test nil-receiver sticky only — not dual-fill via fmSess(nil)).
+func noteErrFM(fm *FactMgr, code int) {
+	if fm == nil {
+		sessNoteError(testAmbientSession, code)
+		return
+	}
+	if fm.Sess == nil {
+		panic("noteErrFM: Sess unset (use NewFactMgrSess)")
+	}
+	sessNoteError(fm.Sess, code)
+}
+
+// noteErrCG notes sticky on c.Sess. Nil c uses testAmbientSession explicitly.
+func noteErrCG(c *CGContext, code int) {
+	if c == nil {
+		sessNoteError(testAmbientSession, code)
+		return
+	}
+	if c.Sess == nil {
+		panic("noteErrCG: Sess unset (use WithSession / set Sess)")
+	}
+	sessNoteError(c.Sess, code)
+}
+
+// noteErrVS notes sticky on vs.Sess. Nil vs uses testAmbientSession explicitly.
+func noteErrVS(vs *VariableSelector, code int) {
+	if vs == nil {
+		sessNoteError(testAmbientSession, code)
+		return
+	}
+	if vs.Sess == nil {
+		panic("noteErrVS: Sess unset (use NewVariableSelector or set VS.Sess)")
+	}
+	sessNoteError(vs.Sess, code)
+}
+
+// noteErrG notes sticky on g.Sess. Nil g uses testAmbientSession explicitly.
+func noteErrG(g *ProgramGenerator, code int) {
+	if g == nil {
+		sessNoteError(testAmbientSession, code)
+		return
+	}
+	if g.Sess == nil {
+		panic("noteErrG: Sess unset (use NewProgramGenerator or set g.Sess)")
+	}
+	sessNoteError(g.Sess, code)
+}
+
+// noteErrEnv notes sticky on env.Sess. Nil env uses testAmbientSession explicitly.
+func noteErrEnv(env *TypeEnv, code int) {
+	if env == nil {
+		sessNoteError(testAmbientSession, code)
+		return
+	}
+	if env.Sess == nil {
+		panic("noteErrEnv: Sess unset (set TypeEnv.Sess)")
+	}
+	sessNoteError(env.Sess, code)
+}
+
+// hasErrFM reports sticky on fm.Sess. Nil fm reads testAmbientSession explicitly.
+func hasErrFM(fm *FactMgr) bool {
+	if fm == nil {
+		return sessHasError(testAmbientSession)
+	}
+	if fm.Sess == nil {
+		panic("hasErrFM: Sess unset (use NewFactMgrSess)")
+	}
+	return sessHasError(fm.Sess)
+}
+
+// hasErrCG reports sticky on c.Sess. Nil c reads testAmbientSession explicitly.
+func hasErrCG(c *CGContext) bool {
+	if c == nil {
+		return sessHasError(testAmbientSession)
+	}
+	if c.Sess == nil {
+		panic("hasErrCG: Sess unset (use WithSession / set Sess)")
+	}
+	return sessHasError(c.Sess)
+}
+
+// hasErrVS reports sticky on vs.Sess. Nil vs reads testAmbientSession explicitly.
+func hasErrVS(vs *VariableSelector) bool {
+	if vs == nil {
+		return sessHasError(testAmbientSession)
+	}
+	if vs.Sess == nil {
+		panic("hasErrVS: Sess unset (use NewVariableSelector or set VS.Sess)")
+	}
+	return sessHasError(vs.Sess)
+}
+
+// hasErrG reports sticky on g.Sess. Nil g reads testAmbientSession explicitly.
+func hasErrG(g *ProgramGenerator) bool {
+	if g == nil {
+		return sessHasError(testAmbientSession)
+	}
+	if g.Sess == nil {
+		panic("hasErrG: Sess unset (use NewProgramGenerator or set g.Sess)")
+	}
+	return sessHasError(g.Sess)
+}
+
+// hasErrEnv reports sticky on env.Sess. Nil env reads testAmbientSession explicitly.
+func hasErrEnv(env *TypeEnv) bool {
+	if env == nil {
+		return sessHasError(testAmbientSession)
+	}
+	if env.Sess == nil {
+		panic("hasErrEnv: Sess unset (set TypeEnv.Sess)")
+	}
+	return sessHasError(env.Sess)
+}
+
+// sessFromCG returns c.Sess. Nil c → testAmbientSession (explicit unit-test nil-CG residual).
+// Unset Sess on live c still panics via cgSess.
+func sessFromCG(c *CGContext) *Session {
+	if c == nil {
+		return testAmbientSession
+	}
+	return cgSess(c)
+}
+
+// sessFromFM returns fm.Sess. Nil fm → testAmbientSession.
+func sessFromFM(fm *FactMgr) *Session {
+	if fm == nil {
+		return testAmbientSession
+	}
+	return fmSess(fm)
+}
+
+// sessFromVS returns vs.Sess. Nil vs → testAmbientSession.
+func sessFromVS(vs *VariableSelector) *Session {
+	if vs == nil {
+		return testAmbientSession
+	}
+	return vsSess(vs)
+}
+
+// sessFromEnv returns env.Sess. Nil env → testAmbientSession.
+func sessFromEnv(env *TypeEnv) *Session {
+	if env == nil {
+		return testAmbientSession
+	}
+	return envSess(env)
+}
+
+// sessFromG returns g.Sess. Nil g → testAmbientSession.
+func sessFromG(g *ProgramGenerator) *Session {
+	if g == nil {
+		return testAmbientSession
+	}
+	return gSess(g)
+}
+
 // sessHasError reports sticky error on an explicit bag. Nil s panics.
 func sessHasError(s *Session) bool {
 	if s == nil {

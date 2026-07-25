@@ -143,13 +143,13 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 func (b *Block) MustReturnWithFMSess(s *Session, fm *FactMgr) bool {
 	if b == nil {
 		if s == nil {
-			s = fmSess(fm)
+			s = sessFromFM(fm)
 		}
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if s == nil {
-		s = fmSess(fm)
+		s = sessFromFM(fm)
 	}
 	if len(b.Stmts) == 0 {
 		return false
@@ -224,7 +224,7 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	// Block::stm_id always live for CFG-indexed edges; StmID 0 is valid (fair sid).
 	// IncompleteStmID sticky possible escape (no invent "no back edge").
 	if StmIDUnset(b.StmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return true
 	}
 	// Statement.cpp:453–467 — e->dest == this only (DestStmID == block.StmID).
@@ -233,8 +233,8 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	back := fm.FindEdgesIn(b.StmID, false, true)
 	// incomplete CFG sticky possible escape
 	if back == nil {
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return true
 	}

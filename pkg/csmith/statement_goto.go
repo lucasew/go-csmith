@@ -509,7 +509,7 @@ func MakeRandomGoto(
 	_ = probs
 	// StatementGoto always has RNG + CG + curr_func; sticky no invent shell without them
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return makeGotoFailed()
 	}
 	// StatementGoto.cpp:66–67 — FactMgr always present (get_fact_mgr);
@@ -521,26 +521,26 @@ func MakeRandomGoto(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return makeGotoFailed()
 	}
 	// incomplete GlobalFacts fail closed sticky (no invent goto under hole shells)
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return makeGotoFailed()
 	}
 
 	// 40% prefer back-edge (StatementGoto.cpp:73–84)
 	wantBack := r.RndFlipcoin(40)
 	// StatementGoto.cpp:74 ERROR_GUARD
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return makeGotoFailed()
 	}
 	// StatementGoto.cpp:70–84 — vector copy of func->blocks only (no invent append curr)
 	// Block* always live on Function.Blocks; nil hole fails closed sticky
-	blocks, ok := copyBlocksNoHoleSess(cgSess(cg), cg.CurrentFunc.Blocks)
+	blocks, ok := copyBlocksNoHoleSess(sessFromCG(cg), cg.CurrentFunc.Blocks)
 	if !ok {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return makeGotoFailed()
 	}
 
@@ -548,7 +548,7 @@ func MakeRandomGoto(
 	backEdge := false
 	if wantBack {
 		// as_dest=true: pick destination for backward jump
-		okBlk = FindGoodJumpBlockSess(cgSess(cg), r, blocks, blk, true)
+		okBlk = FindGoodJumpBlockSess(sessFromCG(cg), r, blocks, blk, true)
 		if okBlk != nil {
 			backEdge = true
 		}
@@ -556,12 +556,12 @@ func MakeRandomGoto(
 	if okBlk == nil {
 		// StatementGoto.cpp:81–84 — forward: re-copy func->blocks; as_dest=false
 		backEdge = false
-		blocks, ok = copyBlocksNoHoleSess(cgSess(cg), cg.CurrentFunc.Blocks)
+		blocks, ok = copyBlocksNoHoleSess(sessFromCG(cg), cg.CurrentFunc.Blocks)
 		if !ok {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return makeGotoFailed()
 		}
-		okBlk = FindGoodJumpBlockSess(cgSess(cg), r, blocks, blk, false)
+		okBlk = FindGoodJumpBlockSess(sessFromCG(cg), r, blocks, blk, false)
 	}
 	if okBlk == nil {
 		// StatementGoto.cpp:86–87 — return nullptr
@@ -583,9 +583,9 @@ func MakeRandomGoto(
 		if dest != nil && s == dest {
 			continue
 		}
-		if s.MustReturnSess(cgSess(cg)) {
+		if s.MustReturnSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent soft-skip must-return then pick later target
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return makeGotoFailed()
 			}
 			continue
@@ -598,12 +598,12 @@ func MakeRandomGoto(
 	}
 	ti := okStms[r.RndUpto(uint32(len(okStms)))]
 	// StatementGoto.cpp:110 ERROR_GUARD
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return makeGotoFailed()
 	}
 	other := &okBlk.Stmts[ti]
 	if StmIDUnset(other.StmID) {
-		other.StmID = AllocStmIDSess(cgSess(cg))
+		other.StmID = AllocStmIDSess(sessFromCG(cg))
 	}
 
 	// StatementGoto.cpp:112 — clear effect_stm after other_stm pick (not before)
@@ -622,7 +622,7 @@ func MakeRandomGoto(
 	if backEdge {
 		// StatementGoto.cpp:119–122 — accum read_vars + global_facts
 		if cg.EffectAccum != nil {
-			readVars = cg.EffectAccum.ReadVarsSess(cgSess(cg))
+			readVars = cg.EffectAccum.ReadVarsSess(sessFromCG(cg))
 		}
 		if cg.FM != nil {
 			uf = cg.FM.UnionFacts
@@ -633,21 +633,21 @@ func MakeRandomGoto(
 		// C++ map[] always (missing live id → empty); StmID 0 IncompleteEffect
 		condBlk = okBlk
 		if cg.FM != nil {
-			readVars = cg.FM.GetMapAccumEffect(other.StmID).ReadVarsSess(cgSess(cg))
+			readVars = cg.FM.GetMapAccumEffect(other.StmID).ReadVarsSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-empty read past GetMapAccum residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return makeGotoFailed()
 			}
 			uf = cg.FM.GetMapUnionFactsOut(other.StmID)
 			// residual ERROR sticky — no invent soft-live UnionFacts past MapUnionOut hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return makeGotoFailed()
 			}
 		}
 	}
 	var cond *Expression
 	if len(readVars) > 0 {
-		if v := ChooseVisibleReadVarOptsSess(cgSess(cg), r, condBlk, readVars, GetIntType(), uf, sessOpts(cgSess(cg))); v != nil {
+		if v := ChooseVisibleReadVarOptsSess(sessFromCG(cg), r, condBlk, readVars, GetIntType(), uf, sessOpts(sessFromCG(cg))); v != nil {
 			// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only.
 			// C++ does not call read_var here; visit_facts later uses check_read_var.
 			// Soft invent was NoteRead/ReadVar during make_random, which pushed the
@@ -663,27 +663,27 @@ func MakeRandomGoto(
 
 	// util.cpp gensym_count process-wide; no invent VS.Sym private or fixed "lbl_1"
 	nextLab := func() string {
-		return GensymSess(cgSess(cg), "lbl_")
+		return GensymSess(sessFromCG(cg), "lbl_")
 	}
 
 	if backEdge {
 		// StatementGoto.cpp:138–150 — goto in curr jumps to other_stm
 		label := other.SourceLabel
 		if label == "" {
-			label = LabelForGotoDestSess(cgSess(cg), other.StmID, nextLab)
+			label = LabelForGotoDestSess(sessFromCG(cg), other.StmID, nextLab)
 			other.SourceLabel = label
 		} else if !StmIDUnset(other.StmID) {
-			setStmLabelSess(cgSess(cg), other.StmID, label)
+			setStmLabelSess(sessFromCG(cg), other.StmID, label)
 		}
 		// incomplete LocalVars on intermediate blocks fails closed sticky (Collect nil)
 		// no invent goto with empty InitSkippedVars when skip list is incomplete
-		skipped := CollectInitSkippedVarsSess(cgSess(cg), blk, okBlk)
+		skipped := CollectInitSkippedVarsSess(sessFromCG(cg), blk, okBlk)
 		if !VariablesComplete(skipped) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return makeGotoFailed()
 		}
 		st := Stmt{
-			Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmIDSess(cgSess(cg)),
+			Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmIDSess(sessFromCG(cg)),
 			GotoBack:        true,
 			GotoDestStmID:   other.StmID,
 			GotoDestParent:  okBlk,
@@ -695,9 +695,9 @@ func MakeRandomGoto(
 		}
 		// StatementGoto.cpp:141–147 — LCA need_revisit
 		// okBlk is other_stm->parent (dest Statement::parent).
-		MarkNeedRevisitLCAParentSess(cgSess(cg), blk, other, okBlk)
+		MarkNeedRevisitLCAParentSess(sessFromCG(cg), blk, other, okBlk)
 		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
-		RecordBackwardJumpSess(cgSess(cg))
+		RecordBackwardJumpSess(sessFromCG(cg))
 		return st
 	}
 
@@ -709,7 +709,7 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 	if StmIDUnset(dest.StmID) {
-		dest.StmID = AllocStmIDSess(cgSess(cg))
+		dest.StmID = AllocStmIDSess(sessFromCG(cg))
 	}
 	// StatementGoto.cpp:185 — StatementGoto ctor gensyms label only after DFA
 	// validation succeeds. Do not gensym here: failed visit_facts/merge must not
@@ -736,14 +736,14 @@ func MakeRandomGoto(
 			srcUnions = fm.GetMapUnionFactsOut(other.StmID)
 		}
 		if !FactsComplete(srcFacts) || !UnionFactsComplete(srcUnions) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return makeGotoFailed()
 		}
-		gotoIn = CloneFactSliceSess(cgSess(cg), srcFacts)
-		gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), srcUnions)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(gotoInU) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		gotoIn = CloneFactSliceSess(sessFromCG(cg), srcFacts)
+		gotoInU = CloneUnionFactSliceDeepSess(sessFromCG(cg), srcUnions)
+		if hasErrCG(cg) || !UnionFactsComplete(gotoInU) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
@@ -752,17 +752,17 @@ func MakeRandomGoto(
 		}
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
 		// Full FactVec: PT half + eUnionWrite half (merge then OOS drop).
-		UpdateFactsForDestSess(cgSess(cg), gotoIn, &gotoOut, fm.Func, blk)
-		if sessHasError(cgSess(cg)) || !FactsComplete(gotoOut) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		UpdateFactsForDestSess(sessFromCG(cg), gotoIn, &gotoOut, fm.Func, blk)
+		if hasErrCG(cg) || !FactsComplete(gotoOut) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
-		UpdateUnionFactsForDestSess(cgSess(cg), gotoInU, &gotoOutU, fm.Func, blk)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(gotoOutU) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		UpdateUnionFactsForDestSess(sessFromCG(cg), gotoInU, &gotoOutU, fm.Func, blk)
+		if hasErrCG(cg) || !UnionFactsComplete(gotoOutU) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
@@ -771,13 +771,13 @@ func MakeRandomGoto(
 		preEffect := cg.AccumEffect()
 		srcAcc := fm.GetMapAccumEffect(other.StmID)
 		if !EffectComplete(srcAcc) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return makeGotoFailed()
 		}
 		cg.AddEffect(srcAcc, true)
-		if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			cg.ResetEffectAccum(preEffect)
 			return makeGotoFailed()
@@ -787,14 +787,14 @@ func MakeRandomGoto(
 		destIn := fm.GetMapFactsIn(dest.StmID)
 		destInU := fm.GetMapUnionFactsIn(dest.StmID)
 		if !FactsComplete(destIn) || !UnionFactsComplete(destInU) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return makeGotoFailed()
 		}
-		stmInMerged = CloneFactSliceSess(cgSess(cg), destIn)
-		stmInMergedU = CloneUnionFactSliceDeepSess(cgSess(cg), destInU)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmInMergedU) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		stmInMerged = CloneFactSliceSess(sessFromCG(cg), destIn)
+		stmInMergedU = CloneUnionFactSliceDeepSess(sessFromCG(cg), destInU)
+		if hasErrCG(cg) || !UnionFactsComplete(stmInMergedU) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
@@ -810,14 +810,14 @@ func MakeRandomGoto(
 		}
 		// tryMerge distinguishes incomplete wipe from complete no-change
 		// (no invent treat MergeJumpFacts false as "unchanged" after wipe)
-		changed, mok := tryMergeJumpFactsSess(cgSess(cg), &stmInMerged, gotoOut)
+		changed, mok := tryMergeJumpFactsSess(sessFromCG(cg), &stmInMerged, gotoOut)
 		if !mok {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return makeGotoFailed()
 		}
-		if !mergeJumpUnionFactsSess(cgSess(cg), &stmInMergedU, gotoOutU) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if !mergeJumpUnionFactsSess(sessFromCG(cg), &stmInMergedU, gotoOutU) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
@@ -837,11 +837,11 @@ func MakeRandomGoto(
 			}
 		}
 		if changed || unionChanged {
-			stmOut = CloneFactSliceSess(cgSess(cg), stmInMerged)
-			stmOutU = CloneUnionFactSliceDeepSess(cgSess(cg), stmInMergedU)
-			if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmOutU) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+			stmOut = CloneFactSliceSess(sessFromCG(cg), stmInMerged)
+			stmOutU = CloneUnionFactSliceDeepSess(sessFromCG(cg), stmInMergedU)
+			if hasErrCG(cg) || !UnionFactsComplete(stmOutU) {
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return makeGotoFailed()
 			}
@@ -856,7 +856,7 @@ func MakeRandomGoto(
 			if !FactsComplete(stmInMerged) || !UnionFactsComplete(stmInMergedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return makeGotoFailed()
 			}
 			// map_facts_in[dest] is the pre-make snapshot of dest and can lack
@@ -869,36 +869,36 @@ func MakeRandomGoto(
 			// fail → extra Select). MakeupNewVarFacts restores those locals
 			// from the live GlobalFacts into the visit inputs (FactMgr.cpp:494–508).
 			// Keep post–merge_jump lattice (e.g. BOTTOM) — do not reload map_in.
-			liveSaved := CloneFactSliceSess(cgSess(cg), fm.GlobalFacts)
-			liveSavedU := CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
+			liveSaved := CloneFactSliceSess(sessFromCG(cg), fm.GlobalFacts)
+			liveSavedU := CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.UnionFacts)
 			if !FactsComplete(liveSaved) || !UnionFactsComplete(liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return makeGotoFailed()
 			}
-			if !MakeupNewVarFactsSess(cgSess(cg), &stmInMerged, liveSaved) {
+			if !MakeupNewVarFactsSess(sessFromCG(cg), &stmInMerged, liveSaved) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return makeGotoFailed()
 			}
-			if !makeupNewUnionFactsSess(cgSess(cg), &stmInMergedU, liveSavedU) {
+			if !makeupNewUnionFactsSess(sessFromCG(cg), &stmInMergedU, liveSavedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return makeGotoFailed()
 			}
 			if !UnionFactsComplete(stmInMergedU) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return makeGotoFailed()
 			}
 			// eUnionWrite visit inputs (StmVisitFacts swaps only ePointTo GlobalFacts)
@@ -906,13 +906,13 @@ func MakeRandomGoto(
 			if stmInMergedU == nil {
 				fm.UnionFacts = []*FactUnion{}
 			} else {
-				clU := CloneUnionFactSliceDeepSess(cgSess(cg), stmInMergedU)
-				if sessHasError(cgSess(cg)) || !UnionFactsComplete(clU) {
+				clU := CloneUnionFactSliceDeepSess(sessFromCG(cg), stmInMergedU)
+				if hasErrCG(cg) || !UnionFactsComplete(clU) {
 					fm.UnionFacts = liveSavedU
 					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 					cg.ResetEffectAccum(preEffect)
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return makeGotoFailed()
 				}
@@ -930,13 +930,13 @@ func MakeRandomGoto(
 			// gen IV read g_77 first vs UP visit order g_16 g_22 g_77).
 			// Do not SetGlobalFacts(work) here: StmVisitFacts captures live
 			// GlobalFacts as restore target then loads *facts as the working set.
-			work := CloneFactSliceSess(cgSess(cg), stmInMerged)
-			if sessHasError(cgSess(cg)) || !FactsComplete(work) {
+			work := CloneFactSliceSess(sessFromCG(cg), stmInMerged)
+			if hasErrCG(cg) || !FactsComplete(work) {
 				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return makeGotoFailed()
 			}
@@ -955,20 +955,20 @@ func MakeRandomGoto(
 				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return makeGotoFailed()
 			}
 			stmOut = work
 			// Capture post-visit eUnionWrite before restoring pre-visit live
 			// (set_fact_out pairs this lattice; C++ stm_out is the visit inputs FactVec).
-			stmOutU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.UnionFacts)
-			if sessHasError(cgSess(cg)) || !UnionFactsComplete(stmOutU) {
+			stmOutU = CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.UnionFacts)
+			if hasErrCG(cg) || !UnionFactsComplete(stmOutU) {
 				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
 				fm.UnionFacts = liveSavedU
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 				cg.ResetEffectAccum(preEffect)
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return makeGotoFailed()
 			}
@@ -987,17 +987,17 @@ func MakeRandomGoto(
 			// Func.Blocks n=37 vs UP n=3 at FindGoodJumpBlock).
 			if ContainsStmt(dest, other) {
 				if IsCtrlStmt(other) {
-					gotoIn = CloneFactSliceSess(cgSess(cg), fm.GetMapFactsIn(other.StmID))
-					gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.GetMapUnionFactsIn(other.StmID))
+					gotoIn = CloneFactSliceSess(sessFromCG(cg), fm.GetMapFactsIn(other.StmID))
+					gotoInU = CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.GetMapUnionFactsIn(other.StmID))
 				} else {
-					gotoIn = CloneFactSliceSess(cgSess(cg), fm.GetMapFactsOut(other.StmID))
-					gotoInU = CloneUnionFactSliceDeepSess(cgSess(cg), fm.GetMapUnionFactsOut(other.StmID))
+					gotoIn = CloneFactSliceSess(sessFromCG(cg), fm.GetMapFactsOut(other.StmID))
+					gotoInU = CloneUnionFactSliceDeepSess(sessFromCG(cg), fm.GetMapUnionFactsOut(other.StmID))
 				}
-				if sessHasError(cgSess(cg)) || !FactsComplete(gotoIn) || !UnionFactsComplete(gotoInU) {
+				if hasErrCG(cg) || !FactsComplete(gotoIn) || !UnionFactsComplete(gotoInU) {
 					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 					cg.ResetEffectAccum(preEffect)
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return makeGotoFailed()
 				}
@@ -1006,13 +1006,13 @@ func MakeRandomGoto(
 				}
 				gotoOut = nil
 				gotoOutU = nil
-				UpdateFactsForDestSess(cgSess(cg), gotoIn, &gotoOut, fm.Func, blk)
-				UpdateUnionFactsForDestSess(cgSess(cg), gotoInU, &gotoOutU, fm.Func, blk)
-				if sessHasError(cgSess(cg)) || !FactsComplete(gotoOut) || !UnionFactsComplete(gotoOutU) {
+				UpdateFactsForDestSess(sessFromCG(cg), gotoIn, &gotoOut, fm.Func, blk)
+				UpdateUnionFactsForDestSess(sessFromCG(cg), gotoInU, &gotoOutU, fm.Func, blk)
+				if hasErrCG(cg) || !FactsComplete(gotoOut) || !UnionFactsComplete(gotoOutU) {
 					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 					cg.ResetEffectAccum(preEffect)
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return makeGotoFailed()
 				}
@@ -1023,9 +1023,9 @@ func MakeRandomGoto(
 	// StatementGoto.cpp:184–192 — insert goto after other_stm in other_blk
 	// incomplete LocalVars on intermediate blocks fails closed sticky (IncompleteVariables)
 	// no invent forward goto with empty InitSkippedVars when skip list is incomplete
-	skippedFwd := CollectInitSkippedVarsSess(cgSess(cg), okBlk, blk)
+	skippedFwd := CollectInitSkippedVarsSess(sessFromCG(cg), okBlk, blk)
 	if !VariablesComplete(skippedFwd) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return makeGotoFailed()
 	}
 	// StatementGoto.cpp:185 + ctor 220–229 — gensym only on successful insert path.
@@ -1038,32 +1038,32 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 	if StmIDUnset(dest.StmID) {
-		dest.StmID = AllocStmIDSess(cgSess(cg))
+		dest.StmID = AllocStmIDSess(sessFromCG(cg))
 	}
 	destID := dest.StmID
 	destIsCtrl := IsCtrlStmt(dest) || dest.Kind == StmtReturn
 	// residual ERROR sticky — no invent soft-insert past IsCtrlStmt residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return makeGotoFailed()
 	}
 	label := dest.SourceLabel
 	if label == "" {
-		label = LabelForGotoDestSess(cgSess(cg), destID, nextLab)
+		label = LabelForGotoDestSess(sessFromCG(cg), destID, nextLab)
 		if label == "" {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
 		dest.SourceLabel = label
 	} else {
-		setStmLabelSess(cgSess(cg), destID, label)
+		setStmLabelSess(sessFromCG(cg), destID, label)
 	}
 	sg := Stmt{
 		Kind:            StmtGoto,
 		Expr:            cond,
 		Label:           label,
-		StmID:           AllocStmIDSess(cgSess(cg)),
+		StmID:           AllocStmIDSess(sessFromCG(cg)),
 		GotoForward:     true,
 		GotoDestStmID:   destID,
 		GotoDestParent:  blk,
@@ -1135,7 +1135,7 @@ func MakeRandomGoto(
 		}
 	}
 	// StatementGoto.cpp:211
-	RecordForwardJumpSess(fmSess(fm))
+	RecordForwardJumpSess(sessFromFM(fm))
 	// StatementGoto.cpp:212 — return nullptr (goto already in other_blk)
 	return makeGotoFailed()
 }

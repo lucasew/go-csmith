@@ -236,7 +236,7 @@ func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo, unions *[]
 		if unions != nil {
 			*unions = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return false
 	}
 	return addBackReturnFactsBlock(b, fm, facts, unions)
@@ -251,7 +251,7 @@ func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo, union
 		if unions != nil {
 			*unions = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {
@@ -271,7 +271,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 		if unions != nil {
 			*unions = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return false
 	}
 	if st.Kind == StmtReturn {
@@ -283,15 +283,15 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 			!UnionFactsComplete(outU) || !UnionFactsComplete(*unions) {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return false
 		}
-		_ = MergeFactsSess(fmSess(fm), facts, out)
+		_ = MergeFactsSess(sessFromFM(fm), facts, out)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return false
 		}
@@ -300,15 +300,15 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 			if nf == nil {
 				*facts = IncompleteFactSlice()
 				*unions = IncompleteUnionFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return false
 			}
-			*unions = MergeUnionFactSess(fmSess(fm), *unions, nf)
+			*unions = MergeUnionFactSess(sessFromFM(fm), *unions, nf)
 			if !UnionFactsComplete(*unions) {
 				*facts = IncompleteFactSlice()
 				*unions = IncompleteUnionFactSlice()
-				if !sessHasError(fmSess(fm)) {
-					sessNoteError(fmSess(fm), ErrGeneric)
+				if !hasErrFM(fm) {
+					noteErrFM(fm, ErrGeneric)
 				}
 				return false
 			}
@@ -316,12 +316,12 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo, unions
 		return true
 	}
 	// Statement.cpp:530–535 — get_blocks then recurse (Then/Else for if/for)
-	for _, blk := range GetBlocksStmtSess(fmSess(fm), st) {
+	for _, blk := range GetBlocksStmtSess(sessFromFM(fm), st) {
 		// Block* always live from get_blocks; nil hole fails closed sticky
 		if blk == nil {
 			*facts = IncompleteFactSlice()
 			*unions = IncompleteUnionFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return false
 		}
 		if !addBackReturnFactsBlock(blk, fm, facts, unions) {

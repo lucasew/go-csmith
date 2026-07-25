@@ -55,9 +55,11 @@ func ClearProcessProgramGeneratorSess(s *Session) { sessOrAmbient(s).ProgramGen 
 // gSess returns g.Sess. Nil g → unit-test ambient.
 // Non-nil g must have Sess set (NewProgramGenerator / set g.Sess);
 // unset Sess panics — no silent dual-fill on a half-built ProgramGenerator.
+// gSess returns g.Sess. Nil g panics — no silent ambient dual-fill.
+// Nil-receiver sticky: noteErrG (explicit testAmbientSession).
 func gSess(g *ProgramGenerator) *Session {
 	if g == nil {
-		return testAmbientSession
+		panic("gSess: nil ProgramGenerator")
 	}
 	if g.Sess == nil {
 		panic("gSess: Sess unset (use NewProgramGenerator or set g.Sess)")
@@ -67,22 +69,22 @@ func gSess(g *ProgramGenerator) *Session {
 
 // noteErr records ERROR on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) noteErr(code int) {
-	sessNoteError(gSess(g), code)
+	noteErrG(g, code)
 }
 
 // hasErr reports ERROR on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) hasErr() bool {
-	return sessHasError(gSess(g))
+	return hasErrG(g)
 }
 
 // clearErr clears ERROR on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) clearErr() {
-	sessClearError(gSess(g))
+	sessClearError(sessFromG(g))
 }
 
 // errCode returns sticky code on g.Sess (nil g → unit-test ambient).
 func (g *ProgramGenerator) errCode() int {
-	return sessErrorCode(gSess(g))
+	return sessErrorCode(sessFromG(g))
 }
 
 // GetOutputMgrKind mirrors AbsProgramGenerator::getOutputMgr kind (Go: no ostream).
@@ -766,11 +768,11 @@ func HashGlobalVariables(vs *VariableSelector) string {
 func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactUnion) string {
 	// VariableSelector always live for global hash; sticky no invent empty hash without it
 	if vs == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return ""
 	}
-	note := func(code int) { sessNoteError(vsSess(vs), code) }
-	has := func() bool { return sessHasError(vsSess(vs)) }
+	note := func(code int) { noteErrVS(vs, code) }
+	has := func() bool { return hasErrVS(vs) }
 	// incomplete GlobalList fails closed sticky (no invent empty hash past nil hole)
 	if !VariablesComplete(vs.GlobalList) {
 		note(ErrGeneric)
@@ -781,12 +783,12 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 		note(ErrGeneric)
 		return ""
 	}
-	ctrl := GetLastCtrlVarsSess(vsSess(vs))
+	ctrl := GetLastCtrlVarsSess(sessFromVS(vs))
 	var b strings.Builder
 	for _, v := range vs.GlobalList {
 		// pre-validated VariablesComplete
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
-		part := v.hashOutputOptsSess(vsSess(vs), ctrl, unionFacts, sessOpts(vsSess(vs)))
+		part := v.hashOutputOptsSess(sessFromVS(vs), ctrl, unionFacts, sessOpts(sessFromVS(vs)))
 		// residual ERROR sticky — no invent soft-continue later globals past hash residual hole
 		if has() {
 			return ""

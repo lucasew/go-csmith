@@ -242,7 +242,7 @@ func MakeRandomArrayControlSess(s *Session, r *Rng, bound int, isSigned bool, oo
 func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg *CGContext) *LoopControl {
 	// StatementFor always has RNG + VS + CG; sticky no invent iteration shell without them
 	if r == nil || vs == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:170–172 — assert(fm); assert(blk)
@@ -254,11 +254,11 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:176 — clear effect_stm before select
@@ -270,26 +270,26 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	var iv *Variable
 	for tries := 0; tries < 256; tries++ {
 		iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
-		if iv == nil || sessHasError(cgSess(cg)) {
+		if iv == nil || hasErrCG(cg) {
 			return nil
 		}
 		// reject volatile IVs (infinite-loop / SE issues)
-		if iv.IsVolatileSess(cgSess(cg)) {
+		if iv.IsVolatileSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent soft-continue past IsVolatile hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			invalid[iv] = true
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue non-vol IV past IsVolatile residual false
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky on loop-ctrl pick
 		// (no invent IV shell past broken array IR)
 		if iv.IsArray && iv.AsArray == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		break
@@ -304,28 +304,28 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 	if !cg.ReadIndices(iv, facts) {
 		// assert(read); no soft invent continue after failed index visit
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return nil
 	}
 	cg.WriteVar(iv)
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	cg.ReadVar(iv)
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 
 	// StatementFor.cpp:222 — assert(var->type)
 	if iv.Type == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
-	signed := iv.Type.IsSignedSess(cgSess(cg))
+	signed := iv.Type.IsSignedSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent for bounds past IsSigned residual hole
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	var initN, limitN, incrN int
@@ -338,12 +338,12 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// (seed-2 e358: Go choose_ok_var n=2 vs upstream n=1 after itemize).
 	bound := InvalidIVBound
 	if cg.RW != nil {
-		mustArr := cg.RW.FindMustUseArraysSess(cgSess(cg))
+		mustArr := cg.RW.FindMustUseArraysSess(sessFromCG(cg))
 		// FindMustUseArrays nil = incomplete must-use lists (no invent empty)
 		if mustArr == nil {
 			// residual ERROR already sticky, or empty complete nil slice?
 			// FindMustUseArrays returns nil only on sticky hole; empty is non-nil empty
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 		}
@@ -353,16 +353,16 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			arrVars := make([]*Variable, 0, len(mustArr))
 			for _, av := range mustArr {
 				if av == nil {
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					return nil
 				}
 				arrVars = append(arrVars, &av.Variable)
 			}
-			pick := ChooseOKVarSess(cgSess(cg), r, arrVars)
+			pick := ChooseOKVarSess(sessFromCG(cg), r, arrVars)
 			// StatementFor.cpp:210–211 — assert(av); library fail closed
 			if pick == nil || pick.AsArray == nil {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return nil
 			}
@@ -391,32 +391,32 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			oob = opts.ArrayOOBProb
 		}
 		var outBound int
-		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControlSess(cgSess(cg), r, b, signed, oob)
+		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControlSess(sessFromCG(cg), r, b, signed, oob)
 		// C++ replaces bound with adjusted return value for IV bounds
 		bound = outBound
 	} else {
 		// StatementFor.cpp:200 / 223–226 — leave bound = INVALID_BOUND
 		bound = InvalidIVBound
-		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControlSess(cgSess(cg), r, opts, signed)
+		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControlSess(sessFromCG(cg), r, opts, signed)
 		// StatementFor.cpp:79/82/102 ERROR_RETURN inside make_random_loop_control
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 	}
 
 	// --- build IR: init attach flags for incr (StatementFor.cpp:229–245) ---
 	lhs := &Lhs{Var: iv, Type: iv.Type}
-	cInit := MakeIntSess(cgSess(cg), initN)
+	cInit := MakeIntSess(sessFromCG(cg), initN)
 	// StatementFor.cpp:229–230 — Constant::make_int; ERROR_GUARD(nullptr)
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
 	// StatementFor.cpp:236–239 — not MakeRandomBinary (sOpBinary/BinAdd soft invent)
 	incrBop, _ := incrOp.CompoundToBinaryOps()
 	// when no compound map, incrBop is MaxBinaryOp (C++ MAX_BINARY_OP)
-	flags1 := MakeRandomBinaryKindSess(cgSess(cg), r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
-	if flags1 == nil || sessHasError(cgSess(cg)) {
+	flags1 := MakeRandomBinaryKindSess(sessFromCG(cg), r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
+	if flags1 == nil || hasErrCG(cg) {
 		return nil
 	}
 	initSt := &Stmt{
@@ -426,50 +426,50 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		Expr:      &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntType()},
 		AssignOp:  AssignSimple,
 		SafeFlags: flags1,
-		StmID:     AllocStmIDSess(cgSess(cg)),
+		StmID:     AllocStmIDSess(sessFromCG(cg)),
 	}
 	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited) sticky
 	if !VisitFactsStatementAssign(initSt, cg, opts) {
 		// C++ assert(visited); sticky make_iteration failure (no invent soft re-pick past fail)
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return nil
 	}
 
 	// Bookkeeper::record_volatile_access read+write on IV (StatementFor.cpp:249–253)
-	RecordVolatileAccessSess(cgSess(cg), iv, 0, false)
-	RecordVolatileAccessSess(cgSess(cg), iv, 0, true)
+	RecordVolatileAccessSess(sessFromCG(cg), iv, 0, false)
+	RecordVolatileAccessSess(sessFromCG(cg), iv, 0, true)
 
 	// test: FunctionInvocation::make_binary(test_op, ExpressionVariable(iv), limit)
 	// StatementFor.cpp:255–263 — ERROR_GUARD on null (no soft bare Invocation)
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
-	cLimit := &Expression{Term: TermConstant, Con: MakeIntSess(cgSess(cg), limitN), ExprType: GetIntType()}
+	cLimit := &Expression{Term: TermConstant, Con: MakeIntSess(sessFromCG(cg), limitN), ExprType: GetIntType()}
 	testFi := MakeBinary(r, opts, probs, *cg, testOp, vExpr, cLimit)
-	if testFi == nil || sessHasError(cgSess(cg)) {
+	if testFi == nil || hasErrCG(cg) {
 		return nil
 	}
 	testTy := testFi.GetType()
 	// residual ERROR sticky — no invent for-test ExprType past GetType residual hole
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testTy}
 
 	// incr assign (StatementFor.cpp:273–281)
 	lhs1 := &Lhs{Var: iv, Type: iv.Type}
-	cIncr := &Expression{Term: TermConstant, Con: MakeIntSess(cgSess(cg), incrN), ExprType: GetIntType()}
+	cIncr := &Expression{Term: TermConstant, Con: MakeIntSess(sessFromCG(cg), incrN), ExprType: GetIntType()}
 	var incrSt Stmt
 	if arrayBound {
 		// plain compound assign (no make_possible_compound)
 		incrSt = Stmt{
-			Kind: StmtAssign, LhsVar: iv, Lhs: lhs1, Expr: cIncr, AssignOp: incrOp, StmID: AllocStmIDSess(cgSess(cg)),
+			Kind: StmtAssign, LhsVar: iv, Lhs: lhs1, Expr: cIncr, AssignOp: incrOp, StmID: AllocStmIDSess(sessFromCG(cg)),
 		}
 	} else {
 		// StatementAssign::make_possible_compound_assign
 		incrSt = makePossibleCompoundAssign(*cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr, gensymFromVS(vs))
 		if StmIDUnset(incrSt.StmID) {
-			incrSt.StmID = AllocStmIDSess(cgSess(cg))
+			incrSt.StmID = AllocStmIDSess(sessFromCG(cg))
 		}
 	}
 
@@ -511,7 +511,7 @@ func MakeRandomFor(
 	// StatementFor.cpp nullptr factory sticky — nil (no invent Kind-only shell)
 	// always has RNG + CGContext sticky
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:288–289 — assert(fm); non-sticky soft re-pick without FactMgr
@@ -522,11 +522,11 @@ func MakeRandomFor(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:290 — clear per-statement effect before building for
@@ -534,7 +534,7 @@ func MakeRandomFor(
 
 	lc := MakeIteration(r, opts, probs, vs, cg)
 	// StatementFor.cpp:296 make_iteration null / ERROR paths → nullptr
-	if lc == nil || sessHasError(cgSess(cg)) {
+	if lc == nil || hasErrCG(cg) {
 		return nil
 	}
 	// when SafeMath and compound add/sub incr, attach dummy flags for emit
@@ -548,35 +548,35 @@ func MakeRandomFor(
 	// StatementFor.cpp:299–300 — record effect and facts before loop body
 	// incomplete GlobalFacts fail closed (no invent cleaned pre-loop snapshot)
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
-	preEffect := cg.EffectStm.CloneSess(cgSess(cg))
+	preEffect := cg.EffectStm.CloneSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent soft-for past EffectStm Clone residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	if !EffectComplete(preEffect) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
-	preFacts := CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
+	preFacts := CloneFactSliceSess(sessFromCG(cg), cg.FM.GlobalFacts)
 	// residual ERROR sticky — no invent soft-for past CloneFactSlice residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// FactMgr.cpp set_fact_in / StatementFor.cpp:299–300 — pre_facts is full FactVec
 	// including eUnionWrite; snapshot UnionFacts with point-to for post_loop restore.
 	if !UnionFactsComplete(cg.FM.UnionFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// Deep: pre_facts eUnionWrite must not alias live FactUnion objects that
 	// body generation renews/joins (StatementFor.cpp:299–300 snapshot).
-	preUnion := CloneUnionFactSliceDeepSess(cgSess(cg), cg.FM.UnionFacts)
-	if sessHasError(cgSess(cg)) || !UnionFactsComplete(preUnion) {
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+	preUnion := CloneUnionFactSliceDeepSess(sessFromCG(cg), cg.FM.UnionFacts)
+	if hasErrCG(cg) || !UnionFactsComplete(preUnion) {
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return nil
 	}
@@ -585,7 +585,7 @@ func MakeRandomFor(
 	// empty effect_stm, shared effect_accum, iv_bounds[iv]=bound.
 	// Incomplete parent accum fails closed (no invent body under incomplete shell)
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	var iv *Variable
@@ -599,7 +599,7 @@ func MakeRandomFor(
 	// bodyCG.EffectAccum aliases cg.EffectAccum (CGContext.cpp:101)
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
-	if sessHasError(cgSess(cg)) || body == nil {
+	if hasErrCG(cg) || body == nil {
 		if lc.IV != nil {
 			bodyCG.RemoveIVBound(lc.IV)
 		}
@@ -610,12 +610,12 @@ func MakeRandomFor(
 		bodyCG.RemoveIVBound(lc.IV)
 	}
 	// post_loop_analysis (StatementFor.cpp:350–370)
-	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmIDSess(cgSess(cg))}
+	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmIDSess(sessFromCG(cg))}
 	postLoopAnalysis(cg.FM, st, body, preFacts, preUnion, preEffect, cg)
 	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
 	if !FactsComplete(cg.FM.GlobalFacts) ||
 		!EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// no MergeEffects: body writes already hit the shared parent EffectAccum
@@ -635,18 +635,18 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	if body == nil || StmIDUnset(body.StmID) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// Full FactVec: point-to + eUnionWrite (AssignGlobalFactsFromMapIn).
 	fm.AssignGlobalFactsFromMapIn(body.StmID)
 	// residual ERROR sticky — no invent soft-must-return path past map_in assign residual
-	if sessHasError(cgSess(cg)) || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
+	if hasErrCG(cg) || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return
 	}
@@ -655,13 +655,13 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// (FactMgr.cpp:575–579) because remove_loop_local already dropped them
 	// (seed-7 for 640 / l_1402). Drop subjects only — match entry semantics.
 	if len(body.LocalVars) > 0 {
-		fm.GlobalFacts = DropFactSubjectsByVarsSess(cgSess(cg), fm.GlobalFacts, body.LocalVars)
-		fm.UnionFacts = DropUnionSubjectsByVarsSess(cgSess(cg), fm.UnionFacts, body.LocalVars)
+		fm.GlobalFacts = DropFactSubjectsByVarsSess(sessFromCG(cg), fm.GlobalFacts, body.LocalVars)
+		fm.UnionFacts = DropUnionSubjectsByVarsSess(sessFromCG(cg), fm.UnionFacts, body.LocalVars)
 		if !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return
 		}
@@ -676,7 +676,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// preUnion is still used by the must_return path below.
 	if body.MustReturn() {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
@@ -685,11 +685,11 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		if !FactsComplete(preFacts) || !UnionFactsComplete(preUnion) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return
 		}
 		fm.RestoreFactsPair(preFacts, preUnion)
-	} else if sessHasError(cgSess(cg)) {
+	} else if hasErrCG(cg) {
 		// residual ERROR sticky — no invent soft-continue break-merge past MustReturn residual false
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
@@ -708,21 +708,21 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 				!UnionFactsComplete(outU) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
-			if _, ok := tryMergeJumpFactsSess(cgSess(cg), &fm.GlobalFacts, out); !ok {
+			if _, ok := tryMergeJumpFactsSess(sessFromCG(cg), &fm.GlobalFacts, out); !ok {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return
 			}
 			// eUnionWrite half of merge_jump_facts on full FactVec
-			if !mergeJumpUnionFactsSess(cgSess(cg), &fm.UnionFacts, outU) {
+			if !mergeJumpUnionFactsSess(sessFromCG(cg), &fm.UnionFacts, outU) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return
 			}
@@ -732,17 +732,17 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// for-stmt stm_id always live; incomplete body/pre effect fails closed sticky
 	if cg != nil && forSt != nil {
 		if StmIDUnset(forSt.StmID) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return
 		}
 		bodyEff := fm.GetMapStmEffect(body.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(preEffect) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return
 		}
 		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, preEffect)
 		if !EffectComplete(fm.GetMapStmEffect(forSt.StmID)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 		}
 	}
 }

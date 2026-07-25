@@ -22,9 +22,11 @@ type TypeEnv struct {
 
 // envSess returns env.Sess. Nil env → unit-test ambient (SelectLType unit paths).
 // Non-nil env must have Sess set (TypeEnv{Sess: …} / GenerateAllTypesEnv / Types.Sess).
+// envSess returns env.Sess. Nil env panics — no silent ambient dual-fill.
+// Nil-receiver sticky: noteErrEnv (explicit testAmbientSession).
 func envSess(env *TypeEnv) *Session {
 	if env == nil {
-		return testAmbientSession
+		panic("envSess: nil TypeEnv")
 	}
 	if env.Sess == nil {
 		panic("envSess: Sess unset (set TypeEnv.Sess or use GenerateAllTypesEnv)")
@@ -37,7 +39,7 @@ func envSess(env *TypeEnv) *Session {
 // Incomplete DerivedTypes fails closed nil when add (no invent soft-skip hole
 // then match/append as if the pool were complete).
 func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
-	return env.FindPointerTypeSess(envSess(env), t, add)
+	return env.FindPointerTypeSess(sessFromEnv(env), t, add)
 }
 
 // FindPointerTypeSess is FindPointerType with explicit PointerCache bag.
@@ -78,7 +80,7 @@ func (env *TypeEnv) HasPointerType() bool {
 		return false
 	}
 	if !typesComplete(env.DerivedTypes) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return false
 	}
 	return len(env.DerivedTypes) > 0
@@ -95,11 +97,11 @@ func (env *TypeEnv) FindType(t *Type) *Type {
 	}
 	// Type* always live as query subject; sticky no invent soft-skip nil key
 	if t == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	for _, x := range env.AllTypes {
@@ -121,7 +123,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 	}
 	if !typesComplete(env.AllTypes) {
 		// incomplete AllTypes fails closed sticky (no invent soft re-pick empty/partial ok pool)
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return IncompleteTypes()
 	}
 	ok := make([]*Type, 0)
@@ -129,7 +131,7 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 		if wantStruct {
 			if !t.IsStruct() {
 				// residual ERROR sticky — no invent soft-skip then pick later past IsStruct residual
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return IncompleteTypes()
 				}
 				continue
@@ -137,47 +139,47 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 		} else {
 			if !t.IsUnion() {
 				// residual ERROR sticky — no invent soft-skip then pick later past IsUnion residual
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return IncompleteTypes()
 				}
 				continue
 			}
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsStruct/IsUnion residual true
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return IncompleteTypes()
 		}
-		if noConst && t.IsConstStructUnionSess(envSess(env)) {
+		if noConst && t.IsConstStructUnionSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return IncompleteTypes()
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsConstStructUnion residual false
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return IncompleteTypes()
 		}
-		if noVolatile && t.IsVolatileStructUnionSess(envSess(env)) {
+		if noVolatile && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return IncompleteTypes()
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue keep past IsVolatileStructUnion residual false
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return IncompleteTypes()
 		}
 		if needIntField && !t.HasIntField() {
 			// residual ERROR sticky — no invent soft-skip then pick later past HasIntField hole
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return IncompleteTypes()
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue keep past HasIntField residual false
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return IncompleteTypes()
 		}
 		ok = append(ok, t)
@@ -245,40 +247,40 @@ func ChooseRandomStructUnionTypeSess(s *Session, r *Rng, ok []*Type) *Type {
 // ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
 // Type.cpp:570–586 — if type is struct return it; else random from env.
 func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
-	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, sessOpts(envSess(env)))
+	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, sessOpts(sessFromEnv(env)))
 }
 
 // ChooseRandomStructFromTypeOpts is ChooseRandomStructFromType with explicit Options.
 func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile bool, opts Options) *Type {
 	if typ != nil && typ.IsStruct() {
 		// residual ERROR sticky — no invent soft-return typ past IsStruct residual hole
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return nil
 		}
-		if noVolatile && typ.IsVolatileStructUnionSess(envSess(env)) {
+		if noVolatile && typ.IsVolatileStructUnionSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-fallthrough past IsVolatileStructUnion residual
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return nil
 			}
 			// fall through to pick another
-		} else if sessHasError(envSess(env)) {
+		} else if hasErrEnv(env) {
 			// residual ERROR sticky — no invent soft-return typ past IsVolatileStructUnion residual false
 			return nil
 		} else {
 			return typ
 		}
-	} else if sessHasError(envSess(env)) {
+	} else if hasErrEnv(env) {
 		// residual ERROR sticky — no invent soft-continue pool pick past IsStruct residual false
 		return nil
 	}
 	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
 	// residual ERROR sticky — no invent soft-pick past GetAllOK residual hole
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	// incomplete AllTypes pool — fail closed sticky (no invent pick from partial)
 	if !typesComplete(ok) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
@@ -288,7 +290,7 @@ func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile
 			return nil
 		}
 	}
-	return ChooseRandomStructUnionTypeSess(envSess(env), r, ok)
+	return ChooseRandomStructUnionTypeSess(sessFromEnv(env), r, ok)
 }
 
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
@@ -297,7 +299,7 @@ func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile
 func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 	// Type.cpp always has process RNG; sticky no invent pointer pick without it
 	if r == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	// empty derived: soft re-pick (no pointer types available)
@@ -305,12 +307,12 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 		return nil
 	}
 	if !typesComplete(env.DerivedTypes) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	p := env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
 	// Type.cpp:538 — ERROR_GUARD(nullptr)
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	return p
@@ -337,7 +339,7 @@ func (env *TypeEnv) chooseRandomForStructField(r *Rng, opts Options, probs *Prob
 func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabilities, forFieldVar, markUsed bool) *Type {
 	if r == nil {
 		// Type.cpp always has RNG; sticky no invent AllTypes[0]
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	if env == nil || len(env.AllTypes) == 0 {
@@ -345,7 +347,7 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1206–1216 — rnd_upto(AllTypes.size(), ChooseRandomTypeFilter)
@@ -358,59 +360,59 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 		// pre-validated complete
 		if t.IsSimple() {
 			// residual ERROR sticky — no invent soft-filter past IsSimple residual true
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 			// SIMPLE_TYPES_PROB_FILTER (Type.cpp:226–228)
 			return probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0
 		}
 		// residual ERROR sticky — no invent soft-continue filter past IsSimple residual false
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return true
 		}
 		// Type.cpp:229–231 — !return_structs rejects structs only (not unions)
 		if t.IsStruct() && !opts.ReturnStructs {
 			// residual ERROR sticky — no invent soft-reject/keep past IsStruct residual
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent soft-continue filter past IsStruct residual false
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return true
 		}
 		// Type.cpp ChooseRandomTypeFilter has no return_unions gate (unlike arg_unions on NonVoidNonVolatile)
-		if forFieldVar && t.IsStructSess(envSess(env)) {
+		if forFieldVar && t.IsStructSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-continue depth filter past IsStruct residual
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 			// Type.cpp:240–242 — reject when depth >= max_nested_struct_level
-			d := t.StructDepthSess(envSess(env))
+			d := t.StructDepthSess(sessFromEnv(env))
 			// residual ERROR sticky — no invent soft-continue filter past StructDepth hole
 			// (RndUptoFilter also fails closed on residual; reject candidate immediately)
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 			if d >= opts.MaxNestedStructLevel {
 				return true
 			}
-		} else if sessHasError(envSess(env)) {
+		} else if hasErrEnv(env) {
 			// residual ERROR sticky — no invent soft-keep past IsStruct residual false
 			return true
 		}
 		return false
 	})
-	idx := r.RndUptoFilterSess(envSess(env), uint32(len(env.AllTypes)), filt)
+	idx := r.RndUptoFilterSess(sessFromEnv(env), uint32(len(env.AllTypes)), filt)
 	// Type.cpp:1208–1209 — ERROR_GUARD(nullptr) after rnd_upto
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	t := env.AllTypes[idx]
 	// Type.cpp:1186–1190 choose_random only — make_one_struct_field does not mark used
-	if markUsed && !typeIsUsed(envSess(env), t) {
-		s := envSess(env)
+	if markUsed && !typeIsUsed(sessFromEnv(env), t) {
+		s := sessFromEnv(env)
 		RecordTypeWithBitfieldsSess(s, t)
 		typeMarkUsed(s, t)
 	}
@@ -436,13 +438,13 @@ func RandomTypeFromType(
 	// Type.cpp always has process RNG sticky; no invent keep-simple / pick-nonvoid without RNG
 	if typ == nil {
 		if r == nil {
-			sessNoteError(envSess(env), ErrGeneric)
+			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
 		// Type.cpp:594–597 — choose_random_nonvoid(_nonvolatile) + ERROR_GUARD; no soft invent simple
 		// TypeEnv + AllTypes always live after GenerateAllTypes; sticky nil (no invent empty pick)
 		if env == nil || len(env.AllTypes) == 0 {
-			sessNoteError(envSess(env), ErrGeneric)
+			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
 		if noVolatile {
@@ -452,25 +454,25 @@ func RandomTypeFromType(
 	}
 	// Type.cpp:599–601 — eSimple && !strict_simple_type → choose_random_simple
 	// no soft invent re-roll when strict_simple_type (make_init_value pointer create)
-	simple := typ.IsSimpleSess(envSess(env))
+	simple := typ.IsSimpleSess(sessFromEnv(env))
 	// residual ERROR sticky — no invent soft-type past IsSimple residual
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	if simple && !strictSimple {
 		if r == nil {
-			sessNoteError(envSess(env), ErrGeneric)
+			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
 		// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
-		if DepthGuardByTypeSess(envSess(env), opts, DtTypeChooseSimple) == BadDepth {
+		if DepthGuardByTypeSess(sessFromEnv(env), opts, DtTypeChooseSimple) == BadDepth {
 			return nil
 		}
-		st := ChooseRandomNonvoidSimpleSess(envSess(env), r, probs)
+		st := ChooseRandomNonvoidSimpleSess(sessFromEnv(env), r, probs)
 		// Type.cpp:603–605 — assert(simple != eVoid) sticky; no soft invent int for void
 		if st == EVoid {
-			if !sessHasError(envSess(env)) {
-				sessNoteError(envSess(env), ErrGeneric)
+			if !hasErrEnv(env) {
+				noteErrEnv(env, ErrGeneric)
 			}
 			return nil
 		}
@@ -478,7 +480,7 @@ func RandomTypeFromType(
 	}
 	// Type.cpp:602–605 — strict simple or non-simple: keep t (assert non-void simple) sticky
 	if simple && typ.Simple() == EVoid {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	return typ
@@ -510,7 +512,7 @@ func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *
 func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilities, noVolatileAgg bool) *Type {
 	// Type.cpp:1218+ — rnd_upto(AllTypes); sticky no invent simple without RNG
 	if r == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	// empty env non-sticky soft re-pick (unit paths without GenerateSimpleTypes)
@@ -518,7 +520,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	filt := filterFunc(func(v uint32) bool {
@@ -530,7 +532,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		// pre-validated complete
 		simple := t.IsSimple()
 		// residual ERROR sticky — no invent soft-filter past IsSimple residual
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return true
 		}
 		if simple && t.Simple() == EVoid {
@@ -539,47 +541,47 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		if simple && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
 			return true
 		}
-		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnionSess(envSess(env)) {
+		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
 			// residual ERROR sticky — no invent soft-skip then pick later past IsVolatileStructUnion hole
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 			return true
 		}
 		// residual ERROR sticky — no invent keep candidate past IsVolatileStructUnion residual false
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return true
 		}
 		// arg_structs / arg_unions: NonVoidNonVolatileTypeFilter only (Type.cpp:171–177)
 		if noVolatileAgg {
 			if t.IsStruct() && !opts.ArgStructs {
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return true
 				}
 				return true
 			}
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 			if t.IsUnion() && !opts.ArgUnions {
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return true
 				}
 				return true
 			}
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return true
 			}
 		}
 		return false
 	})
-	idx := r.RndUptoFilterSess(envSess(env), uint32(len(env.AllTypes)), filt)
+	idx := r.RndUptoFilterSess(sessFromEnv(env), uint32(len(env.AllTypes)), filt)
 	// Type.cpp:1221–1224 — ERROR_GUARD(nullptr); assert(typ)
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	t := env.AllTypes[idx]
-	s := envSess(env)
+	s := sessFromEnv(env)
 	if !typeIsUsed(s, t) {
 		RecordTypeWithBitfieldsSess(s, t)
 		// residual ERROR sticky — no invent soft-mark used past RecordTypeWithBitfields residual
@@ -596,7 +598,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabilities) *Type {
 	// Type.cpp always has process RNG; sticky no invent int* without it
 	if r == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	// nil env non-sticky soft re-pick
@@ -610,29 +612,29 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 	// and fall through to choose_random as if derived were empty).
 	if r.RndFlipcoin(20) {
 		// Type.cpp:1146 — ERROR_GUARD after flipcoin
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return nil
 		}
 		if len(env.DerivedTypes) > 0 {
 			if !typesComplete(env.DerivedTypes) {
-				sessNoteError(envSess(env), ErrGeneric)
+				noteErrEnv(env, ErrGeneric)
 				return nil
 			}
 			idx := r.RndUpto(uint32(len(env.DerivedTypes)))
 			// Type.cpp:1149 ERROR_GUARD after rnd_upto
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return nil
 			}
 			t := env.DerivedTypes[idx]
 			if t.IndirectLevel() < opts.MaxPointerDepth {
 				// residual ERROR sticky — no invent soft-return pointer past IndirectLevel residual
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return nil
 				}
 				return env.FindPointerType(t, true)
 			}
 			// residual ERROR sticky — no invent soft-continue choose_random past IndirectLevel residual false
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return nil
 			}
 		}
@@ -640,7 +642,7 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 	// Type.cpp:1158–1165 — choose_random then consolidate all simple → int*
 	base := env.ChooseRandom(r, opts, probs, false)
 	// residual ERROR sticky — no invent soft-empty pointer past ChooseRandom residual
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	if base == nil {
@@ -650,11 +652,11 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 	// Type.cpp:1161–1164 — any eSimple consolidates to get_int_type()
 	if base.IsSimple() {
 		// residual ERROR sticky — no invent soft-consolidate past IsSimple residual hole
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return nil
 		}
 		base = GetIntType()
-	} else if sessHasError(envSess(env)) {
+	} else if hasErrEnv(env) {
 		// residual ERROR sticky — no invent soft-continue past IsSimple residual false
 		return nil
 	}
@@ -677,14 +679,14 @@ func AssignOpWorksForFloat(op AssignOp) bool {
 func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVolatile bool, op AssignOp) *Type {
 	if r == nil {
 		// C++ always has RNG; sticky no soft invent default int
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	var typ *Type
 	// Type.cpp:1609–1614 — pointer as LType (simple assign only); ERROR_GUARD after flip + make
 	if op == AssignSimple && probs != nil && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
 		// Type.cpp:1610 — ERROR_GUARD(nullptr) after flipcoin
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return nil
 		}
 		if env != nil {
@@ -694,7 +696,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	}
 	// Type.cpp:1613 — ERROR_GUARD(nullptr) always after pointer branch (before default int)
 	// sticky error must not soft invent get_int_type()
-	if sessHasError(envSess(env)) {
+	if hasErrEnv(env) {
 		return nil
 	}
 	// Type.cpp:1616–1625 — struct as LType only (bStruct=true); no union soft path
@@ -703,14 +705,14 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 		cands := env.GetAllOKStructUnionTypes(true, noVolatile, false, true)
 		// incomplete ok_types fail closed sticky (no invent fall-through get_int_type past hole pool)
 		if !typesComplete(cands) {
-			sessNoteError(envSess(env), ErrGeneric)
+			noteErrEnv(env, ErrGeneric)
 			return nil
 		}
 		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
-			if sessHasError(envSess(env)) {
+			if hasErrEnv(env) {
 				return nil
 			}
-			s := envSess(env)
+			s := sessFromEnv(env)
 			typ = ChooseRandomStructUnionTypeSess(s, r, cands)
 			// Type.cpp:526 ERROR_GUARD inside choose_random_struct_union_type
 			if sessHasError(s) {
@@ -722,7 +724,7 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	// Type.cpp:1628–1633 — float as LType
 	if typ == nil && AssignOpWorksForFloat(op) && probs != nil &&
 		r.RndFlipcoin(uint32(probs.Single(PFloatAsLTypeProb))) {
-		if sessHasError(envSess(env)) {
+		if hasErrEnv(env) {
 			return nil
 		}
 		if opts.EnableFloat {
@@ -749,12 +751,12 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 	if wantStruct {
 		for _, t := range env.StructTypes {
 			if t == nil {
-				sessNoteError(envSess(env), ErrGeneric)
+				noteErrEnv(env, ErrGeneric)
 				return IncompleteTypes()
 			}
-			if noVolatile && t.IsVolatileStructUnionSess(envSess(env)) {
+			if noVolatile && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
 				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return IncompleteTypes()
 				}
 				continue
@@ -765,12 +767,12 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 	if wantUnion {
 		for _, t := range env.UnionTypes {
 			if t == nil {
-				sessNoteError(envSess(env), ErrGeneric)
+				noteErrEnv(env, ErrGeneric)
 				return IncompleteTypes()
 			}
-			if noVolatile && t.IsVolatileStructUnionSess(envSess(env)) {
+			if noVolatile && t.IsVolatileStructUnionSess(sessFromEnv(env)) {
 				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
-				if sessHasError(envSess(env)) {
+				if hasErrEnv(env) {
 					return IncompleteTypes()
 				}
 				continue

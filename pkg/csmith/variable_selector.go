@@ -26,9 +26,11 @@ type VariableSelector struct {
 // vsSess returns vs.Sess. Nil vs → unit-test ambient.
 // Non-nil vs must have Sess set (NewVariableSelector / NewProgramGenerator);
 // unset Sess panics — no silent dual-fill on a half-built VS.
+// vsSess returns vs.Sess. Nil vs panics — no silent ambient dual-fill.
+// Nil-receiver sticky: noteErrVS (explicit testAmbientSession).
 func vsSess(vs *VariableSelector) *Session {
 	if vs == nil {
-		return testAmbientSession
+		panic("vsSess: nil VariableSelector")
 	}
 	if vs.Sess == nil {
 		panic("vsSess: Sess unset (use NewVariableSelector or set VS.Sess)")
@@ -62,17 +64,17 @@ func NewVariableSelectorProbs(opts Options, probs *Probabilities) *VariableSelec
 // util.cpp gensym_count is session-wide (shared with t_/func_/lbl_); no invent
 // private VS.Sym counter that desyncs from create_new_tmp_var.
 func (vs *VariableSelector) RandomGlobalName() string {
-	return GensymSess(vsSess(vs), "g_")
+	return GensymSess(sessFromVS(vs), "g_")
 }
 
 // RandomLocalName mirrors RandomLocalName → gensym("l_").
 func (vs *VariableSelector) RandomLocalName() string {
-	return GensymSess(vsSess(vs), "l_")
+	return GensymSess(sessFromVS(vs), "l_")
 }
 
 // RandomParamName mirrors RandomParamName → gensym("p_").
 func (vs *VariableSelector) RandomParamName() string {
-	return GensymSess(vsSess(vs), "p_")
+	return GensymSess(sessFromVS(vs), "p_")
 }
 
 // atMaxGlobals reports whether GlobalList has hit the library MaxGlobals cap.
@@ -229,23 +231,23 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 func (vs *VariableSelector) FindVarByName(name string) *Variable {
 	// VariableSelector always live; sticky no invent name lookup without it
 	if vs == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// empty name incomplete sticky (no invent match-all / soft re-pick)
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	for _, v := range vs.AllVars {
 		// Variable* always live on AllVars; nil hole sticky fail closed
 		if v == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
-		m := v.MatchVarNameSess(vsSess(vs), name)
+		m := v.MatchVarNameSess(sessFromVS(vs), name)
 		// residual ERROR sticky — no invent soft-continue later vars past MatchVarName residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if m != nil {
@@ -256,12 +258,12 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 	// ArrayVariable* always live on Arrays; nil hole sticky fail closed
 	for _, av := range vs.Arrays {
 		if av == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
-		m := av.Variable.MatchVarNameSess(vsSess(vs), name)
+		m := av.Variable.MatchVarNameSess(sessFromVS(vs), name)
 		// residual ERROR sticky — no invent soft-continue later arrays past MatchVarName residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if m != nil {
@@ -276,7 +278,7 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 // VariableSelector always live; sticky (no invent soft-skip finalization past hole).
 func (vs *VariableSelector) DoFinalization() {
 	if vs == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return
 	}
 	vs.AllVars = nil
@@ -297,7 +299,7 @@ const InvalidIVBound = -1
 func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable) *ArrayVariable {
 	// ArrayVariable + Rng always live; sticky incomplete no invent soft-miss itemize
 	if av == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if av.Collective != nil {
@@ -307,11 +309,11 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	dims := len(av.Sizes)
@@ -333,7 +335,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			// Variable* always live as IVBounds keys; nil key fails closed sticky
 			// (no invent partial ok_ivs pool by soft-skipping holes)
 			if iv == nil {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return nil
 			}
 			if bound == InvalidIVBound {
@@ -346,36 +348,36 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			// VariableSelector.cpp:1455–1459 — iv->type always live Type*
 			// Type-nil sticky fail whole itemize (no invent OK-IV soft pool past hole)
 			if iv.Type == nil {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return nil
 			}
-			if iv.Type.IsFloatSess(vsSess(vs)) {
+			if iv.Type.IsFloatSess(sessFromVS(vs)) {
 				// residual ERROR sticky — no invent soft-continue then pick later IV past IsFloat hole
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue non-float past IsFloat residual false path
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			// VariableSelector.cpp:1455–1456 — signed char index option
-			if !cgHasSignedCharIndex(vs) && iv.Type.IsSignedCharSess(vsSess(vs)) {
+			if !cgHasSignedCharIndex(vs) && iv.Type.IsSignedCharSess(sessFromVS(vs)) {
 				// residual ERROR sticky — no invent soft-continue then pick later IV past IsSignedChar hole
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue past IsSignedChar residual false path
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			// VariableSelector.cpp:1457–1458 — ccomp packed aggregate field IV
-			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVarSess(vsSess(vs)) {
+			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVarSess(sessFromVS(vs)) {
 				// residual ERROR sticky — no invent soft-skip then pick later IV past packed hole
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
 				continue
@@ -394,7 +396,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			}
 			boundOf[iv] = bound
 		}
-		v := ChooseOKVarSess(vsSess(vs), r, ok)
+		v := ChooseOKVarSess(sessFromVS(vs), r, ok)
 		if v == nil {
 			return nil
 		}
@@ -404,13 +406,13 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		// Indices string form must match Expression.Output (virtual Variable::Output),
 		// not v.Name — itemized array IVs print as name[i]… (seed-48 g_106[4]).
 		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
-		idx := idxExpr.OutputSess(vsSess(vs))
+		idx := idxExpr.OutputSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-continue later dims past index Output residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if idx == "" {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		remain := dimenLen - boundOf[v]
@@ -418,7 +420,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			off := int(r.RndUpto(uint32(remain)))
 			if off > 0 {
 				offExpr := &Expression{
-					Term: TermConstant, Con: MakeIntSess(vsSess(vs), off), ExprType: GetIntType(),
+					Term: TermConstant, Con: MakeIntSess(sessFromVS(vs), off), ExprType: GetIntType(),
 				}
 				fi := &Invocation{
 					IsStd:  true,
@@ -427,14 +429,14 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 					// Safe nil: ArrayVariable index add must not use safe_* wrappers
 				}
 				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
-				idx = idxExpr.OutputSess(vsSess(vs))
+				idx = idxExpr.OutputSess(sessFromVS(vs))
 				// residual ERROR sticky — no invent soft-continue later dims past index Output residual
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
 				// incomplete index Output sticky — no invent empty index string then partial item
 				if idx == "" {
-					sessNoteError(vsSess(vs), ErrGeneric)
+					noteErrVS(vs, ErrGeneric)
 					return nil
 				}
 			}
@@ -465,20 +467,20 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 	// ArrayVariable.cpp:372–375 — type always live; create_field_vars for aggregates
 	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
 	if item.Type == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	if item.Type.IsAggregateSess(vsSess(vs)) {
+	if item.Type.IsAggregateSess(sessFromVS(vs)) {
 		// residual ERROR sticky — no invent soft-continue expand past IsAggregate residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
-		item.CreateFieldVarsSess(vsSess(vs))
+		item.CreateFieldVarsSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
-	} else if sessHasError(vsSess(vs)) {
+	} else if hasErrVS(vs) {
 		// residual ERROR sticky — no invent soft-continue itemize past IsAggregate residual false
 		return nil
 	}
@@ -506,7 +508,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 func cgHasSignedCharIndex(vs *VariableSelector) bool {
 	// VariableSelector always live for opts; sticky incomplete no invent signed-char-on
 	if vs == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return false
 	}
 	return vs.Opts.SignedCharIndex
@@ -583,14 +585,14 @@ func (vs *VariableSelector) FindAllVisibleVars(b *Block) []*Variable {
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
 			// incomplete GlobalList fails closed sticky (no invent soft re-pick empty-complete)
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, vs.GlobalList...)
 	}
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, b.LocalVars...)
@@ -754,7 +756,7 @@ func BlockContainsStmIDSess(s *Session, b *Block, stmID int) bool {
 
 func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if b == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	fm := cg.FM
@@ -768,7 +770,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 		for _, e := range fm.CFGEdges {
 			if e == nil {
 				// incomplete CFG list hole — sticky (no invent soft-skip edge)
-				sessNoteError(cgSess(&cg), ErrGeneric)
+				noteErrCG(&cg, ErrGeneric)
 				return nil
 			}
 			// Statement.cpp / fair sid: stm_id 0 is valid; only IncompleteStmID is unset
@@ -776,15 +778,15 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				continue
 			}
 			// VariableSelector.cpp:773 — edge->src->eType == eGoto
-			src := FindStmtByIDSess(cgSess(&cg), fm.Func, e.SrcID)
+			src := FindStmtByIDSess(sessFromCG(&cg), fm.Func, e.SrcID)
 			// residual ERROR sticky — no invent soft-continue expand past FindStmt residual hole
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return nil
 			}
 			if src == nil {
-				src = findStmtByIDInTreeSess(cgSess(&cg), rootBlock(b), e.SrcID)
+				src = findStmtByIDInTreeSess(sessFromCG(&cg), rootBlock(b), e.SrcID)
 				// residual ERROR sticky — no invent soft-continue expand past tree FindStmt hole
-				if sessHasError(cgSess(&cg)) {
+				if hasErrCG(&cg) {
 					return nil
 				}
 			}
@@ -795,14 +797,14 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			// C++ edge->src is a live Statement* with parent; no root-tree membership.
 			srcParent := (*Block)(nil)
 			if b.Func != nil {
-				srcParent = FindParentBlockOfStmIDSess(cgSess(&cg), b.Func, e.SrcID)
-				if sessHasError(cgSess(&cg)) {
+				srcParent = FindParentBlockOfStmIDSess(sessFromCG(&cg), b.Func, e.SrcID)
+				if hasErrCG(&cg) {
 					return nil
 				}
 			}
 			if srcParent == nil {
-				srcParent = findParentOfStmIDInTreeSess(cgSess(&cg), rootBlock(b), e.SrcID)
-				if sessHasError(cgSess(&cg)) {
+				srcParent = findParentOfStmIDInTreeSess(sessFromCG(&cg), rootBlock(b), e.SrcID)
+				if hasErrCG(&cg) {
 					return nil
 				}
 			}
@@ -824,25 +826,25 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			// VariableSelector.cpp:773–779
 			// b->contains_stmt(edge->dest) && !b->contains_stmt(edge->src)
-			if !BlockContainsStmIDSess(cgSess(&cg), b, destID) {
-				if sessHasError(cgSess(&cg)) {
+			if !BlockContainsStmIDSess(sessFromCG(&cg), b, destID) {
+				if hasErrCG(&cg) {
 					return nil
 				}
 				continue
 			}
-			if BlockContainsStmIDSess(cgSess(&cg), b, e.SrcID) {
-				if sessHasError(cgSess(&cg)) {
+			if BlockContainsStmIDSess(sessFromCG(&cg), b, e.SrcID) {
+				if hasErrCG(&cg) {
 					return nil
 				}
 				continue
 			}
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return nil
 			}
 			// climb until block contains goto src (C++ while (!b->contains_stmt(src)))
 			cur := b
-			for cur != nil && !BlockContainsStmIDSess(cgSess(&cg), cur, e.SrcID) {
-				if sessHasError(cgSess(&cg)) {
+			for cur != nil && !BlockContainsStmIDSess(sessFromCG(&cg), cur, e.SrcID) {
+				if hasErrCG(&cg) {
 					return nil
 				}
 				cur = cur.Parent
@@ -909,13 +911,13 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
 		for _, v := range vs.GlobalList {
 			// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
 			if v.IsArray && v.AsArray == nil {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return IncompleteVariables()
 			}
 			if !v.IsArray {
@@ -933,20 +935,20 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 	}
 	if f != nil {
 		if !VariablesComplete(f.Param) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, f.Param...)
 	}
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
 		for _, v := range b.LocalVars {
 			// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
 			if v.IsArray && v.AsArray == nil {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return IncompleteVariables()
 			}
 			if !v.IsArray {
@@ -993,7 +995,7 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 	}
 	if !VariablesComplete(vs.GlobalList) {
 		// incomplete GlobalList fails closed sticky (no invent empty-complete array pool)
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return IncompleteVariables()
 	}
 	for _, v := range vs.GlobalList {
@@ -1002,7 +1004,7 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
 		if v.AsArray == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
 		out = append(out, v)
@@ -1011,25 +1013,25 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 	// ArrayVariable* always live; bare nil return invents VariablesComplete(nil) empty-complete
 	for _, av := range vs.Arrays {
 		if av == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return IncompleteVariables()
 		}
-		if av.IsGlobalSess(vsSess(vs)) && av.Collective == nil {
+		if av.IsGlobalSess(sessFromVS(vs)) && av.Collective == nil {
 			// residual ERROR sticky — no invent soft-continue pool past IsGlobal residual
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return IncompleteVariables()
 			}
 			if !IsVariableInSet(out, &av.Variable) {
 				// residual ERROR sticky — no invent soft-continue pool past IsVariableInSet residual
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return IncompleteVariables()
 				}
 				out = append(out, &av.Variable)
-			} else if sessHasError(vsSess(vs)) {
+			} else if hasErrVS(vs) {
 				// residual ERROR sticky — no invent soft-skip dupe past IsVariableInSet residual true
 				return IncompleteVariables()
 			}
-		} else if sessHasError(vsSess(vs)) {
+		} else if hasErrVS(vs) {
 			// residual ERROR sticky — no invent soft-continue pool past IsGlobal residual false
 			return IncompleteVariables()
 		}
@@ -1050,7 +1052,7 @@ func (vs *VariableSelector) MakeInitValue(
 ) *Expression {
 	// VariableSelector always has VS + type + RNG; sticky no invent init shell without them
 	if vs == nil || t == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before const/pointer pick
@@ -1058,28 +1060,28 @@ func (vs *VariableSelector) MakeInitValue(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:830 — assert(qf && qf->sanity_check(t)); no invent empty qfer
 	if qf == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	if !qf.SanityCheckSess(vsSess(vs), t) {
+	if !qf.SanityCheckSess(sessFromVS(vs), t) {
 		// residual ERROR sticky — no invent soft-init past SanityCheck residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-init past SanityCheck residual true
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	qfer := *qf
@@ -1087,53 +1089,53 @@ func (vs *VariableSelector) MakeInitValue(
 	qfer.AcceptStricter = false
 
 	// VariableSelector.cpp:836–841 — non-pointer or 20% chance → constant
-	ptrLike := t.IsPointerLikeSess(vsSess(vs))
+	ptrLike := t.IsPointerLikeSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-init path past IsPointerLike residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if !ptrLike || r.RndFlipcoin(20) {
 		// VariableSelector.cpp:837 ERROR_GUARD
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		// VariableSelector.cpp:838–839 — assert simple != void sticky
-		simple := t.IsSimpleSess(vsSess(vs))
+		simple := t.IsSimpleSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-const past IsSimple residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if simple && t.simple == EVoid {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
-		c := MakeRandomSess(vsSess(vs), t, vs.Opts, vs.Probs, r)
+		c := MakeRandomSess(sessFromVS(vs), t, vs.Opts, vs.Probs, r)
 		// VariableSelector.cpp:842 ERROR_GUARD after make_random
-		if c == nil || sessHasError(vsSess(vs)) {
+		if c == nil || hasErrVS(vs) {
 			return nil
 		}
 		return &Expression{Term: TermConstant, Con: c, ExprType: t}
 	}
 
 	// VariableSelector.cpp:842 ERROR_GUARD
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// pointer path: select visible var of pointee type
 	pointee := t.PtrType()
 	// residual ERROR sticky — no invent soft-pointee past PtrType residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:845 assert(type) sticky
 	if pointee == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	vars := vs.FindAllVisibleVars(b)
 	// incomplete visible pool — fail closed sticky (no invent choose from partial)
 	if !VariablesComplete(vars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	noUnion := !vs.Opts.TakeUnionFieldAddr
@@ -1143,16 +1145,16 @@ func (vs *VariableSelector) MakeInitValue(
 	if b == nil && vs.Opts.CComp {
 		invalid = vs.GetAllArrayVars()
 		if !VariablesComplete(invalid) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
 			invalid, true, true, noUnion)
 	} else {
 		if !vs.Opts.AddrTakenOfLocals {
-			invalid = GetAllLocalVarsSess(vsSess(vs), b)
+			invalid = GetAllLocalVarsSess(sessFromVS(vs), b)
 			if !VariablesComplete(invalid) {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return nil
 			}
 		}
@@ -1160,36 +1162,36 @@ func (vs *VariableSelector) MakeInitValue(
 			invalid, true, false, noUnion)
 	}
 	// VariableSelector.cpp:864 ERROR_GUARD
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 
 	if chosen == nil {
 		// VariableSelector.cpp:866–904 — create suitable addressable
-		if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtInitPointerValue) == BadDepth {
+		if DepthGuardByTypeSess(sessFromVS(vs), vs.Opts, DtInitPointerValue) == BadDepth {
 			return nil
 		}
 		noVolatile := false
 		if vs.Opts.StrictVolatileRule {
-			seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg))
+			seFree := cg.EffectContext().IsSideEffectFreeSess(sessFromCG(&cg))
 			// residual ERROR sticky — no invent soft-no-vol past IsSideEffectFree residual
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			noVolatile = !seFree
 		}
 		qferDeref := qfer.RandomLooseQualifiers(noVolatile, access, cg, vs.Opts, vs.Probs, r)
-		qferDeref.RemoveQualifiersSess(vsSess(vs), 1)
+		qferDeref.RemoveQualifiersSess(sessFromVS(vs), 1)
 		qferDeref.AcceptStricter = false
 		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
-		isPtrLike := pointee.IsPointerLikeSess(firstSess(vsSess(vs), cgSess(&cg)))
+		isPtrLike := pointee.IsPointerLikeSess(firstSess(sessFromVS(vs), sessFromCG(&cg)))
 		// residual ERROR sticky — no invent soft-useLocal past IsPointerLike residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
-		isVol := qferDeref.IsVolatileSess(firstSess(vsSess(vs), cgSess(&cg)))
+		isVol := qferDeref.IsVolatileSess(firstSess(sessFromVS(vs), sessFromCG(&cg)))
 		// residual ERROR sticky — no invent soft-useLocal past IsVolatile residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		useLocal := !vs.Opts.GlobalVariables ||
@@ -1202,29 +1204,29 @@ func (vs *VariableSelector) MakeInitValue(
 			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, false, true)
 		}
 		// VariableSelector.cpp:884 ERROR_GUARD
-		if tt == nil || sessHasError(vsSess(vs)) {
+		if tt == nil || hasErrVS(vs) {
 			return nil
 		}
 		if vs.Opts.AddrTakenOfLocals && useLocal && b != nil {
 			chosen = vs.GenerateNewParentLocal(b, AccessRead, cg, tt, &qferDeref, r)
 			// VariableSelector.cpp:890 ERROR_GUARD
-			if chosen == nil || sessHasError(vsSess(vs)) {
+			if chosen == nil || hasErrVS(vs) {
 				return nil
 			}
 			if chosen.Type != nil {
-				ci := chosen.Type.IndirectLevelSess(vsSess(vs))
+				ci := chosen.Type.IndirectLevelSess(sessFromVS(vs))
 				// residual ERROR sticky — no invent soft-count past IndirectLevel residual
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
-				ti := tt.IndirectLevelSess(vsSess(vs))
+				ti := tt.IndirectLevelSess(sessFromVS(vs))
 				// residual ERROR sticky — no invent soft-count past want IndirectLevel residual
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
-				RecordVolatileAccessSess(vsSess(vs), chosen, ci-ti, false)
+				RecordVolatileAccessSess(sessFromVS(vs), chosen, ci-ti, false)
 				// residual ERROR sticky — no invent soft-continue past RecordVolatileAccess residual
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
 			}
@@ -1235,30 +1237,30 @@ func (vs *VariableSelector) MakeInitValue(
 				chosen = vs.GenerateNewGlobal(AccessRead, cg, tt, &qferDeref, r)
 			}
 			// VariableSelector.cpp:901 ERROR_GUARD
-			if chosen == nil || sessHasError(vsSess(vs)) {
+			if chosen == nil || hasErrVS(vs) {
 				return nil
 			}
 		}
-		RecordAddressTakenSess(vsSess(vs), chosen)
+		RecordAddressTakenSess(sessFromVS(vs), chosen)
 	} else if chosen.Type != nil {
 		// VariableSelector.cpp:905–909
 		if t == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
-		lv := chosen.Type.IndirectLevelSess(vsSess(vs))
+		lv := chosen.Type.IndirectLevelSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-address-taken past subject IndirectLevel residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
-		lw := t.IndirectLevelSess(vsSess(vs))
+		lw := t.IndirectLevelSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-address-taken past desired IndirectLevel residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		derefLevel := lv - lw
 		if derefLevel < 0 {
-			RecordAddressTakenSess(vsSess(vs), chosen)
+			RecordAddressTakenSess(sessFromVS(vs), chosen)
 		}
 	}
 	// VariableSelector.cpp:910 assert(var); defensive after create paths (ERROR_GUARD earlier)
@@ -1275,23 +1277,23 @@ func (vs *VariableSelector) MakeInitValue(
 func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) bool {
 	// Variable always live; sticky incomplete no invent not-eligible soft-skip
 	if v == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return false
 	}
 	// incomplete ambient fails closed sticky (no invent eligible / soft-skip as absent re-pick)
 	if !EffectComplete(cg.EffectContext()) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return false
 	}
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
 	// Incomplete GetCollective fails closed sticky (no invent not-eligible past hole)
-	coll := v.GetCollectiveSess(cgSess(&cg))
+	coll := v.GetCollectiveSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent soft not-eligible past GetCollective residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	if coll == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return false
 	}
 	if coll != v {
@@ -1300,7 +1302,7 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		if cg.FM != nil {
 			// incomplete GlobalFacts fail closed sticky (no invent ReadIndices past holes)
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				sessNoteError(cgSess(&cg), ErrGeneric)
+				noteErrCG(&cg, ErrGeneric)
 				return false
 			}
 			facts = cg.FM.GlobalFacts
@@ -1313,26 +1315,26 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 
 	// VariableSelector.cpp:232–234 — partial volatile through pointer
-	if derefLevel > 0 && v.IsPartialVolatileAfterDerefSess(cgSess(&cg), derefLevel) {
+	if derefLevel > 0 && v.IsPartialVolatileAfterDerefSess(sessFromCG(&cg), derefLevel) {
 		// residual ERROR sticky — no invent eligible past partial-vol hole
 		return false
 	}
 	// residual ERROR sticky — no invent eligible true past Type-nil peel / probe hole
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	eff := cg.EffectContext()
-	isConst := v.IsConstAfterDerefSess(cgSess(&cg), derefLevel)
-	isVol := v.IsVolatileAfterDerefSess(cgSess(&cg), derefLevel) || v.IsVolatileSess(cgSess(&cg))
+	isConst := v.IsConstAfterDerefSess(sessFromCG(&cg), derefLevel)
+	isVol := v.IsVolatileAfterDerefSess(sessFromCG(&cg), derefLevel) || v.IsVolatileSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent eligible true past IsConst/IsVolatileAfterDeref hole
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 
 	// volatile + non-SE-free context → reject
-	seFree := eff.IsSideEffectFreeSess(cgSess(&cg))
+	seFree := eff.IsSideEffectFreeSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent soft-eligible past IsSideEffectFree residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	if isVol && !seFree {
@@ -1340,26 +1342,26 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 	// cannot read/write a var being written in context
 	if access == AccessRead || access == AccessWrite {
-		if eff.IsWrittenPartiallySess(cgSess(&cg), v) {
+		if eff.IsWrittenPartiallySess(sessFromCG(&cg), v) {
 			// residual ERROR sticky — no invent eligible past partial-write hole
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
 			return false
 		}
 	}
 	// residual ERROR sticky from IsWrittenPartially false path
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	// cannot write a var being read (deref_level==0)
-	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartiallySess(cgSess(&cg), v) {
-		if sessHasError(cgSess(&cg)) {
+	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartiallySess(sessFromCG(&cg), v) {
+		if hasErrCG(&cg) {
 			return false
 		}
 		return false
 	}
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	// cannot write const
@@ -1369,38 +1371,38 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	// VariableSelector.cpp:277–287 — nonreadable / nonwritable from context
 	if access == AccessRead && cg.IsNonReadable(v) {
 		// residual ERROR sticky — no invent eligible past IsNonReadable hole
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return false
 		}
 		return false
 	}
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	if access == AccessWrite && cg.IsNonWritable(v) {
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return false
 		}
 		return false
 	}
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	// FactUnion::is_nonreadable_field on READ (VariableSelector.cpp:279–280)
 	if access == AccessRead && cg.FM != nil {
-		if IsNonreadableFieldSess(cgSess(&cg), v, cg.FM.UnionFacts) {
-			if sessHasError(cgSess(&cg)) {
+		if IsNonreadableFieldSess(sessFromCG(&cg), v, cg.FM.UnionFacts) {
+			if hasErrCG(&cg) {
 				return false
 			}
 			return false
 		}
 		// residual ERROR sticky — no invent eligible past IsNonreadableField hole
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return false
 		}
 	}
 	// never invent eligible-complete success with residual ERROR set
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return false
 	}
 	return true
@@ -1421,32 +1423,32 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
 	// incomplete candidate list fails closed sticky (no invent skip hole as absent)
 	if !VariablesComplete(vars) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return false
 	}
 	for _, v := range vars {
 		// incomplete type IR fails closed sticky (no invent filter past hole)
 		if v.Type == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return false
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return false
 		}
-		if typ != nil && !typ.MatchOptsSess(cgSess(&cg), v.Type, MatchFlexible, sessOpts(cgSess(&cg))) {
+		if typ != nil && !typ.MatchOptsSess(sessFromCG(&cg), v.Type, MatchFlexible, sessOpts(sessFromCG(&cg))) {
 			// residual ERROR sticky — no invent soft-continue then true later past Match hole
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
 			continue
 		}
 		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirectOptsSess(cgSess(&cg), v.Qfer, false, sessOpts(cgSess(&cg))) {
+			if !qfer.MatchIndirectOptsSess(sessFromCG(&cg), v.Qfer, false, sessOpts(sessFromCG(&cg))) {
 				// residual ERROR sticky — no invent soft-continue past MatchIndirect hole
-				if sessHasError(cgSess(&cg)) {
+				if hasErrCG(&cg) {
 					return false
 				}
 				continue
@@ -1455,40 +1457,40 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		deref := 0
 		if typ != nil {
 			if v.Type == nil {
-				sessNoteError(cgSess(&cg), ErrGeneric)
+				noteErrCG(&cg, ErrGeneric)
 				return false
 			}
-			lv := v.Type.IndirectLevelSess(cgSess(&cg))
+			lv := v.Type.IndirectLevelSess(sessFromCG(&cg))
 			// residual ERROR sticky — no invent soft-vol-avail past subject IndirectLevel residual
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
-			lw := typ.IndirectLevelSess(cgSess(&cg))
+			lw := typ.IndirectLevelSess(sessFromCG(&cg))
 			// residual ERROR sticky — no invent soft-vol-avail past desired IndirectLevel residual
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
 			deref = lv - lw
 		}
 		if !IsEligibleVar(v, deref, access, cg) {
 			// hard IR residual from IsEligible sticky — no invent soft-continue then true later
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-vol-avail past IsEligible residual true
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return false
 		}
-		vol := v.IsVolatileSess(cgSess(&cg))
+		vol := v.IsVolatileSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-vol-avail past IsVolatile residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return false
 		}
 		if vol {
 			// VariableSelector.cpp:311 — Bookkeeper::volatile_avail++
-			RecordVolatileAvailSess(cgSess(&cg))
+			RecordVolatileAvailSess(sessFromCG(&cg))
 			return true
 		}
 	}
@@ -1501,50 +1503,50 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 // Incomplete candidate list fails closed sticky false (no invent skip hole).
 func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
 	if typ == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return false
 	}
 	// incomplete candidate list fails closed sticky (no invent skip hole)
 	if !VariablesComplete(vars) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return false
 	}
 	var facts []*FactPointTo
 	if cg.FM != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent is_valid_ptr past holes)
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return false
 		}
 		facts = cg.FM.GlobalFacts
 	}
 	for _, v := range vars {
 		if v.Type == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return false
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return false
 		}
 		if typ.IsDereferencedFrom(v.Type) {
 			// residual ERROR sticky — no invent soft-continue then true later past IsDereferencedFrom hole
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
-			if IsValidPtrSess(cgSess(&cg), v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+			if IsValidPtrSess(sessFromCG(&cg), v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 				// residual ERROR sticky — no invent eligible-true past IsValidPtr hole
-				if sessHasError(cgSess(&cg)) {
+				if hasErrCG(&cg) {
 					return false
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later vars past IsValidPtr residual false
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return false
 			}
-		} else if sessHasError(cgSess(&cg)) {
+		} else if hasErrCG(&cg) {
 			// residual ERROR sticky — no invent soft-continue later vars past IsDereferencedFrom residual false
 			return false
 		}
@@ -1564,7 +1566,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 ) *Variable {
 	// VariableSelector always has VS + type; sticky no invent must-use shell without them
 	if vs == nil || typ == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// no RWDirective: soft re-pick (must-use list absent — not broken IR)
@@ -1573,18 +1575,18 @@ func (vs *VariableSelector) SelectMustUseVar(
 	}
 	// itemize / choose always has process RNG sticky
 	if r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before must-use scan (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	var list *[]*Variable
@@ -1602,14 +1604,14 @@ func (vs *VariableSelector) SelectMustUseVar(
 	// incomplete Param/LocalVars must not invent IsVisible false and skip must-use vars
 	if blk != nil && !blk.StackScanComplete() {
 		// residual ERROR sticky — no invent soft-must-use past StackScan residual
-		if !sessHasError(vsSess(vs)) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+		if !hasErrVS(vs) {
+			noteErrVS(vs, ErrGeneric)
 		}
 		return nil
 	}
 	// incomplete must-use list fails closed sticky (no invent partial scan)
 	if !VariablesComplete(*list) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	for i := 0; i < len(*list); i++ {
@@ -1617,13 +1619,13 @@ func (vs *VariableSelector) SelectMustUseVar(
 		// Variable* always live in must-use lists; nil hole fails closed sticky
 		// (no invent skip to next entry / partial must-use)
 		if v == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		// is_visible (VariableSelector.cpp:1523)
-		if !v.IsVisibleSess(vsSess(vs), blk) {
+		if !v.IsVisibleSess(sessFromVS(vs), blk) {
 			// residual ERROR sticky — no invent soft-continue then pick later past hole
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
@@ -1631,13 +1633,13 @@ func (vs *VariableSelector) SelectMustUseVar(
 		// Variable::type always live; Type-nil fails closed sticky (no invent soft-skip
 		// incomplete must-use entry and still pick a later list member)
 		if v.Type == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
-		sMatch := firstSess(vsSess(vs), cgSess(&cg))
+		sMatch := firstSess(sessFromVS(vs), sessFromCG(&cg))
 		if !typ.MatchOptsSess(sMatch, v.Type, mt, sessOpts(sMatch)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
@@ -1646,17 +1648,17 @@ func (vs *VariableSelector) SelectMustUseVar(
 			// qfer->match(v->qfer) — ORs opts.MatchExactQualifiers (assign force)
 			if !qfer.MatchOptsSess(sMatch, v.Qfer, false, sessOpts(sMatch)) {
 				// residual ERROR sticky — no invent soft-continue past Match hole
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					return nil
 				}
 				continue
 			}
 		}
-		deref := v.Type.IndirectLevelSess(vsSess(vs)) - typ.IndirectLevelSess(vsSess(vs))
+		deref := v.Type.IndirectLevelSess(sessFromVS(vs)) - typ.IndirectLevelSess(sessFromVS(vs))
 		// VariableSelector.cpp:1529–1532 — WRITE rejects const after deref
-		if access == AccessWrite && v.IsConstAfterDerefSess(vsSess(vs), deref) {
+		if access == AccessWrite && v.IsConstAfterDerefSess(sessFromVS(vs), deref) {
 			// residual ERROR sticky — no invent soft-continue past incomplete const peel
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
@@ -1665,7 +1667,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent bare array pick via else branch past broken shell)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		if v.IsArray && v.AsArray != nil {
@@ -1673,13 +1675,13 @@ func (vs *VariableSelector) SelectMustUseVar(
 			// (C++ var = itemize_array(...); if null, try next — never return collective)
 			// RNG always live for itemize; sticky nil r (no invent skip to next)
 			if r == nil {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return nil
 			}
 			item := vs.ItemizeArray(r, cg, v.AsArray)
 			if item != nil {
 				out = &item.Variable
-			} else if sessHasError(vsSess(vs)) {
+			} else if hasErrVS(vs) {
 				// hard IR residual from ItemizeArray sticky
 				// (no invent soft-skip failed itemize then pick later list member)
 				return nil
@@ -1745,16 +1747,16 @@ func ChooseVarFull(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	// incomplete candidate / invalid lists — fail closed sticky (no invent choose past hole)
 	if !VariablesComplete(vars) || !VariablesComplete(invalidVars) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	if want == nil {
@@ -1763,13 +1765,13 @@ func ChooseVarFull(
 			// Variable::type always live; Type-nil fails closed sticky (no invent eligible
 			// without type IR via soft-skip)
 			if v.Type == nil {
-				sessNoteError(cgSess(&cg), ErrGeneric)
+				noteErrCG(&cg, ErrGeneric)
 				return nil
 			}
 			// C++ isArray always ArrayVariable*; missing AsArray sticky
 			// (no invent IsEligible soft-false then pick later past broken shell)
 			if v.IsArray && v.AsArray == nil {
-				sessNoteError(cgSess(&cg), ErrGeneric)
+				noteErrCG(&cg, ErrGeneric)
 				return nil
 			}
 			if IsVariableInSet(invalidVars, v) {
@@ -1778,40 +1780,40 @@ func ChooseVarFull(
 			if noBitfield && v.IsBitfield {
 				continue
 			}
-			if noUnion && v.IsInsideUnionFieldSess(cgSess(&cg)) {
+			if noUnion && v.IsInsideUnionFieldSess(sessFromCG(&cg)) {
 				// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
-				if sessHasError(cgSess(&cg)) {
+				if hasErrCG(&cg) {
 					return nil
 				}
 				continue
 			}
 			if IsEligibleVar(v, 0, access, cg) {
 				ok = append(ok, v)
-			} else if sessHasError(cgSess(&cg)) {
+			} else if hasErrCG(&cg) {
 				// hard IR residual (GetCollective/IsArray shell/etc.) sticky
 				// (no invent soft-skip not-eligible then pick a later candidate)
 				return nil
 			}
 		}
-		return ChooseOKVarSess(cgSess(&cg), r, ok)
+		return ChooseOKVarSess(sessFromCG(&cg), r, ok)
 	}
 	cands := vars
 	// VariableSelector.cpp:405–410 — expand when type simple/aggregate
 	if !noExpandStructUnion {
-		simple := want.IsSimpleSess(cgSess(&cg))
+		simple := want.IsSimpleSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-expand past IsSimple residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return nil
 		}
-		agg := want.IsAggregateSess(cgSess(&cg))
+		agg := want.IsAggregateSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-expand past IsAggregate residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return nil
 		}
 		if simple || agg {
-			cands = ExpandStructUnionVarsSess(cgSess(&cg), vars, want)
+			cands = ExpandStructUnionVarsSess(sessFromCG(&cg), vars, want)
 			if !VariablesComplete(cands) {
-				sessNoteError(cgSess(&cg), ErrGeneric)
+				noteErrCG(&cg, ErrGeneric)
 				return nil
 			}
 		}
@@ -1819,17 +1821,17 @@ func ChooseVarFull(
 	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
 	_ = HasEligibleVolatileVarQfer(cands, want, qfer, access, cg)
 	// residual ERROR sticky — no invent soft-continue choose past HasEligible residual hole
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return nil
 	}
 	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
 	// FactPointTo::is_valid_ptr reads session CGOptions null/dead deref probs
-	opts := sessOpts(cgSess(&cg))
+	opts := sessOpts(sessFromCG(&cg))
 	if HasDereferenceableVar(cands, want, cg, opts) {
-		RecordPointerAvailForDerefSess(cgSess(&cg))
+		RecordPointerAvailForDerefSess(sessFromCG(&cg))
 	}
 	// residual ERROR sticky — no invent soft-continue choose past HasDereferenceable residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return nil
 	}
 	// CVQualifiers::match_indirect → match → CGOptions::match_exact_qualifiers()
@@ -1839,37 +1841,37 @@ func ChooseVarFull(
 	for _, x := range cands {
 		if x.Type == nil {
 			// incomplete type IR — fail closed sticky (no invent skip candidate)
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent IsEligible soft-false then pick later past broken shell)
 		if x.IsArray && x.AsArray == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return nil
 		}
 		// VariableSelector.cpp:424–429
 		if noBitfield && x.IsBitfield {
 			continue
 		}
-		if noUnion && x.IsInsideUnionFieldSess(cgSess(&cg)) {
+		if noUnion && x.IsInsideUnionFieldSess(sessFromCG(&cg)) {
 			// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return nil
 			}
 			continue
 		}
-		if !want.MatchOptsSess(cgSess(&cg), x.Type, mt, opts) {
+		if !want.MatchOptsSess(sessFromCG(&cg), x.Type, mt, opts) {
 			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return nil
 			}
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
-			if !qfer.MatchIndirectOptsSess(cgSess(&cg), x.Qfer, matchExact, opts) {
+			if !qfer.MatchIndirectOptsSess(sessFromCG(&cg), x.Qfer, matchExact, opts) {
 				// residual ERROR from MatchIndirect OOB/sticky — no invent soft-continue
-				if sessHasError(cgSess(&cg)) {
+				if hasErrCG(&cg) {
 					return nil
 				}
 				continue
@@ -1879,30 +1881,30 @@ func ChooseVarFull(
 			continue
 		}
 		if x.Type == nil || want == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return nil
 		}
-		lv := x.Type.IndirectLevelSess(cgSess(&cg))
+		lv := x.Type.IndirectLevelSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-pick past subject IndirectLevel residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return nil
 		}
-		lw := want.IndirectLevelSess(cgSess(&cg))
+		lw := want.IndirectLevelSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-pick past desired IndirectLevel residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return nil
 		}
 		deref := lv - lw
 		if !IsEligibleVar(x, deref, access, cg) {
 			// hard IR residual sticky (no invent soft-skip not-eligible then pick later)
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return nil
 			}
 			continue
 		}
 		ok = append(ok, x)
 	}
-	return chooseVarFromOKSess(cgSess(&cg), r, want, ok, opts)
+	return chooseVarFromOKSess(sessFromCG(&cg), r, want, ok, opts)
 }
 
 // chooseVarFromOK mirrors VariableSelector::choose_var post-filter bias.
@@ -2169,23 +2171,23 @@ func (vs *VariableSelector) createAndInitialize(
 ) *Variable {
 	// VariableSelector always has VS + type + RNG; sticky no invent create shell without them
 	if vs == nil || t == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// name always live from gensym; sticky no invent empty-name create path
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:525 — always rnd_flipcoin(NewArrayVariableProb());
@@ -2206,8 +2208,8 @@ func (vs *VariableSelector) createAndInitialize(
 		if vs.Opts.StrictConstArrays {
 			// VariableSelector.cpp:526–527 — Constant::make_random; ERROR_GUARD
 			// no invent array with nil init when make_random fails
-			init = MakeRandomSess(vsSess(vs), t, vs.Opts, vs.Probs, r)
-			if init == nil || sessHasError(vsSess(vs)) {
+			init = MakeRandomSess(sessFromVS(vs), t, vs.Opts, vs.Probs, r)
+			if init == nil || hasErrVS(vs) {
 				return nil
 			}
 			ie = &Expression{Term: TermConstant, Con: init, ExprType: t}
@@ -2215,7 +2217,7 @@ func (vs *VariableSelector) createAndInitialize(
 			// VariableSelector.cpp:528–529 — make_init_value; ERROR_GUARD
 			// no invent array without live Expression* init
 			ie = vs.MakeInitValue(access, cg, t, &qfer, blk, r)
-			if ie == nil || sessHasError(vsSess(vs)) {
+			if ie == nil || hasErrVS(vs) {
 				return nil
 			}
 			if ie.Term == TermConstant {
@@ -2225,11 +2227,11 @@ func (vs *VariableSelector) createAndInitialize(
 		}
 		// VariableSelector.cpp:1325–1333 — CreateArrayVariable; AllVars; return itemize()
 		// no soft invent scalar fallback when array create fails after flip
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		av := CreateArrayVariable(r, vs.Opts, vs.Probs, vs, &cg, blk, name, t, init, qfer)
-		if av == nil || sessHasError(vsSess(vs)) {
+		if av == nil || hasErrVS(vs) {
 			return nil
 		}
 		if ie != nil {
@@ -2238,7 +2240,7 @@ func (vs *VariableSelector) createAndInitialize(
 		vs.AllVars = append(vs.AllVars, &av.Variable)
 		vs.Arrays = append(vs.Arrays, av)
 		// ArrayVariable.cpp:249–275 — itemize() random indices; AllVars; field_vars
-		item := av.ItemizeIntoSess(vsSess(vs), r, vs)
+		item := av.ItemizeIntoSess(sessFromVS(vs), r, vs)
 		if item == nil {
 			return nil
 		}
@@ -2249,16 +2251,16 @@ func (vs *VariableSelector) createAndInitialize(
 	// VariableSelector.cpp:531–533 — make_init_value + new_variable
 	// make_init_value always returns Expression* or ERROR_GUARD(nullptr)
 	ie := vs.MakeInitValue(access, cg, t, &qfer, blk, r)
-	if ie == nil || sessHasError(vsSess(vs)) {
+	if ie == nil || hasErrVS(vs) {
 		return nil
 	}
-	v := CreateVariableWithInitSess(vsSess(vs), name, t, nil, qfer)
+	v := CreateVariableWithInitSess(sessFromVS(vs), name, t, nil, qfer)
 	if v == nil {
 		// VariableSelector.cpp:535 assert(var) sticky
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	applyInitExprSess(vsSess(vs), v, ie)
+	applyInitExprSess(sessFromVS(vs), v, ie)
 	vs.AllVars = append(vs.AllVars, v)
 	vs.VarCreated = true
 	return v
@@ -2298,7 +2300,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 ) *Variable {
 	// VariableSelector always has VS + type + RNG; sticky no invent global shell without them
 	if vs == nil || t == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:129 assert global_variables; library → nil
@@ -2309,18 +2311,18 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		return nil
 	}
 	// VariableSelector.cpp:580 ERROR_GUARD
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent global past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	var varQfer CVQualifiers
@@ -2330,13 +2332,13 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		varQfer = *qfer
 	}
 	// VariableSelector.cpp:585 ERROR_GUARD after random_qualifiers
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	name := vs.RandomGlobalName()
 	// gensym always live; sticky no invent empty-name non-array global shell
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	vs.TmpCount++
@@ -2344,14 +2346,14 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	// use &varQfer (C++ may pass original qfer; assert requires non-null qf)
 	// make_init_value always Expression* or ERROR_GUARD — no invent uninit var
 	ie := vs.MakeInitValue(access, cg, t, &varQfer, nil, r)
-	if ie == nil || sessHasError(vsSess(vs)) {
+	if ie == nil || hasErrVS(vs) {
 		return nil
 	}
-	v := CreateVariableWithInitSess(vsSess(vs), name, t, nil, varQfer)
+	v := CreateVariableWithInitSess(sessFromVS(vs), name, t, nil, varQfer)
 	if v == nil {
 		return nil
 	}
-	applyInitExprSess(vsSess(vs), v, ie)
+	applyInitExprSess(sessFromVS(vs), v, ie)
 	// VariableSelector.cpp:147–149 new_variable → AllVars
 	vs.AllVars = append(vs.AllVars, v)
 	vs.GlobalList = append(vs.GlobalList, v)
@@ -2359,7 +2361,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
-		coll := varCollectiveSess(vsSess(vs), v)
+		coll := varCollectiveSess(sessFromVS(vs), v)
 		if coll == nil {
 			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
 				vs.GlobalList = vs.GlobalList[:n-1]
@@ -2367,7 +2369,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 			if n := len(vs.AllVars); n > 0 && vs.AllVars[n-1] == v {
 				vs.AllVars = vs.AllVars[:n-1]
 			}
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(nil, coll)
@@ -2378,7 +2380,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 			if n := len(vs.AllVars); n > 0 && vs.AllVars[n-1] == v {
 				vs.AllVars = vs.AllVars[:n-1]
 			}
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 	}
@@ -2387,9 +2389,9 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
 	// VariableSelector.cpp:600–602 — no access_once on NonArray path
-	volQ := varQfer.IsVolatileSess(vsSess(vs))
+	volQ := varQfer.IsVolatileSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-register past qfer IsVolatile residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if !volQ {
@@ -2411,7 +2413,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 ) *Variable {
 	// VariableSelector always has VS + type + RNG; sticky no invent global shell without them
 	if vs == nil || t == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if !vs.Opts.GlobalVariables {
@@ -2421,18 +2423,18 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		return nil
 	}
 	// VariableSelector.cpp:550 ERROR_GUARD
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent global past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	var varQfer CVQualifiers
@@ -2445,18 +2447,18 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		varQfer = qfer.Clone()
 	}
 	// VariableSelector.cpp:555 ERROR_GUARD after random_qualifiers
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	name := vs.RandomGlobalName()
 	// gensym always live; sticky no invent empty-name global shell
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	vs.TmpCount++
 	v := vs.createAndInitialize(access, cg, t, varQfer, nil, name, r)
-	if v == nil || sessHasError(vsSess(vs)) {
+	if v == nil || hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:561 — GlobalList (itemized array member when array path)
@@ -2465,13 +2467,13 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
-		coll := varCollectiveSess(vsSess(vs), v)
+		coll := varCollectiveSess(sessFromVS(vs), v)
 		if coll == nil {
 			// drop partial GlobalList registration (no invent orphan global past hole)
 			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
 				vs.GlobalList = vs.GlobalList[:n-1]
 			}
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(nil, coll)
@@ -2479,7 +2481,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
 				vs.GlobalList = vs.GlobalList[:n-1]
 			}
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 	}
@@ -2488,9 +2490,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
 	// VariableSelector.cpp:567–572 — access_once only for non-volatile globals
-	volQ := varQfer.IsVolatileSess(vsSess(vs))
+	volQ := varQfer.IsVolatileSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-register past qfer IsVolatile residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if !volQ {
@@ -2501,9 +2503,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	}
 	// wrap_volatiles → VOL_RVAL on Output
 	if vs.Opts.WrapVolatiles {
-		vol := v.IsVolatileSess(vsSess(vs))
+		vol := v.IsVolatileSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if vol {
@@ -2512,7 +2514,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	}
 	vs.VarCreated = true
 	// VariableSelector.cpp:1230–1236 — use_new_var stats
-	RecordVarCreatedSess(vsSess(vs), v)
+	RecordVarCreatedSess(sessFromVS(vs), v)
 	return v
 }
 
@@ -2541,29 +2543,29 @@ func (vs *VariableSelector) SelectGlobalMT(
 ) *Variable {
 	// VariableSelector always live; sticky no invent SelectGlobal without VS
 	if vs == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before choose/create (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete GlobalList / invalid_vars fail closed sticky (no invent soft-skip holes)
 	if !VariablesComplete(vs.GlobalList) || !VariablesComplete(invalidVars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp always has process RNG for multi-choose / create paths
 	// n==1 ChooseOKVar can skip draw; multi without r sticky fail closed
 	if r == nil && len(vs.GlobalList) != 1 {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// choose_var(GlobalList, …, mt, invalid_vars)
@@ -2579,19 +2581,19 @@ func (vs *VariableSelector) SelectGlobalMT(
 	}
 	// VariableSelector.cpp:685 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectGlobal, nullptr)
 	// only on the GenerateNewGlobal path after choose_var miss
-	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtSelectGlobal) == BadDepth {
+	if DepthGuardByTypeSess(sessFromVS(vs), vs.Opts, DtSelectGlobal) == BadDepth {
 		return nil
 	}
 	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
-	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatileSess(vsSess(vs))
+	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatileSess(sessFromVS(vs))
 	// VariableSelector.cpp:690 — random_type_from_type(type, no_volatile) defaults strict_simple=false
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol, false)
 	// VariableSelector.cpp:691–693 — ERROR_GUARD(nullptr); no soft invent keep original type
-	if t2 == nil || sessHasError(vsSess(vs)) {
+	if t2 == nil || hasErrVS(vs) {
 		return nil
 	}
 	v = vs.GenerateNewGlobal(access, cg, t2, qfer, r)
-	if v == nil || sessHasError(vsSess(vs)) {
+	if v == nil || hasErrVS(vs) {
 		return nil
 	}
 	return v
@@ -2608,7 +2610,7 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 	cands := okStructUnionLTypes(env, noVolatile, true, true)
 	// incomplete ok pool fails closed sticky (no invent keep original typ past hole)
 	if !typesComplete(cands) {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	if len(cands) == 0 {
@@ -2616,7 +2618,7 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 	}
 	st := cands[r.RndUpto(uint32(len(cands)))]
 	if st == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	return st
@@ -2636,28 +2638,28 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 ) *Variable {
 	// VariableSelector always has VS + type + RNG; sticky no invent eager global struct without them
 	if vs == nil || typ == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:611 assert(type)
 	if typ == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	level := typ.IndirectLevelSess(vsSess(vs))
+	level := typ.IndirectLevelSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-create struct past IndirectLevel residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	var inv []*Variable
@@ -2665,7 +2667,7 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		inv = invalidVars[0]
 	}
 	if !VariablesComplete(inv) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:613–630
@@ -2680,19 +2682,19 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		// C++ source has t->ptr_type with t==null (upstream bug); fair uses type->ptr_type
 		pointee := typ.PtrType()
 		// residual ERROR sticky — no invent soft-create struct past PtrType residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if pointee == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		st = chooseRandomStructFromType(vs.Types, pointee, false, r)
 		if qfer != nil {
 			// VariableSelector.cpp:621–622 — qfer->indirect_qualifiers(level)
-			q1 := qfer.IndirectQualifiersSess(vsSess(vs), level)
+			q1 := qfer.IndirectQualifiersSess(sessFromVS(vs), level)
 			// residual ERROR sticky — no invent soft-create past IndirectQualifiers residual
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			createQfer = &q1
@@ -2703,10 +2705,10 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 		return nil
 	}
 	// ERROR_GUARD if choose_random_struct / Generate fails
-	if st == nil || sessHasError(vsSess(vs)) {
+	if st == nil || hasErrVS(vs) {
 		return nil
 	}
-	if vs.GenerateNewGlobal(access, cg, st, createQfer, r) == nil || sessHasError(vsSess(vs)) {
+	if vs.GenerateNewGlobal(access, cg, st, createQfer, r) == nil || hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:631–632 — choose_var(GlobalList, …, invalid_vars)
@@ -2727,28 +2729,28 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 ) *Variable {
 	// VariableSelector always has VS + block + type + RNG; sticky no invent eager local struct without them
 	if vs == nil || block == nil || typ == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:641 assert(type)
 	if typ == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	level := typ.IndirectLevelSess(vsSess(vs))
+	level := typ.IndirectLevelSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-create local struct past IndirectLevel residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	var inv []*Variable
@@ -2756,7 +2758,7 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		inv = invalidVars[0]
 	}
 	if !VariablesComplete(inv) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	var st *Type
@@ -2770,18 +2772,18 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		// fair type->ptr_type (upstream t->ptr_type with t==0)
 		pointee := typ.PtrType()
 		// residual ERROR sticky — no invent soft-create local struct past PtrType residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if pointee == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		st = chooseRandomStructFromType(vs.Types, pointee, true, r)
 		if qfer != nil {
-			q1 := qfer.IndirectQualifiersSess(vsSess(vs), level)
+			q1 := qfer.IndirectQualifiersSess(sessFromVS(vs), level)
 			// residual ERROR sticky — no invent soft-create past IndirectQualifiers residual
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			createQfer = &q1
@@ -2792,10 +2794,10 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		return nil
 	}
 	// VariableSelector.cpp:654–656 — ERROR_GUARD; if (!t) return nullptr
-	if st == nil || sessHasError(vsSess(vs)) {
+	if st == nil || hasErrVS(vs) {
 		return nil
 	}
-	if vs.GenerateNewParentLocal(block, access, cg, st, createQfer, r) == nil || sessHasError(vsSess(vs)) {
+	if vs.GenerateNewParentLocal(block, access, cg, st, createQfer, r) == nil || hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:661–663 — choose_var(block.local_vars, …, invalid_vars)
@@ -2808,18 +2810,18 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQualifiers) *Variable {
 	// VariableSelector always live; sticky no invent param shell without VS
 	if vs == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	name := vs.RandomParamName()
 	// gensym always live; sticky no invent empty-name parameter shell
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	v := CreateVariableQferSess(vsSess(vs), name, typ, qfer)
+	v := CreateVariableQferSess(sessFromVS(vs), name, typ, qfer)
 	if v == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	vs.AllVars = append(vs.AllVars, v)
@@ -2832,17 +2834,17 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Variable {
 	// VariableSelector always has VS + Function + RNG; sticky no invent param without them
 	if vs == nil || f == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:967 ERROR_RETURN after flipcoin setup
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:966–972 — has_pointer_type() && flipcoin(40)
 	// no soft invent MakeRandomPointerType when choose returns nil
 	rndPtr := r.RndFlipcoin(40)
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	var t *Type
@@ -2855,28 +2857,28 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 		t = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
 	}
 	// VariableSelector.cpp:972 ERROR_RETURN
-	if t == nil || sessHasError(vsSess(vs)) {
+	if t == nil || hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:973–974 assert non-void simple sticky
-	simple := t.IsSimpleSess(vsSess(vs))
+	simple := t.IsSimpleSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-param past IsSimple residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if simple && t.Simple() == EVoid {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:976 — CVQualifiers::random_qualifiers(t)
-	qfer := RandomQualifiersNoContextNoVolatileSess(vsSess(vs), t, vs.Opts, vs.Probs, r)
+	qfer := RandomQualifiersNoContextNoVolatileSess(sessFromVS(vs), t, vs.Opts, vs.Probs, r)
 	// VariableSelector.cpp:977 ERROR_RETURN
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	v := vs.GenerateParameterVariableTyped(t, qfer)
 	// VariableSelector.cpp:979–980 ERROR_RETURN; param.push_back
-	if v == nil || sessHasError(vsSess(vs)) {
+	if v == nil || hasErrVS(vs) {
 		return nil
 	}
 	f.Param = append(f.Param, v)
@@ -2889,18 +2891,18 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[*Variable]bool) *Variable {
 	// VariableSelector always has VS + RNG; sticky no invent loop-ctrl shell without them
 	if vs == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before filter (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	ty := GetIntType()
@@ -2908,7 +2910,7 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	vars := vs.FindAllNonArrayVisibleVars(blk)
 	// incomplete visible pool — fail closed sticky (no invent loop ctrl from partial)
 	if !VariablesComplete(vars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1155–1168 — remove no-int-field and union-with-pointer
@@ -2916,29 +2918,29 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	var invalidSlice []*Variable
 	for _, v := range vars {
 		if v.Type == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		if invalid[v] {
 			invalidSlice = append(invalidSlice, v)
 			continue
 		}
-		if !v.Type.HasIntFieldSess(vsSess(vs)) {
+		if !v.Type.HasIntFieldSess(sessFromVS(vs)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past HasIntField hole
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
 		}
-		if v.Type.IsUnionSess(vsSess(vs)) && v.Type.ContainPointerFieldSess(vsSess(vs)) {
+		if v.Type.IsUnionSess(sessFromVS(vs)) && v.Type.ContainPointerFieldSess(sessFromVS(vs)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past ContainPointer hole
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent keep after true ContainPointer/HasInt residual path
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		filtered = append(filtered, v)
@@ -2954,7 +2956,7 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 		return v
 	}
 	// VariableSelector.cpp:1170 ERROR_GUARD after choose_var
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:1172–1178 — create global or parent local
@@ -2980,38 +2982,38 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 ) *Variable {
 	// VariableSelector always has VS + block + type + RNG; sticky no invent local shell without them
 	if vs == nil || block == nil || t == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:920 ERROR_GUARD
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent local past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:921 assert(t); 920–923 — volatile struct/union field(s) → global
 	if t == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	isAgg := t.IsAggregateSess(vsSess(vs))
+	isAgg := t.IsAggregateSess(sessFromVS(vs))
 	// residual ERROR sticky — no invent soft-local past IsAggregate residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if isAgg {
-		volSU := t.IsVolatileStructUnionSess(vsSess(vs))
+		volSU := t.IsVolatileStructUnionSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-global past IsVolatileStructUnion residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if volSU {
@@ -3032,32 +3034,32 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		varQfer = qfer.Clone()
 	}
 	// VariableSelector.cpp:937 ERROR_GUARD after random_qualifiers
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:938 — restrict(access, cg_context)
 	varQfer.Restrict(access, cg)
 	// VariableSelector.cpp:939 — assert(var_qfer.sanity_check(t)); no soft invent bad qfer
-	if !varQfer.SanityCheckSess(vsSess(vs), t) {
+	if !varQfer.SanityCheckSess(sessFromVS(vs), t) {
 		// residual ERROR sticky — no invent soft-local past SanityCheck residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-local past SanityCheck residual true
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	name := vs.RandomLocalName()
 	// gensym always live; sticky no invent empty-name parent-local shell
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
-	if v == nil || sessHasError(vsSess(vs)) {
+	if v == nil || hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:944 — blk->local_vars.push_back(var)
@@ -3067,12 +3069,12 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
-		coll := varCollectiveSess(vsSess(vs), v)
+		coll := varCollectiveSess(sessFromVS(vs), v)
 		if coll == nil {
 			if n := len(block.LocalVars); n > 0 && block.LocalVars[n-1] == v {
 				block.LocalVars = block.LocalVars[:n-1]
 			}
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(block, coll)
@@ -3080,15 +3082,15 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 			if n := len(block.LocalVars); n > 0 && block.LocalVars[n-1] == v {
 				block.LocalVars = block.LocalVars[:n-1]
 			}
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 	}
 	// wrap_volatiles for Output
 	if vs.Opts.WrapVolatiles {
-		vol := v.IsVolatileSess(vsSess(vs))
+		vol := v.IsVolatileSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if vol {
@@ -3106,25 +3108,25 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	// VariableSelector always has VS + RNG; sticky no invent array select without them
 	if vs == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before filters (no invent soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllVisibleVars(blk)
 	// incomplete GlobalList/LocalVars hole — fail closed sticky (no invent array select soft nil)
 	if !VariablesComplete(vars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// also include Arrays list members that may not be on GlobalList yet
@@ -3136,7 +3138,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return true
 		}
 		// VariableSelector.cpp:1393–1412
-		sBag := firstSess(vsSess(vs), cgSess(&cg))
+		sBag := firstSess(sessFromVS(vs), sessFromCG(&cg))
 		if cg.EffectContext().IsReadPartiallySess(sBag, &av.Variable) ||
 			cg.EffectContext().IsWrittenPartiallySess(sBag, &av.Variable) {
 			// residual ERROR sticky — no invent soft-skip past partial-RW hole then pick another
@@ -3218,7 +3220,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	// Variable* always live in visible list; nil hole fails closed sticky (FindAll already)
 	for _, v := range vars {
 		if v == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		if !v.IsArray {
@@ -3227,7 +3229,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		// IsArray without AsArray is incomplete IR — fail closed sticky
 		// (no invent soft-skip broken array as absent then pick another)
 		if v.AsArray == nil {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		if !add(v.AsArray) {
@@ -3238,7 +3240,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	// candidates from vs.Arrays when the collective is not on GlobalList/local_vars
 	// (seed-2 e198: UP create_random_array F25 while Go reused a non-visible Arrays entry).
 	// Type-nil / filter sticky from add — no invent CreateRandomArray / pick soft-success
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	n := len(arrayVars)
@@ -3251,7 +3253,7 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	}
 	idx := r.RndUpto(uint32(n))
 	// VariableSelector.cpp:1434 ERROR_GUARD(nullptr)
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	return arrayVars[idx]
@@ -3264,23 +3266,23 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
 	// VariableSelector always has VS + RNG; sticky no invent random array without them
 	if vs == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before flipcoin (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1341–1342 — global_variables && rnd_flipcoin(25); ERROR_GUARD
 	asGlobal := vs.Opts.GlobalVariables && r.RndFlipcoin(25)
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// Go MaxGlobals library cap applies to global array creates too
@@ -3299,12 +3301,12 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		}
 		// incomplete Stack fails closed sticky (no invent soft-skip nil frame)
 		if !BlocksComplete(cg.CurrentFunc.Stack) {
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 		name = vs.RandomLocalName()
 		idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		blk = cg.CurrentFunc.Stack[idx]
@@ -3316,7 +3318,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	}
 	// gensym always live; sticky no invent empty-name array shell
 	if name == "" {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
@@ -3333,15 +3335,15 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			elem = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
 		}
 		// VariableSelector.cpp:1360 ERROR_GUARD
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if elem == nil {
 			continue
 		}
-		if elem.IsConstStructUnionSess(vsSess(vs)) {
+		if elem.IsConstStructUnionSess(sessFromVS(vs)) {
 			// residual ERROR sticky — no invent soft-continue then create later past field-Type hole
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
@@ -3349,13 +3351,13 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		// VariableSelector.cpp:1361 — cg_context.accept_type(type)
 		if !cg.AcceptType(elem) {
 			// residual ERROR sticky — no invent soft-continue then create later past AcceptType hole
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent break create past AcceptType residual true path
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		break
@@ -3368,12 +3370,12 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	// VariableSelector.cpp:1364 — Constant::make_random(type); ERROR_GUARD path
 	// no invent CreateArrayVariable with nil init when make_random fails
-	init := MakeRandomSess(vsSess(vs), elem, vs.Opts, vs.Probs, r)
-	if init == nil || sessHasError(vsSess(vs)) {
+	init := MakeRandomSess(sessFromVS(vs), elem, vs.Opts, vs.Probs, r)
+	if init == nil || hasErrVS(vs) {
 		return nil
 	}
 	av := CreateArrayVariable(r, vs.Opts, vs.Probs, vs, &cg, blk, name, elem, init, qfer)
-	if av == nil || sessHasError(vsSess(vs)) {
+	if av == nil || hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:1368 — AllVars
@@ -3382,9 +3384,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	// ArrayVariable.cpp:190–191 — CreateArrayVariable already registered GlobalList/local
 	// VariableSelector.cpp:1371–1377 — DFA facts + new_globals (not a second list push)
 	if asGlobal {
-		vol := av.IsVolatileSess(vsSess(vs))
+		vol := av.IsVolatileSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-register array past IsVolatile residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if !vol {
@@ -3397,7 +3399,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			cg.FM.AddNewVarFactAndUpdate(nil, &av.Variable)
 			// Incomplete GlobalFacts after register must not invent create success
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return nil
 			}
 		}
@@ -3405,7 +3407,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if cg.FM != nil {
 			cg.FM.AddNewVarFactAndUpdate(blk, &av.Variable)
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				return nil
 			}
 		}
@@ -3477,28 +3479,28 @@ func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
 func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper VariableScope) VariableScope {
 	// VariableSelector.cpp:1053 — ERROR_GUARD(MAX_VAR_SCOPE) sticky; no soft invent ScopeNewValue
 	if r == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return MaxVarScope
 	}
 	// incomplete Param fails closed sticky (no invent filter ParentParam via len-hole)
 	if cg != nil && cg.CurrentFunc != nil && !VariablesComplete(cg.CurrentFunc.Param) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return MaxVarScope
 	}
 	// VariableSelector.cpp:1050 — InitScopeTableSess(testAmbientSession); use session scopeTable_ only
 	// (no invent NewScopeThresholdTable per draw)
-	tab := sessScopeTab(cgSess(cg))
+	tab := sessScopeTab(sessFromCG(cg))
 	if tab == nil {
 		// library path without InitScopeTable — sticky ERROR_GUARD MAX
 		_ = opts
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return MaxVarScope
 	}
 	filt := variableSelectFilter(tab, cg)
 	// C++ unbounded do-while; cap high (no soft invent MAX early)
 	for tries := 0; tries < 256; tries++ {
-		i := r.RndUptoFilterSess(cgSess(cg), 100, filt)
-		if sessHasError(cgSess(cg)) {
+		i := r.RndUptoFilterSess(sessFromCG(cg), 100, filt)
+		if hasErrCG(cg) {
 			return MaxVarScope
 		}
 		sc := VariableScope(tab.GetValue(int(i)))
@@ -3564,35 +3566,35 @@ func (vs *VariableSelector) SelectWithInvalid(
 ) *Variable {
 	// select always has VS + RNG sticky; no invent select shell without them
 	if vs == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before scope pick (no invent select past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete invalid_vars fails closed sticky (no invent select past hole list)
 	if !VariablesComplete(invalidVars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1190–1191 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtSelectVariable, scope, nullptr)
 	// scope not chosen yet → MAX_VAR_SCOPE flag (mirrors call with default MAX)
-	if DepthGuardByTypeFlagSess(vsSess(vs), vs.Opts, DtSelectVariable, int(MaxVarScope)) == BadDepth {
+	if DepthGuardByTypeFlagSess(sessFromVS(vs), vs.Opts, DtSelectVariable, int(MaxVarScope)) == BadDepth {
 		return nil
 	}
 	vs.VarCreated = false
 	// VariableSelector.cpp:1192–1196 — VariableSelectFilter + VariableSelectionProbability(MAX, &filter)
 	scope := VariableSelectionProbabilityCG(r, vs.Opts, &cg, MaxVarScope)
 	// VariableSelector.cpp:1196 ERROR_GUARD
-	if scope == MaxVarScope || sessHasError(vsSess(vs)) {
+	if scope == MaxVarScope || hasErrVS(vs) {
 		return nil
 	}
 	var v *Variable
@@ -3608,34 +3610,34 @@ func (vs *VariableSelector) SelectWithInvalid(
 		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
 		if vs.Opts.ExpandStruct {
 			// ERROR_GUARD(nullptr) after switch discards selection
-			sessNoteError(vsSess(vs), ErrGeneric)
+			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
 	case MaxVarScope:
 		// VariableSelector.cpp:1222–1223 — assert(0) sticky; no soft invent GenerateNewVariable
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	default:
 		// unknown scope sticky — no soft invent create
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1224 — ERROR_GUARD(nullptr); null scope pick stays null (no soft create)
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
 	// non-sticky null soft re-pick (sticky poisons generation when vol slips through filter)
 	if v != nil {
-		seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(&cg))
+		seFree := cg.EffectContext().IsSideEffectFreeSess(sessFromCG(&cg))
 		// residual ERROR sticky — no invent soft-skip vol assert past IsSideEffectFree residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if !seFree {
-			vol := v.IsVolatileSess(vsSess(vs))
+			vol := v.IsVolatileSess(sessFromVS(vs))
 			// residual ERROR sticky — no invent soft-null past IsVolatile residual
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			if vol {
@@ -3646,9 +3648,9 @@ func (vs *VariableSelector) SelectWithInvalid(
 	// VariableSelector.cpp:1229–1239 — record statistics
 	if v != nil {
 		if vs.VarCreated {
-			RecordVarCreatedSess(vsSess(vs), v)
+			RecordVarCreatedSess(sessFromVS(vs), v)
 		} else {
-			RecordVarReusedSess(vsSess(vs))
+			RecordVarReusedSess(sessFromVS(vs))
 		}
 	}
 	return v
@@ -3679,7 +3681,7 @@ func (vs *VariableSelector) SelectParentLocalInv(
 ) *Variable {
 	// VariableSelector always has VS + RNG; sticky no invent parent-local select without them
 	if vs == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// no CurrentFunc: soft re-pick (select scopes without live func stack)
@@ -3690,15 +3692,15 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:989 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectParentLocal, nullptr)
-	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtSelectParentLocal) == BadDepth {
+	if DepthGuardByTypeSess(sessFromVS(vs), vs.Opts, DtSelectParentLocal) == BadDepth {
 		return nil
 	}
 	// VariableSelector.cpp:991–996 — assert(!stack.empty()); no soft invent global/param
@@ -3708,21 +3710,21 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	}
 	// incomplete Stack list fails closed sticky (no invent soft-skip nil frame)
 	if !BlocksComplete(stack) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete invalid_vars fails closed sticky
 	if !VariablesComplete(invalidVars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1001–1003 — rnd_upto(stack.size()); ERROR_GUARD(nullptr)
 	blk := stack[r.RndUpto(uint32(len(stack)))]
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if blk == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// empty locals: expand_struct eager then GenerateNewParentLocal
@@ -3733,28 +3735,28 @@ func (vs *VariableSelector) SelectParentLocalInv(
 				return v
 			}
 			// VariableSelector.cpp:1009–1010 — ERROR_GUARD after eager_create
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 		}
 		// VariableSelector.cpp:1013–1015 — random_type_from_type(type, true, false); ERROR_GUARD
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
-		if t2 == nil || sessHasError(vsSess(vs)) {
+		if t2 == nil || hasErrVS(vs) {
 			return nil
 		}
 		return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
 	}
 	// incomplete LocalVars fails closed sticky before choose
 	if !VariablesComplete(blk.LocalVars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type no_vol
 	matchT := t
 	if t != nil {
-		simple := t.IsSimpleSess(vsSess(vs))
+		simple := t.IsSimpleSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-match past IsSimple residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			return nil
 		}
 		if simple && t.Simple() != EVoid {
@@ -3764,14 +3766,14 @@ func (vs *VariableSelector) SelectParentLocalInv(
 			// VariableSelector.cpp:1021–1023 — random_type_from_type(type, true, false); ERROR_GUARD
 			matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
 			// no soft invent keep original type when random_type_from_type fails
-			if matchT == nil || sessHasError(vsSess(vs)) {
+			if matchT == nil || hasErrVS(vs) {
 				return nil
 			}
 		}
 	}
 	// VariableSelector.cpp:1026–1028 — choose_var; ERROR_GUARD
 	v := ChooseVarFull(r, blk.LocalVars, access, cg, matchT, qfer, mt, invalidVars, false, false, false)
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	if v != nil {
@@ -3807,34 +3809,34 @@ func (vs *VariableSelector) SelectParentParamInv(
 	invalidVars []*Variable,
 ) *Variable {
 	if cg.CurrentFunc == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before param choose (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete Param list fails closed sticky (no invent soft-skip hole as absent param)
 	if !VariablesComplete(cg.CurrentFunc.Param) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete invalid_vars fails closed sticky
 	if !VariablesComplete(invalidVars) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp always has process RNG for multi-choose / parent-local create
 	// n==1 param can skip draw; multi without r sticky fail closed
 	if r == nil && len(cg.CurrentFunc.Param) != 1 {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1079–1080 — empty param → SelectParentLocal
@@ -3843,7 +3845,7 @@ func (vs *VariableSelector) SelectParentParamInv(
 	}
 	v := ChooseVarFull(r, cg.CurrentFunc.Param, access, cg, t, qfer, mt, invalidVars, false, false, false)
 	// VariableSelector.cpp:1082 ERROR_GUARD
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		return nil
 	}
 	// VariableSelector.cpp:1083–1086 — miss → SelectParentLocal
@@ -3864,34 +3866,34 @@ func (vs *VariableSelector) GenerateNewVariable(
 ) *Variable {
 	// VariableSelector.cpp:1090+ — always has VS + type + RNG; sticky no invent without them
 	if vs == nil || t == nil || r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before scope pick (no invent new var past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1093 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewVariable, nullptr)
-	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtGenerateNewVariable) == BadDepth {
+	if DepthGuardByTypeSess(sessFromVS(vs), vs.Opts, DtGenerateNewVariable) == BadDepth {
 		return nil
 	}
-	scope := VariableCreationProbabilitySess(vsSess(vs), r, vs.Opts)
+	scope := VariableCreationProbabilitySess(sessFromVS(vs), r, vs.Opts)
 	// VariableSelector.cpp:1096–1097 — ERROR_GUARD(nullptr) when creation scope is MAX
-	if scope == MaxVarScope || sessHasError(vsSess(vs)) {
+	if scope == MaxVarScope || hasErrVS(vs) {
 		return nil
 	}
 	var v *Variable
 	switch scope {
 	case ScopeGlobal:
 		// VariableSelector.cpp:1100 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewGlobal, nullptr)
-		if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtGenerateNewGlobal) == BadDepth {
+		if DepthGuardByTypeSess(sessFromVS(vs), vs.Opts, DtGenerateNewGlobal) == BadDepth {
 			return nil
 		}
 		// VariableSelector.cpp:1104–1107 — !is_random && GlobalList.empty → ERROR
@@ -3899,13 +3901,13 @@ func (vs *VariableSelector) GenerateNewVariable(
 		// VariableSelector.cpp:1108 — random_type_from_type(type) defaults
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false, false)
 		// VariableSelector.cpp:1109 ERROR_GUARD
-		if t2 == nil || sessHasError(vsSess(vs)) {
+		if t2 == nil || hasErrVS(vs) {
 			return nil
 		}
 		v = vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	case ScopeParentLocal:
 		// VariableSelector.cpp:1114–1115 — DEPTH_GUARD_BY_DEPTH for parent-local create
-		if DepthGuardByDepthSess(vsSess(vs), vs.Opts, MinimalDepthSess(vsSess(vs), DtGenerateNewParentLocal, 0)) == BadDepth {
+		if DepthGuardByDepthSess(sessFromVS(vs), vs.Opts, MinimalDepthSess(sessFromVS(vs), DtGenerateNewParentLocal, 0)) == BadDepth {
 			return nil
 		}
 		if r == nil {
@@ -3914,13 +3916,13 @@ func (vs *VariableSelector) GenerateNewVariable(
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			// VariableSelector.cpp:1116–1117 — rnd_upto(func.stack.size()); ERROR_GUARD
 			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				return nil
 			}
 			// VariableSelector.cpp:1126 — random_type_from_type(type, true, false)
 			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
 			// VariableSelector.cpp:1127 ERROR_GUARD
-			if t2 == nil || sessHasError(vsSess(vs)) {
+			if t2 == nil || hasErrVS(vs) {
 				return nil
 			}
 			v = vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
@@ -3933,7 +3935,7 @@ func (vs *VariableSelector) GenerateNewVariable(
 		return nil
 	}
 	// VariableSelector.cpp:1135 ERROR_GUARD; 1136 var_created
-	if v == nil || sessHasError(vsSess(vs)) {
+	if v == nil || hasErrVS(vs) {
 		return nil
 	}
 	vs.VarCreated = true

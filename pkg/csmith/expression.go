@@ -1142,7 +1142,7 @@ func MakeRandomParam(
 ) *Expression {
 	// Expression.cpp always has RNG sticky; no invent param expression without it
 	if r == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky when live cg (no invent param past holes)
@@ -1150,22 +1150,22 @@ func MakeRandomParam(
 		if !EffectComplete(cg.EffectContext()) ||
 			(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 			!EffectComplete(cg.EffectStm) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 	}
 	// Expression.cpp:241–242 — assert(type) sticky; DEPTH_GUARD after type known
 	if typ == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// Expression.cpp:242–243 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpressionRandomParam, tt, …)
 	// term type not chosen yet when MAX; guard uses flag 0 until Pick (C++ uses tt arg)
-	if DepthGuardByTypeFlagSess(cgSess(cg), opts, DtExpressionRandomParam, int(MaxTermTypes)) == BadDepth {
+	if DepthGuardByTypeFlagSess(sessFromCG(cg), opts, DtExpressionRandomParam, int(MaxTermTypes)) == BadDepth {
 		return nil
 	}
 	// Expression.cpp:258 — use cg_context.expr_depth (exprDepth param kept for API)
@@ -1173,9 +1173,9 @@ func MakeRandomParam(
 	if cg != nil {
 		depth = cg.ExprDepth
 	}
-	tt := PickParamTermTypeSess(cgSess(cg), r, tables, opts, typ, depth)
+	tt := PickParamTermTypeSess(sessFromCG(cg), r, tables, opts, typ, depth)
 	// Expression.cpp:264 — ERROR_GUARD(nullptr) after ExpressionTypeProbability
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// Expression.cpp:258–260 — depth filtered only in PickParamTermType; no soft invent leaf
@@ -1187,10 +1187,10 @@ func MakeRandomParam(
 		// Expression.cpp:291–294 — depth++ for variable (make_random_param path)
 		e := makeExpressionVariableFlags(r, vs, cg, typ, qfer, true, false)
 		// Expression.cpp:293 — ERROR_GUARD before return
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
-		if e != nil && cg != nil && BumpsExprDepthSess(cgSess(cg), e) {
+		if e != nil && cg != nil && BumpsExprDepthSess(sessFromCG(cg), e) {
 			cg.ExprDepth++
 		}
 		return e
@@ -1273,31 +1273,31 @@ func MakeRandomExpression(
 ) *Expression {
 	// Expression.cpp always has RNG + live CGContext; sticky no invent leaf shells without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent leaf / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// Expression.cpp:144–145 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpression, tt, nullptr)
-	if DepthGuardByTypeFlagSess(cgSess(cg), opts, DtExpression, int(tt)) == BadDepth {
+	if DepthGuardByTypeFlagSess(sessFromCG(cg), opts, DtExpression, int(tt)) == BadDepth {
 		return nil
 	}
 	// Expression::InitProbabilityTables — session tables when caller omits them
 	if tables == nil {
-		tables = sessExprTables(cgSess(cg))
+		tables = sessExprTables(sessFromCG(cg))
 	}
 	if tables == nil {
 		// sticky no invent NewExprTables mid expression
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	var flist *FunctionList
@@ -1326,9 +1326,9 @@ func MakeRandomExpression(
 		if env == nil || len(env.AllTypes) == 0 {
 			return nil
 		}
-		seFree := cg.EffectContext().IsSideEffectFreeSess(cgSess(cg))
+		seFree := cg.EffectContext().IsSideEffectFreeSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-choose type past IsSideEffectFree residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		for tries := 0; tries < 256; tries++ {
@@ -1338,7 +1338,7 @@ func MakeRandomExpression(
 				typ = env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
 			}
 			// Expression.cpp: ERROR_GUARD paths inside choose_random*
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			// Expression.cpp:151–152 — constant structs not as subexpression
@@ -1351,8 +1351,8 @@ func MakeRandomExpression(
 		}
 		// choose_random_nonvoid ERROR_GUARD sticky — no invent expression without type
 		if typ == nil {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return nil
 		}
@@ -1360,26 +1360,26 @@ func MakeRandomExpression(
 	// Expression.cpp:154–157 — asserts on illegal term/type sticky (no soft invent rewrite)
 	// no_func && eFunction / no_const && eConstant / struct && eConstant
 	if noFunc && tt == TermFunction {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if noConst && tt == TermConstant {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if typ != nil && typ.IsStruct() && tt == TermConstant {
 		// was soft invent TermVariable — C++ assert sticky, not rewrite
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// Expression.cpp:176–178 / 213 — always cg_context.expr_depth (not a separate local)
 	_ = exprDepth
 	depth := cg.ExprDepth
 	if tt == MaxTermTypes {
-		tt = PickTermTypeSess(cgSess(cg), r, tables, opts, typ, noFunc, noConst, depth)
+		tt = PickTermTypeSess(sessFromCG(cg), r, tables, opts, typ, noFunc, noConst, depth)
 	}
 	// Expression.cpp:182 — ERROR_GUARD(nullptr) after term pick
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// Expression.cpp:177–178 — depth only via filter in PickTermType; ERROR_GUARD if MAX
@@ -1394,18 +1394,18 @@ func MakeRandomExpression(
 		if typ != nil {
 			simple := typ.IsSimple()
 			// residual ERROR sticky — no invent soft-const past IsSimple residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			if simple && typ.Simple() == EVoid {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return nil
 			}
 		}
 		// Expression.cpp:188 — Constant::make_random; ERROR_GUARD after
 		// no invent TermConstant shell with nil Con when make_random fails
-		con := MakeRandomSess(cgSess(cg), typ, opts, probs, r)
-		if con == nil || sessHasError(cgSess(cg)) {
+		con := MakeRandomSess(sessFromCG(cg), typ, opts, probs, r)
+		if con == nil || hasErrCG(cg) {
 			return nil
 		}
 		e = &Expression{Term: TermConstant, Con: con}
@@ -1427,14 +1427,14 @@ func MakeRandomExpression(
 	// Expression.cpp:213–218 — depth++ for Constant, Variable, or user FuncCall
 	// so siblings (comma/binary/params) see raised expr_depth via same CGContext&.
 	// Expression.cpp:217 — ERROR_GUARD(nullptr) before return
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	if e == nil {
 		// C++ would crash on e->term_type; factories return null only with error
 		return nil
 	}
-	if BumpsExprDepthSess(cgSess(cg), e) {
+	if BumpsExprDepthSess(sessFromCG(cg), e) {
 		cg.ExprDepth++
 	}
 	return e
@@ -1466,7 +1466,7 @@ func makeExpressionVariableFlags(
 	// ExpressionVariable.cpp always has RNG + live context + Type*
 	// sticky no invent var shell without them; nil typ must not soft-skip type filters
 	if r == nil || cg == nil || typ == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// nil VS: non-sticky soft re-pick (unit MaxTermTypes / return factory soft nil;
@@ -1478,29 +1478,29 @@ func makeExpressionVariableFlags(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// ExpressionVariable.cpp:61 — DEPTH_GUARD_BY_TYPE_RETURN(dtExpressionVariable, nullptr)
-	if DepthGuardByTypeSess(vsSess(vs), vs.Opts, DtExpressionVariable) == BadDepth {
+	if DepthGuardByTypeSess(sessFromVS(vs), vs.Opts, DtExpressionVariable) == BadDepth {
 		return nil
 	}
 	// ExpressionVariable.cpp:67–69 — snapshot effects for visit_facts failure restore
 	var preAccum, preStm Effect
 	if cg.EffectAccum != nil {
-		preAccum = cg.EffectAccum.CloneSess(cgSess(cg))
+		preAccum = cg.EffectAccum.CloneSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-expr past EffectAccum Clone residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 	}
-	preStm = cg.EffectStm.CloneSess(cgSess(cg))
+	preStm = cg.EffectStm.CloneSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent soft-expr past EffectStm Clone residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// ExpressionVariable.cpp:71–132 — do { select; filters; visit_facts } while (true).
@@ -1511,7 +1511,7 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
 		v := vs.SelectMustUseVar(r, AccessRead, *cg, typ, qfer)
 		// residual ERROR sticky — no invent fall through soft select past must-use hole
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preAccum
 			}
@@ -1522,7 +1522,7 @@ func makeExpressionVariableFlags(
 			// ExpressionVariable.cpp:77–78 — select(..., dummy, eFlexible)
 			v = vs.SelectWithInvalid(AccessRead, *cg, typ, qfer, r, MatchFlexible, dummy)
 			// residual ERROR sticky — no invent soft-continue / create past select hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1548,7 +1548,7 @@ func makeExpressionVariableFlags(
 		// Variable::type always live; incomplete type IR fails closed sticky (no invent
 		// soft re-pick past hole candidate as if absent)
 		if v.Type == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preAccum
 			}
@@ -1558,7 +1558,7 @@ func makeExpressionVariableFlags(
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent READ var expr past broken array shell)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preAccum
 			}
@@ -1567,9 +1567,9 @@ func makeExpressionVariableFlags(
 		}
 		// ExpressionVariable.cpp:93–94 — no float var for non-float want
 		// C++ continue without dummy.push_back (only validate/visit fail push dummy)
-		if !typ.IsFloatSess(cgSess(cg)) && v.Type.IsFloatSess(cgSess(cg)) {
+		if !typ.IsFloatSess(sessFromCG(cg)) && v.Type.IsFloatSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1579,7 +1579,7 @@ func makeExpressionVariableFlags(
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue non-float filter past IsFloat residual false path
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preAccum
 			}
@@ -1590,9 +1590,9 @@ func makeExpressionVariableFlags(
 		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
 		// continue without dummy (ExpressionVariable.cpp:97–100)
 		if asParam {
-			isArg := v.IsArgumentSess(cgSess(cg))
+			isArg := v.IsArgumentSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-continue past IsArgument residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1601,7 +1601,7 @@ func makeExpressionVariableFlags(
 			}
 			if isArg && v.Type.IsDereferencedFrom(typ) {
 				// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preAccum
 					}
@@ -1611,7 +1611,7 @@ func makeExpressionVariableFlags(
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom residual false
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1622,18 +1622,18 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
 		// continue without dummy
 		if !vs.Opts.AddrTakenOfLocals {
-			isArg := v.IsArgumentSess(cgSess(cg))
+			isArg := v.IsArgumentSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-continue past IsArgument residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
 				cg.EffectStm = preStm
 				return nil
 			}
-			isLoc := v.IsLocalSess(cgSess(cg))
+			isLoc := v.IsLocalSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-continue past IsLocal residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1642,7 +1642,7 @@ func makeExpressionVariableFlags(
 			}
 			if (isArg || isLoc) && v.Type.IsDereferencedFrom(typ) {
 				// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preAccum
 					}
@@ -1652,7 +1652,7 @@ func makeExpressionVariableFlags(
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom residual false
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1664,25 +1664,25 @@ func makeExpressionVariableFlags(
 		// continue without dummy
 		if asReturn && vs.Opts.NoReturnDeadPointer {
 			if v.Type == nil || typ == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
 				cg.EffectStm = preStm
 				return nil
 			}
-			lv := v.Type.IndirectLevelSess(cgSess(cg))
+			lv := v.Type.IndirectLevelSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-filter past subject IndirectLevel residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
 				cg.EffectStm = preStm
 				return nil
 			}
-			lw := typ.IndirectLevelSess(cgSess(cg))
+			lw := typ.IndirectLevelSess(sessFromCG(cg))
 			// residual ERROR sticky — no invent soft-filter past desired IndirectLevel residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1694,7 +1694,7 @@ func makeExpressionVariableFlags(
 			if cg.FM != nil {
 				// incomplete GlobalFacts fail closed sticky (no invent soft-skip local-ptr filter)
 				if !FactsComplete(cg.FM.GlobalFacts) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+					noteErrCG(cg, ErrGeneric)
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preAccum
 					}
@@ -1703,9 +1703,9 @@ func makeExpressionVariableFlags(
 				}
 				facts = cg.FM.GlobalFacts
 			}
-			if IsPointingToLocalsSess(cgSess(cg), v, cg.CurrentBlock(), indirection, facts) {
+			if IsPointingToLocalsSess(sessFromCG(cg), v, cg.CurrentBlock(), indirection, facts) {
 				// residual ERROR sticky — no invent soft-continue past local-ptr hole
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preAccum
 					}
@@ -1719,7 +1719,7 @@ func makeExpressionVariableFlags(
 		var facts []*FactPointTo
 		if cg.FM != nil {
 			if !FactsComplete(cg.FM.GlobalFacts) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1728,9 +1728,9 @@ func makeExpressionVariableFlags(
 			}
 			facts = cg.FM.GlobalFacts
 		}
-		if OpportunisticValidateSess(cgSess(cg), r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
+		if OpportunisticValidateSess(sessFromCG(cg), r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
 			// residual ERROR sticky — no invent soft-continue past validate hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1741,7 +1741,7 @@ func makeExpressionVariableFlags(
 			continue
 		}
 		// ExpressionVariable.cpp:80 ERROR_GUARD after select (sticky)
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preAccum
 			}
@@ -1754,7 +1754,7 @@ func makeExpressionVariableFlags(
 		probe := &Expression{Term: TermVariable, Var: v, ExprType: typ}
 		if !cg.VisitFactsExpressionVariable(probe, vs.Opts) {
 			// residual ERROR sticky — no invent soft-continue past visit_facts hard IR hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -1771,18 +1771,18 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:122–123
 		// VisitFactsExpressionVariable already required complete probe type
 		ev := probe
-		if ind0, iok := probe.IndirectLevelCompleteSess(cgSess(cg)); iok && ind0 == 0 {
+		if ind0, iok := probe.IndirectLevelCompleteSess(sessFromCG(cg)); iok && ind0 == 0 {
 			ev = &Expression{Term: TermVariable, Var: v, ExprType: v.Type}
 		}
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
-		deref, _ := ev.IndirectLevelCompleteSess(cgSess(cg))
+		deref, _ := ev.IndirectLevelCompleteSess(sessFromCG(cg))
 		if deref > 0 {
-			bk := sessBK(cgSess(cg))
-			IncrCounterSess(cgSess(cg), &bk.readDereferenceCnts, deref)
+			bk := sessBK(sessFromCG(cg))
+			IncrCounterSess(sessFromCG(cg), &bk.readDereferenceCnts, deref)
 		} else if deref < 0 {
-			RecordAddressTakenSess(cgSess(cg), v)
+			RecordAddressTakenSess(sessFromCG(cg), v)
 		}
-		RecordVolatileAccessSess(cgSess(cg), v, deref, false)
+		RecordVolatileAccessSess(sessFromCG(cg), v, deref, false)
 		return ev
 	}
 	return nil
@@ -1968,7 +1968,7 @@ func makeExpressionFuncall(
 ) *Expression {
 	// ExpressionFuncall always has RNG + CGContext; sticky no invent funcall shell without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// ExpressionFuncall.cpp:75 — get_fact_mgr always live; non-sticky soft re-pick without FM
@@ -1980,7 +1980,7 @@ func makeExpressionFuncall(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// ExpressionFuncall.cpp:66+ — no DEPTH_GUARD here (guard is on Expression::make_random)
@@ -1994,7 +1994,7 @@ func makeExpressionFuncall(
 	if typ != nil {
 		simple := typ.IsSimple()
 		// residual ERROR sticky — no invent soft-std path past IsSimple residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		if !simple || typ.Simple() == EVoid {
@@ -2004,20 +2004,20 @@ func makeExpressionFuncall(
 	// ExpressionFuncall.cpp:75–78 — snapshot effects and facts for failed invocation
 	var preAccum Effect
 	if cg.EffectAccum != nil {
-		preAccum = cg.EffectAccum.CloneSess(cgSess(cg))
+		preAccum = cg.EffectAccum.CloneSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-funcall past EffectAccum Clone residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 	}
-	preStm := cg.EffectStm.CloneSess(cgSess(cg))
+	preStm := cg.EffectStm.CloneSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent soft-funcall past EffectStm Clone residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// incomplete GlobalFacts/UnionFacts fail closed sticky (no invent cleaned snapshot)
 	if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// ExpressionFuncall.cpp:78 — vector<const Fact *> facts_copy = fm->global_facts
@@ -2030,7 +2030,7 @@ func makeExpressionFuncall(
 	unionCopy := append([]*FactUnion(nil), cg.FM.UnionFacts...)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	// ExpressionFuncall.cpp:82 — ERROR_GUARD(nullptr) before fi->failed
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preAccum
 		}

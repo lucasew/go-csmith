@@ -21,18 +21,18 @@ func MakeExpressionComma(
 ) *Expression {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent comma / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// ExpressionComma.cpp:58–61 — same CGContext&; make_random bumps expr_depth for siblings
@@ -41,14 +41,14 @@ func MakeExpressionComma(
 	// ExpressionComma.cpp:60–61 — rhs type/qfer, no_func=false, no_const=false
 	rhs := MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, false, MaxTermTypes, cg.ExprDepth)
 	// no soft TermVariable/TermConstant retries (C++ uses results directly)
-	if lhs == nil || rhs == nil || sessHasError(cgSess(cg)) {
+	if lhs == nil || rhs == nil || hasErrCG(cg) {
 		return nil
 	}
 	// ExpressionComma.cpp:62–64 — cast_if_needed when lang_cpp (optional for C null ptrs)
 	if opts.LangCPP {
-		castIfNeeded(cgSess(cg), rhs)
+		castIfNeeded(sessFromCG(cg), rhs)
 		// residual ERROR sticky — no invent complete comma past cast/GetType residual hole
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 	}

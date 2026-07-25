@@ -94,9 +94,11 @@ type FactMgr struct {
 
 // fmSess returns fm.Sess. Nil fm → unit-test ambient.
 // Non-nil fm must have Sess set (NewFactMgrSess always installs).
+// fmSess returns fm.Sess. Nil fm panics — no silent ambient dual-fill.
+// Nil-receiver sticky: noteErrFM (explicit testAmbientSession).
 func fmSess(fm *FactMgr) *Session {
 	if fm == nil {
-		return testAmbientSession
+		panic("fmSess: nil FactMgr")
 	}
 	if fm.Sess == nil {
 		panic("fmSess: Sess unset (use NewFactMgrSess)")
@@ -139,12 +141,12 @@ func factHasL233MayNull(facts []*FactPointTo) bool {
 // l_233 may-null is dropped by a full slice replacement (seed-2 first_div 10107).
 func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if os.Getenv("CSMITH_DEBUG_FACTS") != "" && factHasL233MayNull(fm.GlobalFacts) && !factHasL233MayNull(facts) {
 		depth := uint64(0)
-		if r := sessRng(fmSess(fm)); r != nil {
+		if r := sessRng(sessFromFM(fm)); r != nil {
 			depth = r.RandDepth()
 		}
 		fn := "?"
@@ -177,7 +179,7 @@ func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 // FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.SetMapFactsInPair(stmID, facts, fm.UnionFacts)
@@ -187,7 +189,7 @@ func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 // FactMgr.cpp set_fact_in — one FactVec assignment covers both categories.
 func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts []*FactUnion) {
 	if fm == nil || StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapFactsIn == nil {
@@ -196,8 +198,8 @@ func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts
 	if fm.MapUnionFactsIn == nil {
 		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
 	}
-	fm.MapFactsIn[stmID] = storeFactMapEntrySess(fmSess(fm), facts)
-	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntrySess(fmSess(fm), unionFacts)
+	fm.MapFactsIn[stmID] = storeFactMapEntrySess(sessFromFM(fm), facts)
+	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntrySess(sessFromFM(fm), unionFacts)
 }
 
 // SetMapFactsOut records post-statement facts.
@@ -206,7 +208,7 @@ func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts
 // Prefer SetMapFactsOutForBlock for Block* so parent==nullptr filtering applies.
 func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.SetMapFactsOutPair(stmID, facts, fm.UnionFacts)
@@ -221,17 +223,17 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 // skipping remove_function_local_facts left param pointees live after callee return.
 func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 	if fm == nil || b == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if StmIDUnset(b.StmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !FactsComplete(facts) {
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -240,11 +242,11 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 	if b.Parent == nil {
 		// stm is the body; is_var_on_stack uses stm->parent (== nil) so only params
 		// match as stack subjects; mark_func_end still marks param pointees garbage.
-		cp = RemoveFunctionLocalFactsAtSess(fmSess(fm), facts, b.Func, b.Parent)
+		cp = RemoveFunctionLocalFactsAtSess(sessFromFM(fm), facts, b.Func, b.Parent)
 		if !FactsComplete(cp) {
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
@@ -256,35 +258,35 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 	// (Block post_creation keeps pre-OOS live during find_fixed_point).
 	if !UnionFactsComplete(fm.UnionFacts) {
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
-	outU := CloneUnionFactSliceDeepSess(fmSess(fm), fm.UnionFacts)
+	outU := CloneUnionFactSliceDeepSess(sessFromFM(fm), fm.UnionFacts)
 	if !UnionFactsComplete(outU) {
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
 	if len(b.LocalVars) > 0 {
-		UpdateUnionFactsForOOSVarsSess(fmSess(fm), b.LocalVars, &outU)
+		UpdateUnionFactsForOOSVarsSess(sessFromFM(fm), b.LocalVars, &outU)
 		if !UnionFactsComplete(outU) {
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
 	}
 	if b.Parent == nil && b.Func != nil {
-		outU = RemoveFunctionLocalUnionFactsAtSess(fmSess(fm), outU, b.Func, b.Parent)
+		outU = RemoveFunctionLocalUnionFactsAtSess(sessFromFM(fm), outU, b.Func, b.Parent)
 		if !UnionFactsComplete(outU) {
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
@@ -295,7 +297,7 @@ func (fm *FactMgr) SetMapFactsOutForBlock(b *Block, facts []*FactPointTo) {
 // SetMapFactsOutPair stores map_facts_out point-to + eUnionWrite partitions together.
 func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFacts []*FactUnion) {
 	if fm == nil || StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapFactsOut == nil {
@@ -304,8 +306,8 @@ func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFact
 	if fm.MapUnionFactsOut == nil {
 		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
-	fm.MapFactsOut[stmID] = storeFactMapEntrySess(fmSess(fm), facts)
-	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntrySess(fmSess(fm), unionFacts)
+	fm.MapFactsOut[stmID] = storeFactMapEntrySess(sessFromFM(fm), facts)
+	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntrySess(sessFromFM(fm), unionFacts)
 }
 
 // storeFactMapEntry normalizes fact-map values so incomplete is not confused with
@@ -359,11 +361,11 @@ func storeUnionFactMapEntrySess(s *Session, facts []*FactUnion) []*FactUnion {
 // FactMgr + live stm_id always required; sticky IncompleteUnionFactSlice past hole.
 func (fm *FactMgr) GetMapUnionFactsIn(stmID int) []*FactUnion {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if fm.MapUnionFactsIn == nil {
@@ -381,11 +383,11 @@ func (fm *FactMgr) GetMapUnionFactsIn(stmID int) []*FactUnion {
 // GetMapUnionFactsOut returns the eUnionWrite partition of map_facts_out[stm].
 func (fm *FactMgr) GetMapUnionFactsOut(stmID int) []*FactUnion {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if fm.MapUnionFactsOut == nil {
@@ -412,7 +414,7 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	pt := fm.GetMapFactsIn(stmID)
@@ -420,18 +422,18 @@ func (fm *FactMgr) AssignGlobalFactsFromMapIn(stmID int) {
 	if !FactsComplete(pt) || !UnionFactsComplete(un) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
-	fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), pt), "auto_map_in_assign")
+	fm.SetGlobalFacts(CloneFactSliceSess(sessFromFM(fm), pt), "auto_map_in_assign")
 	// Deep install: live lattice must not alias map_facts_in FactUnion objects
 	// (renew/join replace or mutate; maps must retain historical arm/entry lattice).
-	cl := CloneUnionFactSliceDeepSess(fmSess(fm), un)
-	if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
+	cl := CloneUnionFactSliceDeepSess(sessFromFM(fm), un)
+	if hasErrFM(fm) || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -454,7 +456,7 @@ func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	pt := fm.GetMapFactsOut(stmID)
@@ -462,16 +464,16 @@ func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 	if !FactsComplete(pt) || !UnionFactsComplete(un) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
-	fm.SetGlobalFacts(CloneFactSliceSess(fmSess(fm), pt), "auto_map_out_assign")
-	cl := CloneUnionFactSliceDeepSess(fmSess(fm), un)
-	if sessHasError(fmSess(fm)) || !UnionFactsComplete(cl) {
+	fm.SetGlobalFacts(CloneFactSliceSess(sessFromFM(fm), pt), "auto_map_out_assign")
+	cl := CloneUnionFactSliceDeepSess(sessFromFM(fm), un)
+	if hasErrFM(fm) || !UnionFactsComplete(cl) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -490,11 +492,11 @@ func (fm *FactMgr) AssignGlobalFactsFromMapOut(stmID int) {
 // (non-sticky local map holes for soft re-pick factories).
 func (fm *FactMgr) GetMapFactsIn(stmID int) []*FactPointTo {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if fm.MapFactsIn == nil {
@@ -516,11 +518,11 @@ func (fm *FactMgr) GetMapFactsIn(stmID int) []*FactPointTo {
 // Missing live key → complete empty {}. Incomplete stored slots stay markers.
 func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if fm.MapFactsOut == nil {
@@ -539,11 +541,11 @@ func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
 // FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 func (fm *FactMgr) GetMapFactsInFinal(stmID int) []*FactPointTo {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if fm.MapFactsInFinal == nil {
@@ -562,11 +564,11 @@ func (fm *FactMgr) GetMapFactsInFinal(stmID int) []*FactPointTo {
 // FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 func (fm *FactMgr) GetMapFactsOutFinal(stmID int) []*FactPointTo {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if fm.MapFactsOutFinal == nil {
@@ -590,7 +592,7 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 	if st != nil && st.Kind == StmtGoto {
 		destParent = st.GotoDestParent
 		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && fm != nil && fm.Func != nil {
-			destParent = FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, st.GotoDestStmID)
+			destParent = FindParentBlockOfStmIDSess(sessFromFM(fm), fm.Func, st.GotoDestStmID)
 		}
 	}
 	fm.SetMapFactsOutForStmtDest(st, facts, blk, destParent)
@@ -600,13 +602,13 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 // FactMgr + Statement always live; sticky (no invent soft-skip set_fact_out past hole).
 func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk, destParent *Block) {
 	if fm == nil || st == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent silent
 	// set_fact_out success without map entry / soft re-pick past missing out)
 	if StmIDUnset(st.StmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// incomplete source facts fail closed sticky — hole marker (not SetMapFactsOut(nil)
@@ -620,10 +622,10 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
-	cp := CloneFactSliceSess(fmSess(fm), facts)
+	cp := CloneFactSliceSess(sessFromFM(fm), facts)
 	// FactMgr.cpp:257–274 — set_fact_out filters full FactVec (ePointTo + eUnionWrite).
 	// Soft invent was PT-only RemoveLoopLocalFacts / RemoveFunctionLocalFacts then
 	// SetMapFactsOut pairing unfiltered live UnionFacts → continue/break map_out kept
@@ -639,13 +641,13 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
-	outU := CloneUnionFactSliceDeepSess(fmSess(fm), fm.UnionFacts)
-	if sessHasError(fmSess(fm)) || !UnionFactsComplete(outU) {
+	outU := CloneUnionFactSliceDeepSess(sessFromFM(fm), fm.UnionFacts)
+	if hasErrFM(fm) || !UnionFactsComplete(outU) {
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
 		}
@@ -654,8 +656,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -665,13 +667,13 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	switch st.Kind {
 	case StmtContinue, StmtBreak:
 		// FactMgr.cpp:257–262 — remove_loop_local_facts(s, facts_copy) full FactVec
-		cp = RemoveLoopLocalFactsForStmtSess(fmSess(fm), cp, st, blk)
-		outU = RemoveLoopLocalUnionFactsForStmtSess(fmSess(fm), outU, st, blk)
+		cp = RemoveLoopLocalFactsForStmtSess(sessFromFM(fm), cp, st, blk)
+		outU = RemoveLoopLocalUnionFactsForStmtSess(sessFromFM(fm), outU, st, blk)
 	case StmtReturn:
 		// FactMgr.cpp:268–270 — remove_function_local_facts(facts_copy, s)
 		// stack check uses s->parent (blk); no invent f.Body-only walk
-		cp = RemoveFunctionLocalFactsAtSess(fmSess(fm), cp, fm.Func, blk)
-		outU = RemoveFunctionLocalUnionFactsAtSess(fmSess(fm), outU, fm.Func, blk)
+		cp = RemoveFunctionLocalFactsAtSess(sessFromFM(fm), cp, fm.Func, blk)
+		outU = RemoveFunctionLocalUnionFactsAtSess(sessFromFM(fm), outU, fm.Func, blk)
 	case StmtGoto:
 		// FactMgr.cpp:263–266 — update_facts_for_dest(facts, facts_copy, sg->dest)
 		// Full FactVec: ePointTo + eUnionWrite both OOS-drop subjects not visible
@@ -686,7 +688,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 			dp = st.GotoDestParent
 		}
 		if dp == nil && !StmIDUnset(st.GotoDestStmID) && fm.Func != nil {
-			dp = FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, st.GotoDestStmID)
+			dp = FindParentBlockOfStmIDSess(sessFromFM(fm), fm.Func, st.GotoDestStmID)
 		}
 		// FactMgr.cpp:427–428 assert(func); no soft invent RemoveFunctionLocalFacts
 		// when dest unknown (wrong filter vs update_facts_for_dest).
@@ -694,21 +696,21 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		if fm.Func == nil {
 			cp = IncompleteFactSlice()
 			outU = IncompleteUnionFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 		} else {
 			out := []*FactPointTo{}
-			UpdateFactsForDestSess(fmSess(fm), cp, &out, fm.Func, dp)
+			UpdateFactsForDestSess(sessFromFM(fm), cp, &out, fm.Func, dp)
 			cp = out
 			// FactMgr.cpp:450–482 — same OOS filter on eUnionWrite partition
 			var outUnions []*FactUnion
-			UpdateUnionFactsForDestSess(fmSess(fm), outU, &outUnions, fm.Func, dp)
+			UpdateUnionFactsForDestSess(sessFromFM(fm), outU, &outUnions, fm.Func, dp)
 			outU = outUnions
 		}
 	default:
 		// FactMgr.cpp:268 — eReturn || s->parent == nullptr → remove function locals
 		if blk == nil {
-			cp = RemoveFunctionLocalFactsAtSess(fmSess(fm), cp, fm.Func, nil)
-			outU = RemoveFunctionLocalUnionFactsAtSess(fmSess(fm), outU, fm.Func, nil)
+			cp = RemoveFunctionLocalFactsAtSess(sessFromFM(fm), cp, fm.Func, nil)
+			outU = RemoveFunctionLocalUnionFactsAtSess(sessFromFM(fm), outU, fm.Func, nil)
 		}
 	}
 	// incomplete after filter/dest — store hole sticky (no invent complete out map)
@@ -721,8 +723,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -821,12 +823,12 @@ func FindStmtByIDSess(s *Session, f *Function, stmID int) *Stmt {
 // FactMgr + Statement + Fact always live; sticky (no invent soft-skip append past hole).
 func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	if fm == nil || st == nil || fact == nil || fact.Var == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// StmID 0 fails closed sticky (no invent silent add_fact_out without map entry)
 	if StmIDUnset(st.StmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// ensure map exists before fail-closed writes
@@ -836,70 +838,70 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	// incomplete subject fact — sticky hole marker (not soft-skip or invent cleaned clone)
 	if !FactsComplete([]*FactPointTo{fact}) {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// already incomplete out map — stay incomplete sticky (no invent append onto hole)
 	if prev, ok := fm.MapFactsOut[st.StmID]; ok && !FactsComplete(prev) {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	f := fm.Func
 	// visibility needs complete stack for non-globals
-	if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
+	if f != nil && !fact.Var.IsGlobalSess(sessFromFM(fm)) {
 		// residual ERROR sticky — no invent soft-skip AddFactOut past IsGlobal hole
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
 		if !f.StackScanComplete(stParent) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			// residual ERROR sticky — no invent soft-skip AddFactOut past StackScan residual
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
-		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
+		if !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, stParent) {
 			// residual ERROR sticky — no invent soft-skip not-visible past hard IR hole
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			}
 			return
 		}
 		// residual ERROR sticky — no invent append past IsVarVisible hole
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
 	} else if f != nil {
 		// residual from IsGlobal true path
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
-		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
-			if sessHasError(fmSess(fm)) {
+		if !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, stParent) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
 	}
 	switch st.Kind {
 	case StmtReturn:
-		if !fact.Var.IsGlobalSess(fmSess(fm)) {
+		if !fact.Var.IsGlobalSess(sessFromFM(fm)) {
 			// residual ERROR sticky — no invent soft-drop return non-global past IsGlobal hole
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
@@ -909,27 +911,27 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		for b != nil && !b.Looping {
 			b = b.Parent
 		}
-		if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
-			if sessHasError(fmSess(fm)) {
+		if f != nil && !fact.Var.IsGlobalSess(sessFromFM(fm)) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
 			if !f.StackScanComplete(b) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
-		} else if sessHasError(fmSess(fm)) {
+		} else if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
-		if f != nil && !f.IsVarVisibleSess(fmSess(fm), fact.Var, b) {
-			if sessHasError(fmSess(fm)) {
+		if f != nil && !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, b) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
@@ -938,32 +940,32 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		// Prefer GotoDestParent; else resolve parent of GotoDestStmID via function blocks.
 		destParent := st.GotoDestParent
 		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && f != nil {
-			destParent = FindParentBlockOfStmIDSess(fmSess(fm), f, st.GotoDestStmID)
+			destParent = FindParentBlockOfStmIDSess(sessFromFM(fm), f, st.GotoDestStmID)
 			// residual ERROR sticky — no invent soft-skip dest parent miss past hole
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
 		}
 		if destParent != nil && f != nil {
-			if !fact.Var.IsGlobalSess(fmSess(fm)) && !f.StackScanComplete(destParent) {
-				if !sessHasError(fmSess(fm)) {
-					sessNoteError(fmSess(fm), ErrGeneric)
+			if !fact.Var.IsGlobalSess(sessFromFM(fm)) && !f.StackScanComplete(destParent) {
+				if !hasErrFM(fm) {
+					noteErrFM(fm, ErrGeneric)
 				}
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
-			if !f.IsVarVisibleSess(fmSess(fm), fact.Var, destParent) {
-				if sessHasError(fmSess(fm)) {
+			if !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, destParent) {
+				if hasErrFM(fm) {
 					fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				}
 				return
 			}
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
@@ -971,13 +973,13 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	}
 	cl := fact.Clone()
 	// residual ERROR sticky — no invent soft-append past Clone residual
-	if sessHasError(fmSess(fm)) {
+	if hasErrFM(fm) {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		return
 	}
 	if cl == nil {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.MapFactsOut[st.StmID] = append(fm.MapFactsOut[st.StmID], cl)
@@ -992,11 +994,11 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 // post_loop break invent BOTTOM → VisitFacts nonreadable).
 func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 	if fm == nil || st == nil || fact == nil || fact.Var == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if StmIDUnset(st.StmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapUnionFactsOut == nil {
@@ -1004,62 +1006,62 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 	}
 	if !UnionFactsComplete([]*FactUnion{fact}) {
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if prev, ok := fm.MapUnionFactsOut[st.StmID]; ok && !UnionFactsComplete(prev) {
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	f := fm.Func
-	if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
-		if sessHasError(fmSess(fm)) {
+	if f != nil && !fact.Var.IsGlobalSess(sessFromFM(fm)) {
+		if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
 		if !f.StackScanComplete(stParent) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
-		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
-			if sessHasError(fmSess(fm)) {
+		if !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, stParent) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
 	} else if f != nil {
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
-		if !f.IsVarVisibleSess(fmSess(fm), fact.Var, stParent) {
-			if sessHasError(fmSess(fm)) {
+		if !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, stParent) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
 	}
 	switch st.Kind {
 	case StmtReturn:
-		if !fact.Var.IsGlobalSess(fmSess(fm)) {
-			if sessHasError(fmSess(fm)) {
+		if !fact.Var.IsGlobalSess(sessFromFM(fm)) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
@@ -1069,71 +1071,71 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 		for b != nil && !b.Looping {
 			b = b.Parent
 		}
-		if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
-			if sessHasError(fmSess(fm)) {
+		if f != nil && !fact.Var.IsGlobalSess(sessFromFM(fm)) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
 			}
 			if !f.StackScanComplete(b) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
-		} else if sessHasError(fmSess(fm)) {
+		} else if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
-		if f != nil && !f.IsVarVisibleSess(fmSess(fm), fact.Var, b) {
-			if sessHasError(fmSess(fm)) {
+		if f != nil && !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, b) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
 			return
 		}
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
 		}
 	case StmtGoto:
 		destParent := st.GotoDestParent
 		if destParent == nil && !StmIDUnset(st.GotoDestStmID) && f != nil {
-			destParent = FindParentBlockOfStmIDSess(fmSess(fm), f, st.GotoDestStmID)
-			if sessHasError(fmSess(fm)) {
+			destParent = FindParentBlockOfStmIDSess(sessFromFM(fm), f, st.GotoDestStmID)
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
 			}
 		}
 		if destParent != nil && f != nil {
-			if !fact.Var.IsGlobalSess(fmSess(fm)) && !f.StackScanComplete(destParent) {
-				if !sessHasError(fmSess(fm)) {
-					sessNoteError(fmSess(fm), ErrGeneric)
+			if !fact.Var.IsGlobalSess(sessFromFM(fm)) && !f.StackScanComplete(destParent) {
+				if !hasErrFM(fm) {
+					noteErrFM(fm, ErrGeneric)
 				}
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
 			}
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
 			}
-			if !f.IsVarVisibleSess(fmSess(fm), fact.Var, destParent) {
-				if sessHasError(fmSess(fm)) {
+			if !f.IsVarVisibleSess(sessFromFM(fm), fact.Var, destParent) {
+				if hasErrFM(fm) {
 					fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				}
 				return
 			}
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
 			}
 		}
 	}
 	cl := fact.Clone()
-	if sessHasError(fmSess(fm)) {
+	if hasErrFM(fm) {
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 		return
 	}
 	if cl == nil {
 		fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.MapUnionFactsOut[st.StmID] = append(fm.MapUnionFactsOut[st.StmID], cl)
@@ -1309,7 +1311,7 @@ func UpdateUnionFactsForDestSess(s *Session, factsIn []*FactUnion, factsOut *[]*
 
 func (fm *FactMgr) ClearMapVisited() {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapVisited == nil {
@@ -1328,7 +1330,7 @@ func (fm *FactMgr) ClearMapVisited() {
 // makeup, no soft re-pick past wiped GlobalFacts).
 func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// Point-to-only restore keeps current UnionFacts (legacy tests). Generation
@@ -1341,18 +1343,18 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 // (ePointTo + eUnionWrite together).
 func (fm *FactMgr) RestoreFactsPair(oldPT []*FactPointTo, oldUnion []*FactUnion) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// incomplete either partition — wipe both sticky
 	if (oldPT != nil && !FactsComplete(oldPT)) || !UnionFactsComplete(oldUnion) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.restoreFactsPT(oldPT)
-	if sessHasError(fmSess(fm)) || !FactsComplete(fm.GlobalFacts) {
+	if hasErrFM(fm) || !FactsComplete(fm.GlobalFacts) {
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
 	}
@@ -1372,11 +1374,11 @@ func (fm *FactMgr) RestoreFactsPair(oldPT []*FactPointTo, oldUnion []*FactUnion)
 		workU = []*FactUnion{}
 	}
 	// Pull union subjects present in live but missing from old (created mid-body).
-	if !makeupNewUnionFactsSess(fmSess(fm), &workU, fm.UnionFacts) {
+	if !makeupNewUnionFactsSess(sessFromFM(fm), &workU, fm.UnionFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -1386,13 +1388,13 @@ func (fm *FactMgr) RestoreFactsPair(oldPT []*FactPointTo, oldUnion []*FactUnion)
 // restoreFactsPT is the point-to half of restore_facts (FactMgr.cpp:489–492).
 func (fm *FactMgr) restoreFactsPT(oldFacts []*FactPointTo) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// nil oldFacts is empty restore; non-nil with holes → fail closed sticky
 	if oldFacts != nil && !FactsComplete(oldFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:489–492 — makeup_new_var_facts(old_facts, global_facts);
@@ -1402,11 +1404,11 @@ func (fm *FactMgr) restoreFactsPT(oldFacts []*FactPointTo) {
 	// FactMgr.cpp:489–492 only — makeup then assign. No invent re-join of live
 	// may-null into the restored snapshot (SPEC: no invent may-null reinject).
 	work := append([]*FactPointTo(nil), oldFacts...)
-	if !MakeupNewVarFactsSess(fmSess(fm), &work, fm.GlobalFacts) {
+	if !MakeupNewVarFactsSess(sessFromFM(fm), &work, fm.GlobalFacts) {
 		// incomplete GlobalFacts or mid-makeup hole — fail closed sticky
 		fm.GlobalFacts = IncompleteFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -1494,7 +1496,7 @@ func makeupNewUnionFactsSess(s *Session, oldFacts *[]*FactUnion, live []*FactUni
 
 func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapFactsInFinal == nil {
@@ -1514,7 +1516,7 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 		if badOut != 0 {
 			fm.MapFactsOutFinal[badOut] = IncompleteFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 	}
 	if firstTime {
 		for id, facts := range fm.MapFactsIn {
@@ -1523,14 +1525,14 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 				failClosedWipe(id, 0)
 				return
 			}
-			fm.MapFactsInFinal[id] = storeFactMapEntrySess(fmSess(fm), facts)
+			fm.MapFactsInFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts)
 		}
 		for id, facts := range fm.MapFactsOut {
 			if !FactsComplete(facts) {
 				failClosedWipe(0, id)
 				return
 			}
-			fm.MapFactsOutFinal[id] = storeFactMapEntrySess(fmSess(fm), facts)
+			fm.MapFactsOutFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts)
 		}
 		return
 	}
@@ -1544,15 +1546,15 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			return
 		}
 		// MergeFacts clears *facts sticky on incomplete mid-join
-		_ = MergeFactsSess(fmSess(fm), &facts1, facts2)
+		_ = MergeFactsSess(sessFromFM(fm), &facts1, facts2)
 		if !FactsComplete(facts1) {
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			failClosedWipe(id, 0)
 			return
 		}
-		fm.MapFactsInFinal[id] = storeFactMapEntrySess(fmSess(fm), facts1)
+		fm.MapFactsInFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts1)
 	}
 	for id, facts2 := range fm.MapFactsOut {
 		facts1 := fm.MapFactsOutFinal[id]
@@ -1560,15 +1562,15 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			failClosedWipe(0, id)
 			return
 		}
-		_ = MergeFactsSess(fmSess(fm), &facts1, facts2)
+		_ = MergeFactsSess(sessFromFM(fm), &facts1, facts2)
 		if !FactsComplete(facts1) {
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			failClosedWipe(0, id)
 			return
 		}
-		fm.MapFactsOutFinal[id] = storeFactMapEntrySess(fmSess(fm), facts1)
+		fm.MapFactsOutFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts1)
 	}
 }
 
@@ -1587,14 +1589,14 @@ func (fm *FactMgr) BackupStmFactMaps(
 	unionIn, unionOut map[int][]*FactUnion,
 ) {
 	if fm == nil || st == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if factsIn == nil || factsOut == nil || unionIn == nil || unionOut == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
-	blks := GetBlocksStmtSess(fmSess(fm), st)
+	blks := GetBlocksStmtSess(sessFromFM(fm), st)
 	incomplete := false
 	for _, b := range blks {
 		if b == nil {
@@ -1610,7 +1612,7 @@ func (fm *FactMgr) BackupStmFactMaps(
 			unionIn[st.StmID] = IncompleteUnionFactSlice()
 			unionOut[st.StmID] = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	for _, b := range blks {
@@ -1618,16 +1620,16 @@ func (fm *FactMgr) BackupStmFactMaps(
 	}
 	if !StmIDUnset(st.StmID) {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
-			factsIn[st.StmID] = storeFactMapEntrySess(fmSess(fm), in)
+			factsIn[st.StmID] = storeFactMapEntrySess(sessFromFM(fm), in)
 		}
 		if out, ok := fm.MapFactsOut[st.StmID]; ok {
-			factsOut[st.StmID] = storeFactMapEntrySess(fmSess(fm), out)
+			factsOut[st.StmID] = storeFactMapEntrySess(sessFromFM(fm), out)
 		}
 		if in, ok := fm.MapUnionFactsIn[st.StmID]; ok {
-			unionIn[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
+			unionIn[st.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), in)
 		}
 		if out, ok := fm.MapUnionFactsOut[st.StmID]; ok {
-			unionOut[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
+			unionOut[st.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), out)
 		}
 	}
 }
@@ -1640,21 +1642,21 @@ func (fm *FactMgr) backupBlockFactMaps(
 	unionIn, unionOut map[int][]*FactUnion,
 ) {
 	if b == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !StmIDUnset(b.StmID) {
 		if in, ok := fm.MapFactsIn[b.StmID]; ok {
-			factsIn[b.StmID] = storeFactMapEntrySess(fmSess(fm), in)
+			factsIn[b.StmID] = storeFactMapEntrySess(sessFromFM(fm), in)
 		}
 		if out, ok := fm.MapFactsOut[b.StmID]; ok {
-			factsOut[b.StmID] = storeFactMapEntrySess(fmSess(fm), out)
+			factsOut[b.StmID] = storeFactMapEntrySess(sessFromFM(fm), out)
 		}
 		if in, ok := fm.MapUnionFactsIn[b.StmID]; ok {
-			unionIn[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
+			unionIn[b.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), in)
 		}
 		if out, ok := fm.MapUnionFactsOut[b.StmID]; ok {
-			unionOut[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
+			unionOut[b.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), out)
 		}
 	}
 	for i := range b.Stmts {
@@ -1674,11 +1676,11 @@ func (fm *FactMgr) RestoreStmFactMaps(
 	unionIn, unionOut map[int][]*FactUnion,
 ) {
 	if fm == nil || st == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if factsIn == nil || factsOut == nil || unionIn == nil || unionOut == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapFactsIn == nil {
@@ -1693,7 +1695,7 @@ func (fm *FactMgr) RestoreStmFactMaps(
 	if fm.MapUnionFactsOut == nil {
 		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
-	blks := GetBlocksStmtSess(fmSess(fm), st)
+	blks := GetBlocksStmtSess(sessFromFM(fm), st)
 	incomplete := false
 	for _, b := range blks {
 		if b == nil {
@@ -1708,7 +1710,7 @@ func (fm *FactMgr) RestoreStmFactMaps(
 			fm.MapUnionFactsIn[st.StmID] = IncompleteUnionFactSlice()
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 		}
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	for _, b := range blks {
@@ -1716,22 +1718,22 @@ func (fm *FactMgr) RestoreStmFactMaps(
 	}
 	if !StmIDUnset(st.StmID) {
 		if in, ok := factsIn[st.StmID]; ok {
-			fm.MapFactsIn[st.StmID] = storeFactMapEntrySess(fmSess(fm), in)
+			fm.MapFactsIn[st.StmID] = storeFactMapEntrySess(sessFromFM(fm), in)
 		} else {
 			delete(fm.MapFactsIn, st.StmID)
 		}
 		if out, ok := factsOut[st.StmID]; ok {
-			fm.MapFactsOut[st.StmID] = storeFactMapEntrySess(fmSess(fm), out)
+			fm.MapFactsOut[st.StmID] = storeFactMapEntrySess(sessFromFM(fm), out)
 		} else {
 			delete(fm.MapFactsOut, st.StmID)
 		}
 		if in, ok := unionIn[st.StmID]; ok {
-			fm.MapUnionFactsIn[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
+			fm.MapUnionFactsIn[st.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), in)
 		} else {
 			delete(fm.MapUnionFactsIn, st.StmID)
 		}
 		if out, ok := unionOut[st.StmID]; ok {
-			fm.MapUnionFactsOut[st.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
+			fm.MapUnionFactsOut[st.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), out)
 		} else {
 			delete(fm.MapUnionFactsOut, st.StmID)
 		}
@@ -1746,27 +1748,27 @@ func (fm *FactMgr) restoreBlockFactMaps(
 	unionIn, unionOut map[int][]*FactUnion,
 ) {
 	if b == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !StmIDUnset(b.StmID) {
 		if in, ok := factsIn[b.StmID]; ok {
-			fm.MapFactsIn[b.StmID] = storeFactMapEntrySess(fmSess(fm), in)
+			fm.MapFactsIn[b.StmID] = storeFactMapEntrySess(sessFromFM(fm), in)
 		} else {
 			delete(fm.MapFactsIn, b.StmID)
 		}
 		if out, ok := factsOut[b.StmID]; ok {
-			fm.MapFactsOut[b.StmID] = storeFactMapEntrySess(fmSess(fm), out)
+			fm.MapFactsOut[b.StmID] = storeFactMapEntrySess(sessFromFM(fm), out)
 		} else {
 			delete(fm.MapFactsOut, b.StmID)
 		}
 		if in, ok := unionIn[b.StmID]; ok {
-			fm.MapUnionFactsIn[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), in)
+			fm.MapUnionFactsIn[b.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), in)
 		} else {
 			delete(fm.MapUnionFactsIn, b.StmID)
 		}
 		if out, ok := unionOut[b.StmID]; ok {
-			fm.MapUnionFactsOut[b.StmID] = storeUnionFactMapEntrySess(fmSess(fm), out)
+			fm.MapUnionFactsOut[b.StmID] = storeUnionFactMapEntrySess(sessFromFM(fm), out)
 		} else {
 			delete(fm.MapUnionFactsOut, b.StmID)
 		}
@@ -1783,14 +1785,14 @@ func (fm *FactMgr) restoreBlockFactMaps(
 // Incomplete in/out maps fail closed sticky IncompleteFactSlice.
 func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	if fm == nil || StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	in := fm.GetMapFactsIn(stmID)
 	out := fm.GetMapFactsOut(stmID)
 	if !FactsComplete(in) || !FactsComplete(out) {
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return IncompleteFactSlice()
 	}
@@ -1798,14 +1800,14 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	for _, f := range out {
 		// Fact* always live after FactsComplete
 		if f == nil || f.Var == nil {
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:659–662 — assert(prev_f); only changed when prev exists
 		// no soft invent "new out-only fact" as updated
 		prev := FindRelatedPointTo(in, f.Var)
 		// residual ERROR sticky — no invent soft-continue then partial updated past hole
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			return IncompleteFactSlice()
 		}
 		if prev == nil {
@@ -1813,11 +1815,11 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 		}
 		if !f.Equal(prev) {
 			// residual ERROR sticky — no invent soft-continue past Equal hole
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				return IncompleteFactSlice()
 			}
 			updated = append(updated, f)
-		} else if sessHasError(fmSess(fm)) {
+		} else if hasErrFM(fm) {
 			return IncompleteFactSlice()
 		}
 	}
@@ -1831,40 +1833,40 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 // Incomplete in/out maps fail closed sticky IncompleteFactSlice.
 func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	if fm == nil || StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	in := fm.GetMapFactsInFinal(stmID)
 	out := fm.GetMapFactsOutFinal(stmID)
 	if !FactsComplete(in) || !FactsComplete(out) {
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return IncompleteFactSlice()
 	}
 	var updated []*FactPointTo
 	for _, f := range out {
 		if f == nil || f.Var == nil {
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:676–677 — rv facts always listed (no pre-fact required)
-		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.MatchSess(fmSess(fm), f.Var) {
+		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.MatchSess(sessFromFM(fm), f.Var) {
 			// residual ERROR sticky — no invent soft-continue past Match hole
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				return IncompleteFactSlice()
 			}
 			updated = append(updated, f)
 			continue
 		}
 		// residual ERROR sticky from Match false path
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			return IncompleteFactSlice()
 		}
 		// FactMgr.cpp:679–682 — assert(prev_f); no soft invent missing prev as change
-		prev := FindRelatedPointToSess(fmSess(fm), in, f.Var)
+		prev := FindRelatedPointToSess(sessFromFM(fm), in, f.Var)
 		// residual ERROR sticky — no invent soft-continue then partial updated past hole
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			return IncompleteFactSlice()
 		}
 		if prev == nil {
@@ -1872,11 +1874,11 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 		}
 		if !f.Equal(prev) {
 			// residual ERROR sticky — no invent soft-continue past Equal hole
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				return IncompleteFactSlice()
 			}
 			updated = append(updated, f)
-		} else if sessHasError(fmSess(fm)) {
+		} else if hasErrFM(fm) {
 			return IncompleteFactSlice()
 		}
 	}
@@ -2210,7 +2212,7 @@ func filterFactsNotInVarsSess(s *Session, facts []*FactPointTo, drop []*Variable
 // seed-7 binary RHS ambient half-size choose_var ok pool vs upstream).
 func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	if fm == nil || StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapStmEffect == nil {
@@ -2233,11 +2235,11 @@ func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 // with the stored snapshot (mirrors GetMapAccumEffect).
 func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteEffect()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteEffect()
 	}
 	if fm.MapStmEffect == nil {
@@ -2264,7 +2266,7 @@ func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 // stm_visit_facts always records map_accum_effect even when visit returns false.
 func (fm *FactMgr) SetMapAccumEffect(stmID int, acc Effect) {
 	if fm == nil || StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if fm.MapAccumEffect == nil {
@@ -2277,7 +2279,7 @@ func (fm *FactMgr) SetMapAccumEffect(stmID int, acc Effect) {
 	// Nil map keys (broken IR) — sticky incomplete marker; do not invent pure empty
 	if !effectMapKeysComplete(acc.read) || !effectMapKeysComplete(acc.written) ||
 		!effectMapKeysComplete(acc.lhsWrite) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		fm.MapAccumEffect[stmID] = IncompleteEffect()
 		return
 	}
@@ -2293,11 +2295,11 @@ func (fm *FactMgr) SetMapAccumEffect(stmID int, acc Effect) {
 // only read; Go deep-copy prevents accidental shared-map mutation of the snapshot).
 func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteEffect()
 	}
 	if StmIDUnset(stmID) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return IncompleteEffect()
 	}
 	if fm.MapAccumEffect == nil {
@@ -2512,7 +2514,7 @@ func AbstractFactForVarInitSess(s *Session, v *Variable) (pt []*FactPointTo, un 
 
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// Type* always live for non-special subjects; specials Type-nil by design
@@ -2520,14 +2522,14 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if v.Type == nil {
 		if !IsSpecialPtr(v) {
 			fm.GlobalFacts = IncompleteFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
 	// recurse into aggregate fields (pointer members)
-	if !v.IsPointerSess(fmSess(fm)) && !v.Type.IsUnionSess(fmSess(fm)) {
+	if !v.IsPointerSess(sessFromFM(fm)) && !v.Type.IsUnionSess(sessFromFM(fm)) {
 		// residual ERROR sticky — no invent soft-continue field recurse past IsPointer residual false
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
@@ -2536,15 +2538,15 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				// incomplete FieldVars — clear partial aggregate makeup sticky
 				// (no invent soft re-pick AddNewVarFact success past holes)
 				fm.GlobalFacts = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
 			fm.AddNewVarFact(f)
 			// child may have cleared on hole / merge fail
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
-				if !sessHasError(fmSess(fm)) {
-					sessNoteError(fmSess(fm), ErrGeneric)
+				if !hasErrFM(fm) {
+					noteErrFM(fm, ErrGeneric)
 				}
 				return
 			}
@@ -2552,21 +2554,21 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		return
 	}
 	// residual ERROR sticky — no invent soft-continue pointer/union makeup past IsPointer residual true
-	if sessHasError(fmSess(fm)) {
+	if hasErrFM(fm) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// FactMgr.cpp:77–79 — only meta_facts that were registered
-	isPtr := v.IsPointerSess(fmSess(fm))
+	isPtr := v.IsPointerSess(sessFromFM(fm))
 	// residual ERROR sticky — no invent soft-skip makeup past IsPointer residual
-	if sessHasError(fmSess(fm)) {
+	if hasErrFM(fm) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
-	wantPT := MetaFactPointToEnabledSess(fmSess(fm)) && isPtr
-	wantUn := MetaFactUnionEnabledSess(fmSess(fm)) && v.Type != nil && v.Type.IsUnionSess(fmSess(fm))
+	wantPT := MetaFactPointToEnabledSess(sessFromFM(fm)) && isPtr
+	wantUn := MetaFactUnionEnabledSess(sessFromFM(fm)) && v.Type != nil && v.Type.IsUnionSess(sessFromFM(fm))
 	// residual ERROR sticky — no invent soft-skip makeup past IsUnion residual
-	if sessHasError(fmSess(fm)) {
+	if hasErrFM(fm) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
@@ -2576,7 +2578,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if wantPT {
 		rel := FindRelatedPointTo(fm.GlobalFacts, v)
 		// residual ERROR sticky — no invent soft-skip makeup past FindRelated residual
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
@@ -2587,7 +2589,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if wantUn {
 		relU := FindRelatedUnion(fm.UnionFacts, v)
 		// residual ERROR sticky — no invent soft-skip makeup past FindRelatedUnion residual
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
@@ -2595,12 +2597,12 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 			return
 		}
 	}
-	pt, un := AbstractFactForVarInitSess(fmSess(fm), v)
+	pt, un := AbstractFactForVarInitSess(sessFromFM(fm), v)
 	if wantPT {
 		// incomplete abstract must not invent skip (no fact to add) — sticky ERROR
 		if !FactsComplete(pt) {
 			fm.GlobalFacts = IncompleteFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
 		// Fact.cpp:94–95 assert(lvar_cnt==1) — no soft invent NewFactPointTo when empty
@@ -2608,13 +2610,13 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 			if f == nil {
 				// incomplete abstract list — clear partial GlobalFacts sticky
 				fm.GlobalFacts = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
-			merged := MergeFactIntoSess(fmSess(fm), fm.GlobalFacts, f)
+			merged := MergeFactIntoSess(sessFromFM(fm), fm.GlobalFacts, f)
 			if !FactsComplete(merged) {
 				fm.GlobalFacts = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
 			fm.SetGlobalFacts(merged, "auto_fact_mgr_1614")
@@ -2627,21 +2629,21 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		if !UnionFactsComplete(un) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			fm.GlobalFacts = IncompleteFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
 		for _, uf := range un {
 			if uf == nil {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				fm.GlobalFacts = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
-			merged := MergeUnionFactSess(fmSess(fm), fm.UnionFacts, uf)
+			merged := MergeUnionFactSess(sessFromFM(fm), fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				fm.GlobalFacts = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
 			fm.UnionFacts = merged
@@ -2659,15 +2661,15 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 // FactMgr + Variable always live; sticky (no invent soft-skip makeup past hole).
 func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if fm == nil || v == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:72 — assert(var->is_global()) when blk==nullptr
 	// no soft invent facts for non-global "global create" path
 	if blk == nil {
-		isG := v.IsGlobalSess(fmSess(fm))
+		isG := v.IsGlobalSess(sessFromFM(fm))
 		// residual ERROR sticky — no invent soft-skip makeup past IsGlobal residual
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			return
 		}
 		if !isG {
@@ -2677,7 +2679,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	// incomplete subject map before add — fail closed sticky (no invent push onto holes)
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:77–104 — abstract_fact_for_var_init; push into global_facts if
@@ -2694,8 +2696,8 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	fm.AddNewVarFact(v)
 	// AddNewVarFact may wipe GlobalFacts incomplete — stop map push sticky
 	if !FactsComplete(fm.GlobalFacts) {
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -2703,9 +2705,9 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	// results for maps, never the existing related GlobalFacts entry).
 	// Soft invent returned early on nil ptInit (union-only subjects) before the
 	// eUnionWrite map push below — mid-gen union globals never entered map_facts_in.
-	ptInit, unInitEarly := AbstractFactForVarInitSess(fmSess(fm), v)
+	ptInit, unInitEarly := AbstractFactForVarInitSess(sessFromFM(fm), v)
 	// residual ERROR sticky — no invent soft-skip map push past Abstract residual
-	if sessHasError(fmSess(fm)) {
+	if hasErrFM(fm) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		return
@@ -2715,8 +2717,8 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		// pure union) — skip ePointTo map push, still do eUnionWrite below.
 		if ptInit != nil {
 			fm.GlobalFacts = IncompleteFactSlice()
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
@@ -2728,19 +2730,19 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	for _, f := range toPush {
 		if f == nil {
 			fm.GlobalFacts = IncompleteFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
 		cl := f.Clone()
 		// residual ERROR sticky — no invent soft-push past Clone residual
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 		if cl == nil {
 			// incomplete PointTo on new fact — fail closed sticky
 			fm.GlobalFacts = IncompleteFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
 		// map_facts_in: stm in_block(blk) || blk==null
@@ -2750,7 +2752,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		// and would IncompleteFactSlice the out slot (generation poison).
 		if fm.MapFactsIn != nil {
 			for id := range fm.MapFactsIn {
-				if blk != nil && !stmtIDInBlockMapInSess(fmSess(fm), fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapInSess(sessFromFM(fm), fm.Func, id, blk) {
 					continue
 				}
 				// incomplete map slot — stay incomplete (no invent soft-append past hole)
@@ -2778,13 +2780,13 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				}
 				c2 := f.Clone()
 				// residual ERROR sticky — no invent soft-push past Clone residual
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					return
 				}
 				if c2 == nil {
 					fm.GlobalFacts = IncompleteFactSlice()
-					sessNoteError(fmSess(fm), ErrGeneric)
+					noteErrFM(fm, ErrGeneric)
 					return
 				}
 				fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)
@@ -2802,9 +2804,9 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			// read g_99 after l_1326=&g_99 then reassigned in else).
 			// AddFactOut already drops facts not visible at stm / goto dest.
 			for id := range fm.MapFactsOut {
-				st := FindStmtByIDSess(fmSess(fm), fm.Func, id)
+				st := FindStmtByIDSess(sessFromFM(fm), fm.Func, id)
 				// residual ERROR sticky — no invent soft-continue partial IncompleteFactSlice past FindStmt hole
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					return
 				}
@@ -2818,8 +2820,8 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					// FactMgr.cpp:283 — is_var_visible(var, stm); for Block, is_var_on_stack
 					// walks stm->parent (Block.cpp/Function.cpp:192).
 					if fm.Func != nil {
-						vis := fm.Func.IsVarVisibleSess(fmSess(fm), f.Var, b.Parent)
-						if sessHasError(fmSess(fm)) {
+						vis := fm.Func.IsVarVisibleSess(sessFromFM(fm), f.Var, b.Parent)
+						if hasErrFM(fm) {
 							fm.GlobalFacts = IncompleteFactSlice()
 							return
 						}
@@ -2833,27 +2835,27 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 						continue
 					}
 					c2 := f.Clone()
-					if sessHasError(fmSess(fm)) {
+					if hasErrFM(fm) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						return
 					}
 					if c2 == nil {
 						fm.GlobalFacts = IncompleteFactSlice()
-						sessNoteError(fmSess(fm), ErrGeneric)
+						noteErrFM(fm, ErrGeneric)
 						return
 					}
 					fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)
 					continue
 				}
-				parent := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, id)
+				parent := FindParentBlockOfStmIDSess(sessFromFM(fm), fm.Func, id)
 				// residual ERROR sticky — no invent soft-continue AddFactOut past parent residual hole
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					return
 				}
 				fm.AddFactOut(st, parent, f)
 				// residual ERROR sticky — AddFactOut fail-closed on incomplete IR
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					return
 				}
@@ -2872,16 +2874,16 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if !UnionFactsComplete(fm.UnionFacts) {
 		fm.UnionFacts = IncompleteUnionFactSlice()
 		fm.GlobalFacts = IncompleteFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
 	// Prefer first abstract's eUnionWrite (same call as PT); re-abstract only if nil.
 	unInit := unInitEarly
 	if unInit == nil {
-		_, unInit = AbstractFactForVarInitSess(fmSess(fm), v)
-		if sessHasError(fmSess(fm)) {
+		_, unInit = AbstractFactForVarInitSess(sessFromFM(fm), v)
+		if hasErrFM(fm) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
@@ -2891,8 +2893,8 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		if unInit != nil {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 		}
 		return
@@ -2912,13 +2914,13 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		if uf == nil {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
 		// map_facts_in eUnionWrite — iterate PT keys (C++ one map); create missing union slots
 		if fm.MapFactsIn != nil {
 			for id := range fm.MapFactsIn {
-				if blk != nil && !stmtIDInBlockMapInSess(fmSess(fm), fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapInSess(sessFromFM(fm), fm.Func, id, blk) {
 					continue
 				}
 				if fm.MapUnionFactsIn == nil {
@@ -2938,7 +2940,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		} else if fm.MapUnionFactsIn != nil {
 			// union-only map (tests): keep prior behavior
 			for id := range fm.MapUnionFactsIn {
-				if blk != nil && !stmtIDInBlockMapInSess(fmSess(fm), fm.Func, id, blk) {
+				if blk != nil && !stmtIDInBlockMapInSess(sessFromFM(fm), fm.Func, id, blk) {
 					continue
 				}
 				if !UnionFactsComplete(fm.MapUnionFactsIn[id]) {
@@ -2980,11 +2982,11 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					continue
 				}
 				cp := uf.Clone()
-				if cp == nil || sessHasError(fmSess(fm)) {
+				if cp == nil || hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
-					if !sessHasError(fmSess(fm)) {
-						sessNoteError(fmSess(fm), ErrGeneric)
+					if !hasErrFM(fm) {
+						noteErrFM(fm, ErrGeneric)
 					}
 					return
 				}
@@ -3008,8 +3010,8 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 		}
 		for id := range outIDs {
-			st := FindStmtByIDSess(fmSess(fm), fm.Func, id)
-			if sessHasError(fmSess(fm)) {
+			st := FindStmtByIDSess(sessFromFM(fm), fm.Func, id)
+			if hasErrFM(fm) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
@@ -3020,9 +3022,9 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				if b == nil {
 					continue
 				}
-				if fm.Func != nil && !uf.Var.IsGlobalSess(fmSess(fm)) {
-					vis := fm.Func.IsVarVisibleSess(fmSess(fm), uf.Var, b.Parent)
-					if sessHasError(fmSess(fm)) {
+				if fm.Func != nil && !uf.Var.IsGlobalSess(sessFromFM(fm)) {
+					vis := fm.Func.IsVarVisibleSess(sessFromFM(fm), uf.Var, b.Parent)
+					if hasErrFM(fm) {
 						fm.GlobalFacts = IncompleteFactSlice()
 						fm.UnionFacts = IncompleteUnionFactSlice()
 						return
@@ -3039,25 +3041,25 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					continue
 				}
 				cp := uf.Clone()
-				if cp == nil || sessHasError(fmSess(fm)) {
+				if cp == nil || hasErrFM(fm) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					fm.UnionFacts = IncompleteUnionFactSlice()
-					if !sessHasError(fmSess(fm)) {
-						sessNoteError(fmSess(fm), ErrGeneric)
+					if !hasErrFM(fm) {
+						noteErrFM(fm, ErrGeneric)
 					}
 					return
 				}
 				fm.MapUnionFactsOut[id] = append(slot, cp)
 				continue
 			}
-			parent := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, id)
-			if sessHasError(fmSess(fm)) {
+			parent := FindParentBlockOfStmIDSess(sessFromFM(fm), fm.Func, id)
+			if hasErrFM(fm) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
 			}
 			fm.AddFactOutUnion(st, parent, uf)
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
@@ -3315,13 +3317,13 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant *Type, rhs *Expression) bool {
 	// FactMgr always has live Lhs subject; sticky no invent soft-skip assign update
 	if fm == nil || lhs == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return false
 	}
 	changed := false
-	newFacts, lvarCnt := AbstractFactForAssignSess(fmSess(fm), fm.GlobalFacts, lhs, lhsIndir, rhs)
+	newFacts, lvarCnt := AbstractFactForAssignSess(sessFromFM(fm), fm.GlobalFacts, lhs, lhsIndir, rhs)
 	// incomplete abstract must not invent empty apply success then union merge
-	ptChanged, ptOK := applyPointToAssignFactsSess(fmSess(fm), &fm.GlobalFacts, lhs, lhsIndir, newFacts, lvarCnt)
+	ptChanged, ptOK := applyPointToAssignFactsSess(sessFromFM(fm), &fm.GlobalFacts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// if GlobalFacts was wiped (was already incomplete), also wipe union;
 		// incomplete newFacts alone leaves complete GlobalFacts for factory re-pick
@@ -3329,8 +3331,8 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 			fm.UnionFacts = IncompleteUnionFactSlice()
 		}
 		// sticky already set when map wiped; ensure sticky if apply left HasError
-		if !sessHasError(fmSess(fm)) && !FactsComplete(fm.GlobalFacts) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) && !FactsComplete(fm.GlobalFacts) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return false
 	}
@@ -3340,7 +3342,7 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
 	// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
 	// lhsWant = Lhs::get_type(); nil → Variable.Type
-	ufacts, lvarCnt := AbstractFactUnionForAssignSess(fmSess(fm), fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, lhsWant, rhs)
+	ufacts, lvarCnt := AbstractFactUnionForAssignSess(sessFromFM(fm), fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, lhsWant, rhs)
 	// incomplete abstract must not invent empty union merge success; leave prior
 	// complete UnionFacts for factory re-pick (do not poison)
 	if !UnionFactsComplete(ufacts) {
@@ -3350,29 +3352,29 @@ func (fm *FactMgr) UpdateFactForAssignWant(lhs *Variable, lhsIndir int, lhsWant 
 		// FactUnion* always live from complete abstract — nil hole sticky wipe
 		if uf == nil {
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return false
 		}
 		if lvarCnt == 1 && uf.Var != nil && !uf.Var.IsArray {
 			// definitive assignment — renew (strong replace), FactMgr.cpp:379–381
-			if RenewUnionFactSess(fmSess(fm), &fm.UnionFacts, uf) {
+			if RenewUnionFactSess(sessFromFM(fm), &fm.UnionFacts, uf) {
 				changed = true
 			}
-			if sessHasError(fmSess(fm)) || !UnionFactsComplete(fm.UnionFacts) {
+			if hasErrFM(fm) || !UnionFactsComplete(fm.UnionFacts) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !sessHasError(fmSess(fm)) {
-					sessNoteError(fmSess(fm), ErrGeneric)
+				if !hasErrFM(fm) {
+					noteErrFM(fm, ErrGeneric)
 				}
 				return false
 			}
 			continue
 		}
 		// may-assign — merge_fact lattice join
-		merged := MergeUnionFactSess(fmSess(fm), fm.UnionFacts, uf)
+		merged := MergeUnionFactSess(sessFromFM(fm), fm.UnionFacts, uf)
 		if !UnionFactsComplete(merged) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return false
 		}
@@ -3459,7 +3461,7 @@ func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool
 // (Statement.cpp:370 — first Statement has stm_id 0).
 func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDest, backLink bool) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if StmIDUnset(srcID) {
@@ -3471,7 +3473,7 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 	}
 	// residual ERROR sticky — no invent soft-append edge past incomplete edge list residual
 	if fm.CFGEdges != nil && !CFGEdgesComplete(fm.CFGEdges) {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{
@@ -3701,22 +3703,22 @@ func AddNewVarFactIntoSess(s *Session, v *Variable, facts *[]*FactPointTo) {
 
 func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	if fm == nil || f == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	f.DeadGlobals = f.DeadGlobals[:0]
 	if !FactsComplete(fm.GlobalFacts) {
 		// incomplete map fails closed sticky (no invent empty DeadGlobals success)
 		f.DeadGlobals = IncompleteVariables()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
-	s := fmSess(fm)
+	s := sessFromFM(fm)
 	for _, fact := range fm.GlobalFacts {
 		// FactsComplete guarantees live fact.Var
 		v := fact.Var
 		// const pointers should never be dangling; only globals
-		if v.IsConstSess(fmSess(fm)) || !v.IsGlobalSess(fmSess(fm)) {
+		if v.IsConstSess(sessFromFM(fm)) || !v.IsGlobalSess(sessFromFM(fm)) {
 			// residual ERROR sticky — no invent soft-continue dead scan past IsConst/IsGlobal hole
 			if sessHasError(s) {
 				f.DeadGlobals = IncompleteVariables()
@@ -3752,7 +3754,7 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 	// Expression* always live on StatementReturn; sticky fail closed
 	// (no invent garbage RHS transfer as stand-in for missing return value IR)
 	if fm == nil || rv == nil || expr == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return false
 	}
 	// abstract_fact_for_return ≈ abstract_fact_for_assign(facts, Lhs(rv), expr)
@@ -3761,8 +3763,8 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 	// incomplete GlobalFacts after assign — sticky; do not invent return out map
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return false
 	}
@@ -3782,7 +3784,7 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 // Empty vars is complete no-op.
 func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if len(vars) == 0 {
@@ -3790,11 +3792,11 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 	}
 	// reuse slice-level fail-closed filter (nil holes → GlobalFacts nil)
 	facts := fm.GlobalFacts
-	UpdateFactsForOOSVarsSess(fmSess(fm), vars, &facts)
+	UpdateFactsForOOSVarsSess(sessFromFM(fm), vars, &facts)
 	fm.SetGlobalFacts(facts, "auto_fact_mgr_2437")
 	// FactMgr.cpp:143–156 — erase any fact whose subject matches OOS var (FactUnion too).
 	// Go keeps UnionFacts separate from GlobalFacts (point-to only).
-	UpdateUnionFactsForOOSVarsSess(fmSess(fm), vars, &fm.UnionFacts)
+	UpdateUnionFactsForOOSVarsSess(sessFromFM(fm), vars, &fm.UnionFacts)
 }
 
 // UpdateUnionFactsForOOSVars drops FactUnion subjects matching OOS vars.
@@ -3856,41 +3858,41 @@ func UpdateUnionFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*Fact
 
 func (fm *FactMgr) FilterUnionFactsForHandover(keepPT []*FactPointTo) {
 	if fm == nil || fm.Func == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !UnionFactsComplete(fm.UnionFacts) {
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !FactsComplete(keepPT) {
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !VariablesComplete(fm.Func.Param) {
 		fm.UnionFacts = IncompleteUnionFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	out := make([]*FactUnion, 0, len(fm.UnionFacts))
 	for _, uf := range fm.UnionFacts {
 		v := uf.Var
-		isG := v.IsGlobalSess(fmSess(fm))
-		if sessHasError(fmSess(fm)) {
+		isG := v.IsGlobalSess(sessFromFM(fm))
+		if hasErrFM(fm) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
 		keep := isG || IsVariableInSet(fm.Func.Param, v)
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
 		}
 		if !keep {
 			for _, pt := range keepPT {
-				ptOK := pt.PointsToSess(fmSess(fm), v)
-				if sessHasError(fmSess(fm)) {
+				ptOK := pt.PointsToSess(sessFromFM(fm), v)
+				if hasErrFM(fm) {
 					fm.UnionFacts = IncompleteUnionFactSlice()
 					return
 				}
@@ -3916,14 +3918,14 @@ func (fm *FactMgr) FilterUnionFactsForHandover(keepPT []*FactPointTo) {
 // FactMgr + Func + facts always live; sticky (no invent soft-skip param facts past hole).
 func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	if fm == nil || fm.Func == nil || facts == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	for i, p := range fm.Func.Param {
 		if p == nil {
 			// incomplete Param list fails closed sticky — no invent skip remaining params
 			*facts = IncompleteFactSlice()
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
 		var arg *Expression
@@ -3935,8 +3937,8 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 		_ = fm.UpdateFactForAssignInto(p, 0, arg, facts)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
-			if !sessHasError(fmSess(fm)) {
-				sessNoteError(fmSess(fm), ErrGeneric)
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
 			}
 			return
 		}
@@ -3961,12 +3963,12 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsWant *Type, rhs *Expression, facts *[]*FactPointTo) bool {
 	// FactMgr assign-into always has live lhs + facts accumulator; sticky no invent soft-skip
 	if facts == nil || lhs == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return false
 	}
 	changed := false
-	newFacts, lvarCnt := AbstractFactForAssignSess(fmSess(fm), *facts, lhs, lhsIndir, rhs)
-	ptChanged, ptOK := applyPointToAssignFactsSess(fmSess(fm), facts, lhs, lhsIndir, newFacts, lvarCnt)
+	newFacts, lvarCnt := AbstractFactForAssignSess(sessFromFM(fm), *facts, lhs, lhsIndir, rhs)
+	ptChanged, ptOK := applyPointToAssignFactsSess(sessFromFM(fm), facts, lhs, lhsIndir, newFacts, lvarCnt)
 	if !ptOK {
 		// only wipe union when *facts was incomplete (wiped); incomplete abstract alone
 		// leaves prior complete map for factory re-pick
@@ -3980,7 +3982,7 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 	}
 	if fm != nil {
 		// FactMgr.cpp:376–388 — lvar_cnt==1 non-array → renew_fact; else merge_fact
-		ufacts, lvarCnt := AbstractFactUnionForAssignSess(fmSess(fm), fm.UnionFacts, *facts, lhs, lhsIndir, lhsWant, rhs)
+		ufacts, lvarCnt := AbstractFactUnionForAssignSess(sessFromFM(fm), fm.UnionFacts, *facts, lhs, lhsIndir, lhsWant, rhs)
 		// incomplete abstract: fail closed without poisoning prior complete UnionFacts
 		if !UnionFactsComplete(ufacts) {
 			return false
@@ -3989,27 +3991,27 @@ func (fm *FactMgr) UpdateFactForAssignIntoWant(lhs *Variable, lhsIndir int, lhsW
 			// FactUnion* always live from complete abstract — nil hole sticky wipe
 			if uf == nil {
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return false
 			}
 			if lvarCnt == 1 && uf.Var != nil && !uf.Var.IsArray {
-				if RenewUnionFactSess(fmSess(fm), &fm.UnionFacts, uf) {
+				if RenewUnionFactSess(sessFromFM(fm), &fm.UnionFacts, uf) {
 					changed = true
 				}
-				if sessHasError(fmSess(fm)) || !UnionFactsComplete(fm.UnionFacts) {
+				if hasErrFM(fm) || !UnionFactsComplete(fm.UnionFacts) {
 					fm.UnionFacts = IncompleteUnionFactSlice()
-					if !sessHasError(fmSess(fm)) {
-						sessNoteError(fmSess(fm), ErrGeneric)
+					if !hasErrFM(fm) {
+						noteErrFM(fm, ErrGeneric)
 					}
 					return false
 				}
 				continue
 			}
-			merged := MergeUnionFactSess(fmSess(fm), fm.UnionFacts, uf)
+			merged := MergeUnionFactSess(sessFromFM(fm), fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
-				if !sessHasError(fmSess(fm)) {
-					sessNoteError(fmSess(fm), ErrGeneric)
+				if !hasErrFM(fm) {
+					noteErrFM(fm, ErrGeneric)
 				}
 				return false
 			}
@@ -4071,25 +4073,25 @@ func (f *FactPointTo) PointsToSess(s *Session, v *Variable) bool {
 // FactMgr + Func + inputs always live; sticky (no invent soft-skip handover past hole).
 func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPointTo) {
 	if fm == nil || inputs == nil || fm.Func == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// incomplete inputs fail closed sticky before partition (no invent drop via hole skip)
 	if !FactsComplete(*inputs) {
 		*inputs = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !VariablesComplete(fm.Func.Param) {
 		*inputs = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	fm.AddParamFacts(args, inputs)
 	if !FactsComplete(*inputs) {
 		*inputs = IncompleteFactSlice()
-		if !sessHasError(fmSess(fm)) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
 		}
 		return
 	}
@@ -4097,20 +4099,20 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 	var keep, rest []*FactPointTo
 	for _, f := range *inputs {
 		v := f.Var
-		isG := v.IsGlobalSess(fmSess(fm))
+		isG := v.IsGlobalSess(sessFromFM(fm))
 		// residual ERROR sticky — no invent soft-partition past IsGlobal residual
-		if sessHasError(fmSess(fm)) {
+		if hasErrFM(fm) {
 			*inputs = IncompleteFactSlice()
 			return
 		}
 		if isG || IsVariableInSet(fm.Func.Param, v) {
 			// residual ERROR sticky — no invent soft-keep past IsVariableInSet residual
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				*inputs = IncompleteFactSlice()
 				return
 			}
 			keep = append(keep, f)
-		} else if sessHasError(fmSess(fm)) {
+		} else if hasErrFM(fm) {
 			// residual ERROR sticky — no invent soft-rest past IsVariableInSet residual false
 			*inputs = IncompleteFactSlice()
 			return
@@ -4126,19 +4128,19 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 			// Fact* always live after FactsComplete partition; nil hole sticky wipe
 			if rf == nil {
 				*inputs = IncompleteFactSlice()
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
 			moved := false
 			for _, kf := range keep {
 				if kf == nil {
 					*inputs = IncompleteFactSlice()
-					sessNoteError(fmSess(fm), ErrGeneric)
+					noteErrFM(fm, ErrGeneric)
 					return
 				}
-				pt := kf.PointsToSess(fmSess(fm), rf.Var)
+				pt := kf.PointsToSess(sessFromFM(fm), rf.Var)
 				// residual ERROR sticky — no invent soft-partition past PointsTo residual
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					*inputs = IncompleteFactSlice()
 					return
 				}
@@ -4167,24 +4169,24 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 // FactMgr + facts always live; sticky (no invent soft-skip filter past hole).
 func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 	if fm == nil || facts == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	if !FactsComplete(*facts) {
 		// incomplete map fails closed sticky (no invent clean filter past holes)
 		*facts = IncompleteFactSlice()
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	out := make([]*FactPointTo, 0, len(*facts))
 	for _, f := range *facts {
-		if f.Var.IsRVSess(fmSess(fm)) {
+		if f.Var.IsRVSess(sessFromFM(fm)) {
 			// keep only this function's RV
 			if fm.Func != nil && fm.Func.RV != nil {
-				match := fm.Func.RV.MatchSess(fmSess(fm), f.Var)
+				match := fm.Func.RV.MatchSess(sessFromFM(fm), f.Var)
 				// residual ERROR sticky — no invent soft-continue filter past Match hole
 				// (Type-nil RV Match residual ERROR+false soft invents drop then keep later non-RV)
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					*facts = IncompleteFactSlice()
 					return
 				}
@@ -4218,33 +4220,33 @@ func OutputTab(indent int) string {
 // Incomplete maps sticky (no invent soft-pass past holes).
 func (fm *FactMgr) SanityCheckMap() {
 	if fm == nil {
-		sessNoteError(fmSess(fm), ErrGeneric)
+		noteErrFM(fm, ErrGeneric)
 		return
 	}
 	// map_facts_in
 	for stmID, facts := range fm.MapFactsIn {
 		if !FactsComplete(facts) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
-		st := FindStmtByIDSess(fmSess(fm), fm.Func, stmID)
+		st := FindStmtByIDSess(sessFromFM(fm), fm.Func, stmID)
 		var parent *Block
 		if st != nil {
-			parent = FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, stmID)
+			parent = FindParentBlockOfStmIDSess(sessFromFM(fm), fm.Func, stmID)
 		}
 		for _, f := range facts {
 			if f == nil || f.Var == nil {
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
 			v := f.Var
-			if v.IsVisibleSess(fmSess(fm), parent) {
-				if sessHasError(fmSess(fm)) {
+			if v.IsVisibleSess(sessFromFM(fm), parent) {
+				if hasErrFM(fm) {
 					return
 				}
 				continue
 			}
-			if sessHasError(fmSess(fm)) {
+			if hasErrFM(fm) {
 				return
 			}
 			// FactMgr.cpp:713–716 — body entry may include params with parent==0
@@ -4257,28 +4259,28 @@ func (fm *FactMgr) SanityCheckMap() {
 	// map_facts_out
 	for stmID, facts := range fm.MapFactsOut {
 		if !FactsComplete(facts) {
-			sessNoteError(fmSess(fm), ErrGeneric)
+			noteErrFM(fm, ErrGeneric)
 			return
 		}
-		parent := FindParentBlockOfStmIDSess(fmSess(fm), fm.Func, stmID)
+		parent := FindParentBlockOfStmIDSess(sessFromFM(fm), fm.Func, stmID)
 		for _, f := range facts {
 			if f == nil || f.Var == nil {
-				sessNoteError(fmSess(fm), ErrGeneric)
+				noteErrFM(fm, ErrGeneric)
 				return
 			}
 			v := f.Var
-			vis := v.IsVisibleSess(fmSess(fm), parent)
-			if sessHasError(fmSess(fm)) {
+			vis := v.IsVisibleSess(sessFromFM(fm), parent)
+			if hasErrFM(fm) {
 				return
 			}
 			if !vis && fm.Func != nil && fm.Func.RV != nil {
-				if fm.Func.RV.MatchSess(fmSess(fm), v) {
-					if sessHasError(fmSess(fm)) {
+				if fm.Func.RV.MatchSess(sessFromFM(fm), v) {
+					if hasErrFM(fm) {
 						return
 					}
 					continue
 				}
-				if sessHasError(fmSess(fm)) {
+				if hasErrFM(fm) {
 					return
 				}
 			}

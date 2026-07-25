@@ -371,7 +371,7 @@ func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Functi
 func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options, qfer *CVQualifiers) *Function {
 	// incomplete Funcs list fails closed sticky (no invent soft-skip nil hole as absent)
 	if !FunctionsComplete(funcs) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent conflict-filter under hole shells)
@@ -379,40 +379,40 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		if !EffectComplete(cg.EffectContext()) ||
 			(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 			!EffectComplete(cg.EffectStm) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 	}
 	var ok, okBuiltin []*Function
 	for _, f := range funcs {
 		// pre-validated FunctionsComplete
-		if f == exclude || !f.IsEffectKnownSess(cgSess(cg)) {
+		if f == exclude || !f.IsEffectKnownSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsEffectKnown hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}
 		// residual ERROR sticky — no invent soft-continue known-true past IsEffectKnown residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		// Function.cpp:288–289 — type->is_convertable(return_type)
 		// C++ always has live return_type*; nil is incomplete IR
 		// fail closed sticky whole choose (no invent soft-skip broken func as absent)
 		if ret != nil && f.ReturnType == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		if ret != nil && f.ReturnType != nil {
-			ok := ret.IsConvertableOptsSess(cgSess(cg), f.ReturnType, opts)
+			ok := ret.IsConvertableOptsSess(sessFromCG(cg), f.ReturnType, opts)
 			// residual ERROR sticky — no invent soft-continue then pick later past IsConvertable residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			if !ok {
@@ -423,49 +423,49 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		// incomplete RV fails closed sticky (no invent soft-skip as match / re-pick)
 		if qfer != nil && !qfer.Wildcard {
 			if f.RV == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return nil
 			}
-			if !qfer.MatchSess(cgSess(cg), f.RV.Qfer, false) {
+			if !qfer.MatchSess(sessFromCG(cg), f.RV.Qfer, false) {
 				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					return nil
 				}
 				continue
 			}
 			// residual ERROR sticky — no invent soft-keep match past Match residual true path
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 		}
 		// incomplete callee FEffect fails closed sticky (no invent skip as conflict past hole)
 		if cg != nil && !EffectComplete(f.FEffect) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		// Function.cpp:303–306 — in_conflict with callee feffect
 		if cg != nil && cg.InConflict(f.FEffect) {
 			// residual ERROR sticky — no invent soft-continue conflict-skip past hard IR
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			continue
 		}
 		// residual ERROR sticky — no invent soft-keep after InConflict residual false
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		// Function.cpp:307–313 — strict_volatile_rule
 		if opts.StrictVolatileRule && cg != nil {
-			if !f.FEffect.IsSideEffectFreeSess(cgSess(cg)) && !cg.EffectContext().IsSideEffectFreeSess(cgSess(cg)) {
+			if !f.FEffect.IsSideEffectFreeSess(sessFromCG(cg)) && !cg.EffectContext().IsSideEffectFreeSess(sessFromCG(cg)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past SE residual
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					return nil
 				}
 				continue
 			}
 			// residual ERROR sticky — no invent soft-continue SE-free path past residual hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 		}
@@ -484,12 +484,12 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 	var f *Function
 	if opts.Builtins && len(okBuiltin) > 0 && r != nil {
 		p := opts.BuiltinFunctionProb
-		if p > 0 && r.RndFlipcoinSess(cgSess(cg), uint32(p)) {
-			f = getOneFunctionSess(cgSess(cg), r, okBuiltin)
+		if p > 0 && r.RndFlipcoinSess(sessFromCG(cg), uint32(p)) {
+			f = getOneFunctionSess(sessFromCG(cg), r, okBuiltin)
 		}
 	}
 	if f == nil {
-		f = getOneFunctionSess(cgSess(cg), r, ok)
+		f = getOneFunctionSess(sessFromCG(cg), r, ok)
 	}
 	return f
 }
@@ -570,14 +570,14 @@ func BuildUserInvocation(
 	// FunctionInvocationUser.cpp always has RNG + CGContext; sticky Failed
 	// (no invent call shell / soft re-pick past hole)
 	if r == nil || callee == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// incomplete ambient fails closed sticky (no invent param gen / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{User: callee, Failed: true}
 	}
 	fi := &Invocation{User: callee}
@@ -587,7 +587,7 @@ func BuildUserInvocation(
 	for _, p := range callee.Param {
 		// FunctionInvocationUser.cpp:256–258 — v->type / &v->qfer; sticky no invent soft-skip param hole
 		if p == nil || p.Type == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -606,9 +606,9 @@ func BuildUserInvocation(
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		// FunctionInvocationUser.cpp:259 — ERROR_GUARD(false); sticky error or null param → fail
 		// null param without sticky invents soft re-pick past ERROR_GUARD miss
-		if arg == nil || sessHasError(cgSess(cg)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if arg == nil || hasErrCG(cg) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -616,29 +616,29 @@ func BuildUserInvocation(
 		// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
 		arg.CheckAndSetCastOpts(ty, opts)
 		// residual ERROR sticky — no invent param past CheckAndSetCast residual hole
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:264–267 — running first, then merge_param_context(default include_lhs=false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
-		running = running.AddEffectSess(cgSess(cg), paramAccum)
+		running = running.AddEffectSess(sessFromCG(cg), paramAccum)
 		// residual ERROR sticky — no invent soft-continue later params past AddEffect residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
 		if !EffectComplete(running) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		cg.MergeParamContext(paramCG, false)
 		// residual ERROR sticky — no invent soft-continue later params past MergeParam residual
-		if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -647,11 +647,11 @@ func BuildUserInvocation(
 
 	// FunctionInvocationUser.cpp:272–301
 	fi.Failed = false
-	first := GetFirstFunctionSess(cgSess(cg), list)
+	first := GetFirstFunctionSess(sessFromCG(cg), list)
 	// skip revisit for first function (func_1) — no params, single call, DFA hack
-	needRev := callee != first && callee.NeedsRevisitSess(cgSess(cg))
+	needRev := callee != first && callee.NeedsRevisitSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent soft-skip revisit past NeedsRevisit residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		fi.Failed = true
 		return fi
 	}
@@ -659,14 +659,14 @@ func BuildUserInvocation(
 		// FunctionInvocationUser.cpp:277–291 — revisit with accum_eff_context
 		// Incomplete AccumEffContext fails closed sticky (no invent revisit under incomplete ambient)
 		effectAccum := EmptyEffect()
-		effectContext := cg.EffectContext().AddEffectSess(cgSess(cg), callee.AccumEffContext)
+		effectContext := cg.EffectContext().AddEffectSess(sessFromCG(cg), callee.AccumEffContext)
 		// residual ERROR sticky — no invent soft-continue revisit past AddEffect residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
 		if !EffectComplete(effectContext) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -686,7 +686,7 @@ func BuildUserInvocation(
 		newCG.ExprDepth = 0
 		newCG.BlkDepth = 0
 		newCG.ExtendCallChain(*cg)
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
@@ -696,12 +696,12 @@ func BuildUserInvocation(
 		// restores from inputs_copy). Do not deep-clone then reinstall: that path
 		// can drop mid-gen may-null lattice (seed-2 first_div 10107 l_233).
 		if cg.FM == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -718,19 +718,19 @@ func BuildUserInvocation(
 			blk := cg.CurrentBlock()
 			if blk != nil {
 				cg.AddVisibleEffectAt(effectAccum, blk)
-				if sessHasError(cgSess(cg)) {
+				if hasErrCG(cg) {
 					fi.Failed = true
 					return fi
 				}
 			}
 			if !EffectComplete(effectAccum) || !EffectComplete(callee.FEffect) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
-			callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(cgSess(cg), effectAccum, cg.CallChain)
+			callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(sessFromCG(cg), effectAccum, cg.CallChain)
 			if !EffectComplete(callee.FEffect) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
@@ -738,18 +738,18 @@ func BuildUserInvocation(
 	} else {
 		// FunctionInvocationUser.cpp:293–297 — static effect, no re-analyze
 		// add_external_effect(func->get_feffect())
-		if callee.IsEffectKnownSess(cgSess(cg)) {
+		if callee.IsEffectKnownSess(sessFromCG(cg)) {
 			// residual ERROR sticky — no invent static-effect path past IsEffectKnown hole
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				fi.Failed = true
 				return fi
 			}
 			cg.AddExternalEffect(callee.FEffect)
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				fi.Failed = true
 				return fi
 			}
-		} else if sessHasError(cgSess(cg)) {
+		} else if hasErrCG(cg) {
 			// residual ERROR sticky — no invent soft-skip effect fold past IsEffectKnown residual false
 			fi.Failed = true
 			return fi
@@ -782,7 +782,7 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp always has RNG + CGContext + FuncList; sticky Failed
 	// (no invent call+func shell past hole). At-max is complete soft Failed (no sticky).
 	if r == nil || cg == nil || list == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	if ReachMaxFunctions(list, opts) {
@@ -790,14 +790,14 @@ func BuildInvocationAndFunction(
 	}
 	// FunctionInvocationUser.cpp:175 — assert(type); sticky Failed (no invent return type)
 	if retType == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// incomplete ambient fails closed sticky (no invent signature/params past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// FunctionInvocationUser.cpp:179 — make_random_signature(cg, type, qfer)
@@ -806,8 +806,8 @@ func BuildInvocationAndFunction(
 	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, qfer, list)
 	if callee == nil {
 		// signature ERROR_GUARD sticky when not already set
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return &Invocation{Failed: true}
 	}
@@ -818,7 +818,7 @@ func BuildInvocationAndFunction(
 	for _, p := range callee.Param {
 		// FunctionInvocationUser.cpp:185–187 — v->type; sticky no invent soft-skip param hole
 		if p == nil || p.Type == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -835,9 +835,9 @@ func BuildInvocationAndFunction(
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		// FunctionInvocationUser.cpp:186–187 — make_random_param; ERROR_GUARD after sticky error
 		// null param without sticky invents soft re-pick past ERROR_GUARD miss
-		if arg == nil || sessHasError(cgSess(cg)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if arg == nil || hasErrCG(cg) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -845,28 +845,28 @@ func BuildInvocationAndFunction(
 		// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
 		arg.CheckAndSetCastOpts(ty, opts)
 		// residual ERROR sticky — no invent param past CheckAndSetCast residual hole
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
-		running = running.AddEffectSess(cgSess(cg), paramAccum)
+		running = running.AddEffectSess(sessFromCG(cg), paramAccum)
 		// residual ERROR sticky — no invent soft-continue later params past AddEffect residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
 		if !EffectComplete(running) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		cg.MergeParamContext(paramCG, false)
-		if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -879,9 +879,9 @@ func BuildInvocationAndFunction(
 	if cg.FM != nil {
 		callerFM = cg.FM
 	}
-	calFM := callee.PairedFactMgrSess(cgSess(cg))
+	calFM := callee.PairedFactMgrSess(sessFromCG(cg))
 	if calFM == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
@@ -889,13 +889,13 @@ func BuildInvocationAndFunction(
 	if callerFM != nil {
 		// incomplete caller GlobalFacts fail closed sticky (no invent cleaned handover)
 		if !FactsComplete(callerFM.GlobalFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
-		facts = CloneFactSliceSess(cgSess(cg), callerFM.GlobalFacts)
+		facts = CloneFactSliceSess(sessFromCG(cg), callerFM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-handover past CloneFactSlice residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			fi.Failed = true
 			return fi
 		}
@@ -903,14 +903,14 @@ func BuildInvocationAndFunction(
 		// C++ FactVec includes eUnionWrite; Go splits UnionFacts from GlobalFacts.
 		// Incomplete caller UnionFacts fail closed sticky (no invent empty-complete handover).
 		if !UnionFactsComplete(callerFM.UnionFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
-		calFM.UnionFacts = CloneUnionFactSliceSess(cgSess(cg), callerFM.UnionFacts)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(calFM.UnionFacts) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		calFM.UnionFacts = CloneUnionFactSliceSess(sessFromCG(cg), callerFM.UnionFacts)
+		if hasErrCG(cg) || !UnionFactsComplete(calFM.UnionFacts) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -918,7 +918,7 @@ func BuildInvocationAndFunction(
 	}
 	calFM.CallerToCalleeHandover(fi.Args, &facts)
 	// residual ERROR sticky — no invent soft-handover past CallerToCallee residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		fi.Failed = true
 		return fi
 	}
@@ -926,9 +926,9 @@ func BuildInvocationAndFunction(
 	// Filter UnionFacts after PT partition so globals/params/transitive pointees remain.
 	if callerFM != nil {
 		calFM.FilterUnionFactsForHandover(facts)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(calFM.UnionFacts) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if hasErrCG(cg) || !UnionFactsComplete(calFM.UnionFacts) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -959,8 +959,8 @@ func BuildInvocationAndFunction(
 	var retUnions []*FactUnion
 	if callee.Body == nil {
 		// GenerateBody must leave live body; sticky Failed (no invent soft-skip without body)
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		fi.Failed = true
 		return fi
@@ -968,27 +968,27 @@ func BuildInvocationAndFunction(
 	out := calFM.GetMapFactsOut(callee.Body.StmID)
 	outU := calFM.GetMapUnionFactsOut(callee.Body.StmID)
 	// residual ERROR sticky — no invent soft-ret facts past GetMap* residual
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		fi.Failed = true
 		return fi
 	}
 	if !FactsComplete(out) || !UnionFactsComplete(outU) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
-	retFacts = CloneFactSliceSess(cgSess(cg), out)
-	retUnions = CloneUnionFactSliceDeepSess(cgSess(cg), outU)
-	if sessHasError(cgSess(cg)) || !FactsComplete(retFacts) || !UnionFactsComplete(retUnions) {
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+	retFacts = CloneFactSliceSess(sessFromCG(cg), out)
+	retUnions = CloneUnionFactSliceDeepSess(sessFromCG(cg), outU)
+	if hasErrCG(cg) || !FactsComplete(retFacts) || !UnionFactsComplete(retUnions) {
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		fi.Failed = true
 		return fi
 	}
 	if !AddBackReturnFacts(callee.Body, calFM, &retFacts, &retUnions) {
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		fi.Failed = true
 		return fi
@@ -996,9 +996,9 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:214 / 358–365 — save_return_fact full FactVec
 	// (ePointTo + eUnionWrite). Soft invent was PT-only registry so FactUnion
 	// rhs_to_lhs_transfer for FuncCall params missed rv_fact (seed-213 p_34).
-	fi.SaveReturnFactsSess(cgSess(cg), retFacts)
-	fi.SaveReturnUnionFactsSess(cgSess(cg), retUnions)
-	if sessHasError(cgSess(cg)) {
+	fi.SaveReturnFactsSess(sessFromCG(cg), retFacts)
+	fi.SaveReturnUnionFactsSess(sessFromCG(cg), retUnions)
+	if hasErrCG(cg) {
 		fi.Failed = true
 		return fi
 	}
@@ -1011,35 +1011,35 @@ func BuildInvocationAndFunction(
 		// complete retFacts (may be empty nil) required; incomplete caller fails closed sticky
 		// (no invent RenewFacts no-op success past incomplete then keep prior)
 		if !FactsComplete(callerFM.GlobalFacts) || !FactsComplete(retFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
-		_ = RenewFactsSess(cgSess(cg), &callerFM.GlobalFacts, retFacts)
+		_ = RenewFactsSess(sessFromCG(cg), &callerFM.GlobalFacts, retFacts)
 		if !FactsComplete(callerFM.GlobalFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		// eUnionWrite half of ret_facts after add_back_return_facts (globals only
 		// for caller renew — locals stripped by remove_function_local on body out).
 		if !UnionFactsComplete(callerFM.UnionFacts) || !UnionFactsComplete(retUnions) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
-		retUF := GlobalUnionFactsOnlySess(cgSess(cg), retUnions)
+		retUF := GlobalUnionFactsOnlySess(sessFromCG(cg), retUnions)
 		if !UnionFactsComplete(retUF) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
 		}
-		_ = RenewUnionFactsSess(cgSess(cg), &callerFM.UnionFacts, retUF)
+		_ = RenewUnionFactsSess(sessFromCG(cg), &callerFM.UnionFacts, retUF)
 		if !UnionFactsComplete(callerFM.UnionFacts) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			fi.Failed = true
 			return fi
@@ -1047,14 +1047,14 @@ func BuildInvocationAndFunction(
 		// FunctionInvocationUser.cpp:234–238 — new globals facts
 		// Incomplete NewGlobals fails closed sticky (no invent soft-skip hole / partial push)
 		if !VariablesComplete(callee.NewGlobals) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		for _, v := range callee.NewGlobals {
 			callerFM.AddNewVarFactAndUpdate(nil, v)
 			if !FactsComplete(callerFM.GlobalFacts) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
@@ -1064,31 +1064,31 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:223–228 — effect hand-over
 	// Incomplete external merge fails closed sticky (no invent silent Incomplete shells)
 	if !EffectComplete(cg.EffectContext()) || !EffectComplete(callee.AccumEffContext) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
-	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffectSess(cgSess(cg), cg.EffectContext())
+	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffectSess(sessFromCG(cg), cg.EffectContext())
 	if !EffectComplete(callee.AccumEffContext) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	// feffect.add_external_effect(effect_accum, call_chain)
 	if !EffectComplete(effectAccum) || !EffectComplete(callee.FEffect) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
-	callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(cgSess(cg), effectAccum, cg.CallChain)
+	callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(sessFromCG(cg), effectAccum, cg.CallChain)
 	if !EffectComplete(callee.FEffect) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	// also keep ComputeSummary body effect already applied in GenerateBody
 	cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		fi.Failed = true
 		return fi
 	}
@@ -1096,7 +1096,7 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:230–233 — new_globals hand-over
 	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {
 		if !VariablesComplete(callee.NewGlobals) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -1123,22 +1123,22 @@ func MakeRandomBinaryInvocation(
 ) *Invocation {
 	// FunctionInvocation.cpp always has RNG + CGContext sticky; no invent binary shell without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent binary / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:173 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomBinary, nullptr)
-	if DepthGuardByTypeSess(cgSess(cg), opts, DtFunctionInvocationRandomBinary) == BadDepth {
+	if DepthGuardByTypeSess(sessFromCG(cg), opts, DtFunctionInvocationRandomBinary) == BadDepth {
 		return nil
 	}
 	// FunctionInvocation.cpp:171+ — type may be nullptr (StatementExpr); no GetIntType invent
@@ -1158,7 +1158,7 @@ func MakeRandomBinaryInvocation(
 		}
 		if env != nil && env.HasPointerType() {
 			// ERROR_GUARD after flipcoin before call is implicit via HasError checks in callee
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return nil
 			}
 			return MakeRandomBinaryPtrComparison(r, opts, probs, vs, tables, cg, env)
@@ -1169,13 +1169,13 @@ func MakeRandomBinaryInvocation(
 	// Prefer caller probs; fall back to session bag (not ambient-only Process*).
 	binProbs := probs
 	if binProbs == nil {
-		binProbs = sessProbs(cgSess(cg))
+		binProbs = sessProbs(sessFromCG(cg))
 	}
-	op := PickBinaryOpProbsSess(cgSess(cg), r, opts, binProbs)
+	op := PickBinaryOpProbsSess(sessFromCG(cg), r, opts, binProbs)
 	if typ != nil {
-		isF := typ.IsFloatSess(cgSess(cg))
+		isF := typ.IsFloatSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-continue pick past IsFloat residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		if isF {
@@ -1186,7 +1186,7 @@ func MakeRandomBinaryInvocation(
 					validB = true
 					break
 				}
-				op = PickBinaryOpProbsSess(cgSess(cg), r, opts, binProbs)
+				op = PickBinaryOpProbsSess(sessFromCG(cg), r, opts, binProbs)
 			}
 			if !validB {
 				return nil
@@ -1194,16 +1194,16 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 	// PickBinaryOp MAX / empty token — sticky no invent infix shell without live op
-	opStr := op.BinaryOpCSess(cgSess(cg))
+	opStr := op.BinaryOpCSess(sessFromCG(cg))
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:188–207 — always SafeOpFlags::make_random_binary; operands use get_lhs/rhs_type
 	var flags *SafeOpFlags
 	lhsTy, rhsTy := typ, typ
 	// C++ always builds flags; CreateFunctionInvocationBinary only allocates tmps for safe_ops
-	flags = MakeRandomBinaryKindSess(cgSess(cg), r, opts, probs, typ, typ, typ, SafeOpBinary, op)
+	flags = MakeRandomBinaryKindSess(sessFromCG(cg), r, opts, probs, typ, typ, typ, SafeOpBinary, op)
 	if flags == nil {
 		// SafeOpFlags DEPTH_GUARD / ERROR_GUARD
 		return nil
@@ -1212,7 +1212,7 @@ func MakeRandomBinaryInvocation(
 	lhsTy = flags.LHSType()
 	rhsTy = flags.RHSType()
 	if lhsTy == nil || rhsTy == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// non-arith/shift: keep flags for typing but Output ignores safe path (SafeOpsBinary filter)
@@ -1242,15 +1242,15 @@ func MakeRandomBinaryInvocation(
 	// FunctionInvocation.cpp:216 — Expression::make_random(lhs_cg, lhs_type) — no_func=false
 	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, false, false, MaxTermTypes, lhsCG.ExprDepth)
 	// FunctionInvocation.cpp:217 — ERROR_GUARD_AND_DEL1(nullptr, fi)
-	if left == nil || sessHasError(cgSess(cg)) {
+	if left == nil || hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:221 — merge_param_context(lhs) (effects + expr_depth)
 	cg.MergeParamContext(lhsCG, true)
 	// incomplete effect after lhs merge fails closed sticky (no invent RHS / soft re-pick)
-	if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+	if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return nil
 	}
@@ -1262,18 +1262,18 @@ func MakeRandomBinaryInvocation(
 	var unionCopy []*FactUnion
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
-		factsCopy = CloneFactSliceSess(cgSess(cg), cg.FM.GlobalFacts)
+		factsCopy = CloneFactSliceSess(sessFromCG(cg), cg.FM.GlobalFacts)
 		// residual ERROR sticky — no invent soft-binary past CloneFactSlice residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
-		unionCopy = CloneUnionFactSliceSess(cgSess(cg), cg.FM.UnionFacts)
-		if sessHasError(cgSess(cg)) || !UnionFactsComplete(unionCopy) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		unionCopy = CloneUnionFactSliceSess(sessFromCG(cg), cg.FM.UnionFacts)
+		if hasErrCG(cg) || !UnionFactsComplete(unionCopy) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return nil
 		}
@@ -1289,9 +1289,9 @@ func MakeRandomBinaryInvocation(
 		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 		rhsAccum := EmptyEffect()
 		rhsCG := cg.CloneSubcontext()
-		rhsCtx := cg.EffectContext().AddEffectOptsSess(cgSess(cg), lhsAccum, true)
+		rhsCtx := cg.EffectContext().AddEffectOptsSess(sessFromCG(cg), lhsAccum, true)
 		if !EffectComplete(rhsCtx) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		// CGContext.cpp:74–82 — curr_rhs(nullptr) on (cgc, eff_context, accum)
@@ -1305,7 +1305,7 @@ func MakeRandomBinaryInvocation(
 			shiftNonConst := 0
 			if probs != nil {
 				shiftNonConst = probs.Single(PShiftByNonConstantProb)
-			} else if p := sessProbs(cgSess(cg)); p != nil {
+			} else if p := sessProbs(sessFromCG(cg)); p != nil {
 				shiftNonConst = p.Single(PShiftByNonConstantProb)
 			}
 			// not_constant = flip; constant path when !not_constant
@@ -1314,15 +1314,15 @@ func MakeRandomBinaryInvocation(
 				// Type always live after flags assert; SizeInBytes 0 is incomplete
 				// (no invent default 32-bit width)
 				if lhsTy != nil {
-					sb := lhsTy.SizeInBytesSess(cgSess(cg))
+					sb := lhsTy.SizeInBytesSess(sessFromCG(cg))
 					// residual ERROR sticky — no invent soft-shift const past SizeInBytes residual
-					if sessHasError(cgSess(cg)) {
+					if hasErrCG(cg) {
 						return nil
 					}
 					if sb > 0 {
 						bits := uint32(sb * 8)
 						// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
-						if c := MakeRandomUptoSess(cgSess(cg), bits, r); c != nil && !sessHasError(cgSess(cg)) {
+						if c := MakeRandomUptoSess(sessFromCG(cg), bits, r); c != nil && !hasErrCG(cg) {
 							// FunctionInvocation.cpp:241–243 — Constant::make_random_upto as RHS.
 							// Not Expression::make_random — C++ does NOT bump expr_depth here
 							// (depth++ only in Expression.cpp:213–218 after make_random).
@@ -1343,110 +1343,110 @@ func MakeRandomBinaryInvocation(
 			// FunctionInvocation.cpp:246–253 — div/mod zero-guard BEFORE merge (C++ order)
 			// rhs->equals(0) || rhs->is_0_or_1() (all comparison Funcalls are is_0_or_1).
 			// Then rnd_upto(MAX_BINARY_OP, filter) rejecting mod/div/shifts.
-			if right != nil && !sessHasError(cgSess(cg)) && (op == BinMod || op == BinDiv) {
-				eq0 := right.EqualsIntSess(cgSess(cg), 0)
-				if sessHasError(cgSess(cg)) {
+			if right != nil && !hasErrCG(cg) && (op == BinMod || op == BinDiv) {
+				eq0 := right.EqualsIntSess(sessFromCG(cg), 0)
+				if hasErrCG(cg) {
 					return nil
 				}
-				is01 := right.Is0Or1Sess(cgSess(cg))
-				if sessHasError(cgSess(cg)) {
+				is01 := right.Is0Or1Sess(sessFromCG(cg))
+				if hasErrCG(cg) {
 					return nil
 				}
 				if eq0 || is01 {
 					lhsF, rhsF := false, false
 					if lhsTy != nil {
-						lhsF = lhsTy.IsFloatSess(cgSess(cg))
-						if sessHasError(cgSess(cg)) {
+						lhsF = lhsTy.IsFloatSess(sessFromCG(cg))
+						if hasErrCG(cg) {
 							return nil
 						}
 					}
 					if rhsTy != nil {
-						rhsF = rhsTy.IsFloatSess(cgSess(cg))
-						if sessHasError(cgSess(cg)) {
+						rhsF = rhsTy.IsFloatSess(sessFromCG(cg))
+						if hasErrCG(cg) {
 							return nil
 						}
 					}
 					if !lhsF && !rhsF {
-						f := NewVectorFilterItemsSess(cgSess(cg), []int{
+						f := NewVectorFilterItemsSess(sessFromCG(cg), []int{
 							int(BinMod), int(BinDiv), int(BinLShift), int(BinRShift),
 						}, FilterModeOut)
-						op = BinaryOp(r.RndUptoFilterSess(cgSess(cg), uint32(MaxBinaryOp), f))
-						if sessHasError(cgSess(cg)) {
+						op = BinaryOp(r.RndUptoFilterSess(sessFromCG(cg), uint32(MaxBinaryOp), f))
+						if hasErrCG(cg) {
 							return nil
 						}
-						opStr = op.BinaryOpCSess(cgSess(cg))
+						opStr = op.BinaryOpCSess(sessFromCG(cg))
 					}
 				}
 			}
 		}
 		// FunctionInvocation.cpp:255 — merge_param_context(rhs) (incl. shift constant path)
 		cg.MergeParamContext(rhsCG, true)
-		if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return nil
 		}
 	}
 	// FunctionInvocation.cpp:257 — ERROR_GUARD_AND_DEL2
-	if right == nil || sessHasError(cgSess(cg)) {
+	if right == nil || hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:266–273 — CompatibleChecker hard-fail (nullptr)
-	if CompatibleCheckExprsSess(cgSess(cg), opts, left, right) {
+	if CompatibleCheckExprsSess(sessFromCG(cg), opts, left, right) {
 		// residual ERROR sticky — no invent soft-binary past CompatibleCheck residual true
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
-		sessNoteError(cgSess(cg), ErrCompatibleCheck)
+		noteErrCG(cg, ErrCompatibleCheck)
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-binary past CompatibleCheck residual false
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:275–279 — ordered ops merge facts (short-circuit RHS may skip)
 	// full FactVec: makeup_new_var_facts then merge_facts(global, facts_copy).
 	// C++ always runs this on the post-LHS snapshot vector, including empty
 	// (n=0). Soft invent: `factsCopy != nil` skipped the whole block when
-	// GlobalFacts was nil (CloneFactSliceSess(cgSess(cg), nil)==nil; NewFactMgr zero value),
+	// GlobalFacts was nil (CloneFactSliceSess(sessFromCG(cg), nil)==nil; NewFactMgr zero value),
 	// so the first-program && never makeup-joined empty post-LHS with post-RHS
 	// live last=fN → BOTTOM (seed 199: UP nCopy=0 then JOIN 0⊕3, Go kept f3).
 	if IsOrderedBinary(op) && cg.FM != nil {
-		if !MakeupNewVarFactsSess(cgSess(cg), &factsCopy, cg.FM.GlobalFacts) ||
-			!makeupNewUnionFactsSess(cgSess(cg), &unionCopy, cg.FM.UnionFacts) ||
+		if !MakeupNewVarFactsSess(sessFromCG(cg), &factsCopy, cg.FM.GlobalFacts) ||
+			!makeupNewUnionFactsSess(sessFromCG(cg), &unionCopy, cg.FM.UnionFacts) ||
 			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) ||
 			!UnionFactsComplete(unionCopy) || !UnionFactsComplete(cg.FM.UnionFacts) {
 			// incomplete makeup/merge base — fail closed sticky, no invent bare binary
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
-		_ = MergeFactsSess(cgSess(cg), &cg.FM.GlobalFacts, factsCopy)
+		_ = MergeFactsSess(sessFromCG(cg), &cg.FM.GlobalFacts, factsCopy)
 		// residual ERROR sticky — no invent soft-binary past MergeFacts residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		// eUnionWrite half of merge_facts(global_facts, facts_copy)
 		for _, f := range unionCopy {
 			if f == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return nil
 			}
-			cg.FM.UnionFacts = MergeUnionFactSess(cgSess(cg), cg.FM.UnionFacts, f)
-			if sessHasError(cgSess(cg)) || !UnionFactsComplete(cg.FM.UnionFacts) {
-				if !sessHasError(cgSess(cg)) {
-					sessNoteError(cgSess(cg), ErrGeneric)
+			cg.FM.UnionFacts = MergeUnionFactSess(sessFromCG(cg), cg.FM.UnionFacts, f)
+			if hasErrCG(cg) || !UnionFactsComplete(cg.FM.UnionFacts) {
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
 				}
 				return nil
 			}
 		}
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags, Tmp1: tmp1, Tmp2: tmp2}
-	inv.setOutOptsSess(cgSess(cg), opts)
+	inv.setOutOptsSess(sessFromCG(cg), opts)
 	return inv
 }
 
@@ -1473,7 +1473,7 @@ func MakeRandomBinaryPtrComparison(
 ) *Invocation {
 	// FunctionInvocation always has RNG + CGContext; sticky no invent ptr-cmp shell without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// no pointer types: soft re-pick scalar binary (not broken IR)
@@ -1484,11 +1484,11 @@ func MakeRandomBinaryPtrComparison(
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:295–296 — rnd_flipcoin(50) ? eCmpEq : eCmpNe
@@ -1497,14 +1497,14 @@ func MakeRandomBinaryPtrComparison(
 	if r.RndFlipcoin(50) {
 		op = BinCmpEq
 	}
-	opStr := op.BinaryOpCSess(cgSess(cg))
+	opStr := op.BinaryOpCSess(sessFromCG(cg))
 	// FunctionInvocation.cpp:297–299 — SafeOpFlags::make_random_binary(get_int_type(),
 	// nullptr, nullptr, sOpBinary, op) BEFORE choose_random_pointer_type.
 	// Output for ptr_cmp still uses standard ==/!= (not safe_* wrappers), but the
 	// RNG draws for signedness + size still run (seed-2 e129 was F50 from flags).
-	flags := MakeRandomBinaryKindSess(cgSess(cg), r, opts, probs, GetIntType(), nil, nil, SafeOpBinary, op)
+	flags := MakeRandomBinaryKindSess(sessFromCG(cg), r, opts, probs, GetIntType(), nil, nil, SafeOpBinary, op)
 	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison
-	if flags == nil || sessHasError(cgSess(cg)) {
+	if flags == nil || hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:301–303 — CreateFunctionInvocationBinary (no RNG for
@@ -1525,15 +1525,15 @@ func MakeRandomBinaryPtrComparison(
 	lhsCG.CurrRHS = nil
 	// make_random(lhs_cg, type, 0, true) — no_func true
 	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, MaxTermTypes, lhsCG.ExprDepth)
-	if left == nil || sessHasError(cgSess(cg)) {
+	if left == nil || hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:313 — merge_param_context(lhs)
 	cg.MergeParamContext(lhsCG, true)
 	// incomplete effect after lhs merge fails closed sticky (no invent RHS / soft re-pick)
-	if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		if !sessHasError(cgSess(cg)) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+	if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
 		}
 		return nil
 	}
@@ -1557,13 +1557,13 @@ func MakeRandomBinaryPtrComparison(
 		rhsCG := cg.CloneSubcontext()
 		// FunctionInvocation.cpp:338–342 — effect_context + lhs_eff_accum
 		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
-		rhsCtx := cg.EffectContext().AddEffectSess(cgSess(cg), lhsAccum)
+		rhsCtx := cg.EffectContext().AddEffectSess(sessFromCG(cg), lhsAccum)
 		// residual ERROR sticky — no invent soft-continue RHS past AddEffect residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		if !EffectComplete(rhsCtx) {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return nil
 		}
 		rhsCG.effectContext = rhsCtx
@@ -1574,31 +1574,31 @@ func MakeRandomBinaryPtrComparison(
 		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, rhsCG.ExprDepth)
 		// FunctionInvocation.cpp:345
 		cg.MergeParamContext(rhsCG, true)
-		if sessHasError(cgSess(cg)) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-			if !sessHasError(cgSess(cg)) {
-				sessNoteError(cgSess(cg), ErrGeneric)
+		if hasErrCG(cg) || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !hasErrCG(cg) {
+				noteErrCG(cg, ErrGeneric)
 			}
 			return nil
 		}
 	}
-	if right == nil || sessHasError(cgSess(cg)) {
+	if right == nil || hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed (lang_cpp)
-	lt := left.GetTypeSess(cgSess(cg))
+	lt := left.GetTypeSess(sessFromCG(cg))
 	// residual ERROR sticky — no invent ptr-cmp past GetType residual hole
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
-	right.CheckAndSetCastOptsSess(cgSess(cg), lt, opts)
+	right.CheckAndSetCastOptsSess(sessFromCG(cg), lt, opts)
 	// residual ERROR sticky — no invent ptr-cmp past CheckAndSetCast residual hole
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:358 — bookkeeping
-	RecordPointerComparisonsSess(cgSess(cg), left, right)
+	RecordPointerComparisonsSess(sessFromCG(cg), left, right)
 	// residual ERROR sticky — no invent ptr-cmp past RecordPointerComparisons residual hole
-	if sessHasError(cgSess(cg)) {
+	if hasErrCG(cg) {
 		return nil
 	}
 	// flags already drawn before pointer type (FunctionInvocation.cpp:297–304 order)
@@ -1609,7 +1609,7 @@ func MakeRandomBinaryPtrComparison(
 		Safe:   flags,
 		PtrCmp: true,
 	}
-	inv.setOutOptsSess(cgSess(cg), opts)
+	inv.setOutOptsSess(sessFromCG(cg), opts)
 	return inv
 }
 
@@ -1627,37 +1627,37 @@ func MakeBinary(
 	// FunctionInvocation.cpp:565+ — always has RNG + live operands sticky
 	// (no invent binary shell without them / soft re-pick past holes)
 	if r == nil || lhs == nil || rhs == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent binary shell / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:565 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationBinary, nullptr)
-	if DepthGuardByTypeSess(cgSess(&cg), opts, DtFunctionInvocationBinary) == BadDepth {
+	if DepthGuardByTypeSess(sessFromCG(&cg), opts, DtFunctionInvocationBinary) == BadDepth {
 		return nil
 	}
 	// invalid / MAX op — sticky no invent empty Binary token shell
-	opStr := op.BinaryOpCSess(cgSess(&cg))
+	opStr := op.BinaryOpCSess(sessFromCG(&cg))
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return nil
 	}
-	lt, rt := lhs.GetTypeSess(cgSess(&cg)), rhs.GetTypeSess(cgSess(&cg))
+	lt, rt := lhs.GetTypeSess(sessFromCG(&cg)), rhs.GetTypeSess(sessFromCG(&cg))
 	// residual ERROR sticky — no invent binary shell past GetType residual hole
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return nil
 	}
 	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
-	flags := MakeRandomBinaryKindSess(cgSess(&cg), r, opts, probs, nil, lt, rt, SafeOpBinary, op)
+	flags := MakeRandomBinaryKindSess(sessFromCG(&cg), r, opts, probs, nil, lt, rt, SafeOpBinary, op)
 	// FunctionInvocation.cpp:568 — ERROR_GUARD; no soft invent binary without flags
 	if flags == nil {
 		return nil
@@ -1668,7 +1668,7 @@ func MakeBinary(
 		Args:   []*Expression{lhs, rhs},
 		Safe:   flags,
 	}
-	inv.setOutOptsSess(cgSess(&cg), opts)
+	inv.setOutOptsSess(sessFromCG(&cg), opts)
 	// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(cg, nil, flags, op)
 	if flags != nil && SafeOpsBinary(opStr) && inv.Tmp1 == "" {
@@ -1691,40 +1691,40 @@ func MakeRandomUnaryInvocation(
 ) *Invocation {
 	// FunctionInvocation.cpp always has RNG + CGContext sticky; no invent unary shell without them
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent unary / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:143 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomUnary, nullptr)
-	if DepthGuardByTypeSess(cgSess(cg), opts, DtFunctionInvocationRandomUnary) == BadDepth {
+	if DepthGuardByTypeSess(sessFromCG(cg), opts, DtFunctionInvocationRandomUnary) == BadDepth {
 		return nil
 	}
 	// FunctionInvocation.cpp:144 — assert(type) sticky
 	if typ == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:146–149 — do { pick } while (float && !works); no soft invent invalid
 	var uop UnaryOp
 	validU := false
 	// Unary make_random has no Probabilities arg; use session bag (cg.Sess under Generate).
-	unProbs := sessProbs(cgSess(cg))
+	unProbs := sessProbs(sessFromCG(cg))
 	// C++ unbounded do-while; cap high (no soft invent invalid float op)
 	for tries := 0; tries < 256; tries++ {
-		uop = PickUnaryOpProbsSess(cgSess(cg), r, opts, unProbs)
-		isF := typ.IsFloatSess(cgSess(cg))
+		uop = PickUnaryOpProbsSess(sessFromCG(cg), r, opts, unProbs)
+		isF := typ.IsFloatSess(sessFromCG(cg))
 		// residual ERROR sticky — no invent soft-continue unary pick past IsFloat residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return nil
 		}
 		if !isF || UnaryOpWorksForFloat(uop) {
@@ -1736,9 +1736,9 @@ func MakeRandomUnaryInvocation(
 		return nil
 	}
 	// PickUnaryOp MAX / empty token — sticky no invent unary shell without live op
-	op := uop.UnaryOpCSess(cgSess(cg))
+	op := uop.UnaryOpCSess(sessFromCG(cg))
 	if int(uop) < 0 || int(uop) >= MaxUnaryOp || op == "" {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:151–155 — always make_random_unary then operand type from flags
@@ -1747,14 +1747,14 @@ func MakeRandomUnaryInvocation(
 	if vs != nil {
 		probs = vs.Probs
 	}
-	flags := MakeRandomUnarySess(cgSess(cg), r, opts, probs, typ, nil, uop)
+	flags := MakeRandomUnarySess(sessFromCG(cg), r, opts, probs, typ, nil, uop)
 	// FunctionInvocation.cpp:152–154 — ERROR_GUARD; type = flags->get_lhs_type(); assert(type) sticky
 	if flags == nil {
 		return nil
 	}
 	argTy := flags.LHSType()
 	if argTy == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:156–159 — CreateFunctionInvocationUnary BEFORE operand
@@ -1767,11 +1767,11 @@ func MakeRandomUnaryInvocation(
 	// FunctionInvocation.cpp:160–162 — Expression::make_random(cg, type) — no_func=false
 	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
 	// FunctionInvocation.cpp:161 — ERROR_GUARD_AND_DEL1
-	if arg == nil || sessHasError(cgSess(cg)) {
+	if arg == nil || hasErrCG(cg) {
 		return nil
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags, Tmp1: tmp1}
-	inv.setOutOptsSess(cgSess(cg), opts)
+	inv.setOutOptsSess(sessFromCG(cg), opts)
 	return inv
 }
 
@@ -1779,7 +1779,7 @@ func MakeRandomUnaryInvocation(
 // temp allocation. FunctionInvocationBinary.cpp:59–75 — always when flags && safe_ops;
 // no soft invent skip on !MathNoTmp or float size.
 func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags, op BinaryOp) (tmp1, tmp2 string) {
-	if flags == nil || !SafeOpsBinary(op.BinaryOpCSess(cgSess(&cg))) {
+	if flags == nil || !SafeOpsBinary(op.BinaryOpCSess(sessFromCG(&cg))) {
 		return "", ""
 	}
 	// FunctionInvocationBinary.cpp:59–75 — no EffectComplete/FactsComplete gate before
@@ -1794,25 +1794,25 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield simple type sticky
 	ty1 := flags.LHSType()
 	if ty1 == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return "", ""
 	}
 	if !ty1.IsSimple() {
 		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return "", ""
 		}
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return "", ""
 	}
 	// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return "", ""
 	}
 	st := ty1.Simple()
-	tmp1 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cgSess(&cg)), st)
+	tmp1 = blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), st)
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return "", ""
 	}
 	st2 := st
@@ -1821,22 +1821,22 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	if op == BinLShift || op == BinRShift {
 		ty := flags.RHSType()
 		if ty == nil {
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return "", ""
 		}
 		if !ty.IsSimple() {
-			if sessHasError(cgSess(&cg)) {
+			if hasErrCG(&cg) {
 				return "", ""
 			}
-			sessNoteError(cgSess(&cg), ErrGeneric)
+			noteErrCG(&cg, ErrGeneric)
 			return "", ""
 		}
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return "", ""
 		}
 		st2 = ty.Simple()
 	}
-	tmp2 = blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cgSess(&cg)), st2)
+	tmp2 = blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), st2)
 	return tmp1, tmp2
 }
 
@@ -1856,24 +1856,24 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 	// flags_to_type must yield simple type sticky
 	ty := flags.LHSType()
 	if ty == nil {
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return ""
 	}
 	if !ty.IsSimple() {
 		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
-		if sessHasError(cgSess(&cg)) {
+		if hasErrCG(&cg) {
 			return ""
 		}
-		sessNoteError(cgSess(&cg), ErrGeneric)
+		noteErrCG(&cg, ErrGeneric)
 		return ""
 	}
 	// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return ""
 	}
-	tmp := blk.CreateNewTmpVarSess(firstSess(vsSess(vs), cgSess(&cg)), ty.Simple())
+	tmp := blk.CreateNewTmpVarSess(firstSess(sessFromVS(vs), sessFromCG(&cg)), ty.Simple())
 	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
-	if sessHasError(cgSess(&cg)) {
+	if hasErrCG(&cg) {
 		return ""
 	}
 	return tmp
@@ -1898,18 +1898,18 @@ func MakeRandomInvocation(
 	// FunctionInvocation.cpp always has RNG + CGContext; sticky Failed
 	// (no invent invoke shell / soft re-pick past hole)
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// incomplete ambient fails closed sticky (no invent choose/build / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// Match type for choose_func: nil means any return type (C++ type=0).
@@ -1918,7 +1918,7 @@ func MakeRandomInvocation(
 	if typ != nil {
 		pt := typ.PtrType()
 		// residual ERROR sticky — no invent soft-std path past PtrType residual
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return &Invocation{Failed: true}
 		}
 		if pt != nil {
@@ -1926,7 +1926,7 @@ func MakeRandomInvocation(
 		} else {
 			simple := typ.IsSimple()
 			// residual ERROR sticky — no invent soft-std path past IsSimple residual
-			if sessHasError(cgSess(cg)) {
+			if hasErrCG(cg) {
 				return &Invocation{Failed: true}
 			}
 			if simple && typ.Simple() == EVoid {
@@ -1963,16 +1963,16 @@ func MakeRandomInvocation(
 				sigType = RandomReturnType(r, probs, env, opts)
 				// ERROR_GUARD when choose_random fails; sticky Failed (no invent GetIntType return)
 				if sigType == nil {
-					if !sessHasError(cgSess(cg)) {
-						sessNoteError(cgSess(cg), ErrGeneric)
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
 					}
 					return &Invocation{Failed: true}
 				}
 			}
 			// Statement probability table is session singleton; sticky no invent second table
-			stmtTab := sessStmtTab(cgSess(cg))
+			stmtTab := sessStmtTab(sessFromCG(cg))
 			if stmtTab == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return &Invocation{Failed: true}
 			}
 			// FunctionInvocationUser.cpp:179 — pass Expression qfer into signature RV qfer
@@ -1992,19 +1992,19 @@ func MakeRandomInvocation(
 		// typ==nil desyncs RNG vs upstream (unfair soft prefer-binary without F5).
 		// Fair: always Flipcoin; unary only when flag && typ live.
 		if probs == nil || r == nil {
-			sessNoteError(cgSess(cg), ErrGeneric)
+			noteErrCG(cg, ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		stdUnary := r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb)))
 		// FunctionInvocation.cpp ERROR_GUARD after flipcoin
-		if sessHasError(cgSess(cg)) {
+		if hasErrCG(cg) {
 			return &Invocation{Failed: true}
 		}
 		if stdUnary {
 			// FunctionInvocation.cpp:143 assert(type); NDEBUG Release continues into
 			// type->… UB — fail closed sticky (no invent binary after a true unary draw).
 			if typ == nil {
-				sessNoteError(cgSess(cg), ErrGeneric)
+				noteErrCG(cg, ErrGeneric)
 				return &Invocation{Failed: true}
 			}
 			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, typ)

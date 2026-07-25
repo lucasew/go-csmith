@@ -13,25 +13,25 @@ func MakeRandomBreak(
 ) Stmt {
 	// StatementBreak always has RNG + CGContext; sticky no invent Kind-only shell
 	if r == nil || cg == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
-	loop := ClosestLoopingBlockSess(cgSess(cg), cg.CurrentBlock())
+	loop := ClosestLoopingBlockSess(sessFromCG(cg), cg.CurrentBlock())
 	// StatementBreak.cpp:72 — assert(b) sticky; no soft invent break without looping block
 	if loop == nil {
-		sessNoteError(cgSess(cg), ErrGeneric)
+		noteErrCG(cg, ErrGeneric)
 		return Stmt{}
 	}
 	// StatementBreak.cpp:76 — clear effect_stm before condition
@@ -40,10 +40,10 @@ func MakeRandomBreak(
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	// StatementBreak.cpp:79 — ERROR_GUARD(nullptr)
 	// residual ERROR sticky — no invent soft-return break past condition make residual
-	if expr == nil || sessHasError(cgSess(cg)) {
+	if expr == nil || hasErrCG(cg) {
 		return Stmt{}
 	}
-	st := Stmt{Kind: StmtBreak, Expr: expr, StmID: AllocStmIDSess(cgSess(cg))}
+	st := Stmt{Kind: StmtBreak, Expr: expr, StmID: AllocStmIDSess(sessFromCG(cg))}
 	// StatementBreak.cpp:81 — b->break_stms.push_back only
 	// CFG edges created in StatementFor::post_loop_analysis (for-stmt dest), not here
 	loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)

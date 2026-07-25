@@ -164,7 +164,7 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 	// Type::choose_random requires AllTypes + RNG; ERROR_GUARD path → nil
 	// sticky no invent default int when r nil; empty env stays non-sticky soft nil
 	if r == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
 	if env == nil || len(env.AllTypes) == 0 {
@@ -207,9 +207,9 @@ func MakeRandomSignature(
 ) *Function {
 	// Prefer VS/run bag on the context (MakeRandom under generation has vs.Sess).
 	if cg.Sess == nil {
-		cg.Sess = vsSess(vs)
+		cg.Sess = sessFromVS(vs)
 	}
-	s := cgSess(&cg)
+	s := sessFromCG(&cg)
 	// Function.cpp:401+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
 		sessNoteError(s, ErrGeneric)
@@ -253,7 +253,7 @@ func MakeRandomSignature(
 	if sessHasError(s) {
 		return nil
 	}
-	name := RandomFunctionNameSess(firstSess(vsSess(vs), s), sym)
+	name := RandomFunctionNameSess(firstSess(sessFromVS(vs), s), sym)
 	// gensym always live; sticky no invent empty-name signature / "_alias" shell
 	if name == "" {
 		sessNoteError(s, ErrGeneric)
@@ -320,9 +320,9 @@ func MakeRandomFunction(
 	list *FunctionList,
 ) *Function {
 	if cg.Sess == nil {
-		cg.Sess = vsSess(vs)
+		cg.Sess = sessFromVS(vs)
 	}
-	s := cgSess(&cg)
+	s := sessFromCG(&cg)
 	f := MakeRandomSignature(r, opts, probs, vs, sym, cg, retType, qfer, list)
 	// Function.cpp:434 ERROR_GUARD after signature
 	if f == nil || sessHasError(s) {
@@ -390,7 +390,7 @@ func MakeFirst(
 	fmMap *FactMgrMap,
 ) *Function {
 	// Function.cpp:457–458 bag — prefer VS / FMList session before any sticky write.
-	runSess := firstSess(vsSess(vs), nil)
+	runSess := firstSess(sessFromVS(vs), nil)
 	if fmMap != nil && fmMap.Sess != nil {
 		runSess = firstSess(runSess, fmMap.Sess)
 	}
@@ -581,7 +581,7 @@ func (f *Function) generateBodyCore(
 	knownParams bool,
 ) {
 	if f == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return
 	}
 	// Function.cpp:626–629 / 668–671 — ignore regenerate
@@ -591,7 +591,7 @@ func (f *Function) generateBodyCore(
 	// Function.cpp:643–648 — non-builtin make_random body always has process RNG
 	// sticky no invent Building/Built shell without RNG
 	if !f.IsBuiltin && r == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return
 	}
 	// incomplete ambient fails closed sticky before BuildBuilding
@@ -599,11 +599,11 @@ func (f *Function) generateBodyCore(
 	if !EffectComplete(prev.EffectContext()) ||
 		(prev.EffectAccum != nil && !EffectComplete(*prev.EffectAccum)) ||
 		!EffectComplete(prev.EffectStm) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return
 	}
 	if prev.FM != nil && !FactsComplete(prev.FM.GlobalFacts) {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		return
 	}
 	f.BuildState = BuildBuilding
@@ -646,7 +646,7 @@ func (f *Function) generateBodyCore(
 	// empty and the caller frame is omitted from call_chain.
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -656,9 +656,9 @@ func (f *Function) generateBodyCore(
 	}
 	// Function.cpp:635 / 674 — get_fact_mgr_for_func(this); no invent NewFactMgr here
 	if cg.FM == nil {
-		cg.FM = f.PairedFactMgrSess(vsSess(vs))
+		cg.FM = f.PairedFactMgrSess(sessFromVS(vs))
 		// residual ERROR sticky — no invent soft-continue body past PairedFactMgr residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -666,7 +666,7 @@ func (f *Function) generateBodyCore(
 	}
 	if cg.FM == nil {
 		// get_fact_mgr_for_func returned null — sticky fail closed (no soft invent FM)
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -678,13 +678,13 @@ func (f *Function) generateBodyCore(
 	if knownParams {
 		if rwd := prev.BuildCalleeRWDirective(cg.FM.GlobalFacts); rwd != nil {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual
-			if sessHasError(vsSess(vs)) {
+			if hasErrVS(vs) {
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			cg.RW = rwd
-		} else if sessHasError(vsSess(vs)) {
+		} else if hasErrVS(vs) {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual nil
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
@@ -700,42 +700,42 @@ func (f *Function) generateBodyCore(
 	if !knownParams {
 		for _, p := range f.Param {
 			if p == nil {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			if p.Type == nil && !IsSpecialPtr(p) {
-				sessNoteError(vsSess(vs), ErrGeneric)
+				noteErrVS(vs, ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
-			if p.IsPointerSess(vsSess(vs)) {
+			if p.IsPointerSess(sessFromVS(vs)) {
 				// residual ERROR sticky — no invent soft-skip param seed past IsPointer hole
-				if sessHasError(vsSess(vs)) {
+				if hasErrVS(vs) {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
 				// incomplete GlobalFacts sticky before soft FindRelated miss invent
 				if !FactsComplete(cg.FM.GlobalFacts) {
-					sessNoteError(vsSess(vs), ErrGeneric)
+					noteErrVS(vs, ErrGeneric)
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
 				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
 					// residual ERROR sticky — no invent soft-continue later params past FindRelated hole
-					if sessHasError(vsSess(vs)) {
+					if hasErrVS(vs) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
 					nf := MakeFactPointTo(p, TBDPtr)
-					if nf == nil || sessHasError(vsSess(vs)) {
-						if !sessHasError(vsSess(vs)) {
-							sessNoteError(vsSess(vs), ErrGeneric)
+					if nf == nil || hasErrVS(vs) {
+						if !hasErrVS(vs) {
+							noteErrVS(vs, ErrGeneric)
 						}
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
@@ -743,17 +743,17 @@ func (f *Function) generateBodyCore(
 					}
 					cg.FM.SetGlobalFacts(append(cg.FM.GlobalFacts, nf), "auto_function_666")
 					// residual ERROR sticky — no invent soft-continue later params past append residual
-					if sessHasError(vsSess(vs)) {
+					if hasErrVS(vs) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
-				} else if sessHasError(vsSess(vs)) {
+				} else if hasErrVS(vs) {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
-			} else if sessHasError(vsSess(vs)) {
+			} else if hasErrVS(vs) {
 				// residual ERROR sticky — no invent soft-continue non-pointer past IsPointer hole
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
@@ -767,7 +767,7 @@ func (f *Function) generateBodyCore(
 	if f.IsBuiltin {
 		f.Body = MakeDummyBlockCG(&cg, opts)
 		// residual ERROR sticky — no invent soft-Built past MakeDummyBlock residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -775,7 +775,7 @@ func (f *Function) generateBodyCore(
 	} else {
 		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
 		// residual ERROR sticky — no invent soft-Built past MakeRandomBlock residual
-		if sessHasError(vsSess(vs)) {
+		if hasErrVS(vs) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -783,7 +783,7 @@ func (f *Function) generateBodyCore(
 	}
 	// Function.cpp:647 / 689 — ERROR_RETURN(); body->set_depth_protect
 	// sticky error aborts; null body without error would crash C++ on body->
-	if sessHasError(vsSess(vs)) {
+	if hasErrVS(vs) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -803,7 +803,7 @@ func (f *Function) generateBodyCore(
 	// Block*/Variable*/Fact* always live; nil holes fail closed (abort cleanup invent)
 	// Early SetError must leave Unbuilt (no invent stuck Building / later markBuilt success)
 	abortUnbuilt := func() {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		noteErrVS(vs, ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 	}
@@ -828,9 +828,9 @@ func (f *Function) generateBodyCore(
 		}
 		for i, fact := range cg.FM.GlobalFacts {
 			// nil without error = no lattice change; nil with sticky = incomplete fail closed
-			if nf := fact.MarkFuncEndLocalsSess(vsSess(vs), locals); nf != nil {
+			if nf := fact.MarkFuncEndLocalsSess(sessFromVS(vs), locals); nf != nil {
 				cg.FM.GlobalFacts[i] = nf
-			} else if sessHasError(vsSess(vs)) {
+			} else if hasErrVS(vs) {
 				abortUnbuilt()
 				return
 			}
@@ -855,16 +855,16 @@ func (f *Function) generateBodyCore(
 			return
 		}
 	}
-	f.ComputeSummarySess(vsSess(vs), summaryEff)
-	if sessHasError(vsSess(vs)) {
+	f.ComputeSummarySess(sessFromVS(vs), summaryEff)
+	if hasErrVS(vs) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
 	}
 
 	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
-	f.MakeReturnConstSess(vsSess(vs), opts, probs, r)
-	if sessHasError(vsSess(vs)) {
+	f.MakeReturnConstSess(sessFromVS(vs), opts, probs, r)
+	if hasErrVS(vs) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -896,7 +896,7 @@ func (f *Function) generateBodyCore(
 		}
 	}
 	// Function.cpp:661–662 — Mark Built
-	f.markBuiltSess(vsSess(vs))
+	f.markBuiltSess(sessFromVS(vs))
 }
 
 // MakeReturnConst mirrors Function::make_return_const.
