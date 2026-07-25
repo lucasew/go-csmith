@@ -14,7 +14,7 @@ import "testing"
 // need_revisit LCA → Func.Blocks n=37 vs UP n=3 at FindGoodJumpBlock).
 func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	body := &Block{StmID: 1, Func: f, Parent: nil}

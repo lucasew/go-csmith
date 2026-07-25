@@ -11,7 +11,7 @@ import (
 func TestAddParamFactsDoesNotSetFactChanged(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	fn := &Function{Name: "func_param", ReturnType: GetIntType()}
 	p := CreateVariableScalars("p_0", PointerTo(GetIntType()), false, false)
 	fn.Param = []*Variable{p}

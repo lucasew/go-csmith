@@ -125,21 +125,21 @@ func TestCheckWriteVarPartialConflict(t *testing.T) {
 func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	// FactPointTo.cpp:476–482 — is_dangling when dead && dead_pointer_dereference_prob==0
 	// CGOptions has dead_pointer_dereference_prob only (no dual DanglingPtrDerefProb invent)
-	prev := ProcessOptions()
-	defer SetProcessOptions(prev)
+	prev := ProcessOptionsSess(testAmbientSession)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	cg := EmptyCGContext()
 	// default dead prob 0 → dangling reject
 	opts := Defaults()
 	opts.DeadPointerDerefProb = 0
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	if cg.CheckReadVar(p, facts) {
 		t.Fatal("dead ptr with deadProb 0 must fail")
 	}
 	// dead_pointer_dereference_prob > 0 → is_dangling_ptr false; read allowed
 	opts.DeadPointerDerefProb = 50
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	if !cg.CheckReadVar(p, facts) {
 		t.Fatal("dead ptr with deadProb>0 must not invent always-reject")
 	}

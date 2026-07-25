@@ -7,10 +7,10 @@ import "testing"
 func TestPointerArrayInitThenArrayOpMerge(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	r := NewRng(42)
-	SetProcessRng(r)
+	SetProcessRngSess(testAmbientSession, r)
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
 	ie := &Expression{Term: TermVariable, Var: g, ExprType: elem}

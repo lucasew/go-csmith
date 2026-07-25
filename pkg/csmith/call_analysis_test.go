@@ -524,7 +524,7 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -623,7 +623,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	ClearError()
 	defer ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	gExtra := CreateVariableScalars("g_extra", GetIntType(), true, false)

@@ -182,9 +182,9 @@ func TestBinaryConstantPath(t *testing.T) {
 	// force BinaryConstProb 100% via process probs
 	probs := NewProbabilities(opts)
 	probs.single[PBinaryConstProb] = 100
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(probs)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, probs)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	s := generateRandomIntConstant(opts, NewRng(1))
 	if !strings.HasPrefix(s, "0b") {
 		t.Fatalf("want binary int, got %q", s)

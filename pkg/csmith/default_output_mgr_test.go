@@ -14,7 +14,7 @@ func TestCreateDefaultOutputMgrSplit(t *testing.T) {
 	if !CreateDefaultOutputMgr(o) || HasError() {
 		t.Fatal("create", HasError())
 	}
-	paths := ProcessSplitPaths()
+	paths := ProcessSplitPathsSess(testAmbientSession)
 	if len(paths) != 3 {
 		t.Fatal(paths)
 	}
@@ -50,7 +50,7 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 	}()
 	CreateRandomNumberInstance(RngKindDefault, 2)
 	o := Defaults()
-	SetProcessOptions(o)
+	SetProcessOptionsSess(testAmbientSession, o)
 	v1 := CreateVariableScalars("g_1", GetIntType(), true, false)
 	v2 := CreateVariableScalars("g_2", GetIntType(), true, false)
 	out := RandomOutputVarDefs([]*Variable{v1, v2}, 2, true)
@@ -99,16 +99,16 @@ func TestCreateDFSOutputMgr(t *testing.T) {
 	ClearOutputMgr()
 	o := Defaults()
 	CreateDFSOutputMgr(o)
-	if ProcessOutputMgrKind() != OutputMgrKindDFS {
-		t.Fatal(ProcessOutputMgrKind())
+	if ProcessOutputMgrKindSess(testAmbientSession) != OutputMgrKindDFS {
+		t.Fatal(ProcessOutputMgrKindSess(testAmbientSession))
 	}
-	if ProcessStructOutput() != DefaultStructOutputName {
-		t.Fatal(ProcessStructOutput())
+	if ProcessStructOutputSess(testAmbientSession) != DefaultStructOutputName {
+		t.Fatal(ProcessStructOutputSess(testAmbientSession))
 	}
 	o.StructOutput = "my_structs.h"
 	CreateDFSOutputMgr(o)
-	if ProcessStructOutput() != "my_structs.h" {
-		t.Fatal(ProcessStructOutput())
+	if ProcessStructOutputSess(testAmbientSession) != "my_structs.h" {
+		t.Fatal(ProcessStructOutputSess(testAmbientSession))
 	}
 	if DFSOutputHeader("HDR\n", true) != "" {
 		t.Fatal("compact skip")
@@ -138,8 +138,8 @@ func TestGetCountPrefix(t *testing.T) {
 
 func TestProcessProgramGenerator(t *testing.T) {
 	ClearError()
-	ClearProcessProgramGenerator()
-	if ProcessProgramGenerator() != nil || !HasError() {
+	ClearProcessProgramGeneratorSess(testAmbientSession)
+	if ProcessProgramGeneratorSess(testAmbientSession) != nil || !HasError() {
 		t.Fatal("nil sticky")
 	}
 	ClearError()
@@ -155,7 +155,7 @@ func TestProcessProgramGenerator(t *testing.T) {
 	}
 	DoFinalization()
 	ReinstallTestProcessSingletons()
-	if ProcessProgramGenerator() != nil {
+	if ProcessProgramGeneratorSess(testAmbientSession) != nil {
 		// finalization clears; may sticky on Get
 		ClearError()
 	}
@@ -163,11 +163,11 @@ func TestProcessProgramGenerator(t *testing.T) {
 
 func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
 	ClearError()
-	prevO := ProcessOptions()
+	prevO := ProcessOptionsSess(testAmbientSession)
 	defer func() {
 		DoFinalization()
 		ReinstallTestProcessSingletons()
-		SetProcessOptions(prevO)
+		SetProcessOptionsSess(testAmbientSession, prevO)
 		ClearError()
 	}()
 	o := Defaults()

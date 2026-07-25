@@ -5,9 +5,9 @@ import "testing"
 func TestPickBinaryOpFullRange(t *testing.T) {
 	// FunctionInvocation.cpp:179 — BINARY_OPS_PROB_FILTER from process Probabilities
 	opts := Defaults()
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(NewProbabilities(opts))
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	seen := map[BinaryOp]bool{}
 	r := NewRng(1)
 	for i := 0; i < 500; i++ {
@@ -28,9 +28,9 @@ func TestPickBinaryOpRespectsNoMuls(t *testing.T) {
 	opts := Defaults()
 	opts.Muls = false
 	opts.Divs = false
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(NewProbabilities(opts))
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	r := NewRng(2)
 	for i := 0; i < 200; i++ {
 		op := PickBinaryOp(r, opts)
@@ -43,9 +43,9 @@ func TestPickBinaryOpRespectsNoMuls(t *testing.T) {
 func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
 	// no soft invent BinaryOpsFilter(opts) when process Probabilities unset
 	// non-sticky MAX (sticky poisons unit paths without process singleton)
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(nil)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	op := PickBinaryOp(NewRng(1), Defaults())
 	if int(op) != MaxBinaryOp {
 		t.Fatalf("want MAX without process probs, got %v", op)

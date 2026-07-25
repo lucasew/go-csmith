@@ -512,11 +512,11 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	}
 	// macro_tmp_vars name+type always live; sticky no invent partial tmp list
 	// Block.cpp:261 — OutputTmpVariableList only under math_notmp
-	prevO := ProcessOptions()
+	prevO := ProcessOptionsSess(testAmbientSession)
 	o := prevO
 	o.MathNoTmp = true
-	SetProcessOptions(o)
-	defer SetProcessOptions(prevO)
+	SetProcessOptionsSess(testAmbientSession, o)
+	defer SetProcessOptionsSess(testAmbientSession, prevO)
 	ClearError()
 	b := &Block{TmpVars: map[string]ESimpleType{"": EInt}}
 	if out := b.Output(0); out != "" {
@@ -574,8 +574,8 @@ func TestAddNewVarFactTo(t *testing.T) {
 	// no invent NewFactPointTo garbage for null-init pointer.
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
 	if p == nil || p.Init == nil {
 		t.Fatal("pointer init")
@@ -741,7 +741,7 @@ func TestFindFixedPointShortcut(t *testing.T) {
 // After drop, currentUnions must equal the map_in half so shortcut can match.
 func TestDropUnionLocalsSyncsCurrentUnionsForSameFacts(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_sync", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -1361,9 +1361,9 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	opts.MaxBlockDepth = 5
 	opts.MaxBlockSize = 1
 	// Minimal process tables so MakeRandomFor can run or fail cleanly
-	prevStmt := ProcessStmtTab()
-	SetProcessStmtTab(InitProbabilityTable(opts))
-	defer SetProcessStmtTab(prevStmt)
+	prevStmt := ProcessStmtTabSess(testAmbientSession)
+	SetProcessStmtTabSess(testAmbientSession, InitProbabilityTable(opts))
+	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	b := &Block{Looping: true, Func: f, StmID: 1}
@@ -1394,9 +1394,9 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockDepth = 5
 	opts.MaxBlockSize = 1
-	prevStmt := ProcessStmtTab()
-	SetProcessStmtTab(InitProbabilityTable(opts))
-	defer SetProcessStmtTab(prevStmt)
+	prevStmt := ProcessStmtTabSess(testAmbientSession)
+	SetProcessStmtTabSess(testAmbientSession, InitProbabilityTable(opts))
+	defer SetProcessStmtTabSess(testAmbientSession, prevStmt)
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	b := &Block{Looping: true, Func: f, StmID: 1}
@@ -1459,9 +1459,9 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	// ProcessAssignOpsTable required past FM gate
-	prevTab := ProcessAssignOpsTable()
-	SetProcessAssignOpsTable(NewAssignOpsTable(opts))
-	defer SetProcessAssignOpsTable(prevTab)
+	prevTab := ProcessAssignOpsTableSess(testAmbientSession)
+	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTable(opts))
+	defer SetProcessAssignOpsTableSess(testAmbientSession, prevTab)
 	cq := NewCVQualifiers([]bool{true}, []bool{false})
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: cq},
@@ -1499,7 +1499,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	// IsVolatileStructUnion residual under StrictVolatileRule soft invent was soft-continue RHS.
 	optsSV := Defaults()
 	optsSV.StrictVolatileRule = true
-	SetProcessAssignOpsTable(NewAssignOpsTable(optsSV))
+	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTable(optsSV))
 	got3 := MakeRandomAssign(NewRng(1), optsSV, NewProbabilities(optsSV), NewVariableSelector(optsSV), NewExprTables(optsSV), &cg, hole)
 	if stmtOK(got3) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed assign")
@@ -1617,7 +1617,7 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	// live may stay polluted until post_creation installs map_facts_out (729).
 	// map_facts_out from re-analysis outputs only (no invent reinject after strip).
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
@@ -1764,7 +1764,7 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 // Invent per-stmt mergeMayNull reinjected mid-gen null during FP (seed-2 e12688).
 func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
@@ -1802,7 +1802,7 @@ func TestFindFixedPointBackEdgeMergesUnionFacts(t *testing.T) {
 	// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src]) full FactVec.
 	// Soft invent was PT-only merge; eUnionWrite half stayed at entry last_write.
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	ut := &Type{isUnion: true, StructName: "U_fpbe", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -1857,7 +1857,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	// Self-back / entry with may-null makes *p=… visit fail (C++ same); strip path.
 	// No invent mergeMayNull needed for that fail — inputs already carry null.
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
@@ -1895,7 +1895,7 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 // No invent mergeMayNullFromLive — pure sequential + self-back.
 func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
@@ -1941,7 +1941,7 @@ func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
 // append_return must not re-read live after ShortcutAnalysis installs map_out).
 func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
@@ -2032,7 +2032,7 @@ func TestIsNonreadableFieldNeedsUnionFact(t *testing.T) {
 // when Go uses GlobalFacts as the analysis working set (unlike C++ inputs FactVec).
 func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgr(f)
 	pt := PointerTo(GetIntType())
@@ -2089,9 +2089,9 @@ func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
 func TestPostCreationMapVisitedMergesSelfBackMayNull(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(1))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -2193,7 +2193,7 @@ func TestAppendNestedLoopMakeupsUnionFacts(t *testing.T) {
 func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U_nofp", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -2305,7 +2305,7 @@ func TestPostCreationNoFPOOSsLiveUnionsNotMapOut(t *testing.T) {
 func TestPostCreationNoFPNoSelfBackWhenMustBreak(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
 	parent := &Block{StmID: AllocStmID(), Func: fn}
 	// Last stmt is return → must_break_or_return true → is_loop_body false

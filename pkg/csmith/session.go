@@ -9,7 +9,8 @@
 // not toggle any package meta lock (pureGenStrict deleted).
 //
 // Quarantined ambient (unit tests only):
-//   - testAmbientSession + Process*/SetError bridges for legacy unit tests
+//   - testAmbientSession + SetError/GetError + non-Sess helpers (InitScopeTable, …)
+//   - *Sess(testAmbientSession, …) Process* accessors (non-Sess Process* deleted)
 //   - NewVariableSelector / NewFactMgr / EmptyCGContext install ambient
 //   - vsSess/envSess/fmSess/cgSess/gSess panic if owner.Sess unset
 //     (constructors / NewProgramGenerator set it)
@@ -21,7 +22,7 @@
 //
 // Concurrent Generate in one process is unsupported (upstream: one gen/process).
 // Fuzz workers are separate OS processes.
-// Generate is not fully pure while Process* bridges + testAmbientSession remain.
+// Generate is not fully pure while testAmbientSession + SetError bridges remain.
 //
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith

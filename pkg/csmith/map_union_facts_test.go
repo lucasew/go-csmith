@@ -114,7 +114,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 // AssignGlobalFactsFromMapOut installs that lattice into live UnionFacts.
 func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},

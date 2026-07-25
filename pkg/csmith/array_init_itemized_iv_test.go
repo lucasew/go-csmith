@@ -12,7 +12,7 @@ func TestArrayInitAccessUsesItemizedIVOutput(t *testing.T) {
 	defer ClearError()
 	CtrlVarsDoFinalization()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	// itemized array IV like choose_ok_var after SelectLoopCtrlVar
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_106", Type: GetIntType(), IsArray: true, ArraySizes: []int{5}},

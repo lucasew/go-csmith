@@ -6,9 +6,9 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	// Expression::InitProbabilityTables always live; no invent NewExprTables
 	// when both arg and process tables are missing — sticky MaxTermTypes
 	ClearError()
-	prev := ProcessExprTables()
-	SetProcessExprTables(nil)
-	defer SetProcessExprTables(prev)
+	prev := ProcessExprTablesSess(testAmbientSession)
+	SetProcessExprTablesSess(testAmbientSession, nil)
+	defer SetProcessExprTablesSess(testAmbientSession, prev)
 	tt := PickTermType(NewRng(1), nil, Defaults(), GetIntType(), false, false, 0)
 	if tt != MaxTermTypes {
 		t.Fatalf("want MaxTermTypes, got %v", tt)
@@ -30,9 +30,9 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	// StatementAssign::assignOpsTable_ sticky; no invent per assign
 	ClearError()
-	prev := ProcessAssignOpsTable()
-	SetProcessAssignOpsTable(nil)
-	defer SetProcessAssignOpsTable(prev)
+	prev := ProcessAssignOpsTableSess(testAmbientSession)
+	SetProcessAssignOpsTableSess(testAmbientSession, nil)
+	defer SetProcessAssignOpsTableSess(testAmbientSession, prev)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := EmptyCGContext().WithFactMgr(f.ensurePairedFactMgr())
@@ -74,9 +74,9 @@ func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	// nested GenerateBody needs session Statement table; sticky no invent second table
 	ClearError()
-	prev := ProcessStmtTab()
-	SetProcessStmtTab(nil)
-	defer SetProcessStmtTab(prev)
+	prev := ProcessStmtTabSess(testAmbientSession)
+	SetProcessStmtTabSess(testAmbientSession, nil)
+	defer SetProcessStmtTabSess(testAmbientSession, prev)
 	opts := Defaults()
 	opts.MaxFuncs = 10
 	vs := NewVariableSelector(opts)
@@ -91,7 +91,7 @@ func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	// without ProcessStmtTab, create-new path fails closed sticky Failed; may pick existing or fail
 	if fi != nil && !fi.Failed && fi.User != nil && fi.User != f && fi.User.Body != nil {
 		// if somehow built without stmt tab, bad
-		if ProcessStmtTab() == nil && fi.User.BuildState == BuildBuilt {
+		if ProcessStmtTabSess(testAmbientSession) == nil && fi.User.BuildState == BuildBuilt {
 			t.Fatal("must not invent body without session StmtTab")
 		}
 	}
@@ -135,15 +135,15 @@ func TestEnsureAttrGeneratorsNoInvent(t *testing.T) {
 
 func TestNewVariableSelectorNoInventProbs(t *testing.T) {
 	// C++ VariableSelector uses process Probabilities; no invent second table
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(nil)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	vs := NewVariableSelector(Defaults())
 	if vs.Probs != nil {
 		t.Fatal("must not invent NewProbabilities when process unset")
 	}
 	p := NewProbabilities(Defaults())
-	SetProcessProbabilities(p)
+	SetProcessProbabilitiesSess(testAmbientSession, p)
 	vs2 := NewVariableSelector(Defaults())
 	if vs2.Probs != p {
 		t.Fatal("must share process Probabilities")
@@ -151,9 +151,9 @@ func TestNewVariableSelectorNoInventProbs(t *testing.T) {
 }
 
 func TestBinaryOpsFilterNoInventProbs(t *testing.T) {
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(nil)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	// reject-all when process unset (no invent NewProbabilities(opts))
 	f := BinaryOpsFilter(Defaults())
 	if !f.Filter(0) {
@@ -180,11 +180,11 @@ func TestStatementTableFromSessionProbs(t *testing.T) {
 		}
 	}
 	// NewProgramGenerator installs same instance as ProcessStmtTab
-	prevP := ProcessProbabilities()
-	prevS := ProcessStmtTab()
+	prevP := ProcessProbabilitiesSess(testAmbientSession)
+	prevS := ProcessStmtTabSess(testAmbientSession)
 	defer func() {
-		SetProcessProbabilities(prevP)
-		SetProcessStmtTab(prevS)
+		SetProcessProbabilitiesSess(testAmbientSession, prevP)
+		SetProcessStmtTabSess(testAmbientSession, prevS)
 	}()
 	s := NewSession(opts)
 	g := NewProgramGenerator(s)

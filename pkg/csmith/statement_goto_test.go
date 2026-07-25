@@ -456,11 +456,11 @@ func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 }
 
 func TestGotoLabelsClearedOnFinalization(t *testing.T) {
-	prevR := ProcessRng()
-	prevP := ProcessProbabilities()
+	prevR := ProcessRngSess(testAmbientSession)
+	prevP := ProcessProbabilitiesSess(testAmbientSession)
 	defer func() {
-		SetProcessRng(prevR)
-		SetProcessProbabilities(prevP)
+		SetProcessRngSess(testAmbientSession, prevR)
+		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
 	GotoLabelsDoFinalization()
 	_ = LabelForGotoDest(1, func() string { return "lbl_x" })
@@ -895,7 +895,7 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	// StatementGoto.cpp:70–84 — vector copy of func->blocks only; no invent
 	// append of current block when missing from the list.
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	outer := &Block{StmID: 1, Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
 	// curr not registered on f.Blocks
@@ -909,7 +909,7 @@ func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
 	r := NewRng(1)
 	// Force goto: may still fail soft if no good block; ensure we don't panic
 	// and that FindGoodJumpBlock is only given func.Blocks (size 1), not 2.
-	_ = MakeRandomGoto(r, Defaults(), ProcessProbabilities(), NewVariableSelector(Defaults()), nil, &cg, curr)
+	_ = MakeRandomGoto(r, Defaults(), ProcessProbabilitiesSess(testAmbientSession), NewVariableSelector(Defaults()), nil, &cg, curr)
 	// If invent-append were present, first RndUpto would see n=2 for seed paths;
 	// unit documents the contract: Blocks list is source of truth.
 	if len(f.Blocks) != 1 {

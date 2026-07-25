@@ -84,7 +84,7 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 
 func TestOutputQualifiedTypeSimple(t *testing.T) {
 	// Defaults enable Consts/Volatiles
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	s := q.OutputQualifiedType(GetIntType())
 	if !strings.Contains(s, "const") || !strings.Contains(s, "volatile") || !strings.Contains(s, "int") {
@@ -99,8 +99,8 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 	opts := Defaults()
 	opts.Consts = false
 	opts.Volatiles = false
-	SetProcessOptions(opts)
-	defer SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, opts)
+	defer SetProcessOptionsSess(testAmbientSession, Defaults())
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	s := q.OutputQualifiedType(GetIntType())
 	if s != "" {
@@ -954,7 +954,7 @@ func TestOutputQualifiedTypeConstVolatilePointerDoubleSpace(t *testing.T) {
 	// "const " then (i>0) " " then "volatile " → "const  volatile "
 	// (seed-2 g_459: UP "const  volatile" vs invent skip space when const already present)
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	pt := PointerTo(PointerTo(GetIntType())) // int32_t **
 	// depth 3: [obj, *, *] — outer pointer level both const+vol
 	q := NewCVQualifiers(

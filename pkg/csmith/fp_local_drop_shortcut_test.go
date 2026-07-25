@@ -12,7 +12,7 @@ import "testing"
 // before ShortcutAnalysisBlock, so the lattice matches map_facts_in.
 func TestFindFixedPointDropsBodyLocalsBeforeShortcut(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_fp_local_drop"}
 	fm := NewFactMgr(f)
 	g := CreateVariableScalars("g_pt", GetIntType(), false, false)

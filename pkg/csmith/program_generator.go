@@ -31,24 +31,14 @@ type ProgramGenerator struct {
 	OutputKind OutputMgrKind
 }
 
-// SetProcessProgramGenerator installs AbsProgramGenerator::current_generator_
-// on the active session.
-func SetProcessProgramGenerator(g *ProgramGenerator) {
-	SetProcessProgramGeneratorSess(testAmbientSession, g)
-}
-
-// SetProcessProgramGeneratorSess installs current_generator_ on an explicit session bag.
+// SetProcessProgramGeneratorSess installs AbsProgramGenerator::current_generator_
+// on an explicit session bag.
 func SetProcessProgramGeneratorSess(s *Session, g *ProgramGenerator) {
 	sessOrAmbient(s).ProgramGen = g
 }
 
-// ProcessProgramGenerator mirrors AbsProgramGenerator::GetInstance.
-// Nil sticky fail-closed (C++ asserts).
-func ProcessProgramGenerator() *ProgramGenerator {
-	return ProcessProgramGeneratorSess(testAmbientSession)
-}
-
 // ProcessProgramGeneratorSess returns ProgramGen on an explicit session bag.
+// Nil sticky fail-closed (C++ AbsProgramGenerator::GetInstance asserts).
 func ProcessProgramGeneratorSess(s *Session) *ProgramGenerator {
 	s = sessOrAmbient(s)
 	g := s.ProgramGen
@@ -58,9 +48,6 @@ func ProcessProgramGeneratorSess(s *Session) *ProgramGenerator {
 	}
 	return g
 }
-
-// ClearProcessProgramGenerator drops current_generator_ (finalization / tests).
-func ClearProcessProgramGenerator() { ClearProcessProgramGeneratorSess(testAmbientSession) }
 
 // ClearProcessProgramGeneratorSess clears ProgramGen on an explicit session bag.
 func ClearProcessProgramGeneratorSess(s *Session) { sessOrAmbient(s).ProgramGen = nil }

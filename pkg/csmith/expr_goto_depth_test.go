@@ -116,7 +116,7 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 	// Fresh engine current_pos_=-1 → eager_backtracking returns false → GOOD.
 	RandomNumberDoFinalization()
 	opts.MaxExhaustiveDepth = 8
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	CreateRandomNumberInstance(RngKindDFS, 1)
 	defer func() {
 		RandomNumberDoFinalization()

@@ -7,7 +7,7 @@ import "testing"
 // Upstream seed-2: UP_ABS_L233 null=1 lhs=l_236 indir=1 → e10107 lattice.
 func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := PointerTo(PointerTo(GetSimpleType(EShort))) // int16_t**
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	arr := &ArrayVariable{

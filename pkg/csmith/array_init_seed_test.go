@@ -9,7 +9,7 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 	// ArrayVariable.cpp:429 static unsigned seed = 0xABCDEF across OutputDefs
 	ClearError()
 	ResetArrayInitSeed()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 
 	// First array: size 1, pool {"A"} → one leaf, seed advances once
 	a1 := &ArrayVariable{
@@ -54,7 +54,7 @@ func TestBuildInitializerStrForceNonUniformUsesStaticSeed(t *testing.T) {
 	ResetArrayInitSeed()
 	opts := Defaults()
 	opts.ForceNonUniformArrayInit = true
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 2}},
 		Sizes:    []int{2, 2},

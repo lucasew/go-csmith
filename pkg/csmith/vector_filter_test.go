@@ -6,7 +6,7 @@ import "testing"
 
 func TestFilterCtorEnablesAllKinds(t *testing.T) {
 	// Filter.cpp:40 — kinds_.set() all true
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilter(nil)
 	if !f.ValidFilter() {
 		t.Fatal("default ctor valid_filter true in random mode")
@@ -18,7 +18,7 @@ func TestFilterCtorEnablesAllKinds(t *testing.T) {
 
 func TestFilterDisableDefaultInvalidatesRandom(t *testing.T) {
 	// Filter.cpp:55–57 disable; 74–79 valid_filter
-	SetProcessOptions(Defaults()) // RandomBased
+	SetProcessOptionsSess(testAmbientSession, Defaults()) // RandomBased
 	f := NewVectorFilter(nil)
 	f.Disable(FilterKindDefault)
 	if f.ValidFilter() {
@@ -38,8 +38,8 @@ func TestFilterCurrentKindDFS(t *testing.T) {
 	o := Defaults()
 	o.RandomBased = false
 	o.DFSExhaustive = true
-	SetProcessOptions(o)
-	defer SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, o)
+	defer SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilter(nil)
 	if f.CurrentKind() != FilterKindDFS {
 		t.Fatalf("dfs current_kind: got %d", f.CurrentKind())
@@ -52,7 +52,7 @@ func TestFilterCurrentKindDFS(t *testing.T) {
 
 func TestVectorFilterFilterOutWithItems(t *testing.T) {
 	// VectorFilter.cpp:58–66 FilterOut: reject if in set
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterItems([]int{3, 7}, FilterModeOut)
 	if !f.Filter(3) {
 		t.Fatal("FilterOut must reject 3")
@@ -64,7 +64,7 @@ func TestVectorFilterFilterOutWithItems(t *testing.T) {
 
 func TestVectorFilterKeepMode(t *testing.T) {
 	// Keep: reject if NOT in set
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterItems([]int{3}, FilterModeKeep)
 	if f.Filter(3) {
 		t.Fatal("Keep must accept 3")
@@ -85,7 +85,7 @@ func TestVectorFilterAddDedup(t *testing.T) {
 
 func TestVectorFilterLookupWithTable(t *testing.T) {
 	// lookup through DistributionTable when valid
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	tab := &DistributionTable{}
 	tab.AddEntry(10, 50) // key 10 weight 50 → rnd 0..49 → 10
 	tab.AddEntry(20, 50) // key 20 weight 50 → rnd 50..99 → 20
@@ -106,7 +106,7 @@ func TestVectorFilterLookupWithTable(t *testing.T) {
 
 func TestBlockProbabilityMatchesDisabledKeepFilter(t *testing.T) {
 	// Block.cpp:87–93 — disable fDefault → uniform rnd_upto(block_size)
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	r := NewRng(2)
 	// first genrand % 4 == 1959434203 % 4
 	want := int(NewRng(2).RndUpto(4))

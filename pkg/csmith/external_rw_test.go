@@ -180,7 +180,7 @@ func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 	// FunctionInvocation.cpp:530–551 — always revisit user callees in visit_facts.
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: nil}
 	fm := callee.ensurePairedFactMgr()
@@ -217,7 +217,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 // corrupt the outer StatementAssign analysis — seed-2 func_49 e37241).
 func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	g := CreateVariableScalars("g_overlap", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// body: g_overlap = 1

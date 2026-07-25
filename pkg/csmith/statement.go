@@ -140,7 +140,7 @@ func IsCompound(t StatementType) bool {
 // Prefer session Probabilities::StatementThresholdTable when live.
 func InitProbabilityTable(opts Options) *ThresholdTable {
 	t := NewStatementThresholdTable(opts)
-	SetProcessStmtTab(t)
+	SetProcessStmtTabSess(testAmbientSession, t)
 	return t
 }
 

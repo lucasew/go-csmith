@@ -50,7 +50,7 @@ func TestDumpAndParseSingle(t *testing.T) {
 		t.Fatal("group must fail")
 	}
 	DestroyProcessProbabilities()
-	if ProcessProbabilities() != nil {
+	if ProcessProbabilitiesSess(testAmbientSession) != nil {
 		t.Fatal("destroy")
 	}
 	ReinstallTestProcessSingletons()

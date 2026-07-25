@@ -29,7 +29,7 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 	ClearError()
 	defer ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	// Fixed seed that may add offset; accept g_106[4] or (g_106[4] + N)
 	r := NewRng(1)
 	vs := NewVariableSelector(opts)

@@ -6,7 +6,7 @@ import "testing"
 // Constant::make_random(pointer) is always "0"; AddNewVarFact must record null/may-null.
 func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	r := NewRng(42)
@@ -37,7 +37,7 @@ func TestCreateArrayVariablePointerPrimaryNullFact(t *testing.T) {
 // (pointer-array init / self-back) must not be replaced by mid-gen definitive-only out.
 func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_54", ReturnType: GetIntType()}
 	ptType := PointerTo(GetSimpleType(EShort))
 	g := CreateVariableScalars("g_127", GetSimpleType(EShort), false, false)
@@ -69,7 +69,7 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 // (may-null from entry / prior self-back). map_facts_in must be reinstalled with it.
 func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	ptType := PointerTo(GetIntType())
 	g := CreateVariableScalars("g_t", GetIntType(), false, false)

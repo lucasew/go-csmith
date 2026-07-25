@@ -8,7 +8,7 @@ import "testing"
 func TestFunc1PreFactsSnapshotIsShallow(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	g := CreateVariableScalars("g_ptr", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_tgt", GetIntType(), false, false)
 	if g == nil || tgt == nil {

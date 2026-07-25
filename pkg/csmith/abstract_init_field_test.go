@@ -9,9 +9,9 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	ClearError()
 	// Process RNG for CreateFieldVars field Constant::make_random
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(1))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	st := &Type{
 		isStruct:   true,

@@ -13,7 +13,7 @@ import "testing"
 // Observed UP seed-199: UP_ORDERED_MERGE live=3 copy=MISSING then JOIN 0⊕3.
 func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_ord2", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -64,7 +64,7 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 // → JOIN 0⊕3 BOTTOM; Go kept last=3 and later ChooseOKVar pool differed).
 func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{isUnion: true, StructName: "U_ord_nil", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},

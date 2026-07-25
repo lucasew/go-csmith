@@ -107,8 +107,8 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	// FactMgr.cpp:504 — add_new_var_fact → abstract_fact_for_var_init; no invent garbage
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	old := []*FactPointTo{}
 	// pointer with const null init (CreateVariableScalars → Constant "0")
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)

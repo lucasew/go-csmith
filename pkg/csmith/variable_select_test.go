@@ -8,7 +8,7 @@ func TestVariableSelectionProbabilityRange(t *testing.T) {
 	// VariableSelector.cpp:110–122 InitScopeTable once; no invent table per draw
 	opts := Defaults()
 	InitScopeTable(opts)
-	defer SetProcessScopeTab(nil)
+	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	seen := map[VariableScope]bool{}
 	r := NewRng(2)
 	for i := 0; i < 200; i++ {
@@ -22,9 +22,9 @@ func TestVariableSelectionProbabilityRange(t *testing.T) {
 func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
 	// VariableSelector.cpp:1050 InitScopeTable required sticky ERROR_GUARD MAX
 	ClearError()
-	prev := ProcessScopeTab()
-	SetProcessScopeTab(nil)
-	defer SetProcessScopeTab(prev)
+	prev := ProcessScopeTabSess(testAmbientSession)
+	SetProcessScopeTabSess(testAmbientSession, nil)
+	defer SetProcessScopeTabSess(testAmbientSession, prev)
 	sc := VariableSelectionProbability(NewRng(1), Defaults())
 	if sc != MaxVarScope {
 		t.Fatalf("want MAX without InitScopeTable, got %v", sc)
@@ -40,7 +40,7 @@ func TestVariableSelectionProbabilityNilRNGSticky(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	InitScopeTable(opts)
-	defer SetProcessScopeTab(nil)
+	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	if sc := VariableSelectionProbability(nil, opts); sc != MaxVarScope {
 		t.Fatalf("nil RNG must fail closed MAX, got %v", sc)
 	}
@@ -62,7 +62,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	InitScopeTable(opts)
-	defer SetProcessScopeTab(nil)
+	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	// many draws with empty params: never ParentParam
@@ -94,7 +94,7 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	InitScopeTable(opts)
-	defer SetProcessScopeTab(nil)
+	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType(), Param: IncompleteVariables()}
 	cg := WithFunc(f, EmptyEffect())
 	if sc := VariableSelectionProbabilityCG(NewRng(1), opts, &cg, MaxVarScope); sc != MaxVarScope {
@@ -109,7 +109,7 @@ func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
 func TestSelectCreatesOrFinds(t *testing.T) {
 	opts := Defaults()
 	InitScopeTable(opts)
-	defer SetProcessScopeTab(nil)
+	defer SetProcessScopeTabSess(testAmbientSession, nil)
 	vs := NewVariableSelector(opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
 	r := NewRng(3)

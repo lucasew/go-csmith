@@ -158,8 +158,8 @@ func TestDefaultDepthProtectNoInventDEPTH(t *testing.T) {
 	if opts.DepthProtect {
 		t.Fatal("default depth_protect must be false")
 	}
-	SetProcessOptions(opts)
-	defer SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, opts)
+	defer SetProcessOptionsSess(testAmbientSession, Defaults())
 	out, err := Generate(opts)
 	if err != nil {
 		t.Fatal(err)

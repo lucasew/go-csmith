@@ -1165,7 +1165,7 @@ func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
 	// ExpressionVariable.cpp:210–216 — & + ArrayVariable::Output → &g_83[1]
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_83", Type: GetSimpleType(EULong), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -1191,7 +1191,7 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 	// ArrayVariable.cpp:512–521 + CVQualifiers.cpp:534–561 —
 	// storage-volatile pointer array: "int32_t * volatile g_38[1]" not "volatile int32_t* g_38[1]"
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	pt := PointerTo(GetIntType())
 	av := &ArrayVariable{
 		Variable: Variable{
@@ -1226,7 +1226,7 @@ func TestArrayCDeclTypePointerVolatileStorage(t *testing.T) {
 func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 	// Variable.cpp:662–664 + OutputMgr.cpp:318 — ";/* VOLATILE GLOBAL name */"
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	v.Init = MakeInt(0)
 	s := v.OutputDefOpts(true, false)

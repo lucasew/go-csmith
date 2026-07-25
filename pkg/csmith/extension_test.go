@@ -70,9 +70,9 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	o := Defaults()
 	o.Klee = true
 	o.Func1MaxParams = 2
-	SetProcessOptions(o)
-	SetProcessRng(NewRng(1))
-	SetProcessProbabilities(NewProbabilities(o))
+	SetProcessOptionsSess(testAmbientSession, o)
+	SetProcessRngSess(testAmbientSession, NewRng(1))
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(o))
 	CreateExtension(o)
 	if HasError() || !ExtensionActive() || ExtensionKind() != "klee" {
 		t.Fatal("klee create", HasError(), ExtensionKind())

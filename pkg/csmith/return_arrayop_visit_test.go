@@ -9,8 +9,8 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 	// StatementReturn.cpp:127–129 / Block.cpp:255 — emit gates on CGOptions::depth_protect
 	opts := Defaults()
 	opts.DepthProtect = true
-	SetProcessOptions(opts)
-	defer SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, opts)
+	defer SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	st := Stmt{
 		Kind: StmtReturn,
@@ -26,7 +26,7 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 		t.Fatal(out)
 	}
 	// default options must not invent DEPTH++/--
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	out2 := b.Output(0)
 	if strings.Contains(out2, "DEPTH") {
 		t.Fatal("depth_protect off must not invent DEPTH:", out2)

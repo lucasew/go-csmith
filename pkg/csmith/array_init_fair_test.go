@@ -10,7 +10,7 @@ import (
 // (cannot assign brace init directly to array member of struct/union).
 func TestArrayOpAggregateConstantTmp(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ut := &Type{
 		isUnion: true, StructName: "U0", Used: true,
 		Fields: []StructField{

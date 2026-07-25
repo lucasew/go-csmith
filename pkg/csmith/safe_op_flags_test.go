@@ -31,9 +31,9 @@ func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
 	// or fails closed. Ensure signed coin is not invent-50: Op1Signed false at 0%.
 	opts := Defaults()
 	// install process probs so size pick can succeed while call-site probs nil
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(NewProbabilities(opts))
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	for seed := uint64(1); seed < 20; seed++ {
 		f := MakeRandomBinaryKind(NewRng(seed), opts, nil, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd)
 		if f == nil {
@@ -130,9 +130,9 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	// SafeOpFlags.cpp:164 — SAFE_OPS_SIZE_PROB_FILTER from Probabilities group
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(nil)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearError()
 	// nil probs arg + nil process → sticky fail closed
 	if _, ok := pickSafeOpSize(NewRng(1), nil); ok {

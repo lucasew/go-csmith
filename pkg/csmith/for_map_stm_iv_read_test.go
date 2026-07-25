@@ -10,7 +10,7 @@ import "testing"
 func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	g := CreateVariableScalars("g_iv", GetIntType(), false, false)
 	fn := &Function{Name: "func_x", ReturnType: GetIntType()}

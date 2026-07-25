@@ -342,10 +342,10 @@ func TestSeedrandIndependence(t *testing.T) {
 
 func TestProcessRndWrappers(t *testing.T) {
 	// random.cpp process wrappers vs direct Rng methods (random mode).
-	prev := ProcessRng()
+	prev := ProcessRngSess(testAmbientSession)
 	r := NewRng(2)
-	SetProcessRng(r)
-	defer SetProcessRng(prev)
+	SetProcessRngSess(testAmbientSession, r)
+	defer SetProcessRngSess(testAmbientSession, prev)
 
 	r2 := NewRng(2)
 	// pure_rnd_upto(n==0) short-circuits without draw
@@ -353,17 +353,17 @@ func TestProcessRndWrappers(t *testing.T) {
 		t.Fatal("pure_rnd_upto(0) → 0")
 	}
 	// ProcessRndUpto matches Rng.RndUpto on same seed stream
-	got := ProcessRndUpto(10, nil)
+	got := ProcessRndUptoSess(testAmbientSession, 10, nil)
 	want := r2.RndUpto(10)
 	if got != want {
 		t.Fatalf("ProcessRndUpto: got %d want %d", got, want)
 	}
-	gotF := ProcessRndFlipcoin(50, nil)
+	gotF := ProcessRndFlipcoinSess(testAmbientSession, 50, nil)
 	wantF := r2.RndFlipcoin(50)
 	if gotF != wantF {
 		t.Fatalf("ProcessRndFlipcoin: got %v want %v", gotF, wantF)
 	}
-	gotH := ProcessRandomHexDigits(4)
+	gotH := ProcessRandomHexDigitsSess(testAmbientSession, 4)
 	wantH := r2.RandomHexDigits(4)
 	if gotH != wantH {
 		t.Fatalf("hex: got %q want %q", gotH, wantH)
@@ -373,25 +373,25 @@ func TestProcessRndWrappers(t *testing.T) {
 	if gotD != wantD {
 		t.Fatalf("digits: got %q want %q", gotD, wantD)
 	}
-	if ProcessTraceDepth() != "" || ProcessGetSequence() != "" {
+	if ProcessTraceDepthSess(testAmbientSession) != "" || ProcessGetSequenceSess(testAmbientSession) != "" {
 		t.Fatal("default mode trace/sequence empty")
 	}
 }
 
 func TestProcessRndNilSticky(t *testing.T) {
-	prev := ProcessRng()
-	SetProcessRng(nil)
-	defer SetProcessRng(prev)
+	prev := ProcessRngSess(testAmbientSession)
+	SetProcessRngSess(testAmbientSession, nil)
+	defer SetProcessRngSess(testAmbientSession, prev)
 	ClearError()
-	if ProcessRndUpto(5, nil) != 0 || !HasError() {
+	if ProcessRndUptoSess(testAmbientSession, 5, nil) != 0 || !HasError() {
 		t.Fatal("nil process Rng RndUpto sticky 0")
 	}
 	ClearError()
-	if ProcessRndFlipcoin(50, nil) || !HasError() {
+	if ProcessRndFlipcoinSess(testAmbientSession, 50, nil) || !HasError() {
 		t.Fatal("nil process Rng flipcoin sticky false")
 	}
 	ClearError()
-	if ProcessRandomHexDigits(2) != "" || !HasError() {
+	if ProcessRandomHexDigitsSess(testAmbientSession, 2) != "" || !HasError() {
 		t.Fatal("nil process hex sticky empty")
 	}
 	ClearError()
@@ -399,11 +399,11 @@ func TestProcessRndNilSticky(t *testing.T) {
 
 func TestRandomNumberCreateInstance(t *testing.T) {
 	// RandomNumber.cpp:63–74 CreateInstance default generator
-	prevR := ProcessRng()
+	prevR := ProcessRngSess(testAmbientSession)
 	RandomNumberDoFinalization()
 	defer func() {
 		RandomNumberDoFinalization()
-		SetProcessRng(prevR)
+		SetProcessRngSess(testAmbientSession, prevR)
 	}()
 
 	ClearError()
@@ -430,7 +430,7 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 	ClearError()
 	o := Defaults()
 	o.MaxExhaustiveDepth = 4
-	SetProcessOptions(o)
+	SetProcessOptionsSess(testAmbientSession, o)
 	old = SwitchRndNumGenerator(RngKindDFS)
 	if old != RngKindDefault {
 		t.Fatalf("switch to DFS old=%v", old)
@@ -443,8 +443,8 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 }
 
 func TestRandomNumberDoFinalization(t *testing.T) {
-	prevR := ProcessRng()
-	defer SetProcessRng(prevR)
+	prevR := ProcessRngSess(testAmbientSession)
+	defer SetProcessRngSess(testAmbientSession, prevR)
 	CreateRandomNumberInstance(RngKindDefault, 1)
 	RandomNumberDoFinalization()
 	ClearError()
@@ -466,15 +466,15 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	}
 	// DFS without positive max depth sticky
 	ClearError()
-	prevO := ProcessOptions()
-	SetProcessOptions(Defaults()) // MaxExhaustiveDepth -1
+	prevO := ProcessOptionsSess(testAmbientSession)
+	SetProcessOptionsSess(testAmbientSession, Defaults()) // MaxExhaustiveDepth -1
 	if MakeRndNumGenerator(RngKindDFS, 1) != nil || !HasError() {
 		t.Fatal("DFS max_depth<=0 sticky")
 	}
 	ClearError()
 	o := Defaults()
 	o.MaxExhaustiveDepth = 3
-	SetProcessOptions(o)
+	SetProcessOptionsSess(testAmbientSession, o)
 	// clear prior singleton if any
 	clearDFSImpl()
 	dr := MakeRndNumGenerator(RngKindDFS, 1)
@@ -486,6 +486,6 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 		t.Fatal("DFS singleton")
 	}
 	clearDFSImpl()
-	SetProcessOptions(prevO)
+	SetProcessOptionsSess(testAmbientSession, prevO)
 	ClearError()
 }

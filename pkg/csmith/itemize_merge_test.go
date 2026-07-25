@@ -9,7 +9,7 @@ import "testing"
 // contract that keeps null in the lattice across element assigns.
 func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort))) // int16_t**
 	coll := &ArrayVariable{
@@ -67,7 +67,7 @@ func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 // (seed-2 first_div@10107 after itemize size 10).
 func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := PointerTo(GetIntType())
 	coll := &ArrayVariable{
 		Variable: Variable{Name: "l_233", Type: elem, IsArray: true},

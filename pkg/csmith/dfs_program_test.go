@@ -5,11 +5,11 @@ import "testing"
 func TestGoGeneratorDFSLoopDebugSequence(t *testing.T) {
 	// Finite debug sequence ends all_done after last choice.
 	ClearError()
-	prevO := ProcessOptions()
+	prevO := ProcessOptionsSess(testAmbientSession)
 	defer func() {
 		DoFinalization()
 		ReinstallTestProcessSingletons()
-		SetProcessOptions(prevO)
+		SetProcessOptionsSess(testAmbientSession, prevO)
 		ClearError()
 	}()
 	o := Defaults()

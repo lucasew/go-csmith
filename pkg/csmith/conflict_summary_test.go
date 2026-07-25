@@ -420,11 +420,11 @@ func TestIsFrameVar(t *testing.T) {
 }
 
 func TestDoFinalization(t *testing.T) {
-	prevR := ProcessRng()
-	prevP := ProcessProbabilities()
+	prevR := ProcessRngSess(testAmbientSession)
+	prevP := ProcessProbabilitiesSess(testAmbientSession)
 	defer func() {
-		SetProcessRng(prevR)
-		SetProcessProbabilities(prevP)
+		SetProcessRngSess(testAmbientSession, prevR)
+		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
 	IncrCounter(&currentSession().BK.structDepthCnts, 1)
 	currentSession().NextStmID = 5

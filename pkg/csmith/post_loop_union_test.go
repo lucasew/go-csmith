@@ -54,7 +54,7 @@ func TestPostLoopKeepsMapInUnionLattice(t *testing.T) {
 func TestPostCreationFPStartsUnionFromMapInNotLive(t *testing.T) {
 	ClearError()
 	defer ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}
 	f.Stack = []*Block{}
 	ut := &Type{

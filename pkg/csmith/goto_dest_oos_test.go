@@ -11,7 +11,7 @@ import "testing"
 // VisitFacts still valid, for kept (seed 17809409409875472624 func_61).
 func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{
@@ -54,7 +54,7 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 
 func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	st := &Type{
 		isStruct: true, StructName: "S0",
 		Fields: []StructField{

@@ -15,7 +15,7 @@ import "testing"
 // each full statement walk so map_accum rebuilds progressively.
 func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_map_accum_prog"}
 	fm := NewFactMgr(f)
 	early := CreateVariableScalars("g_early", GetIntType(), false, false)

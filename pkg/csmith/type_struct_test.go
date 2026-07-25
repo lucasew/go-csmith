@@ -124,7 +124,7 @@ func TestAggregateSharedSIDSequence(t *testing.T) {
 func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	// Type.cpp:1823–1829 / 1879–1883 — non-ccomp pack(push) then pack(1); pack(pop)
 	ClearError()
-	SetProcessOptions(Defaults()) // CComp=false
+	SetProcessOptionsSess(testAmbientSession, Defaults()) // CComp=false
 	st := &Type{
 		isStruct: true, StructName: "S0", Packed: true, Used: true,
 		Fields: []StructField{
@@ -145,7 +145,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	opts.CComp = true
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	decl2 := st.OutputStructDecl()
 	if strings.Contains(decl2, "#pragma pack(push)") {
 		t.Fatalf("ccomp must not emit pack(push): %q", decl2)
@@ -153,7 +153,7 @@ func TestOutputStructDeclPackPragmaNonCComp(t *testing.T) {
 	if !strings.Contains(decl2, "#pragma pack(1)\n") || !strings.Contains(decl2, "#pragma pack()\n") {
 		t.Fatalf("ccomp pack(1)/pack(): %q", decl2)
 	}
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ClearError()
 }
 

@@ -1524,7 +1524,7 @@ func TestExpressionCloneGetInvokeComplexity(t *testing.T) {
 	}
 	ClearError()
 	tabs := InitProbabilityTables(Defaults())
-	if tabs == nil || ProcessExprTables() != tabs {
+	if tabs == nil || ProcessExprTablesSess(testAmbientSession) != tabs {
 		t.Fatal("init tables")
 	}
 }

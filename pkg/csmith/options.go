@@ -13,31 +13,20 @@ import (
 	"unsafe"
 )
 
-// Process* accessors read/write the active Session (see session.go).
-// Mutable generation config lives on the session; concurrent Generate in one
+// Process*Sess accessors read/write an explicit *Session bag (see session.go).
+// Non-Sess Process*/SetProcess* bridges are deleted — unit tests pass
+// testAmbientSession explicitly. Prefer sessOpts/sessProbs/sessRng when a bag
+// is already in hand (cg.Sess / vs.Sess / g.Sess). Concurrent Generate in one
 // process is unsupported (same as upstream one-process csmith).
-//
-// Prefer sessOpts/sessProbs/… when a *Session is already in hand (cg.Sess /
-// vs.Sess / g.Sess). Process* remains the ambient bridge for package helpers
-// that still lack an explicit bag.
-
-// SetProcessOptions installs the active session Options (CGOptions mirror).
-// NewProgramGenerator calls this so CreateVariable / ChooseVarFull / Block.Output
-// use session options instead of inventing Defaults().
-func SetProcessOptions(o Options) { SetProcessOptionsSess(testAmbientSession, o) }
 
 // SetProcessOptionsSess installs Options on an explicit session bag.
 func SetProcessOptionsSess(s *Session, o Options) { sessOrAmbient(s).Opts = o }
-
-// ProcessOptions returns the active session Options (CGOptions mirror).
-// Safe default is Defaults() on testAmbientSession until SetProcessOptions is called.
-func ProcessOptions() Options { return ProcessOptionsSess(testAmbientSession) }
 
 // ProcessOptionsSess returns Options on an explicit session bag.
 func ProcessOptionsSess(s *Session) Options { return sessOrAmbient(s).Opts }
 
 // sessOpts returns s.Opts. Nil s panics — pass run bag or testAmbientSession
-// (no silent ProcessOptions dual-read).
+// (no silent dual-read).
 func sessOpts(s *Session) Options {
 	if s == nil {
 		panic("sessOpts(nil)")
@@ -45,19 +34,12 @@ func sessOpts(s *Session) Options {
 	return s.Opts
 }
 
-// SetProcessProbabilities installs the session Probabilities singleton.
-// NewProgramGenerator sets this to the same table shared with VS / generator.
-func SetProcessProbabilities(p *Probabilities) { SetProcessProbabilitiesSess(testAmbientSession, p) }
-
 // SetProcessProbabilitiesSess installs Probabilities on an explicit session bag.
 func SetProcessProbabilitiesSess(s *Session, p *Probabilities) { sessOrAmbient(s).Probs = p }
 
-// ProcessProbabilities returns the active session Probabilities (may be nil).
+// ProcessProbabilitiesSess returns Probabilities on an explicit session bag.
 // C++ Probabilities::GetInstance() is always live after init; nil here is
 // fail-closed for library paths that ran without NewProgramGenerator.
-func ProcessProbabilities() *Probabilities { return ProcessProbabilitiesSess(testAmbientSession) }
-
-// ProcessProbabilitiesSess returns Probabilities on an explicit session bag.
 func ProcessProbabilitiesSess(s *Session) *Probabilities { return sessOrAmbient(s).Probs }
 
 // sessProbs returns s.Probs. Nil s panics — pass run bag or testAmbientSession.
@@ -68,15 +50,8 @@ func sessProbs(s *Session) *Probabilities {
 	return s.Probs
 }
 
-// SetProcessRng installs the session DefaultRndNumGenerator (shared with generator).
-// NewProgramGenerator sets this to the same *Rng used for generation draws.
-func SetProcessRng(r *Rng) { SetProcessRngSess(testAmbientSession, r) }
-
 // SetProcessRngSess installs Rng on an explicit session bag.
 func SetProcessRngSess(s *Session, r *Rng) { sessOrAmbient(s).Rng = r }
-
-// ProcessRng returns the active session Rng (may be nil outside a generation run).
-func ProcessRng() *Rng { return ProcessRngSess(testAmbientSession) }
 
 // ProcessRngSess returns Rng on an explicit session bag.
 func ProcessRngSess(s *Session) *Rng { return sessOrAmbient(s).Rng }
@@ -89,19 +64,12 @@ func sessRng(s *Session) *Rng {
 	return s.Rng
 }
 
-// SetProcessStmtTab installs the session statement probability table.
-// NewProgramGenerator sets this to the same StmtTab used for generation.
-func SetProcessStmtTab(t *ThresholdTable) { SetProcessStmtTabSess(testAmbientSession, t) }
-
 // SetProcessStmtTabSess installs StmtTab on an explicit session bag.
 func SetProcessStmtTabSess(s *Session, t *ThresholdTable) { sessOrAmbient(s).StmtTab = t }
 
-// ProcessStmtTab returns the active statement ThresholdTable (may be nil).
+// ProcessStmtTabSess returns StmtTab on an explicit session bag.
 // C++ Statement probability table is always live after init; nil is fail-closed
 // for library paths without NewProgramGenerator.
-func ProcessStmtTab() *ThresholdTable { return ProcessStmtTabSess(testAmbientSession) }
-
-// ProcessStmtTabSess returns StmtTab on an explicit session bag.
 func ProcessStmtTabSess(s *Session) *ThresholdTable { return sessOrAmbient(s).StmtTab }
 
 // sessStmtTab returns s.StmtTab. Nil s panics — pass run bag or testAmbientSession.
@@ -112,18 +80,11 @@ func sessStmtTab(s *Session) *ThresholdTable {
 	return s.StmtTab
 }
 
-// SetProcessScopeTab installs the session VariableSelector::scopeTable_.
-// NewProgramGenerator / InitScopeTable set this once per generation.
-func SetProcessScopeTab(t *ThresholdTable) { SetProcessScopeTabSess(testAmbientSession, t) }
-
 // SetProcessScopeTabSess installs ScopeTab on an explicit session bag.
 func SetProcessScopeTabSess(s *Session, t *ThresholdTable) { sessOrAmbient(s).ScopeTab = t }
 
-// ProcessScopeTab returns the active scope ThresholdTable (may be nil).
-// C++ scopeTable_ is always live after InitScopeTable; nil is fail-closed.
-func ProcessScopeTab() *ThresholdTable { return ProcessScopeTabSess(testAmbientSession) }
-
 // ProcessScopeTabSess returns ScopeTab on an explicit session bag.
+// C++ scopeTable_ is always live after InitScopeTable; nil is fail-closed.
 func ProcessScopeTabSess(s *Session) *ThresholdTable { return sessOrAmbient(s).ScopeTab }
 
 // sessScopeTab returns s.ScopeTab. Nil s panics — pass run bag or testAmbientSession.
@@ -143,16 +104,10 @@ func InitScopeTableSess(s *Session, opts Options) {
 	SetProcessScopeTabSess(s, NewScopeThresholdTable(opts))
 }
 
-// SetProcessAssignOpsTable installs StatementAssign::assignOpsTable_.
-func SetProcessAssignOpsTable(t *DistributionTable) { SetProcessAssignOpsTableSess(testAmbientSession, t) }
-
 // SetProcessAssignOpsTableSess installs AssignOpsTab on an explicit session bag.
 func SetProcessAssignOpsTableSess(s *Session, t *DistributionTable) {
 	sessOrAmbient(s).AssignOpsTab = t
 }
-
-// ProcessAssignOpsTable returns the session assign-ops table (may be nil).
-func ProcessAssignOpsTable() *DistributionTable { return ProcessAssignOpsTableSess(testAmbientSession) }
 
 // ProcessAssignOpsTableSess returns AssignOpsTab on an explicit session bag.
 func ProcessAssignOpsTableSess(s *Session) *DistributionTable {
@@ -167,14 +122,8 @@ func sessAssignOpsTab(s *Session) *DistributionTable {
 	return s.AssignOpsTab
 }
 
-// SetProcessExprTables installs Expression::exprTable_/paramTable_ session pair.
-func SetProcessExprTables(t *ExprTables) { SetProcessExprTablesSess(testAmbientSession, t) }
-
 // SetProcessExprTablesSess installs ExprTables on an explicit session bag.
 func SetProcessExprTablesSess(s *Session, t *ExprTables) { sessOrAmbient(s).ExprTables = t }
-
-// ProcessExprTables returns the session Expression term tables (may be nil).
-func ProcessExprTables() *ExprTables { return ProcessExprTablesSess(testAmbientSession) }
 
 // ProcessExprTablesSess returns ExprTables on an explicit session bag.
 func ProcessExprTablesSess(s *Session) *ExprTables { return sessOrAmbient(s).ExprTables }

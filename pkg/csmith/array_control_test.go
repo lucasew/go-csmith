@@ -173,7 +173,7 @@ func TestCombineVariableSets(t *testing.T) {
 func TestVectorFilterNilTableMatchesCPP(t *testing.T) {
 	// VectorFilter.cpp:75–83 — ptable==nullptr → get_max_prob 100, lookup returns v
 	// kinds all set (Filter ctor) → valid in random mode
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilter(nil)
 	if f.MaxProb() != 100 {
 		t.Fatalf("nil ptable MaxProb: got %d want 100 (VectorFilter.cpp:75–77)", f.MaxProb())

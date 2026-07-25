@@ -884,7 +884,7 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 // polluted EffectAccum for the outer StatementFor / validate path.
 func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	// Body with StmID 0 assign forces FindFixedPoint analyze fail-closed sticky
@@ -915,7 +915,7 @@ func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
 // TestVisitFactsBlockMarksVisitedOnSuccess — Block.cpp:478 map_visited[this]=true.
 func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	b := &Block{StmID: 51, Func: f, Stmts: nil}
@@ -939,7 +939,7 @@ func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 // (seed-2 func_49 VisitFacts ×5 then BUILD_REV fail / first_div e37241).
 func TestVisitFactsBlockPreservesMapVisitedForShortcut(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	body := &Block{StmID: 50, Func: f, Looping: false, Stmts: nil}
@@ -967,7 +967,7 @@ func TestVisitFactsBlockPreservesMapVisitedForShortcut(t *testing.T) {
 // map_visited[this]: merge map_facts_out of back edges into current inputs.
 func TestVisitFactsBlockMergesBackEdgesWhenVisited(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	body := &Block{StmID: 50, Func: f, Looping: true, Stmts: nil}

@@ -361,9 +361,9 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	probs.single[PShiftByNonConstantProb] = 0
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(probs)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, probs)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	vs := NewVariableSelector(opts)
 	vs.Probs = probs
 	tables := NewExprTables(opts)
@@ -394,7 +394,7 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 		t.Log("no shift op in seeds 1..199 — still covered by nil-probs 0% unit path via Single")
 	}
 	// nil probs + nil process → 0% non-constant (no invent 50)
-	SetProcessProbabilities(nil)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearError()
 		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
@@ -416,9 +416,9 @@ func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	probs.single[PShiftByNonConstantProb] = 100
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(probs)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, probs)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	// Seed a local int so Variable term is available under depth/no_const filters.
 	vs := NewVariableSelector(opts)
 	vs.Probs = probs

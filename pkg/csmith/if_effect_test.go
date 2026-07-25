@@ -265,7 +265,7 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
 	inner := CreateVariableScalars("g_inner", GetIntType(), false, false)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
@@ -321,7 +321,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	ut := &Type{isUnion: true, StructName: "U_vif", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},

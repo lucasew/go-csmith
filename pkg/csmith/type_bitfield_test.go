@@ -122,7 +122,7 @@ func TestBitfieldDeclEmit(t *testing.T) {
 // the raw creation slot Name (make_one uses i including padding — seed 118 f4 vs f3).
 func TestOutputStructDeclPaddingFieldIndex(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	// Names deliberately wrong/raw-slot so emit must not trust them.
 	st := &Type{
 		isStruct: true, StructName: "S0", Used: true,

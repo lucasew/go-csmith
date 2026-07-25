@@ -518,8 +518,8 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	// AddNewVarFactInto FieldVars hole clears *oldFacts; must not invent later vars
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	// non-pointer aggregate with nil field hole (global name)
 	agg := CreateVariableScalars("g_agg", GetIntType(), true, false)
 	if agg == nil {
@@ -722,9 +722,9 @@ func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
 	// FactMgr.cpp:378 — array LHS merges.
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(1))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
@@ -750,9 +750,9 @@ func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
 	// Primary &g plus Constant 0 alt must leave may-null.
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(2))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(2))
 
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
@@ -819,9 +819,9 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 	// FactMgr.cpp:378–388 — isArray → merge_fact not renew_fact.
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(1))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
@@ -863,9 +863,9 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(1))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)

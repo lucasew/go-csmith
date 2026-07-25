@@ -104,7 +104,7 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	ClearError()
 	CtrlVarsDoFinalization()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	_ = GetNewCtrlVars(opts)
 	parent := &ArrayVariable{
 		Variable: Variable{
@@ -149,7 +149,7 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	ClearError()
 	CtrlVarsDoFinalization()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	_ = GetNewCtrlVars(opts)
 	ut := &Type{
 		isUnion:    true,
@@ -199,7 +199,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	opts.HashValuePrintf = false
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	_ = GetNewCtrlVars(opts)
 	av := &ArrayVariable{
 		Variable: Variable{
@@ -217,7 +217,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 		t.Fatal(out)
 	}
 	// restore process defaults for later tests
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ClearError()
 	CtrlVarsDoFinalization()
 }

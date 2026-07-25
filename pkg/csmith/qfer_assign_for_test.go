@@ -4,11 +4,11 @@ import "testing"
 
 func TestCVQualifiersMatch(t *testing.T) {
 	// isolate process match_exact (CGOptions) so Match(false) still sees non-exact
-	prev := ProcessOptions()
+	prev := ProcessOptionsSess(testAmbientSession)
 	po := prev
 	po.MatchExactQualifiers = false
-	SetProcessOptions(po)
-	defer SetProcessOptions(prev)
+	SetProcessOptionsSess(testAmbientSession, po)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 
 	a := NewCVQualifiers([]bool{false}, []bool{false})
 	b := NewCVQualifiers([]bool{true}, []bool{false})
@@ -25,7 +25,7 @@ func TestCVQualifiersMatch(t *testing.T) {
 	}
 	// process CGOptions::match_exact_qualifiers true → Match(false) still exact via Options
 	po.MatchExactQualifiers = true
-	SetProcessOptions(po)
+	SetProcessOptionsSess(testAmbientSession, po)
 	if a.Match(b, false) {
 		t.Fatal("process exact should reject differing 1-level")
 	}
@@ -33,11 +33,11 @@ func TestCVQualifiersMatch(t *testing.T) {
 
 func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
 	// VariableSelector choose_var → match_indirect → process match_exact
-	prev := ProcessOptions()
-	defer SetProcessOptions(prev)
+	prev := ProcessOptionsSess(testAmbientSession)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 	po := prev
 	po.MatchExactQualifiers = true
-	SetProcessOptions(po)
+	SetProcessOptionsSess(testAmbientSession, po)
 
 	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
 	plain := CreateVariableScalars("g_p", GetIntType(), false, false)
@@ -55,11 +55,11 @@ func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
 }
 
 func TestMatchIndirect(t *testing.T) {
-	prev := ProcessOptions()
+	prev := ProcessOptionsSess(testAmbientSession)
 	po := prev
 	po.MatchExactQualifiers = false
-	SetProcessOptions(po)
-	defer SetProcessOptions(prev)
+	SetProcessOptionsSess(testAmbientSession, po)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 
 	// wanted scalar qfer vs pointer var qfer (2 levels)
 	want := NewCVQualifiers([]bool{false}, []bool{false})

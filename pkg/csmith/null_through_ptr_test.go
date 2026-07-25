@@ -15,7 +15,7 @@ import "testing"
 // this transfer/merge path is wrong or skipped (shortcut).
 func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	i32 := GetIntType()
 	pt := PointerTo(i32)
 	ppt := PointerTo(pt)
@@ -43,7 +43,7 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 // StatementIf.cpp: both arms from post-cond; merge outputs.
 func TestIfThenNullMergeMakesPointeeInvalid(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	i32 := GetIntType()
 	pt := PointerTo(i32)
 	ppt := PointerTo(pt)

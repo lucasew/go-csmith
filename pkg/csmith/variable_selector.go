@@ -41,7 +41,7 @@ func vsSess(vs *VariableSelector) *Session {
 // process unset — Probs may be nil (fail closed on draws that need tables).
 func NewVariableSelector(opts Options) *VariableSelector {
 	// Unit-test convenience: Probs from ambient Process* bag (ReinstallTestProcessSingletons).
-	return NewVariableSelectorProbs(opts, ProcessProbabilities())
+	return NewVariableSelectorProbs(opts, ProcessProbabilitiesSess(testAmbientSession))
 }
 
 // NewVariableSelectorProbs constructs a selector sharing session Probabilities

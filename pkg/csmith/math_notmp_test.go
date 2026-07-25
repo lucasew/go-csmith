@@ -45,11 +45,11 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 
 func TestTmpVarsEmitSorted(t *testing.T) {
 	// Block.cpp:261–262 — decls only when math_notmp
-	prev := ProcessOptions()
+	prev := ProcessOptionsSess(testAmbientSession)
 	opts := prev
 	opts.MathNoTmp = true
-	SetProcessOptions(opts)
-	t.Cleanup(func() { SetProcessOptions(prev) })
+	SetProcessOptionsSess(testAmbientSession, opts)
+	t.Cleanup(func() { SetProcessOptionsSess(testAmbientSession, prev) })
 
 	b := &Block{TmpVars: map[string]ESimpleType{
 		"t_3": EInt,
@@ -85,7 +85,7 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	ClearError()
 	// default !math_notmp: create-only, no decls (C++ OutputTmpVariableList gated)
 	opts.MathNoTmp = false
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	if strings.Contains((&Block{TmpVars: map[string]ESimpleType{"t_9": EInt}}).Output(0), "t_9") {
 		t.Fatal("!math_notmp must not emit tmp decls")
 	}

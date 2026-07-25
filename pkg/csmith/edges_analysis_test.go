@@ -426,7 +426,7 @@ func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
 // Inventing fail-closed on ShortcutConflict emptied bodies during outer FP.
 func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	w := CreateVariableScalars("g_w", GetIntType(), false, false)
 	// empty body: full visit after conflict is trivial success
 	b := &Block{StmID: 1, Looping: true, Stmts: nil}

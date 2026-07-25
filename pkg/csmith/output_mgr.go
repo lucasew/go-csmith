@@ -388,22 +388,13 @@ func ClearOutputMgrSess(s *Session) {
 	s.OutputFile = ""
 }
 
-// ProcessOutputMgrKind returns active OutputMgr kind.
-func ProcessOutputMgrKind() OutputMgrKind { return ProcessOutputMgrKindSess(testAmbientSession) }
-
 // ProcessOutputMgrKindSess returns OutputMgrKind on an explicit session bag.
 func ProcessOutputMgrKindSess(s *Session) OutputMgrKind {
 	return sessOrAmbient(s).OutputMgrKind
 }
 
-// ProcessStructOutput returns DFSOutputMgr::struct_output_.
-func ProcessStructOutput() string { return ProcessStructOutputSess(testAmbientSession) }
-
 // ProcessStructOutputSess returns StructOutput on an explicit session bag.
 func ProcessStructOutputSess(s *Session) string { return sessOrAmbient(s).StructOutput }
-
-// ProcessSplitPaths returns a copy of DefaultOutputMgr split file paths.
-func ProcessSplitPaths() []string { return ProcessSplitPathsSess(testAmbientSession) }
 
 // ProcessSplitPathsSess returns SplitPaths on an explicit session bag.
 func ProcessSplitPathsSess(s *Session) []string {
@@ -413,9 +404,6 @@ func ProcessSplitPathsSess(s *Session) []string {
 	}
 	return append([]string(nil), s.SplitPaths...)
 }
-
-// ProcessOutputFile returns DefaultOutputMgr ofile path (empty → stdout).
-func ProcessOutputFile() string { return ProcessOutputFileSess(testAmbientSession) }
 
 // ProcessOutputFileSess returns OutputFile on an explicit session bag.
 func ProcessOutputFileSess(s *Session) string { return sessOrAmbient(s).OutputFile }

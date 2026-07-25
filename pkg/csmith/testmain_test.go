@@ -15,12 +15,12 @@ func ReinstallTestProcessSingletons() {
 	// Replace unit-test ambient bag entirely (Generate is bag-local; no dual-install).
 	testAmbientSession = newSession()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessRng(NewRng(1))
-	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessRngSess(testAmbientSession, NewRng(1))
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	InitScopeTable(opts)
 	InitSessionProbabilityTables(opts)
-	InitAttrGenerators(opts, ProcessProbabilities())
+	InitAttrGenerators(opts, ProcessProbabilitiesSess(testAmbientSession))
 	ClearError()
 }
 

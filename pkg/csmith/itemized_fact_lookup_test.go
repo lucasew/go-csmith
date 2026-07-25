@@ -8,7 +8,7 @@ import "testing"
 // same_facts and breaks nested for shortcut reuse — seed-90).
 func TestIsValidPtrItemizedFallsBackToCollectiveOnRevisit(t *testing.T) {
 	ClearError()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	i32 := GetIntType()
 	tgt := CreateVariableScalars("g_t", i32, false, false)
 	l118 := CreateVariableScalars("l_118", PointerTo(i32), false, false)

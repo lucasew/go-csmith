@@ -12,7 +12,7 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	defer ClearError()
 	CtrlVarsDoFinalization()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	r := NewRng(177)
 	vs := NewVariableSelector(opts)

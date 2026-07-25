@@ -295,12 +295,12 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// StatementAssign.cpp:190–203 — force match_exact when qf, always restore.
 	// Invent sticky process MatchExactQualifiers over-restricts later choose_var.
 	ClearError()
-	prev := ProcessOptions()
-	defer SetProcessOptions(prev)
+	prev := ProcessOptionsSess(testAmbientSession)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 	opts := Defaults()
 	opts.MatchExactQualifiers = false
 	opts.StrictFloat = true
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	// nil FM → early empty Stmt before set (callerQf path after FM check)
 	// Use path: set exact, then StrictFloat+rhs GetType residual early return.
 	// Incomplete Expression type triggers GetType residual under StrictFloat.
@@ -320,7 +320,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// then force HasError during strict float by… hard to hit GetType residual.
 	// Unit the defer contract: after any MakeRandomAssignQfer with qf, process flag restored.
 	_ = MakeRandomAssignQfer(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType(), &q)
-	if ProcessOptions().MatchExactQualifiers {
+	if ProcessOptionsSess(testAmbientSession).MatchExactQualifiers {
 		t.Fatal("MatchExactQualifiers must restore to false after MakeRandomAssignQfer with qf")
 	}
 	ClearError()
@@ -333,7 +333,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 func TestAssignQferFromRHSAcceptStricterKeepsConstBits(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	// Simulate RHS qualifiers: const int
 	rhsQ := NewCVQualifiers([]bool{true}, []bool{false})
 	// What StatementAssign does for !callerQf after expressionQualifiers:

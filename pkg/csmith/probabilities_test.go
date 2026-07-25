@@ -186,10 +186,10 @@ func TestSimpleTypesFilterNilProbsResidualSticky(t *testing.T) {
 
 func TestProbabilityFilterEqualGroup(t *testing.T) {
 	// ProbabilityFilter for pSimpleTypesProb via process singleton.
-	prev := ProcessProbabilities()
+	prev := ProcessProbabilitiesSess(testAmbientSession)
 	p := NewProbabilities(Defaults())
-	SetProcessProbabilities(p)
-	defer SetProcessProbabilities(prev)
+	SetProcessProbabilitiesSess(testAmbientSession, p)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 
 	f := GetProbFilter(PSimpleTypesProb)
 	// void weight 0 → reject
@@ -204,7 +204,7 @@ func TestProbabilityFilterEqualGroup(t *testing.T) {
 	o := Defaults()
 	o.Muls = false
 	p2 := NewProbabilities(o)
-	SetProcessProbabilities(p2)
+	SetProcessProbabilitiesSess(testAmbientSession, p2)
 	bf := GetProbFilter(PBinaryOpsProb)
 	if !bf.Filter(uint32(BinMul)) {
 		t.Fatal("mul disabled must filter")
@@ -221,10 +221,10 @@ func (r *rejectSimple) Filter(v uint32) bool { return v == uint32(*r) }
 
 func TestRegisterExtraFilter(t *testing.T) {
 	// Probabilities.cpp:791–813 register + check_extra_filter
-	prev := ProcessProbabilities()
+	prev := ProcessProbabilitiesSess(testAmbientSession)
 	p := NewProbabilities(Defaults())
-	SetProcessProbabilities(p)
-	defer SetProcessProbabilities(prev)
+	SetProcessProbabilitiesSess(testAmbientSession, p)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 
 	// Reject eInt via extra filter even though weight is 1 (pointer Filter for identity)
 	rej := rejectSimple(EInt)
@@ -246,9 +246,9 @@ func TestRegisterExtraFilter(t *testing.T) {
 
 func TestGetProbFilterMissingSticky(t *testing.T) {
 	// No process probs → fail closed
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(nil)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearError()
 	f := GetProbFilter(PSimpleTypesProb)
 	if !f.Filter(0) {

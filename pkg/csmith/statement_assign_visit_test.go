@@ -374,10 +374,10 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	// and post_creation_analysis update (seed-2 e10107 double-merge path).
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	r := NewRng(42)
-	SetProcessRng(r)
+	SetProcessRngSess(testAmbientSession, r)
 	vs := NewVariableSelector(opts)
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	vs.GlobalList = append(vs.GlobalList, g)

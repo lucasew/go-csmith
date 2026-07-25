@@ -14,7 +14,7 @@ func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 	o.MaxExhaustiveDepth = 5
 	o.DFSExhaustive = true
 	o.RandomBased = false
-	SetProcessOptions(o)
+	SetProcessOptionsSess(testAmbientSession, o)
 	clearDFSImpl()
 	r := NewDFSRng(1, o)
 	if r == nil {
@@ -188,7 +188,7 @@ func TestDFSDepthGuardIntegration(t *testing.T) {
 	o.DFSExhaustive = true
 	o.RandomBased = false
 	o.MaxExhaustiveDepth = 8
-	SetProcessOptions(o)
+	SetProcessOptionsSess(testAmbientSession, o)
 	clearDFSImpl()
 	CreateRandomNumberInstance(RngKindDFS, 2)
 	if DepthGuardByDepth(o, 1) != GoodDepth || HasError() {

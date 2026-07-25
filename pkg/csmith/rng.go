@@ -403,15 +403,10 @@ func RejectEQ(bad uint32) Filter {
 	return filterFunc(func(v uint32) bool { return v == bad })
 }
 
-// --- random.cpp process wrappers (RandomNumber::GetInstance → ProcessRng) ---
+// --- random.cpp session wrappers (RandomNumber::GetInstance → bag Rng) ---
 
-// ProcessRndUpto mirrors random.cpp::rnd_upto → process DefaultRndNumGenerator.
-// random.cpp:67–71. Nil process RNG sticky 0.
-func ProcessRndUpto(n uint32, f Filter) uint32 {
-	return ProcessRndUptoSess(testAmbientSession, n, f)
-}
-
-// ProcessRndUptoSess is ProcessRndUpto on an explicit session bag.
+// ProcessRndUptoSess mirrors random.cpp::rnd_upto on an explicit session bag.
+// random.cpp:67–71. Nil bag RNG sticky 0.
 func ProcessRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 	r := ProcessRngSess(s)
 	if r == nil {
@@ -421,13 +416,8 @@ func ProcessRndUptoSess(s *Session, n uint32, f Filter) uint32 {
 	return r.RndUptoFilterSess(s, n, f)
 }
 
-// ProcessRndFlipcoin mirrors random.cpp::rnd_flipcoin.
+// ProcessRndFlipcoinSess mirrors random.cpp::rnd_flipcoin on an explicit bag.
 // random.cpp:73–77.
-func ProcessRndFlipcoin(p uint32, f Filter) bool {
-	return ProcessRndFlipcoinSess(testAmbientSession, p, f)
-}
-
-// ProcessRndFlipcoinSess is ProcessRndFlipcoin on an explicit session bag.
 func ProcessRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 	r := ProcessRngSess(s)
 	if r == nil {
@@ -437,13 +427,8 @@ func ProcessRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 	return r.RndFlipcoinFilterSess(s, p, f)
 }
 
-// ProcessRandomHexDigits mirrors random.cpp::RandomHexDigits.
+// ProcessRandomHexDigitsSess mirrors random.cpp::RandomHexDigits on an explicit bag.
 // random.cpp:57–60.
-func ProcessRandomHexDigits(num int) string {
-	return ProcessRandomHexDigitsSess(testAmbientSession, num)
-}
-
-// ProcessRandomHexDigitsSess is ProcessRandomHexDigits on an explicit session bag.
 func ProcessRandomHexDigitsSess(s *Session, num int) string {
 	r := ProcessRngSess(s)
 	if r == nil {
@@ -453,13 +438,8 @@ func ProcessRandomHexDigitsSess(s *Session, num int) string {
 	return r.RandomHexDigitsSess(s, num)
 }
 
-// ProcessRandomDigits mirrors random.cpp::RandomDigits.
+// ProcessRandomDigitsSess mirrors random.cpp::RandomDigits on an explicit bag.
 // random.cpp:62–65.
-func ProcessRandomDigits(num int) string {
-	return ProcessRandomDigitsSess(testAmbientSession, num)
-}
-
-// ProcessRandomDigitsSess is ProcessRandomDigits on an explicit session bag.
 func ProcessRandomDigitsSess(s *Session, num int) string {
 	r := ProcessRngSess(s)
 	if r == nil {
@@ -469,13 +449,8 @@ func ProcessRandomDigitsSess(s *Session, num int) string {
 	return r.RandomDigitsSess(s, num)
 }
 
-// ProcessTraceDepth mirrors random.cpp::trace_depth.
+// ProcessTraceDepthSess mirrors random.cpp::trace_depth on an explicit bag.
 // random.cpp:132–135.
-func ProcessTraceDepth() string {
-	return ProcessTraceDepthSess(testAmbientSession)
-}
-
-// ProcessTraceDepthSess is ProcessTraceDepth on an explicit session bag.
 func ProcessTraceDepthSess(s *Session) string {
 	r := ProcessRngSess(s)
 	if r == nil {
@@ -485,13 +460,8 @@ func ProcessTraceDepthSess(s *Session) string {
 	return r.TraceDepthSess(s)
 }
 
-// ProcessGetSequence mirrors random.cpp::get_sequence.
+// ProcessGetSequenceSess mirrors random.cpp::get_sequence on an explicit bag.
 // random.cpp:137–140.
-func ProcessGetSequence() string {
-	return ProcessGetSequenceSess(testAmbientSession)
-}
-
-// ProcessGetSequenceSess is ProcessGetSequence on an explicit session bag.
 func ProcessGetSequenceSess(s *Session) string {
 	r := ProcessRngSess(s)
 	if r == nil {

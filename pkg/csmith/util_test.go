@@ -25,11 +25,11 @@ func TestGensymSequence(t *testing.T) {
 
 func TestDoFinalizationResetsGensym(t *testing.T) {
 	// DFSProgramGenerator.cpp:92 reset_gensym between runs
-	prevR := ProcessRng()
-	prevP := ProcessProbabilities()
+	prevR := ProcessRngSess(testAmbientSession)
+	prevP := ProcessProbabilitiesSess(testAmbientSession)
 	defer func() {
-		SetProcessRng(prevR)
-		SetProcessProbabilities(prevP)
+		SetProcessRngSess(testAmbientSession, prevR)
+		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
 	ResetDefaultGensym()
 	_ = Gensym("g_")

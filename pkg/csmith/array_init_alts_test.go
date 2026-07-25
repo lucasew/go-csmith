@@ -9,7 +9,7 @@ import (
 // Seed-2 func_11 brace multi-value needs InitExprs; empty alts → single-value only.
 func TestCreateArrayVariableProducesAlts(t *testing.T) {
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	elem := GetSimpleType(EUInt)
 	if elem == nil {
@@ -21,7 +21,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 		ClearError()
 		ResetArrayInitSeed()
 		r := NewRng(seed)
-		SetProcessRng(r)
+		SetProcessRngSess(testAmbientSession, r)
 		vs := NewVariableSelector(opts)
 		vs.Probs = probs
 		blk := &Block{StmID: 1}
@@ -30,7 +30,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 			continue
 		}
 		r = NewRng(seed)
-		SetProcessRng(r)
+		SetProcessRngSess(testAmbientSession, r)
 		av := CreateArrayVariable(r, opts, probs, vs, nil, blk, "l_arr", elem, init, NewCVQualifiers(nil, nil))
 		if av == nil || HasError() {
 			continue
@@ -62,7 +62,7 @@ func TestCreateArrayVariableProducesAlts(t *testing.T) {
 func TestBuildInitRecursiveThreeStringsVaries(t *testing.T) {
 	ClearError()
 	ResetArrayInitSeed()
-	SetProcessOptions(Defaults())
+	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := GetSimpleType(EUInt)
 	av := &ArrayVariable{
 		Variable: Variable{

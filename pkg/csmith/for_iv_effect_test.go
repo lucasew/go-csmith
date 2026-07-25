@@ -13,7 +13,7 @@ import "testing"
 func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},

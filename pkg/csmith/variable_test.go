@@ -75,9 +75,9 @@ func TestCreateVariableScalarsUsesProcessProbs(t *testing.T) {
 	// Variable.cpp:395 — Constant::make_random uses Probabilities singleton
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(probs)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, probs)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearError()
 	// simple still works with process table
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
@@ -99,9 +99,9 @@ func TestCreateVariableScalarsUsesProcessProbs(t *testing.T) {
 
 func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 	// no invent NewProbabilities when process singleton unset — sticky
-	prev := ProcessProbabilities()
-	SetProcessProbabilities(nil)
-	defer SetProcessProbabilities(prev)
+	prev := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessProbabilitiesSess(testAmbientSession, nil)
+	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	ClearError()
 	st := &Type{isStruct: true, StructName: "SFail", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -121,9 +121,9 @@ func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 
 func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
 	// Variable.cpp:395 — Constant::make_random uses process RNG; sticky no invent private stream
-	prevR := ProcessRng()
-	SetProcessRng(nil)
-	defer SetProcessRng(prevR)
+	prevR := ProcessRngSess(testAmbientSession)
+	SetProcessRngSess(testAmbientSession, nil)
+	defer SetProcessRngSess(testAmbientSession, prevR)
 	ClearError()
 	// simple needs pure_rnd — fail closed sticky without invent nextCreateVarRng
 	if CreateVariableScalars("g_i", GetIntType(), false, false) != nil {
@@ -162,13 +162,13 @@ func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
 	// Variable.cpp:395 — Constant::make_random uses process DefaultRndNumGenerator
 	opts := Defaults()
 	r := NewRng(42)
-	prevR := ProcessRng()
-	prevP := ProcessProbabilities()
-	SetProcessRng(r)
-	SetProcessProbabilities(NewProbabilities(opts))
+	prevR := ProcessRngSess(testAmbientSession)
+	prevP := ProcessProbabilitiesSess(testAmbientSession)
+	SetProcessRngSess(testAmbientSession, r)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	defer func() {
-		SetProcessRng(prevR)
-		SetProcessProbabilities(prevP)
+		SetProcessRngSess(testAmbientSession, prevR)
+		SetProcessProbabilitiesSess(testAmbientSession, prevP)
 	}()
 	ClearError()
 	// burn some process draws so depth moves

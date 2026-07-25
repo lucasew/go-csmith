@@ -16,9 +16,9 @@ import "testing"
 func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
-	SetProcessProbabilities(NewProbabilities(opts))
-	SetProcessRng(NewRng(1))
+	SetProcessOptionsSess(testAmbientSession, opts)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
+	SetProcessRngSess(testAmbientSession, NewRng(1))
 
 	i32 := GetIntType()
 	pt := PointerTo(i32)
@@ -103,7 +103,7 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	ClearError()
 	opts := Defaults()
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 
 	i32 := GetIntType()
 	pt := PointerTo(i32)

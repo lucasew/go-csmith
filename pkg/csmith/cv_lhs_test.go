@@ -77,12 +77,12 @@ func TestIndirectQualifiersMultiLevelAddrFailClosed(t *testing.T) {
 func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 	// CVQualifiers.cpp:641–648 — assert sticky when bit set but option off
 	ClearError()
-	prev := ProcessOptions()
+	prev := ProcessOptionsSess(testAmbientSession)
 	opts := Defaults()
 	opts.Consts = false
 	opts.Volatiles = false
-	SetProcessOptions(opts)
-	defer SetProcessOptions(prev)
+	SetProcessOptionsSess(testAmbientSession, opts)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	if s := q.OutputFirstQuals(); s != "" {
 		t.Fatalf("want empty when options off, got %q", s)
@@ -93,7 +93,7 @@ func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 	ClearError()
 	opts.Consts = true
 	opts.Volatiles = true
-	SetProcessOptions(opts)
+	SetProcessOptionsSess(testAmbientSession, opts)
 	if s := q.OutputFirstQuals(); !strings.Contains(s, "const") || !strings.Contains(s, "volatile") {
 		t.Fatal(s)
 	}

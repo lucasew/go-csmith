@@ -9,9 +9,9 @@ func TestAccessOnceMarking(t *testing.T) {
 	opts := Defaults()
 	opts.AccessOnce = true
 	// Variable.cpp:694 — CGOptions::access_once() process option for Output wrap
-	prev := ProcessOptions()
-	SetProcessOptions(opts)
-	defer SetProcessOptions(prev)
+	prev := ProcessOptionsSess(testAmbientSession)
+	SetProcessOptionsSess(testAmbientSession, opts)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 	vs := NewVariableSelector(opts)
 	vs.Probs = NewProbabilities(opts)
 	// force many creates until AccessOnce set
@@ -39,11 +39,11 @@ func TestAccessOnceMarking(t *testing.T) {
 func TestAccessOnceWrapRequiresOption(t *testing.T) {
 	// Variable.cpp:694–695 — assert(access_once); sticky, no invent wrap when option off
 	ClearError()
-	prev := ProcessOptions()
+	prev := ProcessOptionsSess(testAmbientSession)
 	opts := Defaults()
 	opts.AccessOnce = false
-	SetProcessOptions(opts)
-	defer SetProcessOptions(prev)
+	SetProcessOptionsSess(testAmbientSession, opts)
+	defer SetProcessOptionsSess(testAmbientSession, prev)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	v.IsAccessOnce = true
 	out := v.OutputC()
