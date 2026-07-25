@@ -1614,7 +1614,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 		all.WriteString("--- end structs --- */\n")
 	}
 	// DFSProgramGenerator.cpp:78 — OutputStructUnions once before loop
-	for iter := 0; !g.Rng.DFSGetAllDone(); iter++ {
+	for iter := 0; !g.Rng.DFSGetAllDoneSess(g.Sess); iter++ {
 		if iter >= dfsLoopMaxPrograms {
 			g.noteErr(ErrGeneric)
 			return ""
@@ -1640,7 +1640,7 @@ func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
 			}
 		}
 		// reset for next enumeration
-		g.Rng.DFSResetState()
+		g.Rng.DFSResetStateSess(g.Sess)
 		// Function::doFinalization — drop built funcs
 		g.Funcs = FunctionList{}
 		g.FactMgrs = NewFactMgrMapSess(g.Sess)

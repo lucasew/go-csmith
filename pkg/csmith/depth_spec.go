@@ -171,7 +171,7 @@ func DepthGuardByDepthSess(s *Session, opts Options, depthNeeded int) int {
 		sessNoteError(s, ErrGeneric)
 		return BadDepth
 	}
-	if r.EagerBacktracking(depthNeeded) {
+	if r.EagerBacktrackingSess(s, depthNeeded) {
 		return BadDepth
 	}
 	return GoodDepth

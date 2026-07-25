@@ -32,11 +32,16 @@ type dfsEngine struct {
 // opts.MaxExhaustiveDepth sizes the SearchState vector (CGOptions::max_exhaustive_depth).
 // Incomplete maxDepth<=0 sticky nil (no invent empty engine that always EXCEED).
 func NewDFSRng(seed uint64, opts Options) *Rng {
+	return NewDFSRngSess(nil, seed, opts)
+}
+
+// NewDFSRngSess is NewDFSRng with explicit session residual sticky.
+func NewDFSRngSess(s *Session, seed uint64, opts Options) *Rng {
 	maxDepth := opts.MaxExhaustiveDepth
 	// C++ init_states(max) with max<=0 yields empty states_; every choice EXCEED.
 	// Library fail-closed: require positive depth for a usable DFS engine.
 	if maxDepth <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	r := NewRng(seed)
@@ -45,7 +50,7 @@ func NewDFSRng(seed uint64, opts Options) *Rng {
 		decisionDepth: -1,
 		currentPos:    -1,
 		allDone:       false,
-		seq:           MakeSequence(),
+		seq:           MakeSequenceSess(s),
 		maxDepth:      maxDepth,
 		states:        make([]dfsSearchState, maxDepth),
 	}
@@ -54,13 +59,13 @@ func NewDFSRng(seed uint64, opts Options) *Rng {
 	}
 	// DFSRndNumGenerator.cpp:147–155 — optional dfs_debug_sequence
 	if dbg := opts.DFSDebugSequence; dbg != "" {
-		nums, ok := ParseSequenceLine(dbg, CurrentSepChar())
+		nums, ok := ParseSequenceLine(dbg, CurrentSepCharSess(s))
 		if !ok {
 			// C++ assert("dfs debugging sequence error!"); sticky fail closed
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		eng.initializeSequence(nums)
+		eng.initializeSequenceSess(s, nums)
 		eng.useDebugSequence = true
 	}
 	r.dfs = eng
@@ -80,7 +85,7 @@ func makeDFSRndNumGeneratorOptsSess(s *Session, seed uint64, opts Options) *Rng 
 	if s.DFSImpl != nil {
 		return s.DFSImpl
 	}
-	r := NewDFSRng(seed, opts)
+	r := NewDFSRngSess(s, seed, opts)
 	if r == nil {
 		return nil
 	}
@@ -104,9 +109,13 @@ func clearDFSImplSess(s *Session) {
 }
 
 func (e *dfsEngine) initializeSequence(v []int) {
+	e.initializeSequenceSess(nil, v)
+}
+
+func (e *dfsEngine) initializeSequenceSess(s *Session, v []int) {
 	// DFSRndNumGenerator.cpp:161–165
 	if e == nil || e.seq == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	for i, n := range v {
@@ -117,8 +126,13 @@ func (e *dfsEngine) initializeSequence(v []int) {
 // EagerBacktracking mirrors DFSRndNumGenerator::eager_backtracking.
 // DFSRndNumGenerator.cpp:181–206 — true means do eager backtracking (sets BACKTRACKING_ERROR).
 func (r *Rng) EagerBacktracking(depthNeeded int) bool {
+	return r.EagerBacktrackingSess(nil, depthNeeded)
+}
+
+// EagerBacktrackingSess is EagerBacktracking with explicit session residual sticky.
+func (r *Rng) EagerBacktrackingSess(s *Session, depthNeeded int) bool {
 	if r == nil || r.kind != RngKindDFS || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	e := r.dfs
@@ -131,21 +145,26 @@ func (r *Rng) EagerBacktracking(depthNeeded int) bool {
 		return false
 	}
 	if e.currentPos > e.decisionDepth {
-		sessNoteError(nil, ErrBacktracking)
+		sessNoteError(s, ErrBacktracking)
 		return true
 	}
 	e.decisionDepth = e.currentPos
 	for i := e.currentPos + 1; i < maxDepth; i++ {
 		e.states[i].init = false
 	}
-	sessNoteError(nil, ErrBacktracking)
+	sessNoteError(s, ErrBacktracking)
 	return true
 }
 
 // DFSGetDecisionDepth mirrors get_decision_depth.
 func (r *Rng) DFSGetDecisionDepth() int {
+	return r.DFSGetDecisionDepthSess(nil)
+}
+
+// DFSGetDecisionDepthSess is DFSGetDecisionDepth with explicit session residual sticky.
+func (r *Rng) DFSGetDecisionDepthSess(s *Session) int {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	return r.dfs.decisionDepth
@@ -153,8 +172,13 @@ func (r *Rng) DFSGetDecisionDepth() int {
 
 // DFSGetCurrentPos mirrors get_current_pos.
 func (r *Rng) DFSGetCurrentPos() int {
+	return r.DFSGetCurrentPosSess(nil)
+}
+
+// DFSGetCurrentPosSess is DFSGetCurrentPos with explicit session residual sticky.
+func (r *Rng) DFSGetCurrentPosSess(s *Session) int {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	return r.dfs.currentPos
@@ -162,8 +186,13 @@ func (r *Rng) DFSGetCurrentPos() int {
 
 // DFSSetCurrentPos mirrors set_current_pos.
 func (r *Rng) DFSSetCurrentPos(pos int) {
+	r.DFSSetCurrentPosSess(nil, pos)
+}
+
+// DFSSetCurrentPosSess is DFSSetCurrentPos with explicit session residual sticky.
+func (r *Rng) DFSSetCurrentPosSess(s *Session, pos int) {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	r.dfs.currentPos = pos
@@ -171,8 +200,13 @@ func (r *Rng) DFSSetCurrentPos(pos int) {
 
 // DFSGetAllDone mirrors get_all_done.
 func (r *Rng) DFSGetAllDone() bool {
+	return r.DFSGetAllDoneSess(nil)
+}
+
+// DFSGetAllDoneSess is DFSGetAllDone with explicit session residual sticky.
+func (r *Rng) DFSGetAllDoneSess(s *Session) bool {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return r.dfs.allDone
@@ -181,8 +215,13 @@ func (r *Rng) DFSGetAllDone() bool {
 // DFSResetState mirrors reset_state.
 // DFSRndNumGenerator.cpp:381–385.
 func (r *Rng) DFSResetState() {
+	r.DFSResetStateSess(nil)
+}
+
+// DFSResetStateSess is DFSResetState with explicit session residual sticky.
+func (r *Rng) DFSResetStateSess(s *Session) {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	e := r.dfs
@@ -207,24 +246,28 @@ func filterInvalidNums(invalid []int, v int) bool {
 // dfsRevisitNode mirrors revisit_node.
 // DFSRndNumGenerator.cpp:208–227.
 func (e *dfsEngine) revisitNode(state *dfsSearchState, localPos, bound int, f Filter) int {
+	return e.revisitNodeSess(nil, state, localPos, bound, f)
+}
+
+func (e *dfsEngine) revisitNodeSess(s *Session, state *dfsSearchState, localPos, bound int, f Filter) int {
 	rv := state.value
 	if f != nil {
 		// C++ asserts rv < bound; sticky fail closed
 		if rv >= bound {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 		_ = f.Filter(uint32(rv))
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return -1
 		}
 		if e.currentPos >= e.maxDepth {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return -1
 		}
 	}
 	if e.seq == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return -1
 	}
 	e.seq.AddNumber(rv, bound, localPos)
@@ -244,7 +287,7 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 		return -1
 	}
 	e := r.dfs
-	err := GetError()
+	err := GetErrorSess(s)
 	if err == ErrBacktracking {
 		return -1
 	}
@@ -292,7 +335,7 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 
 	// Revisit a node
 	if e.currentPos < e.decisionDepth && state.init {
-		return e.revisitNode(state, localPos, bound, f)
+		return e.revisitNodeSess(s, state, localPos, bound, f)
 	}
 
 	if state.init {
@@ -385,8 +428,13 @@ func (r *Rng) dfsRandomChoiceSess(s *Session, bound int, f Filter, invalid []int
 // DFSRndNumGenerator.cpp:351–365.}
 
 func (r *Rng) DFSLogDepth(d int, where, log string) {
+	r.DFSLogDepthSess(nil, d, where, log)
+}
+
+// DFSLogDepthSess is DFSLogDepth with explicit session residual sticky.
+func (r *Rng) DFSLogDepthSess(s *Session, d int, where, log string) {
 	if r == nil || r.dfs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	e := r.dfs
@@ -406,12 +454,17 @@ func (r *Rng) DFSLogDepth(d int, where, log string) {
 // GetPrefixedNameDFS mirrors DFSRndNumGenerator::get_prefixed_name.
 // DFSRndNumGenerator.cpp:397–403 — "p_" + sequence + sep + name.
 func (r *Rng) GetPrefixedNameDFS(name string) string {
+	return r.GetPrefixedNameDFSSess(nil, name)
+}
+
+// GetPrefixedNameDFSSess is GetPrefixedNameDFS with explicit session residual sticky.
+func (r *Rng) GetPrefixedNameDFSSess(s *Session, name string) string {
 	if r == nil || r.dfs == nil || r.dfs.seq == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return name
 	}
 	seq := r.dfs.seq.GetSequence()
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		// empty sequence sticky — no invent "p__name"
 		return name
 	}
@@ -421,7 +474,11 @@ func (r *Rng) GetPrefixedNameDFS(name string) string {
 // dfsRndUpto mirrors DFSRndNumGenerator::rnd_upto.
 // DFSRndNumGenerator.cpp:411–415.
 func (r *Rng) dfsRndUpto(n uint32, f Filter) uint32 {
-	x := r.dfsRandomChoice(int(n), f, nil)
+	return r.dfsRndUptoSess(nil, n, f)
+}
+
+func (r *Rng) dfsRndUptoSess(s *Session, n uint32, f Filter) uint32 {
+	x := r.dfsRandomChoiceSess(s, int(n), f, nil)
 	// C++ casts -1 → unsigned max; callers ERROR_GUARD first
 	if x < 0 {
 		return uint32(int32(x))
@@ -432,17 +489,21 @@ func (r *Rng) dfsRndUpto(n uint32, f Filter) uint32 {
 // dfsRndFlipcoin mirrors DFSRndNumGenerator::rnd_flipcoin.
 // DFSRndNumGenerator.cpp:417–431 — p==100 forces 1; p==0 forces 0 via invalid list.
 func (r *Rng) dfsRndFlipcoin(p uint32, f Filter) bool {
+	return r.dfsRndFlipcoinSess(nil, p, f)
+}
+
+func (r *Rng) dfsRndFlipcoinSess(s *Session, p uint32, f Filter) bool {
 	var invalid []int
 	var y int
 	switch {
 	case p == 100:
 		invalid = []int{0}
-		y = r.dfsRandomChoice(2, f, invalid)
+		y = r.dfsRandomChoiceSess(s, 2, f, invalid)
 	case p == 0:
 		invalid = []int{1}
-		y = r.dfsRandomChoice(2, f, invalid)
+		y = r.dfsRandomChoiceSess(s, 2, f, invalid)
 	default:
-		y = r.dfsRandomChoice(2, f, nil)
+		y = r.dfsRandomChoiceSess(s, 2, f, nil)
 	}
 	// C++ return y as bool: -1 → true; 0 → false; 1 → true
 	return y != 0

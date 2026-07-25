@@ -19,18 +19,23 @@ func MakeRndNumGenerator(kind RngKind, seed uint64) *Rng {
 
 // MakeRndNumGeneratorSess is MakeRndNumGenerator using session Options (DFS).
 func MakeRndNumGeneratorSess(s *Session, kind RngKind, seed uint64) *Rng {
-	return makeRndNumGeneratorWithOpts(kind, seed, sessOpts(s))
+	return makeRndNumGeneratorWithOptsSess(s, kind, seed, sessOpts(s))
 }
 
 // makeRndNumGeneratorWithOpts is the factory used under session ownership.
 func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
+	return makeRndNumGeneratorWithOptsSess(nil, kind, seed, opts)
+}
+
+// makeRndNumGeneratorWithOptsSess is the factory on an explicit session bag.
+func makeRndNumGeneratorWithOptsSess(s *Session, kind RngKind, seed uint64, opts Options) *Rng {
 	switch kind {
 	case RngKindDefault:
 		return NewRng(seed)
 	case RngKindDFS:
-		return makeDFSRndNumGeneratorOpts(seed, opts)
+		return makeDFSRndNumGeneratorOptsSess(s, seed, opts)
 	default:
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 }
@@ -49,7 +54,7 @@ func CreateRandomNumberInstanceSess(s *Session, kind RngKind, seed uint64) {
 			seed:       seed,
 			generators: make(map[RngKind]*Rng),
 		}
-		g := makeRndNumGeneratorWithOpts(kind, seed, s.Opts)
+		g := makeRndNumGeneratorWithOptsSess(s, kind, seed, s.Opts)
 		if g == nil {
 			return
 		}
@@ -62,7 +67,7 @@ func CreateRandomNumberInstanceSess(s *Session, kind RngKind, seed uint64) {
 	rn := s.RandomNumber
 	g := rn.generators[kind]
 	if g == nil {
-		g = makeRndNumGeneratorWithOpts(kind, rn.seed, s.Opts)
+		g = makeRndNumGeneratorWithOptsSess(s, kind, rn.seed, s.Opts)
 		if g == nil {
 			return
 		}
@@ -122,7 +127,7 @@ func SwitchRndNumGeneratorSess(s *Session, kind RngKind) RngKind {
 	old := rn.currKind
 	g := rn.generators[kind]
 	if g == nil {
-		g = makeRndNumGeneratorWithOpts(kind, rn.seed, s.Opts)
+		g = makeRndNumGeneratorWithOptsSess(s, kind, rn.seed, s.Opts)
 		if g == nil {
 			return old
 		}
@@ -153,12 +158,17 @@ func RandomNumberDoFinalizationSess(s *Session) {
 
 // GetPrefixedName mirrors RandomNumber::get_prefixed_name → curr_generator_.
 func (rn *RandomNumber) GetPrefixedName(name string) string {
+	return rn.GetPrefixedNameSess(nil, name)
+}
+
+// GetPrefixedNameSess is GetPrefixedName with explicit session residual sticky.
+func (rn *RandomNumber) GetPrefixedNameSess(s *Session, name string) string {
 	if rn == nil || rn.curr == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return name
 	}
 	if rn.curr.kind == RngKindDFS {
-		return rn.curr.GetPrefixedNameDFS(name)
+		return rn.curr.GetPrefixedNameDFSSess(s, name)
 	}
 	return GetPrefixedNameDefault(name)
 }
