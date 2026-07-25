@@ -1858,7 +1858,7 @@ func (v *Variable) IsPointerSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	pt := v.Type.PtrType()
+	pt := v.Type.PtrTypeSess(s)
 	// residual ERROR sticky — no invent soft not-pointer past PtrType residual
 	if sessHasError(s) {
 		return false

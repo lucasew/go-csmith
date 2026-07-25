@@ -991,7 +991,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		if isLoopBody || b.NeedRevisit || hasBack {
 			selfBack := false
 			if isLoopBody {
-				fromTail := b.FromTailToHead()
+				fromTail := b.FromTailToHeadSess(cgSess(cg))
 				// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
 				if sessHasError(cgSess(cg)) {
 					fm.GlobalFacts = IncompleteFactSlice()
@@ -1133,7 +1133,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					b.NeedRevisit = true
 					fm.ResetBlockFactMaps(b)
 					if !selfBack {
-						fromTail := b.FromTailToHead()
+						fromTail := b.FromTailToHeadSess(cgSess(cg))
 						// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
 						if sessHasError(cgSess(cg)) {
 							fm.GlobalFacts = IncompleteFactSlice()
@@ -1147,7 +1147,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 						}
 					}
 					if cg.EffectAccum != nil {
-						*cg.EffectAccum = preEffect.Clone()
+						*cg.EffectAccum = preEffect.CloneSess(cgSess(cg))
 						// residual ERROR sticky — no invent soft-reset past Effect Clone residual
 						if sessHasError(cgSess(cg)) {
 							fm.GlobalFacts = IncompleteFactSlice()

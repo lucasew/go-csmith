@@ -1682,7 +1682,7 @@ func (f *FactPointTo) MarkFuncEndLocalsSess(s *Session, locals []*Variable) *Fac
 			return nil
 		}
 		localSet[l] = true
-		exp := l.CollectExpandable()
+		exp := l.CollectExpandableSess(s)
 		// residual ERROR sticky — no invent soft-mark past CollectExpandable residual
 		if sessHasError(s) {
 			return nil
@@ -1834,7 +1834,7 @@ func MarkFuncEndOnFactsSess(s *Session, facts *[]*FactPointTo, fn *Function, stP
 	}
 	for i, f := range *facts {
 		// nil without error = no lattice change; sticky = incomplete fail closed
-		if nf := f.MarkFuncEnd(fn, stParent); nf != nil {
+		if nf := f.MarkFuncEndSess(s, fn, stParent); nf != nil {
 			(*facts)[i] = nf
 		} else if sessHasError(s) {
 			*facts = IncompleteFactSlice()
@@ -2126,7 +2126,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !v.IsPointer() {
+	if !v.IsPointerSess(s) {
 		// residual ERROR sticky — no invent not-pointer soft-skip past IsPointer hole
 		if sessHasError(s) {
 			return true
@@ -2206,7 +2206,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 			return true
 		}
 		// recurse one level of pointees that are pointers
-		if p.IsPointer() {
+		if p.IsPointerSess(s) {
 			// residual ERROR sticky — no invent soft-skip recurse past IsPointer residual
 			if sessHasError(s) {
 				return true
@@ -2217,7 +2217,7 @@ func IsPointingToLocalsSess(s *Session, v *Variable, b *Block, indirection int, 
 				return true
 			}
 			for j := 0; j < il; j++ {
-				nested := MergePointeesOfPointer(p, j+1, facts)
+				nested := MergePointeesOfPointerSess(s, p, j+1, facts)
 				// residual ERROR sticky — no invent soft-recurse past MergePointees residual
 				if sessHasError(s) {
 					return true

@@ -2094,7 +2094,7 @@ func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Functio
 		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
-		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
+		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.MatchSess(s, fact.Var)) {
 			// residual ERROR sticky — no invent soft-skip RV past Match hole
 			if sessHasError(s) {
 				return IncompleteFactSlice()
@@ -2104,7 +2104,7 @@ func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Functio
 		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
-		cl := fact.Clone()
+		cl := fact.CloneSess(s)
 		// residual ERROR sticky — no invent soft-keep past Clone residual
 		if sessHasError(s) {
 			return IncompleteFactSlice()
@@ -3721,26 +3721,27 @@ func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 		sessNoteError(fmSess(fm), ErrGeneric)
 		return
 	}
+	s := fmSess(fm)
 	for _, fact := range fm.GlobalFacts {
 		// FactsComplete guarantees live fact.Var
 		v := fact.Var
 		// const pointers should never be dangling; only globals
-		if v.IsConst() || !v.IsGlobal() {
+		if v.IsConstSess(s) || !v.IsGlobalSess(s) {
 			// residual ERROR sticky — no invent soft-continue dead scan past IsConst/IsGlobal hole
-			if sessHasError(fmSess(fm)) {
+			if sessHasError(s) {
 				f.DeadGlobals = IncompleteVariables()
 				return
 			}
 			continue
 		}
-		if fact.IsDead() {
+		if fact.IsDeadSess(s) {
 			// residual ERROR sticky — no invent soft-continue later dead appends past IsDead hole
-			if sessHasError(fmSess(fm)) {
+			if sessHasError(s) {
 				f.DeadGlobals = IncompleteVariables()
 				return
 			}
 			f.DeadGlobals = append(f.DeadGlobals, v)
-		} else if sessHasError(fmSess(fm)) {
+		} else if sessHasError(s) {
 			// residual ERROR sticky — no invent not-dead soft-skip then complete DeadGlobals past hole
 			f.DeadGlobals = IncompleteVariables()
 			return

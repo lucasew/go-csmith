@@ -828,7 +828,7 @@ func (f *Function) generateBodyCore(
 		}
 		for i, fact := range cg.FM.GlobalFacts {
 			// nil without error = no lattice change; nil with sticky = incomplete fail closed
-			if nf := fact.MarkFuncEndLocals(locals); nf != nil {
+			if nf := fact.MarkFuncEndLocalsSess(vsSess(vs), locals); nf != nil {
 				cg.FM.GlobalFacts[i] = nf
 			} else if sessHasError(vsSess(vs)) {
 				abortUnbuilt()
