@@ -7,7 +7,7 @@ import "testing"
 func TestFilterCtorEnablesAllKinds(t *testing.T) {
 	// Filter.cpp:40 — kinds_.set() all true
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := NewVectorFilter(nil)
+	f := NewVectorFilterSess(testAmbientSession, nil)
 	if !f.ValidFilter() {
 		t.Fatal("default ctor valid_filter true in random mode")
 	}
@@ -19,7 +19,7 @@ func TestFilterCtorEnablesAllKinds(t *testing.T) {
 func TestFilterDisableDefaultInvalidatesRandom(t *testing.T) {
 	// Filter.cpp:55–57 disable; 74–79 valid_filter
 	SetProcessOptionsSess(testAmbientSession, Defaults()) // RandomBased
-	f := NewVectorFilter(nil)
+	f := NewVectorFilterSess(testAmbientSession, nil)
 	f.Disable(FilterKindDefault)
 	if f.ValidFilter() {
 		t.Fatal("after disable(fDefault), valid_filter false in random mode")
@@ -40,7 +40,7 @@ func TestFilterCurrentKindDFS(t *testing.T) {
 	o.DFSExhaustive = true
 	SetProcessOptionsSess(testAmbientSession, o)
 	defer SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := NewVectorFilter(nil)
+	f := NewVectorFilterSess(testAmbientSession, nil)
 	if f.CurrentKind() != FilterKindDFS {
 		t.Fatalf("dfs current_kind: got %d", f.CurrentKind())
 	}
@@ -53,7 +53,7 @@ func TestFilterCurrentKindDFS(t *testing.T) {
 func TestVectorFilterFilterOutWithItems(t *testing.T) {
 	// VectorFilter.cpp:58–66 FilterOut: reject if in set
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := NewVectorFilterItems([]int{3, 7}, FilterModeOut)
+	f := NewVectorFilterItemsSess(testAmbientSession, []int{3, 7}, FilterModeOut)
 	if !f.Filter(3) {
 		t.Fatal("FilterOut must reject 3")
 	}
@@ -65,7 +65,7 @@ func TestVectorFilterFilterOutWithItems(t *testing.T) {
 func TestVectorFilterKeepMode(t *testing.T) {
 	// Keep: reject if NOT in set
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	f := NewVectorFilterItems([]int{3}, FilterModeKeep)
+	f := NewVectorFilterItemsSess(testAmbientSession, []int{3}, FilterModeKeep)
 	if f.Filter(3) {
 		t.Fatal("Keep must accept 3")
 	}
@@ -76,7 +76,7 @@ func TestVectorFilterKeepMode(t *testing.T) {
 
 func TestVectorFilterAddDedup(t *testing.T) {
 	// VectorFilter.cpp:68–72 — add only if not present
-	f := NewVectorFilter(nil)
+	f := NewVectorFilterSess(testAmbientSession, nil)
 	f.Add(1).Add(1).Add(2)
 	if len(f.items) != 2 {
 		t.Fatalf("items after dedup: %v", f.items)
@@ -89,7 +89,7 @@ func TestVectorFilterLookupWithTable(t *testing.T) {
 	tab := &DistributionTable{}
 	tab.AddEntry(10, 50) // key 10 weight 50 → rnd 0..49 → 10
 	tab.AddEntry(20, 50) // key 20 weight 50 → rnd 50..99 → 20
-	f := NewVectorFilter(tab)
+	f := NewVectorFilterSess(testAmbientSession, tab)
 	f.Add(10) // filter out key 10
 	// raw 0 → key 10 → reject
 	if !f.Filter(0) {

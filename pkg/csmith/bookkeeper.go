@@ -85,10 +85,6 @@ func BookkeeperDoFinalizationSess(s *Session) {
 	bk.relyOnPtrSize = false
 }
 
-func formattedOutput(b *strings.Builder, msg string, num int) {
-	formattedOutputSess(testAmbientSession, b, msg, num)
-}
-
 // formattedOutputSess is formattedOutput with explicit session residual sticky.
 func formattedOutputSess(s *Session, b *strings.Builder, msg string, num int) {
 	// Bookkeeper.cpp always has live ostream + message; sticky no invent silent
@@ -104,10 +100,6 @@ func formattedOutputSess(s *Session, b *strings.Builder, msg string, num int) {
 	b.WriteString("XXX ")
 	b.WriteString(msg)
 	b.WriteString(fmt.Sprintf("%d\n", num))
-}
-
-func formattedOutputf(b *strings.Builder, msg string, num float64) {
-	formattedOutputfSess(testAmbientSession, b, msg, num)
 }
 
 // formattedOutputfSess is formattedOutputf with explicit session residual sticky.
@@ -449,9 +441,6 @@ func OOBCount() int { return sessBK(nil).oobCnt }
 // plus sum of arg complexities; assign/comma nest.
 // Incomplete IR fails closed sticky as -1 (no invent leaf depth 0 / soft re-pick
 // stats past partial nest counts).
-func ExpressionComplexity(e *Expression) int {
-	return ExpressionComplexitySess(testAmbientSession, e)
-}
 
 func ExpressionComplexitySess(s *Session, e *Expression) int {
 	if e == nil {
@@ -554,10 +543,6 @@ func ExpressionComplexitySess(s *Session, e *Expression) int {
 // Bookkeeper.cpp:209–221 / Statement.cpp get_exprs virtuals.
 // Returns false on incomplete IR sticky (no invent partial expr list / soft re-pick past holes).}
 
-func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
-	return collectStmtExprsSess(testAmbientSession, st, out)
-}
-
 func collectStmtExprsSess(s *Session, st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
 		if out != nil {
@@ -616,10 +601,6 @@ func collectStmtExprsSess(s *Session, st *Stmt, out *[]*Expression) bool {
 // Builtins without body skip. Incomplete expressions / stmt IR sticky clear counts —
 // no invent counting broken IR as leaf depth 0 / soft re-pick past holes.}
 
-func StatExprDepths(funcs []*Function) {
-	StatExprDepthsSess(testAmbientSession, funcs)
-}
-
 // StatExprDepthsSess is StatExprDepths writing expr depth counters on bag s.
 func StatExprDepthsSess(s *Session, funcs []*Function) {
 	sessBK(s).exprDepthCnts = nil
@@ -667,9 +648,6 @@ func StatExprDepthsSess(s *Session, funcs []*Function) {
 // StatBlkDepths mirrors Bookkeeper::stat_blk_depths.
 // Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
 // Incomplete Funcs / Block* holes fail closed sticky zero counts (no invent partial depths).
-func StatBlkDepths(funcs []*Function) int {
-	return StatBlkDepthsSess(testAmbientSession, funcs)
-}
 
 // StatBlkDepthsSess is StatBlkDepths writing block depth counters on bag s.
 func StatBlkDepthsSess(s *Session, funcs []*Function) int {
@@ -734,9 +712,6 @@ func StatBlkDepthsSess(s *Session, funcs []*Function) int {
 
 // OutputStatistics mirrors Bookkeeper::output_statistics.
 // Bookkeeper.cpp:167–192.
-func OutputStatistics(funcs []*Function, opts Options) string {
-	return OutputStatisticsSess(testAmbientSession, funcs, opts)
-}
 
 // OutputStatisticsSess is OutputStatistics reading counters on bag s.
 func OutputStatisticsSess(s *Session, funcs []*Function, opts Options) string {
@@ -789,10 +764,6 @@ func OutputStatisticsSess(s *Session, funcs []*Function, opts Options) string {
 	return b.String()
 }
 
-func outputStructUnionStatistics(b *strings.Builder, opts Options) {
-	outputStructUnionStatisticsSess(testAmbientSession, b, opts)
-}
-
 func outputStructUnionStatisticsSess(s *Session, b *strings.Builder, opts Options) {
 	maxD := len(sessBK(s).structDepthCnts) - 1
 	if maxD < 0 {
@@ -811,10 +782,6 @@ func outputStructUnionStatisticsSess(s *Session, b *strings.Builder, opts Option
 	}
 	formattedOutputSess(s, b, "total union variables: ", sessBK(s).unionVarCnt)
 	outputBitfieldsSess(s, b, opts)
-}
-
-func outputBitfields(b *strings.Builder, opts Options) {
-	outputBitfieldsSess(testAmbientSession, b, opts)
 }
 
 func outputBitfieldsSess(s *Session, b *strings.Builder, opts Options) {
@@ -836,10 +803,6 @@ func outputBitfieldsSess(s *Session, b *strings.Builder, opts Options) {
 	formattedOutputSess(s, b, "times a bitfields struct is write: ", sessBK(s).lhsBitfieldsStructsVarsCnt)
 	formattedOutputSess(s, b, "times a bitfield is read: ", sessBK(s).rhsBitfieldCnt)
 	formattedOutputSess(s, b, "times a bitfield is write: ", sessBK(s).lhsBitfieldCnt)
-}
-
-func outputExprStatistics(b *strings.Builder, funcs []*Function) {
-	outputExprStatisticsSess(testAmbientSession, b, funcs)
 }
 
 func outputExprStatisticsSess(s *Session, b *strings.Builder, funcs []*Function) {
@@ -973,10 +936,6 @@ func outputPointerStatistics(b *strings.Builder, s *Session) {
 	}
 }
 
-func outputVolatileAccessStatistics(b *strings.Builder) {
-	outputVolatileAccessStatisticsSess(testAmbientSession, b)
-}
-
 func outputVolatileAccessStatisticsSess(s *Session, b *strings.Builder) {
 	formattedOutputSess(s, b, "times a non-volatile is read: ", sessBK(s).readNonVolatileCnt)
 	formattedOutputSess(s, b, "times a non-volatile is write: ", sessBK(s).writeNonVolatileCnt)
@@ -993,17 +952,9 @@ func outputVolatileAccessStatisticsSess(s *Session, b *strings.Builder) {
 	formattedOutputfSess(s, b, "percentage of non-volatile access: ", percentage)
 }
 
-func outputJumpStatistics(b *strings.Builder) {
-	outputJumpStatisticsSess(testAmbientSession, b)
-}
-
 func outputJumpStatisticsSess(s *Session, b *strings.Builder) {
 	formattedOutputSess(s, b, "forward jumps: ", sessBK(s).forwardJumpCnt)
 	formattedOutputSess(s, b, "backward jumps: ", sessBK(s).backwardJumpCnt)
-}
-
-func outputStmtsStatistics(b *strings.Builder, funcs []*Function) {
-	outputStmtsStatisticsSess(testAmbientSession, b, funcs)
 }
 
 func outputStmtsStatisticsSess(s *Session, b *strings.Builder, funcs []*Function) {
@@ -1023,10 +974,6 @@ func outputStmtsStatisticsSess(s *Session, b *strings.Builder, funcs []*Function
 	}
 }
 
-func outputVarFreshness(b *strings.Builder) {
-	outputVarFreshnessSess(testAmbientSession, b)
-}
-
 func outputVarFreshnessSess(s *Session, b *strings.Builder) {
 	total := sessBK(s).useNewVarCnt + sessBK(s).useOldVarCnt
 	fresh, exist := 0.0, 0.0
@@ -1040,9 +987,6 @@ func outputVarFreshnessSess(s *Session, b *strings.Builder) {
 
 // OutputTail mirrors OutputMgr::OutputTail — statistics comment after main.
 // OutputMgr.cpp:223–233.
-func OutputTail(funcs []*Function, opts Options) string {
-	return OutputTailSess(testAmbientSession, funcs, opts)
-}
 
 // OutputTailSess is OutputTail reading statistics counters on bag s.
 func OutputTailSess(s *Session, funcs []*Function, opts Options) string {

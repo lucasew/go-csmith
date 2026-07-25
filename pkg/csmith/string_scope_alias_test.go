@@ -144,7 +144,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	if len(currentSession().AllPtrs) != 1 {
 		t.Fatal(currentSession().AllPtrs)
 	}
-	out := OutputStatistics(nil, Defaults())
+	out := OutputStatisticsSess(testAmbientSession, nil, Defaults())
 	if !strings.Contains(out, "total number of pointers: 1") {
 		t.Fatal(out)
 	}

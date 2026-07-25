@@ -12,8 +12,8 @@
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
 //   - cgSess/vsSess/fmSess/gSess/envSess panic on nil (no dual-fill)
 //   - nil-owner residual sticky: noteErr*/hasErr*/sessFrom* → ambient explicitly
-//   - residual: bookkeeper/vector_filter duals, RandomNumber duals,
-//     PureRnd* ambient; ArrayVariable duals deleted; rSess panics on nil/unset
+//   - residual: RandomNumber duals, PureRnd* ambient; VectorFilter duals
+//     route via f.Sess (vfSess); bookkeeper duals deleted; rSess panics
 //   - NewVariableSelector requires *Session (no ambient install)
 //   - CVQualifiers + statement_meta + Effect + Variable duals deleted (*Sess only)
 //   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set

@@ -66,7 +66,7 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	ClearPartialExpanderSess(testAmbientSession)
 	opts := Defaults()
 	tables := NewExprTables(opts)
-	f := NewVectorFilter(&tables.Expr)
+	f := NewVectorFilterSess(testAmbientSession, &tables.Expr)
 	// no filters: max=120
 	r := NewRngSess(testAmbientSession, 2)
 	// first RndUpto(120) for seed2
@@ -315,19 +315,19 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	e := &Expression{Term: TermFunction, Invoke: fi}
 	// 1 (call) + 0 + 0
-	if ExpressionComplexity(e) != 1 {
-		t.Fatal(ExpressionComplexity(e))
+	if ExpressionComplexitySess(testAmbientSession, e) != 1 {
+		t.Fatal(ExpressionComplexitySess(testAmbientSession, e))
 	}
 	// nested call arg
 	nested := &Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "g"}, Args: nil}}
 	fi2 := &Invocation{User: &Function{Name: "f"}, Args: []*Expression{nested}}
 	e2 := &Expression{Term: TermFunction, Invoke: fi2}
-	if ExpressionComplexity(e2) != 2 {
-		t.Fatal(ExpressionComplexity(e2))
+	if ExpressionComplexitySess(testAmbientSession, e2) != 2 {
+		t.Fatal(ExpressionComplexitySess(testAmbientSession, e2))
 	}
 	// nil Invoke — fail closed sticky -1 (no invent leaf depth 0)
 	ClearErrorSess(testAmbientSession)
-	if ExpressionComplexity(&Expression{Term: TermFunction}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermFunction}) >= 0 {
 		t.Fatal("nil invoke must fail closed -1, not invent depth 0")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -335,21 +335,21 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	// incomplete assign / comma / nil arg — fail closed sticky -1
 	ClearErrorSess(testAmbientSession)
-	if ExpressionComplexity(&Expression{Term: TermAssignment}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermAssignment}) >= 0 {
 		t.Fatal("nil Assign must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Assign ExpressionComplexity must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ExpressionComplexity(&Expression{Term: TermCommaExpr, CommaLHS: inner}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermCommaExpr, CommaLHS: inner}) >= 0 {
 		t.Fatal("nil CommaRHS must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil CommaRHS ExpressionComplexity must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermFunction, Invoke: &Invocation{
 		User: &Function{Name: "h"}, Args: []*Expression{inner, nil},
 	}}) >= 0 {
 		t.Fatal("nil arg hole must fail closed -1")
@@ -359,7 +359,7 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	// incomplete constant / variable leaf
 	ClearErrorSess(testAmbientSession)
-	if ExpressionComplexity(&Expression{Term: TermConstant}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermConstant}) >= 0 {
 		t.Fatal("nil Con must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -367,7 +367,7 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil Constant shell sticky (no invent leaf complexity 0)
-	if ExpressionComplexity(&Expression{Term: TermConstant, Con: &Constant{Value: "0"}}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}) >= 0 {
 		t.Fatal("nil Con.Type must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -375,7 +375,7 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil Variable shell sticky (no invent leaf complexity 0)
-	if ExpressionComplexity(&Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}) >= 0 {
 		t.Fatal("Type-nil Var must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -383,7 +383,7 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-std nil User sticky (no invent complexity 0 as non-call)
-	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{}}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermFunction, Invoke: &Invocation{}}) >= 0 {
 		t.Fatal("non-std nil User must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -391,14 +391,14 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// std binary without User is complete leaf complexity 0
-	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}) != 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}) != 0 {
 		t.Fatal("std binary ExpressionComplexity must be 0")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("std binary ExpressionComplexity must not sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if ExpressionComplexity(&Expression{Term: TermVariable}) >= 0 {
+	if ExpressionComplexitySess(testAmbientSession, &Expression{Term: TermVariable}) >= 0 {
 		t.Fatal("nil Var must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -465,7 +465,7 @@ func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
 	defer ClearPartialExpanderSess(testAmbientSession)
 	opts := Defaults()
 	tables := NewExprTables(opts)
-	f := NewVectorFilter(&tables.Expr)
+	f := NewVectorFilterSess(testAmbientSession, &tables.Expr)
 	// even with no_func filter setup in PickTermType, ExpressionTypeProbability alone forces Function
 	got := ExpressionTypeProbability(NewRngSess(testAmbientSession, 2), f)
 	if got != TermFunction {

@@ -122,7 +122,7 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 	if currentSession().BK.useNewVarCnt != 1 || currentSession().BK.useOldVarCnt != 1 {
 		t.Fatal(currentSession().BK.useNewVarCnt, currentSession().BK.useOldVarCnt)
 	}
-	out := OutputStatistics(nil, Defaults())
+	out := OutputStatisticsSess(testAmbientSession, nil, Defaults())
 	if !strings.Contains(out, "forward jumps: 1") || !strings.Contains(out, "backward jumps: 2") {
 		t.Fatal(out)
 	}
@@ -141,12 +141,12 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil builder sticky (no invent silent skip of stats lines / undercount)
-	formattedOutput(nil, "x: ", 1)
+	formattedOutputSess(testAmbientSession, nil, "x: ", 1)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil builder formattedOutput must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	formattedOutputf(nil, "x: ", 1.0)
+	formattedOutputfSess(testAmbientSession, nil, "x: ", 1.0)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil builder formattedOutputf must SetError sticky")
 	}
@@ -232,14 +232,14 @@ func TestOutputStatisticsStatResidualSticky(t *testing.T) {
 	// Stat residual soft invent was soft-continue later stats invent partial OutputStatistics.
 	ClearErrorSess(testAmbientSession)
 	// incomplete Funcs → StatExprDepths stickies ERROR
-	if s := OutputStatistics([]*Function{nil}, Defaults()); s != "" {
+	if s := OutputStatisticsSess(testAmbientSession, []*Function{nil}, Defaults()); s != "" {
 		t.Fatal("Stat residual must fail closed OutputStatistics, not invent partial", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Stat residual OutputStatistics must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := OutputTail([]*Function{nil}, Defaults()); s != "" {
+	if s := OutputTailSess(testAmbientSession, []*Function{nil}, Defaults()); s != "" {
 		t.Fatal("Stat residual must fail closed OutputTail, not invent stats shell", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -299,7 +299,7 @@ func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
 		{Kind: StmtIfElse, StmID: 2, Then: inner, Else: &Block{Parent: outer}},
 	}
 	inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 3}}
-	n := StatBlkDepths([]*Function{f})
+	n := StatBlkDepthsSess(testAmbientSession, []*Function{f})
 	// 3 non-block stmts: assign, if, assign
 	if n != 3 {
 		t.Fatalf("count %d", n)
@@ -320,7 +320,7 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}}, // nil Invoke
 	}}}
-	StatExprDepths([]*Function{f})
+	StatExprDepthsSess(testAmbientSession, []*Function{f})
 	if currentSession().BK.exprDepthCnts != nil {
 		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", currentSession().BK.exprDepthCnts)
 	}
@@ -333,7 +333,7 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	good := &Function{Name: "g", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
 	}}}
-	StatExprDepths([]*Function{nil, good})
+	StatExprDepthsSess(testAmbientSession, []*Function{nil, good})
 	if currentSession().BK.exprDepthCnts != nil {
 		t.Fatal("Funcs hole must clear depths, not invent count past hole", currentSession().BK.exprDepthCnts)
 	}
@@ -341,7 +341,7 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 		t.Fatal("Funcs hole StatExprDepths must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if StatBlkDepths([]*Function{nil, good}) != 0 || currentSession().BK.blkDepthCnts != nil {
+	if StatBlkDepthsSess(testAmbientSession, []*Function{nil, good}) != 0 || currentSession().BK.blkDepthCnts != nil {
 		t.Fatal("Funcs hole must zero StatBlkDepths")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -358,7 +358,7 @@ func TestStatExprDepthsForTestExpr(t *testing.T) {
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}},
 	}}}
-	StatExprDepths([]*Function{f})
+	StatExprDepthsSess(testAmbientSession, []*Function{f})
 	if len(currentSession().BK.exprDepthCnts) < 1 || currentSession().BK.exprDepthCnts[0] < 1 {
 		t.Fatalf("for-test must count: %+v", currentSession().BK.exprDepthCnts)
 	}
@@ -371,7 +371,7 @@ func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{IV: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)}, Then: &Block{}},
 	}}}
-	StatExprDepths([]*Function{f})
+	StatExprDepthsSess(testAmbientSession, []*Function{f})
 	if currentSession().BK.exprDepthCnts != nil {
 		t.Fatal("for without TestExpr must fail closed clear, not invent skip", currentSession().BK.exprDepthCnts)
 	}
@@ -388,7 +388,7 @@ func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
 	}}}
-	StatExprDepths([]*Function{f})
+	StatExprDepthsSess(testAmbientSession, []*Function{f})
 	if currentSession().BK.exprDepthCnts != nil {
 		t.Fatal("assign without Expr must fail closed clear depths", currentSession().BK.exprDepthCnts)
 	}

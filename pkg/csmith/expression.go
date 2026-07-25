@@ -172,7 +172,12 @@ func (e *Expression) CompatibleWithExprSess(s *Session, other *Expression, expan
 // Incomplete IR sticky -1 (no invent leaf 0 past holes).}
 
 func (e *Expression) GetComplexity() int {
-	return ExpressionComplexity(e)
+	return e.GetComplexitySess(testAmbientSession)
+}
+
+// GetComplexitySess is GetComplexity with explicit session residual sticky.
+func (e *Expression) GetComplexitySess(s *Session) int {
+	return ExpressionComplexitySess(s, e)
 }
 
 // GetInvoke mirrors Expression::get_invoke — non-nil only for TermFunction.
