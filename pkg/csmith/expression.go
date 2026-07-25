@@ -954,27 +954,33 @@ type ExprTables struct {
 // NewExprTables mirrors Expression::InitProbabilityTables for given options.
 // Expression.cpp:68–96.
 func NewExprTables(opts Options) *ExprTables {
+	// Construction path: residual bag unused (table always live; AddEntry only stickies nil).
+	return NewExprTablesSess(testAmbientSession, opts)
+}
+
+// NewExprTablesSess builds expr/param tables with explicit residual sticky bag.
+func NewExprTablesSess(s *Session, opts Options) *ExprTables {
 	t := &ExprTables{}
 	// InitExprProbabilityTable
-	t.Expr.AddEntry(int(TermFunction), 70)
-	t.Expr.AddEntry(int(TermVariable), 20)
-	t.Expr.AddEntry(int(TermConstant), 10)
+	t.Expr.AddEntrySess(s, int(TermFunction), 70)
+	t.Expr.AddEntrySess(s, int(TermVariable), 20)
+	t.Expr.AddEntrySess(s, int(TermConstant), 10)
 	if opts.EmbeddedAssigns {
-		t.Expr.AddEntry(int(TermAssignment), 10)
+		t.Expr.AddEntrySess(s, int(TermAssignment), 10)
 	}
 	if opts.CommaOperators {
-		t.Expr.AddEntry(int(TermCommaExpr), 10)
+		t.Expr.AddEntrySess(s, int(TermCommaExpr), 10)
 	}
 	// InitParamProbabilityTable
-	t.Param.AddEntry(int(TermFunction), 40)
-	t.Param.AddEntry(int(TermVariable), 40)
+	t.Param.AddEntrySess(s, int(TermFunction), 40)
+	t.Param.AddEntrySess(s, int(TermVariable), 40)
 	// Expression.cpp — constant params weight 0; add_entry still records key (max += 0).
-	t.Param.AddEntry(int(TermConstant), 0)
+	t.Param.AddEntrySess(s, int(TermConstant), 0)
 	if opts.EmbeddedAssigns {
-		t.Param.AddEntry(int(TermAssignment), 10)
+		t.Param.AddEntrySess(s, int(TermAssignment), 10)
 	}
 	if opts.CommaOperators {
-		t.Param.AddEntry(int(TermCommaExpr), 10)
+		t.Param.AddEntrySess(s, int(TermCommaExpr), 10)
 	}
 	return t
 }
@@ -1040,10 +1046,10 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 	}
 	f := NewVectorFilterSess(s, &tables.Expr)
 	if noFunc {
-		f.Add(int(TermFunction))
+		f.AddSess(s, int(TermFunction))
 	}
 	if noConst {
-		f.Add(int(TermConstant))
+		f.AddSess(s, int(TermConstant))
 	}
 	// Expression.cpp:166–175 — struct/union cannot be constant subexpr; func gated by return flags
 	if typ != nil {
@@ -1058,12 +1064,12 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 			return MaxTermTypes
 		}
 		if isSt || isUn {
-			f.Add(int(TermConstant))
+			f.AddSess(s, int(TermConstant))
 			if isSt && !opts.ReturnStructs {
-				f.Add(int(TermFunction))
+				f.AddSess(s, int(TermFunction))
 			}
 			if isUn && !opts.ReturnUnions {
-				f.Add(int(TermFunction))
+				f.AddSess(s, int(TermFunction))
 			}
 			isCSU := typ.IsConstStructUnionSess(s)
 			// residual ERROR sticky — no invent soft-filter term past IsConstStructUnion residual
@@ -1076,13 +1082,13 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 				return MaxTermTypes
 			}
 			if isCSU || isVSU {
-				f.Add(int(TermAssignment))
+				f.AddSess(s, int(TermAssignment))
 			}
 		}
 	}
 	// depth gate: Expression.cpp:177–178
 	if exprDepth+2 > opts.MaxExprComplexity {
-		f.Add(int(TermFunction)).Add(int(TermAssignment)).Add(int(TermCommaExpr))
+		f.AddSess(s, int(TermFunction)).AddSess(s, int(TermAssignment)).AddSess(s, int(TermCommaExpr))
 	}
 	return ExpressionTypeProbabilitySess(s, r, f)
 }
@@ -1107,13 +1113,13 @@ func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options,
 	}
 	f := NewVectorFilterSess(s, &tables.Param)
 	// don't call functions with constant parameters
-	f.Add(int(TermConstant))
+	f.AddSess(s, int(TermConstant))
 	if typ != nil {
 		if typ.IsStructSess(s) && !opts.ReturnStructs {
-			f.Add(int(TermFunction))
+			f.AddSess(s, int(TermFunction))
 		}
 		if typ.IsUnionSess(s) && !opts.ReturnUnions {
-			f.Add(int(TermFunction))
+			f.AddSess(s, int(TermFunction))
 		}
 		isCSU := typ.IsConstStructUnionSess(s)
 		// residual ERROR sticky — no invent soft-filter param term past IsConstStructUnion residual
@@ -1121,11 +1127,11 @@ func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options,
 			return MaxTermTypes
 		}
 		if isCSU {
-			f.Add(int(TermAssignment))
+			f.AddSess(s, int(TermAssignment))
 		}
 	}
 	if exprDepth+2 > opts.MaxExprComplexity {
-		f.Add(int(TermFunction)).Add(int(TermAssignment)).Add(int(TermCommaExpr))
+		f.AddSess(s, int(TermFunction)).AddSess(s, int(TermAssignment)).AddSess(s, int(TermCommaExpr))
 	}
 	return ExpressionTypeProbabilitySess(s, r, f)
 }

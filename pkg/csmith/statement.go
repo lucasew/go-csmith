@@ -28,25 +28,25 @@ const StmtLabel StatementType = 100
 // from set_default_statement_prob thresholds (unequal group).
 // Probabilities.cpp:748–774; keys are cumulative cutoffs, values are statement kinds
 // (C++ stores ProbName then pname_to_type → eStatementType; we store StatementType).
-func buildStatementThresholdTable(opts Options) *ThresholdTable {
+func buildStatementThresholdTable(s *Session, opts Options) *ThresholdTable {
 	t := &ThresholdTable{}
 	// Block weight 0 → not inserted
 	// IfElse 15, For 30, Return 35, Continue 40, Break 45
-	t.Add(15, int(StmtIfElse))
-	t.Add(30, int(StmtFor))
-	t.Add(35, int(StmtReturn))
-	t.Add(40, int(StmtContinue))
-	t.Add(45, int(StmtBreak))
+	t.AddSess(s, 15, int(StmtIfElse))
+	t.AddSess(s, 30, int(StmtFor))
+	t.AddSess(s, 35, int(StmtReturn))
+	t.AddSess(s, 40, int(StmtContinue))
+	t.AddSess(s, 45, int(StmtBreak))
 	if opts.Jumps && opts.Arrays {
-		t.Add(50, int(StmtGoto))
-		t.Add(60, int(StmtArrayOp))
+		t.AddSess(s, 50, int(StmtGoto))
+		t.AddSess(s, 60, int(StmtArrayOp))
 	} else if opts.Jumps && !opts.Arrays {
-		t.Add(50, int(StmtGoto))
+		t.AddSess(s, 50, int(StmtGoto))
 		// ArrayOp 0 → skip
 	} else if !opts.Jumps && opts.Arrays {
-		t.Add(55, int(StmtArrayOp))
+		t.AddSess(s, 55, int(StmtArrayOp))
 	}
-	t.Add(100, int(StmtAssign))
+	t.AddSess(s, 100, int(StmtAssign))
 	return t
 }
 
@@ -66,7 +66,7 @@ func NewStatementThresholdTableSess(s *Session, opts Options) *ThresholdTable {
 		}
 	}
 	// no invent from process when unset — library path builds from opts only
-	return buildStatementThresholdTable(opts)
+	return buildStatementThresholdTable(s, opts)
 }
 
 // NumberToType mirrors Statement::number_to_type(value) for value in [0,100).

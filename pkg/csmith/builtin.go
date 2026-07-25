@@ -32,10 +32,6 @@ var builtinFunctionStrings = []string{
 
 // TypeFromString mirrors Type::get_type_from_string.
 // Type.cpp:370–402 — assert(0 && "Unsupported type string!") on default.
-func TypeFromString(s string) *Type {
-	return TypeFromStringSess(testAmbientSession, s)
-}
-
 // TypeFromStringSess is TypeFromString with explicit session residual sticky.
 func TypeFromStringSess(s *Session, name string) *Type {
 	name = strings.TrimSpace(name)
@@ -127,10 +123,6 @@ func EnabledBuiltin(opts Options, kinds string) bool {
 // MakeDummyBlock mirrors Block::make_dummy_block without live CGContext.
 // Prefer MakeDummyBlockCG when CGContext is available (fact_in + post_creation).
 // Block.cpp:95–110 — empty block, stack push/pop, fact_in, post_creation_analysis.
-func MakeDummyBlock(f *Function) *Block {
-	return MakeDummyBlockSess(testAmbientSession, f)
-}
-
 // MakeDummyBlockSess is MakeDummyBlock allocating StmID on bag s.
 func MakeDummyBlockSess(s *Session, f *Function) *Block {
 	// Block always has live Function; sticky no invent dummy body without it
@@ -149,10 +141,6 @@ func MakeDummyBlockSess(s *Session, f *Function) *Block {
 // Returns false on assert-path failure (empty list, mid Void, bad type, nil var).
 // Fail wipes Param to IncompleteVariables sticky (not bare nil invent empty-complete
 // void-param list after partial append / soft re-pick past VariablesComplete(nil)).
-func GenerateParameterListFromString(f *Function, params string) bool {
-	return GenerateParameterListFromStringSess(testAmbientSession, f, params)
-}
-
 // GenerateParameterListFromStringSess is GenerateParameterListFromString with
 // explicit session residual sticky.
 func GenerateParameterListFromStringSess(s *Session, f *Function, params string) bool {
@@ -203,10 +191,6 @@ func GenerateParameterListFromStringSess(s *Session, f *Function, params string)
 
 // MakeBuiltinFunction mirrors Function::make_builtin_function.
 // Function.cpp:734–771.
-func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap, line string) *Function {
-	return MakeBuiltinFunctionSess(testAmbientSession, opts, probs, r, list, fmMap, line)
-}
-
 // MakeBuiltinFunctionSess is MakeBuiltinFunction with StmID / sticky on bag s.
 func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap, line string) *Function {
 	if s == nil && fmMap != nil {
@@ -289,10 +273,6 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 
 // InitializeBuiltinFunctions mirrors Function::initialize_builtin_functions.
 // Function.cpp:700–732.
-func InitializeBuiltinFunctions(opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap) int {
-	return InitializeBuiltinFunctionsSess(testAmbientSession, opts, probs, r, list, fmMap)
-}
-
 // InitializeBuiltinFunctionsSess is InitializeBuiltinFunctions on bag s.
 func InitializeBuiltinFunctionsSess(s *Session, opts Options, probs *Probabilities, r *Rng, list *FunctionList, fmMap *FactMgrMap) int {
 	if s == nil && fmMap != nil {

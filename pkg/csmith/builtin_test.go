@@ -7,16 +7,16 @@ import (
 
 func TestTypeFromString(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if TypeFromString("Int") != GetIntTypeSess(testAmbientSession) {
+	if TypeFromStringSess(testAmbientSession, "Int") != GetIntTypeSess(testAmbientSession) {
 		t.Fatal("Int")
 	}
-	if TypeFromString("UInt") == nil || !TypeFromString("UInt").IsSimpleSess(testAmbientSession) {
+	if TypeFromStringSess(testAmbientSession, "UInt") == nil || !TypeFromStringSess(testAmbientSession, "UInt").IsSimpleSess(testAmbientSession) {
 		t.Fatal("UInt")
 	}
-	if TypeFromString("Void").SimpleSess(testAmbientSession) != EVoid {
+	if TypeFromStringSess(testAmbientSession, "Void").SimpleSess(testAmbientSession) != EVoid {
 		t.Fatal("Void")
 	}
-	if TypeFromString("NoSuch") != nil {
+	if TypeFromStringSess(testAmbientSession, "NoSuch") != nil {
 		t.Fatal("bad")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -50,7 +50,7 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	// Function.cpp:350/355 — empty / mid Void fail closed sticky
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "b"}
-	if GenerateParameterListFromString(f, "") {
+	if GenerateParameterListFromStringSess(testAmbientSession, f, "") {
 		t.Fatal("empty params")
 	}
 	if VariablesComplete(f.Param) {
@@ -61,7 +61,7 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f2 := &Function{Name: "b2"}
-	if GenerateParameterListFromString(f2, "UInt, Void") {
+	if GenerateParameterListFromStringSess(testAmbientSession, f2, "UInt, Void") {
 		t.Fatal("mid Void")
 	}
 	// IncompleteVariables sticky — not bare nil invent empty-complete void Param
@@ -73,11 +73,11 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	f3 := &Function{Name: "b3"}
-	if !GenerateParameterListFromString(f3, "Void") {
+	if !GenerateParameterListFromStringSess(testAmbientSession, f3, "Void") {
 		t.Fatal("sole Void ok")
 	}
 	f4 := &Function{Name: "b4"}
-	if !GenerateParameterListFromString(f4, "UInt, UChar") || len(f4.Param) != 2 {
+	if !GenerateParameterListFromStringSess(testAmbientSession, f4, "UInt, UChar") || len(f4.Param) != 2 {
 		t.Fatal("two params", f4.Param)
 	}
 }
@@ -87,7 +87,7 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	opts := Defaults()
 	opts.Builtins = true
 	list := &FunctionList{}
-	f := MakeBuiltinFunction(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil,
+	f := MakeBuiltinFunctionSess(testAmbientSession, opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil,
 		"Int; __builtin_clz; (UInt); x86")
 	if f == nil || !f.IsBuiltin || f.Name != "__builtin_clz" {
 		t.Fatal(f)
@@ -103,12 +103,12 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	}
 	// disabled kind — soft skip non-sticky (kind filter, not broken IR)
 	ClearErrorSess(testAmbientSession)
-	if MakeBuiltinFunction(opts, nil, nil, list, nil, "Int; __builtin_clzs; (UShort); clang") != nil {
+	if MakeBuiltinFunctionSess(testAmbientSession, opts, nil, nil, list, nil, "Int; __builtin_clzs; (UShort); clang") != nil {
 		t.Fatal("clang should skip")
 	}
 	// empty name token — sticky no invent shell
 	ClearErrorSess(testAmbientSession)
-	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "Int; ; (UInt); x86") != nil {
+	if MakeBuiltinFunctionSess(testAmbientSession, opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "Int; ; (UInt); x86") != nil {
 		t.Fatal("empty builtin name must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -116,14 +116,14 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	}
 	// Function.cpp always has RNG for random_qualifiers; sticky no invent fixed RV qfer
 	ClearErrorSess(testAmbientSession)
-	if MakeBuiltinFunction(opts, NewProbabilities(opts), nil, list, nil, "Int; __builtin_clz; (UInt); x86") != nil {
+	if MakeBuiltinFunctionSess(testAmbientSession, opts, NewProbabilities(opts), nil, list, nil, "Int; __builtin_clz; (UInt); x86") != nil {
 		t.Fatal("nil RNG must not invent builtin")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "badformat") != nil {
+	if MakeBuiltinFunctionSess(testAmbientSession, opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "badformat") != nil {
 		t.Fatal("invalid format must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -136,14 +136,14 @@ func TestInitializeBuiltinFunctions(t *testing.T) {
 	opts := Defaults()
 	opts.Builtins = true
 	list := &FunctionList{}
-	n := InitializeBuiltinFunctions(opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 2), list, nil)
+	n := InitializeBuiltinFunctionsSess(testAmbientSession, opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 2), list, nil)
 	// x86 builtins only by default (~18)
 	if n < 10 || n > 25 {
 		t.Fatal(n, len(list.Funcs))
 	}
 	// off
 	opts.Builtins = false
-	if InitializeBuiltinFunctions(opts, nil, nil, &FunctionList{}, nil) != 0 {
+	if InitializeBuiltinFunctionsSess(testAmbientSession, opts, nil, nil, &FunctionList{}, nil) != 0 {
 		t.Fatal("off")
 	}
 }

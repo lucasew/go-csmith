@@ -49,10 +49,6 @@ func (l *Lhs) GetComplexitySess(s *Session) int {
 // GetDereferencedPtrs mirrors Lhs::get_dereferenced_ptrs.
 // Lhs.cpp:225–232 — self ExpressionVariable when indirect_level > 0.
 // Incomplete Lhs sticky IncompleteExpressions.
-func (l *Lhs) GetDereferencedPtrs() []*Expression {
-	return l.GetDereferencedPtrsSess(testAmbientSession)
-}
-
 // GetDereferencedPtrsSess is GetDereferencedPtrs with explicit session residual sticky.
 func (l *Lhs) GetDereferencedPtrsSess(s *Session) []*Expression {
 	if l == nil || l.Var == nil {

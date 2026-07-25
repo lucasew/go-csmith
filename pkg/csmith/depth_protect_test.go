@@ -7,10 +7,10 @@ import (
 
 func TestDepthGuardRandomModeAlwaysGood(t *testing.T) {
 	opts := Defaults()
-	if DepthGuardByDepth(opts, 99) != GoodDepth {
+	if DepthGuardByDepthSess(testAmbientSession, opts, 99) != GoodDepth {
 		t.Fatal("depth")
 	}
-	if DepthGuardByType(opts, "dtBlock") != GoodDepth {
+	if DepthGuardByTypeSess(testAmbientSession, opts, "dtBlock") != GoodDepth {
 		t.Fatal("type")
 	}
 	// wired factories always GOOD in random mode
@@ -19,7 +19,7 @@ func TestDepthGuardRandomModeAlwaysGood(t *testing.T) {
 		DtFunctionInvocationRandomUnary, DtFunctionInvocationRandomBinary,
 		DtFunctionInvocationBinary, DtExpression, DtLhs,
 	} {
-		if DepthGuardByType(opts, dt) != GoodDepth {
+		if DepthGuardByTypeSess(testAmbientSession, opts, dt) != GoodDepth {
 			t.Fatal(dt)
 		}
 	}
@@ -43,13 +43,13 @@ func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
 	// Type.cpp / SafeOpFlags.cpp DEPTH_GUARD wired; random mode always GOOD
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if DepthGuardByType(opts, DtRandomTypeFromType) != GoodDepth {
+	if DepthGuardByTypeSess(testAmbientSession, opts, DtRandomTypeFromType) != GoodDepth {
 		t.Fatal("dtRandomTypeFromType")
 	}
-	if DepthGuardByType(opts, DtTypeChooseSimple) != GoodDepth {
+	if DepthGuardByTypeSess(testAmbientSession, opts, DtTypeChooseSimple) != GoodDepth {
 		t.Fatal("dtTypeChooseSimple")
 	}
-	if DepthGuardByTypeFlag(opts, DtSafeOpFlags, int(SafeOpBinary)) != GoodDepth {
+	if DepthGuardByTypeFlagSess(testAmbientSession, opts, DtSafeOpFlags, int(SafeOpBinary)) != GoodDepth {
 		t.Fatal("dtSafeOpFlags")
 	}
 	probs := NewProbabilities(opts)
@@ -109,14 +109,14 @@ func TestDepthGuardUnknownTypeFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.DFSExhaustive = true
-	if DepthGuardByType(opts, "dtNoSuchType") != BadDepth {
+	if DepthGuardByTypeSess(testAmbientSession, opts, "dtNoSuchType") != BadDepth {
 		t.Fatal("unknown dType must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown dType DepthGuard must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MinimalDepth("dtNoSuchType", 0) >= 0 {
+	if MinimalDepthSess(testAmbientSession, "dtNoSuchType", 0) >= 0 {
 		t.Fatal("unknown minimal depth")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -125,7 +125,7 @@ func TestDepthGuardUnknownTypeFailClosed(t *testing.T) {
 	// random mode still GOOD for any type name (guard short-circuits)
 	ClearErrorSess(testAmbientSession)
 	opts.DFSExhaustive = false
-	if DepthGuardByType(opts, "dtNoSuchType") != GoodDepth {
+	if DepthGuardByTypeSess(testAmbientSession, opts, "dtNoSuchType") != GoodDepth {
 		t.Fatal("random mode always GOOD")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -134,14 +134,14 @@ func TestDepthGuardUnknownTypeFailClosed(t *testing.T) {
 func TestKnownDepthTypeUnknownResidualSticky(t *testing.T) {
 	// MinimalDepth residual soft invent was invent known-true for unknown dType.
 	ClearErrorSess(testAmbientSession)
-	if knownDepthType("dtTotallyUnknown") {
+	if knownDepthTypeSess(testAmbientSession, "dtTotallyUnknown") {
 		t.Fatal("unknown dType must fail closed not-known")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("unknown dType knownDepthType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !knownDepthType(DtConstant) {
+	if !knownDepthTypeSess(testAmbientSession, DtConstant) {
 		t.Fatal("DtConstant must be known")
 	}
 	if HasErrorSess(testAmbientSession) {

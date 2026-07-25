@@ -7,22 +7,28 @@ import "strings"
 // NewAssignOpsTable mirrors StatementAssign::InitProbabilityTable.
 // StatementAssign.cpp:68–81.
 func NewAssignOpsTable(opts Options) *DistributionTable {
+	// Construction path: residual bag unused (table always live).
+	return NewAssignOpsTableSess(testAmbientSession, opts)
+}
+
+// NewAssignOpsTableSess builds assign-op distribution with explicit residual bag.
+func NewAssignOpsTableSess(s *Session, opts Options) *DistributionTable {
 	var t DistributionTable
-	t.AddEntry(int(AssignSimple), 70)
-	t.AddEntry(int(AssignBitAnd), 10)
-	t.AddEntry(int(AssignBitXor), 10)
-	t.AddEntry(int(AssignBitOr), 10)
+	t.AddEntrySess(s, int(AssignSimple), 70)
+	t.AddEntrySess(s, int(AssignBitAnd), 10)
+	t.AddEntrySess(s, int(AssignBitXor), 10)
+	t.AddEntrySess(s, int(AssignBitOr), 10)
 	if opts.PreIncrOperator {
-		t.AddEntry(int(AssignPreIncr), 5)
+		t.AddEntrySess(s, int(AssignPreIncr), 5)
 	}
 	if opts.PreDecrOperator {
-		t.AddEntry(int(AssignPreDecr), 5)
+		t.AddEntrySess(s, int(AssignPreDecr), 5)
 	}
 	if opts.PostIncrOperator {
-		t.AddEntry(int(AssignPostIncr), 5)
+		t.AddEntrySess(s, int(AssignPostIncr), 5)
 	}
 	if opts.PostDecrOperator {
-		t.AddEntry(int(AssignPostDecr), 5)
+		t.AddEntrySess(s, int(AssignPostDecr), 5)
 	}
 	return &t
 }
@@ -75,7 +81,7 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 			return AssignOp(-1)
 		}
 		if signed {
-			f.Add(int(AssignPreIncr)).Add(int(AssignPreDecr)).Add(int(AssignPostIncr)).Add(int(AssignPostDecr))
+			f.AddSess(s, int(AssignPreIncr)).AddSess(s, int(AssignPreDecr)).AddSess(s, int(AssignPostIncr)).AddSess(s, int(AssignPostDecr))
 		}
 	}
 	v := r.RndUptoFilterSess(s, uint32(f.MaxProb()), f)
@@ -455,7 +461,7 @@ func MakeRandomAssignQfer(
 	}
 
 	// StatementAssign.cpp:218–223 — CompatibleChecker → nullptr
-	if CompatibleCheckExprsSess(sessFromCG(cg), opts, rhs, LhsAsExpression(lhs)) {
+	if CompatibleCheckExprsSess(sessFromCG(cg), opts, rhs, LhsAsExpressionSess(sessFromCG(cg), lhs)) {
 		// residual ERROR sticky — no invent soft-assign past CompatibleCheck residual true
 		if hasErrCG(cg) {
 			return Stmt{}
@@ -621,7 +627,7 @@ func makePossibleCompoundAssign(
 	}
 	st.SafeFlags = flags
 	// StatementAssign.cpp:269–271 — add_operand ExpressionVariable(lhs); e.clone(); ExpressionFuncall
-	lhsExpr := LhsAsExpression(lhs)
+	lhsExpr := LhsAsExpressionSess(sessFromCG(&cg), lhs)
 	if lhsExpr == nil {
 		// C++ always has live Lhs; incomplete IR sticky empty assign
 		noteErrCG(&cg, ErrGeneric)

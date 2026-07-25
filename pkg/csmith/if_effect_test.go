@@ -13,7 +13,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	// assign-only so arms write
 	tab := &ThresholdTable{}
-	tab.Add(100, int(StmtAssign))
+	tab.AddSess(testAmbientSession, 100, int(StmtAssign))
 	opts.MaxBlockSize = 2
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -438,7 +438,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	// assign-only arms so generation writes/reads globals into shared accum
 	tab := &ThresholdTable{}
-	tab.Add(100, int(StmtAssign))
+	tab.AddSess(testAmbientSession, 100, int(StmtAssign))
 	opts.MaxBlockSize = 2
 	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)

@@ -72,7 +72,7 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	// first RndUpto(120) for seed2
 	r2 := NewRngSess(testAmbientSession, 2)
 	raw := int(r2.RndUpto(120))
-	want := TermType(tables.Expr.RndNumToKey(raw))
+	want := TermType(tables.Expr.RndNumToKeySess(testAmbientSession, raw))
 	got := ExpressionTypeProbability(r, f)
 	if got != want {
 		t.Fatalf("got %v want %v (raw %d)", got, want, raw)

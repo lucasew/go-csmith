@@ -12,10 +12,6 @@ type DistributionTable struct {
 // AddEntry mirrors DistributionTable::add_entry.
 // Probabilities.cpp:1025–1029 — always push key/prob (including weight 0).
 // Incomplete table sticky no-op (no invent soft grow past missing shell).
-func (d *DistributionTable) AddEntry(key, prob int) {
-	d.AddEntrySess(testAmbientSession, key, prob)
-}
-
 // AddEntrySess is AddEntry with explicit session residual sticky.
 func (d *DistributionTable) AddEntrySess(s *Session, key, prob int) {
 	// DistributionTable always live when building filters; sticky incomplete no invent
@@ -30,10 +26,6 @@ func (d *DistributionTable) AddEntrySess(s *Session, key, prob int) {
 
 // Max mirrors get_max.
 // Incomplete table sticky 0 (no invent default domain soft-skip past hole).
-func (d *DistributionTable) Max() int {
-	return d.MaxSess(testAmbientSession)
-}
-
 // MaxSess is Max with explicit session residual sticky.
 func (d *DistributionTable) MaxSess(s *Session) int {
 	// DistributionTable always live; sticky incomplete no invent max 0 soft-skip
@@ -46,10 +38,6 @@ func (d *DistributionTable) MaxSess(s *Session) int {
 
 // KeyToProb mirrors DistributionTable::key_to_prob.
 // Probabilities.cpp:1031–1038 — first matching key's weight; 0 if missing.
-func (d *DistributionTable) KeyToProb(key int) int {
-	return d.KeyToProbSess(testAmbientSession, key)
-}
-
 // KeyToProbSess is KeyToProb with explicit session residual sticky.
 func (d *DistributionTable) KeyToProbSess(s *Session, key int) int {
 	if d == nil {
@@ -67,10 +55,6 @@ func (d *DistributionTable) KeyToProbSess(s *Session, key int) int {
 // RndNumToKey mirrors rnd_num_to_key — walk cumulative probs.
 // Incomplete table sticky -1 (no invent identity key soft-skip past hole).
 // OOB rnd (not in [0,max)) returns -1; C++ asserts.
-func (d *DistributionTable) RndNumToKey(rnd int) int {
-	return d.RndNumToKeySess(testAmbientSession, rnd)
-}
-
 // RndNumToKeySess is RndNumToKey with explicit session residual sticky.
 func (d *DistributionTable) RndNumToKeySess(s *Session, rnd int) int {
 	// DistributionTable always live for lookup; sticky incomplete no invent -1 soft-skip
@@ -101,10 +85,6 @@ type ThresholdTable struct {
 
 // Add mirrors sorted insert of (threshold, value).
 // Incomplete table sticky no-op (no invent grow past missing table shell).
-func (t *ThresholdTable) Add(key, value int) {
-	t.AddSess(testAmbientSession, key, value)
-}
-
 // AddSess is Add with explicit session residual sticky.
 func (t *ThresholdTable) AddSess(s *Session, key, value int) {
 	// ThresholdTable always live when building stmt tables; sticky incomplete no invent
@@ -130,10 +110,6 @@ func (t *ThresholdTable) AddSess(s *Session, key, value int) {
 
 // GetValue mirrors ProbabilityTable::get_value — first key > k.
 // Incomplete table sticky -1 (no invent miss soft-success past missing table shell).
-func (t *ThresholdTable) GetValue(k int) int {
-	return t.GetValueSess(testAmbientSession, k)
-}
-
 // GetValueSess is GetValue with explicit session residual sticky.
 func (t *ThresholdTable) GetValueSess(s *Session, k int) int {
 	// ThresholdTable always live for draws; sticky incomplete no invent -1 soft-skip

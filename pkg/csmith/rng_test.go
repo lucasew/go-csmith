@@ -237,8 +237,8 @@ func TestDefaultTraceDepthAndSequenceEmpty(t *testing.T) {
 	if r.TraceDepth() != "" {
 		t.Fatalf("trace_depth initial: %q", r.TraceDepth())
 	}
-	if r.GetSequence() != "" {
-		t.Fatalf("get_sequence default: %q", r.GetSequence())
+	if r.GetSequenceSess(testAmbientSession) != "" {
+		t.Fatalf("get_sequence default: %q", r.GetSequenceSess(testAmbientSession))
 	}
 }
 

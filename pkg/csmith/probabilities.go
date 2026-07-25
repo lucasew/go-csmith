@@ -555,7 +555,7 @@ func (p *Probabilities) initSafeOpsSize(opts Options) {
 // Probabilities.cpp:748–774 — cumulative cutoffs; Statement::InitProbabilityTable
 // installs stmtTable_ from pStatementProb (pname_to_type → eStatementType).
 func (p *Probabilities) initStatementProbs(opts Options) {
-	p.statementTable = buildStatementThresholdTable(opts)
+	p.statementTable = buildStatementThresholdTable(testAmbientSession, opts)
 }
 
 // SafeOpsSizeWeight returns equal-group weight for SafeOpSize index (int sizes only).

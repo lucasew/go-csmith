@@ -214,7 +214,7 @@ func TestHaveOverlappingFieldsFindUnionResidualSticky(t *testing.T) {
 	// Type-nil non-special expr → FindUnionPointees incomplete → overlap sticky
 	e1 := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
 	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)}
-	if !HaveOverlappingFields(e1, e2, nil) {
+	if !HaveOverlappingFieldsSess(testAmbientSession, e1, e2, nil) {
 		t.Fatal("Type-nil FindUnion residual must fail closed overlap true")
 	}
 	if !HasErrorSess(testAmbientSession) {

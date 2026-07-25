@@ -313,7 +313,7 @@ func TestGetEvalToSubexpsComma(t *testing.T) {
 		CommaLHS: &Expression{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)},
 		CommaRHS: &Expression{Term: TermVariable, Var: b, ExprType: GetIntTypeSess(testAmbientSession)},
 	}
-	subs := GetEvalToSubexps(e)
+	subs := GetEvalToSubexpsSess(testAmbientSession, e)
 	if len(subs) != 1 || subs[0].Var != b {
 		t.Fatal(subs)
 	}
@@ -332,7 +332,7 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	}
 	for _, e := range cases {
 		ClearErrorSess(testAmbientSession)
-		if ExpressionsComplete(GetEvalToSubexps(e)) {
+		if ExpressionsComplete(GetEvalToSubexpsSess(testAmbientSession, e)) {
 			t.Fatalf("incomplete eval must IncompleteExpressions, got complete for %#v", e)
 		}
 		if !HasErrorSess(testAmbientSession) {
@@ -341,7 +341,7 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil Constant shell sticky (no invent self-eval complete list)
-	if ExpressionsComplete(GetEvalToSubexps(&Expression{
+	if ExpressionsComplete(GetEvalToSubexpsSess(testAmbientSession, &Expression{
 		Term: TermConstant, Con: &Constant{Value: "0"},
 	})) {
 		t.Fatal("Type-nil Constant must IncompleteExpressions")
@@ -351,7 +351,7 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil Variable shell sticky (specials exempt)
-	if ExpressionsComplete(GetEvalToSubexps(&Expression{
+	if ExpressionsComplete(GetEvalToSubexpsSess(testAmbientSession, &Expression{
 		Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil},
 	})) {
 		t.Fatal("Type-nil Variable must IncompleteExpressions")
@@ -361,7 +361,7 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Type-nil LhsVar assign sticky
-	if ExpressionsComplete(GetEvalToSubexps(&Expression{
+	if ExpressionsComplete(GetEvalToSubexpsSess(testAmbientSession, &Expression{
 		Term:   TermAssignment,
 		Assign: &Stmt{Kind: StmtAssign, LhsVar: &Variable{Name: "g_hole", Type: nil}},
 	})) {
@@ -387,11 +387,11 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 	// indirection: Var type *int, ExprType int → level 1
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
-	u1 := FindUnionPointees(facts, e1)
+	u1 := FindUnionPointeesSess(testAmbientSession, facts, e1)
 	if len(u1) == 0 {
 		t.Fatalf("expected union pointees, ind=%d", e1.IndirectLevel())
 	}
-	if !HaveOverlappingFields(e1, e2, facts) {
+	if !HaveOverlappingFieldsSess(testAmbientSession, e1, e2, facts) {
 		t.Fatal("overlap", u1)
 	}
 }
@@ -404,10 +404,10 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	holeFacts := []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr), nil}
-	if !HaveOverlappingFields(e1, e2, holeFacts) {
+	if !HaveOverlappingFieldsSess(testAmbientSession, e1, e2, holeFacts) {
 		t.Fatal("incomplete facts must fail closed as overlap")
 	}
-	if VariablesComplete(FindUnionPointees(holeFacts, e1)) {
+	if VariablesComplete(FindUnionPointeesSess(testAmbientSession, holeFacts, e1)) {
 		t.Fatal("FindUnionPointees incomplete must fail closed incomplete, not invent empty complete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -416,11 +416,11 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete empty: non-pointer term → empty unions, no overlap
 	c := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
-	empty := FindUnionPointees(nil, c)
+	empty := FindUnionPointeesSess(testAmbientSession, nil, c)
 	if empty == nil || len(empty) != 0 {
 		t.Fatal("complete non-ptr must be non-nil empty", empty)
 	}
-	if HaveOverlappingFields(c, c, nil) {
+	if HaveOverlappingFieldsSess(testAmbientSession, c, c, nil) {
 		t.Fatal("complete constants must not invent overlap")
 	}
 }
@@ -434,7 +434,7 @@ func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	fld := &Variable{Name: "g_hole.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parent}
 	facts := []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{fld})}
 	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
-	got := FindUnionPointees(facts, e)
+	got := FindUnionPointeesSess(testAmbientSession, facts, e)
 	if VariablesComplete(got) {
 		t.Fatal("GetContainerUnion residual must fail closed incomplete, not invent empty complete", got)
 	}
@@ -443,7 +443,7 @@ func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// residual must also invent overlap (restrictive) not conflict-free
-	if !HaveOverlappingFields(e, e, facts) {
+	if !HaveOverlappingFieldsSess(testAmbientSession, e, e, facts) {
 		t.Fatal("GetContainerUnion residual HaveOverlappingFields must fail closed as overlap")
 	}
 	if !HasErrorSess(testAmbientSession) {

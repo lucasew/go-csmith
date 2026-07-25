@@ -3431,16 +3431,22 @@ const (
 // VariableSelector.cpp:112–121 — with globals: 35 Global, 65 Local, 95 Param, 100 New;
 // without: 50 Local, 95 Param, 100 New.
 func NewScopeThresholdTable(opts Options) *ThresholdTable {
+	// Construction path: residual bag unused (table always live).
+	return NewScopeThresholdTableSess(testAmbientSession, opts)
+}
+
+// NewScopeThresholdTableSess builds the scope selection table with explicit residual bag.
+func NewScopeThresholdTableSess(s *Session, opts Options) *ThresholdTable {
 	t := &ThresholdTable{}
 	if opts.GlobalVariables {
-		t.Add(35, int(ScopeGlobal))
-		t.Add(65, int(ScopeParentLocal))
-		t.Add(95, int(ScopeParentParam))
-		t.Add(100, int(ScopeNewValue))
+		t.AddSess(s, 35, int(ScopeGlobal))
+		t.AddSess(s, 65, int(ScopeParentLocal))
+		t.AddSess(s, 95, int(ScopeParentParam))
+		t.AddSess(s, 100, int(ScopeNewValue))
 	} else {
-		t.Add(50, int(ScopeParentLocal))
-		t.Add(95, int(ScopeParentParam))
-		t.Add(100, int(ScopeNewValue))
+		t.AddSess(s, 50, int(ScopeParentLocal))
+		t.AddSess(s, 95, int(ScopeParentParam))
+		t.AddSess(s, 100, int(ScopeNewValue))
 	}
 	return t
 }
@@ -3455,7 +3461,7 @@ func variableSelectFilter(tab *ThresholdTable, cg *CGContext) Filter {
 			// no soft invent scope mapping without InitScopeTable
 			return true
 		}
-		sc := VariableScope(tab.GetValue(int(v)))
+		sc := VariableScope(tab.GetValueSess(sessFromCG(cg), int(v)))
 		if sc != ScopeParentParam {
 			return false
 		}
@@ -3503,7 +3509,7 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 		if hasErrCG(cg) {
 			return MaxVarScope
 		}
-		sc := VariableScope(tab.GetValue(int(i)))
+		sc := VariableScope(tab.GetValueSess(sessFromCG(cg), int(i)))
 		if sc < 0 {
 			return MaxVarScope
 		}

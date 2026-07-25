@@ -199,7 +199,7 @@ func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 	// incomplete Lhs mid-compound — sticky no invent empty Binary shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	// SafeAssign path uses dummy flags; LhsAsExpression(nil Lhs.Var) fails sticky
+	// SafeAssign path uses dummy flags; LhsAsExpressionSess(testAmbientSession, nil Lhs.Var) fails sticky
 	lhs := &Lhs{Var: nil}
 	st := makePossibleCompoundAssign(
 		EmptyCGContext().WithSession(testAmbientSession),

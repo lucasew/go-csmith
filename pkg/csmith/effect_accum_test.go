@@ -13,7 +13,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	tables := NewExprTables(opts)
 	// Force assign-only statement table
 	tab := &ThresholdTable{}
-	tab.Add(100, int(StmtAssign))
+	tab.AddSess(testAmbientSession, 100, int(StmtAssign))
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	// StatementAssign.cpp:127 assert(fm) — assign needs FactMgr
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))

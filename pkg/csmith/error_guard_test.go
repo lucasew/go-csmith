@@ -80,7 +80,7 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.Types = &TypeEnv{Sess: testAmbientSession}
 	tab := &ThresholdTable{}
-	tab.Add(100, int(StmtAssign))
+	tab.AddSess(testAmbientSession, 100, int(StmtAssign))
 	ClearErrorSess(testAmbientSession)
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), tab, &cg, false)
 	if b == nil {

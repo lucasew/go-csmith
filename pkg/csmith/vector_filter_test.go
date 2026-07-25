@@ -77,7 +77,7 @@ func TestVectorFilterKeepMode(t *testing.T) {
 func TestVectorFilterAddDedup(t *testing.T) {
 	// VectorFilter.cpp:68–72 — add only if not present
 	f := NewVectorFilterSess(testAmbientSession, nil)
-	f.Add(1).Add(1).Add(2)
+	f.AddSess(testAmbientSession, 1).AddSess(testAmbientSession, 1).AddSess(testAmbientSession, 2)
 	if len(f.items) != 2 {
 		t.Fatalf("items after dedup: %v", f.items)
 	}
@@ -87,10 +87,10 @@ func TestVectorFilterLookupWithTable(t *testing.T) {
 	// lookup through DistributionTable when valid
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	tab := &DistributionTable{}
-	tab.AddEntry(10, 50) // key 10 weight 50 → rnd 0..49 → 10
-	tab.AddEntry(20, 50) // key 20 weight 50 → rnd 50..99 → 20
+	tab.AddEntrySess(testAmbientSession, 10, 50) // key 10 weight 50 → rnd 0..49 → 10
+	tab.AddEntrySess(testAmbientSession, 20, 50) // key 20 weight 50 → rnd 50..99 → 20
 	f := NewVectorFilterSess(testAmbientSession, tab)
-	f.Add(10) // filter out key 10
+	f.AddSess(testAmbientSession, 10) // filter out key 10
 	// raw 0 → key 10 → reject
 	if !f.FilterSess(testAmbientSession, 0) {
 		t.Fatal("raw 0 → key 10 should reject")

@@ -286,7 +286,7 @@ func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile
 	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
 	// session CGOptions (dfs_exhaustive / max_exhaustive_depth); no Defaults invent
 	if len(ok) > 0 {
-		if DepthGuardByDepth(opts, 1) == BadDepth {
+		if DepthGuardByDepthSess(sessFromEnv(env), opts, 1) == BadDepth {
 			return nil
 		}
 	}
@@ -432,7 +432,7 @@ func RandomTypeFromType(
 	strictSimple bool,
 ) *Type {
 	// Type.cpp:592 — DEPTH_GUARD_BY_TYPE_RETURN(dtRandomTypeFromType, nullptr)
-	if DepthGuardByType(opts, DtRandomTypeFromType) == BadDepth {
+	if DepthGuardByTypeSess(sessFromEnv(env), opts, DtRandomTypeFromType) == BadDepth {
 		return nil
 	}
 	// Type.cpp always has process RNG sticky; no invent keep-simple / pick-nonvoid without RNG
@@ -490,7 +490,7 @@ func RandomTypeFromType(
 // Type.cpp:1218–1227 — NonVoidTypeFilter rejects void.
 func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabilities) *Type {
 	// Type.cpp:1219 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
-	if DepthGuardByDepth(opts, 1) == BadDepth {
+	if DepthGuardByDepthSess(sessFromEnv(env), opts, 1) == BadDepth {
 		return nil
 	}
 	return env.chooseRandomFiltered(r, opts, probs, false)
@@ -500,7 +500,7 @@ func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabiliti
 // Type.cpp:1229+ / NonVoidNonVolatileTypeFilter — also reject volatile aggregates.
 func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *Probabilities) *Type {
 	// Type.cpp:1230 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
-	if DepthGuardByDepth(opts, 1) == BadDepth {
+	if DepthGuardByDepthSess(sessFromEnv(env), opts, 1) == BadDepth {
 		return nil
 	}
 	return env.chooseRandomFiltered(r, opts, probs, true)

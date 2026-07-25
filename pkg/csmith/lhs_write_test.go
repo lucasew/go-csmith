@@ -230,12 +230,12 @@ func TestRemoveLoopLocalFactsForStmtUsesParent(t *testing.T) {
 func TestGetDereferencedPtrs(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
-	d := GetDereferencedPtrs(e)
+	d := GetDereferencedPtrsSess(testAmbientSession, e)
 	if len(d) != 1 {
 		t.Fatal(d)
 	}
 	bare := &Expression{Term: TermVariable, Var: p, ExprType: p.Type}
-	if bareOut := GetDereferencedPtrs(bare); bareOut == nil || len(bareOut) != 0 {
+	if bareOut := GetDereferencedPtrsSess(testAmbientSession, bare); bareOut == nil || len(bareOut) != 0 {
 		t.Fatal("no deref complete empty", bareOut)
 	}
 }
@@ -255,7 +255,7 @@ func TestGetDereferencedPtrsIncompleteFailClosed(t *testing.T) {
 	}
 	for _, e := range cases {
 		ClearErrorSess(testAmbientSession)
-		if ExpressionsComplete(GetDereferencedPtrs(e)) {
+		if ExpressionsComplete(GetDereferencedPtrsSess(testAmbientSession, e)) {
 			t.Fatalf("incomplete deref must IncompleteExpressions, got complete for %#v", e)
 		}
 		if !HasErrorSess(testAmbientSession) {

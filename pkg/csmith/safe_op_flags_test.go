@@ -227,10 +227,10 @@ func TestMakeDummyFlagsAndGetters(t *testing.T) {
 	if SafeOpUnary != 0 || SafeOpBinary != 1 || SafeOpAssign != 2 || MaxSafeOpKind != 3 {
 		t.Fatalf("kind order u=%d b=%d a=%d max=%d", SafeOpUnary, SafeOpBinary, SafeOpAssign, MaxSafeOpKind)
 	}
-	if MinimalDepth(DtSafeOpFlags, int(SafeOpBinary)) != 2 {
+	if MinimalDepthSess(testAmbientSession, DtSafeOpFlags, int(SafeOpBinary)) != 2 {
 		t.Fatal("binary minimal depth")
 	}
-	if MinimalDepth(DtSafeOpFlags, int(SafeOpUnary)) != 3 {
+	if MinimalDepthSess(testAmbientSession, DtSafeOpFlags, int(SafeOpUnary)) != 3 {
 		t.Fatal("unary minimal depth")
 	}
 	ClearErrorSess(testAmbientSession)

@@ -12,7 +12,7 @@ const (
 	AtomicDepthIncr = 1
 )
 
-// Depth type name keys used by DepthGuardByType (subset of dType enum).
+// Depth type name keys used by DepthGuardByTypeSess(s, subset of dType enum).
 const (
 	DtFunction                       = "dtFunction"
 	DtFirstFunction                  = "dtFirstFunction"
@@ -57,10 +57,6 @@ const (
 // MinimalDepth returns DepthSpec::*minimal_depth for a dType name.
 // DepthSpec.cpp atomic and composed depths (flag ignored except documented cases).
 // Used when dfs_exhaustive; random mode guards ignore the value.
-func MinimalDepth(dType string, flag int) int {
-	return MinimalDepthSess(testAmbientSession, dType, flag)
-}
-
 // MinimalDepthSess is MinimalDepth with explicit session residual sticky.
 func MinimalDepthSess(s *Session, dType string, flag int) int {
 	switch dType {
@@ -148,10 +144,6 @@ func MinimalDepthSess(s *Session, dType string, flag int) int {
 }
 
 // knownDepthType reports whether dType is a handled DepthSpec case.
-func knownDepthType(dType string) bool {
-	return knownDepthTypeSess(testAmbientSession, dType)
-}
-
 // knownDepthTypeSess is knownDepthType with explicit session residual sticky.
 func knownDepthTypeSess(s *Session, dType string) bool {
 	d := MinimalDepthSess(s, dType, 0)
@@ -166,10 +158,6 @@ func knownDepthTypeSess(s *Session, dType string) bool {
 // DepthGuardByDepth mirrors DepthSpec::depth_guard_by_depth.
 // DepthSpec.cpp:330–335 — always GOOD_DEPTH when !dfs_exhaustive (random mode).
 // DFS: DFSRndNumGenerator::eager_backtracking → BAD_DEPTH when true.
-func DepthGuardByDepth(opts Options, depthNeeded int) int {
-	return DepthGuardByDepthSess(testAmbientSession, opts, depthNeeded)
-}
-
 // DepthGuardByDepthSess is DepthGuardByDepth using an explicit session RNG bag.
 func DepthGuardByDepthSess(s *Session, opts Options, depthNeeded int) int {
 	if !opts.DFSExhaustive {
@@ -189,20 +177,12 @@ func DepthGuardByDepthSess(s *Session, opts Options, depthNeeded int) int {
 
 // DepthGuardByType mirrors DepthSpec::depth_guard_by_type.
 // DepthSpec.cpp:337+ — always GOOD when !dfs_exhaustive; else backtracking(minimal).
-func DepthGuardByType(opts Options, dType string) int {
-	return DepthGuardByTypeSess(testAmbientSession, opts, dType)
-}
-
 // DepthGuardByTypeSess is DepthGuardByType with an explicit session RNG bag.
 func DepthGuardByTypeSess(s *Session, opts Options, dType string) int {
 	return DepthGuardByTypeFlagSess(s, opts, dType, 0)
 }
 
 // DepthGuardByTypeFlag is depth_guard_by_type with extra_flag for MAX_* cases.
-func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
-	return DepthGuardByTypeFlagSess(testAmbientSession, opts, dType, flag)
-}
-
 // DepthGuardByTypeFlagSess is DepthGuardByTypeFlag on bag s (DFS RNG / sticky).
 func DepthGuardByTypeFlagSess(s *Session, opts Options, dType string, flag int) int {
 	if !opts.DFSExhaustive {

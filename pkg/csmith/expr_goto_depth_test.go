@@ -91,16 +91,16 @@ func TestMustJumpUsesNotEquals(t *testing.T) {
 }
 
 func TestMinimalDepthTable(t *testing.T) {
-	if MinimalDepth(DtConstant, 0) != 0 {
+	if MinimalDepthSess(testAmbientSession, DtConstant, 0) != 0 {
 		t.Fatal("const")
 	}
-	if MinimalDepth(DtBlock, 0) != MinimalDepth(DtStatement, 0)+1 {
+	if MinimalDepthSess(testAmbientSession, DtBlock, 0) != MinimalDepthSess(testAmbientSession, DtStatement, 0)+1 {
 		t.Fatal("block")
 	}
-	if MinimalDepth(DtLoopControl, 0) != 3 {
+	if MinimalDepthSess(testAmbientSession, DtLoopControl, 0) != 3 {
 		t.Fatal("loop")
 	}
-	if MinimalDepth(DtExpression, int(MaxTermTypes)) != 1 {
+	if MinimalDepthSess(testAmbientSession, DtExpression, int(MaxTermTypes)) != 1 {
 		t.Fatal("expr max term")
 	}
 }
@@ -108,7 +108,7 @@ func TestMinimalDepthTable(t *testing.T) {
 func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 	opts := Defaults()
 	opts.DFSExhaustive = false
-	if DepthGuardByType(opts, DtBlock) != GoodDepth {
+	if DepthGuardByTypeSess(testAmbientSession, opts, DtBlock) != GoodDepth {
 		t.Fatal("random")
 	}
 	opts.DFSExhaustive = true
@@ -124,7 +124,7 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 	}()
 	ClearErrorSess(testAmbientSession)
-	if DepthGuardByTypeFlag(opts, DtFunction, 0) != GoodDepth {
+	if DepthGuardByTypeFlagSess(testAmbientSession, opts, DtFunction, 0) != GoodDepth {
 		t.Fatal("dfs fresh engine GOOD", GetErrorSess(testAmbientSession))
 	}
 	if HasErrorSess(testAmbientSession) {

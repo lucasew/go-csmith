@@ -7,10 +7,6 @@ package csmith
 // Incomplete IR fails closed sticky IncompleteExpressions (not bare nil —
 // ExpressionsComplete(nil)/len==0 invents empty-complete eval list / soft re-pick skip overlap).
 // Complete expressions always yield ≥1 subexp.
-func GetEvalToSubexps(e *Expression) []*Expression {
-	return GetEvalToSubexpsSess(testAmbientSession, e)
-}
-
 func GetEvalToSubexpsSess(s *Session, e *Expression) []*Expression {
 	if e == nil {
 		sessNoteError(s, ErrGeneric)
@@ -74,7 +70,7 @@ func GetEvalToSubexpsSess(s *Session, e *Expression) []*Expression {
 				sessNoteError(s, ErrGeneric)
 				return IncompleteExpressions()
 			}
-			sub := LhsAsExpression(e.Assign.Lhs)
+			sub := LhsAsExpressionSess(s, e.Assign.Lhs)
 			// residual ERROR sticky — no invent self-eval list past LhsAsExpression residual
 			if sessHasError(s) {
 				return IncompleteExpressions()
@@ -114,10 +110,6 @@ func GetEvalToSubexpsSess(s *Session, e *Expression) []*Expression {
 // Incomplete facts/pointees/expr fail closed sticky IncompleteVariables (not bare nil —
 // VariablesComplete(nil)/len(nil)==0 invent empty-complete "no union" success / soft re-pick).
 // Complete empty (no union pointees) returns non-nil empty.}
-
-func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
-	return FindUnionPointeesSess(testAmbientSession, facts, e)
-}
 
 func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*Variable {
 	if e == nil {
@@ -194,10 +186,6 @@ func FindUnionPointeesSess(s *Session, facts []*FactPointTo, e *Expression) []*V
 // Incomplete fact maps / pointees / exprs fail closed sticky as overlap
 // (no invent conflict-free / soft re-pick past holes).}
 
-func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
-	return HaveOverlappingFieldsSess(testAmbientSession, e1, e2, facts)
-}
-
 func HaveOverlappingFieldsSess(s *Session, e1, e2 *Expression, facts []*FactPointTo) bool {
 	if facts != nil && !FactsComplete(facts) {
 		sessNoteError(s, ErrGeneric)
@@ -261,10 +249,6 @@ func HaveOverlappingFieldsSess(s *Session, e1, e2 *Expression, facts []*FactPoin
 // LhsAsExpression builds a TermVariable expression for Lhs (for overlap checks).
 // Incomplete Lhs shell sticky nil (no invent soft-skip / empty expression past hole).}
 
-func LhsAsExpression(lhs *Lhs) *Expression {
-	return LhsAsExpressionSess(testAmbientSession, lhs)
-}
-
 func LhsAsExpressionSess(s *Session, lhs *Lhs) *Expression {
 	// Lhs always live with Variable*; sticky incomplete no invent nil soft-skip
 	if lhs == nil || lhs.Var == nil {
@@ -289,10 +273,6 @@ func LhsAsExpressionSess(s *Session, lhs *Lhs) *Expression {
 // Incomplete IR fails closed sticky IncompleteExpressions (not bare nil invent
 // empty-complete deref list / soft re-pick past holes).
 // Complete no-deref cases return empty non-nil slice so callers can distinguish.}
-
-func GetDereferencedPtrs(e *Expression) []*Expression {
-	return GetDereferencedPtrsSess(testAmbientSession, e)
-}
 
 func GetDereferencedPtrsSess(s *Session, e *Expression) []*Expression {
 	out, ok := collectDereferencedPtrs(s, e)

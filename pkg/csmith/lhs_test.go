@@ -529,14 +529,14 @@ func TestLhsGetVarGetTypeNilSticky(t *testing.T) {
 
 func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if LhsAsExpression(nil) != nil {
+	if LhsAsExpressionSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil Lhs LhsAsExpression must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs LhsAsExpression must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if LhsAsExpression(&Lhs{}) != nil {
+	if LhsAsExpressionSess(testAmbientSession, &Lhs{}) != nil {
 		t.Fatal("Lhs without Var LhsAsExpression must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -544,7 +544,7 @@ func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
-	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)})
+	e := LhsAsExpressionSess(testAmbientSession, &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)})
 	if e == nil || e.Var != v {
 		t.Fatal("complete LhsAsExpression must return TermVariable")
 	}
@@ -631,7 +631,7 @@ func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 func TestLhsAsExpressionTypeNilResidualSticky(t *testing.T) {
 	// Type-nil Lhs soft invent was invent TermVariable shell past incomplete type IR.
 	ClearErrorSess(testAmbientSession)
-	if LhsAsExpression(&Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: nil}) != nil {
+	if LhsAsExpressionSess(testAmbientSession, &Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: nil}) != nil {
 		t.Fatal("Type-nil LhsAsExpression must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -640,7 +640,7 @@ func TestLhsAsExpressionTypeNilResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete path
 	v := CreateVariableScalarsSess(testAmbientSession, "g_y", GetIntTypeSess(testAmbientSession), false, false)
-	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)})
+	e := LhsAsExpressionSess(testAmbientSession, &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)})
 	if e == nil || e.Var != v {
 		t.Fatal("complete LhsAsExpression")
 	}
@@ -720,14 +720,14 @@ func TestLhsCloneDereferencedComplexity(t *testing.T) {
 	if lhs.GetComplexity() != 0 {
 		t.Fatal(lhs.GetComplexity())
 	}
-	ptrs := lhs.GetDereferencedPtrs()
+	ptrs := lhs.GetDereferencedPtrsSess(testAmbientSession)
 	if len(ptrs) != 1 || ptrs[0].Var != v {
 		t.Fatal(ptrs)
 	}
 	// bare non-deref
 	sc := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	bare := &Lhs{Var: sc, Type: GetIntTypeSess(testAmbientSession)}
-	if len(bare.GetDereferencedPtrs()) != 0 {
+	if len(bare.GetDereferencedPtrsSess(testAmbientSession)) != 0 {
 		t.Fatal("no deref")
 	}
 	ClearErrorSess(testAmbientSession)

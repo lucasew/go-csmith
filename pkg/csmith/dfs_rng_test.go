@@ -33,7 +33,7 @@ func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 	if HasErrorSess(testAmbientSession) || v2 != 0 {
 		t.Fatalf("second %d", v2)
 	}
-	seq := r.GetSequence()
+	seq := r.GetSequenceSess(testAmbientSession)
 	if seq != "0_0" {
 		t.Fatal(seq)
 	}
@@ -191,7 +191,7 @@ func TestDFSDepthGuardIntegration(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, o)
 	clearDFSImpl()
 	CreateRandomNumberInstanceSess(testAmbientSession, RngKindDFS, 2)
-	if DepthGuardByDepth(o, 1) != GoodDepth || HasErrorSess(testAmbientSession) {
+	if DepthGuardByDepthSess(testAmbientSession, o, 1) != GoodDepth || HasErrorSess(testAmbientSession) {
 		t.Fatal("fresh GOOD")
 	}
 	// burn a few choices so pos advances
@@ -199,7 +199,7 @@ func TestDFSDepthGuardIntegration(t *testing.T) {
 	_ = r.RndUpto(2)
 	_ = r.RndUpto(2)
 	// pos=1, remain=7; need 20 → BAD + BACKTRACKING
-	if DepthGuardByDepth(o, 20) != BadDepth || GetErrorSess(testAmbientSession) != ErrBacktracking {
+	if DepthGuardByDepthSess(testAmbientSession, o, 20) != BadDepth || GetErrorSess(testAmbientSession) != ErrBacktracking {
 		t.Fatal("deep need BAD", GetErrorSess(testAmbientSession))
 	}
 	ClearErrorSess(testAmbientSession)

@@ -409,7 +409,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// MakeDummyBlock without CG still needs live Function sticky
-	if MakeDummyBlock(nil) != nil {
+	if MakeDummyBlockSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil Function MakeDummyBlock must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
