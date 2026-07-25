@@ -1171,7 +1171,7 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			sessNoteError(cgSess(cg), ErrGeneric)
 			return false
 		}
-		fi.User.FEffect = fi.User.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+		fi.User.FEffect = fi.User.FEffect.AddExternalEffectWithCallersSess(cgSess(cg), effectAccum, cg.CallChain)
 		if !EffectComplete(fi.User.FEffect) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)

@@ -490,7 +490,7 @@ func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 			sessNoteError(s, ErrGeneric)
 			return CVQualifiers{}
 		}
-		q := e.Var.Qfer.IndirectQualifiers(n)
+		q := e.Var.Qfer.IndirectQualifiersSess(s, n)
 		// residual ERROR sticky — no invent soft-quals past IndirectQualifiers residual
 		if sessHasError(s) {
 			return CVQualifiers{}

@@ -728,7 +728,7 @@ func BuildUserInvocation(
 				fi.Failed = true
 				return fi
 			}
-			callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+			callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(cgSess(cg), effectAccum, cg.CallChain)
 			if !EffectComplete(callee.FEffect) {
 				sessNoteError(cgSess(cg), ErrGeneric)
 				fi.Failed = true

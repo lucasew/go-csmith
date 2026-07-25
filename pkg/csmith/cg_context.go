@@ -416,13 +416,13 @@ func (c *CGContext) AddExternalEffect(e Effect) {
 		return
 	}
 	if c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.AddExternalEffect(e)
+		*c.EffectAccum = c.EffectAccum.AddExternalEffectSess(cgSess(c), e)
 		if !EffectComplete(*c.EffectAccum) {
 			sessNoteError(cgSess(c), ErrGeneric)
 			return
 		}
 	}
-	c.EffectStm = c.EffectStm.AddExternalEffect(e)
+	c.EffectStm = c.EffectStm.AddExternalEffectSess(cgSess(c), e)
 	if !EffectComplete(c.EffectStm) {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return
@@ -474,13 +474,13 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 		callers = append(callers, b)
 	}
 	if c.EffectAccum != nil {
-		*c.EffectAccum = c.EffectAccum.AddExternalEffectWithCallers(e, callers)
+		*c.EffectAccum = c.EffectAccum.AddExternalEffectWithCallersSess(cgSess(c), e, callers)
 		if !EffectComplete(*c.EffectAccum) {
 			sessNoteError(cgSess(c), ErrGeneric)
 			return
 		}
 	}
-	c.EffectStm = c.EffectStm.AddExternalEffectWithCallers(e, callers)
+	c.EffectStm = c.EffectStm.AddExternalEffectWithCallersSess(cgSess(c), e, callers)
 	if !EffectComplete(c.EffectStm) {
 		sessNoteError(cgSess(c), ErrGeneric)
 		return

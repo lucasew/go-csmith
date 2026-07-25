@@ -849,7 +849,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	f.AccumEffContext = f.AccumEffContext.AddExternalEffect(cg.EffectContext())
+	f.AccumEffContext = f.AccumEffContext.AddExternalEffectSess(cgSess(cg), cg.EffectContext())
 	if !EffectComplete(f.AccumEffContext) {
 		restore()
 		if !sessHasError(cgSess(cg)) {
