@@ -80,12 +80,53 @@ type StructField struct {
 }
 
 // simpleTypes mirrors Type::simple_types[MAX_SIMPLE_TYPES] cache.
+// Canonical identity only — run-local Type::used for these lives on
+// Session.simpleUsed (typeIsUsed / typeMarkUsed), not Type.Used.
 var simpleTypes [MaxSimpleTypes]*Type
 
 func init() {
 	for i := 0; i < MaxSimpleTypes; i++ {
 		simpleTypes[i] = &Type{simple: ESimpleType(i)}
 	}
+}
+
+// packageSimpleIndex returns the simpleTypes index when t is a package
+// canonical eSimple, else -1 (heap aggregates / pointers use Type.Used).
+func packageSimpleIndex(t *Type) int {
+	if t == nil || t.ptrTo != nil || t.isStruct || t.isUnion {
+		return -1
+	}
+	st := int(t.simple)
+	if st < 0 || st >= MaxSimpleTypes {
+		return -1
+	}
+	if simpleTypes[st] != t {
+		return -1
+	}
+	return st
+}
+
+// typeIsUsed reports Type::used — session-local for package simples.
+func typeIsUsed(s *Session, t *Type) bool {
+	if t == nil {
+		return false
+	}
+	if i := packageSimpleIndex(t); i >= 0 {
+		return sessOrAmbient(s).simpleUsed[i]
+	}
+	return t.Used
+}
+
+// typeMarkUsed sets Type::used — session-local for package simples.
+func typeMarkUsed(s *Session, t *Type) {
+	if t == nil {
+		return
+	}
+	if i := packageSimpleIndex(t); i >= 0 {
+		sessOrAmbient(s).simpleUsed[i] = true
+		return
+	}
+	t.Used = true
 }
 
 // GetSimpleType mirrors Type::get_simple_type — canonical cached values.
@@ -836,22 +877,19 @@ func (t *Type) IndirectLevelSess(s *Session) int {
 // Mirrors Type::derived_types pointer entries (Type.cpp find_pointer_type).
 // TypeDoFinalization mirrors Type::doFinalization for session derived types.
 // Type.cpp:1962–1971 — clears derived_types (Go: PointerCache).
-// simpleTypes stay: permanent eSimple cache (C++ simple_types[] is not reallocated each run).}
+// simpleTypes stay: permanent eSimple cache (C++ simple_types[] is not reallocated each run).
+// Used marks for package simples live on Session.simpleUsed (not Type.Used).
 
 func TypeDoFinalization() {
 	TypeDoFinalizationSess(testAmbientSession)
 }
 
-// TypeDoFinalizationSess clears PointerCache on an explicit session bag and
-// resets package simpleTypes.Used so multi-Generate reuses a clean used mark
-// (C++ simple_types[] is process-static; library multi-Generate needs reset).
+// TypeDoFinalizationSess clears PointerCache and session-local simpleUsed on bag s.
+// Does not mutate package simpleTypes (canonical identity only).
 func TypeDoFinalizationSess(s *Session) {
-	sessOrAmbient(s).PointerCache = map[*Type]*Type{}
-	for _, t := range simpleTypes {
-		if t != nil {
-			t.Used = false
-		}
-	}
+	s = sessOrAmbient(s)
+	s.PointerCache = map[*Type]*Type{}
+	s.simpleUsed = [MaxSimpleTypes]bool{}
 }
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).

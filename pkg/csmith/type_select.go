@@ -20,12 +20,13 @@ type TypeEnv struct {
 	AggregateSeq int
 }
 
-// envSess is nil-safe Sess for *TypeEnv (env methods / type factories).
+// envSess returns env.Sess when set; else the quarantined unit-test ambient bag.
+// Generate always installs Types.Sess; unit tests often build TypeEnv without a bag.
 func envSess(env *TypeEnv) *Session {
-	if env == nil {
-		return nil
+	if env != nil && env.Sess != nil {
+		return env.Sess
 	}
-	return env.Sess
+	return testAmbientSession
 }
 
 // FindPointerType mirrors Type::find_pointer_type(t, add).
@@ -234,10 +235,10 @@ func ChooseRandomStructUnionTypeSess(s *Session, r *Rng, ok []*Type) *Type {
 		return nil
 	}
 	// pre-validated complete
-	if !rv.Used {
+	if !typeIsUsed(s, rv) {
 		// Type.cpp:528–531
 		RecordTypeWithBitfieldsSess(s, rv)
-		rv.Used = true
+		typeMarkUsed(s, rv)
 	}
 	return rv
 }
@@ -417,13 +418,10 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 	}
 	t := env.AllTypes[idx]
 	// Type.cpp:1186–1190 choose_random only — make_one_struct_field does not mark used
-	if markUsed && !t.Used {
-		var s *Session
-		if env != nil {
-			s = env.Sess
-		}
+	if markUsed && !typeIsUsed(envSess(env), t) {
+		s := envSess(env)
 		RecordTypeWithBitfieldsSess(s, t)
-		t.Used = true
+		typeMarkUsed(s, t)
 	}
 	return t
 }
@@ -590,17 +588,14 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		return nil
 	}
 	t := env.AllTypes[idx]
-	if !t.Used {
-		var s *Session
-		if env != nil {
-			s = env.Sess
-		}
+	s := envSess(env)
+	if !typeIsUsed(s, t) {
 		RecordTypeWithBitfieldsSess(s, t)
 		// residual ERROR sticky — no invent soft-mark used past RecordTypeWithBitfields residual
 		if sessHasError(s) {
 			return nil
 		}
-		t.Used = true
+		typeMarkUsed(s, t)
 	}
 	return t
 }

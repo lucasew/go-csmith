@@ -16,8 +16,8 @@
 //     fail if residual writes ambient GenError / NextStmID)
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
-// (note: simpleTypes[].Used is still process-static like C++ and reset in
-// TypeDoFinalizationSess — remaining Generate impurity vs concurrent runs).
+// (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not
+// on the package Type objects).
 //
 // Concurrent Generate in one process is unsupported (upstream: one gen/process).
 // Fuzz workers are separate OS processes.
@@ -51,6 +51,10 @@ type Session struct {
 	PointerCache    map[*Type]*Type
 	PlatformIntSize int
 	PlatformPtrSize int
+	// simpleUsed is Type::used for package simpleTypes[] (process-static *Type
+	// cache must not carry run-local used marks — C++ process-static Used would
+	// race multi-Generate; library bags keep marks session-local).
+	simpleUsed [MaxSimpleTypes]bool
 
 	// Bookkeeper static counters (subset; full fields inlined via package funcs)
 	BK bookkeeperState

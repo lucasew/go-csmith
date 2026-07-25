@@ -511,7 +511,9 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 			g.noteErr(ErrGeneric)
 			return ""
 		}
-		if !t.Used || !t.IsAggregate() {
+		// Aggregates are heap-local to the run bag (Type.Used); package simples
+		// use Session.simpleUsed and are skipped by !IsAggregate.
+		if !typeIsUsed(g.Sess, t) || !t.IsAggregate() {
 			continue
 		}
 		if !g.outputStructUnion(t, &b, structAttr, unionAttr) {
