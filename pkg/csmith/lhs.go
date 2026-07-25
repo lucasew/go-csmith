@@ -62,7 +62,7 @@ func (l *Lhs) GetDereferencedPtrs() []*Expression {
 // Lhs.cpp:233–257.
 func (l *Lhs) PtrModifiedInRhs(cg *CGContext, facts []*FactPointTo) bool {
 	if l == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return true // fail closed as modified
 	}
 	return cg.PtrModifiedInRhs(l, facts)
@@ -274,13 +274,13 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	// Lhs.cpp:264+ — get_var()->get_array may be null → true without using cg
 	// incomplete Lhs shell sticky (visit always has live Lhs* in C++)
 	if l == nil || l.Var == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
 	// sticky (no invent complete true soft-skip past IsArray without AsArray)
 	if l.Var.IsArray && l.Var.AsArray == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	av := l.Var.AsArray
@@ -290,18 +290,18 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	}
 	// need cg to visit Expression indices; nil cg sticky hard IR
 	if cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	// Lhs.cpp:273–276 — combine context + stm as ambient; no accum
 	// Incomplete ambient sticky (no invent index visit under incomplete context)
 	eff := cg.EffectContext().AddEffect(cg.EffectStm)
 	// residual ERROR sticky — no invent soft-continue index visit past AddEffect residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return false
 	}
 	if !EffectComplete(eff) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	rhsCG := CGContext{
@@ -319,7 +319,7 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	}
 	// incomplete IndexExprs sticky (no invent soft-skip nil index)
 	if !ExpressionsComplete(av.IndexExprs) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return false
 	}
 	for _, e := range av.IndexExprs {
@@ -491,18 +491,18 @@ func MakeRandomLhs(
 ) *Lhs {
 	// Lhs::make_random always receives type + RNG + VS + CG; sticky no invent LHS shell without them
 	if typ == nil || r == nil || vs == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent LHS / soft re-pick past holes)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// Lhs.cpp:qfer from caller; default non-const non-vol storage
@@ -518,18 +518,18 @@ func MakeRandomLhs(
 	if cg.EffectAccum != nil {
 		cp := cg.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-LHS past Effect Clone residual
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		if !EffectComplete(cp) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		accumSave = &cp
 	}
 	stmSave := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-LHS past EffectStm Clone residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 
@@ -552,14 +552,14 @@ func MakeRandomLhs(
 		if DepthGuardByTypeSess(cgSess(cg), opts, DtLhs) == BadDepth {
 			return nil
 		}
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		var v *Variable
 		// Lhs.cpp:73–76 — try must_use WRITE first
 		v = vs.SelectMustUseVar(r, AccessWrite, *cg, typ, &q)
 		// residual ERROR sticky — no invent fall through to soft select past must-use hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			restore()
 			return nil
 		}
@@ -576,7 +576,7 @@ func MakeRandomLhs(
 			if r.RndFlipcoin(uint32(derefProb)) {
 				v = selectDerefPointerInv(r, opts, probs, vs, *cg, typ, &q, AccessWrite, dummy)
 				// residual ERROR sticky — no invent soft-continue past deref select hole
-				if sessHasError(nil) {
+				if sessHasError(cgSess(cg)) {
 					restore()
 					return nil
 				}
@@ -590,14 +590,14 @@ func MakeRandomLhs(
 				newQ.Restrict(AccessWrite, *cg)
 			}
 			// residual Restrict sticky — no invent soft select past qfer hole
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
 			v = vs.SelectWithInvalid(AccessWrite, *cg, typ, &newQ, r, MatchDerefExact, dummy)
 			// Lhs.cpp:94 — ERROR_GUARD(nullptr); select may create vars itself
 			// residual ERROR sticky — no invent soft-continue / create past select hole
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
@@ -611,14 +611,14 @@ func MakeRandomLhs(
 		// Variable::type always live; incomplete type IR fails closed sticky
 		// (no invent soft-skip const-after-deref filter then accept later create)
 		if v.Type == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			restore()
 			return nil
 		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky
 		// (no invent WRITE Lhs past broken array shell)
 		if v.IsArray && v.AsArray == nil {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			restore()
 			return nil
 		}
@@ -627,7 +627,7 @@ func MakeRandomLhs(
 		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
 		if v.IsConstAfterDeref(deref) {
 			// residual ERROR sticky — no invent soft-continue past incomplete const peel
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
@@ -646,7 +646,7 @@ func MakeRandomLhs(
 				valid = false
 			}
 			// residual ERROR sticky — no invent soft-continue past validate hole
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
@@ -656,14 +656,14 @@ func MakeRandomLhs(
 			valid = false
 		}
 		// residual ERROR sticky — no invent soft-continue past IsWritten hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			restore()
 			return nil
 		}
 		// Lhs.cpp:110–113 — no_signed_overflow rejects signed base / bitfield for ++/--
 		if valid && typ.IsSimple() && noSignedOverflow {
 			// residual ERROR sticky — no invent soft-continue past IsSimple residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
@@ -672,19 +672,19 @@ func MakeRandomLhs(
 				base = base.BaseType()
 			}
 			// residual ERROR sticky — no invent soft-continue past BaseType residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
 			if base != nil {
 				if base.IsSigned() {
 					// residual ERROR sticky — no invent soft-continue past IsSigned residual true
-					if sessHasError(nil) {
+					if sessHasError(cgSess(cg)) {
 						restore()
 						return nil
 					}
 					valid = false
-				} else if sessHasError(nil) {
+				} else if sessHasError(cgSess(cg)) {
 					// residual ERROR sticky — no invent soft-continue past IsSigned residual false
 					restore()
 					return nil
@@ -693,7 +693,7 @@ func MakeRandomLhs(
 			if valid && v.IsBitfield {
 				valid = false
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue past IsSimple residual false
 			restore()
 			return nil
@@ -701,7 +701,7 @@ func MakeRandomLhs(
 		// Lhs.cpp:114–116 — ccomp forbids bitfield assigned as long long
 		if valid && opts.CComp && v.IsBitfield && typ.IsSimple() {
 			// residual ERROR sticky — no invent soft-continue past IsSimple residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
@@ -709,7 +709,7 @@ func MakeRandomLhs(
 			case ELongLong, EULongLong:
 				valid = false
 			}
-		} else if sessHasError(nil) {
+		} else if sessHasError(cgSess(cg)) {
 			restore()
 			return nil
 		}
@@ -717,22 +717,22 @@ func MakeRandomLhs(
 		if valid && typ != nil && v.Type != nil {
 			if !typ.IsFloat() && v.Type.IsFloat() {
 				// residual ERROR sticky — no invent soft-continue past IsFloat residual
-				if sessHasError(nil) {
+				if sessHasError(cgSess(cg)) {
 					restore()
 					return nil
 				}
 				valid = false
-			} else if sessHasError(nil) {
+			} else if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
 			if valid && opts.StrictFloat && typ.IsFloat() && !v.Type.IsFloat() {
-				if sessHasError(nil) {
+				if sessHasError(cgSess(cg)) {
 					restore()
 					return nil
 				}
 				valid = false
-			} else if sessHasError(nil) {
+			} else if sessHasError(cgSess(cg)) {
 				restore()
 				return nil
 			}
@@ -750,7 +750,7 @@ func MakeRandomLhs(
 
 		lhs := finishLhs(v, typ, compoundAssign, cg, opts)
 		// residual ERROR sticky — no invent soft-continue past visit_facts hard IR hole
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			restore()
 			return nil
 		}
@@ -769,7 +769,7 @@ func MakeRandomLhs(
 func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Options) *Lhs {
 	// Lhs always has live var + CG after select; sticky no invent LHS shell without them
 	if v == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	lhs := &Lhs{Var: v, Type: typ, CompoundAssign: compound}
@@ -799,18 +799,18 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compound bool) *Variable {
 	// want Type always live for Match; sticky no invent empty pool / soft re-pick past hole
 	if typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before pool scan (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	var ok []*Variable
@@ -827,32 +827,32 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		// IsConst / IsVolatile residual only on nil (v already gated); complete path never stickies
 		if v.IsConst() {
 			// residual ERROR sticky — no invent soft-skip const past IsConst residual true
-			if sessHasError(nil) {
+			if sessHasError(cg.Sess) {
 				incomplete = true
 			}
 			return
 		}
 		// residual ERROR sticky — no invent soft-continue past IsConst residual false
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			incomplete = true
 			return
 		}
 		if compound && v.IsVolatile() {
 			// residual ERROR sticky — no invent soft-skip vol past IsVolatile residual true
-			if sessHasError(nil) {
+			if sessHasError(cg.Sess) {
 				incomplete = true
 			}
 			return
 		}
 		// residual ERROR sticky — no invent soft-continue past IsVolatile residual false
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			incomplete = true
 			return
 		}
 		// expand fields for aggregates
 		exp := v.CollectExpandable()
 		// residual ERROR sticky — no invent soft-expand past CollectExpandable residual
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			incomplete = true
 			return
 		}
@@ -867,7 +867,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			}
 			if x.IsConst() {
 				// residual ERROR sticky — no invent soft-continue then pick later past IsConst hole
-				if sessHasError(nil) {
+				if sessHasError(cg.Sess) {
 					incomplete = true
 					return
 				}
@@ -875,7 +875,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			}
 			if !typ.MatchOpts(x.Type, MatchFlexible, sessOpts(cg.Sess)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
-				if sessHasError(nil) {
+				if sessHasError(cg.Sess) {
 					incomplete = true
 					return
 				}
@@ -883,7 +883,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			}
 			if compound && x.IsVolatile() {
 				// residual ERROR sticky — no invent soft-continue then pick later past IsVolatile hole
-				if sessHasError(nil) {
+				if sessHasError(cg.Sess) {
 					incomplete = true
 					return
 				}
@@ -895,18 +895,18 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 	if cg.CurrentFunc != nil {
 		// incomplete Stack fails closed sticky (no invent soft-skip nil frame)
 		if !BlocksComplete(cg.CurrentFunc.Stack) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		if !VariablesComplete(cg.CurrentFunc.Param) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		for i := len(cg.CurrentFunc.Stack) - 1; i >= 0; i-- {
 			blk := cg.CurrentFunc.Stack[i]
 			// pre-validated BlocksComplete
 			if !VariablesComplete(blk.LocalVars) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cg.Sess, ErrGeneric)
 				return nil
 			}
 			for _, v := range blk.LocalVars {
@@ -919,7 +919,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 	}
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		for _, v := range vs.GlobalList {
@@ -928,7 +928,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 	}
 	if incomplete {
 		// incomplete expand/type IR fails closed sticky (no invent soft re-pick past hole)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	return ChooseOKVar(r, ok)
@@ -964,45 +964,45 @@ func selectDerefPointerInv(
 	invalidVars []*Variable,
 ) *Variable {
 	if typ == nil || r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before choose/create (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1249 — assert(qfer && qfer->sanity_check(type)); sticky no invent
 	if qfer == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	if !qfer.SanityCheck(typ) {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cg.Sess) {
+			sessNoteError(cg.Sess, ErrGeneric)
 		}
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-create past SanityCheck residual true path
-	if sessHasError(nil) {
+	if sessHasError(cg.Sess) {
 		return nil
 	}
 	// incomplete invalid_vars fails closed sticky
 	if !VariablesComplete(invalidVars) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1252–1266 — GlobalNonvolatilesList only (no GlobalList soft-fallback)
 	var cands []*Variable
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalNonvolatilesList) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		cands = append(cands, vs.GlobalNonvolatilesList...)
@@ -1010,11 +1010,11 @@ func selectDerefPointerInv(
 	var blk *Block
 	if cg.CurrentFunc != nil {
 		if !BlocksComplete(cg.CurrentFunc.Stack) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		if !VariablesComplete(cg.CurrentFunc.Param) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		if len(cg.CurrentFunc.Stack) > 0 {
@@ -1022,7 +1022,7 @@ func selectDerefPointerInv(
 		}
 		for b := blk; b != nil; b = b.Parent {
 			if !VariablesComplete(b.LocalVars) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cg.Sess, ErrGeneric)
 				return nil
 			}
 			cands = append(cands, b.LocalVars...)
@@ -1036,12 +1036,12 @@ func selectDerefPointerInv(
 
 	// VariableSelector.cpp:1268–1272 — create ptr if under max_indirect_level
 	if typ == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	il := typ.IndirectLevel()
 	// residual ERROR sticky — no invent soft-create ptr past IndirectLevel residual
-	if sessHasError(nil) {
+	if sessHasError(cg.Sess) {
 		return nil
 	}
 	if il >= opts.MaxPointerDepth {
@@ -1064,13 +1064,13 @@ func selectDerefPointerInv(
 		// random_add_qualifiers(!SE-free)
 		seFree := cg.EffectContext().IsSideEffectFree()
 		// residual ERROR sticky — no invent soft-no-vol RandomAdd past IsSideEffectFree residual
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			return nil
 		}
 		pq = qfer.RandomAddQualifiers(r, opts, probs, !seFree)
 	}
 	// VariableSelector.cpp:1281 ERROR_GUARD after random_add/random_qualifiers
-	if sessHasError(nil) {
+	if sessHasError(cg.Sess) {
 		return nil
 	}
 	pq.AcceptStricter = false
@@ -1085,13 +1085,13 @@ func selectDerefPointerInv(
 	if vs.Opts.ExpandStruct {
 		if pq.IsVolatile() {
 			v := vs.EagerCreateGlobalStruct(access, cg, ptrType, &pq, r, MatchDereference, invalidVars)
-			if sessHasError(nil) {
+			if sessHasError(cg.Sess) {
 				return nil
 			}
 			if v != nil {
 				return v
 			}
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cg.Sess, ErrGeneric)
 			return nil
 		}
 		if blk == nil {
@@ -1099,19 +1099,19 @@ func selectDerefPointerInv(
 			return nil
 		}
 		v := vs.EagerCreateLocalStruct(blk, access, cg, ptrType, &pq, r, MatchDereference, invalidVars)
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			return nil
 		}
 		if v != nil {
 			return v
 		}
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cg.Sess, ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1286–1315 non-expand: volatile global else parent local
 	if pq.IsVolatile() {
 		v := vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
-		if sessHasError(nil) {
+		if sessHasError(cg.Sess) {
 			return nil
 		}
 		return v
@@ -1122,7 +1122,7 @@ func selectDerefPointerInv(
 	}
 	v := vs.GenerateNewParentLocal(blk, access, cg, ptrType, &pq, r)
 	// VariableSelector.cpp:1318 ERROR_GUARD
-	if sessHasError(nil) {
+	if sessHasError(cg.Sess) {
 		return nil
 	}
 	return v

@@ -16,18 +16,18 @@ func MakeRandomIf(
 ) *Stmt {
 	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell without them
 	if r == nil || cg == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
 		!EffectComplete(cg.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	if cg.FM != nil && (!FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts)) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	// StatementIf.cpp:58 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementIf, nullptr)
@@ -47,27 +47,27 @@ func MakeRandomIf(
 	if func1Hack && cg.FM != nil {
 		// incomplete GlobalFacts/UnionFacts fail closed (no invent cleaned pre-facts snapshot)
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// StatementIf.cpp:69 — shallow Fact* vector (same as restoreFactsPT).
 		func1PreFacts = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
 		// CloneUnionFactSlice is already a shallow FactUnion* copy (FactVec partition).
 		func1PreUnion = CloneUnionFactSlice(cg.FM.UnionFacts)
-		if sessHasError(nil) || !UnionFactsComplete(func1PreUnion) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !UnionFactsComplete(func1PreUnion) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return nil
 		}
 		if cg.EffectAccum != nil {
 			if !EffectComplete(*cg.EffectAccum) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(cgSess(cg), ErrGeneric)
 				return nil
 			}
 			func1PreEffect = cg.EffectAccum.Clone()
 			// residual ERROR sticky — no invent soft-if past Effect Clone residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return nil
 			}
 		}
@@ -80,13 +80,13 @@ func MakeRandomIf(
 	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
 	// StatementIf.cpp:72 — ERROR_GUARD(nullptr)
 	// residual ERROR sticky — no invent soft-continue if arms past condition make residual
-	if test == nil || sessHasError(nil) {
+	if test == nil || sessHasError(cgSess(cg)) {
 		return nil
 	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
 	hasUnc := func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test)
 	// residual ERROR sticky — no invent soft-continue if arms past HasUncertain residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 	if hasUnc {
@@ -94,20 +94,20 @@ func MakeRandomIf(
 		// reset accum; visit_facts(pre_facts); global_facts = pre_facts.
 		// incomplete current GlobalFacts/UnionFacts fail closed sticky
 		if !FactsComplete(cg.FM.GlobalFacts) || !UnionFactsComplete(cg.FM.UnionFacts) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// FactMgr.cpp:489–492 restore_facts on full FactVec (makeup + assign both cats)
 		// Install pre-condition FactVec; VisitFactsExpression then mutates FM in place
 		// (C++ visit mutates pre_facts then assigns back — same end state).
 		cg.FM.RestoreFactsPair(func1PreFacts, func1PreUnion)
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = func1PreEffect.Clone()
 			// residual ERROR sticky — no invent soft-restore past Effect Clone residual
-			if sessHasError(nil) {
+			if sessHasError(cgSess(cg)) {
 				return nil
 			}
 		}
@@ -116,13 +116,13 @@ func MakeRandomIf(
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = func1PreEffect.Clone()
 			}
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return nil
 		}
 		// residual ERROR sticky — no invent if arms past condition visit residual true path
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = func1PreEffect.Clone()
 			}
@@ -133,7 +133,7 @@ func MakeRandomIf(
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
 	condEff := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		return nil
 	}
 
@@ -145,7 +145,7 @@ func MakeRandomIf(
 	// else started from a second clone of the stale parent (seed-2 e13830: SelectParentLocal
 	// stack n=4 vs UP n=5 — nesting bookkeeping desync after if arms).
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(cgSess(cg), ErrGeneric)
 		return nil
 	}
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
@@ -153,12 +153,12 @@ func MakeRandomIf(
 	// if_true already ~Block via make_random ERROR path when nil).
 	// live if_true Block* required sticky (no invent if with nil Then shell)
 	if thenB == nil {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		return nil
 	}
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		// residual after successful then: drop live if_true (no StatementIf yet)
 		tombstoneBlock(thenB)
 		return nil
@@ -175,12 +175,12 @@ func MakeRandomIf(
 		if StmIDUnset(thenB.StmID) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
 			cg.FM.UnionFacts = IncompleteUnionFactSlice()
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			tombstoneBlock(thenB)
 			return nil
 		}
 		cg.FM.AssignGlobalFactsFromMapIn(thenB.StmID)
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			tombstoneBlock(thenB)
 			return nil
 		}
@@ -191,13 +191,13 @@ func MakeRandomIf(
 	// (if_false already ~Block on make_random ERROR when nil).
 	// live if_false Block* required sticky (no invent if with nil Else shell)
 	if elseB == nil {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(cgSess(cg)) {
+			sessNoteError(cgSess(cg), ErrGeneric)
 		}
 		tombstoneBlock(thenB)
 		return nil
 	}
-	if sessHasError(nil) {
+	if sessHasError(cgSess(cg)) {
 		tombstoneBlock(thenB)
 		tombstoneBlock(elseB)
 		return nil
@@ -216,24 +216,24 @@ func MakeRandomIf(
 		elseMap := cg.FM.GetMapStmEffect(elseB.StmID)
 		if !EffectComplete(condEff) || !EffectComplete(thenMap) || !EffectComplete(elseMap) {
 			cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		// first call: cond + then
 		SetAccumulatedEffectAfterBlock(st, thenMap, cg, condEff)
-		if sessHasError(nil) {
+		if sessHasError(cgSess(cg)) {
 			return nil
 		}
 		// second call: (cond+then) + else — base is stored map from first call
 		mid := cg.FM.GetMapStmEffect(st.StmID)
 		if !EffectComplete(mid) {
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(cgSess(cg), ErrGeneric)
 			return nil
 		}
 		SetAccumulatedEffectAfterBlock(st, elseMap, cg, mid)
-		if sessHasError(nil) || !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
-			if !sessHasError(nil) {
-				sessNoteError(nil, ErrGeneric)
+		if sessHasError(cgSess(cg)) || !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+			if !sessHasError(cgSess(cg)) {
+				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return nil
 		}

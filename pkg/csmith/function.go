@@ -560,7 +560,7 @@ func (f *Function) generateBodyCore(
 	knownParams bool,
 ) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return
 	}
 	// Function.cpp:626–629 / 668–671 — ignore regenerate
@@ -570,7 +570,7 @@ func (f *Function) generateBodyCore(
 	// Function.cpp:643–648 — non-builtin make_random body always has process RNG
 	// sticky no invent Building/Built shell without RNG
 	if !f.IsBuiltin && r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return
 	}
 	// incomplete ambient fails closed sticky before BuildBuilding
@@ -578,11 +578,11 @@ func (f *Function) generateBodyCore(
 	if !EffectComplete(prev.EffectContext()) ||
 		(prev.EffectAccum != nil && !EffectComplete(*prev.EffectAccum)) ||
 		!EffectComplete(prev.EffectStm) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return
 	}
 	if prev.FM != nil && !FactsComplete(prev.FM.GlobalFacts) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		return
 	}
 	f.BuildState = BuildBuilding
@@ -625,7 +625,7 @@ func (f *Function) generateBodyCore(
 	// empty and the caller frame is omitted from call_chain.
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual
-	if sessHasError(nil) {
+	if sessHasError(vsSess(vs)) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -637,7 +637,7 @@ func (f *Function) generateBodyCore(
 	if cg.FM == nil {
 		cg.FM = f.PairedFactMgr()
 		// residual ERROR sticky — no invent soft-continue body past PairedFactMgr residual
-		if sessHasError(nil) {
+		if sessHasError(vsSess(vs)) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -645,7 +645,7 @@ func (f *Function) generateBodyCore(
 	}
 	if cg.FM == nil {
 		// get_fact_mgr_for_func returned null — sticky fail closed (no soft invent FM)
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -657,13 +657,13 @@ func (f *Function) generateBodyCore(
 	if knownParams {
 		if rwd := prev.BuildCalleeRWDirective(cg.FM.GlobalFacts); rwd != nil {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual
-			if sessHasError(nil) {
+			if sessHasError(vsSess(vs)) {
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			cg.RW = rwd
-		} else if sessHasError(nil) {
+		} else if sessHasError(vsSess(vs)) {
 			// residual ERROR sticky — no invent soft-continue body past BuildCalleeRW residual nil
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
@@ -679,42 +679,42 @@ func (f *Function) generateBodyCore(
 	if !knownParams {
 		for _, p := range f.Param {
 			if p == nil {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(vsSess(vs), ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			if p.Type == nil && !IsSpecialPtr(p) {
-				sessNoteError(nil, ErrGeneric)
+				sessNoteError(vsSess(vs), ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
 				return
 			}
 			if p.IsPointer() {
 				// residual ERROR sticky — no invent soft-skip param seed past IsPointer hole
-				if sessHasError(nil) {
+				if sessHasError(vsSess(vs)) {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
 				// incomplete GlobalFacts sticky before soft FindRelated miss invent
 				if !FactsComplete(cg.FM.GlobalFacts) {
-					sessNoteError(nil, ErrGeneric)
+					sessNoteError(vsSess(vs), ErrGeneric)
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
 				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
 					// residual ERROR sticky — no invent soft-continue later params past FindRelated hole
-					if sessHasError(nil) {
+					if sessHasError(vsSess(vs)) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
 					nf := MakeFactPointTo(p, TBDPtr)
-					if nf == nil || sessHasError(nil) {
-						if !sessHasError(nil) {
-							sessNoteError(nil, ErrGeneric)
+					if nf == nil || sessHasError(vsSess(vs)) {
+						if !sessHasError(vsSess(vs)) {
+							sessNoteError(vsSess(vs), ErrGeneric)
 						}
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
@@ -722,17 +722,17 @@ func (f *Function) generateBodyCore(
 					}
 					cg.FM.SetGlobalFacts(append(cg.FM.GlobalFacts, nf), "auto_function_666")
 					// residual ERROR sticky — no invent soft-continue later params past append residual
-					if sessHasError(nil) {
+					if sessHasError(vsSess(vs)) {
 						f.BuildState = BuildUnbuilt
 						f.IsBuilt = false
 						return
 					}
-				} else if sessHasError(nil) {
+				} else if sessHasError(vsSess(vs)) {
 					f.BuildState = BuildUnbuilt
 					f.IsBuilt = false
 					return
 				}
-			} else if sessHasError(nil) {
+			} else if sessHasError(vsSess(vs)) {
 				// residual ERROR sticky — no invent soft-continue non-pointer past IsPointer hole
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
@@ -746,7 +746,7 @@ func (f *Function) generateBodyCore(
 	if f.IsBuiltin {
 		f.Body = MakeDummyBlockCG(&cg, opts)
 		// residual ERROR sticky — no invent soft-Built past MakeDummyBlock residual
-		if sessHasError(nil) {
+		if sessHasError(vsSess(vs)) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -754,7 +754,7 @@ func (f *Function) generateBodyCore(
 	} else {
 		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
 		// residual ERROR sticky — no invent soft-Built past MakeRandomBlock residual
-		if sessHasError(nil) {
+		if sessHasError(vsSess(vs)) {
 			f.BuildState = BuildUnbuilt
 			f.IsBuilt = false
 			return
@@ -762,7 +762,7 @@ func (f *Function) generateBodyCore(
 	}
 	// Function.cpp:647 / 689 — ERROR_RETURN(); body->set_depth_protect
 	// sticky error aborts; null body without error would crash C++ on body->
-	if sessHasError(nil) {
+	if sessHasError(vsSess(vs)) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -782,7 +782,7 @@ func (f *Function) generateBodyCore(
 	// Block*/Variable*/Fact* always live; nil holes fail closed (abort cleanup invent)
 	// Early SetError must leave Unbuilt (no invent stuck Building / later markBuilt success)
 	abortUnbuilt := func() {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(vsSess(vs), ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 	}
@@ -809,7 +809,7 @@ func (f *Function) generateBodyCore(
 			// nil without error = no lattice change; nil with sticky = incomplete fail closed
 			if nf := fact.MarkFuncEndLocals(locals); nf != nil {
 				cg.FM.GlobalFacts[i] = nf
-			} else if sessHasError(nil) {
+			} else if sessHasError(vsSess(vs)) {
 				abortUnbuilt()
 				return
 			}
@@ -835,7 +835,7 @@ func (f *Function) generateBodyCore(
 		}
 	}
 	f.ComputeSummary(summaryEff)
-	if sessHasError(nil) {
+	if sessHasError(vsSess(vs)) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
@@ -843,7 +843,7 @@ func (f *Function) generateBodyCore(
 
 	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
 	f.MakeReturnConst(opts, probs, r)
-	if sessHasError(nil) {
+	if sessHasError(vsSess(vs)) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return
