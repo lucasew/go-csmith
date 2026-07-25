@@ -71,9 +71,14 @@ type Function struct {
 // Mirrors get_fact_mgr_for_func when the function is on FuncList/FMList.
 // Incomplete Function sticky nil (no invent soft-miss FM past hole).
 func (f *Function) PairedFactMgr() *FactMgr {
+	return f.PairedFactMgrSess(nil)
+}
+
+// PairedFactMgrSess is PairedFactMgr with explicit session residual sticky.
+func (f *Function) PairedFactMgrSess(s *Session) *FactMgr {
 	// Function always live; sticky incomplete no invent nil FM soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return f.factMgr
@@ -104,9 +109,14 @@ func (f *Function) ensurePairedFactMgrSess(s *Session) *FactMgr {
 // Function.h:96–97.
 // Incomplete Function sticky false (no invent effect-known / soft re-pick past hole).
 func (f *Function) IsEffectKnown() bool {
+	return f.IsEffectKnownSess(nil)
+}
+
+// IsEffectKnownSess is IsEffectKnown with explicit session residual sticky.
+func (f *Function) IsEffectKnownSess(s *Session) bool {
 	// Function always live; sticky incomplete no invent effect-known soft-skip
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return f.BuildState == BuildBuilt
@@ -115,8 +125,13 @@ func (f *Function) IsEffectKnown() bool {
 // markBuilt sets Built state and IsBuilt flag.
 // Function always live; sticky (no invent soft-skip Built past hole).
 func (f *Function) markBuilt() {
+	f.markBuiltSess(nil)
+}
+
+// markBuiltSess is markBuilt with explicit session residual sticky.
+func (f *Function) markBuiltSess(s *Session) {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	f.BuildState = BuildBuilt
@@ -160,9 +175,14 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 
 // ParamListProbability mirrors Function.cpp ParamListProbability → rnd_upto(max_params).
 func ParamListProbability(r *Rng, opts Options) uint32 {
+	return ParamListProbabilitySess(nil, r, opts)
+}
+
+// ParamListProbabilitySess is ParamListProbability with explicit session residual sticky.
+func ParamListProbabilitySess(s *Session, r *Rng, opts Options) uint32 {
 	// C++ always has RNG; sticky no invent param count 0 without draw
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	n := opts.MaxParams
@@ -258,7 +278,7 @@ func MakeRandomSignature(
 		return nil
 	}
 	// GenerateParameterList: for i=0; i<=max; i++
-	max := ParamListProbability(r, opts)
+	max := ParamListProbabilitySess(s, r, opts)
 	if sessHasError(s) {
 		return nil
 	}
@@ -310,7 +330,7 @@ func MakeRandomFunction(
 	}
 	// Function.cpp:422 FMList entry from signature — get_fact_mgr_for_func (no invent second)
 	// sticky no invent GenerateBody without live FactMgr
-	fm := f.PairedFactMgr()
+	fm := f.PairedFactMgrSess(s)
 	if fm == nil {
 		sessNoteError(s, ErrGeneric)
 		return nil
@@ -635,7 +655,7 @@ func (f *Function) generateBodyCore(
 	}
 	// Function.cpp:635 / 674 — get_fact_mgr_for_func(this); no invent NewFactMgr here
 	if cg.FM == nil {
-		cg.FM = f.PairedFactMgr()
+		cg.FM = f.PairedFactMgrSess(vsSess(vs))
 		// residual ERROR sticky — no invent soft-continue body past PairedFactMgr residual
 		if sessHasError(vsSess(vs)) {
 			f.BuildState = BuildUnbuilt
@@ -875,7 +895,7 @@ func (f *Function) generateBodyCore(
 		}
 	}
 	// Function.cpp:661–662 — Mark Built
-	f.markBuilt()
+	f.markBuiltSess(vsSess(vs))
 }
 
 // MakeReturnConst mirrors Function::make_return_const.
@@ -1188,14 +1208,14 @@ func (f *Function) OutputForwardDeclWithSess(sess *Session, forceStatic bool, r 
 	if f.IsBuiltin {
 		return ""
 	}
-	s := f.OutputHeaderOpts(forceStatic, opts)
+	s := f.OutputHeaderOptsSess(sess, forceStatic, opts)
 	// residual ERROR sticky — no invent bare ";" past OutputHeader residual
-	if sessHasError(nil) {
+	if sessHasError(sess) {
 		return ""
 	}
 	// incomplete header IR sticky — no invent bare ";"
 	if s == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(sess, ErrGeneric)
 		return ""
 	}
 	if withAttrs && r != nil {
@@ -1220,27 +1240,32 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 
 // OutputHeaderAliasOpts is OutputHeaderAlias with explicit session Options.
 func (f *Function) OutputHeaderAliasOpts(forceStatic bool, opts Options) string {
+	return f.OutputHeaderAliasOptsSess(nil, forceStatic, opts)
+}
+
+// OutputHeaderAliasOptsSess is OutputHeaderAliasOpts with explicit session residual sticky.
+func (f *Function) OutputHeaderAliasOptsSess(s *Session, forceStatic bool, opts Options) string {
 	// Function always live at emit; sticky incomplete no invent empty alias shell
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	// Function::alias_name set at create (name + "_alias"); sticky no invent when missing
 	if f.AliasName == "" || f.Name == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	rtName := f.returnTypeCOpts(opts)
+	rtName := f.returnTypeCOptsSess(s, opts)
 	if rtName == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
-	params := f.paramListCOpts(opts)
+	params := f.paramListCOptsSess(s, opts)
 	if params == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -1259,6 +1284,7 @@ func (f *Function) OutputHeaderAliasOpts(forceStatic bool, opts Options) string 
 	return b.String()
 }
 
+
 // OutputForwardDeclAlias mirrors Function::OutputForwardDeclAlias.
 // Function.cpp:555–559 — OutputHeaderAlias + ";".
 // Function always live at emit; sticky empty (no invent bare ";" past hole).
@@ -1269,23 +1295,29 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 
 // OutputForwardDeclAliasOpts is OutputForwardDeclAlias with explicit session Options.
 func (f *Function) OutputForwardDeclAliasOpts(forceStatic bool, opts Options) string {
+	return f.OutputForwardDeclAliasOptsSess(nil, forceStatic, opts)
+}
+
+// OutputForwardDeclAliasOptsSess is OutputForwardDeclAliasOpts with explicit session residual sticky.
+func (f *Function) OutputForwardDeclAliasOptsSess(s *Session, forceStatic bool, opts Options) string {
 	if f == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	if f.IsBuiltin {
 		return ""
 	}
-	s := f.OutputHeaderAliasOpts(forceStatic, opts)
+	out := f.OutputHeaderAliasOptsSess(s, forceStatic, opts)
 	// incomplete alias header sticky — no invent bare ";"
-	if s == "" {
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+	if out == "" {
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
-	return s + ";"
+	return out + ";"
 }
+
 
 // Output emits a C function definition (minimal statements).
 // Function.cpp:565–598 — builtins emit nothing.

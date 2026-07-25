@@ -612,7 +612,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// the caller's cg.FM. Using caller maps made VisitFactsBlock fail on nested
 	// calls in if-conditions, fixed-point stripped the if, and func->blocks lost
 	// nested arms (seed-2 e2342: goto nblocks 8 vs UP 10).
-	fm := f.PairedFactMgr()
+	fm := f.PairedFactMgrSess(cgSess(cg))
 	if fm == nil {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		return false

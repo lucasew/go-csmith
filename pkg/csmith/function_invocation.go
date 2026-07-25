@@ -380,7 +380,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 	var ok, okBuiltin []*Function
 	for _, f := range funcs {
 		// pre-validated FunctionsComplete
-		if f == exclude || !f.IsEffectKnown() {
+		if f == exclude || !f.IsEffectKnownSess(cgSess(cg)) {
 			// residual ERROR sticky — no invent soft-continue then pick later past IsEffectKnown hole
 			if sessHasError(cgSess(cg)) {
 				return nil
@@ -718,7 +718,7 @@ func BuildUserInvocation(
 	} else {
 		// FunctionInvocationUser.cpp:293–297 — static effect, no re-analyze
 		// add_external_effect(func->get_feffect())
-		if callee.IsEffectKnown() {
+		if callee.IsEffectKnownSess(cgSess(cg)) {
 			// residual ERROR sticky — no invent static-effect path past IsEffectKnown hole
 			if sessHasError(cgSess(cg)) {
 				fi.Failed = true
@@ -859,7 +859,7 @@ func BuildInvocationAndFunction(
 	if cg.FM != nil {
 		callerFM = cg.FM
 	}
-	calFM := callee.PairedFactMgr()
+	calFM := callee.PairedFactMgrSess(cgSess(cg))
 	if calFM == nil {
 		sessNoteError(cgSess(cg), ErrGeneric)
 		fi.Failed = true

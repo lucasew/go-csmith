@@ -715,7 +715,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		forwards.WriteString("\n")
 		// Function.cpp:820–826 — alias decls when FunctionAttributes
 		if g.Opts.FunctionAttributes {
-			a := f.OutputForwardDeclAliasOpts(g.Opts.ForceGlobalsStatic, g.Opts)
+			a := f.OutputForwardDeclAliasOptsSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Opts)
 			// residual ERROR sticky — no invent soft-continue later funcs past alias residual
 			if g.hasErr() {
 				return ""
