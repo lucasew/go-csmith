@@ -854,7 +854,7 @@ func (f *Function) generateBodyCore(
 			return
 		}
 	}
-	f.ComputeSummary(summaryEff)
+	f.ComputeSummarySess(vsSess(vs), summaryEff)
 	if sessHasError(vsSess(vs)) {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false

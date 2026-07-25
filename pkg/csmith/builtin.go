@@ -267,7 +267,7 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 	// dummy body (no random generation for builtins)
 	// Block.cpp:97 assert(curr_func) — f is live
 	f.Body = MakeDummyBlockSess(s, f)
-	f.ComputeSummary(EmptyEffect())
+	f.ComputeSummarySess(s, EmptyEffect())
 	f.BuildState = BuildBuilt
 	f.IsBuilt = true
 	if list != nil {

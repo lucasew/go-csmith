@@ -379,8 +379,13 @@ func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, 
 // Statement.cpp:355–359.
 // Incomplete IR fails closed sticky as true (no invent "no pointer used" / soft re-pick past holes).
 func IsPtrUsed(st *Stmt) bool {
+	return IsPtrUsedSess(nil, st)
+}
+
+// IsPtrUsedSess is IsPtrUsed with explicit session residual sticky.
+func IsPtrUsedSess(s *Session, st *Stmt) bool {
 	var ptrs []*Variable
-	CollectReferencedPtrsStmt(st, &ptrs)
+	CollectReferencedPtrsStmtSess(s, st, &ptrs)
 	if !VariablesComplete(ptrs) {
 		// CollectReferencedPtrsStmt already SetError sticky
 		return true
