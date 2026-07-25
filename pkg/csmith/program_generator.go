@@ -833,7 +833,7 @@ func (g *ProgramGenerator) unionWriteFactsForHash() []*FactUnion {
 		g.noteErr(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
-	first := GetFirstFunction(&g.Funcs)
+	first := GetFirstFunctionSess(g.Sess, &g.Funcs)
 	if first == nil {
 		// no first function → empty eUnionWrite partition (complete)
 		return []*FactUnion{}

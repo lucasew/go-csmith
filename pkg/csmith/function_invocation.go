@@ -41,8 +41,13 @@ type Invocation struct {
 // setOutOpts snapshots CGOptions bits needed by Output (no live Options at emit).
 // Invocation always live; sticky (no invent soft-skip out-opts past hole).
 func (fi *Invocation) setOutOpts(opts Options) {
+	fi.setOutOptsSess(nil, opts)
+}
+
+// setOutOptsSess is setOutOpts with explicit session residual sticky.
+func (fi *Invocation) setOutOptsSess(s *Session, opts Options) {
 	if fi == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	fi.OutSafeMath = opts.SafeMath
@@ -474,12 +479,12 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 	var f *Function
 	if opts.Builtins && len(okBuiltin) > 0 && r != nil {
 		p := opts.BuiltinFunctionProb
-		if p > 0 && r.RndFlipcoin(uint32(p)) {
-			f = getOneFunction(r, okBuiltin)
+		if p > 0 && r.RndFlipcoinSess(cgSess(cg), uint32(p)) {
+			f = getOneFunctionSess(cgSess(cg), r, okBuiltin)
 		}
 	}
 	if f == nil {
-		f = getOneFunction(r, ok)
+		f = getOneFunctionSess(cgSess(cg), r, ok)
 	}
 	return f
 }
@@ -487,6 +492,11 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 // getOneFunction mirrors Function::get_one_function — random pick.
 // Function.cpp:262–276.
 func getOneFunction(r *Rng, funcs []*Function) *Function {
+	return getOneFunctionSess(nil, r, funcs)
+}
+
+// getOneFunctionSess is getOneFunction with explicit session residual sticky.
+func getOneFunctionSess(s *Session, r *Rng, funcs []*Function) *Function {
 	// Function.cpp:262–276 — rnd_upto(ok_size) when n>1; sticky no invent funcs[0]
 	n := len(funcs)
 	if n == 0 {
@@ -496,10 +506,10 @@ func getOneFunction(r *Rng, funcs []*Function) *Function {
 		return funcs[0]
 	}
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	return funcs[r.RndUpto(uint32(n))]
+	return funcs[r.RndUptoSess(s, uint32(n))]
 }
 
 // ExpressionFunctionProbability mirrors ExpressionFuncall.cpp:57–62.
@@ -523,12 +533,17 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 // BuildUserInvocation may pass nil list as "no first-function identity").
 // Function* always live at [0]; nil hole sticky (no invent scan later).
 func GetFirstFunction(list *FunctionList) *Function {
+	return GetFirstFunctionSess(nil, list)
+}
+
+// GetFirstFunctionSess is GetFirstFunction with explicit session residual sticky.
+func GetFirstFunctionSess(s *Session, list *FunctionList) *Function {
 	if list == nil || len(list.Funcs) == 0 {
 		return nil
 	}
 	// C++ first_function is funcs[0]; incomplete IR at front sticky fail closed
 	if list.Funcs[0] == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return list.Funcs[0]
@@ -627,7 +642,7 @@ func BuildUserInvocation(
 
 	// FunctionInvocationUser.cpp:272–301
 	fi.Failed = false
-	first := GetFirstFunction(list)
+	first := GetFirstFunctionSess(cgSess(cg), list)
 	// skip revisit for first function (func_1) — no params, single call, DFA hack
 	needRev := callee != first && callee.NeedsRevisitSess(cgSess(cg))
 	// residual ERROR sticky — no invent soft-skip revisit past NeedsRevisit residual
@@ -1426,7 +1441,7 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags, Tmp1: tmp1, Tmp2: tmp2}
-	inv.setOutOpts(opts)
+	inv.setOutOptsSess(cgSess(cg), opts)
 	return inv
 }
 
@@ -1589,7 +1604,7 @@ func MakeRandomBinaryPtrComparison(
 		Safe:   flags,
 		PtrCmp: true,
 	}
-	inv.setOutOpts(opts)
+	inv.setOutOptsSess(cgSess(cg), opts)
 	return inv
 }
 
@@ -1648,7 +1663,7 @@ func MakeBinary(
 		Args:   []*Expression{lhs, rhs},
 		Safe:   flags,
 	}
-	inv.setOutOpts(opts)
+	inv.setOutOptsSess(cg.Sess, opts)
 	// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(cg, nil, flags, op)
 	if flags != nil && SafeOpsBinary(opStr) && inv.Tmp1 == "" {
@@ -1751,7 +1766,7 @@ func MakeRandomUnaryInvocation(
 		return nil
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags, Tmp1: tmp1}
-	inv.setOutOpts(opts)
+	inv.setOutOptsSess(cgSess(cg), opts)
 	return inv
 }
 

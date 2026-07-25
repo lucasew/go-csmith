@@ -4290,7 +4290,7 @@ func GetProgramEndFacts(list *FunctionList, fms *FactMgrMap) []*FactPointTo {
 }
 
 func GetProgramEndFactsSess(s *Session, list *FunctionList, fms *FactMgrMap) []*FactPointTo {
-	first := GetFirstFunction(list)
+	first := GetFirstFunctionSess(s, list)
 	if first == nil {
 		// complete miss when list empty; sticky if hole in list
 		if sessHasError(s) {

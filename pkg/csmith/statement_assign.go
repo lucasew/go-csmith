@@ -582,7 +582,7 @@ func makePossibleCompoundAssign(
 		// StatementAssign.cpp:256–259 — dummy flags + FunctionInvocationBinary(bop, local_fs)
 		flags = MakeDummyFlags()
 		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
-		inv.setOutOpts(opts)
+		inv.setOutOptsSess(cg.Sess, opts)
 	} else {
 		// StatementAssign.cpp:260–266 — make_random_binary + CreateFunctionInvocationBinary
 		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
@@ -597,7 +597,7 @@ func makePossibleCompoundAssign(
 			return Stmt{}
 		}
 		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
-		inv.setOutOpts(opts)
+		inv.setOutOptsSess(cg.Sess, opts)
 		// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 		// assert(blk) when safe_ops — no soft invent compound without temps
 		if SafeOpsBinary(opStr) {
