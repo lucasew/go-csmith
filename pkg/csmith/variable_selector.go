@@ -971,7 +971,7 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return IncompleteVariables()
 		}
-		if av.IsGlobal() && av.Collective == nil {
+		if av.IsGlobalSess(vsSess(vs)) && av.Collective == nil {
 			// residual ERROR sticky — no invent soft-continue pool past IsGlobal residual
 			if sessHasError(vsSess(vs)) {
 				return IncompleteVariables()

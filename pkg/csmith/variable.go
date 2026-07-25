@@ -1335,7 +1335,7 @@ func (v *Variable) GetDimensionSess(s *Session) int {
 		return 0
 	}
 	if v.AsArray != nil {
-		return v.AsArray.Dimension()
+		return v.AsArray.DimensionSess(s)
 	}
 	// C++ base Variable returns 0; IsArray without AsArray is broken IR sticky
 	// (no invent non-zero dim from ArraySizes / soft re-pick NeedNestedLoop past hole)

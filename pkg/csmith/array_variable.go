@@ -212,8 +212,13 @@ func CreateArrayVariable(
 // Dimension returns get_dimension.
 // ArrayVariable always live at get_dimension; sticky 0 (no invent dim soft-skip past hole).
 func (av *ArrayVariable) Dimension() int {
+	return av.DimensionSess(nil)
+}
+
+// DimensionSess is Dimension with explicit session residual sticky.
+func (av *ArrayVariable) DimensionSess(s *Session) int {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	return len(av.Sizes)
@@ -222,13 +227,18 @@ func (av *ArrayVariable) Dimension() int {
 // TotalSize is product of sizes.
 // ArrayVariable always live; sticky 0 (no invent empty-size soft-skip past hole).
 func (av *ArrayVariable) TotalSize() int {
+	return av.TotalSizeSess(nil)
+}
+
+// TotalSizeSess is TotalSize with explicit session residual sticky.
+func (av *ArrayVariable) TotalSizeSess(s *Session) int {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
 	n := 1
-	for _, s := range av.Sizes {
-		n *= s
+	for _, sz := range av.Sizes {
+		n *= sz
 	}
 	return n
 }
@@ -236,14 +246,19 @@ func (av *ArrayVariable) TotalSize() int {
 // IsGlobal for arrays: name prefix g_ (same as Variable).
 // ArrayVariable always live; sticky incomplete no invent not-global soft-skip.
 func (av *ArrayVariable) IsGlobal() bool {
+	return av.IsGlobalSess(nil)
+}
+
+// IsGlobalSess is IsGlobal with explicit session residual sticky.
+func (av *ArrayVariable) IsGlobalSess(s *Session) bool {
 	// residual sticky via Variable.IsGlobal
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := av.Variable.IsGlobal()
+	ok := av.Variable.IsGlobalSess(s)
 	// residual ERROR sticky — no invent soft-global past Variable.IsGlobal residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return ok
@@ -660,17 +675,22 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 // sticky no invent pad empty holes or empty Constant "0" stand-ins
 // ArrayVariable always live; sticky (no invent soft-skip index set past hole).
 func (av *ArrayVariable) SetIndex(index int, expr string) {
+	av.SetIndexSess(nil, index, expr)
+}
+
+// SetIndexSess is SetIndex with explicit session residual sticky.
+func (av *ArrayVariable) SetIndexSess(s *Session, index int, expr string) {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if index < 0 || expr == "" {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	// C++ indices[index] — sticky no grow past end with empty pad slots
 	if index > len(av.Indices) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	con := &Expression{
@@ -690,7 +710,7 @@ func (av *ArrayVariable) SetIndex(index int, expr string) {
 		av.IndexExprs = append(av.IndexExprs, con)
 	} else {
 		// index > len(IndexExprs): lag hole sticky — leave IndexExprs unchanged
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 	}
 }
 
@@ -711,7 +731,7 @@ func (av *ArrayVariable) SetIndexExprSess(s *Session, index int, e *Expression) 
 		return
 	}
 	// sticky no soft invent "0" for nil/empty Output (C++ uses Expression* directly)
-	str := e.Output()
+	str := e.OutputOptsSess(s, sessOpts(s))
 	// residual ERROR sticky — no invent soft-continue set-index past Output residual
 	if sessHasError(s) {
 		return
@@ -748,13 +768,18 @@ func (av *ArrayVariable) SetIndexExprSess(s *Session, index int, e *Expression) 
 // ArrayVariable always live; sticky (no invent soft-skip add past hole).}
 
 func (av *ArrayVariable) AddIndex(expr string) {
+	av.AddIndexSess(nil, expr)
+}
+
+// AddIndexSess is AddIndex with explicit session residual sticky.
+func (av *ArrayVariable) AddIndexSess(s *Session, expr string) {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if expr == "" {
 		// empty index string is broken IR sticky; no invent empty Constant shell
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	av.Indices = append(av.Indices, expr)
@@ -767,26 +792,31 @@ func (av *ArrayVariable) AddIndex(expr string) {
 // ArrayVariable.cpp:227 — indices.push_back(e); sticky no soft invent "0".
 // ArrayVariable always live; sticky (no invent soft-skip add past hole).
 func (av *ArrayVariable) AddIndexExpr(e *Expression) {
+	av.AddIndexExprSess(nil, e)
+}
+
+// AddIndexExprSess is AddIndexExpr with explicit session residual sticky.
+func (av *ArrayVariable) AddIndexExprSess(s *Session, e *Expression) {
 	if av == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	if e == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return
 	}
-	s := e.Output()
+	out := e.OutputOptsSess(s, sessOpts(s))
 	// residual ERROR sticky — no invent soft-continue add-index past Output residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return
 	}
 	// incomplete index IR sticky — no invent empty bracket token
-	if s == "" {
-		sessNoteError(nil, ErrGeneric)
+	if out == "" {
+		sessNoteError(s, ErrGeneric)
 		return
 	}
 	av.IndexExprs = append(av.IndexExprs, e)
-	av.Indices = append(av.Indices, s)
+	av.Indices = append(av.Indices, out)
 }
 
 // Session.ArrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
@@ -1278,13 +1308,18 @@ func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelecto
 // ArrayVariable/Type always live; sticky 0 (no invent zero-size soft-skip past hole).}
 
 func (av *ArrayVariable) SizeInBytesArray() int {
+	return av.SizeInBytesArraySess(nil)
+}
+
+// SizeInBytesArraySess is SizeInBytesArray with explicit session residual sticky.
+func (av *ArrayVariable) SizeInBytesArraySess(s *Session) int {
 	if av == nil || av.Type == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return 0
 	}
-	n := av.Type.SizeInBytes()
+	n := av.Type.SizeInBytesSess(s)
 	// residual ERROR sticky — no invent soft-zero size past SizeInBytes residual
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return 0
 	}
 	for _, sz := range av.Sizes {
@@ -1486,8 +1521,13 @@ func (av *ArrayVariable) OutputIndexModuloSess(s *Session, i int, idx *Expressio
 // Fail closed sticky: always nil (no invent variant/offset mutation / soft re-pick).}
 
 func (av *ArrayVariable) RndMutate(r *Rng) *ArrayVariable {
+	return av.RndMutateSess(nil, r)
+}
+
+// RndMutateSess is RndMutate with explicit session residual sticky.
+func (av *ArrayVariable) RndMutateSess(s *Session, r *Rng) *ArrayVariable {
 	_ = r
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return nil
 }
 
@@ -1495,8 +1535,13 @@ func (av *ArrayVariable) RndMutate(r *Rng) *ArrayVariable {
 // VariableSelector.cpp:1552–1554 — assert(0 && "invalid call…"); dead API.
 // Fail closed sticky: always nil (no invent new itemized member from index rewrite).
 func CreateMutatedArrayVar(av *ArrayVariable, newIndices []*Expression) *ArrayVariable {
+	return CreateMutatedArrayVarSess(nil, av, newIndices)
+}
+
+// CreateMutatedArrayVarSess is CreateMutatedArrayVar with explicit session residual sticky.
+func CreateMutatedArrayVarSess(s *Session, av *ArrayVariable, newIndices []*Expression) *ArrayVariable {
 	_ = av
 	_ = newIndices
-	sessNoteError(nil, ErrGeneric)
+	sessNoteError(s, ErrGeneric)
 	return nil
 }

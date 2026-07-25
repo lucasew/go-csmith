@@ -1951,7 +1951,7 @@ func (f *FactPointTo) UpdateWithModifiedIndexSess(s *Session, indexVar *Variable
 		newAV.IsArray = true
 		newAV.AsArray = newAV
 		for _, k := range modified {
-			newAV.SetIndex(k, "-1")
+			newAV.SetIndexSess(s, k, "-1")
 		}
 		// FactPointTo.cpp:740 — pointees[j] = new_av (array root, even if field walked)
 		pointees[j] = &newAV.Variable
