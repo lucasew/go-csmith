@@ -12,10 +12,10 @@
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
 //   - cgSess/vsSess/fmSess/gSess/envSess panic on nil (no dual-fill)
 //   - nil-owner residual sticky: noteErr*/hasErr*/sessFrom* → ambient explicitly
-//   - residual: Filter interface duals (ProbabilityFilter.Filter → ambient;
-//     VectorFilter.Filter → vfSess); noteErr*/hasErr*/sessFrom* nil-owner → ambient
-//     (unit-test residual sticky only). sessBK panics on nil. Most dual wrappers deleted.
-//     VectorFilter via f.Sess; rSess panics on nil/unset
+//   - residual: Filter() interface duals (ProbabilityFilter → throwaway NewSession;
+//     VectorFilter → vfSess which panics if Sess unset). noteErr*/hasErr*/sessFrom*
+//     nil-owner → ambient (unit-test residual sticky only). sessBK/vfSess/rSess panic
+//     on nil/unset. Most dual wrappers deleted.
 //   - NewVariableSelector requires *Session (no ambient install)
 //   - CVQualifiers + statement_meta + Effect + Variable duals deleted (*Sess only)
 //   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set

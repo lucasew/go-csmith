@@ -28,7 +28,7 @@ const (
 // C++: kinds_ bitset all-set in Filter ctor; VectorFilter holds vs_, ptable, mode_.
 type VectorFilter struct {
 	// Sess is the residual sticky bag from New*Sess (Generate run bag or test ambient).
-	// Non-Sess dual methods (Filter for interface, Add/MaxProb/Lookup) use vfSess.
+	// Filter() interface dual uses vfSess (requires Sess set). Other duals deleted.
 	Sess *Session
 
 	// kinds mirrors Filter::kinds_ — index by FilterKind; true = enabled for that mode.
@@ -47,13 +47,16 @@ type VectorFilter struct {
 	modeKindSet bool
 }
 
-// vfSess returns f.Sess. Nil f or unset Sess → testAmbientSession (unit-test nil /
-// Filter-interface dual only). Prefer *Sess methods with explicit bag.
+// vfSess returns f.Sess. Nil f or unset Sess panics — no ambient dual-fill.
+// Filter-interface dual Filter() requires f.Sess set (NewVectorFilter*Sess).
 func vfSess(f *VectorFilter) *Session {
-	if f != nil && f.Sess != nil {
-		return f.Sess
+	if f == nil {
+		panic("vfSess: nil VectorFilter")
 	}
-	return testAmbientSession
+	if f.Sess == nil {
+		panic("vfSess: Sess unset (use NewVectorFilterSess / NewVectorFilterItemsSess)")
+	}
+	return f.Sess
 }
 
 // NewVectorFilterSess is NewVectorFilter with current_kind snapshotted from bag opts.
@@ -89,11 +92,7 @@ func (f *VectorFilter) snapModeKind(s *Session) {
 	f.modeKindSet = true
 }
 
-// Enable routes residual sticky via vfSess (f.Sess or unit-test ambient).
-// Prefer EnableSess with an explicit bag.
-func (f *VectorFilter) Enable(kind FilterKind) {
-	f.EnableSess(vfSess(f), kind)
-}
+// Non-Sess Enable deleted — pass run bag or testAmbientSession explicitly.
 
 // EnableSess is Enable with explicit session residual sticky.
 func (f *VectorFilter) EnableSess(s *Session, kind FilterKind) {
@@ -107,10 +106,7 @@ func (f *VectorFilter) EnableSess(s *Session, kind FilterKind) {
 	f.kinds[kind] = true
 }
 
-// Disable routes residual sticky via vfSess (f.Sess or unit-test ambient).
-func (f *VectorFilter) Disable(kind FilterKind) {
-	f.DisableSess(vfSess(f), kind)
-}
+// Non-Sess Disable deleted — pass run bag or testAmbientSession explicitly.
 
 // DisableSess is Disable with explicit session residual sticky.
 func (f *VectorFilter) DisableSess(s *Session, kind FilterKind) {
@@ -127,10 +123,7 @@ func (f *VectorFilter) DisableSess(s *Session, kind FilterKind) {
 // CurrentKind mirrors Filter::current_kind.
 // Filter.cpp:63–68 — random_based → fDefault; dfs_exhaustive → fDFS; else MAX.
 
-// CurrentKindSess is CurrentKind with explicit session residual sticky.
-func (f *VectorFilter) CurrentKind() FilterKind {
-	return f.CurrentKindSess(vfSess(f))
-}
+// Non-Sess CurrentKind deleted — pass run bag or testAmbientSession explicitly.
 
 func (f *VectorFilter) CurrentKindSess(s *Session) FilterKind {
 	return f.CurrentKindOpts(sessOpts(s))
@@ -150,10 +143,7 @@ func (f *VectorFilter) CurrentKindOpts(o Options) FilterKind {
 // ValidFilter mirrors Filter::valid_filter.
 // Filter.cpp:74–79 — kinds_.test(current_kind); false if kind is MAX or disabled.
 
-// ValidFilterSess is ValidFilter with explicit session residual sticky.
-func (f *VectorFilter) ValidFilter() bool {
-	return f.ValidFilterSess(vfSess(f))
-}
+// Non-Sess ValidFilter deleted — pass run bag or testAmbientSession explicitly.
 
 func (f *VectorFilter) ValidFilterSess(s *Session) bool {
 	if f == nil {
@@ -188,10 +178,7 @@ func (f *VectorFilter) AddSess(s *Session, item int) *VectorFilter {
 	return f
 }
 
-// Add routes residual sticky via vfSess (f.Sess or unit-test ambient).
-func (f *VectorFilter) Add(item int) *VectorFilter {
-	return f.AddSess(vfSess(f), item)
-}
+// Non-Sess Add deleted — pass run bag or testAmbientSession explicitly.
 
 // MaxProb mirrors VectorFilter::get_max_prob.
 // VectorFilter.cpp:75–77 — ptable ? ptable->get_max() : 100.
@@ -209,10 +196,7 @@ func (f *VectorFilter) MaxProbSess(s *Session) int {
 	return f.table.MaxSess(s)
 }
 
-// MaxProb routes residual sticky via vfSess (f.Sess or unit-test ambient).
-func (f *VectorFilter) MaxProb() int {
-	return f.MaxProbSess(vfSess(f))
-}
+// Non-Sess MaxProb deleted — pass run bag or testAmbientSession explicitly.
 
 // Lookup mirrors VectorFilter::lookup.
 // VectorFilter.cpp:79–83 — if !valid_filter() || ptable==nullptr return v;
@@ -230,10 +214,7 @@ func (f *VectorFilter) LookupSess(s *Session, v int) int {
 	return f.table.RndNumToKeySess(s, v)
 }
 
-// Lookup routes residual sticky via vfSess (f.Sess or unit-test ambient).
-func (f *VectorFilter) Lookup(v int) int {
-	return f.LookupSess(vfSess(f), v)
-}
+// Non-Sess Lookup deleted — pass run bag or testAmbientSession explicitly.
 
 // Filter implements Filter interface (RndUptoFilterSess type assert).
 // Routes residual sticky via vfSess (f.Sess when set by New*Sess).

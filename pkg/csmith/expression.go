@@ -943,8 +943,8 @@ func ExpressionTypeProbabilitySess(s *Session, r *Rng, filter *VectorFilter) Ter
 		sessNoteError(s, ErrGeneric)
 		return MaxTermTypes
 	}
-	i := r.RndUptoFilterSess(s, uint32(filter.MaxProb()), filter)
-	return TermType(filter.Lookup(int(i)))
+	i := r.RndUptoFilterSess(s, uint32(filter.MaxProbSess(s)), filter)
+	return TermType(filter.LookupSess(s, int(i)))
 }
 
 // PickTermType builds default filters for Expression::make_random when tt==MAX.

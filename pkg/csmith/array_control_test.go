@@ -175,11 +175,11 @@ func TestVectorFilterNilTableMatchesCPP(t *testing.T) {
 	// kinds all set (Filter ctor) → valid in random mode
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterSess(testAmbientSession, nil)
-	if f.MaxProb() != 100 {
-		t.Fatalf("nil ptable MaxProb: got %d want 100 (VectorFilter.cpp:75–77)", f.MaxProb())
+	if f.MaxProbSess(testAmbientSession) != 100 {
+		t.Fatalf("nil ptable MaxProb: got %d want 100 (VectorFilter.cpp:75–77)", f.MaxProbSess(testAmbientSession))
 	}
-	if f.Lookup(5) != 5 {
-		t.Fatalf("nil ptable Lookup: got %d want identity 5", f.Lookup(5))
+	if f.LookupSess(testAmbientSession, 5) != 5 {
+		t.Fatalf("nil ptable Lookup: got %d want identity 5", f.LookupSess(testAmbientSession, 5))
 	}
 	// empty FilterOut set → never rejects
 	if f.Filter(0) {
@@ -376,7 +376,7 @@ func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
 
 func TestVectorFilterNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*VectorFilter)(nil).MaxProb() != 0 {
+	if (*VectorFilter)(nil).MaxProbSess(testAmbientSession) != 0 {
 		t.Fatal("nil MaxProb must return 0")
 	}
 	if !HasErrorSess(testAmbientSession) {

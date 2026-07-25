@@ -98,7 +98,9 @@ func newProbabilityFilterOwned(p *Probabilities, pname ProbName) *ProbabilityFil
 // Generation prefers type-assert FilterSess in RndUptoFilterSess.
 // Probabilities.cpp:59–81.
 func (f *ProbabilityFilter) Filter(v uint32) bool {
-	return f.FilterSess(testAmbientSession, v)
+	// Interface dual: throwaway bag — no ambient write. Generation type-asserts
+	// *ProbabilityFilter and calls FilterSess with the run bag.
+	return f.FilterSess(NewSession(Defaults()), v)
 }
 
 // FilterSess is Filter with explicit session residual sticky.

@@ -8,11 +8,11 @@ func TestFilterCtorEnablesAllKinds(t *testing.T) {
 	// Filter.cpp:40 — kinds_.set() all true
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterSess(testAmbientSession, nil)
-	if !f.ValidFilter() {
+	if !f.ValidFilterSess(testAmbientSession) {
 		t.Fatal("default ctor valid_filter true in random mode")
 	}
-	if f.CurrentKind() != FilterKindDefault {
-		t.Fatalf("current_kind random: got %d", f.CurrentKind())
+	if f.CurrentKindSess(testAmbientSession) != FilterKindDefault {
+		t.Fatalf("current_kind random: got %d", f.CurrentKindSess(testAmbientSession))
 	}
 }
 
@@ -20,16 +20,16 @@ func TestFilterDisableDefaultInvalidatesRandom(t *testing.T) {
 	// Filter.cpp:55–57 disable; 74–79 valid_filter
 	SetProcessOptionsSess(testAmbientSession, Defaults()) // RandomBased
 	f := NewVectorFilterSess(testAmbientSession, nil)
-	f.Disable(FilterKindDefault)
-	if f.ValidFilter() {
+	f.DisableSess(testAmbientSession, FilterKindDefault)
+	if f.ValidFilterSess(testAmbientSession) {
 		t.Fatal("after disable(fDefault), valid_filter false in random mode")
 	}
 	// VectorFilter.cpp:59–60 — invalid filter never rejects
 	if f.Filter(0) || f.Filter(99) {
 		t.Fatal("invalid filter must return false (accept)")
 	}
-	f.Enable(FilterKindDefault)
-	if !f.ValidFilter() {
+	f.EnableSess(testAmbientSession, FilterKindDefault)
+	if !f.ValidFilterSess(testAmbientSession) {
 		t.Fatal("enable restores valid_filter")
 	}
 }
@@ -41,11 +41,11 @@ func TestFilterCurrentKindDFS(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, o)
 	defer SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := NewVectorFilterSess(testAmbientSession, nil)
-	if f.CurrentKind() != FilterKindDFS {
-		t.Fatalf("dfs current_kind: got %d", f.CurrentKind())
+	if f.CurrentKindSess(testAmbientSession) != FilterKindDFS {
+		t.Fatalf("dfs current_kind: got %d", f.CurrentKindSess(testAmbientSession))
 	}
-	f.Disable(FilterKindDFS)
-	if f.ValidFilter() {
+	f.DisableSess(testAmbientSession, FilterKindDFS)
+	if f.ValidFilterSess(testAmbientSession) {
 		t.Fatal("disable fDFS must invalidate in dfs mode")
 	}
 }
@@ -99,8 +99,8 @@ func TestVectorFilterLookupWithTable(t *testing.T) {
 	if f.Filter(50) {
 		t.Fatal("raw 50 → key 20 should accept")
 	}
-	if f.MaxProb() != 100 {
-		t.Fatalf("MaxProb: got %d want 100", f.MaxProb())
+	if f.MaxProbSess(testAmbientSession) != 100 {
+		t.Fatalf("MaxProb: got %d want 100", f.MaxProbSess(testAmbientSession))
 	}
 }
 

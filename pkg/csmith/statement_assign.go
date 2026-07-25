@@ -79,8 +79,8 @@ func AssignOpsProbabilitySess(s *Session, r *Rng, opts Options, table *Distribut
 			f.AddSess(s, int(AssignPreIncr)).AddSess(s, int(AssignPreDecr)).AddSess(s, int(AssignPostIncr)).AddSess(s, int(AssignPostDecr))
 		}
 	}
-	v := r.RndUptoFilterSess(s, uint32(f.MaxProb()), f)
-	return AssignOp(f.Lookup(int(v)))
+	v := r.RndUptoFilterSess(s, uint32(f.MaxProbSess(s)), f)
+	return AssignOp(f.LookupSess(s, int(v)))
 }
 
 // SafeAssign mirrors StatementAssign::safe_assign — bit ops need no overflow wrap.
