@@ -21,8 +21,13 @@ func KleeOutputHeader() string {
 
 // KleeOutputSymbolics mirrors KleeExtension::output_symbolics.
 func KleeOutputSymbolics(values []*ExtensionValue) string {
+	return KleeOutputSymbolicsSess(nil, values)
+}
+
+// KleeOutputSymbolicsSess is KleeOutputSymbolics with explicit session residual sticky.
+func KleeOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -41,13 +46,18 @@ func KleeOutputSymbolics(values []*ExtensionValue) string {
 
 // KleeOutputInit mirrors KleeExtension::OutputInit.
 func KleeOutputInit(values []*ExtensionValue) string {
+	return KleeOutputInitSess(nil, values)
+}
+
+// KleeOutputInitSess is KleeOutputInit with explicit session residual sticky.
+func KleeOutputInitSess(s *Session, values []*ExtensionValue) string {
 	var b strings.Builder
 	b.WriteString("int main(void)\n{\n")
-	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
-	if sessHasError(nil) {
+	b.WriteString(AbsExtensionDefaultOutputDefinitionsSess(s, values, false))
+	if sessHasError(s) {
 		return ""
 	}
-	b.WriteString(KleeOutputSymbolics(values))
+	b.WriteString(KleeOutputSymbolicsSess(s, values))
 	return b.String()
 }
 
@@ -64,11 +74,16 @@ const CrestInputBaseName = "CREST_"
 // CrestTypeToString mirrors CrestExtension::type_to_string.
 // CrestExtension.cpp:52–78 — simple types only; sticky "" on non-simple.
 func CrestTypeToString(t *Type) string {
-	if t == nil || !t.IsSimple() {
-		sessNoteError(nil, ErrGeneric)
+	return CrestTypeToStringSess(nil, t)
+}
+
+// CrestTypeToStringSess is CrestTypeToString with explicit session residual sticky.
+func CrestTypeToStringSess(s *Session, t *Type) string {
+	if t == nil || !t.IsSimpleSess(s) {
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	switch t.Simple() {
+	switch t.SimpleSess(s) {
 	case EChar:
 		return "char"
 	case EUChar:
@@ -86,21 +101,26 @@ func CrestTypeToString(t *Type) string {
 	case EULong:
 		return "unsigned_int"
 	default:
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 }
 
 // CrestOutputSymbolics mirrors CrestExtension::output_symbolics.
 func CrestOutputSymbolics(values []*ExtensionValue) string {
+	return CrestOutputSymbolicsSess(nil, values)
+}
+
+// CrestOutputSymbolicsSess is CrestOutputSymbolics with explicit session residual sticky.
+func CrestOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 	if !extensionValuesComplete(values) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
 	for _, value := range values {
-		ts := CrestTypeToString(value.Type)
-		if sessHasError(nil) || ts == "" {
+		ts := CrestTypeToStringSess(s, value.Type)
+		if sessHasError(s) || ts == "" {
 			return ""
 		}
 		b.WriteString(AbsExtensionTab)
@@ -115,13 +135,18 @@ func CrestOutputSymbolics(values []*ExtensionValue) string {
 
 // CrestOutputInit mirrors CrestExtension::OutputInit.
 func CrestOutputInit(values []*ExtensionValue) string {
+	return CrestOutputInitSess(nil, values)
+}
+
+// CrestOutputInitSess is CrestOutputInit with explicit session residual sticky.
+func CrestOutputInitSess(s *Session, values []*ExtensionValue) string {
 	var b strings.Builder
 	b.WriteString("int main(void)\n{\n")
-	b.WriteString(AbsExtensionDefaultOutputDefinitions(values, false))
-	if sessHasError(nil) {
+	b.WriteString(AbsExtensionDefaultOutputDefinitionsSess(s, values, false))
+	if sessHasError(s) {
 		return ""
 	}
-	b.WriteString(CrestOutputSymbolics(values))
+	b.WriteString(CrestOutputSymbolicsSess(s, values))
 	return b.String()
 }
 
@@ -189,7 +214,7 @@ func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSiz
 		return ""
 	}
 	if inputsSize == 1 {
-		return tests[base].Output()
+		return tests[base].OutputOptsSess(s, sessOpts(s))
 	}
 	var b strings.Builder
 	lenN := 0
@@ -200,7 +225,7 @@ func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSiz
 			b.WriteString(AbsExtensionTab)
 			b.WriteString(AbsExtensionTab)
 		}
-		o := tests[i].Output()
+		o := tests[i].OutputOptsSess(s, sessOpts(s))
 		if sessHasError(s) || o == "" {
 			return ""
 		}
@@ -213,7 +238,7 @@ func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSiz
 		b.WriteString(AbsExtensionTab)
 		b.WriteString(AbsExtensionTab)
 	}
-	o := tests[last].Output()
+	o := tests[last].OutputOptsSess(s, sessOpts(s))
 	if sessHasError(s) || o == "" {
 		return ""
 	}
@@ -250,7 +275,7 @@ func CoverageOutputDeclsSess(s *Session, values []*ExtensionValue, tests []*Cons
 		b.WriteString(" ")
 		b.WriteString(fmt.Sprintf("%s%d", CoverageArrayBaseName, count))
 		b.WriteString(fmt.Sprintf("[%d] = {", inputsSize))
-		init := CoverageOutputArrayInit(tests, count, inputsSize)
+		init := CoverageOutputArrayInitSess(s, tests, count, inputsSize)
 		if sessHasError(s) {
 			return ""
 		}
@@ -267,8 +292,13 @@ func CoverageOutputDeclsSess(s *Session, values []*ExtensionValue, tests []*Cons
 // CoverageOutputFirstFunInvocation mirrors OutputFirstFunInvocation.}
 
 func CoverageOutputFirstFunInvocation(values []*ExtensionValue, invokeOut string, inputsSize int) string {
+	return CoverageOutputFirstFunInvocationSess(nil, values, invokeOut, inputsSize)
+}
+
+// CoverageOutputFirstFunInvocationSess is CoverageOutputFirstFunInvocation with explicit session residual sticky.
+func CoverageOutputFirstFunInvocationSess(s *Session, values []*ExtensionValue, invokeOut string, inputsSize int) string {
 	if !extensionValuesComplete(values) || invokeOut == "" || inputsSize <= 0 {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -303,9 +333,14 @@ func CoverageOutputFirstFunInvocation(values []*ExtensionValue, invokeOut string
 
 // CoverageOutputInit mirrors CoverageTestExtension::OutputInit.
 func CoverageOutputInit(values []*ExtensionValue, tests []*Constant, inputsSize int) string {
+	return CoverageOutputInitSess(nil, values, tests, inputsSize)
+}
+
+// CoverageOutputInitSess is CoverageOutputInit with explicit session residual sticky.
+func CoverageOutputInitSess(s *Session, values []*ExtensionValue, tests []*Constant, inputsSize int) string {
 	var b strings.Builder
 	b.WriteString("int main(void)\n{\n")
-	b.WriteString(CoverageOutputDecls(values, tests, inputsSize))
+	b.WriteString(CoverageOutputDeclsSess(s, values, tests, inputsSize))
 	return b.String()
 }
 

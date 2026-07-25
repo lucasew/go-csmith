@@ -360,11 +360,11 @@ func ExtensionMgrOutputInitSess(s *Session, acceptArgc bool) string {
 	if s.ExtensionActive {
 		switch s.ExtKind {
 		case "klee":
-			return KleeOutputInit(s.ExtValues)
+			return KleeOutputInitSess(s, s.ExtValues)
 		case "crest":
-			return CrestOutputInit(s.ExtValues)
+			return CrestOutputInitSess(s, s.ExtValues)
 		case "coverage":
-			return CoverageOutputInit(s.ExtValues, s.CoverageTests, s.CoverageSize)
+			return CoverageOutputInitSess(s, s.ExtValues, s.CoverageTests, s.CoverageSize)
 		default:
 			sessNoteError(s, ErrGeneric)
 			return ""
@@ -394,7 +394,7 @@ func ExtensionMgrOutputFirstFunInvocationSess(s *Session, invokeOut string) stri
 		case "klee", "crest":
 			return AbsExtensionOutputFirstFunInvocation(invokeOut)
 		case "coverage":
-			return CoverageOutputFirstFunInvocation(s.ExtValues, invokeOut, s.CoverageSize)
+			return CoverageOutputFirstFunInvocationSess(s, s.ExtValues, invokeOut, s.CoverageSize)
 		default:
 			sessNoteError(s, ErrGeneric)
 			return ""
